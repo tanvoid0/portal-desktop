@@ -1,0 +1,6 @@
+# Build artifacts
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Generated files
+src-tauri/target/debug/build/

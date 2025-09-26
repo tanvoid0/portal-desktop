@@ -18,6 +18,9 @@ export default defineConfig(
 	prettier,
 	...svelte.configs.prettier,
 	{
+		ignores: ['src-tauri/target/**', 'src-tauri/Cargo.lock']
+	},
+	{
 		languageOptions: {
 			globals: { ...globals.browser, ...globals.node }
 		},
@@ -36,6 +39,12 @@ export default defineConfig(
 				parser: ts.parser,
 				svelteConfig
 			}
+		}
+	},
+	{
+		files: ['src/lib/components/ui/**/*.svelte'],
+		rules: {
+			'svelte/no-navigation-without-resolve': 'off'
 		}
 	}
 );
