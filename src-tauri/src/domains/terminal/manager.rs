@@ -65,7 +65,7 @@ impl TerminalManager {
                 } else if shell_lower.contains("pwsh") || shell_lower == "pwsh.exe" {
                     ("pwsh.exe".to_string(), vec!["-NoLogo".to_string(), "-NoProfile".to_string(), "-NoExit".to_string()])
                 } else if shell_lower.contains("bash") || shell_lower == "bash.exe" {
-                    ("bash.exe".to_string(), vec!["-i".to_string(), "-l".to_string()])
+                    ("bash.exe".to_string(), vec![])
                 } else if shell_lower.contains("wsl") {
                     ("wsl.exe".to_string(), vec![])
                 } else {
@@ -74,9 +74,9 @@ impl TerminalManager {
                 }
             } else {
                 if shell_lower.contains("bash") {
-                    ("bash".to_string(), vec!["-i".to_string(), "-l".to_string()])
+                    ("bash".to_string(), vec![])
                 } else if shell_lower.contains("zsh") {
-                    ("zsh".to_string(), vec!["-i".to_string(), "-l".to_string()])
+                    ("zsh".to_string(), vec![])
                 } else if shell_lower.contains("fish") {
                     ("fish".to_string(), vec![])
                 } else {
