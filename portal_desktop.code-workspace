@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../portal_desktop_old"
+		},
+		{
+			"path": "../portal_terminal"
+		}
+	],
+	"settings": {}
+}

@@ -6,7 +6,15 @@ import { sveltekit } from '@sveltejs/kit/vite';
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit()],
+	plugins: [
+		tailwindcss({
+			safelist: [],
+			safelistPatterns: [],
+			include: ['**/*.css'],
+			exclude: ['**/*.svelte']
+		}),
+		sveltekit()
+	],
 	
 	// Vite options tailored for Tauri development
 	clearScreen: false,

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Terminal, terminalActions } from '$lib/domains/terminal';
+  import { Terminal, terminalActions, terminalStore } from '$lib/domains/terminal';
   import type { TerminalSettings } from '$lib/domains/terminal';
 
   let tabId: string;
@@ -19,7 +19,7 @@
 
   onMount(() => {
     // Create a new terminal tab
-    tabId = terminalActions.createTab('Main Terminal', '/', undefined);
+    tabId = terminalActions.createTab('Terminal', '/', undefined);
   });
 </script>
 
