@@ -56,19 +56,24 @@ impl TerminalManager {
         
         // Determine shell command based on platform and request
         let (shell_cmd, shell_args) = if cfg!(target_os = "windows") {
-            if request.shell.contains("powershell") {
-                ("powershell.exe", vec!["-NoLogo", "-NoProfile"])
-            } else if request.shell.contains("cmd") {
+            if request.shell.contains("cmd") {
                 ("cmd.exe", vec!["/k"])
+            } else if request.shell.contains("powershell") {
+                // Use PowerShell with explicit interactive mode to avoid continuation prompts
+                ("powershell.exe", vec!["-NoLogo", "-NoProfile", "-NoExit"])
+            } else if request.shell.contains("pwsh") {
+                ("pwsh.exe", vec!["-NoLogo", "-NoProfile", "-NoExit"])
             } else {
-                // Default to PowerShell on Windows if shell is not recognized
-                ("powershell.exe", vec!["-NoLogo", "-NoProfile"])
+                // Default to cmd on Windows to avoid PowerShell continuation issues
+                ("cmd.exe", vec!["/k"])
             }
         } else {
             if request.shell.contains("bash") {
                 ("bash", vec!["-i", "-l"])
             } else if request.shell.contains("zsh") {
                 ("zsh", vec!["-i", "-l"])
+            } else if request.shell.contains("fish") {
+                ("fish", vec![])
             } else {
                 // Default to bash on Unix
                 ("bash", vec!["-i", "-l"])
@@ -104,9 +109,16 @@ impl TerminalManager {
             pixel_width: 0,
             pixel_height: 0,
         };
+        
+        println!("Opening PTY with size: {}x{}", size.cols, size.rows);
         let pair = pty_system
             .openpty(size)
-            .map_err(|e| format!("Failed to open PTY: {}", e))?;
+            .map_err(|e| {
+                println!("PTY creation failed: {}", e);
+                format!("Failed to open PTY: {}", e)
+            })?;
+        
+        println!("PTY opened successfully");
 
         let mut cmd = CommandBuilder::new(shell_cmd);
         for a in &shell_args {
@@ -117,10 +129,18 @@ impl TerminalManager {
             cmd.env(k, v);
         }
 
+        println!("Spawning command: {} with args: {:?}", shell_cmd, shell_args);
+        println!("Working directory: {}", request.working_directory);
+        
         let child = pair
             .slave
             .spawn_command(cmd)
-            .map_err(|e| format!("Failed to spawn PTY shell: {}", e))?;
+            .map_err(|e| {
+                println!("Failed to spawn PTY shell: {}", e);
+                format!("Failed to spawn PTY shell: {}", e)
+            })?;
+        
+        println!("Shell spawned successfully");
 
         // PID (if available)
         let pid = child.process_id();
@@ -133,10 +153,13 @@ impl TerminalManager {
         }
 
         // Take writer for input handling and store
-        let mut master = pair.master;
+        let master = pair.master;
         if let Ok(writer) = master.take_writer() {
             let mut stdin_handles = self.stdin_handles.lock().unwrap();
             stdin_handles.insert(process_id.clone(), writer);
+            println!("Stdin writer stored for process: {}", process_id);
+        } else {
+            println!("Warning: Could not take writer from master PTY");
         }
 
         // Store the PTY child for lifecycle management
@@ -164,13 +187,17 @@ impl TerminalManager {
             let mut masters = MASTER_PTYS.lock().unwrap();
             if let Some(m) = masters.get_mut(&process_id) {
                 if let Ok(mut reader) = m.try_clone_reader() {
+                    println!("Starting output streaming for process: {}", process_id);
                     let pid_for_thread = process_id.clone();
                     let window_for_reader = window.clone();
                     std::thread::spawn(move || {
                         let mut buf = [0u8; 8192];
                         loop {
                             match reader.read(&mut buf) {
-                                Ok(0) => break, // EOF
+                                Ok(0) => {
+                                    println!("PTY reader reached EOF for process: {}", pid_for_thread);
+                                    break; // EOF
+                                }
                                 Ok(n) => {
                                     let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
                                     let output = TerminalOutput {
@@ -185,13 +212,17 @@ impl TerminalManager {
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("PTY read error: {}", e);
+                                    eprintln!("PTY read error for process {}: {}", pid_for_thread, e);
                                     break;
                                 }
                             }
                         }
                     });
+                } else {
+                    println!("Warning: Could not clone reader from master PTY");
                 }
+            } else {
+                println!("Warning: Master PTY not found for process: {}", process_id);
             }
         }
 
@@ -228,7 +259,7 @@ impl TerminalManager {
             println!("Successfully sent input to process");
             
             // Small delay to ensure the process has time to process the input
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            std::thread::sleep(std::time::Duration::from_millis(50));
         } else {
             println!("No stdin handle found for process: {}", process_id);
             return Err("No stdin handle found for process".to_string());

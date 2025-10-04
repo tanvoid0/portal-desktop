@@ -13,8 +13,8 @@
     bellSound: false,
     autoClose: true,
     confirmClose: true,
-    defaultShell: 'bash',
-    workingDirectory: '/'
+    defaultShell: navigator.userAgent.includes('Windows') ? 'cmd.exe' : 'bash',
+    workingDirectory: navigator.userAgent.includes('Windows') ? 'C:\\' : '/'
   };
 
   onMount(() => {

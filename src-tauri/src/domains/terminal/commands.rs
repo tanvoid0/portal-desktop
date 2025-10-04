@@ -68,7 +68,7 @@ pub async fn add_command_interceptor(
     interceptor: CommandInterceptor,
     manager: State<'_, TerminalManager>,
 ) -> Result<(), String> {
-    manager.add_command_interceptor(interceptor).await;
+    let _ = manager.add_command_interceptor(interceptor).await;
     Ok(())
 }
 
@@ -77,7 +77,7 @@ pub async fn remove_command_interceptor(
     pattern: String,
     manager: State<'_, TerminalManager>,
 ) -> Result<(), String> {
-    manager.remove_command_interceptor(pattern).await;
+    let _ = manager.remove_command_interceptor(pattern).await;
     Ok(())
 }
 
@@ -86,7 +86,7 @@ pub async fn add_output_parser(
     parser: OutputParser,
     manager: State<'_, TerminalManager>,
 ) -> Result<(), String> {
-    manager.add_output_parser(parser).await;
+    let _ = manager.add_output_parser(parser).await;
     Ok(())
 }
 
@@ -95,7 +95,7 @@ pub async fn remove_output_parser(
     pattern: String,
     manager: State<'_, TerminalManager>,
 ) -> Result<(), String> {
-    manager.remove_output_parser(pattern).await;
+    let _ = manager.remove_output_parser(pattern).await;
     Ok(())
 }
 

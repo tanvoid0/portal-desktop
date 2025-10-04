@@ -11,6 +11,7 @@
   export let initialProfile: string = ''; // Optional profile to start with
 
   let terminal: Terminal;
+  let fitAddon: FitAddon;
   let currentProcess: TerminalProcess | null = null;
   let isConnected = false;
   let outputBuffer = '';
@@ -29,7 +30,8 @@
     fontSize: settings.fontSize,
     fontFamily: settings.fontFamily,
     cursorStyle: settings.cursorStyle,
-    scrollback: settings.scrollbackLines
+    scrollback: settings.scrollbackLines,
+    windowsMode: true
   };
 
   onMount(async () => {
@@ -39,7 +41,7 @@
     
     // Initialize xterm.js terminal
     terminal = new Terminal(options);
-    const fitAddon = new FitAddon();
+    fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     
     // Open terminal in the div
@@ -107,9 +109,13 @@
 
   async function initializeTerminal() {
     try {
+      terminal.write('Connecting to terminal process...\r\n');
+      
       // Use selected profile or fallback to settings
       const shellCommand = availableProfiles.find(p => p.name === selectedProfile)?.command || 
-                          (navigator.userAgent.includes('Windows') ? 'powershell.exe' : 'bash');
+                          (navigator.userAgent.includes('Windows') ? 'cmd.exe' : 'bash');
+      
+      console.log('Creating terminal process with shell:', shellCommand);
       
       // Create real terminal process using domain-specific backend
       currentProcess = await TerminalService.createProcess(tabId, {
@@ -119,42 +125,52 @@
         rows: 24
       });
 
+      console.log('Terminal process created:', currentProcess);
+
       // Subscribe to output
       unsubscribe = await TerminalService.subscribeToOutput(
         currentProcess.id,
         handleOutput
       );
 
+      // After process is ready, send an initial resize to match the renderer
+      try {
+        fitAddon?.fit();
+        TerminalService.resizeTerminal(currentProcess.id, terminal.cols, terminal.rows);
+      } catch (e) {
+        console.warn('Initial resize failed:', e);
+      }
+
       isConnected = true;
-      terminal.write('Portal Desktop Terminal - Full Control Mode\r\n');
-      terminal.write('Connected to real terminal process!\r\n');
-      terminal.write(`Process ID: ${currentProcess.id}\r\n`);
-      terminal.write(`Shell: ${shellCommand}\r\n`);
-      terminal.write(`Working Directory: ${settings.workingDirectory}\r\n`);
-      terminal.write('Type commands and press Enter to execute them.\r\n');
-      terminal.write('Commands are intercepted and output is parsed.\r\n\r\n');
+      terminal.write('\r\n✅ Portal Desktop Terminal - Connected!\r\n');
+      terminal.write(`🔧 Shell: ${shellCommand}\r\n`);
+      terminal.write(`📁 Working Directory: ${settings.workingDirectory}\r\n`);
+      terminal.write(`🆔 Process ID: ${currentProcess.id.slice(0, 8)}...\r\n`);
+      terminal.write('💡 Type commands and press Enter to execute them.\r\n');
+      terminal.write('🎯 Commands are intercepted and output is parsed.\r\n\r\n');
       
       // Send a command to get the shell to show a prompt
       setTimeout(() => {
         if (currentProcess) {
           console.log('Sending test command to process:', currentProcess.id);
-          TerminalService.sendInput(currentProcess.id, 'echo "Terminal ready"\r\n').catch(error => {
+          TerminalService.sendInput(currentProcess.id, 'echo "🚀 Terminal ready for commands!"\r\n').catch(error => {
             console.error('Failed to send test command:', error);
           });
         }
       }, 100);
     } catch (error) {
       console.error('Failed to initialize terminal:', error);
-      terminal.write('Failed to connect to terminal process!\r\n');
-      terminal.write('Falling back to simulated terminal...\r\n\r\n');
+      terminal.write('\r\n❌ Failed to connect to terminal process!\r\n');
+      terminal.write('🔄 Falling back to simulated terminal...\r\n\r\n');
       setupSimulatedTerminal();
     }
   }
 
   function setupSimulatedTerminal() {
-    terminal.write('Welcome to Portal Desktop Terminal!\r\n');
-    terminal.write('Type commands and press Enter to execute them.\r\n');
-    terminal.write('Available commands: help, clear, echo, ls, pwd, whoami, date\r\n\r\n');
+    terminal.write('🎉 Welcome to Portal Desktop Terminal!\r\n');
+    terminal.write('💡 Type commands and press Enter to execute them.\r\n');
+    terminal.write('📋 Available commands: help, clear, echo, ls, pwd, whoami, date, connect\r\n');
+    terminal.write('🔧 Try typing "connect" to attempt a real terminal connection.\r\n\r\n');
     writePrompt();
   }
 
@@ -164,6 +180,9 @@
 
     // Handle resize
     window.addEventListener('resize', () => {
+      if (!terminal) return;
+      // Fit the renderer to the container first, then notify backend
+      fitAddon?.fit();
       if (currentProcess) {
         TerminalService.resizeTerminal(currentProcess.id, terminal.cols, terminal.rows);
       }
@@ -171,52 +190,27 @@
   }
 
   function onData(data: string) {
-    // Parse the data if it's a JSON string (happens when data is wrapped in quotes)
-    let processedData = data;
-    try {
-      // Check if data is wrapped in quotes and parse it
-      if ((data.startsWith('"') && data.endsWith('"')) || 
-          (data.startsWith("'") && data.endsWith("'"))) {
-        processedData = JSON.parse(`"${data.slice(1, -1)}"`);
-      }
-    } catch (e) {
-      console.warn('Failed to parse input data:', e);
+    // Forward keystrokes directly to the PTY when connected to avoid double-echo
+    // and to allow the shell to handle line editing/history.
+    let chunk = data;
+
+    // Normalize Enter/newline across platforms: always send CRLF to the PTY on Enter
+    if (chunk === '\n' || chunk === '\r') {
+      chunk = '\r\n';
     }
-    
+
     if (isConnected && currentProcess) {
-      // Handle special control characters
-      if (processedData === '\r' || processedData === '\n') {
-        // Enter pressed - send the buffered command
-        if (inputBuffer.trim()) {
-          console.log('Sending complete command to process:', currentProcess.id, 'command:', inputBuffer);
-          TerminalService.sendInput(currentProcess.id, inputBuffer + '\r').catch(error => {
-            console.error('Failed to send input:', error);
-          });
-          inputBuffer = '';
-        }
-      } else if (processedData === '\x7f' || processedData === '\b' || processedData === '\u007f') {
-        // Backspace - remove last character from buffer and terminal
-        if (inputBuffer.length > 0) {
-          inputBuffer = inputBuffer.slice(0, -1);
-          terminal.write('\b \b');
-        }
-      } else if (processedData === '\x03') {
-        // Ctrl+C - send interrupt signal
-        console.log('Sending Ctrl+C to process:', currentProcess.id);
-        TerminalService.sendInput(currentProcess.id, '\x03').catch(error => {
-          console.error('Failed to send Ctrl+C:', error);
+      // Add a small delay to ensure proper input handling
+      setTimeout(() => {
+        TerminalService.sendInput(currentProcess.id, chunk).catch((error) => {
+          console.error('Failed to send input:', error);
         });
-        inputBuffer = '';
-      } else if (processedData.length > 0 && processedData !== '\x1b') {
-        // Regular character - add to buffer and echo to terminal
-        inputBuffer += processedData;
-        terminal.write(processedData);
-      }
-    } else {
-      console.log('Not connected, using simulated terminal');
-      // Handle simulated terminal
-      handleSimulatedInput(data);
+      }, 10);
+      return;
     }
+
+    // Fallback simulated terminal when not connected
+    handleSimulatedInput(data);
   }
 
   function onKey(data: { key: string; domEvent: KeyboardEvent }) {
@@ -260,31 +254,56 @@
         terminal.clear();
         break;
       case 'help':
-        terminal.write('Available commands:\r\n');
-        terminal.write('  clear - Clear the terminal\r\n');
-        terminal.write('  help - Show this help message\r\n');
-        terminal.write('  echo <text> - Echo text\r\n');
-        terminal.write('  ls - List files\r\n');
-        terminal.write('  pwd - Show current directory\r\n');
-        terminal.write('  whoami - Show current user\r\n');
-        terminal.write('  date - Show current date\r\n');
-        terminal.write('  connect - Try to connect to real terminal\r\n');
+        terminal.write('📚 Available commands:\r\n');
+        terminal.write('  🧹 clear - Clear the terminal\r\n');
+        terminal.write('  ❓ help - Show this help message\r\n');
+        terminal.write('  📢 echo <text> - Echo text\r\n');
+        terminal.write('  📁 ls - List files\r\n');
+        terminal.write('  📍 pwd - Show current directory\r\n');
+        terminal.write('  👤 whoami - Show current user\r\n');
+        terminal.write('  📅 date - Show current date\r\n');
+        terminal.write('  🔌 connect - Try to connect to real terminal\r\n');
+        terminal.write('  🎯 status - Show terminal status\r\n');
         break;
       case 'connect':
-        terminal.write('Attempting to connect to real terminal...\r\n');
+        terminal.write('🔌 Attempting to connect to real terminal...\r\n');
         initializeTerminal();
+        break;
+      case 'status':
+        terminal.write('📊 Terminal Status:\r\n');
+        terminal.write(`  🔗 Connected: ${isConnected ? '✅ Yes' : '❌ No'}\r\n`);
+        terminal.write(`  🆔 Process ID: ${currentProcess?.id.slice(0, 8) || 'None'}...\r\n`);
+        terminal.write(`  🖥️  Shell: ${currentProcess?.command || 'Simulated'}\r\n`);
+        terminal.write(`  📁 Working Dir: ${settings.workingDirectory}\r\n`);
+        break;
+      case 'ls':
+        terminal.write('📁 Directory listing (simulated):\r\n');
+        terminal.write('  📄 file1.txt\r\n');
+        terminal.write('  📄 file2.txt\r\n');
+        terminal.write('  📁 folder1/\r\n');
+        terminal.write('  📁 folder2/\r\n');
+        break;
+      case 'pwd':
+        terminal.write(`📍 Current directory: ${settings.workingDirectory}\r\n`);
+        break;
+      case 'whoami':
+        terminal.write('👤 Current user: portal-user\r\n');
+        break;
+      case 'date':
+        terminal.write(`📅 Current date: ${new Date().toLocaleString()}\r\n`);
         break;
       default:
         if (command.startsWith('echo ')) {
           const text = command.substring(5);
-          terminal.write(text + '\r\n');
+          terminal.write(`📢 ${text}\r\n`);
         } else {
           // Try to execute as a real command using Tauri backend
           try {
             const result = await TerminalService.executeCommand(command);
             terminal.write(result + '\r\n');
           } catch (error) {
-            terminal.write(`Command not found: ${command}\r\n`);
+            terminal.write(`❌ Command not found: ${command}\r\n`);
+            terminal.write('💡 Type "help" to see available commands\r\n');
           }
         }
     }
@@ -392,7 +411,7 @@
         
         {#if currentProcess}
           <div class="text-xs text-gray-400">
-            PID: {currentProcess.id.slice(0, 8)}
+            PID: {currentProcess.pid ?? currentProcess.id.slice(0, 8)}
           </div>
         {/if}
       </div>
@@ -402,8 +421,8 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4 text-xs text-gray-400">
         {#if currentProcess}
-          <span>Shell: {settings.defaultShell}</span>
-          <span>Dir: {settings.workingDirectory}</span>
+          <span>Shell: {currentProcess ? currentProcess.command.split(' ')[0] : settings.defaultShell}</span>
+          <span>Dir: {currentProcess?.working_directory || settings.workingDirectory}</span>
           <span>Size: {terminal?.cols || 80}×{terminal?.rows || 24}</span>
         {/if}
       </div>
@@ -467,16 +486,16 @@
                      </div>
             {#if currentProcess}
               <div class="flex justify-between">
-                <span>Process ID:</span>
-                <span class="font-mono">{currentProcess.id.slice(0, 8)}</span>
+                <span>PID:</span>
+                <span class="font-mono">{currentProcess.pid ?? currentProcess.id.slice(0, 8)}</span>
               </div>
               <div class="flex justify-between">
                 <span>Shell:</span>
-                <span>{settings.defaultShell}</span>
+                <span>{currentProcess ? currentProcess.command.split(' ')[0] : settings.defaultShell}</span>
               </div>
               <div class="flex justify-between">
                 <span>Working Dir:</span>
-                <span class="font-mono text-xs">{settings.workingDirectory}</span>
+                <span class="font-mono text-xs">{currentProcess?.working_directory || settings.workingDirectory}</span>
               </div>
               <div class="flex justify-between">
                 <span>Terminal Size:</span>
