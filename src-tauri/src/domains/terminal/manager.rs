@@ -54,29 +54,35 @@ impl TerminalManager {
         
         println!("Creating process with shell: {}", request.shell);
         
-        // Determine shell command based on platform and request
-        let (shell_cmd, shell_args) = if cfg!(target_os = "windows") {
-            if request.shell.contains("cmd") {
-                ("cmd.exe", vec!["/k"])
-            } else if request.shell.contains("powershell") {
-                // Use PowerShell with explicit interactive mode to avoid continuation prompts
-                ("powershell.exe", vec!["-NoLogo", "-NoProfile", "-NoExit"])
-            } else if request.shell.contains("pwsh") {
-                ("pwsh.exe", vec!["-NoLogo", "-NoProfile", "-NoExit"])
+        // Use the raw shell command and add appropriate arguments internally
+        let (shell_cmd, shell_args) = {
+            let shell_lower = request.shell.to_lowercase();
+            if cfg!(target_os = "windows") {
+                if shell_lower.contains("cmd") || shell_lower == "cmd.exe" {
+                    ("cmd.exe".to_string(), vec!["/k".to_string()])
+                } else if shell_lower.contains("powershell") || shell_lower == "powershell.exe" {
+                    ("powershell.exe".to_string(), vec!["-NoLogo".to_string(), "-NoProfile".to_string(), "-NoExit".to_string()])
+                } else if shell_lower.contains("pwsh") || shell_lower == "pwsh.exe" {
+                    ("pwsh.exe".to_string(), vec!["-NoLogo".to_string(), "-NoProfile".to_string(), "-NoExit".to_string()])
+                } else if shell_lower.contains("bash") || shell_lower == "bash.exe" {
+                    ("bash.exe".to_string(), vec!["-i".to_string(), "-l".to_string()])
+                } else if shell_lower.contains("wsl") {
+                    ("wsl.exe".to_string(), vec![])
+                } else {
+                    // For any other shell, try to use it as-is
+                    (request.shell.clone(), vec![])
+                }
             } else {
-                // Default to cmd on Windows to avoid PowerShell continuation issues
-                ("cmd.exe", vec!["/k"])
-            }
-        } else {
-            if request.shell.contains("bash") {
-                ("bash", vec!["-i", "-l"])
-            } else if request.shell.contains("zsh") {
-                ("zsh", vec!["-i", "-l"])
-            } else if request.shell.contains("fish") {
-                ("fish", vec![])
-            } else {
-                // Default to bash on Unix
-                ("bash", vec!["-i", "-l"])
+                if shell_lower.contains("bash") {
+                    ("bash".to_string(), vec!["-i".to_string(), "-l".to_string()])
+                } else if shell_lower.contains("zsh") {
+                    ("zsh".to_string(), vec!["-i".to_string(), "-l".to_string()])
+                } else if shell_lower.contains("fish") {
+                    ("fish".to_string(), vec![])
+                } else {
+                    // For any other shell, try to use it as-is
+                    (request.shell.clone(), vec![])
+                }
             }
         };
 
@@ -84,7 +90,7 @@ impl TerminalManager {
 
         let process = TerminalProcess {
             id: process_id.clone(),
-            tab_id: "default".to_string(),
+            tab_id: request.tab_id.clone(),
             command: format!("{} {}", shell_cmd, shell_args.join(" ")),
             working_directory: request.working_directory.clone(),
             environment: request.environment.clone(),
@@ -120,17 +126,21 @@ impl TerminalManager {
         
         println!("PTY opened successfully");
 
-        let mut cmd = CommandBuilder::new(shell_cmd);
+        // Use request working directory and environment directly
+        let working_dir = request.working_directory.clone();
+        let environment = request.environment.clone();
+
+        let mut cmd = CommandBuilder::new(&shell_cmd);
         for a in &shell_args {
             cmd.arg(a);
         }
-        cmd.cwd(&request.working_directory);
-        for (k, v) in &request.environment {
+        cmd.cwd(&working_dir);
+        for (k, v) in &environment {
             cmd.env(k, v);
         }
 
         println!("Spawning command: {} with args: {:?}", shell_cmd, shell_args);
-        println!("Working directory: {}", request.working_directory);
+        println!("Working directory: {}", working_dir);
         
         let child = pair
             .slave

@@ -35,6 +35,7 @@ pub struct TerminalCommand {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateProcessRequest {
+    pub tab_id: String,
     pub shell: String,
     pub working_directory: String,
     pub environment: HashMap<String, String>,
