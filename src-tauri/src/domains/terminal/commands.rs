@@ -54,6 +54,20 @@ pub async fn get_terminal_process(
 }
 
 #[command]
+pub async fn get_process_exit_code(
+    process_id: String,
+    manager: State<'_, TerminalManager>,
+) -> Result<Option<i32>, String> {
+    let processes = manager.get_processes();
+    let processes = processes.lock().unwrap();
+    if let Some(process) = processes.get(&process_id) {
+        Ok(process.exit_code)
+    } else {
+        Err(format!("Process {} not found", process_id))
+    }
+}
+
+#[command]
 pub async fn resize_terminal(
     process_id: String,
     cols: u32,
@@ -118,19 +132,24 @@ pub async fn get_system_info() -> Result<serde_json::Value, String> {
 
 async fn get_available_shells() -> Vec<String> {
     let mut shells = Vec::new();
+    println!("Detecting available shells on Windows...");
     
     if cfg!(target_os = "windows") {
-        // Use PowerShell to get all available shells
-        if let Ok(output) = Command::new("powershell")
-            .args(&["-Command", "Get-Command *shell*, *bash*, *cmd*, *pwsh* | Select-Object -ExpandProperty Name | Sort-Object"])
-            .output()
-        {
-            if let Ok(output_str) = String::from_utf8(output.stdout) {
-                for line in output_str.lines() {
-                    let shell = line.trim();
-                    if !shell.is_empty() && !shells.contains(&shell.to_string()) {
-                        shells.push(shell.to_string());
-                    }
+        // Check for specific terminal shells only
+        let terminal_shells = vec![
+            "cmd.exe",
+            "powershell.exe", 
+            "powershell_ise.exe",
+            "pwsh.exe",
+            "bash.exe",
+            "wsl.exe"
+        ];
+        
+        for shell in terminal_shells {
+            if let Ok(_) = Command::new("where").arg(shell).output() {
+                if !shells.contains(&shell.to_string()) {
+                    shells.push(shell.to_string());
+                    println!("Found terminal shell: {}", shell);
                 }
             }
         }
@@ -141,15 +160,20 @@ async fn get_available_shells() -> Vec<String> {
                 if let Ok(entries) = std::fs::read_dir(path_dir) {
                     for entry in entries.flatten() {
                         if let Some(name) = entry.file_name().to_str() {
+                            // Only include known terminal shells
                             if name.ends_with(".exe") && (
-                                name.contains("shell") || 
-                                name.contains("bash") || 
-                                name.contains("cmd") || 
-                                name.contains("pwsh") ||
-                                name.contains("powershell")
+                                name == "cmd.exe" ||
+                                name == "powershell.exe" ||
+                                name == "powershell_ise.exe" ||
+                                name == "pwsh.exe" ||
+                                name == "bash.exe" ||
+                                name == "wsl.exe" ||
+                                name == "zsh.exe" ||
+                                name == "fish.exe"
                             ) {
                                 if !shells.contains(&name.to_string()) {
                                     shells.push(name.to_string());
+                                    println!("Found terminal shell in PATH: {}", name);
                                 }
                             }
                         }
@@ -195,6 +219,7 @@ async fn get_available_shells() -> Vec<String> {
     
     // Fallback to default if none found
     if shells.is_empty() {
+        println!("No shells found, using fallback");
         shells.push(if cfg!(target_os = "windows") { 
             "powershell.exe".to_string() 
         } else { 
@@ -202,6 +227,7 @@ async fn get_available_shells() -> Vec<String> {
         });
     }
     
+    println!("Final shells list: {:?}", shells);
     shells
 }
 

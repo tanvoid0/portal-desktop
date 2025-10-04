@@ -24,6 +24,7 @@ pub fn run() {
             domains::terminal::kill_terminal_process,
             domains::terminal::get_terminal_processes,
             domains::terminal::get_terminal_process,
+            domains::terminal::get_process_exit_code,
             domains::terminal::resize_terminal,
             domains::terminal::add_command_interceptor,
             domains::terminal::remove_command_interceptor,

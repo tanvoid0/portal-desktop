@@ -380,25 +380,44 @@ impl TerminalManager {
     }
 
     fn start_process_monitoring(&self, process_id: String, window: Window) {
+        let processes = self.processes.clone();
         std::thread::spawn(move || {
             loop {
                 std::thread::sleep(std::time::Duration::from_millis(1000));
                 
-                let mut processes = INTERACTIVE_PROCESSES.lock().unwrap();
-                if let Some(child) = processes.get_mut(&process_id) {
+                let mut interactive_processes = INTERACTIVE_PROCESSES.lock().unwrap();
+                if let Some(child) = interactive_processes.get_mut(&process_id) {
                     match child.try_wait() {
                         Ok(Some(status)) => {
-                            println!("Process {} exited with status: {:?}", process_id, status);
+                            // Extract exit code from status
+                            // portable_pty::ExitStatus doesn't expose the raw exit code
+                            // For now, we'll use success/failure, but we can improve this later
+                            let exit_code = if status.success() { 0 } else { 1 };
+                            
+                            // TODO: Find a way to get the actual exit code from portable_pty
+                            // This might require switching to a different PTY library or
+                            // using platform-specific code to get the real exit code
+                            println!("Process {} exited with code: {}", process_id, exit_code);
+                            
+                            // Update process record with exit code
+                            {
+                                let mut process_map = processes.lock().unwrap();
+                                if let Some(proc) = process_map.get_mut(&process_id) {
+                                    proc.exit_code = Some(exit_code);
+                                    proc.status = "exited".to_string();
+                                    proc.end_time = Some(chrono::Utc::now().to_rfc3339());
+                                }
+                            }
                             
                             let output = TerminalOutput {
                                 process_id: process_id.clone(),
-                                content: format!("\nProcess exited: {:?}\n", status),
+                                content: format!("\nProcess exited with code: {}\n", exit_code),
                                 output_type: "exit".to_string(),
                                 timestamp: chrono::Utc::now().to_rfc3339(),
                             };
                             
                             let _ = window.emit("terminal-output", &output);
-                            processes.remove(&process_id);
+                            interactive_processes.remove(&process_id);
                             break;
                         }
                         Ok(None) => {

@@ -4,6 +4,8 @@
   import { FitAddon } from '@xterm/addon-fit';
   import { terminalStore, terminalActions, activeTab, activeProcess } from '../stores/terminalStore';
   import { TerminalService } from '../services/terminalService';
+  import { commandHistoryStore } from '../stores/commandHistoryStore';
+  import CommandHistory from './CommandHistory.svelte';
   import type { TerminalSettings, TerminalProcess, TerminalOutput } from '../types';
   
   export let tabId: string;
@@ -73,27 +75,71 @@
 
   async function loadSystemInfo() {
     try {
+      console.log('🚀 LOADING SYSTEM INFO - NEW CODE IS RUNNING!');
       systemInfo = await TerminalService.getSystemInfo();
+      console.log('System info loaded:', systemInfo);
+      console.log('🔍 System info keys:', Object.keys(systemInfo));
+      console.log('🔍 terminal_profiles exists:', 'terminal_profiles' in systemInfo);
+      console.log('🔍 terminal_profiles value:', systemInfo.terminal_profiles);
+      console.log('🔍 terminal_profiles type:', typeof systemInfo.terminal_profiles);
       
-      // Extract available profiles from native system detection
-      availableProfiles = [];
-      if (systemInfo.terminalProfiles) {
-        Object.entries(systemInfo.terminalProfiles).forEach(([category, profiles]: [string, any]) => {
-          if (category === 'available_shells' && typeof profiles === 'object') {
-            Object.entries(profiles).forEach(([name, profile]: [string, any]) => {
-              availableProfiles.push({
-                name,
-                category,
-                command: profile.command,
-                args: profile.args || [],
-                icon: profile.icon || 'terminal'
-              });
+        // Extract available profiles from native system detection
+        availableProfiles = [];
+        console.log('🔍 Starting profile extraction...');
+        
+        if (systemInfo.terminal_profiles) {
+          console.log('✅ Terminal profiles found:', systemInfo.terminal_profiles);
+          console.log('🔍 Terminal profiles keys:', Object.keys(systemInfo.terminal_profiles));
+          
+          // Process available_shells directly
+          if (systemInfo.terminal_profiles.available_shells) {
+            console.log('✅ Processing available_shells:', systemInfo.terminal_profiles.available_shells);
+            console.log('🔍 Available shells type:', typeof systemInfo.terminal_profiles.available_shells);
+            console.log('🔍 Available shells keys:', Object.keys(systemInfo.terminal_profiles.available_shells));
+            
+            Object.entries(systemInfo.terminal_profiles.available_shells).forEach(([name, profile]: [string, any]) => {
+              console.log(`🔍 Processing profile: ${name}`, profile);
+              if (typeof profile === 'object' && profile.command) {
+                availableProfiles.push({
+                  name,
+                  category: 'available_shells',
+                  command: profile.command,
+                  args: profile.args || [],
+                  icon: profile.icon || 'terminal'
+                });
+                console.log(`✅ Added profile: ${name}`);
+              } else {
+                console.log(`❌ Skipped profile ${name}: invalid structure`, profile);
+              }
             });
+          } else {
+            console.log('❌ available_shells not found in terminal_profiles');
           }
-        });
-      }
+          
+          // Also process other categories
+          Object.entries(systemInfo.terminal_profiles).forEach(([category, profiles]: [string, any]) => {
+            console.log(`🔍 Processing category: ${category}`, profiles);
+            if (category !== 'available_shells' && Array.isArray(profiles)) {
+              profiles.forEach((profile: any) => {
+                if (profile.name) {
+                  availableProfiles.push({
+                    name: profile.name,
+                    category,
+                    command: profile.command || profile.executable,
+                    args: profile.args || profile.arguments || [],
+                    icon: profile.icon || 'terminal'
+                  });
+                }
+              });
+            }
+          });
+        } else {
+          console.log('❌ No terminal_profiles found in systemInfo');
+        }
       
-      // Set default profile
+      console.log('Available profiles:', availableProfiles);
+      
+      // Set default profile only if profiles were found
       if (availableProfiles.length > 0) {
         if (initialProfile && availableProfiles.find(p => p.name === initialProfile)) {
           selectedProfile = initialProfile;
@@ -101,9 +147,19 @@
           selectedProfile = availableProfiles[0].name;
         }
         settings.defaultShell = availableProfiles.find(p => p.name === selectedProfile)?.command || availableProfiles[0].command;
+        console.log('Selected profile:', selectedProfile, 'Shell:', settings.defaultShell);
+      } else {
+        console.warn('No profiles found from system detection');
+        // Don't set any profiles - let the user know the system detection failed
+        selectedProfile = '';
+        settings.defaultShell = navigator.userAgent.includes('Windows') ? 'cmd.exe' : 'bash';
       }
     } catch (error) {
       console.error('Failed to load system info:', error);
+      // Don't provide fallback profiles - system detection failed
+      availableProfiles = [];
+      selectedProfile = '';
+      settings.defaultShell = navigator.userAgent.includes('Windows') ? 'cmd.exe' : 'bash';
     }
   }
 
@@ -202,7 +258,7 @@
     if (isConnected && currentProcess) {
       // Add a small delay to ensure proper input handling
       setTimeout(() => {
-        TerminalService.sendInput(currentProcess.id, chunk).catch((error) => {
+        TerminalService.sendInput(currentProcess!.id, chunk).catch((error) => {
           console.error('Failed to send input:', error);
         });
       }, 10);
@@ -225,6 +281,17 @@
 
   function handleOutput(output: TerminalOutput) {
     terminal.write(output.content);
+    
+    // Check if this looks like a command completion (new prompt)
+    // Note: We don't automatically complete with exit code 0 anymore
+    // The exit code will be handled by the process exit event
+    if (output.content.includes('D:\\>') || output.content.includes('PS D:\\>')) {
+      // Command completed, but let the exit event handle the exit code
+      // This is just a fallback for cases where exit events don't fire
+      if (!output.content.includes('Process exited with code:')) {
+        TerminalService.completeCurrentCommand();
+      }
+    }
   }
 
   function handleSimulatedInput(data: string) {
@@ -331,6 +398,28 @@
     terminal.clear();
     if (!isConnected) {
       writePrompt();
+    }
+  }
+
+  function getProfileIcon(iconType: string): string {
+    switch (iconType.toLowerCase()) {
+      case 'cmd':
+      case 'command prompt':
+        return '💻';
+      case 'powershell':
+      case 'pwsh':
+        return '⚡';
+      case 'bash':
+      case 'git bash':
+        return '🐧';
+      case 'wsl':
+        return '🐧';
+      case 'zsh':
+        return '🐚';
+      case 'fish':
+        return '🐠';
+      default:
+        return '🖥️';
     }
   }
 
@@ -471,9 +560,16 @@
               <div id="terminal" class="h-full w-full"></div>
             </div>
 
-    <!-- Control Panel Sidebar -->
-    <div class="control-panel w-80 bg-gray-800 border-l border-gray-700 p-4 overflow-y-auto">
-      <div class="space-y-6">
+    <!-- Right Sidebar -->
+    <div class="flex w-96 bg-gray-800 border-l border-gray-700">
+      <!-- Command History -->
+      <div class="flex-1 border-r border-gray-700">
+        <CommandHistory />
+      </div>
+
+      <!-- Control Panel -->
+      <div class="control-panel w-80 p-4 overflow-y-auto">
+        <div class="space-y-6">
         <!-- System Information -->
         <div>
           <h3 class="text-sm font-medium text-gray-300 mb-3">System Info</h3>
@@ -578,12 +674,17 @@
                        bind:value={selectedProfile}
                        on:change={handleProfileChange}
                        class="w-full bg-gray-700 text-gray-200 text-xs px-2 py-1 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                       disabled={availableProfiles.length === 0}
                      >
-                       {#each availableProfiles as profile}
-                         <option value={profile.name}>
-                           {profile.icon} {profile.name}
-                         </option>
-                       {/each}
+                       {#if availableProfiles.length === 0}
+                         <option value="">No profiles detected</option>
+                       {:else}
+                         {#each availableProfiles as profile}
+                           <option value={profile.name}>
+                             {getProfileIcon(profile.icon)} {profile.name}
+                           </option>
+                         {/each}
+                       {/if}
                      </select>
                      {#if selectedProfile}
                        {@const currentProfile = availableProfiles.find(p => p.name === selectedProfile)}
@@ -638,6 +739,7 @@
             <div>• Output is parsed</div>
             <div>• Full process control</div>
           </div>
+        </div>
         </div>
       </div>
     </div>

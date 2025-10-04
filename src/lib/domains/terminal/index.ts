@@ -13,6 +13,9 @@ export { terminalProcessManager, type ProcessConfig, type CommandInterceptor, ty
 
 // Stores
 export { terminalStore, terminalActions, activeTab, activeProcess, activeOutput } from './stores/terminalStore';
+export { commandHistoryStore, type CommandHistoryEntry } from './stores/commandHistoryStore';
 
 // Components
 export { default as Terminal } from './components/Terminal.svelte';
+export { default as CommandHistory } from './components/CommandHistory.svelte';
+export { default as ContainerizedTerminal } from './components/ContainerizedTerminal.svelte';
