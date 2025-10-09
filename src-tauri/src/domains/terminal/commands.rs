@@ -2,6 +2,7 @@ use std::process::Command;
 use tauri::{command, State, Window};
 use crate::domains::terminal::types::*;
 use crate::domains::terminal::manager::TerminalManager;
+use crate::domains::terminal::shell_integration::ShellHooks;
 
 #[command]
 pub async fn create_terminal_process(
@@ -392,4 +393,9 @@ async fn get_terminal_profiles() -> serde_json::Value {
     }
     
     serde_json::Value::Object(profiles)
+}
+
+#[command]
+pub async fn get_shell_integration_hooks() -> Result<ShellHooks, String> {
+    Ok(ShellHooks::new())
 }

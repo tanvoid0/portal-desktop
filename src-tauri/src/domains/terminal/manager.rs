@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{Window, Emitter};
 use uuid::Uuid;
 use crate::domains::terminal::types::*;
+use crate::domains::terminal::shell_integration::ShellIntegrationParser;
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem, MasterPty};
 
 // Global state for interactive processes (PTY-backed)
@@ -15,25 +16,24 @@ static MASTER_PTYS: Lazy<std::sync::Mutex<HashMap<String, Box<dyn MasterPty + Se
     Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
 
 pub type ProcessMap = Arc<Mutex<HashMap<String, TerminalProcess>>>;
-pub type OutputCallbacks = Arc<Mutex<HashMap<String, Vec<Box<dyn Fn(TerminalOutput) + Send + Sync>>>>>;
 pub type StdinHandles = Arc<Mutex<HashMap<String, Box<dyn Write + Send>>>>;
 
 pub struct TerminalManager {
     processes: ProcessMap,
-    output_callbacks: OutputCallbacks,
     stdin_handles: StdinHandles,
     command_interceptors: Arc<Mutex<Vec<CommandInterceptor>>>,
     output_parsers: Arc<Mutex<Vec<OutputParser>>>,
+    shell_integration_parsers: Arc<Mutex<HashMap<String, ShellIntegrationParser>>>,
 }
 
 impl TerminalManager {
     pub fn new() -> Self {
         Self {
             processes: Arc::new(Mutex::new(HashMap::new())),
-            output_callbacks: Arc::new(Mutex::new(HashMap::new())),
             stdin_handles: Arc::new(Mutex::new(HashMap::new())),
             command_interceptors: Arc::new(Mutex::new(Vec::new())),
             output_parsers: Arc::new(Mutex::new(Vec::new())),
+            shell_integration_parsers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -41,9 +41,6 @@ impl TerminalManager {
         self.processes.clone()
     }
 
-    pub fn get_output_callbacks(&self) -> OutputCallbacks {
-        self.output_callbacks.clone()
-    }
 
     pub async fn create_process(
         &self,
@@ -73,15 +70,19 @@ impl TerminalManager {
                     (request.shell.clone(), vec![])
                 }
             } else {
-                if shell_lower.contains("bash") {
-                    ("bash".to_string(), vec![])
-                } else if shell_lower.contains("zsh") {
+                if shell_lower.contains("zsh") {
                     ("zsh".to_string(), vec![])
+                } else if shell_lower.contains("bash") {
+                    ("bash".to_string(), vec![])
                 } else if shell_lower.contains("fish") {
                     ("fish".to_string(), vec![])
                 } else {
-                    // For any other shell, try to use it as-is
-                    (request.shell.clone(), vec![])
+                    // Default to zsh on Linux, fallback to bash
+                    if request.shell == "bash" || request.shell.is_empty() {
+                        ("zsh".to_string(), vec![])
+                    } else {
+                        (request.shell.clone(), vec![])
+                    }
                 }
             }
         };
@@ -128,7 +129,57 @@ impl TerminalManager {
 
         // Use request working directory and environment directly
         let working_dir = request.working_directory.clone();
-        let environment = request.environment.clone();
+        let mut environment = request.environment.clone();
+
+        // Add essential environment variables if not already set
+        if !environment.contains_key("TERM") {
+            environment.insert("TERM".to_string(), "xterm-256color".to_string());
+        }
+        if !environment.contains_key("COLORTERM") {
+            environment.insert("COLORTERM".to_string(), "truecolor".to_string());
+        }
+        if !environment.contains_key("HOME") {
+            if let Ok(home) = std::env::var("HOME") {
+                environment.insert("HOME".to_string(), home);
+            }
+        }
+        if !environment.contains_key("USER") {
+            if let Ok(user) = std::env::var("USER") {
+                environment.insert("USER".to_string(), user);
+            }
+        }
+        if !environment.contains_key("PATH") {
+            if let Ok(path) = std::env::var("PATH") {
+                environment.insert("PATH".to_string(), path);
+            }
+        }
+        if !environment.contains_key("SHELL") {
+            environment.insert("SHELL".to_string(), shell_cmd.clone());
+        }
+        if !environment.contains_key("LANG") {
+            environment.insert("LANG".to_string(), "en_US.UTF-8".to_string());
+        }
+        if !environment.contains_key("LC_ALL") {
+            environment.insert("LC_ALL".to_string(), "en_US.UTF-8".to_string());
+        }
+        
+        // Linux-specific environment variables for better shell experience
+        if !environment.contains_key("HISTSIZE") {
+            environment.insert("HISTSIZE".to_string(), "10000".to_string());
+        }
+        if !environment.contains_key("HISTFILESIZE") {
+            environment.insert("HISTFILESIZE".to_string(), "10000".to_string());
+        }
+        if !environment.contains_key("EDITOR") {
+            environment.insert("EDITOR".to_string(), "nano".to_string());
+        }
+        if !environment.contains_key("PAGER") {
+            environment.insert("PAGER".to_string(), "less".to_string());
+        }
+        
+        // Ensure TUI applications work properly
+        environment.insert("NO_COLOR".to_string(), "0".to_string());
+        environment.insert("FORCE_COLOR".to_string(), "1".to_string());
 
         let mut cmd = CommandBuilder::new(&shell_cmd);
         for a in &shell_args {
@@ -192,7 +243,13 @@ impl TerminalManager {
         };
         let _ = window.emit("terminal-output", &initial_output);
 
-        // Start PTY output streaming (single stream contains both stdout/err)
+        // Initialize shell integration parser for this process
+        {
+            let mut parsers = self.shell_integration_parsers.lock().unwrap();
+            parsers.insert(process_id.clone(), ShellIntegrationParser::new());
+        }
+
+        // Start PTY output streaming with shell integration
         {
             let mut masters = MASTER_PTYS.lock().unwrap();
             if let Some(m) = masters.get_mut(&process_id) {
@@ -200,16 +257,45 @@ impl TerminalManager {
                     println!("Starting output streaming for process: {}", process_id);
                     let pid_for_thread = process_id.clone();
                     let window_for_reader = window.clone();
+                    let parsers = self.shell_integration_parsers.clone();
+                    
                     std::thread::spawn(move || {
                         let mut buf = [0u8; 8192];
                         loop {
                             match reader.read(&mut buf) {
                                 Ok(0) => {
                                     println!("PTY reader reached EOF for process: {}", pid_for_thread);
+                                    // Flush any remaining content from shell integration parser
+                                    if let Ok(mut parsers) = parsers.lock() {
+                                        if let Some(parser) = parsers.get_mut(&pid_for_thread) {
+                                            let events = parser.flush();
+                                            for event in events {
+                                                if let Err(e) = window_for_reader.emit("shell-integration-event", &event) {
+                                                    eprintln!("Failed to emit shell integration event: {}", e);
+                                                }
+                                            }
+                                        }
+                                    }
                                     break; // EOF
                                 }
                                 Ok(n) => {
                                     let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
+                                    
+                                    // Process through shell integration parser
+                                    if let Ok(mut parsers) = parsers.lock() {
+                                        if let Some(parser) = parsers.get_mut(&pid_for_thread) {
+                                            let events = parser.process_output(&chunk);
+                                            
+                                            // Emit shell integration events
+                                            for event in events {
+                                                if let Err(e) = window_for_reader.emit("shell-integration-event", &event) {
+                                                    eprintln!("Failed to emit shell integration event: {}", e);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Emit raw output as before
                                     let output = TerminalOutput {
                                         process_id: pid_for_thread.clone(),
                                         content: chunk,
