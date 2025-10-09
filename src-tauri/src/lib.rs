@@ -69,6 +69,12 @@ pub fn run() {
             domains::terminal::save_command_history,
             domains::terminal::load_command_history,
             domains::terminal::clear_command_history,
+            // Session Persistence
+            domains::terminal::save_terminal_session,
+            domains::terminal::load_terminal_session,
+            domains::terminal::list_terminal_sessions,
+            domains::terminal::delete_terminal_session,
+            domains::terminal::clear_all_sessions,
             // Project commands
             domains::projects::get_all_projects,
             domains::projects::get_project,

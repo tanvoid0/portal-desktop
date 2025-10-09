@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::collections::HashMap;
+use std::sync::Lazy;
 use tauri::{command, State, Window};
 use crate::domains::terminal::types::*;
 use crate::domains::terminal::manager::TerminalManager;
@@ -416,8 +417,8 @@ pub struct CommandHistoryEntry {
 }
 
 // In-memory storage for command history (in production, use a database)
-static COMMAND_HISTORY: std::sync::Lazy<std::sync::Mutex<HashMap<String, Vec<CommandHistoryEntry>>>> = 
-    std::sync::Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
+static COMMAND_HISTORY: Lazy<std::sync::Mutex<HashMap<String, Vec<CommandHistoryEntry>>>> = 
+    Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
 
 #[command]
 pub async fn save_command_history(tab_id: String, entries: Vec<CommandHistoryEntry>) -> Result<(), String> {
@@ -445,5 +446,63 @@ pub async fn clear_command_history(tab_id: Option<String>) -> Result<(), String>
         history.clear();
         println!("Cleared all command history");
     }
+    Ok(())
+}
+
+// Session State Persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminalSession {
+    pub tab_id: String,
+    pub working_directory: String,
+    pub environment: std::collections::HashMap<String, String>,
+    pub scrollback_buffer: Vec<String>,
+    pub cursor_position: (u16, u16),
+    pub terminal_size: (u16, u16),
+    pub last_activity: String,
+    pub process_id: Option<String>,
+}
+
+// In-memory storage for terminal sessions
+static TERMINAL_SESSIONS: Lazy<std::sync::Mutex<HashMap<String, TerminalSession>>> = 
+    Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
+
+#[command]
+pub async fn save_terminal_session(session: TerminalSession) -> Result<(), String> {
+    let mut sessions = TERMINAL_SESSIONS.lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    sessions.insert(session.tab_id.clone(), session);
+    println!("Saved terminal session for tab: {}", session.tab_id);
+    Ok(())
+}
+
+#[command]
+pub async fn load_terminal_session(tab_id: String) -> Result<Option<TerminalSession>, String> {
+    let sessions = TERMINAL_SESSIONS.lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    let session = sessions.get(&tab_id).cloned();
+    if session.is_some() {
+        println!("Loaded terminal session for tab: {}", tab_id);
+    }
+    Ok(session)
+}
+
+#[command]
+pub async fn list_terminal_sessions() -> Result<Vec<String>, String> {
+    let sessions = TERMINAL_SESSIONS.lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    let tab_ids: Vec<String> = sessions.keys().cloned().collect();
+    Ok(tab_ids)
+}
+
+#[command]
+pub async fn delete_terminal_session(tab_id: String) -> Result<(), String> {
+    let mut sessions = TERMINAL_SESSIONS.lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    sessions.remove(&tab_id);
+    println!("Deleted terminal session for tab: {}", tab_id);
+    Ok(())
+}
+
+#[command]
+pub async fn clear_all_sessions() -> Result<(), String> {
+    let mut sessions = TERMINAL_SESSIONS.lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    sessions.clear();
+    println!("Cleared all terminal sessions");
     Ok(())
 }
