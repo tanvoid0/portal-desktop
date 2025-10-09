@@ -1,8 +1,10 @@
 use std::process::Command;
+use std::collections::HashMap;
 use tauri::{command, State, Window};
 use crate::domains::terminal::types::*;
 use crate::domains::terminal::manager::TerminalManager;
 use crate::domains::terminal::shell_integration::ShellHooks;
+use serde::{Deserialize, Serialize};
 
 #[command]
 pub async fn create_terminal_process(
@@ -398,4 +400,50 @@ async fn get_terminal_profiles() -> serde_json::Value {
 #[command]
 pub async fn get_shell_integration_hooks() -> Result<ShellHooks, String> {
     Ok(ShellHooks::new())
+}
+
+// Command History Persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandHistoryEntry {
+    pub id: String,
+    pub tab_id: String,
+    pub timestamp: String,
+    pub command: String,
+    pub output: String,
+    pub exit_code: Option<i32>,
+    pub duration: Option<u64>,
+    pub intercepted: Option<bool>,
+}
+
+// In-memory storage for command history (in production, use a database)
+static COMMAND_HISTORY: std::sync::Lazy<std::sync::Mutex<HashMap<String, Vec<CommandHistoryEntry>>>> = 
+    std::sync::Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
+
+#[command]
+pub async fn save_command_history(tab_id: String, entries: Vec<CommandHistoryEntry>) -> Result<(), String> {
+    let mut history = COMMAND_HISTORY.lock().map_err(|e| format!("Failed to lock history: {}", e))?;
+    history.insert(tab_id, entries);
+    println!("Saved command history for tab: {}", tab_id);
+    Ok(())
+}
+
+#[command]
+pub async fn load_command_history(tab_id: String) -> Result<Vec<CommandHistoryEntry>, String> {
+    let history = COMMAND_HISTORY.lock().map_err(|e| format!("Failed to lock history: {}", e))?;
+    let entries = history.get(&tab_id).cloned().unwrap_or_default();
+    println!("Loaded {} command history entries for tab: {}", entries.len(), tab_id);
+    Ok(entries)
+}
+
+#[command]
+pub async fn clear_command_history(tab_id: Option<String>) -> Result<(), String> {
+    let mut history = COMMAND_HISTORY.lock().map_err(|e| format!("Failed to lock history: {}", e))?;
+    if let Some(tab) = tab_id {
+        history.remove(&tab);
+        println!("Cleared command history for tab: {}", tab);
+    } else {
+        history.clear();
+        println!("Cleared all command history");
+    }
+    Ok(())
 }

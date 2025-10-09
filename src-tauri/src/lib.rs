@@ -64,6 +64,11 @@ pub fn run() {
             domains::terminal::add_output_parser,
             domains::terminal::remove_output_parser,
             domains::terminal::get_system_info,
+            domains::terminal::get_shell_integration_hooks,
+            // Command History Persistence
+            domains::terminal::save_command_history,
+            domains::terminal::load_command_history,
+            domains::terminal::clear_command_history,
             // Project commands
             domains::projects::get_all_projects,
             domains::projects::get_project,
