@@ -44,4 +44,21 @@ impl TaskService {
     pub async fn get_task_count(&self) -> Result<u64, sea_orm::DbErr> {
         self.repository.count().await
     }
+
+    // New advanced methods
+    pub async fn get_overdue_tasks(&self) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        self.repository.find_overdue().await
+    }
+
+    pub async fn get_due_today_tasks(&self) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        self.repository.find_due_today().await
+    }
+
+    pub async fn get_unestimated_tasks(&self) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        self.repository.find_unestimated().await
+    }
+
+    pub async fn get_recurring_tasks(&self) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        self.repository.find_recurring().await
+    }
 }

@@ -1,38 +1,87 @@
-# sv
+# Portal Desktop
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A cross-platform desktop application built with SvelteKit and Tauri, featuring AI integration, terminal emulation, and development tools.
 
-## Creating a project
+## 🚀 Quick Start
 
-If you're seeing this, you've probably already done this step. Congrats!
+### Prerequisites
+This project requires native compilation for some dependencies. Please ensure you have the required build tools installed:
 
-```sh
-# create a new project in the current directory
-npx sv create
+- **Windows**: Python 3.x + Visual Studio Build Tools
+- **macOS**: Xcode Command Line Tools + Python 3.x  
+- **Linux**: build-essential + Python 3.x
 
-# create a new project in my-app
-npx sv create my-app
+### Installation
+
+#### Automated Setup (Recommended)
+```bash
+# Single command for all platforms
+npm run install
 ```
 
-## Developing
+#### Manual Setup
+```bash
+# Install dependencies (will check build tools automatically)
+npm install
+```
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+### Development
 
-```sh
+```bash
+# Start development server
 npm run dev
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+# Start Tauri development (desktop app)
+npm run tauri:dev
 ```
 
-## Building
+### Building
 
-To create a production version of your app:
-
-```sh
+```bash
+# Build web version
 npm run build
+
+# Build desktop application
+npm run tauri:build
 ```
 
-You can preview the production build with `npm run preview`.
+## 📋 Features
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+- **Cross-platform Desktop App** (Windows, macOS, Linux)
+- **AI Integration** with Ollama support
+- **Terminal Emulation** with xterm.js
+- **Development Tools** and SDK management
+- **Modern UI** with Tailwind CSS and Svelte 5
+
+## 🛠️ Dependencies
+
+This project uses native dependencies that require compilation:
+- `node-pty` - Pseudo-terminal functionality
+- `ws` - WebSocket library
+- `esbuild` - JavaScript bundler
+
+## 📖 Documentation
+
+- [Installation Guide](INSTALLATION.md) - Detailed setup instructions
+- [Build Tools Checker](scripts/check-build-tools.js) - Automated tool verification
+
+## 🔧 Troubleshooting
+
+If you encounter build issues:
+
+1. **Check build tools**: The postinstall script will verify your environment
+2. **Follow platform-specific guides** in `INSTALLATION.md`
+3. **Clear cache**: `npm cache clean --force`
+4. **Fresh install**: Delete `node_modules` and reinstall
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test across platforms
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.

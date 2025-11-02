@@ -4,10 +4,10 @@
 			"path": "."
 		},
 		{
-			"path": "../portal_desktop_old"
+			"path": "../../javascript/FlyEnv"
 		},
 		{
-			"path": "../portal_terminal"
+			"path": "I:/project/production/logs-explorer"
 		}
 	],
 	"settings": {}

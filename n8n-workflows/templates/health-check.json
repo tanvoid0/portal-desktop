@@ -1,0 +1,256 @@
+{
+  "name": "Project Health Check",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "health-check",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "health-check"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "project_path",
+              "value": "={{ $json.path }}"
+            },
+            {
+              "name": "framework",
+              "value": "={{ $json.framework }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-variables",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "command": "cd {{ $json.project_path }} && git status --porcelain",
+        "options": {}
+      },
+      "id": "check-git-status",
+      "name": "Check Git Status",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "command": "cd {{ $json.project_path }} && find . -name 'node_modules' -o -name 'target' -o -name '__pycache__' | wc -l",
+        "options": {}
+      },
+      "id": "check-dependencies",
+      "name": "Check Dependencies",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "command": "cd {{ $json.project_path }} && du -sh . | cut -f1",
+        "options": {}
+      },
+      "id": "check-project-size",
+      "name": "Check Project Size",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.framework }}",
+              "operation": "contains",
+              "value2": "Node.js"
+            }
+          ]
+        }
+      },
+      "id": "check-node-deps",
+      "name": "Check Node Dependencies",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "command": "cd {{ $json.project_path }} && npm outdated",
+        "options": {}
+      },
+      "id": "check-outdated",
+      "name": "Check Outdated Packages",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "success",
+              "value": "true"
+            },
+            {
+              "name": "message",
+              "value": "Health check completed"
+            },
+            {
+              "name": "git_status",
+              "value": "={{ $('Check Git Status').item.json.stdout }}"
+            },
+            {
+              "name": "project_size",
+              "value": "={{ $('Check Project Size').item.json.stdout }}"
+            },
+            {
+              "name": "has_uncommitted_changes",
+              "value": "={{ $('Check Git Status').item.json.stdout.length > 0 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Check Git Status",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Dependencies",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Project Size",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Node Dependencies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Node Dependencies": {
+      "main": [
+        [
+          {
+            "node": "Check Outdated Packages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Git Status": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Dependencies": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Project Size": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Outdated Packages": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "1"
+}

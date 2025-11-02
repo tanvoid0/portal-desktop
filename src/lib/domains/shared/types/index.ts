@@ -1,128 +1,121 @@
 /**
- * Shared Domain Types
- * 
- * Common types and interfaces used across all domains
+ * Shared types for Portal Desktop
  */
 
-// Logger Types
-export interface LogContext {
-  context: string;
-  data?: Record<string, any>;
-  error?: Error;
-  traceId?: string;
+export interface BaseEntity {
+	id: string;
+	createdAt: Date;
+	updatedAt: Date;
 }
 
-export interface LogEntry {
-  level: 'debug' | 'info' | 'warn' | 'error';
-  message: string;
-  context: LogContext;
-  timestamp: Date;
+export interface ApiResponse<T = unknown> {
+	success: boolean;
+	data?: T;
+	error?: string;
+	message?: string;
 }
 
-// Cache Types
-export interface CacheEntry<T = any> {
-  data: T;
-  timestamp: number;
-  ttl: number;
+export interface PaginatedResponse<T = unknown> extends ApiResponse<T[]> {
+	pagination: {
+		page: number;
+		limit: number;
+		total: number;
+		totalPages: number;
+	};
 }
 
-export interface CacheStats {
-  hits: number;
-  misses: number;
-  size: number;
-  maxSize: number;
+export interface SortOptions {
+	field: string;
+	direction: 'asc' | 'desc';
 }
 
-// Event Bus Types
-export interface DomainEvent {
-  type: string;
-  payload: any;
-  timestamp: Date;
-  source: string;
+export interface FilterOptions {
+	[key: string]: unknown;
 }
 
-export interface EventSubscription {
-  id: string;
-  eventType: string;
-  callback: (event: DomainEvent) => void;
+export interface QueryOptions {
+	page?: number;
+	limit?: number;
+	sort?: SortOptions;
+	filter?: FilterOptions;
+	search?: string;
 }
 
-// System Types
+export interface UserPreferences {
+	theme: 'light' | 'dark' | 'system';
+	language: string;
+	notifications: {
+		enabled: boolean;
+		sound: boolean;
+		desktop: boolean;
+	};
+	terminal: {
+		fontSize: number;
+		fontFamily: string;
+		theme: string;
+	};
+	projects: {
+		defaultPath: string;
+		autoSave: boolean;
+	};
+}
+
 export interface SystemInfo {
-  platform: string;
-  arch: string;
-  version: string;
-  nodeVersion: string;
-  memory: {
-    total: number;
-    free: number;
-    used: number;
-  };
+	platform: string;
+	arch: string;
+	version: string;
+	hostname: string;
+	username: string;
+	homeDir: string;
 }
 
-export interface DockerStatus {
-  isRunning: boolean;
-  version?: string;
-  containers: number;
-  images: number;
+export interface NotificationOptions {
+	title: string;
+	message: string;
+	type?: 'info' | 'success' | 'warning' | 'error';
+	duration?: number;
+	actions?: Array<{
+		label: string;
+		action: () => void;
+	}>;
 }
 
-// Error Types
-export interface DomainError extends Error {
-  code: string;
-  context: string;
-  data?: Record<string, any>;
+export interface MenuItem {
+	id: string;
+	label: string;
+	icon?: string;
+	action?: () => void;
+	children?: MenuItem[];
+	disabled?: boolean;
+	separator?: boolean;
 }
 
-// API Types
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
+export interface TabItem {
+	id: string;
+	title: string;
+	icon?: string;
+	closable?: boolean;
+	data?: unknown;
 }
 
-export interface PaginationParams {
-  page: number;
-  limit: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+export interface DialogOptions {
+	title: string;
+	message: string;
+	type?: 'info' | 'warning' | 'error' | 'confirm';
+	buttons?: Array<{
+		label: string;
+		action: () => void;
+		variant?: 'primary' | 'secondary' | 'destructive';
+	}>;
 }
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-// Process Types
-export interface ProcessInfo {
-  id: string;
-  name: string;
-  status: 'running' | 'stopped' | 'error';
-  pid?: number;
-  startTime?: Date;
-  endTime?: Date;
-  logs: string[];
-}
-
-// Master Password Types
-export interface MasterPasswordInfo {
-  isSet: boolean;
-  lastChanged?: Date;
-  strength: 'weak' | 'medium' | 'strong';
-}
-
-// Generic Types
-export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
-
-export interface AsyncState<T> {
-  data: T | null;
-  loading: boolean;
-  error: string | null;
-  lastUpdated?: Date;
+export interface ToastOptions {
+	title: string;
+	description?: string;
+	type?: 'info' | 'success' | 'warning' | 'error';
+	duration?: number;
+	action?: {
+		label: string;
+		onClick: () => void;
+	};
 }

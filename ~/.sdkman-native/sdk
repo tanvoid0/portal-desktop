@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Native SDKMAN CLI wrapper script
+SDKMAN_NATIVE_DIR="$HOME/.sdkman-native"
+SDKMAN_NATIVE_LIBEXEC="$SDKMAN_NATIVE_DIR/libexec"
+
+# Check if the command exists in libexec
+if [ -f "$SDKMAN_NATIVE_LIBEXEC/$1" ]; then
+    exec "$SDKMAN_NATIVE_LIBEXEC/$1" "${@:2}"
+else
+    echo "Unknown command: $1"
+    echo "Available commands:"
+    ls "$SDKMAN_NATIVE_LIBEXEC" | sed 's/^/  /'
+    exit 1
+fi

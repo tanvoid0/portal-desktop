@@ -1,10 +1,19 @@
 <script lang="ts">
   import { commandHistoryStore, type CommandHistoryEntry } from '../stores/commandHistoryStore';
   import { formatCommandOutput } from '../utils/textUtils';
+  import { formatDuration, getDurationColor, getDurationBadgeVariant, calculateAverageDuration } from '../utils/durationUtils';
+  import { Badge } from '@/lib/components/ui/badge';
+  import { Button } from '@/lib/components/ui/button';
   import { onMount } from 'svelte';
+
+  export let tabId: string;
 
   let selectedEntry: CommandHistoryEntry | null = null;
   let showModal = false;
+
+  // Get reactive history for the current tab
+  $: tabHistoryStore = commandHistoryStore.getTabHistoryReactive(tabId);
+  $: averageDuration = calculateAverageDuration($tabHistoryStore);
 
   function formatTimestamp(date: Date): string {
     return date.toLocaleTimeString();
@@ -40,30 +49,40 @@
   }
 
   function clearHistory() {
-    commandHistoryStore.clearHistory();
+    commandHistoryStore.clearHistory(tabId);
   }
 </script>
 
 <div class="command-history h-full flex flex-col">
   <!-- Header -->
   <div class="flex items-center justify-between p-3 border-b border-gray-700">
-    <h3 class="text-sm font-medium text-gray-300">Command History</h3>
-    <button
-      on:click={clearHistory}
-      class="text-xs text-gray-400 hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+    <div class="flex items-center space-x-2">
+      <h3 class="text-sm font-medium text-gray-300">Command History</h3>
+      {#if averageDuration > 0}
+        <Badge variant="outline" class="text-xs">
+          Avg: {formatDuration(averageDuration)}
+        </Badge>
+      {/if}
+    </div>
+    <Button
+      variant="ghost"
+      size="sm"
+      onclick={clearHistory}
+      class="text-xs text-gray-400 hover:text-gray-200"
       title="Clear history"
     >
       Clear
-    </button>
+    </Button>
   </div>
 
   <!-- History List -->
   <div class="flex-1 overflow-y-auto">
-    {#each $commandHistoryStore.entries as entry (entry.id)}
-      <button
-        class="w-full p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition-colors text-left"
-        on:click={() => showEntryDetails(entry)}
-        on:keydown={(e) => e.key === 'Enter' && showEntryDetails(entry)}
+    {#each $tabHistoryStore as entry (entry.id)}
+      <Button
+        variant="ghost"
+        class="w-full p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition-colors text-left justify-start h-auto"
+        onclick={() => showEntryDetails(entry)}
+        onkeydown={(e) => e.key === 'Enter' && showEntryDetails(entry)}
         type="button"
       >
         <div class="flex items-start justify-between mb-2">
@@ -74,6 +93,14 @@
             <code class="text-sm text-gray-200 font-mono bg-gray-900 px-2 py-1 rounded">
               {entry.command}
             </code>
+            {#if entry.duration}
+              <Badge 
+                variant={getDurationBadgeVariant(entry.duration)} 
+                class="text-xs {getDurationColor(entry.duration)}"
+              >
+                {formatDuration(entry.duration)}
+              </Badge>
+            {/if}
           </div>
           <span class="text-xs text-gray-500">
             {formatTimestamp(entry.timestamp)}
@@ -83,13 +110,7 @@
         <div class="text-xs text-gray-400">
           {formatCommandOutput(entry.output, 80)}
         </div>
-        
-        {#if entry.duration}
-          <div class="text-xs text-gray-500 mt-1">
-            Duration: {entry.duration}ms
-          </div>
-        {/if}
-      </button>
+      </Button>
     {:else}
       <div class="p-6 text-center text-gray-500">
         <div class="text-4xl mb-2">📝</div>
@@ -104,8 +125,8 @@
 {#if showModal && selectedEntry}
   <div 
     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
-    on:click={closeModal}
-    on:keydown={(e) => e.key === 'Escape' && closeModal()}
+    onclick={closeModal}
+    onkeydown={(e) => e.key === 'Escape' && closeModal()}
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -117,12 +138,14 @@
       <!-- Modal Header -->
       <div class="flex items-center justify-between p-4 border-b border-gray-700">
         <h2 class="text-lg font-medium text-gray-200">Command Details</h2>
-        <button
-          on:click={closeModal}
-          class="text-gray-400 hover:text-gray-200 text-xl"
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={closeModal}
+          class="text-gray-400 hover:text-gray-200 text-xl h-auto p-1"
         >
           ×
-        </button>
+        </Button>
       </div>
 
       <!-- Modal Content -->
@@ -153,7 +176,9 @@
           {#if selectedEntry.duration}
             <div>
               <span class="text-gray-400">Duration:</span>
-              <span class="text-gray-200 ml-2">{selectedEntry.duration}ms</span>
+              <span class="ml-2 {getDurationColor(selectedEntry.duration)} font-mono">
+                {formatDuration(selectedEntry.duration)}
+              </span>
             </div>
           {/if}
         </div>
@@ -167,12 +192,13 @@
 
       <!-- Modal Footer -->
       <div class="flex justify-end p-4 border-t border-gray-700">
-        <button
-          on:click={closeModal}
-          class="px-4 py-2 bg-gray-700 text-gray-200 rounded hover:bg-gray-600 transition-colors"
+        <Button
+          variant="secondary"
+          onclick={closeModal}
+          class="px-4 py-2"
         >
           Close
-        </button>
+        </Button>
       </div>
     </div>
   </div>

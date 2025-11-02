@@ -1,18 +1,6 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
-/// OSC (Operating System Command) sequences for shell integration
-pub mod osc {
-    /// Start of command execution marker
-    pub const CMD_START: &str = "\x1b]133;A\x1b\\";
-    /// End of command execution marker  
-    pub const CMD_END: &str = "\x1b]133;B\x1b\\";
-    /// Current working directory marker
-    pub const CWD_MARKER: &str = "\x1b]7;";
-    /// Command prompt marker
-    pub const PROMPT_MARKER: &str = "\x1b]133;C\x1b\\";
-}
-
 /// Represents a command block with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandBlock {
@@ -172,14 +160,6 @@ impl ShellIntegrationParser {
         }
         None
     }
-
-    pub fn get_blocks(&self) -> &[CommandBlock] {
-        &self.blocks
-    }
-
-    pub fn get_current_block(&self) -> Option<&CommandBlock> {
-        self.current_block.as_ref()
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,126 +169,4 @@ pub enum ShellIntegrationEvent {
     CommandDetected(String),
     PromptDetected,
     OutputContent(String),
-}
-
-/// Shell integration hooks for different shells
-pub struct ShellHooks {
-    pub bash: String,
-    pub zsh: String,
-    pub fish: String,
-    pub powershell: String,
-}
-
-impl ShellHooks {
-    pub fn new() -> Self {
-        Self {
-            bash: Self::bash_hook(),
-            zsh: Self::zsh_hook(),
-            fish: Self::fish_hook(),
-            powershell: Self::powershell_hook(),
-        }
-    }
-
-    fn bash_hook() -> String {
-        r#"
-# Portal Desktop Shell Integration for Bash
-if [[ "$TERM_PROGRAM" == "PortalDesktop" ]]; then
-    # Function to emit command start marker
-    __portal_preexec() {
-        printf "\033]133;A\033\\"
-    }
-    
-    # Function to emit command end marker
-    __portal_precmd() {
-        printf "\033]133;B\033\\"
-    }
-    
-    # Function to emit prompt marker
-    __portal_prompt() {
-        printf "\033]133;C\033\\"
-    }
-    
-    # Hook into bash's preexec and precmd
-    trap '__portal_preexec' DEBUG
-    PROMPT_COMMAND="__portal_precmd; $PROMPT_COMMAND"
-    
-    # Add prompt marker to PS1
-    PS1="$(__portal_prompt)$PS1"
-fi
-"#.to_string()
-    }
-
-    fn zsh_hook() -> String {
-        r#"
-# Portal Desktop Shell Integration for Zsh
-if [[ "$TERM_PROGRAM" == "PortalDesktop" ]]; then
-    # Function to emit command start marker
-    __portal_preexec() {
-        printf "\033]133;A\033\\"
-    }
-    
-    # Function to emit command end marker
-    __portal_precmd() {
-        printf "\033]133;B\033\\"
-    }
-    
-    # Function to emit prompt marker
-    __portal_prompt() {
-        printf "\033]133;C\033\\"
-    }
-    
-    # Hook into zsh's preexec and precmd
-    autoload -U add-zsh-hook
-    add-zsh-hook preexec __portal_preexec
-    add-zsh-hook precmd __portal_precmd
-    
-    # Add prompt marker to PS1
-    PS1="$(__portal_prompt)$PS1"
-fi
-"#.to_string()
-    }
-
-    fn fish_hook() -> String {
-        r#"
-# Portal Desktop Shell Integration for Fish
-if test "$TERM_PROGRAM" = "PortalDesktop"
-    function __portal_preexec --on-event fish_preexec
-        printf "\033]133;A\033\\"
-    end
-    
-    function __portal_precmd --on-event fish_prompt
-        printf "\033]133;B\033\\"
-    end
-    
-    function __portal_prompt
-        printf "\033]133;C\033\\"
-    end
-end
-"#.to_string()
-    }
-
-    fn powershell_hook() -> String {
-        r#"
-# Portal Desktop Shell Integration for PowerShell
-if ($env:TERM_PROGRAM -eq "PortalDesktop") {
-    function __portal_preexec {
-        Write-Host "`e]133;A`e\" -NoNewline
-    }
-    
-    function __portal_precmd {
-        Write-Host "`e]133;B`e\" -NoNewline
-    }
-    
-    function __portal_prompt {
-        Write-Host "`e]133;C`e\" -NoNewline
-    }
-    
-    # Hook into PowerShell's prompt
-    function prompt {
-        __portal_prompt
-        return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
-    }
-}
-"#.to_string()
-    }
 }

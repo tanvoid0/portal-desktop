@@ -1,0 +1,217 @@
+{
+  "name": "AI Code Analysis with Ollama",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "ai-code-analysis",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "ai-code-analysis"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "project_path",
+              "value": "={{ $json.path }}"
+            },
+            {
+              "name": "framework",
+              "value": "={{ $json.framework }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-variables",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "command": "cd {{ $json.project_path }} && find . -name '*.js' -o -name '*.ts' -o -name '*.py' -o -name '*.rs' -o -name '*.go' | head -10",
+        "options": {}
+      },
+      "id": "find-source-files",
+      "name": "Find Source Files",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "command": "cd {{ $json.project_path }} && head -50 $(find . -name '*.js' -o -name '*.ts' -o -name '*.py' -o -name '*.rs' -o -name '*.go' | head -3 | tr '\\n' ' ')",
+        "options": {}
+      },
+      "id": "read-sample-code",
+      "name": "Read Sample Code",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "codellama:7b"
+            },
+            {
+              "name": "prompt",
+              "value": "Analyze this {{ $json.framework }} project code and provide:\n1. Code quality assessment\n2. Potential improvements\n3. Security concerns\n4. Performance suggestions\n\nCode:\n{{ $json.stdout }}\n\nProject path: {{ $json.project_path }}"
+            },
+            {
+              "name": "stream",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ollama-analysis",
+      "name": "Ollama Code Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "success",
+              "value": "true"
+            },
+            {
+              "name": "message",
+              "value": "AI code analysis completed"
+            },
+            {
+              "name": "analysis",
+              "value": "={{ $json.response }}"
+            },
+            {
+              "name": "files_analyzed",
+              "value": "={{ $('Find Source Files').item.json.stdout }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Find Source Files",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Sample Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Source Files": {
+      "main": [
+        [
+          {
+            "node": "Ollama Code Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Sample Code": {
+      "main": [
+        [
+          {
+            "node": "Ollama Code Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Code Analysis": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "1"
+}

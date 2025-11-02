@@ -13,6 +13,17 @@ pub struct CreateTaskRequest {
     pub resource_id: Option<String>,
     pub resource_type: Option<String>,
     pub due_date: Option<chrono::DateTime<chrono::Utc>>,
+    // New advanced fields
+    pub estimated_time: Option<i32>,
+    pub actual_time: Option<i32>,
+    pub tags: Option<String>, // JSON array of strings
+    pub assignee: Option<String>,
+    pub recurring_pattern: Option<String>,
+    pub recurring_interval: Option<i32>,
+    pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
+    pub blocked_by: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>, // JSON array of task IDs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,6 +37,17 @@ pub struct UpdateTaskRequest {
     pub resource_id: Option<String>,
     pub resource_type: Option<String>,
     pub due_date: Option<chrono::DateTime<chrono::Utc>>,
+    // New advanced fields
+    pub estimated_time: Option<i32>,
+    pub actual_time: Option<i32>,
+    pub tags: Option<String>, // JSON array of strings
+    pub assignee: Option<String>,
+    pub recurring_pattern: Option<String>,
+    pub recurring_interval: Option<i32>,
+    pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
+    pub blocked_by: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>, // JSON array of task IDs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +80,17 @@ impl TaskRepository {
             resource_id: Set(request.resource_id),
             resource_type: Set(request.resource_type),
             due_date: Set(request.due_date.map(|dt| dt.into())),
+            // New advanced fields
+            estimated_time: Set(request.estimated_time),
+            actual_time: Set(request.actual_time),
+            tags: Set(request.tags),
+            assignee: Set(request.assignee),
+            recurring_pattern: Set(request.recurring_pattern),
+            recurring_interval: Set(request.recurring_interval),
+            recurring_end_date: Set(request.recurring_end_date.map(|dt| dt.into())),
+            recurring_last_generated: Set(request.recurring_last_generated.map(|dt| dt.into())),
+            blocked_by: Set(request.blocked_by),
+            blocks: Set(request.blocks),
             ..Default::default()
         };
 
@@ -104,6 +137,37 @@ impl TaskRepository {
         }
         if let Some(due_date) = request.due_date {
             active_model.due_date = Set(Some(due_date.into()));
+        }
+        // Handle new advanced fields
+        if let Some(estimated_time) = request.estimated_time {
+            active_model.estimated_time = Set(Some(estimated_time));
+        }
+        if let Some(actual_time) = request.actual_time {
+            active_model.actual_time = Set(Some(actual_time));
+        }
+        if let Some(tags) = request.tags {
+            active_model.tags = Set(Some(tags));
+        }
+        if let Some(assignee) = request.assignee {
+            active_model.assignee = Set(Some(assignee));
+        }
+        if let Some(recurring_pattern) = request.recurring_pattern {
+            active_model.recurring_pattern = Set(Some(recurring_pattern));
+        }
+        if let Some(recurring_interval) = request.recurring_interval {
+            active_model.recurring_interval = Set(Some(recurring_interval));
+        }
+        if let Some(recurring_end_date) = request.recurring_end_date {
+            active_model.recurring_end_date = Set(Some(recurring_end_date.into()));
+        }
+        if let Some(recurring_last_generated) = request.recurring_last_generated {
+            active_model.recurring_last_generated = Set(Some(recurring_last_generated.into()));
+        }
+        if let Some(blocked_by) = request.blocked_by {
+            active_model.blocked_by = Set(Some(blocked_by));
+        }
+        if let Some(blocks) = request.blocks {
+            active_model.blocks = Set(Some(blocks));
         }
 
         // Set completed_at if status is completed
@@ -170,5 +234,55 @@ impl TaskRepository {
 
     pub async fn count(&self) -> Result<u64, sea_orm::DbErr> {
         TaskEntity::find().count(&self.db).await
+    }
+
+    // New advanced methods
+    pub async fn find_by_tags(&self, _tags: Vec<String>) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        // This would need JSON query support - simplified for now
+        // TODO: Implement proper JSON tag filtering when SeaORM supports it
+        TaskEntity::find()
+            .filter(Column::Tags.is_not_null())
+            .all(&self.db)
+            .await
+    }
+
+    pub async fn find_overdue(&self) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        let now = chrono::Utc::now();
+        TaskEntity::find()
+            .filter(Column::DueDate.lt(now))
+            .filter(Column::Status.ne("completed"))
+            .filter(Column::Status.ne("cancelled"))
+            .all(&self.db)
+            .await
+    }
+
+    pub async fn find_due_today(&self) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        let today = chrono::Utc::now().date_naive();
+        let start_of_day = today.and_hms_opt(0, 0, 0).unwrap().and_utc();
+        let end_of_day = today.and_hms_opt(23, 59, 59).unwrap().and_utc();
+        
+        TaskEntity::find()
+            .filter(Column::DueDate.gte(start_of_day))
+            .filter(Column::DueDate.lte(end_of_day))
+            .filter(Column::Status.ne("completed"))
+            .filter(Column::Status.ne("cancelled"))
+            .all(&self.db)
+            .await
+    }
+
+    pub async fn find_recurring(&self) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        TaskEntity::find()
+            .filter(Column::RecurringPattern.is_not_null())
+            .all(&self.db)
+            .await
+    }
+
+    pub async fn find_unestimated(&self) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+        TaskEntity::find()
+            .filter(Column::EstimatedTime.is_null())
+            .filter(Column::Status.ne("completed"))
+            .filter(Column::Status.ne("cancelled"))
+            .all(&self.db)
+            .await
     }
 }

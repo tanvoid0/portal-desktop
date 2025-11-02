@@ -6,7 +6,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { TerminalProcess, TerminalOutput, TerminalCommand, TerminalContext, CreateProcessRequest } from '../types';
-import type { CommandInterceptor, OutputParser } from './terminalProcessManager';
 import { commandHistoryStore } from '../stores/commandHistoryStore';
 
 export interface ExecuteCommandRequest {
@@ -16,8 +15,6 @@ export interface ExecuteCommandRequest {
 }
 
 export class TerminalService {
-  private static commandInterceptors: CommandInterceptor[] = [];
-  private static outputParsers: OutputParser[] = [];
   private static outputCallbacks = new Map<string, (output: TerminalOutput) => void>();
   private static currentCommand: { command: string; startTime: number; output: string; exitCode?: number } | null = null;
 
@@ -25,10 +22,50 @@ export class TerminalService {
    * Create a new terminal process with full control
    */
   static async createProcess(tabId: string, config: Partial<CreateProcessRequest> = {}): Promise<TerminalProcess> {
+    // Create a proper environment for terminal applications
+    const isWindows = navigator.userAgent.includes('Windows');
+    const environment: Record<string, string> = {
+      // Essential terminal capabilities - use a proper terminal type for TUI apps
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+      
+      // Shell environment - prefer zsh on Linux
+      SHELL: isWindows ? 'powershell.exe' : '/usr/bin/zsh',
+      
+      // User environment - these will be overridden by backend with actual system values
+      HOME: isWindows ? 'C:\\Users\\user' : '/home/tan',
+      USER: 'tan',
+      USERNAME: 'tan',
+      
+      // Path environment - use system PATH
+      PATH: isWindows 
+        ? 'C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0'
+        : '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/home/tan/.local/bin',
+      
+      // Terminal size
+      COLUMNS: '80',
+      LINES: '24',
+      
+      // Locale
+      LANG: 'en_US.UTF-8',
+      LC_ALL: 'en_US.UTF-8',
+      
+      // Enable color output for TUI applications
+      NO_COLOR: '0',
+      FORCE_COLOR: '1',
+      
+      // Additional environment variables for better shell experience
+      HISTSIZE: '10000',
+      HISTFILESIZE: '10000',
+      EDITOR: 'nano',
+      PAGER: 'less',
+    };
+
     const defaultConfig: CreateProcessRequest = {
-      shell: navigator.userAgent.includes('Windows') ? 'powershell.exe' : 'bash',
-      working_directory: navigator.userAgent.includes('Windows') ? 'C:\\' : '/',
-      environment: {},
+      tab_id: tabId,
+      shell: navigator.userAgent.includes('Windows') ? 'powershell.exe' : 'zsh',
+      working_directory: navigator.userAgent.includes('Windows') ? 'C:\\' : '/home/tan',
+      environment,
       cols: 80,
       rows: 24,
       ...config
@@ -50,58 +87,34 @@ export class TerminalService {
   }
 
   /**
-   * Send input with command interception
+   * Send input directly to backend
    */
-  static async sendInput(processId: string, input: string): Promise<void> {
+  static async sendInput(processId: string, input: string, tabId?: string): Promise<void> {
     try {
-      // Debug: Log input characters to understand what we're receiving (can be removed in production)
-      if (input.length === 1 && (input.charCodeAt(0) < 32 || input.charCodeAt(0) > 126)) {
-        const charCode = input.charCodeAt(0);
-        console.log(`Control character: "${input}" (code: ${charCode})`);
-      }
-      
-      // Track command line for interception
+      // Track command line for history (but don't intercept)
       if (input === '\r\n' || input === '\n' || input === '\r') {
         const commandLine = this.lastCommandLine.trim();
         
         if (commandLine) {
-          // Start tracking this command
+          // Start tracking this command for history
           this.currentCommand = {
             command: commandLine,
             startTime: Date.now(),
             output: ''
           };
-          
-          // Check for command interception
-          const intercepted = await this.checkCommandInterception(processId, input);
-          if (intercepted) {
-            // Command was intercepted, add to history immediately
-            commandHistoryStore.addEntry({
-              command: commandLine,
-              output: 'Command intercepted by interceptor',
-              intercepted: true,
-              duration: Date.now() - this.currentCommand.startTime
-            });
-            this.currentCommand = null;
-            this.lastCommandLine = '';
-            return;
-          }
         }
         
         // Clear the command line after execution
         this.lastCommandLine = '';
       } else if (input === '\u007f' || input === '\b' || input === '\x7f' || input.charCodeAt(0) === 127 || input.charCodeAt(0) === 8) {
-        // Backspace - remove last character (handle different backspace representations)
-        // 127 = DEL, 8 = BS
+        // Backspace - remove last character
         this.lastCommandLine = this.lastCommandLine.slice(0, -1);
-        // Backspace detected
       } else if (input.length === 1 && input >= ' ' && input.charCodeAt(0) < 127) {
         // Regular printable character input - append to command line
         this.lastCommandLine += input;
-      } else {
-        // Other control characters - ignore for command tracking
       }
 
+      // Send input directly to backend
       await invoke('send_terminal_input', {
         processId,
         input
@@ -180,67 +193,6 @@ export class TerminalService {
     }
   }
 
-  /**
-   * Add command interceptor for full control
-   */
-  static async addCommandInterceptor(interceptor: CommandInterceptor): Promise<void> {
-    try {
-      await invoke('add_command_interceptor', {
-        interceptor: {
-          pattern: interceptor.pattern.source,
-          handler_type: 'monitor' // Default to monitor
-        }
-      });
-      this.commandInterceptors.push(interceptor);
-    } catch (error) {
-      console.error('Failed to add command interceptor:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Remove command interceptor
-   */
-  static async removeCommandInterceptor(pattern: RegExp): Promise<void> {
-    try {
-      await invoke('remove_command_interceptor', { pattern: pattern.source });
-      this.commandInterceptors = this.commandInterceptors.filter(i => i.pattern !== pattern);
-    } catch (error) {
-      console.error('Failed to remove command interceptor:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Add output parser for full control
-   */
-  static async addOutputParser(parser: OutputParser): Promise<void> {
-    try {
-      await invoke('add_output_parser', {
-        parser: {
-          pattern: parser.pattern.source,
-          parser_type: 'highlight' // Default to highlight
-        }
-      });
-      this.outputParsers.push(parser);
-    } catch (error) {
-      console.error('Failed to add output parser:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Remove output parser
-   */
-  static async removeOutputParser(pattern: RegExp): Promise<void> {
-    try {
-      await invoke('remove_output_parser', { pattern: pattern.source });
-      this.outputParsers = this.outputParsers.filter(p => p.pattern !== pattern);
-    } catch (error) {
-      console.error('Failed to remove output parser:', error);
-      throw error;
-    }
-  }
 
   /**
    * Get system information with native terminal profiles
@@ -324,9 +276,6 @@ export class TerminalService {
         if (callback) {
           callback(output);
         }
-
-        // Run output parsers
-        this.parseOutput(output).catch(console.error);
       }
     });
   }
@@ -336,61 +285,64 @@ export class TerminalService {
    */
   private static async handleProcessExit(processId: string): Promise<void> {
     try {
+      // Get the process to extract tab_id
+      const process = await this.getProcess(processId);
+      const tabId = process?.tab_id;
+      
       // Get the actual exit code from the backend
       const exitCode = await invoke<number | null>('get_process_exit_code', { processId });
       console.log(`Process ${processId} exited with code:`, exitCode);
       
       // Complete the current command with the real exit code
-      this.completeCurrentCommand(exitCode ?? undefined);
+      this.completeCurrentCommand(exitCode ?? undefined, tabId);
     } catch (error) {
       console.error('Failed to get process exit code:', error);
       // Fallback to output-based detection
-      this.completeCurrentCommand();
+      const process = await this.getProcess(processId);
+      const tabId = process?.tab_id;
+      this.completeCurrentCommand(undefined, tabId);
     }
   }
 
-  private static async checkCommandInterception(processId: string, input: string): Promise<boolean> {
-    const process = await this.getProcess(processId);
-    if (!process) return false;
-
-    // Only check for command interception on Enter key (command execution)
-    if (input === '\r\n' || input === '\n' || input === '\r') {
-      const commandLine = this.lastCommandLine.trim();
-      if (commandLine) {
-        console.log(`Checking command for interception: "${commandLine}"`);
-        for (const interceptor of this.commandInterceptors) {
-          if (interceptor.pattern.test(commandLine)) {
-            console.log(`Command intercepted: ${commandLine}`);
-            const intercepted = await interceptor.handler(commandLine, process);
-            if (intercepted) {
-              return true;
-            }
-          }
-        }
-      }
-    }
-    return false;
-  }
 
   private static lastCommandLine: string = '';
 
   /**
+   * Start tracking a command for history (used by quick commands)
+   */
+  static startCommandTracking(command: string, tabId?: string): void {
+    console.log('Starting command tracking for:', command, 'tabId:', tabId);
+    this.currentCommand = {
+      command: command.trim(),
+      startTime: Date.now(),
+      output: ''
+    };
+    this.lastCommandLine = command.trim();
+  }
+
+  /**
    * Complete the current command and add it to history
    */
-  static completeCurrentCommand(exitCode?: number): void {
+  static completeCurrentCommand(exitCode?: number, tabId?: string): void {
+    // console.log('Completing current command:', this.currentCommand?.command, 'tabId:', tabId);
     if (this.currentCommand) {
       const duration = Date.now() - this.currentCommand.startTime;
       
       // Try to detect exit code from output if not provided
       const detectedExitCode = exitCode ?? this.detectExitCodeFromOutput(this.currentCommand.output);
       
-      commandHistoryStore.addEntry({
-        command: this.currentCommand.command,
-        output: this.currentCommand.output,
-        exitCode: detectedExitCode,
-        duration,
-        intercepted: false
-      });
+      console.log('Adding to history - command:', this.currentCommand.command, 'output length:', this.currentCommand.output.length, 'tabId:', tabId);
+      
+      if (tabId) {
+        // Use persistence-enabled method
+        commandHistoryStore.addEntryWithPersistence(tabId, {
+          command: this.currentCommand.command,
+          output: this.currentCommand.output,
+          exitCode: detectedExitCode,
+          duration,
+          intercepted: false
+        });
+      }
       
       this.currentCommand = null;
     }
@@ -427,15 +379,4 @@ export class TerminalService {
     return 0;
   }
 
-  private static async parseOutput(output: TerminalOutput): Promise<void> {
-    for (const parser of this.outputParsers) {
-      if (parser.pattern.test(output.content)) {
-        // Get the process for the parser
-        const process = await this.getProcess(output.process_id);
-        if (process) {
-          parser.handler(output.content, process);
-        }
-      }
-    }
-  }
 }

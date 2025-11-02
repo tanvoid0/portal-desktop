@@ -1,0 +1,39 @@
+{
+  "n8n_url": "http://localhost:5678",
+  "api_key": "",
+  "ollama": {
+    "base_url": "http://localhost:11434",
+    "default_model": "llama3.2:3b",
+    "code_model": "codellama:7b",
+    "mistral_model": "mistral:7b"
+  },
+  "workflows": {
+    "node_setup": "",
+    "rust_setup": "",
+    "python_setup": "",
+    "git_init": "",
+    "dependency_update": "",
+    "health_check": "",
+    "ai_code_analysis": "",
+    "ai_suggestions": "",
+    "ai_code_review": ""
+  },
+  "framework_mappings": {
+    "Node.js": ["node_setup", "dependency_update", "ai_code_analysis"],
+    "Rust": ["rust_setup", "cargo_update", "ai_code_analysis"],
+    "Python": ["python_setup", "pip_update", "ai_code_analysis"],
+    "Go": ["go_setup", "go_update", "ai_code_analysis"],
+    "PHP": ["php_setup", "composer_update", "ai_code_analysis"],
+    "Ruby": ["ruby_setup", "bundle_update", "ai_code_analysis"]
+  },
+  "package_manager_mappings": {
+    "npm": ["node_setup", "dependency_update", "ai_suggestions"],
+    "yarn": ["node_setup", "dependency_update", "ai_suggestions"],
+    "pnpm": ["node_setup", "dependency_update", "ai_suggestions"],
+    "cargo": ["rust_setup", "cargo_update", "ai_code_review"],
+    "pip": ["python_setup", "pip_update", "ai_suggestions"],
+    "go": ["go_setup", "go_update", "ai_code_review"],
+    "composer": ["php_setup", "composer_update", "ai_suggestions"],
+    "bundle": ["ruby_setup", "bundle_update", "ai_suggestions"]
+  }
+}

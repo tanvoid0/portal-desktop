@@ -20,7 +20,8 @@ export const POST: RequestHandler = async ({ request }) => {
     });
   } catch (error) {
     console.error('Command execution error:', error);
-    return new Response(`Error: ${error.message}`, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new Response(`Error: ${errorMessage}`, { status: 500 });
   }
 };
 

@@ -9,11 +9,11 @@ use crate::domains::terminal::shell_integration::ShellIntegrationParser;
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem, MasterPty};
 
 // Global state for interactive processes (PTY-backed)
-use once_cell::sync::Lazy;
-static INTERACTIVE_PROCESSES: Lazy<std::sync::Mutex<HashMap<String, Box<dyn portable_pty::Child + Send>>>> = 
-    Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
-static MASTER_PTYS: Lazy<std::sync::Mutex<HashMap<String, Box<dyn MasterPty + Send>>>> =
-    Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
+use std::sync::OnceLock;
+static INTERACTIVE_PROCESSES: OnceLock<std::sync::Mutex<HashMap<String, Box<dyn portable_pty::Child + Send>>>> = 
+    OnceLock::new();
+static MASTER_PTYS: OnceLock<std::sync::Mutex<HashMap<String, Box<dyn MasterPty + Send>>>> =
+    OnceLock::new();
 
 pub type ProcessMap = Arc<Mutex<HashMap<String, TerminalProcess>>>;
 pub type StdinHandles = Arc<Mutex<HashMap<String, Box<dyn Write + Send>>>>;
@@ -225,12 +225,12 @@ impl TerminalManager {
 
         // Store the PTY child for lifecycle management
         {
-            let mut processes = INTERACTIVE_PROCESSES.lock().unwrap();
+            let mut processes = INTERACTIVE_PROCESSES.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
             processes.insert(process_id.clone(), child);
         }
         // Store the Master PTY for resize operations
         {
-            let mut masters = MASTER_PTYS.lock().unwrap();
+            let mut masters = MASTER_PTYS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
             masters.insert(process_id.clone(), master);
         }
 
@@ -251,7 +251,7 @@ impl TerminalManager {
 
         // Start PTY output streaming with shell integration
         {
-            let mut masters = MASTER_PTYS.lock().unwrap();
+            let mut masters = MASTER_PTYS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
             if let Some(m) = masters.get_mut(&process_id) {
                 if let Ok(mut reader) = m.try_clone_reader() {
                     println!("Starting output streaming for process: {}", process_id);
@@ -365,7 +365,7 @@ impl TerminalManager {
     }
 
     pub async fn kill_process(&self, process_id: String) -> Result<(), String> {
-        let mut processes = INTERACTIVE_PROCESSES.lock().unwrap();
+        let mut processes = INTERACTIVE_PROCESSES.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
         
         if let Some(mut child) = processes.remove(&process_id) {
             if let Err(e) = child.kill() {
@@ -461,7 +461,7 @@ impl TerminalManager {
     }
 
     pub async fn resize_terminal(&self, process_id: String, cols: u32, rows: u32) -> Result<(), String> {
-        let mut masters = MASTER_PTYS.lock().unwrap();
+        let mut masters = MASTER_PTYS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
         if let Some(m) = masters.get_mut(&process_id) {
             let size = PtySize { cols: cols as u16, rows: rows as u16, pixel_width: 0, pixel_height: 0 };
             if let Err(e) = m.resize(size) {
@@ -481,7 +481,7 @@ impl TerminalManager {
             loop {
                 std::thread::sleep(std::time::Duration::from_millis(1000));
                 
-                let mut interactive_processes = INTERACTIVE_PROCESSES.lock().unwrap();
+                let mut interactive_processes = INTERACTIVE_PROCESSES.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
                 if let Some(child) = interactive_processes.get_mut(&process_id) {
                     match child.try_wait() {
                         Ok(Some(status)) => {

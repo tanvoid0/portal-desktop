@@ -81,19 +81,19 @@ export * from './shared';
 export * from './projects';
 
 // Deployment domain exports
-export * from './deployments';
+// export * from './deployments';
 
 // Credentials domain exports
-export * from './credentials';
+// export * from './credentials';
 
 // Settings domain exports
-export * from './settings';
+// export * from './settings';
 
-// Terminal domain exports
+// Terminal domain exports  
 export * from './terminal';
 
 // Notifications domain exports
-export * from './notifications';
+// export * from './notifications';
 
 // Performance domain exports
-export * from './performance';
+// export * from './performance';

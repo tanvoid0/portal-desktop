@@ -3,11 +3,9 @@ use sea_orm_migration::prelude::*;
 use tauri::{AppHandle, Manager};
 
 use crate::entities::project as project_entity;
-use crate::entities::task as task_entity;
 
 // Re-export the ProjectModel and TaskModel from the entity for compatibility
 pub use project_entity::Model as ProjectModel;
-pub use task_entity::Model as TaskModel;
 
 #[derive(Clone)]
 pub struct DatabaseManager {
@@ -79,15 +77,27 @@ impl DatabaseManager {
     
 
     async fn run_migrations(conn: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
-        // Run all migrations using the generated registry
-        let migrations = crate::migrations::get_migrations();
+        println!("[DatabaseManager] Starting migration process...");
         
         // Create a schema manager for running migrations
         let schema_manager = sea_orm_migration::SchemaManager::new(conn);
         
-        for migration in migrations {
-            migration.up(&schema_manager).await?;
+        // Run all migrations using the generated registry
+        let migrations = crate::migrations::get_migrations();
+        println!("[DatabaseManager] Found {} migrations to run", migrations.len());
+        
+        for (i, migration) in migrations.iter().enumerate() {
+            println!("[DatabaseManager] Running migration {} of {}", i + 1, migrations.len());
+            match migration.up(&schema_manager).await {
+                Ok(_) => println!("[DatabaseManager] Migration {} completed successfully", i + 1),
+                Err(e) => {
+                    println!("[DatabaseManager] Migration {} failed: {}", i + 1, e);
+                    return Err(e);
+                }
+            }
         }
+        
+        println!("[DatabaseManager] All migrations completed successfully");
         Ok(())
     }
 }

@@ -18,6 +18,17 @@ pub struct Model {
     pub completed_at: Option<DateTimeWithTimeZone>,
     pub created_at: Option<DateTimeWithTimeZone>,
     pub updated_at: Option<DateTimeWithTimeZone>,
+    // New advanced fields
+    pub estimated_time: Option<i32>, // estimated minutes
+    pub actual_time: Option<i32>, // actual minutes spent
+    pub tags: Option<String>, // JSON array of strings
+    pub assignee: Option<String>, // assignee name/email
+    pub recurring_pattern: Option<String>, // daily/weekly/monthly/yearly
+    pub recurring_interval: Option<i32>, // every N units
+    pub recurring_end_date: Option<DateTimeWithTimeZone>,
+    pub recurring_last_generated: Option<DateTimeWithTimeZone>,
+    pub blocked_by: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>, // JSON array of task IDs
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

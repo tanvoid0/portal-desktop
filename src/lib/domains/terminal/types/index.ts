@@ -7,6 +7,7 @@ export interface TerminalTab {
   name: string;
   projectId?: string;
   workingDirectory: string;
+  shell?: string; // Terminal shell/profile for this tab
   status: 'idle' | 'running' | 'completed' | 'error' | 'killed';
   processId?: string;
   startTime?: Date;
@@ -76,9 +77,65 @@ export interface TerminalContext {
 }
 
 export interface CreateProcessRequest {
+  tab_id: string; // snake_case to match Rust backend
   shell: string;
   working_directory: string; // snake_case to match Rust backend
   environment: Record<string, string>;
   cols: number;
   rows: number;
+}
+
+export interface TerminalSystemInfo {
+  os: string;
+  arch: string;
+  platform: string;
+  workingDirectory: string;
+  availableShells: string[];
+  terminalProfiles: TerminalProfile[];
+}
+
+export interface TerminalProfile {
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  icon?: string;
+  description?: string;
+}
+
+export interface ShellIntegrationEvent {
+  type: 'CommandStart' | 'CommandOutput' | 'CommandEnd' | 'CommandDetected';
+  payload: CommandStartEvent | CommandOutputEvent | CommandEndEvent | CommandDetectedEvent;
+}
+
+export interface CommandStartEvent {
+  id: string;
+  command: string;
+  workingDirectory: string;
+  timestamp: Date;
+}
+
+export interface CommandOutputEvent {
+  process_id: string;
+  content: string;
+  timestamp: Date;
+}
+
+export interface CommandEndEvent {
+  id: string;
+  exitCode: number;
+  duration: number;
+  timestamp: Date;
+}
+
+export interface CommandDetectedEvent {
+  command: string;
+  workingDirectory: string;
+  timestamp: Date;
+}
+
+export interface TerminalOutputEvent {
+  process_id: string;
+  content: string;
+  timestamp: Date;
 }

@@ -20,6 +20,17 @@ pub struct TaskResponse {
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    // New advanced fields
+    pub estimated_time: Option<i32>,
+    pub actual_time: Option<i32>,
+    pub tags: Option<String>, // JSON array of strings
+    pub assignee: Option<String>,
+    pub recurring_pattern: Option<String>,
+    pub recurring_interval: Option<i32>,
+    pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
+    pub blocked_by: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>, // JSON array of task IDs
 }
 
 impl From<crate::domains::tasks::entities::task::Model> for TaskResponse {
@@ -38,6 +49,17 @@ impl From<crate::domains::tasks::entities::task::Model> for TaskResponse {
             completed_at: model.completed_at.map(|dt| dt.into()),
             created_at: model.created_at.map(|dt| dt.into()),
             updated_at: model.updated_at.map(|dt| dt.into()),
+            // New advanced fields
+            estimated_time: model.estimated_time,
+            actual_time: model.actual_time,
+            tags: model.tags,
+            assignee: model.assignee,
+            recurring_pattern: model.recurring_pattern,
+            recurring_interval: model.recurring_interval,
+            recurring_end_date: model.recurring_end_date.map(|dt| dt.into()),
+            recurring_last_generated: model.recurring_last_generated.map(|dt| dt.into()),
+            blocked_by: model.blocked_by,
+            blocks: model.blocks,
         }
     }
 }
@@ -53,6 +75,17 @@ pub struct CreateTaskCommand {
     pub resource_id: Option<String>,
     pub resource_type: Option<String>,
     pub due_date: Option<chrono::DateTime<chrono::Utc>>,
+    // New advanced fields
+    pub estimated_time: Option<i32>,
+    pub actual_time: Option<i32>,
+    pub tags: Option<String>, // JSON array of strings
+    pub assignee: Option<String>,
+    pub recurring_pattern: Option<String>,
+    pub recurring_interval: Option<i32>,
+    pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
+    pub blocked_by: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>, // JSON array of task IDs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +99,17 @@ pub struct UpdateTaskCommand {
     pub resource_id: Option<String>,
     pub resource_type: Option<String>,
     pub due_date: Option<chrono::DateTime<chrono::Utc>>,
+    // New advanced fields
+    pub estimated_time: Option<i32>,
+    pub actual_time: Option<i32>,
+    pub tags: Option<String>, // JSON array of strings
+    pub assignee: Option<String>,
+    pub recurring_pattern: Option<String>,
+    pub recurring_interval: Option<i32>,
+    pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
+    pub blocked_by: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>, // JSON array of task IDs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,6 +166,17 @@ pub async fn create_task(
         resource_id: command.resource_id.map(|r| r.trim().to_string()).filter(|r| !r.is_empty()),
         resource_type: command.resource_type.map(|r| r.trim().to_string()).filter(|r| !r.is_empty()),
         due_date: command.due_date,
+        // New advanced fields
+        estimated_time: command.estimated_time,
+        actual_time: command.actual_time,
+        tags: command.tags,
+        assignee: command.assignee,
+        recurring_pattern: command.recurring_pattern,
+        recurring_interval: command.recurring_interval,
+        recurring_end_date: command.recurring_end_date,
+        recurring_last_generated: command.recurring_last_generated,
+        blocked_by: command.blocked_by,
+        blocks: command.blocks,
     };
 
     task_service
@@ -185,6 +240,17 @@ pub async fn update_task(
         resource_id: command.resource_id.map(|r| r.trim().to_string()).filter(|r| !r.is_empty()),
         resource_type: command.resource_type.map(|r| r.trim().to_string()).filter(|r| !r.is_empty()),
         due_date: command.due_date,
+        // New advanced fields
+        estimated_time: command.estimated_time,
+        actual_time: command.actual_time,
+        tags: command.tags,
+        assignee: command.assignee,
+        recurring_pattern: command.recurring_pattern,
+        recurring_interval: command.recurring_interval,
+        recurring_end_date: command.recurring_end_date,
+        recurring_last_generated: command.recurring_last_generated,
+        blocked_by: command.blocked_by,
+        blocks: command.blocks,
     };
 
     task_service
@@ -322,6 +388,56 @@ pub async fn get_task_count(
         .await
         .map_err(|e| {
             eprintln!("Failed to get task count: {}", e);
+            e.to_string()
+        })
+}
+
+// New advanced commands
+
+#[tauri::command]
+pub async fn get_overdue_tasks(
+    db_manager: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<TaskResponse>, String> {
+    let task_service = TaskService::new(db_manager.get_connection_clone());
+    
+    task_service
+        .get_overdue_tasks()
+        .await
+        .map(|tasks| tasks.into_iter().map(TaskResponse::from).collect())
+        .map_err(|e| {
+            eprintln!("Failed to get overdue tasks: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+pub async fn get_due_today_tasks(
+    db_manager: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<TaskResponse>, String> {
+    let task_service = TaskService::new(db_manager.get_connection_clone());
+    
+    task_service
+        .get_due_today_tasks()
+        .await
+        .map(|tasks| tasks.into_iter().map(TaskResponse::from).collect())
+        .map_err(|e| {
+            eprintln!("Failed to get due today tasks: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+pub async fn get_unestimated_tasks(
+    db_manager: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<TaskResponse>, String> {
+    let task_service = TaskService::new(db_manager.get_connection_clone());
+    
+    task_service
+        .get_unestimated_tasks()
+        .await
+        .map(|tasks| tasks.into_iter().map(TaskResponse::from).collect())
+        .map_err(|e| {
+            eprintln!("Failed to get unestimated tasks: {}", e);
             e.to_string()
         })
 }
