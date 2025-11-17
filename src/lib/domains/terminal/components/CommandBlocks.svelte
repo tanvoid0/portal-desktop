@@ -4,12 +4,18 @@
   import CommandBlock from './CommandBlock.svelte';
   import { Button } from '@/lib/components/ui/button';
   import { Badge } from '@/lib/components/ui/badge';
-  import { Trash2, Maximize2, Minimize2 } from 'lucide-svelte';
+  import { Trash2, Maximize2, Minimize2 } from '@lucide/svelte';
   import type { ShellIntegrationEvent, CommandStartEvent, CommandOutputEvent, CommandEndEvent, CommandDetectedEvent, TerminalOutputEvent } from '../types';
   
-  export let processId: string;
+  interface Props {
+    processId: string;
+  }
+
+  let {
+    processId
+  }: Props = $props();
   
-  let commandBlocks: Array<{
+  let commandBlocks = $state<Array<{
     id: string;
     command: string;
     output: string;
@@ -18,10 +24,10 @@
     workingDirectory?: string;
     timestamp: string;
     isExpanded?: boolean;
-  }> = [];
+  }>>([]);
   
-  let isExpanded = true;
-  let unsubscribe: (() => void) | null = null;
+  let isExpanded = $state(true);
+  let unsubscribe = $state<(() => void) | null>(null);
 
   onMount(async () => {
     console.log('CommandBlocks mounted with processId:', processId);
@@ -223,10 +229,10 @@
   }
 
   // Get summary stats
-  $: totalBlocks = commandBlocks.length;
-  $: successfulBlocks = commandBlocks.filter(b => b.exitCode === 0).length;
-  $: failedBlocks = commandBlocks.filter(b => b.exitCode !== undefined && b.exitCode !== 0).length;
-  $: runningBlocks = commandBlocks.filter(b => b.exitCode === undefined).length;
+  const totalBlocks = $derived(commandBlocks.length);
+  const successfulBlocks = $derived(commandBlocks.filter(b => b.exitCode === 0).length);
+  const failedBlocks = $derived(commandBlocks.filter(b => b.exitCode !== undefined && b.exitCode !== 0).length);
+  const runningBlocks = $derived(commandBlocks.filter(b => b.exitCode === undefined).length);
 </script>
 
 <div class="command-blocks-container">

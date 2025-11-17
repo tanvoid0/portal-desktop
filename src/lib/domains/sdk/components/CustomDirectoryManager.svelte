@@ -24,7 +24,7 @@
 		X,
 		Search,
 		Settings
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface CustomDirectory {
 		id: string;

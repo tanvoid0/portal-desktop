@@ -2,22 +2,29 @@
   import { Badge } from '@/lib/components/ui/badge';
   import { Button } from '@/lib/components/ui/button';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/lib/components/ui/collapsible';
-  import { ChevronDown, ChevronRight, Clock, Terminal, CheckCircle, XCircle, AlertCircle } from 'lucide-svelte';
+  import { ChevronDown, ChevronRight, Clock, Terminal, CheckCircle, XCircle, AlertCircle } from '@lucide/svelte';
   
-  export let block: {
-    id: string;
-    command: string;
-    output: string;
-    exitCode?: number;
-    duration?: number;
-    workingDirectory?: string;
-    timestamp: string;
-    isExpanded?: boolean;
-  };
-  export let onclick: (() => void) | undefined = undefined;
+  interface Props {
+    block: {
+      id: string;
+      command: string;
+      output: string;
+      exitCode?: number;
+      duration?: number;
+      workingDirectory?: string;
+      timestamp: string;
+      isExpanded?: boolean;
+    };
+    onclick?: (() => void) | undefined;
+  }
 
-  let isExpanded = block.isExpanded ?? false;
-  let isRunning = block.exitCode === undefined;
+  let {
+    block,
+    onclick = undefined
+  }: Props = $props();
+
+  let isExpanded = $state(block.isExpanded ?? false);
+  let isRunning = $derived(block.exitCode === undefined);
 
   // Format duration
   function formatDuration(ms: number): string {
@@ -45,9 +52,22 @@
 
   const statusInfo = getStatusInfo();
   const StatusIcon = statusInfo.icon;
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (onclick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onclick();
+    }
+  }
 </script>
 
-<div class="command-block border border-border rounded-lg bg-card" onclick={() => onclick && onclick()}>
+<div 
+  class="command-block border border-border rounded-lg bg-card {onclick ? 'cursor-pointer' : ''}" 
+  onclick={() => onclick && onclick()}
+  role={onclick ? 'button' : undefined}
+  tabindex={onclick ? 0 : undefined}
+  onkeydown={handleKeyDown}
+>
   <!-- Command Header -->
   <div class="flex items-center justify-between p-3 border-b border-border">
     <div class="flex items-center gap-3 flex-1 min-w-0">

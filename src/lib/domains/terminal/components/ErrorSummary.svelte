@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Badge } from '@/lib/components/ui/badge';
   import { Button } from '@/lib/components/ui/button';
-  import { AlertTriangle, Info, AlertCircle, X } from 'lucide-svelte';
+  import { AlertTriangle, Info, AlertCircle, X } from '@lucide/svelte';
 
   export let errorCount: number = 0;
   export let warningCount: number = 0;

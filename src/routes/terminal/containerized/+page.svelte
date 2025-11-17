@@ -7,7 +7,7 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Container, Terminal, Plus, Play, Square } from 'lucide-svelte';
+	import { Container, Terminal, Plus, Play, Square } from '@lucide/svelte';
 
 	// Mock container data - in real implementation, this would come from a store
 	let containers = $state([

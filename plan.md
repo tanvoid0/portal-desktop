@@ -594,6 +594,19 @@ This approach preserves a vanilla shell while giving you structure.
 * ✅ Search functionality for command history - **COMPLETED**
 * 🔄 Basic "blocks": foldable outputs, exit code badges, durations - **CANCELLED/BACKLOG**
 
+**Week 3.5: AI Integration** 🚨 **HIGHEST PRIORITY - IN PROGRESS**
+
+* 🚨 **Dedicated AI page** (`/ai`) - **HIGHEST PRIORITY**
+* 🚨 **AI chat interface** - Full chat with AI assistants (Ollama, OpenAI, Anthropic, Gemini)
+* 🚨 **AI content management**:
+  - View and manage training data
+  - View AI interaction logs
+  - Manage AI provider configurations
+  - View conversation history
+* 🚨 **Move AI settings from settings page** to dedicated AI page
+* ✅ **AI provider infrastructure** - **COMPLETED** (AI provider service exists)
+* ✅ **AI chat components** - **PARTIAL** (AIChatPanel exists, needs integration)
+
 ### **Recent Implementation Details**
 
 #### **Command History Persistence** ✅ **COMPLETED**
@@ -614,26 +627,62 @@ This approach preserves a vanilla shell while giving you structure.
 - **Command Detection**: Basic prompt-based command detection implemented
 - **Backend Integration**: Shell integration parser integrated into PTY output streaming
 
-**Week 4: Kubernetes Integration** 📋 **PLANNED**
+### **Kubernetes Implementation Details** ✅ **85% COMPLETE**
 
-* 📋 **Kubernetes API client setup** with kubeconfig management - **NOT STARTED**
-* 📋 **Cluster browser** with multi-cluster support and context switching - **NOT STARTED**
-* 📋 **Resource tree view** (namespaces, pods, services, deployments) - **NOT STARTED**
-* 📋 **Real-time resource monitoring** with WebSocket connections - **NOT STARTED**
+#### **Completed Kubernetes Features**
+- ✅ **Multi-cluster support** with context switching and cluster health monitoring
+- ✅ **Kubeconfig management** with automatic discovery and validation
+- ✅ **Resource management** for all major types:
+  - ✅ Pods: list, view, delete, logs, exec, port-forward, YAML editing
+  - ✅ Services: list, view, YAML editing
+  - ✅ Deployments: list, view, scale, rollback, YAML editing
+  - ✅ StatefulSets: list, view, YAML editing
+  - ✅ DaemonSets: list, view, YAML editing
+  - ✅ Jobs: list, view, YAML editing
+  - ✅ CronJobs: list, view, YAML editing
+  - ✅ ConfigMaps: full CRUD + YAML editing
+  - ✅ Secrets: full CRUD + secure viewing + YAML editing
+  - ✅ Ingress: list, view, YAML editing
+  - ✅ Namespaces: list, select
+- ✅ **Real-time resource updates** via Kubernetes watch API
+- ✅ **Log streaming** from pods with filtering and search capabilities
+- ✅ **Port forwarding** with session management
+- ✅ **Exec into containers** with terminal integration
+- ✅ **YAML/JSON editing** for all resource types
+- ✅ **Deployment rollback** functionality
 
-**Week 5: Kubernetes Management Features** 📋 **PLANNED**
+#### **Missing/Incomplete Kubernetes Features**
+- ⚠️ **Log search** - **PARTIAL** (client-side filtering exists, backend search not fully implemented)
+- ❌ **Event monitoring** with filtering and alerting
+- ❌ **Resource metrics UI** (CPU, memory visualization) - types exist but UI missing
+- ❌ **Health checks** visualization (readiness/liveness probe status)
+- ❌ **Network topology** visualization for services and ingress
+- ❌ **File transfer** to/from containers
+- ❌ **Resource templates** and quick deployment wizards
+- ❌ **Helm chart management** (install, upgrade, rollback)
+- ❌ **Bulk operations** (delete, scale, restart multiple resources)
+- ⚠️ **Resource tree view** - hierarchical view missing (lists exist)
 
-* 📋 **Pod management** (logs, exec, port forwarding) - **NOT STARTED**
-* 📋 **Resource CRUD operations** (create, edit, delete, scale) - **NOT STARTED**
-* 📋 **YAML/JSON editor** for resource definitions - **NOT STARTED**
-* 📋 **Event monitoring** and alerting - **NOT STARTED**
+**Week 4: Kubernetes Integration** ✅ **85% COMPLETE**
 
-**Week 6: Advanced Kubernetes Features** 📋 **PLANNED**
+* ✅ **Kubernetes API client setup** with kubeconfig management - **COMPLETED** (using `kube-rs`)
+* ✅ **Cluster browser** with multi-cluster support and context switching - **COMPLETED**
+* ⚠️ **Resource tree view** (namespaces, pods, services, deployments) - **PARTIAL** (resource lists exist, hierarchical tree missing)
+* ✅ **Real-time resource monitoring** with WebSocket connections - **COMPLETED** (Watch API for pods, services, deployments)
 
-* 📋 **Helm chart management** (install, upgrade, rollback) - **NOT STARTED**
-* 📋 **Network topology visualization** - **NOT STARTED**
-* 📋 **Resource metrics and monitoring** - **NOT STARTED**
-* 📋 **Terminal integration** with kubectl commands - **NOT STARTED**
+**Week 5: Kubernetes Management Features** ✅ **90% COMPLETE**
+
+* ✅ **Pod management** (logs, exec, port forwarding) - **COMPLETED** (all features working)
+* ✅ **Resource CRUD operations** (create, edit, delete, scale) - **COMPLETED** (all resource types)
+* ✅ **YAML/JSON editor** for resource definitions - **COMPLETED** (full YAML editing for all resources)
+* ❌ **Event monitoring** and alerting - **NOT STARTED**
+
+**Week 6: Advanced Kubernetes Features** ⚠️ **30% COMPLETE**
+
+* ❌ **Helm chart management** (install, upgrade, rollback) - **NOT STARTED**
+* ❌ **Network topology visualization** - **NOT STARTED**
+* ⚠️ **Resource metrics and monitoring** - **PARTIAL** (types exist, UI missing)
+* ✅ **Terminal integration** with kubectl commands - **COMPLETED** (exec into containers working)
 
 **Week 7: Terminal UX Improvements** 📋 **PLANNED**
 
@@ -652,15 +701,57 @@ This approach preserves a vanilla shell while giving you structure.
 
 # 13) Current Status & Next Steps
 
+## 📊 **Overall Progress Summary**
+
+### **Terminal Features**: ✅ **75% Complete**
+- **Core Infrastructure**: ✅ 100% (8/8 features)
+- **Shell Integration**: ✅ 90% (5/6 features)
+- **UX Improvements**: ❌ 0% (0/4 features)
+- **Multiplexing**: ❌ 0% (0/5 features)
+
+### **Kubernetes Features**: ✅ **85% Complete**
+- **Core Infrastructure**: ✅ 100% (4/4 features)
+- **Resource Management**: ✅ 95% (11/12 resource types)
+- **Real-time Monitoring**: ✅ 75% (Watch API ✅, Events ❌)
+- **Developer Experience**: ✅ 80% (Port-forward ✅, Exec ✅, YAML ✅, File transfer ❌)
+- **Advanced Features**: ⚠️ 30% (Metrics partial, Helm ❌, Topology ❌)
+
+### **AI Features**: 🚨 **20% Complete** - **HIGHEST PRIORITY**
+- **AI Provider Infrastructure**: ✅ 100% (AI service exists)
+- **AI Chat Components**: ⚠️ 50% (AIChatPanel exists, needs integration)
+- **Dedicated AI Page**: ❌ 0% (not started - **HIGHEST PRIORITY**)
+- **AI Content Management**: ❌ 0% (training data, logs, history - not started)
+- **AI Settings Migration**: ❌ 0% (move from settings to AI page)
+
+### **Overall Project**: ✅ **75% Complete**
+
+---
+
 ## 🎯 **IMMEDIATE PRIORITIES (Next 2-3 weeks)**
 
-### **🚨 Priority 0: Critical Fixes** 🚨 **URGENT**
-- **Fix Linux PTY connection failures** - **BLOCKING ISSUE**
-- **Implement terminal state persistence** - **CRITICAL FOR UX**
-- **Fix session restoration** across app restarts
-- **Investigate portable-pty Linux compatibility**
+### **🚨 Priority 0: AI Dedicated Page** 🚨 **HIGHEST PRIORITY**
+- **Create dedicated AI page** (`/ai`) with full chat interface
+- **AI chat functionality** - Chat with AI assistants (Ollama, OpenAI, Anthropic, Gemini)
+- **AI content management**:
+  - View and manage training data
+  - View AI interaction logs
+  - Manage AI provider configurations
+  - View conversation history
+- **Move AI-related content from settings** to dedicated AI page
+- **Unified AI experience** - Single place for all AI interactions and management
 
-### **Priority 1: Shell Integration & Command History** ✅ **COMPLETED**
+### **Priority 1: Kubernetes & Terminal Improvements** 🚧
+- **Kubernetes log search** - **Backend search implementation** (currently only client-side filtering)
+- **Terminal state persistence** - **CRITICAL FOR UX**
+- **Session restoration** across app restarts
+- **Scrollback persistence** across sessions
+
+### **Priority 2: Terminal UX Improvements** 🚧
+- **Command palette** with quick actions (kill, rerun, clear)
+- **Better error detection** and hyperlink parsing
+- **Session management** improvements
+
+### **Shell Integration & Command History** ✅ **COMPLETED**
 - ✅ **Implement OSC markers** for command start/end detection
 - ✅ **Command history persistence** with backend storage
 - ✅ **Search functionality** for command history
@@ -668,24 +759,30 @@ This approach preserves a vanilla shell while giving you structure.
 - 🔄 **Add command duration** tracking and display - **IN PROGRESS**
 - 🔄 **Command blocks** with foldable outputs and exit codes - **CANCELLED/BACKLOG**
 
-### **Priority 2: Terminal UX Improvements** 🚧
-- **Command palette** with quick actions (kill, rerun, clear)
-- **Better error detection** and hyperlink parsing
-- **Session management** improvements
-- **Scrollback persistence** across sessions
-
-### **Priority 3: Kubernetes Integration** 📋
-- **Kubernetes API client** with kubeconfig management
-- **Cluster browser** with multi-cluster support
-- **Resource management** (pods, services, deployments)
-- **Real-time monitoring** and log streaming
-- **Port forwarding** and exec capabilities
+### **Priority 3: Kubernetes Integration** ✅ **85% COMPLETE**
+- ✅ **Kubernetes API client** with kubeconfig management - **COMPLETED**
+- ✅ **Cluster browser** with multi-cluster support - **COMPLETED**
+- ✅ **Resource management** (pods, services, deployments, StatefulSets, DaemonSets, Jobs, CronJobs, ConfigMaps, Secrets, Ingress) - **COMPLETED**
+- ✅ **Real-time monitoring** and log streaming - **COMPLETED** (Watch API + log streaming with filtering)
+- ✅ **Port forwarding** and exec capabilities - **COMPLETED**
+- ✅ **YAML editing** for all resources - **COMPLETED**
+- ✅ **Deployment rollback** - **COMPLETED**
+- ⚠️ **Log search** - **PARTIAL** (client-side filtering exists, backend search not fully implemented)
+- ❌ **Event monitoring** - **NOT STARTED**
+- ❌ **Resource metrics UI** - **NOT STARTED** (types exist)
+- ❌ **Network topology** - **NOT STARTED**
+- ❌ **Helm chart management** - **NOT STARTED**
 
 ### **Priority 4: Advanced Features** 📋
 - **Multiple tabs/panes** support
 - **Process tree view** for better debugging
 - **Settings UI** for customization
 - **Windows-specific polish**
+
+### **Priority 5: Linux PTY Fix** 🔧 **DEPRIORITIZED**
+- **Fix Linux PTY connection failures** - **COMPLEX ISSUE** (moved to lower priority)
+- **Investigate portable-pty Linux compatibility** - **LOW PRIORITY**
+- **Note**: Currently has workaround (simulated terminal), not blocking core functionality
 
 ## 🏗️ **TECHNICAL DEBT & IMPROVEMENTS**
 
@@ -710,11 +807,12 @@ This approach preserves a vanilla shell while giving you structure.
 - ❌ **Sessions lost on app restart** - **NEEDS IMMEDIATE FIX**
 - ❌ **Scrollback buffer lost** - **DATA LOSS ISSUE**
 
-#### **Linux Terminal Connection Issues** 🚨 **HIGH PRIORITY**
-- ❌ **Failed to connect to terminal process!** - **CRITICAL BUG**
-- ❌ **Falling back to simulated terminal** - **WORKAROUND ACTIVE**
-- ❌ **Real PTY connection failing on Linux** - **PLATFORM SPECIFIC**
-- 🔧 **Need to investigate portable-pty Linux compatibility**
+#### **Linux Terminal Connection Issues** 🔧 **DEPRIORITIZED**
+- ❌ **Failed to connect to terminal process!** - **COMPLEX ISSUE** (moved to lower priority)
+- ❌ **Falling back to simulated terminal** - **WORKAROUND ACTIVE** (acceptable for now)
+- ❌ **Real PTY connection failing on Linux** - **PLATFORM SPECIFIC** (low priority)
+- 🔧 **Need to investigate portable-pty Linux compatibility** - **LOW PRIORITY**
+- **Note**: Workaround exists, not blocking core functionality. Deprioritized in favor of AI features.
 
 #### **Terminal Connection Diagnostics**
 ```

@@ -11,7 +11,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
-	import { Eye, EyeOff, Copy, Edit, Trash2, Calendar, Tag } from 'lucide-svelte';
+	import { Eye, EyeOff, Copy, Edit, Trash2, Calendar, Tag } from '@lucide/svelte';
 
 	interface Props {
 		credential: Credential;

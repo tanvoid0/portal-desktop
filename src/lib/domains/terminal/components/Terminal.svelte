@@ -15,29 +15,36 @@
   import type { TerminalSettings, TerminalProcess, TerminalOutput, TerminalSystemInfo, TerminalOutputEvent } from '../types';
   import type { CommandHistoryEntry } from '../stores/commandHistoryStore';
   
-  export let tabId: string;
-  export let settings: TerminalSettings;
+  interface Props {
+    tabId: string;
+    settings: TerminalSettings;
+  }
 
-  let terminal: Terminal;
-  let fitAddon: FitAddon;
-  let currentProcess: TerminalProcess | null = null;
-  let isConnected = false;
-  let outputBuffer = '';
-  let inputBuffer = '';
-  let unsubscribe: (() => void) | null = null;
-  let systemInfo: TerminalSystemInfo | null = null;
-  let selectedEntry: CommandHistoryEntry | null = null;
-  let showModal = false;
-  let savedOutput = '';
-  let outputSaveInterval: NodeJS.Timeout | null = null;
+  let {
+    tabId,
+    settings
+  }: Props = $props();
+
+  let terminal = $state<Terminal | null>(null);
+  let fitAddon = $state<FitAddon | null>(null);
+  let currentProcess = $state<TerminalProcess | null>(null);
+  let isConnected = $state(false);
+  let outputBuffer = $state('');
+  let inputBuffer = $state('');
+  let unsubscribe = $state<(() => void) | null>(null);
+  let systemInfo = $state<TerminalSystemInfo | null>(null);
+  let selectedEntry = $state<CommandHistoryEntry | null>(null);
+  let showModal = $state(false);
+  let savedOutput = $state('');
+  let outputSaveInterval = $state<NodeJS.Timeout | null>(null);
   
   // Error tracking
-  let errorCount = 0;
-  let warningCount = 0;
-  let infoCount = 0;
-  let recentErrors: string[] = [];
-  let terminalOutput = '';
-  let sessionSaveTimeout: NodeJS.Timeout | null = null;
+  let errorCount = $state(0);
+  let warningCount = $state(0);
+  let infoCount = $state(0);
+  let recentErrors = $state<string[]>([]);
+  let terminalOutput = $state('');
+  let sessionSaveTimeout = $state<NodeJS.Timeout | null>(null);
 
   // Shell-specific Quick Commands
   const quickCommands = {
@@ -111,11 +118,22 @@
   };
 
   // Detect shell type and get appropriate commands
-  $: shellType = detectShellType(settings.defaultShell);
-  $: availableCommands = quickCommands[shellType] || quickCommands.linux;
-  $: randomCommands = availableCommands
-    .sort(() => Math.random() - 0.5)
-    .slice(0, Math.floor(Math.random() * 3) + 3);
+  const shellType = $derived(detectShellType(settings.defaultShell));
+  const availableCommands = $derived(quickCommands[shellType] || quickCommands.linux);
+  
+  // Function to generate random commands
+  function generateRandomCommands() {
+    return availableCommands
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.floor(Math.random() * 3) + 3);
+  }
+  
+  let randomCommands = $state(generateRandomCommands());
+  
+  // Update random commands when available commands change
+  $effect(() => {
+    randomCommands = generateRandomCommands();
+  });
 
   const options = {
     // Use more native-looking theme
@@ -222,15 +240,17 @@
   });
 
   // Handle tab switching - ensure terminal is properly sized when shown
-  $: if (tabId) {
-    console.log('Tab ID changed to:', tabId);
-    // Resize terminal when tab becomes active
-    setTimeout(() => {
-      if (fitAddon) {
-        fitAddon.fit();
-      }
-    }, 100);
-  }
+  $effect(() => {
+    if (tabId) {
+      console.log('Tab ID changed to:', tabId);
+      // Resize terminal when tab becomes active
+      setTimeout(() => {
+        if (fitAddon) {
+          fitAddon.fit();
+        }
+      }, 100);
+    }
+  });
 
   async function loadSystemInfo() {
     try {
@@ -344,8 +364,10 @@
 
       // After process is ready, send an initial resize to match the renderer
       try {
-        fitAddon?.fit();
-        TerminalService.resizeTerminal(currentProcess.id, terminal.cols, terminal.rows);
+        if (fitAddon && terminal) {
+          fitAddon.fit();
+          TerminalService.resizeTerminal(currentProcess.id, terminal.cols, terminal.rows);
+        }
       } catch (e) {
         console.warn('Initial resize failed:', e);
       }
@@ -359,13 +381,16 @@
       console.log('Terminal connected successfully');
     } catch (error) {
       console.error('Failed to initialize terminal:', error);
-      terminal.write('\r\n❌ Failed to connect to terminal process!\r\n');
-      terminal.write('🔄 Falling back to simulated terminal...\r\n\r\n');
-      setupSimulatedTerminal();
+      if (terminal) {
+        terminal.write('\r\n❌ Failed to connect to terminal process!\r\n');
+        terminal.write('🔄 Falling back to simulated terminal...\r\n\r\n');
+        setupSimulatedTerminal();
+      }
     }
   }
 
   function setupSimulatedTerminal() {
+    if (!terminal) return;
     terminal.write('🎉 Welcome to Portal Desktop Terminal!\r\n');
     terminal.write('💡 Type commands and press Enter to execute them.\r\n');
     terminal.write('📋 Available commands: help, clear, echo, ls, pwd, whoami, date, connect\r\n');
@@ -1017,9 +1042,7 @@
                           <button
                             onclick={() => {
                               // Refresh random commands for current shell type
-                              randomCommands = availableCommands
-                                .sort(() => Math.random() - 0.5)
-                                .slice(0, Math.floor(Math.random() * 3) + 3);
+                              randomCommands = generateRandomCommands();
                             }}
                             class="w-full text-center text-xs text-gray-500 hover:text-gray-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
                             title="Get new random commands for current shell"

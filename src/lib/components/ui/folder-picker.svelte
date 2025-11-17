@@ -8,7 +8,7 @@
 	import { Input } from './input';
 	import { Label } from './label';
 	import { invoke } from '@tauri-apps/api/core';
-	import { FolderOpen } from 'lucide-svelte';
+	import { FolderOpen } from '@lucide/svelte';
 
 	interface Props {
 		value?: string;

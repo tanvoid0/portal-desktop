@@ -134,7 +134,7 @@
 		if (navigator.vibrate) {
 			navigator.vibrate(50);
 		}
-		goto(`/tasks/${task.id}/edit`);
+		goto(`/tasks/${task.id}`);
 	}
 
 	function handleTaskCreate() {
@@ -372,6 +372,14 @@
 					>
 						<Icon icon="mdi:keyboard" class="w-4 h-4" />
 						<span>Shortcuts</span>
+					</Button>
+					<Button
+						onclick={() => goto('/tasks/generate')}
+						variant="outline"
+						class="flex items-center space-x-2"
+					>
+						<Icon icon="lucide:sparkles" class="w-4 h-4" />
+						<span>Generate Tasks with AI</span>
 					</Button>
 					<Button
 						onclick={handleTaskCreate}

@@ -3,6 +3,7 @@ use crate::domains::ide::services::ide_service::IdeService;
 use crate::domains::ide::repositories::framework_repository::FrameworkRepository;
 use crate::domains::ide::repositories::ide_repository::IdeRepository;
 use crate::domains::ide::repositories::framework_ide_mapping_repository::FrameworkIdeMappingRepository;
+use crate::domains::learning::repositories::learned_pattern_repository::LearnedPatternRepository;
 use crate::database::DatabaseManager;
 use std::sync::Arc;
 use tauri::{Manager, State};
@@ -204,7 +205,33 @@ pub async fn delete_framework_ide_mapping(
 }
 
 #[tauri::command]
-pub async fn get_suggested_frameworks() -> Result<Vec<FrameworkGroup>, String> {
+pub async fn get_suggested_frameworks(
+    db_manager: tauri::State<'_, std::sync::Arc<crate::database::DatabaseManager>>,
+) -> Result<Vec<FrameworkGroup>, String> {
+    // Get learned framework patterns
+    let db = db_manager.get_connection();
+    let learned_patterns = LearnedPatternRepository::get_by_type(db, "framework")
+        .await
+        .unwrap_or_else(|_| Vec::new());
+    
+    // Extract unique framework names from learned patterns (sorted by frequency)
+    let mut learned_frameworks: Vec<(String, i32)> = Vec::new();
+    for pattern in &learned_patterns {
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&pattern.pattern_data) {
+            if let Some(framework) = data.get("framework").and_then(|v| v.as_str()) {
+                // Check if we already have this framework
+                if let Some((_, freq)) = learned_frameworks.iter_mut().find(|(name, _)| name == framework) {
+                    *freq += pattern.frequency;
+                } else {
+                    learned_frameworks.push((framework.to_string(), pattern.frequency));
+                }
+            }
+        }
+    }
+    
+    // Sort by frequency (highest first)
+    learned_frameworks.sort_by(|a, b| b.1.cmp(&a.1));
+    
     let groups = vec![
         FrameworkGroup {
             category: "Frontend".to_string(),
@@ -271,6 +298,38 @@ pub async fn get_suggested_frameworks() -> Result<Vec<FrameworkGroup>, String> {
             ],
         },
     ];
+    
+    // Add a "Recommended" group if we have learned frameworks
+    if !learned_frameworks.is_empty() {
+        let recommended_frameworks: Vec<SuggestedFramework> = learned_frameworks
+            .iter()
+            .take(10) // Top 10 most frequently used
+            .map(|(name, _)| {
+                // Try to find matching icon from existing groups
+                let icon = groups
+                    .iter()
+                    .flat_map(|g| &g.frameworks)
+                    .find(|f| f.name.eq_ignore_ascii_case(name))
+                    .map(|f| f.icon.clone())
+                    .unwrap_or_else(|| format!("logos:{}", name.to_lowercase().replace(" ", "-")));
+                
+                SuggestedFramework {
+                    name: name.clone(),
+                    icon,
+                    category: "Recommended".to_string(),
+                }
+            })
+            .collect();
+        
+        if !recommended_frameworks.is_empty() {
+            let mut groups_with_recommended = groups;
+            groups_with_recommended.insert(0, FrameworkGroup {
+                category: "Recommended (Based on Your Usage)".to_string(),
+                frameworks: recommended_frameworks,
+            });
+            return Ok(groups_with_recommended);
+        }
+    }
     
     Ok(groups)
 }

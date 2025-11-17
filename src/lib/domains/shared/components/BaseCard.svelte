@@ -19,12 +19,14 @@
 		class: className = '',
 		children,
 		onclick,
-		role = 'button',
-		tabindex = 0,
-		onkeydown = () => {}
+		role,
+		tabindex,
+		onkeydown
 	}: Props = $props();
 
 	const isClickable = $derived(!!onclick);
+	const cardRole = $derived(role ?? (isClickable ? 'button' : undefined));
+	const cardTabindex = $derived(tabindex ?? (isClickable ? 0 : undefined));
 </script>
 
 <div 
@@ -34,9 +36,9 @@
 		className
 	)}
 	{onclick}
-	{role}
-	{tabindex}
-	{onkeydown}
+	role={cardRole}
+	tabindex={cardTabindex}
+	onkeydown={onkeydown}
 >
 	{@render children?.()}
 </div>

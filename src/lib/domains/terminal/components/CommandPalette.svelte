@@ -15,7 +15,7 @@
     Clock, 
     Terminal,
     Zap
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
 
   export let tabId: string;
   export let onKillProcess: () => void;

@@ -16,7 +16,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import Select from '$lib/components/ui/select.svelte';
 	import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '$lib/components/ui/dialog';
-	import { RefreshCw, Download, AlertCircle, Settings, FolderOpen, Zap, Globe, Database, Container, Code, Terminal, Plus, Trash2, ArrowRightLeft, Play, Square } from 'lucide-svelte';
+	import { RefreshCw, Download, AlertCircle, Settings, FolderOpen, Zap, Globe, Database, Container, Code, Terminal, Plus, Trash2, ArrowRightLeft, Play, Square } from '@lucide/svelte';
 
 	interface Props {
 		onSDKSelect?: (sdk: any) => void;

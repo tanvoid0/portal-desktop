@@ -26,13 +26,17 @@
 		RefreshCw,
 		Check,
 		X
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/tabs';
 	import { ProjectTerminal } from '@/lib/domains/terminal';
 	import { projectService } from '@/lib/domains/projects/services/projectService';
 	import { breadcrumbActions } from '@/lib/domains/shared/stores/breadcrumbStore';
 	import { logger } from '@/lib/domains/shared/services/logger';
 	import type { Project } from '@/lib/domains/projects/types';
+	import PipelineBuilder from '@/lib/domains/projects/pipelines/components/PipelineBuilder.svelte';
+	import ExecutionMonitor from '@/lib/domains/projects/pipelines/components/ExecutionMonitor.svelte';
+	import type { Pipeline, PipelineExecution } from '@/lib/domains/projects/pipelines';
+	import { pipelineService, executionService } from '@/lib/domains/projects/pipelines';
 
 	const log = logger.createScoped('ProjectDetailsPage');
 
@@ -50,6 +54,13 @@
 	let editingField = $state<string | null>(null);
 	let editValues = $state<Record<string, string>>({});
 	let savingField = $state<string | null>(null);
+	
+	// Pipeline state
+	let pipelines = $state<Pipeline[]>([]);
+	let selectedPipeline: Pipeline | null = $state(null);
+	let showBuilder = $state(false);
+	let currentExecution: PipelineExecution | null = $state(null);
+	let pipelinesLoading = $state(false);
 
 	// Load project details
 	async function loadProject() {
@@ -217,8 +228,61 @@
 		}
 	}
 
+	async function loadPipelines() {
+		if (!projectId) return;
+		pipelinesLoading = true;
+		try {
+			pipelines = await pipelineService.getPipelines(projectId);
+		} catch (error) {
+			log.error('Failed to load pipelines', error);
+		} finally {
+			pipelinesLoading = false;
+		}
+	}
+	
+	function handleCreatePipeline() {
+		selectedPipeline = null;
+		showBuilder = true;
+	}
+	
+	function handleEditPipeline(pipeline: Pipeline) {
+		selectedPipeline = pipeline;
+		showBuilder = true;
+	}
+	
+	async function handleDeletePipeline(pipelineId: string) {
+		if (confirm('Are you sure you want to delete this pipeline?')) {
+			try {
+				await pipelineService.deletePipeline(pipelineId);
+				await loadPipelines();
+			} catch (error) {
+				log.error('Failed to delete pipeline', error);
+			}
+		}
+	}
+	
+	async function handleExecutePipeline(pipelineId: string) {
+		try {
+			const execution = await executionService.executePipeline({ 
+				pipelineId, 
+				projectId, 
+				triggeredBy: 'user' 
+			});
+			currentExecution = execution;
+		} catch (error) {
+			log.error('Failed to execute pipeline', error);
+		}
+	}
+	
+	function handleBuilderClose() {
+		showBuilder = false;
+		selectedPipeline = null;
+		loadPipelines();
+	}
+
 	onMount(() => {
 		loadProject();
+		loadPipelines();
 	});
 </script>
 
@@ -315,7 +379,7 @@
 
 			<!-- Project Tabs -->
 			<Tabs bind:value={activeTab} class="w-full">
-				<TabsList class="grid w-full" style="grid-template-columns: repeat({project.metadata?.dependencies ? 3 : 2}, minmax(0, 1fr));">
+				<TabsList class="grid w-full" style="grid-template-columns: repeat({project.metadata?.dependencies ? 4 : 3}, minmax(0, 1fr));">
 					<TabsTrigger value="overview" class="flex items-center gap-2">
 						<FolderOpen class="h-4 w-4" />
 						Overview
@@ -326,6 +390,10 @@
 							Dependencies
 						</TabsTrigger>
 					{/if}
+					<TabsTrigger value="pipelines" class="flex items-center gap-2">
+						<Code class="h-4 w-4" />
+						Pipelines
+					</TabsTrigger>
 					<TabsTrigger value="terminal" class="flex items-center gap-2">
 						<Terminal class="h-4 w-4" />
 						Terminal
@@ -345,20 +413,20 @@
 					</CardHeader>
 					<CardContent class="space-y-4">
 						<div>
-							<label class="text-sm font-medium text-muted-foreground">Project Path</label>
+							<p class="text-sm font-medium text-muted-foreground">Project Path</p>
 							<p class="text-sm font-mono bg-muted p-2 rounded mt-1 break-all">{project.path}</p>
 						</div>
 						
 						{#if project.framework}
 							<div>
-								<label class="text-sm font-medium text-muted-foreground">Framework</label>
+								<p class="text-sm font-medium text-muted-foreground">Framework</p>
 								<p class="text-sm mt-1">{project.framework}</p>
 							</div>
 						{/if}
 						
 						{#if project.package_manager}
 							<div>
-								<label class="text-sm font-medium text-muted-foreground">Package Manager</label>
+								<p class="text-sm font-medium text-muted-foreground">Package Manager</p>
 								<p class="text-sm mt-1">{project.package_manager}</p>
 							</div>
 						{/if}
@@ -375,23 +443,23 @@
 					</CardHeader>
 					<CardContent class="space-y-4">
 						<div>
-							<label class="text-sm font-medium text-muted-foreground">Open Count</label>
+							<p class="text-sm font-medium text-muted-foreground">Open Count</p>
 							<p class="text-sm mt-1">{project.open_count} times</p>
 						</div>
 						
 						<div>
-							<label class="text-sm font-medium text-muted-foreground">Project Size</label>
+							<p class="text-sm font-medium text-muted-foreground">Project Size</p>
 							<p class="text-sm mt-1">{formatFileSize(project.size)}</p>
 						</div>
 						
 						<div>
-							<label class="text-sm font-medium text-muted-foreground">File Count</label>
+							<p class="text-sm font-medium text-muted-foreground">File Count</p>
 							<p class="text-sm mt-1">{project.file_count} files</p>
 						</div>
 						
 						{#if project.last_opened}
 							<div>
-								<label class="text-sm font-medium text-muted-foreground">Last Opened</label>
+								<p class="text-sm font-medium text-muted-foreground">Last Opened</p>
 								<p class="text-sm mt-1">{formatDate(project.last_opened)}</p>
 							</div>
 						{/if}
@@ -653,7 +721,7 @@
 						
 						{#if project.dev_port || project.prod_port}
 							<div>
-								<label class="text-sm font-medium text-muted-foreground">Ports</label>
+								<p class="text-sm font-medium text-muted-foreground">Ports</p>
 								<div class="flex gap-2 mt-1">
 									{#if project.dev_port}
 										<Badge variant="outline">Dev: {project.dev_port}</Badge>
@@ -679,28 +747,28 @@
 					<CardContent class="space-y-4">
 						{#if project.git_repository}
 							<div>
-								<label class="text-sm font-medium text-muted-foreground">Repository</label>
+								<p class="text-sm font-medium text-muted-foreground">Repository</p>
 								<p class="text-sm font-mono bg-muted p-2 rounded mt-1 break-all">{project.git_repository}</p>
 							</div>
 						{/if}
 						
 						{#if project.git_branch}
 							<div>
-								<label class="text-sm font-medium text-muted-foreground">Branch</label>
+								<p class="text-sm font-medium text-muted-foreground">Branch</p>
 								<p class="text-sm mt-1">{project.git_branch}</p>
 							</div>
 						{/if}
 						
 						{#if project.git_commit}
 							<div>
-								<label class="text-sm font-medium text-muted-foreground">Last Commit</label>
+								<p class="text-sm font-medium text-muted-foreground">Last Commit</p>
 								<p class="text-sm font-mono bg-muted p-2 rounded mt-1">{project.git_commit}</p>
 							</div>
 						{/if}
 						
 						{#if project.has_uncommitted_changes !== undefined}
 							<div>
-								<label class="text-sm font-medium text-muted-foreground">Uncommitted Changes</label>
+								<p class="text-sm font-medium text-muted-foreground">Uncommitted Changes</p>
 								<Badge variant={project.has_uncommitted_changes ? 'destructive' : 'default'}>
 									{project.has_uncommitted_changes ? 'Yes' : 'No'}
 								</Badge>
@@ -830,6 +898,83 @@
 						</div>
 					</TabsContent>
 				{/if}
+				
+				<TabsContent value="pipelines" class="mt-6">
+					<div class="space-y-6">
+						<div class="flex items-center justify-between">
+							<h2 class="text-xl font-semibold">Pipelines</h2>
+							<div class="flex gap-2">
+								<Button variant="outline" onclick={() => goto(`/projects/${projectId}/pipelines/new`)}>
+									Create from Template
+								</Button>
+								<Button onclick={handleCreatePipeline}>Create Pipeline</Button>
+							</div>
+						</div>
+						
+						{#if showBuilder}
+							<PipelineBuilder
+								pipeline={selectedPipeline || undefined}
+								projectId={projectId}
+								onSave={handleBuilderClose}
+								onCancel={handleBuilderClose}
+							/>
+						{:else if currentExecution}
+							<ExecutionMonitor executionId={currentExecution.id} onClose={() => (currentExecution = null)} />
+						{:else}
+							{#if pipelinesLoading}
+								<p class="text-center text-muted-foreground py-8">Loading pipelines...</p>
+							{:else if pipelines.length === 0}
+								<Card>
+									<CardContent class="py-12 text-center">
+										<p class="text-muted-foreground mb-4">No pipelines yet</p>
+										<Button onclick={handleCreatePipeline}>Create Your First Pipeline</Button>
+									</CardContent>
+								</Card>
+							{:else}
+								<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+									{#each pipelines as pipeline (pipeline.id)}
+										<Card>
+											<CardHeader>
+												<CardTitle>{pipeline.name}</CardTitle>
+												{#if pipeline.description}
+													<CardDescription>{pipeline.description}</CardDescription>
+												{/if}
+											</CardHeader>
+											<CardContent class="space-y-2">
+												<p class="text-sm text-muted-foreground">
+													{pipeline.steps.length} step{pipeline.steps.length !== 1 ? 's' : ''}
+												</p>
+												<div class="flex gap-2">
+													<Button
+														size="sm"
+														onclick={() => handleExecutePipeline(pipeline.id)}
+														disabled={!pipeline.enabled}
+													>
+														Run
+													</Button>
+													<Button
+														size="sm"
+														variant="outline"
+														onclick={() => handleEditPipeline(pipeline)}
+													>
+														Edit
+													</Button>
+													<Button
+														size="sm"
+														variant="destructive"
+														onclick={() => handleDeletePipeline(pipeline.id)}
+													>
+														Delete
+													</Button>
+												</div>
+											</CardContent>
+										</Card>
+									{/each}
+								</div>
+							{/if}
+						{/if}
+					</div>
+				</TabsContent>
 				
 				<TabsContent value="terminal" class="mt-6">
 					{#if project}

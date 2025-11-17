@@ -24,7 +24,7 @@
 		CheckCircle,
 		FileText,
 		Code
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface ConfigFile {
 		name: string;

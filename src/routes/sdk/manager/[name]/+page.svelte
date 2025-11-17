@@ -10,7 +10,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { CheckCircle, XCircle, Download, ExternalLink } from 'lucide-svelte';
+	import { CheckCircle, XCircle, Download, ExternalLink } from '@lucide/svelte';
 
 	// Get manager name from URL
 	let managerName = $derived($page.params.name);
@@ -146,11 +146,11 @@
 				</CardHeader>
 				<CardContent class="space-y-4">
 					<div>
-						<label class="text-sm font-medium">Category</label>
+						<p class="text-sm font-medium">Category</p>
 						<p class="text-sm text-muted-foreground">{manager.category}</p>
 					</div>
 					<div>
-						<label class="text-sm font-medium">Website</label>
+						<p class="text-sm font-medium">Website</p>
 						<a 
 							href={manager.website} 
 							target="_blank" 
@@ -161,7 +161,7 @@
 						</a>
 					</div>
 					<div>
-						<label class="text-sm font-medium">Installation Command</label>
+						<p class="text-sm font-medium">Installation Command</p>
 						<code class="text-xs bg-gray-100 p-2 rounded block mt-1">{manager.installCommand}</code>
 					</div>
 				</CardContent>

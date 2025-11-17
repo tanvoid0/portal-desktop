@@ -10,9 +10,11 @@
 	import { Textarea } from '@/lib/components/ui/textarea';
 	import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/lib/components/ui/dialog';
 	import Select from '@/lib/components/ui/select.svelte';
-	import { projectService } from '@/lib/domains/projects/services/projectService';
+	import { projectService, extractContext } from '@/lib/domains/projects/services/projectService';
 	import { logger } from '@/lib/domains/shared/services/logger';
+	import { patternCollector, suggestionEngine } from '@/lib/domains/learning';
 	import type { CreateProjectRequest } from '@/lib/domains/projects/types';
+	import { Sparkles } from '@lucide/svelte';
 
 	const log = logger.createScoped('ProjectCreateDialog');
 
@@ -39,6 +41,20 @@
 
 	let isLoading = $state(false);
 	let error = $state('');
+	let suggestions = $state<{
+		framework?: string;
+		packageManager?: string;
+		buildCommand?: string;
+		startCommand?: string;
+		devPort?: number;
+	} | null>(null);
+	let loadingSuggestions = $state(false);
+	let suggestionPatternIds = $state<{
+		framework?: number;
+		packageManager?: number;
+		buildCommand?: number;
+		startCommand?: number;
+	}>({});
 
 	// Reset form when dialog opens
 	$effect(() => {
@@ -46,6 +62,91 @@
 			resetForm();
 		}
 	});
+
+	// Load suggestions when framework or package manager changes
+	$effect(() => {
+		if (open && (framework || packageManager)) {
+			loadSuggestions();
+		}
+	});
+
+	const loadSuggestions = async () => {
+		try {
+			loadingSuggestions = true;
+			const suggestionsData = await projectService.getProjectSetupSuggestions(
+				framework || undefined,
+				packageManager || undefined
+			);
+			suggestions = suggestionsData;
+			
+			// Load pattern IDs for tracking acceptance/rejection
+			if (suggestions) {
+				const context = extractContext(suggestions.framework, suggestions.packageManager);
+				const frameworkSuggestions = await suggestionEngine.getContextualSuggestions('framework', context);
+				const configSuggestions = await suggestionEngine.getContextualSuggestions('config', context);
+				
+				suggestionPatternIds = {
+					framework: frameworkSuggestions[0]?.pattern_id,
+					packageManager: configSuggestions[0]?.pattern_id,
+					buildCommand: configSuggestions[0]?.pattern_id,
+					startCommand: configSuggestions[0]?.pattern_id,
+				};
+			}
+			
+			log.info('Loaded project setup suggestions', suggestions);
+		} catch (err) {
+			log.warn('Failed to load suggestions', err);
+			suggestions = null;
+		} finally {
+			loadingSuggestions = false;
+		}
+	};
+
+	const applySuggestion = async () => {
+		if (!suggestions) return;
+
+		let appliedCount = 0;
+
+		if (suggestions.framework && !framework) {
+			framework = suggestions.framework;
+			appliedCount++;
+			// Track acceptance
+			if (suggestionPatternIds.framework) {
+				await suggestionEngine.recordSuggestionAccepted(suggestionPatternIds.framework);
+			}
+		}
+		if (suggestions.packageManager && !packageManager) {
+			packageManager = suggestions.packageManager;
+			appliedCount++;
+			if (suggestionPatternIds.packageManager) {
+				await suggestionEngine.recordSuggestionAccepted(suggestionPatternIds.packageManager);
+			}
+		}
+		if (suggestions.buildCommand && !buildCommand) {
+			buildCommand = suggestions.buildCommand;
+			appliedCount++;
+			if (suggestionPatternIds.buildCommand) {
+				await suggestionEngine.recordSuggestionAccepted(suggestionPatternIds.buildCommand);
+			}
+		}
+		if (suggestions.startCommand && !startCommand) {
+			startCommand = suggestions.startCommand;
+			appliedCount++;
+			if (suggestionPatternIds.startCommand) {
+				await suggestionEngine.recordSuggestionAccepted(suggestionPatternIds.startCommand);
+			}
+		}
+		if (suggestions.devPort && !devPort) {
+			devPort = suggestions.devPort;
+			appliedCount++;
+		}
+
+		if (appliedCount > 0) {
+			log.info('Applied suggestions to form', { count: appliedCount });
+			// Clear suggestions after applying
+			suggestions = null;
+		}
+	};
 
 	const resetForm = () => {
 		name = '';
@@ -60,6 +161,8 @@
 		devPort = undefined;
 		prodPort = undefined;
 		error = '';
+		suggestions = null;
+		suggestionPatternIds = {};
 	};
 
 	const handleSubmit = async () => {
@@ -153,28 +256,101 @@
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
 					<Label for="framework">Framework</Label>
-					<Input
-						id="framework"
-						bind:value={framework}
-						placeholder="React, Vue, Angular, etc."
-						disabled={isLoading}
-					/>
+					<div class="flex gap-2">
+						<Input
+							id="framework"
+							bind:value={framework}
+							placeholder="React, Vue, Angular, etc."
+							disabled={isLoading}
+							class="flex-1"
+						/>
+						{#if suggestions?.framework && !framework}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onclick={() => {
+									if (suggestions?.framework) {
+										framework = suggestions.framework;
+									}
+								}}
+								title="Apply suggested framework: {suggestions.framework}"
+								class="flex items-center gap-1"
+							>
+								<Sparkles class="w-4 h-4 text-primary" />
+							</Button>
+						{/if}
+					</div>
 				</div>
 				<div class="space-y-2">
 					<Label for="packageManager">Package Manager</Label>
-					<Select
-						options={[
-							{ value: '', label: 'None' },
-							{ value: 'npm', label: 'npm' },
-							{ value: 'yarn', label: 'yarn' },
-							{ value: 'pnpm', label: 'pnpm' }
-						]}
-						defaultValue={packageManager}
-						onSelect={(value) => packageManager = value}
-						disabled={isLoading}
-					/>
+					<div class="flex gap-2">
+						<Select
+							options={[
+								{ value: '', label: 'None' },
+								{ value: 'npm', label: 'npm' },
+								{ value: 'yarn', label: 'yarn' },
+								{ value: 'pnpm', label: 'pnpm' }
+							]}
+							defaultValue={packageManager}
+							onSelect={(value) => packageManager = value}
+							disabled={isLoading}
+							class="flex-1"
+						/>
+						{#if suggestions?.packageManager && !packageManager}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onclick={async () => {
+									if (suggestions?.packageManager) {
+										packageManager = suggestions.packageManager;
+										if (suggestionPatternIds.packageManager) {
+											await suggestionEngine.recordSuggestionAccepted(suggestionPatternIds.packageManager);
+										}
+									}
+								}}
+								title="Apply suggested package manager: {suggestions.packageManager}"
+								class="flex items-center gap-1"
+							>
+								<Sparkles class="w-4 h-4 text-primary" />
+							</Button>
+						{/if}
+					</div>
 				</div>
 			</div>
+
+			<!-- Intelligent Suggestions Badge -->
+			{#if suggestions && (suggestions.buildCommand || suggestions.startCommand || suggestions.devPort)}
+				<div class="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
+					<Sparkles class="w-4 h-4 text-primary flex-shrink-0" />
+					<div class="flex-1 text-sm">
+						<span class="font-medium text-primary">Smart Suggestions:</span>
+						<span class="text-muted-foreground ml-2">
+							{#if suggestions.buildCommand && !buildCommand}
+								Build: {suggestions.buildCommand}
+							{/if}
+							{#if suggestions.startCommand && !startCommand}
+								{#if suggestions.buildCommand && !buildCommand}, {/if}
+								Start: {suggestions.startCommand}
+							{/if}
+							{#if suggestions.devPort && !devPort}
+								{#if (suggestions.buildCommand && !buildCommand) || (suggestions.startCommand && !startCommand)}, {/if}
+								Port: {suggestions.devPort}
+							{/if}
+						</span>
+					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onclick={applySuggestion}
+						disabled={isLoading}
+					>
+						Apply
+					</Button>
+				</div>
+			{/if}
 
 			<!-- Commands -->
 			<div class="grid grid-cols-3 gap-4">

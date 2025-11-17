@@ -10,7 +10,7 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Separator } from '$lib/components/ui/separator';
-	import { Settings, Database, Code, Globe, Container, Package, Download } from 'lucide-svelte';
+	import { Settings, Database, Code, Globe, Container, Package, Download } from '@lucide/svelte';
 	import Devicon from '$lib/components/ui/devicon.svelte';
 	import { logger } from '$lib/domains/shared';
 	import { sdkService } from '$lib/domains/sdk/services/sdkService';

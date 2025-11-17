@@ -8,7 +8,7 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { FolderOpen, Terminal, Plus } from 'lucide-svelte';
+	import { FolderOpen, Terminal, Plus } from '@lucide/svelte';
 
 	// Reactive stores
 	let projects = $derived($projectStore.projects);

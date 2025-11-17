@@ -6,7 +6,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import { Button } from './button';
-	import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-svelte';
+	import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 
 	interface ToastProps {
@@ -36,32 +36,32 @@
 	let isRemoving = $state(false);
 	let isVisible = $state(false);
 
-	// Variant configurations
+	// Variant configurations - matching alert styling exactly
 	const variantConfig = {
 		default: {
 			icon: Info,
-			className: 'bg-background border-border text-foreground',
-			iconClassName: 'text-foreground'
+			className: 'bg-card border-border text-card-foreground',
+			iconClassName: 'text-muted-foreground'
 		},
 		success: {
 			icon: CheckCircle,
-			className: 'bg-green-50 border-green-200 text-green-900 dark:bg-green-900/20 dark:border-green-800 dark:text-green-100',
+			className: 'bg-card border-border text-card-foreground',
 			iconClassName: 'text-green-600 dark:text-green-400'
 		},
 		error: {
 			icon: AlertCircle,
-			className: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-900/20 dark:border-red-800 dark:text-red-100',
-			iconClassName: 'text-red-600 dark:text-red-400'
+			className: 'bg-card border-border text-card-foreground',
+			iconClassName: 'text-destructive'
 		},
 		warning: {
 			icon: AlertTriangle,
-			className: 'bg-yellow-50 border-yellow-200 text-yellow-900 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-100',
+			className: 'bg-card border-border text-card-foreground',
 			iconClassName: 'text-yellow-600 dark:text-yellow-400'
 		},
 		info: {
 			icon: Info,
-			className: 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-100',
-			iconClassName: 'text-blue-600 dark:text-blue-400'
+			className: 'bg-card border-border text-card-foreground',
+			iconClassName: 'text-primary'
 		}
 	};
 
@@ -128,9 +128,9 @@
 
 <div
 	class={cn(
-		'group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-6 pr-8 shadow-lg transition-all',
-		'data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out',
-		'data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-bottom-full',
+		'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-lg border px-4 py-3 transition-all',
+		isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full',
+		isRemoving ? 'opacity-0 translate-x-full' : '',
 		config.className,
 		className
 	)}
@@ -138,16 +138,14 @@
 	aria-live="assertive"
 	aria-atomic="true"
 >
-	<div class="flex items-start space-x-3">
-		<Icon class={cn("h-5 w-5 flex-shrink-0", config.iconClassName)} />
-		<div class="flex-1 space-y-1">
-			{#if title}
-				<div class="text-sm font-semibold">{title}</div>
-			{/if}
-			{#if description}
-				<div class="text-sm opacity-90">{description}</div>
-			{/if}
-		</div>
+	<Icon class={cn("h-4 w-4 flex-shrink-0 translate-y-0.5", config.iconClassName)} />
+	<div class="flex-1 space-y-0.5 min-w-0">
+		{#if title}
+			<div class="text-sm leading-none">{title}</div>
+		{/if}
+		{#if description}
+			<div class="text-sm text-muted-foreground leading-relaxed">{description}</div>
+		{/if}
 	</div>
 
 	{#if action}
@@ -155,7 +153,7 @@
 			variant="outline"
 			size="sm"
 			onclick={action.onClick}
-			class="ml-4"
+			class="ml-2 shrink-0"
 		>
 			{action.label}
 		</Button>
@@ -165,17 +163,17 @@
 		variant="ghost"
 		size="sm"
 		onclick={handleClose}
-		class="absolute right-2 top-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+		class="h-6 w-6 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity -mr-1"
 		aria-label="Close notification"
 	>
-		<X class="h-4 w-4" />
+		<X class="h-3.5 w-3.5" />
 	</Button>
 
 	<!-- Progress bar -->
 	{#if duration > 0}
-		<div class="absolute bottom-0 left-0 h-1 bg-current opacity-20 w-full">
+		<div class="absolute bottom-0 left-0 h-[2px] bg-border w-full overflow-hidden">
 			<div 
-				class="h-full bg-current transition-all duration-75 ease-linear"
+				class="h-full bg-muted-foreground/30 transition-all duration-75 ease-linear"
 				style="width: {progress}%"
 			></div>
 		</div>

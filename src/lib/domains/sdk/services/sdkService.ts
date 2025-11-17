@@ -4,6 +4,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { logger } from '../../shared';
+import { patternCollector, suggestionEngine, learningService } from '@/lib/domains/learning';
 import type { 
 	SDK, 
 	SDKManagerInfo, 
@@ -149,6 +150,21 @@ export class SDKService {
 				projectPath: request.projectPath
 			});
 			
+			// Learn from SDK version preference
+			try {
+				await patternCollector.collectSDKPreference(
+					request.type,
+					request.version,
+					request.projectPath ? `project_${request.projectPath}` : 'global'
+				);
+			} catch (error) {
+				// Don't fail version switch if learning fails
+				logger.warn('Failed to collect SDK preference', {
+					context: 'SDKService',
+					error
+				});
+			}
+			
 			logger.info('SDK version switched successfully', { 
 				context: 'SDKService', 
 				data: request 
@@ -177,6 +193,21 @@ export class SDKService {
 				sdkType: request.type,
 				version: request.version
 			});
+			
+			// Learn from SDK installation preference
+			try {
+				await patternCollector.collectSDKPreference(
+					request.type,
+					request.version,
+					'global'
+				);
+			} catch (error) {
+				// Don't fail installation if learning fails
+				logger.warn('Failed to collect SDK preference', {
+					context: 'SDKService',
+					error
+				});
+			}
 			
 			logger.info('SDK version installed successfully', { 
 				context: 'SDKService', 
@@ -639,6 +670,58 @@ export class SDKService {
 				data: request
 			});
 			throw error;
+		}
+	}
+
+	/**
+	 * Get suggested SDK version based on learned preferences
+	 * Returns the most commonly used version for the given SDK type and context
+	 */
+	async getSuggestedVersion(
+		sdkType: string,
+		projectPath?: string
+	): Promise<string | null> {
+		try {
+			const context = projectPath ? `project_${projectPath}` : 'global';
+			
+			// Get preference for this SDK type and context
+			const preference = await learningService.getPreference(
+				'sdk_version',
+				context
+			);
+
+			if (preference && preference.sdk_type === sdkType && preference.version) {
+				logger.info('SDK version suggestion found', {
+					context: 'SDKService',
+					data: { sdkType, version: preference.version, context }
+				});
+				return preference.version as string;
+			}
+
+			// Fallback: try global context
+			if (context !== 'global') {
+				const globalPreference = await learningService.getPreference(
+					'sdk_version',
+					`sdk_${sdkType}`
+				);
+
+				if (globalPreference && globalPreference.version) {
+					logger.info('SDK version suggestion found (global)', {
+						context: 'SDKService',
+						data: { sdkType, version: globalPreference.version }
+					});
+					return globalPreference.version as string;
+				}
+			}
+
+			return null;
+		} catch (error) {
+			logger.warn('Failed to get SDK version suggestion', {
+				context: 'SDKService',
+				error,
+				data: { sdkType, projectPath }
+			});
+			return null;
 		}
 	}
 }

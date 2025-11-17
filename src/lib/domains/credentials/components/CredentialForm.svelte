@@ -16,7 +16,7 @@
 	import Select from '$lib/components/ui/select.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert';
-	import { Loader2, AlertCircle, Plus, X } from 'lucide-svelte';
+	import { Loader2, AlertCircle, Plus, X } from '@lucide/svelte';
 
 	interface Props {
 		credential?: Credential | null;

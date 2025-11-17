@@ -11,8 +11,11 @@
 	import { Label } from '@/lib/components/ui/label';
 	import Select from '@/lib/components/ui/select.svelte';
 	import Icon from '@iconify/svelte';
+	import MarkdownView from '@/lib/components/ui/markdown-view.svelte';
 	import { taskActions, tasks } from '@/lib/domains/tasks/stores/taskStore';
 	import { toastActions } from '@/lib/domains/shared/stores/toastStore';
+	import { documentActions, documents } from '@/lib/domains/documents';
+	import { ResourceType } from '@/lib/domains/shared/types/resourceType';
 	import LoadingSpinner from '@/lib/components/ui/loading-spinner.svelte';
 	import type { Task, TaskStatus, TaskPriority, UpdateTaskRequest } from '@/lib/domains/tasks/types';
 	import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS, TASK_TYPE_OPTIONS } from '@/lib/domains/tasks/types';
@@ -68,7 +71,10 @@
 		}
 	}
 
-	onMount(loadTaskData);
+	onMount(() => {
+		loadTaskData();
+		documentActions.loadDocuments();
+	});
 
 	// Watch for taskId changes and reload data
 	$effect(() => {
@@ -343,6 +349,14 @@
 					{:else}
 						<Button
 							variant="outline"
+							onclick={() => goto(`/tasks/${task.id}/generate`)}
+							class="flex items-center gap-2"
+						>
+							<Icon icon="lucide:sparkles" class="w-4 h-4" />
+							Generate Tasks with AI
+						</Button>
+						<Button
+							variant="outline"
 							onclick={handleEdit}
 							class="flex items-center gap-2"
 						>
@@ -436,7 +450,11 @@
 									<div>
 										<h2 class="text-2xl font-bold text-foreground">{task.title}</h2>
 										{#if task.description}
-											<p class="text-muted-foreground mt-2 whitespace-pre-wrap">{task.description}</p>
+											<div class="mt-3">
+												<MarkdownView content={task.description} truncateAt={500} />
+											</div>
+										{:else}
+											<p class="text-muted-foreground mt-2 italic">No description provided</p>
 										{/if}
 									</div>
 									
@@ -773,6 +791,67 @@
 							{/if}
 						</CardContent>
 					</Card>
+
+					<!-- Linked Document -->
+					{#if task && task.resourceType === ResourceType.DOCUMENT && task.resourceId}
+						{@const linkedDoc = $documents.find((d) => d.id === parseInt(task.resourceId!))}
+						{#if linkedDoc}
+							<Card>
+								<CardHeader>
+									<CardTitle class="text-lg flex items-center gap-2">
+										<Icon icon="lucide:file-text" class="h-5 w-5" />
+										Linked Document
+									</CardTitle>
+								</CardHeader>
+								<CardContent class="space-y-3">
+									<div>
+										<h4 class="font-medium">{linkedDoc.title}</h4>
+										<p class="text-sm text-muted-foreground line-clamp-2 mt-1">
+											{linkedDoc.content.substring(0, 100)}
+											{linkedDoc.content.length > 100 ? '...' : ''}
+										</p>
+									</div>
+									<div class="flex gap-2">
+										<Button
+											variant="outline"
+											size="sm"
+											onclick={() => goto(`/documents/${linkedDoc.id}`)}
+											class="flex-1"
+										>
+											<Icon icon="lucide:external-link" class="h-4 w-4 mr-2" />
+											Open Document
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											onclick={() => goto(`/documents/${linkedDoc.id}/edit`)}
+										>
+											<Icon icon="lucide:edit" class="h-4 w-4" />
+										</Button>
+									</div>
+								</CardContent>
+							</Card>
+						{/if}
+					{:else if task}
+						<Card>
+							<CardHeader>
+								<CardTitle class="text-lg flex items-center gap-2">
+									<Icon icon="lucide:file-text" class="h-5 w-5" />
+									Document
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<Button
+									variant="outline"
+									onclick={() => goto(`/documents/create?taskId=${task.id}&taskTitle=${encodeURIComponent(task.title)}`)}
+									class="w-full"
+								>
+									<Icon icon="lucide:plus" class="h-4 w-4 mr-2" />
+									Create Document for Task
+								</Button>
+							</CardContent>
+						</Card>
+					{/if}
 
 					<!-- Quick Actions -->
 					<Card>

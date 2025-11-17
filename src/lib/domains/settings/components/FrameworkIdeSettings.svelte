@@ -10,7 +10,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Badge } from '$lib/components/ui/badge';
 	import Select from '@/lib/components/ui/select.svelte';
-	import { Link2, Plus, Edit, Trash2, ArrowRight, RefreshCw, Loader2 } from 'lucide-svelte';
+	import { Link2, Plus, Edit, Trash2, ArrowRight, RefreshCw, Loader2 } from '@lucide/svelte';
 	import { toast } from '$lib/domains/shared/stores/toastStore';
 	import { logger } from '$lib/domains/shared';
 	import { ideService, type IdeConfig, type FrameworkIdeMapping } from '$lib/domains/ide';
@@ -76,6 +76,12 @@
 		editingMapping = null;
 		mappingFramework = '';
 		mappingIdeId = '';
+	}
+
+	function handleModalKeyDown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			closeModal();
+		}
 	}
 
 	async function saveMapping() {
@@ -207,7 +213,15 @@
 
 <!-- Add/Edit Modal -->
 {#if showModal}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={closeModal} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+	<div 
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" 
+		onclick={closeModal}
+		onkeydown={handleModalKeyDown}
+		role="dialog" 
+		aria-modal="true" 
+		aria-labelledby="modal-title"
+		tabindex="-1"
+	>
 		<div class="bg-background rounded-lg shadow-lg p-6 w-full max-w-md" onclick={(e) => e.stopPropagation()} role="document">
 			<h3 id="modal-title" class="text-lg font-semibold mb-4">{editingMapping ? 'Edit Framework IDE Mapping' : 'Add Framework IDE Mapping'}</h3>
 			

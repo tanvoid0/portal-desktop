@@ -7,8 +7,14 @@ pub mod credentials;
 pub mod ide;
 pub mod settings;
 pub mod sdk;
+pub mod learning;
+pub mod autonomy;
+pub mod kubernetes;
+pub mod shared;
+pub mod documents;
+pub mod ai;
+pub mod custom_scripts;
 
 // Future domains will be added here:
 // pub mod notifications;
 // pub mod performance;
-// pub mod shared;

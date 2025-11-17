@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { automationStore } from '../stores/automationStore';
 	import type { AvailableWorkflow, WorkflowResult } from '../types';
-	import { Play, Loader2, CheckCircle, XCircle } from 'lucide-svelte';
+	import { Play, Loader2, CheckCircle, XCircle } from '@lucide/svelte';
 
 	export let project: { 
 		id: string; 

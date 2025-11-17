@@ -4,10 +4,7 @@
 			"path": "."
 		},
 		{
-			"path": "../../javascript/FlyEnv"
-		},
-		{
-			"path": "I:/project/production/logs-explorer"
+			"path": "../../../../ExternalDrive/project/production/logs-explorer"
 		}
 	],
 	"settings": {}

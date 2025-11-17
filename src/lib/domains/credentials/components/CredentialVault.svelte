@@ -16,7 +16,7 @@
 	import Select from '$lib/components/ui/select.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert';
-	import { Plus, Search, Shield, AlertCircle, Loader2 } from 'lucide-svelte';
+	import { Plus, Search, Shield, AlertCircle, Loader2 } from '@lucide/svelte';
 	import type { CredentialType, Credential } from '../types';
 
 	let searchQuery = $state('');

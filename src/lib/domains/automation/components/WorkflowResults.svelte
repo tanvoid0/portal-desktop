@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { WorkflowResult } from '../types';
-	import { CheckCircle, XCircle, Clock, FileText, Terminal } from 'lucide-svelte';
+	import { CheckCircle, XCircle, Clock, FileText, Terminal } from '@lucide/svelte';
 
 	export let result: WorkflowResult;
 

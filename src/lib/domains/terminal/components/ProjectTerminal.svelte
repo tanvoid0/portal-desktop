@@ -7,28 +7,39 @@
   import type { TerminalSettings } from '../types';
 
   // Props
-  export let projectId: string;
-  export let projectName: string;
-  export let projectPath: string;
-  export let settings: TerminalSettings = {
-    theme: 'dark',
+  interface Props {
+    projectId: string;
+    projectName: string;
+    projectPath: string;
+    settings?: TerminalSettings;
+  }
+
+  let {
+    projectId,
+    projectName,
+    projectPath,
+    settings: providedSettings
+  }: Props = $props();
+
+  const settings = $derived(providedSettings ?? {
+    theme: 'dark' as const,
     fontSize: 14,
     fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-    cursorStyle: 'block',
+    cursorStyle: 'block' as const,
     scrollbackLines: 1000,
     bellSound: false,
     autoClose: true,
     confirmClose: true,
     defaultShell: navigator.userAgent.includes('Windows') ? 'cmd.exe' : 'zsh',
     workingDirectory: projectPath
-  };
+  });
 
   // Reactive stores
-  $: tabs = $terminalStore.tabs.filter(tab => 
+  const tabs = $derived($terminalStore.tabs.filter(tab => 
     tab.resourceName === 'project' && tab.resourceId === projectId
-  );
-  $: activeTab = $terminalStore.activeTabId;
-  $: hasTabs = tabs.length > 0;
+  ));
+  const activeTab = $derived($terminalStore.activeTabId);
+  const hasTabs = $derived(tabs.length > 0);
 
   // Create a new terminal tab for this project
   function createNewTerminalTab(shellCommand?: string) {

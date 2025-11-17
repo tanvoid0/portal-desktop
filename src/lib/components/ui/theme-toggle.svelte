@@ -2,7 +2,7 @@
 	import { Button } from './button';
 	import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu';
 	import { themeStore, resolvedTheme } from '@/lib/domains/shared';
-	import { Sun, Moon, Monitor } from 'lucide-svelte';
+	import { Sun, Moon, Monitor } from '@lucide/svelte';
 
 	let isOpen = false;
 

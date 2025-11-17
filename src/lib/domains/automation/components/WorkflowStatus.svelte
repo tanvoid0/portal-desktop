@@ -9,7 +9,7 @@
 		XCircle, 
 		Clock, 
 		Loader2 
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	export let executionId: string;
 	export let onStatusChange: (execution: WorkflowExecution) => void = () => {};
@@ -117,8 +117,8 @@
 			{#if execution.status === 'running'}
 				<Loader2 class="w-5 h-5 animate-spin text-blue-600" />
 			{:else}
-				<svelte:component 
-					this={getStatusIcon(execution.status)} 
+				{@const StatusIcon = getStatusIcon(execution.status)}
+				<StatusIcon 
 					class="w-5 h-5 {getStatusColor(execution.status)}" 
 				/>
 			{/if}

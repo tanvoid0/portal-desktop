@@ -65,6 +65,36 @@
     document.body.style.userSelect = '';
   }
   
+  function handleKeyDown(event: KeyboardEvent) {
+    if (!resizable || !container) return;
+    
+    const step = 1; // 1% per keypress
+    let newSize = currentSize;
+    
+    if (direction === 'horizontal') {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        newSize = Math.max(minSize, currentSize - step);
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        newSize = Math.min(maxSize, currentSize + step);
+      }
+    } else {
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        newSize = Math.max(minSize, currentSize - step);
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        newSize = Math.min(maxSize, currentSize + step);
+      }
+    }
+    
+    if (newSize !== currentSize) {
+      currentSize = newSize;
+      if (onResize) onResize({ size: newSize });
+    }
+  }
+  
   onDestroy(() => {
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
@@ -86,8 +116,10 @@
     <div
       class="resize-handle absolute {direction === 'horizontal' ? 'right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400' : 'bottom-0 left-0 h-1 w-full cursor-row-resize hover:bg-blue-400'} {isResizing ? 'bg-blue-400' : 'bg-transparent'} transition-colors"
       onmousedown={handleMouseDown}
+      onkeydown={handleKeyDown}
       role="separator"
       aria-orientation={direction}
+      aria-label={direction === 'horizontal' ? 'Resize pane width' : 'Resize pane height'}
       tabindex="0"
     ></div>
   {/if}

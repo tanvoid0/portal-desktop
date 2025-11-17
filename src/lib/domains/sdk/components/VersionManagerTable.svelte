@@ -11,6 +11,8 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Input } from '$lib/components/ui/input';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert';
+	import { sdkService } from '@/lib/domains/sdk/services/sdkService';
+	import { Sparkles } from '@lucide/svelte';
 	import { 
 		CheckCircle, 
 		XCircle, 
@@ -27,7 +29,7 @@
 		FolderOpen,
 		Play,
 		Square
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface VersionInfo {
 		version: string;
@@ -48,10 +50,12 @@
 	let error = $state<string | null>(null);
 	let searchTerm = $state('');
 	let selectedVersions = $state<Set<string>>(new Set());
+	let suggestedVersion = $state<string | null>(null);
 
 	// Initialize
-	onMount(() => {
-		loadVersions();
+	onMount(async () => {
+		await loadVersions();
+		await loadSuggestedVersion();
 	});
 
 	async function loadVersions() {
@@ -69,6 +73,16 @@
 		}
 	}
 
+	async function loadSuggestedVersion() {
+		try {
+			const suggested = await sdkService.getSuggestedVersion(sdkType);
+			suggestedVersion = suggested;
+		} catch (err) {
+			console.error('Failed to load suggested version:', err);
+			suggestedVersion = null;
+		}
+	}
+
 	async function installVersion(version: string) {
 		loading = true;
 		error = null;
@@ -76,6 +90,8 @@
 		try {
 			await invoke('install_sdk_version', { sdkType, version });
 			await loadVersions();
+			// Reload suggestion after installing (may have changed)
+			await loadSuggestedVersion();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to install version';
 			console.error('Failed to install version:', err);
@@ -110,6 +126,8 @@
 		try {
 			await invoke('switch_sdk_version', { sdkType, version });
 			await loadVersions();
+			// Reload suggestion after switching (may have changed)
+			await loadSuggestedVersion();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to switch version';
 			console.error('Failed to switch version:', err);
@@ -205,7 +223,15 @@
 <Card class="w-full">
 	<CardHeader>
 		<div class="flex items-center justify-between">
-			<CardTitle class="text-xl">Version Manager</CardTitle>
+			<div>
+				<CardTitle class="text-xl">Version Manager</CardTitle>
+				{#if suggestedVersion}
+					<p class="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+						<Sparkles class="w-3 h-3" />
+						Suggested version: <code class="text-primary font-mono">{suggestedVersion}</code>
+					</p>
+				{/if}
+			</div>
 			<div class="flex items-center gap-2">
 				<Button variant="outline" size="sm" onclick={loadVersions} disabled={loading}>
 					<RefreshCw class="w-4 h-4" />
@@ -307,6 +333,12 @@
 											<Badge variant="default" class="text-xs">
 												<Play class="w-3 h-3 mr-1" />
 												Active
+											</Badge>
+										{/if}
+										{#if suggestedVersion && version.version === suggestedVersion}
+											<Badge variant="outline" class="text-xs border-primary text-primary bg-primary/5">
+												<Sparkles class="w-3 h-3 mr-1" />
+												Suggested
 											</Badge>
 										{/if}
 									</div>
