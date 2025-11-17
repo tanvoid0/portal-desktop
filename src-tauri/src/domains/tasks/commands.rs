@@ -4,6 +4,9 @@ use std::sync::Arc;
 use crate::database::DatabaseManager;
 use crate::domains::tasks::services::task_service::TaskService;
 use crate::domains::tasks::repositories::task_repository::{CreateTaskRequest, UpdateTaskRequest, TaskFilters};
+use crate::domains::tasks::services::ai_task_generator::{AITaskGenerator, GeneratedTaskStructure};
+use crate::domains::ai::providers::ProviderType;
+use crate::domains::ai::services::AIService;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskResponse {
@@ -439,5 +442,94 @@ pub async fn get_unestimated_tasks(
         .map_err(|e| {
             eprintln!("Failed to get unestimated tasks: {}", e);
             e.to_string()
+        })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerateTasksFromStoryCommand {
+    pub story_text: String,
+    pub provider_type: Option<ProviderType>,
+    pub history: Option<Vec<ConversationMessage>>,
+    pub context: Option<TaskContext>,
+    pub developer_note: Option<String>,
+    pub instruction: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationMessage {
+    pub role: String, // "user" or "assistant"
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskContext {
+    pub parent_task: Option<ParentTaskInfo>,
+    pub existing_children: Option<Vec<ChildTaskInfo>>,
+    pub existing_siblings: Option<Vec<SiblingTaskInfo>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParentTaskInfo {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub priority: Option<String>,
+    pub type_: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChildTaskInfo {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SiblingTaskInfo {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+}
+
+#[tauri::command]
+pub async fn generate_tasks_from_story(
+    ai_service: State<'_, Arc<AIService>>,
+    command: GenerateTasksFromStoryCommand,
+) -> Result<GeneratedTaskStructure, String> {
+    // Validation
+    if command.story_text.trim().is_empty() {
+        return Err("Story text cannot be empty".to_string());
+    }
+
+    if command.story_text.len() > 10000 {
+        return Err("Story text is too long (max 10000 characters)".to_string());
+    }
+
+    // Create AI task generator
+    let generator = AITaskGenerator::new(ai_service.inner().clone());
+
+    // Convert history to (role, content) pairs
+    let history = command.history.map(|hist| {
+        hist.into_iter()
+            .map(|msg| (msg.role, msg.content))
+            .collect()
+    });
+
+    // Generate tasks
+    generator
+        .generate_tasks_from_story(
+            &command.story_text,
+            command.provider_type,
+            history,
+            command.context.as_ref(),
+            command.developer_note.as_deref(),
+            command.instruction.as_deref(),
+        )
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to generate tasks from story: {}", e);
+            format!("Failed to generate tasks: {}", e)
         })
 }

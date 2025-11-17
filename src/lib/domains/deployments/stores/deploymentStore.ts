@@ -2,7 +2,7 @@
  * Deployment Store - State management for deployments
  */
 
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { deploymentService } from '../services/deploymentService';
 import { logger, loadingState, loadingActions } from '$lib/domains/shared';
 import type { 
@@ -11,6 +11,7 @@ import type {
 	DeploymentCreateRequest,
 	DeploymentUpdateRequest
 } from '../types/index';
+import { DeploymentStatus } from '../types/index';
 
 // Core stores
 export const deployments = writable<Deployment[]>([]);
@@ -366,5 +367,35 @@ export const deploymentActions = {
 	 */
 	clearError() {
 		loadingActions.setError(null);
+	},
+
+	/**
+	 * Poll CLI deployment statuses
+	 */
+	async pollCliDeploymentStatuses(intervalMs: number = 5000) {
+		const currentDeployments = get(deployments);
+		const cliDeployments = currentDeployments.filter((d: Deployment) => d.type === 'cli' && d.status === 'running');
+		
+		for (const deployment of cliDeployments) {
+			try {
+				const isRunning = await deploymentService.getProcessStatus(deployment.id);
+				if (!isRunning && deployment.status === 'running') {
+					// Process stopped, update status
+					deployments.update((current: Deployment[]) =>
+						current.map((d: Deployment) => 
+							d.id === deployment.id 
+								? { ...d, status: DeploymentStatus.STOPPED }
+								: d
+						)
+					);
+				}
+			} catch (error) {
+				logger.error('Failed to poll CLI deployment status', {
+					context: 'deploymentStore',
+					error,
+					deploymentId: deployment.id
+				});
+			}
+		}
 	}
 };

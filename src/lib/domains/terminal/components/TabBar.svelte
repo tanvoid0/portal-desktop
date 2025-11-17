@@ -1,26 +1,35 @@
 <script lang="ts">
   import { terminalStore, terminalActions, activeTab, tabCount } from '../stores/terminalStore';
-  import { Plus, X, ChevronDown } from 'lucide-svelte';
+  import { Plus, X, ChevronDown } from '@lucide/svelte';
   import { TerminalService } from '../services/terminalService';
   import { Button } from '@/lib/components/ui/button';
   import Select from '@/lib/components/ui/select.svelte';
   import { onMount } from 'svelte';
 
   // Props
-  export let onNewTab: ((profileName?: string) => void) | null = null;
-  export let showNewTabButton = true;
-  export let closable = true;
-  export let showProfileSelector = true;
+  interface Props {
+    onNewTab?: ((profileName?: string) => void) | null;
+    showNewTabButton?: boolean;
+    closable?: boolean;
+    showProfileSelector?: boolean;
+  }
+
+  let {
+    onNewTab = null,
+    showNewTabButton = true,
+    closable = true,
+    showProfileSelector = true
+  }: Props = $props();
 
   // Terminal profile state
-  let availableProfiles: any[] = [];
-  let selectedProfile: string = '';
-  let systemInfo: any = null;
+  let availableProfiles = $state<any[]>([]);
+  let selectedProfile = $state('');
+  let systemInfo = $state<any>(null);
 
   // Reactive stores
-  $: tabs = $terminalStore.tabs;
-  $: activeTabId = $terminalStore.activeTabId;
-  $: currentActiveTab = $activeTab;
+  const tabs = $derived($terminalStore.tabs);
+  const activeTabId = $derived($terminalStore.activeTabId);
+  const currentActiveTab = $derived($activeTab);
 
   function handleTabClick(tabId: string) {
     terminalActions.setActiveTab(tabId);

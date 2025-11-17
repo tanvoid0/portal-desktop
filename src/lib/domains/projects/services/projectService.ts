@@ -14,8 +14,67 @@ import type {
 import { projectStore } from '@/lib/domains/projects/stores/projectStore';
 import { logger } from '@/lib/domains/shared/services/logger';
 import { cache } from '@/lib/domains/shared/services/cache';
+import { patternCollector, suggestionEngine } from '@/lib/domains/learning';
 
 const log = logger.createScoped('ProjectService');
+
+/**
+ * Extract context string from project information
+ * Enhanced with hierarchical context support
+ * Exported for use in UI components
+ */
+export function extractContext(
+	framework: string | null | undefined,
+	packageManager: string | null | undefined,
+	projectPath?: string | null
+): string {
+	const parts: string[] = [];
+
+	if (framework) {
+		parts.push(`fw_${framework.toLowerCase().replace(/\s+/g, '_')}`);
+	}
+
+	if (packageManager) {
+		parts.push(`pm_${packageManager.toLowerCase()}`);
+	}
+
+	if (projectPath) {
+		// Extract project identifier from path (last directory name)
+		try {
+			const pathParts = projectPath.split(/[/\\]/).filter(p => p);
+			if (pathParts.length > 0) {
+				const projectName = pathParts[pathParts.length - 1];
+				parts.push(`proj_${projectName.toLowerCase().replace(/\s+/g, '_')}`);
+			}
+		} catch {
+			// Ignore path parsing errors
+		}
+	}
+
+	return parts.length > 0 ? parts.join('_') : 'global';
+}
+
+/**
+ * Get context hierarchy (most specific to least specific)
+ * For better pattern matching across similar contexts
+ */
+function getContextHierarchy(context: string): string[] {
+	const parts = context.split('_');
+	const hierarchy: string[] = [];
+
+	// Build increasingly general contexts
+	for (let i = 1; i <= parts.length; i++) {
+		const partial = parts.slice(0, i).join('_');
+		hierarchy.push(partial);
+	}
+
+	// Always include global as fallback
+	if (!hierarchy.includes('global')) {
+		hierarchy.push('global');
+	}
+
+	return hierarchy;
+}
 
 class ProjectService {
 	private initialized = false;
@@ -115,6 +174,28 @@ class ProjectService {
 			
 			// Update cache
 			cache.delete('projects');
+			
+			// Learn from project creation pattern
+			try {
+				const context = extractContext(request.framework, request.package_manager, request.path);
+				await patternCollector.collectProjectSetupPattern(
+					request.framework ?? null,
+					request.package_manager ?? null,
+					context
+				);
+
+				// Learn preference for framework + package manager combination
+				if (request.framework && request.package_manager) {
+					await patternCollector.collectSDKPreference(
+						'project_setup',
+						`${request.framework}+${request.package_manager}`,
+						context
+					);
+				}
+			} catch (error) {
+				// Don't fail project creation if learning fails
+				log.warn('Failed to collect learning pattern', error);
+			}
 			
 			log.info('Project created successfully', { id: project.id });
 			return project;
@@ -356,11 +437,93 @@ class ProjectService {
 			// Update cache
 			cache.delete('projects');
 			
+			// Learn from imported project
+			try {
+				const context = extractContext(project.framework, project.package_manager);
+				await patternCollector.collectProjectSetupPattern(
+					project.framework ?? null,
+					project.package_manager ?? null,
+					context
+				);
+			} catch (error) {
+				log.warn('Failed to collect learning pattern for imported project', error);
+			}
+			
 			log.info('Project imported successfully', { id: project.id });
 			return project;
 		} catch (error) {
 			log.error('Failed to import project', error);
 			throw error;
+		}
+	}
+
+	/**
+	 * Get intelligent suggestions for new project setup
+	 * Based on learned patterns from previous projects
+	 */
+	async getProjectSetupSuggestions(
+		framework?: string,
+		packageManager?: string
+	): Promise<{
+		framework?: string;
+		packageManager?: string;
+		buildCommand?: string;
+		startCommand?: string;
+		devPort?: number;
+	}> {
+		try {
+			const context = extractContext(framework, packageManager);
+			
+			// Get framework suggestions
+			const frameworkSuggestions = await suggestionEngine.getContextualSuggestions(
+				'framework',
+				context
+			);
+
+			// Get config suggestions
+			const configSuggestions = await suggestionEngine.getContextualSuggestions(
+				'config',
+				context
+			);
+
+			const suggestions: {
+				framework?: string;
+				packageManager?: string;
+				buildCommand?: string;
+				startCommand?: string;
+				devPort?: number;
+			} = {};
+
+			// Extract most common framework if suggested
+			if (frameworkSuggestions.length > 0) {
+				const topSuggestion = frameworkSuggestions[0];
+				if (topSuggestion.pattern_data.framework) {
+					suggestions.framework = topSuggestion.pattern_data.framework as string;
+				}
+			}
+
+			// Extract config suggestions
+			if (configSuggestions.length > 0) {
+				const topConfig = configSuggestions[0].pattern_data as Record<string, unknown>;
+				if (topConfig.package_manager) {
+					suggestions.packageManager = topConfig.package_manager as string;
+				}
+				if (topConfig.build_command) {
+					suggestions.buildCommand = topConfig.build_command as string;
+				}
+				if (topConfig.start_command) {
+					suggestions.startCommand = topConfig.start_command as string;
+				}
+				if (topConfig.dev_port) {
+					suggestions.devPort = topConfig.dev_port as number;
+				}
+			}
+
+			log.info('Project setup suggestions retrieved', { suggestions, context });
+			return suggestions;
+		} catch (error) {
+			log.error('Failed to get project setup suggestions', error);
+			return {};
 		}
 	}
 }

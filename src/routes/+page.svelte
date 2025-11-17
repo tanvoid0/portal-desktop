@@ -1,413 +1,353 @@
-<!--
-	Home page - Modern Dashboard
-	Comprehensive overview with quick actions and statistics
--->
-
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/lib/components/ui/card';
 	import { Button } from '@/lib/components/ui/button';
 	import { Badge } from '@/lib/components/ui/badge';
 	import { Separator } from '@/lib/components/ui/separator';
-	import { Progress } from '@/lib/components/ui/progress';
-	import { 
-		Terminal, 
-		Code, 
-		Folder, 
-		CheckSquare, 
-		Lock, 
-		Rocket, 
-		FileText, 
-		Settings,
-		Plus,
-		Activity,
-		Clock,
-		Star,
-		GitBranch,
-		Zap,
-		Database,
-		Server,
-		Monitor
-	} from 'lucide-svelte';
-	import { projectStore } from '@/lib/domains/projects';
+	import { projectStore, recentProjects } from '@/lib/domains/projects';
 	import { taskStats } from '@/lib/domains/tasks';
-	import { terminalStore } from '@/lib/domains/terminal';
+	import { invoke } from '@tauri-apps/api/core';
 
-	// Reactive data with null safety
-	$: projects = $projectStore.projects || [];
-	$: recentProjects = projects.slice(0, 3);
-	$: starredProjects = projects.filter(p => p.starred);
-	$: activeTabs = $terminalStore.tabs?.length || 0;
-	$: taskStatsData = $taskStats || { total: 0, completed: 0, inProgress: 0, pending: 0 };
+	// Get current time for greeting
+	const currentHour = new Date().getHours();
+	const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
-	// Quick actions
+	// Quick actions configuration
 	const quickActions = [
 		{
 			title: 'New Project',
 			description: 'Create a new project',
-			icon: Plus,
-			href: '/projects',
-			variant: 'default' as const,
-			action: 'create'
+			icon: 'folder-plus',
+			url: '/projects/create',
+			color: 'text-blue-600 dark:text-blue-400'
 		},
 		{
-			title: 'Open Terminal',
-			description: 'Launch integrated terminal',
-			icon: Terminal,
-			href: '/terminal',
-			variant: 'secondary' as const,
-			action: 'terminal'
+			title: 'New Task',
+			description: 'Add a new task',
+			icon: 'check-square',
+			url: '/tasks/create',
+			color: 'text-green-600 dark:text-green-400'
+		},
+		{
+			title: 'Terminal',
+			description: 'Open terminal',
+			icon: 'terminal',
+			url: '/terminal',
+			color: 'text-purple-600 dark:text-purple-400'
 		},
 		{
 			title: 'SDK Manager',
 			description: 'Manage SDK versions',
-			icon: Code,
-			href: '/sdk',
-			variant: 'outline' as const,
-			action: 'sdk'
+			icon: 'code',
+			url: '/sdk',
+			color: 'text-orange-600 dark:text-orange-400'
 		},
 		{
-			title: 'Deployments',
-			description: 'Manage Docker deployments',
-			icon: Rocket,
-			href: '/deployments',
-			variant: 'outline' as const,
-			action: 'deploy'
+			title: 'Cloud Resources',
+			description: 'Manage cloud resources',
+			icon: 'cloud',
+			url: '/cloud',
+			color: 'text-cyan-600 dark:text-cyan-400'
+		},
+		{
+			title: 'Credentials',
+			description: 'Manage credentials',
+			icon: 'lock',
+			url: '/credentials',
+			color: 'text-red-600 dark:text-red-400'
+		},
+		{
+			title: 'Pipeline Blocks',
+			description: 'Manage reusable blocks',
+			icon: 'blocks',
+			url: '/blocks',
+			color: 'text-indigo-600 dark:text-indigo-400'
 		}
 	];
 
-	// Navigation sections with null safety
-	$: navigationSections = [
+	// Main navigation items
+	const mainNavItems = [
 		{
-			title: 'Development',
-			items: [
-				{ title: 'Projects', href: '/projects', icon: Folder, count: projects.length },
-				{ title: 'Terminal', href: '/terminal', icon: Terminal, count: activeTabs },
-				{ title: 'SDK Manager', href: '/sdk', icon: Code, count: null }
-			]
+			title: 'Projects',
+			description: 'Manage your projects',
+			url: '/projects',
+			icon: 'folder',
+			badge: $projectStore.projects.length,
+			color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
 		},
 		{
-			title: 'Management',
-			items: [
-				{ title: 'Tasks', href: '/tasks', icon: CheckSquare, count: taskStatsData.total },
-				{ title: 'Credentials', href: '/credentials', icon: Lock, count: null },
-				{ title: 'Deployments', href: '/deployments', icon: Rocket, count: null }
-			]
+			title: 'Tasks',
+			description: 'View and manage tasks',
+			url: '/tasks',
+			icon: 'check-square',
+			badge: $taskStats.total,
+			color: 'bg-green-500/10 text-green-600 dark:text-green-400'
 		},
 		{
-			title: 'System',
-			items: [
-				{ title: 'Documents', href: '/documents', icon: FileText, count: null },
-				{ title: 'Settings', href: '/settings', icon: Settings, count: null }
-			]
+			title: 'Terminal',
+			description: 'Integrated terminal',
+			url: '/terminal',
+			icon: 'terminal',
+			color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+		},
+		{
+			title: 'Cloud',
+			description: 'Cloud resources',
+			url: '/cloud',
+			icon: 'cloud',
+			color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
 		}
 	];
 
-	// System stats with null safety
-	$: systemStats = [
-		{
-			title: 'Active Projects',
-			value: projects.length,
-			change: '+2 this week',
-			icon: Folder,
-			color: 'text-blue-600'
-		},
-		{
-			title: 'Terminal Sessions',
-			value: activeTabs,
-			change: '3 running',
-			icon: Terminal,
-			color: 'text-green-600'
-		},
-		{
-			title: 'Tasks Completed',
-			value: taskStatsData.completed,
-			change: `${Math.round((taskStatsData.completed / Math.max(taskStatsData.total, 1)) * 100)}% done`,
-			icon: CheckSquare,
-			color: 'text-purple-600'
-		},
-		{
-			title: 'Starred Projects',
-			value: starredProjects.length,
-			change: 'Favorites',
-			icon: Star,
-			color: 'text-yellow-600'
-		}
-	];
+	let runningServicesCount = $state(0);
 
-	function handleQuickAction(action: string) {
-		switch (action) {
-			case 'create':
-				goto('/projects');
-				break;
-			case 'terminal':
-				goto('/terminal');
-				break;
-			case 'sdk':
-				goto('/sdk');
-				break;
-			case 'deploy':
-				goto('/deployments');
-				break;
+	// Load running services count
+	async function loadRunningServicesCount() {
+		try {
+			const result = await invoke('get_running_services_count') as number;
+			runningServicesCount = result || 0;
+		} catch (err) {
+			console.error('Failed to load running services count:', err);
+			runningServicesCount = 0;
 		}
 	}
 
-	function formatDate(date: Date): string {
-		return new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
-			Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
-			'day'
-		);
+	loadRunningServicesCount();
+
+	// Icon component helper
+	function getIcon(iconName: string) {
+		const icons: Record<string, string> = {
+			'folder-plus': 'M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+			'check-square': 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+			'terminal': 'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+			'code': 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+			'blocks': 'M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z',
+			'cloud': 'M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z',
+			'lock': 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z',
+			'folder': 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z',
+			'settings': 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+			'container': 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'
+		};
+		return icons[iconName] || icons['folder'];
 	}
 </script>
 
-<svelte:head>
-	<title>Portal Desktop - Dashboard</title>
-</svelte:head>
-
-<main class="min-h-screen bg-background">
-	<!-- Header -->
-	<div class="border-b bg-card">
-		<div class="container mx-auto px-6 py-8">
-			<div class="flex items-center justify-between">
-				<div>
-					<h1 class="text-3xl font-bold tracking-tight">Welcome back!</h1>
-					<p class="text-muted-foreground mt-2">
-						Here's what's happening with your development environment.
-					</p>
-				</div>
-				<div class="flex items-center space-x-2">
-					<Badge variant="outline" class="flex items-center gap-1">
-						<Activity class="h-3 w-3" />
-						All systems operational
-					</Badge>
-				</div>
-			</div>
-		</div>
+<div class="container mx-auto p-6 space-y-6 max-w-7xl">
+	<!-- Welcome Header -->
+	<div class="mb-8">
+		<h1 class="text-4xl font-bold mb-2">{greeting}!</h1>
+		<p class="text-muted-foreground text-lg">
+			Welcome to Portal Desktop. Here's what's happening with your workspace.
+		</p>
 	</div>
 
-	<!-- Main Content -->
-	<div class="container mx-auto px-6 py-8">
-		<div class="grid gap-8">
-			<!-- System Stats -->
-			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-				{#each systemStats as stat (stat.title)}
-					<Card>
-						<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-							<CardTitle class="text-sm font-medium">{stat.title}</CardTitle>
-							<svelte:component this={stat.icon} class="h-4 w-4 {stat.color}" />
-						</CardHeader>
-						<CardContent>
-							<div class="text-2xl font-bold">{stat.value}</div>
-							<p class="text-xs text-muted-foreground">{stat.change}</p>
-						</CardContent>
-					</Card>
+	<!-- Stats Overview -->
+	<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+		<Card>
+			<CardContent class="p-6">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm text-muted-foreground mb-1">Total Tasks</p>
+						<p class="text-3xl font-bold">{$taskStats.total}</p>
+						{#if $taskStats.completed > 0}
+							<p class="text-xs text-green-600 dark:text-green-400 mt-1">
+								{$taskStats.completed} completed
+							</p>
+						{/if}
+					</div>
+					<div class="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
+						<svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+					</div>
+				</div>
+			</CardContent>
+		</Card>
+
+		<Card>
+			<CardContent class="p-6">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm text-muted-foreground mb-1">Projects</p>
+						<p class="text-3xl font-bold">{$projectStore.projects.length}</p>
+						{#if $recentProjects.length > 0}
+							<p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+								{$recentProjects.length} recent
+							</p>
+						{/if}
+					</div>
+					<div class="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+						<svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+						</svg>
+					</div>
+				</div>
+			</CardContent>
+		</Card>
+
+		<Card>
+			<CardContent class="p-6">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm text-muted-foreground mb-1">Running Services</p>
+						<p class="text-3xl font-bold">{runningServicesCount}</p>
+						<p class="text-xs text-muted-foreground mt-1">
+							SDK services
+						</p>
+					</div>
+					<div class="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center">
+						<svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+						</svg>
+					</div>
+				</div>
+			</CardContent>
+		</Card>
+
+		<Card>
+			<CardContent class="p-6">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm text-muted-foreground mb-1">Completion Rate</p>
+						<p class="text-3xl font-bold">
+							{$taskStats.total > 0 ? Math.round(($taskStats.completed / $taskStats.total) * 100) : 0}%
+						</p>
+						<p class="text-xs text-muted-foreground mt-1">
+							Tasks completed
+						</p>
+					</div>
+					<div class="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center">
+						<svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+						</svg>
+					</div>
+				</div>
+			</CardContent>
+		</Card>
+	</div>
+
+	<!-- Quick Actions -->
+	<Card>
+		<CardHeader>
+			<CardTitle>Quick Actions</CardTitle>
+			<CardDescription>Common tasks and shortcuts</CardDescription>
+		</CardHeader>
+		<CardContent>
+			<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+				{#each quickActions as action}
+					<Button
+						variant="outline"
+						class="h-24 flex flex-col gap-2 hover:bg-accent transition-colors"
+						onclick={() => goto(action.url)}
+					>
+						<svg class="w-6 h-6 {action.color}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={getIcon(action.icon)} />
+						</svg>
+						<span class="text-sm font-medium">{action.title}</span>
+					</Button>
 				{/each}
 			</div>
+		</CardContent>
+	</Card>
 
-			<!-- Quick Actions -->
-			<Card>
-				<CardHeader>
-					<CardTitle>Quick Actions</CardTitle>
-					<CardDescription>
-						Get started with common tasks
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-						{#each quickActions as action (action.title)}
-							<Button
-								variant={action.variant}
-								class="h-auto p-6 flex flex-col items-center space-y-2"
-								onclick={() => handleQuickAction(action.action)}
-							>
-								<svelte:component this={action.icon} class="h-6 w-6" />
-								<div class="text-center">
-									<div class="font-medium">{action.title}</div>
-									<div class="text-xs opacity-70">{action.description}</div>
-								</div>
-							</Button>
-						{/each}
+	<!-- Main Navigation -->
+	<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+		<Card class="cursor-pointer hover:shadow-lg transition-shadow" onclick={() => goto('/projects')}>
+			<CardHeader>
+				<div class="flex items-center justify-between">
+					<CardTitle class="flex items-center gap-3">
+						<div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+							<svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+							</svg>
+						</div>
+						Projects
+					</CardTitle>
+					{#if $projectStore.projects.length > 0}
+						<Badge variant="secondary">{$projectStore.projects.length}</Badge>
+					{/if}
+				</div>
+				<CardDescription>
+					Manage your projects and workspaces
+				</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<p class="text-sm text-muted-foreground">
+					{#if $projectStore.projects.length === 0}
+						No projects yet. Create your first project to get started.
+					{:else if $recentProjects.length > 0}
+						Recent: {$recentProjects[0].name}
+					{:else}
+						{$projectStore.projects.length} project{$projectStore.projects.length !== 1 ? 's' : ''} available
+					{/if}
+				</p>
+			</CardContent>
+		</Card>
+
+		<Card class="cursor-pointer hover:shadow-lg transition-shadow" onclick={() => goto('/tasks')}>
+			<CardHeader>
+				<div class="flex items-center justify-between">
+					<CardTitle class="flex items-center gap-3">
+						<div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+							<svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+							</svg>
+						</div>
+						Tasks
+					</CardTitle>
+					{#if $taskStats.total > 0}
+						<Badge variant="secondary">{$taskStats.total}</Badge>
+					{/if}
+				</div>
+				<CardDescription>
+					View and manage your tasks
+				</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<div class="space-y-2">
+					<div class="flex items-center justify-between text-sm">
+						<span class="text-muted-foreground">Total</span>
+						<span class="font-medium">{$taskStats.total}</span>
 					</div>
-				</CardContent>
-			</Card>
-
-			<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-				<!-- Recent Projects -->
-				<Card>
-					<CardHeader>
-						<CardTitle>Recent Projects</CardTitle>
-						<CardDescription>
-							Your most recently accessed projects
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						{#if recentProjects.length > 0}
-							<div class="space-y-4">
-								{#each recentProjects as project (project.id)}
-									<div class="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-										<div class="flex items-center space-x-3">
-											<div class="p-2 bg-primary/10 rounded-lg">
-												<Folder class="h-4 w-4 text-primary" />
-											</div>
-											<div>
-												<div class="font-medium">{project.name}</div>
-												<div class="text-sm text-muted-foreground">
-													{project.framework || 'No framework'}
-												</div>
-											</div>
-										</div>
-										<div class="flex items-center space-x-2">
-											{#if project.starred}
-												<Star class="h-4 w-4 text-yellow-500 fill-current" />
-											{/if}
-											<Button variant="ghost" size="sm" onclick={() => goto(`/projects/${project.id}`)}>
-												Open
-											</Button>
-										</div>
-									</div>
-								{/each}
-							</div>
-						{:else}
-							<div class="text-center py-8">
-								<Folder class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-								<p class="text-muted-foreground">No projects yet</p>
-								<Button variant="outline" class="mt-4" onclick={() => goto('/projects')}>
-									<Plus class="h-4 w-4 mr-2" />
-									Create your first project
-								</Button>
-							</div>
-						{/if}
-					</CardContent>
-				</Card>
-
-				<!-- Navigation -->
-				<Card>
-					<CardHeader>
-						<CardTitle>Navigation</CardTitle>
-						<CardDescription>
-							Access all application features
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<div class="space-y-6">
-							{#each navigationSections as section (section.title)}
-								<div>
-									<h4 class="text-sm font-medium text-muted-foreground mb-3">{section.title}</h4>
-									<div class="space-y-2">
-										{#each section.items as item (item.title)}
-											<Button
-												variant="ghost"
-												class="w-full justify-start h-auto p-3"
-												onclick={() => goto(item.href)}
-											>
-												<svelte:component this={item.icon} class="h-4 w-4 mr-3" />
-												<div class="flex-1 text-left">
-													<div class="font-medium">{item.title}</div>
-													{#if item.count !== null}
-														<div class="text-xs text-muted-foreground">
-															{item.count} {item.count === 1 ? 'item' : 'items'}
-														</div>
-													{/if}
-												</div>
-												{#if item.count !== null}
-													<Badge variant="secondary" class="ml-2">
-														{item.count}
-													</Badge>
-												{/if}
-											</Button>
-										{/each}
-									</div>
-								</div>
-								{#if section !== navigationSections[navigationSections.length - 1]}
-									<Separator />
-								{/if}
-							{/each}
-						</div>
-					</CardContent>
-				</Card>
-			</div>
-
-			<!-- Task Progress -->
-			{#if taskStatsData.total > 0}
-				<Card>
-					<CardHeader>
-						<CardTitle>Task Progress</CardTitle>
-						<CardDescription>
-							Your current task completion status
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<div class="space-y-4">
-							<div class="flex items-center justify-between">
-								<span class="text-sm font-medium">Overall Progress</span>
-								<span class="text-sm text-muted-foreground">
-									{taskStatsData.completed} of {taskStatsData.total} tasks
-								</span>
-							</div>
-							<Progress 
-								value={Math.round((taskStatsData.completed / Math.max(taskStatsData.total, 1)) * 100)} 
-								class="h-2"
-							/>
-							<div class="grid grid-cols-3 gap-4 text-center">
-								<div>
-									<div class="text-2xl font-bold text-green-600">{taskStatsData.completed}</div>
-									<div class="text-xs text-muted-foreground">Completed</div>
-								</div>
-								<div>
-									<div class="text-2xl font-bold text-yellow-600">{taskStatsData.inProgress}</div>
-									<div class="text-xs text-muted-foreground">In Progress</div>
-								</div>
-								<div>
-									<div class="text-2xl font-bold text-gray-600">{taskStatsData.pending}</div>
-									<div class="text-xs text-muted-foreground">Pending</div>
-								</div>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-			{/if}
-
-			<!-- System Status -->
-			<Card>
-				<CardHeader>
-					<CardTitle>System Status</CardTitle>
-					<CardDescription>
-						Current system health and performance
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-						<div class="flex items-center space-x-3">
-							<div class="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-								<Server class="h-4 w-4 text-green-600" />
-							</div>
-							<div>
-								<div class="font-medium">Backend Services</div>
-								<div class="text-sm text-green-600">Operational</div>
-							</div>
-						</div>
-						<div class="flex items-center space-x-3">
-							<div class="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-								<Database class="h-4 w-4 text-blue-600" />
-							</div>
-							<div>
-								<div class="font-medium">Database</div>
-								<div class="text-sm text-blue-600">Connected</div>
-							</div>
-						</div>
-						<div class="flex items-center space-x-3">
-							<div class="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
-								<Monitor class="h-4 w-4 text-purple-600" />
-							</div>
-							<div>
-								<div class="font-medium">Terminal</div>
-								<div class="text-sm text-purple-600">{activeTabs} sessions</div>
-							</div>
-						</div>
+					<div class="flex items-center justify-between text-sm">
+						<span class="text-muted-foreground">Completed</span>
+						<span class="font-medium text-green-600 dark:text-green-400">{$taskStats.completed}</span>
 					</div>
-				</CardContent>
-			</Card>
-		</div>
+					{#if $taskStats.total > 0}
+						<div class="w-full bg-secondary rounded-full h-2 mt-2">
+							<div 
+								class="bg-green-600 h-2 rounded-full transition-all"
+								style="width: {($taskStats.completed / $taskStats.total) * 100}%"
+							></div>
+						</div>
+					{/if}
+				</div>
+			</CardContent>
+		</Card>
 	</div>
-</main>
+
+	<!-- Additional Quick Links -->
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+		{#each mainNavItems.slice(2) as item}
+			<Card class="cursor-pointer hover:shadow-lg transition-shadow" onclick={() => goto(item.url)}>
+				<CardContent class="p-6">
+					<div class="flex items-center gap-4">
+						<div class="w-12 h-12 rounded-lg {item.color} flex items-center justify-center">
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={getIcon(item.icon)} />
+							</svg>
+						</div>
+						<div class="flex-1">
+							<h3 class="font-semibold mb-1">{item.title}</h3>
+							<p class="text-sm text-muted-foreground">{item.description}</p>
+						</div>
+						{#if item.badge}
+							<Badge variant="secondary">{item.badge}</Badge>
+						{/if}
+					</div>
+				</CardContent>
+			</Card>
+		{/each}
+	</div>
+</div>
+

@@ -12,7 +12,7 @@
 	import { Textarea } from '@/lib/components/ui/textarea';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/lib/components/ui/card';
 	import FolderPicker from '@/lib/components/ui/folder-picker.svelte';
-	import { RefreshCw } from 'lucide-svelte';
+	import { RefreshCw } from '@lucide/svelte';
 	import { logger } from '@/lib/domains/shared/services/logger';
 	import type { CreateProjectRequest } from '@/lib/domains/projects/types';
 

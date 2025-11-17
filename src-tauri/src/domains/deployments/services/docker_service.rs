@@ -3,12 +3,22 @@ use std::collections::HashMap;
 use tokio::process::Command;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum DeploymentType {
+    Docker,
+    Cli,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum DeploymentStatus {
     Building,
     Running,
     Stopped,
     Error,
     Unknown,
+    Creating,
+    Failed,
+    Restarting,
+    Removing,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -37,12 +47,20 @@ pub struct Deployment {
     pub id: String,
     pub project_id: String,
     pub name: String,
+    pub deployment_type: DeploymentType,
     pub status: DeploymentStatus,
     pub sdk_version: String,
     pub environment: EnvironmentConfig,
-    pub docker_image_name: String,
+    // Docker-specific fields
+    pub docker_image_name: Option<String>,
     pub container_id: Option<String>,
     pub exposed_port: Option<u16>,
+    pub dockerfile_path: Option<String>,
+    // CLI-specific fields
+    pub command: Option<String>,
+    pub working_directory: Option<String>,
+    pub process_id: Option<u32>,
+    // Shared fields
     pub logs: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -104,10 +122,16 @@ impl DockerService {
         Ok(containers)
     }
 
-    /// Build a Docker image
-    pub async fn build_image(&self, context_path: &str, image_name: &str, dockerfile_path: Option<&str>) -> Result<String, String> {
+    /// Build a Docker image with progress tracking
+    pub async fn build_image(
+        &self,
+        context_path: &str,
+        image_name: &str,
+        dockerfile_path: Option<&str>,
+    ) -> Result<String, String> {
         let mut cmd = Command::new("docker");
         cmd.arg("build");
+        cmd.arg("--progress=plain"); // Plain progress for easier parsing
         cmd.arg("-t").arg(image_name);
         
         if let Some(dockerfile) = dockerfile_path {
@@ -116,13 +140,61 @@ impl DockerService {
         
         cmd.arg(context_path);
 
-        let output = cmd.output().await.map_err(|e| format!("Failed to build image: {}", e))?;
+        // Capture output for progress tracking
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| format!("Failed to build image: {}", e))?;
 
         if output.status.success() {
-            Ok(format!("Image {} built successfully", image_name))
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Extract image ID if available
+            let image_id = stdout
+                .lines()
+                .rev()
+                .find_map(|line| {
+                    if line.contains("Successfully built") || line.contains("Successfully tagged") {
+                        Some(line.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| format!("Image {} built successfully", image_name));
+            
+            Ok(image_id)
         } else {
-            Err(format!("Build failed: {}", String::from_utf8_lossy(&output.stderr)))
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            Err(format!(
+                "Build failed: {}\n{}",
+                stderr,
+                stdout
+            ))
         }
+    }
+
+    /// Build a Docker image and stream output (for real-time progress)
+    pub async fn build_image_stream(
+        &self,
+        context_path: &str,
+        image_name: &str,
+        dockerfile_path: Option<&str>,
+    ) -> Result<tokio::process::Child, String> {
+        let mut cmd = Command::new("docker");
+        cmd.arg("build");
+        cmd.arg("--progress=plain");
+        cmd.arg("-t").arg(image_name);
+        
+        if let Some(dockerfile) = dockerfile_path {
+            cmd.arg("-f").arg(dockerfile);
+        }
+        
+        cmd.arg(context_path);
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+
+        cmd.spawn()
+            .map_err(|e| format!("Failed to spawn docker build process: {}", e))
     }
 
     /// Run a container
@@ -163,6 +235,22 @@ impl DockerService {
             Ok(container_id)
         } else {
             Err(format!("Failed to run container: {}", String::from_utf8_lossy(&output.stderr)))
+        }
+    }
+
+    /// Start a container by ID or name
+    pub async fn start_container(&self, container_id: &str) -> Result<(), String> {
+        let output = Command::new("docker")
+            .arg("start")
+            .arg(container_id)
+            .output()
+            .await
+            .map_err(|e| format!("Failed to start container: {}", e))?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!("Failed to start container: {}", String::from_utf8_lossy(&output.stderr)))
         }
     }
 

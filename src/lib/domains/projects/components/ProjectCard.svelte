@@ -6,6 +6,8 @@
 <script lang="ts">
 	import type { Project } from '@/lib/domains/projects/types';
 	import { formatRelativeTime, formatBytes } from '@/lib/domains/shared/utils';
+	import { Button } from '@/lib/components/ui/button';
+	import { Edit, Trash2 } from '@lucide/svelte';
 
 	interface Props {
 		project: Project;
@@ -151,26 +153,26 @@
 
 		{#if showActions}
 			<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-				<button
-					class="btn-icon"
+				<Button
+					variant="ghost"
+					size="sm"
 					onclick={handleEdit}
+					class="h-8 w-8 p-0"
 					title="Edit project"
 					aria-label="Edit project"
 				>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-					</svg>
-				</button>
-				<button
-					class="btn-icon text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+					<Edit class="w-4 h-4" />
+				</Button>
+				<Button
+					variant="ghost"
+					size="sm"
 					onclick={handleDelete}
+					class="h-8 w-8 p-0 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
 					title="Delete project"
 					aria-label="Delete project"
 				>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-					</svg>
-				</button>
+					<Trash2 class="w-4 h-4" />
+				</Button>
 			</div>
 		{/if}
 	</div>

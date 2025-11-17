@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { Tooltip as TooltipPrimitive } from 'bits-ui';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import {
@@ -37,7 +37,7 @@
 
 <svelte:window onkeydown={sidebar.handleShortcutKeydown} />
 
-<Tooltip.Provider delayDuration={0}>
+<TooltipPrimitive.Provider delayDuration={0}>
 	<div
 		data-slot="sidebar-wrapper"
 		style="--sidebar-width: {SIDEBAR_WIDTH}; --sidebar-width-icon: {SIDEBAR_WIDTH_ICON}; {style}"
@@ -50,4 +50,4 @@
 	>
 		{@render children?.()}
 	</div>
-</Tooltip.Provider>
+</TooltipPrimitive.Provider>

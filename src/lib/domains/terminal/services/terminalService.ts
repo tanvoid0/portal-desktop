@@ -7,6 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { TerminalProcess, TerminalOutput, TerminalCommand, TerminalContext, CreateProcessRequest } from '../types';
 import { commandHistoryStore } from '../stores/commandHistoryStore';
+import { patternCollector } from '@/lib/domains/learning';
 
 export interface ExecuteCommandRequest {
   command: string;
@@ -17,6 +18,8 @@ export interface ExecuteCommandRequest {
 export class TerminalService {
   private static outputCallbacks = new Map<string, (output: TerminalOutput) => void>();
   private static currentCommand: { command: string; startTime: number; output: string; exitCode?: number } | null = null;
+  private static globalListenerSetup = false;
+  private static globalListenerUnsubscribe: (() => void) | null = null;
 
   /**
    * Create a new terminal process with full control
@@ -168,6 +171,10 @@ export class TerminalService {
     processId: string,
     callback: (output: TerminalOutput) => void
   ): Promise<() => void> {
+    // Ensure global listener is set up
+    await this.setupGlobalOutputListener();
+    
+    // Register the callback
     this.outputCallbacks.set(processId, callback);
     
     return () => {
@@ -257,10 +264,20 @@ export class TerminalService {
     }
   }
 
-  private static setupOutputListener(processId: string): void {
-    listen<TerminalOutput>('terminal-output', (event) => {
-      const output = event.payload;
-      if (output.process_id === processId) {
+  /**
+   * Set up a global listener for terminal output events
+   * This ensures we have a single listener that routes events to all registered callbacks
+   */
+  private static async setupGlobalOutputListener(): Promise<void> {
+    if (this.globalListenerSetup) {
+      return; // Already set up
+    }
+
+    try {
+      const unsubscribe = await listen<TerminalOutput>('terminal-output', (event) => {
+        const output = event.payload;
+        const processId = output.process_id;
+
         // Capture output for current command
         if (this.currentCommand) {
           this.currentCommand.output += output.content;
@@ -271,13 +288,23 @@ export class TerminalService {
           this.handleProcessExit(processId).catch(console.error);
         }
 
-        // Call registered callback
+        // Call registered callback for this process
         const callback = this.outputCallbacks.get(processId);
         if (callback) {
           callback(output);
         }
-      }
-    });
+      });
+
+      this.globalListenerUnsubscribe = unsubscribe;
+      this.globalListenerSetup = true;
+    } catch (error) {
+      console.error('Failed to set up global terminal output listener:', error);
+    }
+  }
+
+  private static setupOutputListener(processId: string): void {
+    // Ensure global listener is set up
+    this.setupGlobalOutputListener().catch(console.error);
   }
 
   /**
@@ -294,13 +321,13 @@ export class TerminalService {
       console.log(`Process ${processId} exited with code:`, exitCode);
       
       // Complete the current command with the real exit code
-      this.completeCurrentCommand(exitCode ?? undefined, tabId);
+      await this.completeCurrentCommand(exitCode ?? undefined, tabId);
     } catch (error) {
       console.error('Failed to get process exit code:', error);
       // Fallback to output-based detection
       const process = await this.getProcess(processId);
       const tabId = process?.tab_id;
-      this.completeCurrentCommand(undefined, tabId);
+      await this.completeCurrentCommand(undefined, tabId);
     }
   }
 
@@ -323,7 +350,7 @@ export class TerminalService {
   /**
    * Complete the current command and add it to history
    */
-  static completeCurrentCommand(exitCode?: number, tabId?: string): void {
+  static async completeCurrentCommand(exitCode?: number, tabId?: string): Promise<void> {
     // console.log('Completing current command:', this.currentCommand?.command, 'tabId:', tabId);
     if (this.currentCommand) {
       const duration = Date.now() - this.currentCommand.startTime;
@@ -342,6 +369,21 @@ export class TerminalService {
           duration,
           intercepted: false
         });
+      }
+
+      // Learn from command pattern
+      try {
+        const success = detectedExitCode === 0 || detectedExitCode === undefined;
+        // Extract context from working directory if available
+        const context = undefined; // Could be extracted from working directory
+        await patternCollector.collectCommandPattern(
+          this.currentCommand.command,
+          success,
+          context
+        );
+      } catch (error) {
+        // Don't fail command completion if learning fails
+        console.warn('Failed to collect command pattern', error);
       }
       
       this.currentCommand = null;

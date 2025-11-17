@@ -135,7 +135,7 @@
 			<CardContent class="space-y-6 overflow-y-auto">
 				<!-- Search -->
 				<div>
-					<label class="block text-sm font-medium text-foreground mb-2">Search</label>
+					<p class="block text-sm font-medium text-foreground mb-2">Search</p>
 					<div class="relative">
 						<Icon icon="mdi:magnify" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
 						<Input
@@ -149,7 +149,7 @@
 
 				<!-- Status Filters -->
 				<div>
-					<label class="block text-sm font-medium text-foreground mb-3">Status</label>
+					<p class="block text-sm font-medium text-foreground mb-3">Status</p>
 					<div class="grid grid-cols-2 gap-2">
 						{#each statusOptions as option}
 							<label class="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-muted/50">
@@ -166,7 +166,7 @@
 
 				<!-- Priority Filters -->
 				<div>
-					<label class="block text-sm font-medium text-foreground mb-3">Priority</label>
+					<p class="block text-sm font-medium text-foreground mb-3">Priority</p>
 					<div class="grid grid-cols-3 gap-2">
 						{#each priorityOptions as option}
 							<label class="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-muted/50">
@@ -183,7 +183,7 @@
 
 				<!-- Type Filters -->
 				<div>
-					<label class="block text-sm font-medium text-foreground mb-3">Types</label>
+					<p class="block text-sm font-medium text-foreground mb-3">Types</p>
 					<div class="grid grid-cols-2 gap-2">
 						{#each typeOptions as typeOption}
 							<label class="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-muted/50">

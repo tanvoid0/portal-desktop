@@ -9,10 +9,15 @@
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '$lib/components/ui/collapsible';
 	import Select from '$lib/components/ui/select.svelte';
 	import { toastActions } from '$lib/domains/shared/stores/toastStore';
-	import { taskActions } from '../stores/taskStore';
+	import { taskActions, tasks } from '../stores/taskStore';
 	import type { Task, CreateTaskRequest, UpdateTaskRequest, TaskStatus, TaskPriority } from '../types';
 	import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS, TASK_TYPE_OPTIONS, TaskStatusEnum, TaskPriorityEnum, RecurringPatternEnum } from '../types';
+	import { ResourceType } from '$lib/domains/shared/types/resourceType';
+	import { documentActions, documents } from '$lib/domains/documents';
+	import DocumentLinkSelector from '$lib/domains/documents/components/DocumentLinkSelector.svelte';
+	import type { Document } from '$lib/domains/documents/types';
 	import Icon from '@iconify/svelte';
+	import { goto } from '$app/navigation';
 
 	interface Props {
 		task?: Task;
@@ -41,6 +46,18 @@
 	let recurringEndDate = $state(task?.recurring?.endDate ? task.recurring.endDate.toISOString().split('T')[0] : '');
 	let blockedBy = $state<string[]>(task?.blockedBy || []);
 	let blocks = $state<string[]>(task?.blocks || []);
+	
+	// Document linking
+	let linkedDocumentId = $state<number | null>(
+		task?.resourceType === ResourceType.DOCUMENT && task?.resourceId
+			? parseInt(task.resourceId)
+			: null
+	);
+
+	// Load documents when component mounts
+	$effect(() => {
+		documentActions.loadDocuments();
+	});
 
 	// Using enums for recurring patterns
 	const RECURRING_PATTERNS = Object.values(RecurringPatternEnum);
@@ -50,6 +67,7 @@
 	let showAdvanced = $state(false);
 	let isSubmitting = $state(false);
 	let errors = $state<Record<string, string>>({});
+	
 
 	// Helper functions
 	function addTag() {
@@ -115,6 +133,9 @@
 				type: type.trim() || undefined,
 				...(dueDate ? { dueDate: new Date(dueDate) } : {}),
 				...(parentId ? { parentId } : {}),
+				// Document linking
+				resourceId: linkedDocumentId ? linkedDocumentId.toString() : undefined,
+				resourceType: linkedDocumentId ? ResourceType.DOCUMENT : undefined,
 				// New advanced fields
 				estimatedTime: estimatedTime || undefined,
 				actualTime: actualTime || undefined,
@@ -161,15 +182,30 @@
 			}
 		}
 	}
+
 </script>
 
-<Card class="max-w-2xl mx-auto">
-	<CardHeader>
-		<CardTitle>{task ? 'Edit Task' : 'Create New Task'}</CardTitle>
-		<CardDescription>
-			{task ? 'Update the task details below' : 'Fill in the details to create a new task'}
-		</CardDescription>
-	</CardHeader>
+	<Card class="max-w-2xl mx-auto">
+		<CardHeader>
+			<div class="flex items-center justify-between">
+				<div>
+					<CardTitle>{task ? 'Edit Task' : 'Create New Task'}</CardTitle>
+					<CardDescription>
+						{task ? 'Update the task details below' : 'Fill in the details to create a new task'}
+					</CardDescription>
+				</div>
+				{#if !task}
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => goto('/tasks/generate')}
+					>
+						<Icon icon="lucide:sparkles" class="h-4 w-4 mr-2" />
+						Generate Tasks with AI
+					</Button>
+				{/if}
+			</div>
+		</CardHeader>
 	<CardContent class="space-y-6" onkeydown={handleKeydown}>
 		<!-- Title -->
 		<div class="space-y-2">
@@ -318,6 +354,20 @@
 				id="assignee"
 				bind:value={assignee}
 				placeholder="Enter assignee name or email..."
+			/>
+		</div>
+
+		<!-- Document Link -->
+		<div class="space-y-2">
+			<DocumentLinkSelector
+				selectedDocumentId={linkedDocumentId}
+				onSelect={(doc) => {
+					linkedDocumentId = doc?.id || null;
+				}}
+				onCreateNew={() => {
+					// Create new document and link it
+					goto(`/documents/create?taskId=${task?.id || ''}&taskTitle=${encodeURIComponent(title || '')}`);
+				}}
 			/>
 		</div>
 

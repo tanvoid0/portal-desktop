@@ -22,7 +22,7 @@
 		CheckCircle,
 		XCircle,
 		RefreshCw
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface HealthData {
 		is_healthy: boolean;

@@ -9,12 +9,13 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Label } from '$lib/components/ui/label';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Laptop, Plus, Edit, Trash2, Search, RefreshCw, Loader2, Code2, Code } from 'lucide-svelte';
+	import { Laptop, Plus, Edit, Trash2, Search, RefreshCw, Loader2, Code2, Code } from '@lucide/svelte';
 	import { toast } from '$lib/domains/shared/stores/toastStore';
 	import { logger } from '$lib/domains/shared';
 	import { ideService, type IdeConfig, type FrameworkIdeMapping } from '$lib/domains/ide';
 	import { Separator } from '$lib/components/ui/separator';
-	import { Link2, ArrowRight, Upload, X } from 'lucide-svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import { Link2, ArrowRight, Upload, X } from '@lucide/svelte';
 	import Select from '@/lib/components/ui/select.svelte';
 	import Icon from '@iconify/svelte';
 	import { open } from '@tauri-apps/plugin-dialog';
@@ -839,93 +840,94 @@
 </div>
 
 <!-- Add/Edit Modal -->
-{#if showModal}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={closeModal} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-		<div class="bg-background rounded-lg shadow-lg p-6 w-full max-w-md" onclick={(e) => e.stopPropagation()} role="document">
-			<h3 id="modal-title" class="text-lg font-semibold mb-4">{editingIde ? 'Edit IDE' : 'Add IDE'}</h3>
-			
-			<div class="space-y-4">
-				<div class="space-y-2">
-					<Label for="ide-name">IDE Name</Label>
-					<Input
-						id="ide-name"
-						bind:value={ideName}
-						placeholder="e.g., Visual Studio Code"
-						required
-					/>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="ide-executable">Executable Path</Label>
-					<Input
-						id="ide-executable"
-						bind:value={ideExecutable}
-						placeholder="e.g., /usr/bin/code or C:\Program Files\Code\code.exe"
-						required
-					/>
-					<p class="text-xs text-muted-foreground">
-						Full path to the IDE executable
-					</p>
-				</div>
-
-				<div class="flex justify-end gap-3 pt-4 border-t">
-					<Button variant="outline" onclick={closeModal}>Cancel</Button>
-					<Button onclick={saveIde}>{editingIde ? 'Update' : 'Add'} IDE</Button>
-				</div>
+<Dialog.Root bind:open={showModal}>
+	<Dialog.Content class="max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>{editingIde ? 'Edit IDE' : 'Add IDE'}</Dialog.Title>
+		</Dialog.Header>
+		
+		<div class="space-y-4">
+			<div class="space-y-2">
+				<Label for="ide-name">IDE Name</Label>
+				<Input
+					id="ide-name"
+					bind:value={ideName}
+					placeholder="e.g., Visual Studio Code"
+					required
+				/>
 			</div>
+
+			<div class="space-y-2">
+				<Label for="ide-executable">Executable Path</Label>
+				<Input
+					id="ide-executable"
+					bind:value={ideExecutable}
+					placeholder="e.g., /usr/bin/code or C:\Program Files\Code\code.exe"
+					required
+				/>
+				<p class="text-xs text-muted-foreground">
+					Full path to the IDE executable
+				</p>
+			</div>
+
+			<Dialog.Footer>
+				<Button variant="outline" onclick={closeModal}>Cancel</Button>
+				<Button onclick={saveIde}>{editingIde ? 'Update' : 'Add'} IDE</Button>
+			</Dialog.Footer>
 		</div>
-	</div>
-{/if}
+	</Dialog.Content>
+</Dialog.Root>
 
 <!-- Framework IDE Mapping Modal -->
-{#if showMappingModal}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={closeMappingModal} role="dialog" aria-modal="true" aria-labelledby="mapping-modal-title">
-		<div class="bg-background rounded-lg shadow-lg p-6 w-full max-w-md" onclick={(e) => e.stopPropagation()} role="document">
-			<h3 id="mapping-modal-title" class="text-lg font-semibold mb-4">{editingMapping ? 'Edit Framework IDE Mapping' : 'Add Framework IDE Mapping'}</h3>
-			
-			<div class="space-y-4">
-				<div class="space-y-2">
-					<Label for="mapping-framework">Framework</Label>
-					<Input
-						id="mapping-framework"
-						bind:value={mappingFramework}
-						placeholder="e.g., React, Vue, Angular, Node.js"
-						required
-					/>
-					<p class="text-xs text-muted-foreground">
-						The framework name that will trigger this IDE
-					</p>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="mapping-ide">IDE</Label>
-					<Select
-						defaultValue={mappingIdeId || ''}
-						options={ides.map(ide => ({ value: String(ide.id || ''), label: ide.name }))}
-						onSelect={(value) => mappingIdeId = value || ''}
-						placeholder="Select an IDE..."
-					/>
-					<p class="text-xs text-muted-foreground">
-						The IDE that will open for this framework
-					</p>
-				</div>
-
-				<div class="flex justify-end gap-3 pt-4 border-t">
-					<Button variant="outline" onclick={closeMappingModal}>Cancel</Button>
-					<Button onclick={saveMapping}>{editingMapping ? 'Update' : 'Create'} Mapping</Button>
-				</div>
+<Dialog.Root bind:open={showMappingModal}>
+	<Dialog.Content class="max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>{editingMapping ? 'Edit Framework IDE Mapping' : 'Add Framework IDE Mapping'}</Dialog.Title>
+		</Dialog.Header>
+		
+		<div class="space-y-4">
+			<div class="space-y-2">
+				<Label for="mapping-framework">Framework</Label>
+				<Input
+					id="mapping-framework"
+					bind:value={mappingFramework}
+					placeholder="e.g., React, Vue, Angular, Node.js"
+					required
+				/>
+				<p class="text-xs text-muted-foreground">
+					The framework name that will trigger this IDE
+				</p>
 			</div>
+
+			<div class="space-y-2">
+				<Label for="mapping-ide">IDE</Label>
+				<Select
+					defaultValue={mappingIdeId || ''}
+					options={ides.map(ide => ({ value: String(ide.id || ''), label: ide.name }))}
+					onSelect={(value) => mappingIdeId = value || ''}
+					placeholder="Select an IDE..."
+				/>
+				<p class="text-xs text-muted-foreground">
+					The IDE that will open for this framework
+				</p>
+			</div>
+
+			<Dialog.Footer>
+				<Button variant="outline" onclick={closeMappingModal}>Cancel</Button>
+				<Button onclick={saveMapping}>{editingMapping ? 'Update' : 'Create'} Mapping</Button>
+			</Dialog.Footer>
 		</div>
-	</div>
-{/if}
+	</Dialog.Content>
+</Dialog.Root>
 
 <!-- Framework Modal -->
-{#if showFrameworkModal}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={closeFrameworkModal} role="dialog" aria-modal="true">
-		<div class="bg-background rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onclick={(e) => e.stopPropagation()} role="document">
-			<h3 class="text-lg font-semibold mb-4">{editingFramework ? 'Edit Framework' : 'Create Framework'}</h3>
-			
-			<div class="space-y-4">
+<Dialog.Root bind:open={showFrameworkModal}>
+	<Dialog.Content class="max-w-2xl max-h-[90vh] overflow-y-auto">
+		<Dialog.Header>
+			<Dialog.Title>{editingFramework ? 'Edit Framework' : 'Create Framework'}</Dialog.Title>
+		</Dialog.Header>
+		
+		<div class="space-y-4">
 				<div class="space-y-2">
 					<Label for="framework-name">Framework Name</Label>
 					<Input
@@ -983,15 +985,16 @@
 							{#if iconSearchResults.length > 0}
 								<div class="grid grid-cols-4 gap-2 p-2 border rounded-md max-h-48 overflow-y-auto">
 									{#each iconSearchResults as iconName}
-										<button
+										<Button
 											type="button"
+											variant={frameworkIcon === iconName ? 'default' : 'outline'}
+											size="sm"
 											onclick={() => { frameworkIcon = iconName; iconSearchQuery = ''; iconSearchResults = []; }}
-											class="p-2 border rounded hover:bg-accent transition-colors flex flex-col items-center gap-1"
-											class:bg-accent={frameworkIcon === iconName}
+											class="p-2 h-auto flex flex-col items-center gap-1"
 										>
 											<Icon icon={iconName} class="w-6 h-6" />
 											<span class="text-xs truncate w-full text-center">{iconName.replace('logos:', '')}</span>
-										</button>
+										</Button>
 									{/each}
 								</div>
 							{/if}
@@ -1037,11 +1040,10 @@
 					{/if}
 				</div>
 
-				<div class="flex justify-end gap-3 pt-4 border-t">
+				<Dialog.Footer>
 					<Button variant="outline" onclick={closeFrameworkModal}>Cancel</Button>
 					<Button onclick={saveFramework}>{editingFramework ? 'Update' : 'Create'} Framework</Button>
-				</div>
+				</Dialog.Footer>
 			</div>
-		</div>
-	</div>
-{/if}
+	</Dialog.Content>
+</Dialog.Root>

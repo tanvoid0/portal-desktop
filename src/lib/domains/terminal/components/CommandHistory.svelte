@@ -6,14 +6,20 @@
   import { Button } from '@/lib/components/ui/button';
   import { onMount } from 'svelte';
 
-  export let tabId: string;
+  interface Props {
+    tabId: string;
+  }
 
-  let selectedEntry: CommandHistoryEntry | null = null;
-  let showModal = false;
+  let {
+    tabId
+  }: Props = $props();
+
+  let selectedEntry = $state<CommandHistoryEntry | null>(null);
+  let showModal = $state(false);
 
   // Get reactive history for the current tab
-  $: tabHistoryStore = commandHistoryStore.getTabHistoryReactive(tabId);
-  $: averageDuration = calculateAverageDuration($tabHistoryStore);
+  const tabHistoryStore = $derived(commandHistoryStore.getTabHistoryReactive(tabId));
+  const averageDuration = $derived(calculateAverageDuration(tabHistoryStore));
 
   function formatTimestamp(date: Date): string {
     return date.toLocaleTimeString();

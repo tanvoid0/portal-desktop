@@ -10,7 +10,7 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import { Download, Trash2, Check, Clock, AlertCircle } from 'lucide-svelte';
+	import { Download, Trash2, Check, Clock, AlertCircle } from '@lucide/svelte';
 
 	interface VersionInfo {
 		version: string;

@@ -12,7 +12,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Settings, Download, RotateCcw, Save, RefreshCw, Loader2, AlertCircle } from 'lucide-svelte';
+	import { Settings, Download, RotateCcw, Save, RefreshCw, Loader2, AlertCircle } from '@lucide/svelte';
 	import { toast } from '$lib/domains/shared/stores/toastStore';
 	import { logger } from '$lib/domains/shared';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
@@ -128,9 +128,9 @@
 	<title>Settings - Portal Desktop</title>
 </svelte:head>
 
-<div class="flex flex-col h-full">
+<div class="flex flex-col h-full overflow-hidden">
 	<!-- Top Bar -->
-	<div class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+	<div class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
 		<div class="flex items-center justify-between px-6 py-4">
 			<div>
 				<h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -189,19 +189,19 @@
 	</div>
 
 	<!-- Main Content Area -->
-	<div class="flex flex-1 overflow-hidden">
+	<div class="flex flex-1 min-h-0 overflow-hidden">
 		<!-- Sidebar Navigation -->
-		<aside class="w-64 border-r bg-background flex-shrink-0 overflow-y-auto">
-			<div class="sticky top-0 p-4">
-				<Card class="p-4">
+		<aside class="w-80 border-r bg-background flex-shrink-0 overflow-y-auto">
+			<div class="p-4">
+				<Card class="p-3">
 					<SettingsNavigation currentSection={currentSection()} />
 				</Card>
 			</div>
 		</aside>
 
 		<!-- Page Content -->
-		<main class="flex-1 overflow-y-auto">
-			<div class="p-6">
+		<main class="flex-1 overflow-y-auto min-w-0">
+			<div class="p-6 max-w-5xl">
 				{#if $isLoadingSettings}
 					<div class="flex items-center justify-center py-12">
 						<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />

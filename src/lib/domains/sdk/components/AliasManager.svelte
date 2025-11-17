@@ -23,7 +23,7 @@
 		Search,
 		Tag,
 		X
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface Alias {
 		name: string;

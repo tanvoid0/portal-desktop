@@ -15,22 +15,23 @@
 	import ThemeCustomizer from './ThemeCustomizer.svelte';
 	import IdeSettings from './IdeSettings.svelte';
 	import FrameworkIdeSettings from './FrameworkIdeSettings.svelte';
+	import LearningSettings from './LearningSettings.svelte';
 	import SettingsNavigation from './SettingsNavigation.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Settings, Download, RotateCcw, AlertCircle, Loader2, Save, RefreshCw } from 'lucide-svelte';
+	import { Settings, Download, RotateCcw, AlertCircle, Loader2, Save, RefreshCw } from '@lucide/svelte';
 	import type { SettingsCategory } from '../types';
 	
-	type SettingsSection = 'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'framework-ides';
+	type SettingsSection = 'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'framework-ides' | 'learning';
 
 	// Derive active section from URL
 	const activeSection = $derived.by((): SettingsSection => {
 		const path = $page.url.pathname;
 		if (path === '/settings' || path === '/settings/') return 'general';
 		const section = path.replace('/settings/', '').replace(/\/$/, '');
-		if (['general', 'editor', 'terminal', 'theme', 'ides', 'framework-ides'].includes(section)) {
+		if (['general', 'editor', 'terminal', 'theme', 'ides', 'framework-ides', 'learning'].includes(section)) {
 			return section as SettingsSection;
 		}
 		return 'general';
@@ -185,30 +186,37 @@
 			</p>
 		</div>
 		<div class="flex gap-2">
-			<Button variant="outline" onclick={handleExport} disabled={isExporting || !settingsData}>
-				{#if isExporting}
-					<Loader2 class="h-4 w-4 mr-2 animate-spin" />
-				{:else}
-					<Download class="h-4 w-4 mr-2" />
-				{/if}
-				Export Settings
-			</Button>
-			<Button variant="outline" onclick={handleReset} disabled={isResetting}>
-				{#if isResetting}
-					<Loader2 class="h-4 w-4 mr-2 animate-spin" />
-				{:else}
-					<RotateCcw class="h-4 w-4 mr-2" />
-				{/if}
-				Reset to Defaults
-			</Button>
-			<Button onclick={handleSave} disabled={isSaving || !settingsData}>
-				{#if isSaving}
-					<Loader2 class="h-4 w-4 mr-2 animate-spin" />
-				{:else}
+			{#if activeSection !== 'learning'}
+				<Button variant="outline" onclick={handleExport} disabled={isExporting || !settingsData}>
+					{#if isExporting}
+						<Loader2 class="h-4 w-4 mr-2 animate-spin" />
+					{:else}
+						<Download class="h-4 w-4 mr-2" />
+					{/if}
+					Export Settings
+				</Button>
+				<Button variant="outline" onclick={handleReset} disabled={isResetting}>
+					{#if isResetting}
+						<Loader2 class="h-4 w-4 mr-2 animate-spin" />
+					{:else}
+						<RotateCcw class="h-4 w-4 mr-2" />
+					{/if}
+					Reset to Defaults
+				</Button>
+				<Button onclick={handleSave} disabled={isSaving || !settingsData}>
+					{#if isSaving}
+						<Loader2 class="h-4 w-4 mr-2 animate-spin" />
+					{:else}
+						<Save class="h-4 w-4 mr-2" />
+					{/if}
+					Save Changes
+				</Button>
+			{:else}
+				<div class="text-sm text-muted-foreground flex items-center">
 					<Save class="h-4 w-4 mr-2" />
-				{/if}
-				Save Changes
-			</Button>
+					Learning settings are saved automatically when changed
+				</div>
+			{/if}
 		</div>
 	</div>
 
@@ -254,9 +262,9 @@
 	<!-- Settings Content with Sidebar Navigation -->
 	<div class="flex flex-col lg:flex-row gap-8">
 		<!-- Navigation Sidebar -->
-		<div class="lg:w-64 flex-shrink-0">
+		<div class="lg:w-80 flex-shrink-0">
 			<div class="sticky top-8">
-				<Card class="p-4">
+				<Card class="p-3">
 					<SettingsNavigation
 						currentSection={activeSection === 'framework-ides' ? 'ides' : activeSection}
 					/>
@@ -308,6 +316,8 @@
 						settings={settingsData.theme} 
 						onUpdate={handleThemeUpdate} 
 					/>
+				{:else if activeSection === 'learning'}
+					<LearningSettings />
 				{/if}
 			{:else}
 				<Card>

@@ -1,23 +1,19 @@
 <script lang="ts">
+	import { cn } from '$lib/utils';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { cn, type WithElementRef } from '$lib/utils.js';
-
+	
+	interface AlertDescriptionProps extends HTMLAttributes<HTMLParagraphElement> {}
+	
 	let {
-		ref = $bindable(null),
 		class: className,
 		children,
 		...restProps
-	}: WithElementRef<HTMLAttributes<HTMLDivElement>> = $props();
+	}: AlertDescriptionProps = $props();
 </script>
 
 <div
-	bind:this={ref}
-	data-slot="alert-description"
-	class={cn(
-		'col-start-2 grid justify-items-start gap-1 text-sm text-muted-foreground [&_p]:leading-relaxed',
-		className
-	)}
+	class={cn('text-sm [&_p]:leading-relaxed', className)}
 	{...restProps}
 >
-	{@render children?.()}
+	{@render children()}
 </div>

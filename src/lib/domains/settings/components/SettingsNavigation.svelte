@@ -6,9 +6,9 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
-	import { Settings, Code, Terminal, Palette, Laptop } from 'lucide-svelte';
+	import { Settings, Code, Terminal, Palette, Laptop, Brain, Package, Bot } from '@lucide/svelte';
 
-	type SettingsSectionType = 'general' | 'editor' | 'terminal' | 'theme' | 'ides';
+	type SettingsSectionType = 'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'frameworks' | 'learning' | 'autonomy';
 
 	interface Props {
 		currentSection?: SettingsSectionType | 'framework-ides';
@@ -50,11 +50,32 @@
 			path: '/settings/ides'
 		},
 		{
+			id: 'frameworks' as const,
+			label: 'Frameworks',
+			description: 'Manage frameworks & recommendations',
+			icon: Package,
+			path: '/settings/frameworks'
+		},
+		{
 			id: 'theme' as const,
 			label: 'Theme',
 			description: 'Appearance & colors',
 			icon: Palette,
 			path: '/settings/theme'
+		},
+		{
+			id: 'learning' as const,
+			label: 'Learning',
+			description: 'ML learning & AI settings',
+			icon: Brain,
+			path: '/settings/learning'
+		},
+		{
+			id: 'autonomy' as const,
+			label: 'Autonomy',
+			description: 'Autonomous action settings',
+			icon: Bot,
+			path: '/settings/autonomy'
 		}
 	];
 
@@ -71,7 +92,7 @@
 		if (section === 'framework-ides') return 'ides';
 		const normalizedSection = section || 'general';
 		// Type guard to ensure we return a valid section
-		if (['general', 'editor', 'terminal', 'theme', 'ides'].includes(normalizedSection)) {
+		if (['general', 'editor', 'terminal', 'theme', 'ides', 'frameworks', 'learning', 'autonomy'].includes(normalizedSection)) {
 			return normalizedSection as SettingsSectionType;
 		}
 		return 'general';
@@ -82,23 +103,22 @@
 	}
 </script>
 
-<nav class="space-y-1 {className}">
+<nav class="space-y-2 {className}">
 	{#each sections as section}
 		{@const isActive = activeSection() === section.id}
 		<Button
 			type="button"
 			variant="ghost"
-			size="sm"
 			onclick={() => handleSectionClick(section.id, section.path)}
-			class="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors justify-start {isActive
+			class="w-full flex items-start px-4 py-3 text-base font-medium rounded-lg transition-colors justify-start h-auto whitespace-normal {isActive
 				? 'bg-accent text-accent-foreground' 
 				: 'text-muted-foreground hover:text-foreground hover:bg-accent/50'}"
 		>
 			{@const Icon = section.icon}
-			<Icon class="h-4 w-4 mr-3" />
-			<div class="flex-1 text-left">
-				<div class="font-medium">{section.label}</div>
-				<p class="text-xs text-muted-foreground mt-0.5">
+			<Icon class="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+			<div class="flex-1 text-left min-w-0">
+				<div class="font-semibold text-base leading-tight">{section.label}</div>
+				<p class="text-sm text-muted-foreground mt-1 leading-relaxed break-words">
 					{section.description}
 				</p>
 			</div>

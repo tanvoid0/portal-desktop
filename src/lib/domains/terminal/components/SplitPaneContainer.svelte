@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import ResizablePane from './ResizablePane.svelte';
   import { Button } from '@/lib/components/ui/button';
-  import { Maximize2, Minimize2, Split, X } from 'lucide-svelte';
+  import { Maximize2, Minimize2, Split, X } from '@lucide/svelte';
   
   export let direction: 'horizontal' | 'vertical' = 'horizontal';
   export let panes: Array<{
@@ -99,7 +99,8 @@
       
       {#each panes as pane (pane.id)}
         {#if pane.id === maximizedPaneId}
-          <svelte:component this={pane.component} {...pane.props} />
+          {@const Component = pane.component}
+          <Component {...pane.props} />
         {/if}
       {/each}
     </div>
@@ -150,7 +151,8 @@
           </div>
           
           <!-- Pane Content -->
-          <svelte:component this={pane.component} {...pane.props} />
+          {@const Component = pane.component}
+          <Component {...pane.props} />
         </div>
       </ResizablePane>
     {/each}

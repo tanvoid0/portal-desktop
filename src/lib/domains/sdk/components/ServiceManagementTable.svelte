@@ -30,7 +30,7 @@
 		Trash2,
 		Eye,
 		EyeOff
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface ServiceInfo {
 		id: string;

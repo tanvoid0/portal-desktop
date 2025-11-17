@@ -4,7 +4,7 @@
 -->
 
 <script lang="ts">
-	import { toastStore } from '$lib/stores/toast';
+	import { toastStore, toastActions } from '$lib/domains/shared/stores/toastStore';
 	import { cn } from '@/lib/utils';
 	import Toast from './toast.svelte';
 
@@ -43,8 +43,13 @@
 >
 	{#each $toastStore.toasts as toast (toast.id)}
 		<Toast
-			{...toast}
-			onClose={() => toastStore.remove(toast.id)}
+			id={toast.id}
+			title={toast.title}
+			description={toast.description}
+			variant={toast.type || 'default'}
+			duration={toast.duration}
+			action={toast.action}
+			onClose={() => toastActions.dismiss(toast.id)}
 		/>
 	{/each}
 </div>

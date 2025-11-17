@@ -23,7 +23,7 @@
 		Info,
 		AlertTriangle,
 		X
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface LogEntry {
 		timestamp: string;

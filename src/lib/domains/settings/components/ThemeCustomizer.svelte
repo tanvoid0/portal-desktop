@@ -9,7 +9,7 @@
 	import Select from '@/lib/components/ui/select.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
-	import { Palette, Download, Upload, RotateCcw } from 'lucide-svelte';
+	import { Palette, Download, Upload, RotateCcw } from '@lucide/svelte';
 	import { settingsService } from '../services/settingsService';
 	import type { ThemeSettings, CustomTheme } from '../types';
 

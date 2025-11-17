@@ -9,7 +9,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Play, Square, Settings, ExternalLink, AlertCircle } from 'lucide-svelte';
+	import { Play, Square, Settings, ExternalLink, AlertCircle } from '@lucide/svelte';
 
 	// State
 	let loading = $state(true);

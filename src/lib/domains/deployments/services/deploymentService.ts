@@ -29,12 +29,31 @@ export class DeploymentService {
 		try {
 			logger.info('Creating deployment', { context: 'DeploymentService',  
 				name: request.name, 
-				projectPath: request.projectPath 
+				projectPath: request.projectPath,
+				type: request.type
 			});
 			
-			const deployment = await invoke<Deployment>('create_deployment_command', {
-				request
+			// Convert frontend request to backend format
+			const backendRequest = {
+				project_id: request.metadata?.projectId || '',
+				name: request.name,
+				deployment_type: request.type === 'docker' ? 'Docker' : 'Cli',
+				sdk_version: 'latest', // TODO: Get from request if available
+				project_type: request.projectType,
+				project_path: request.projectPath,
+				environment: request.environment.variables || {},
+				exposed_port: request.exposedPort,
+				docker_image_name: request.dockerImageName,
+				dockerfile_path: request.dockerfilePath,
+				command: request.command,
+				working_directory: request.workingDirectory,
+			};
+			
+			const backendDeployment = await invoke<any>('create_deployment_command', {
+				request: backendRequest
 			});
+			
+			const deployment = this.convertBackendDeployment(backendDeployment);
 			
 			logger.info('Deployment created successfully', { context: 'DeploymentService',  
 				deploymentId: deployment.id 
@@ -52,13 +71,34 @@ export class DeploymentService {
 	}
 
 	/**
+	 * Convert backend deployment to frontend format
+	 */
+	private convertBackendDeployment(backendDeployment: any): Deployment {
+		return {
+			...backendDeployment,
+			type: backendDeployment.deployment_type === 'Docker' ? 'docker' : 'cli',
+			createdAt: new Date(backendDeployment.created_at),
+			updatedAt: new Date(backendDeployment.updated_at),
+			startedAt: backendDeployment.started_at ? new Date(backendDeployment.started_at) : undefined,
+			stoppedAt: backendDeployment.stopped_at ? new Date(backendDeployment.stopped_at) : undefined,
+			// Map backend fields to frontend
+			dockerImageName: backendDeployment.docker_image_name,
+			dockerfilePath: backendDeployment.dockerfile_path,
+			workingDirectory: backendDeployment.working_directory,
+			processId: backendDeployment.process_id,
+			exposedPort: backendDeployment.exposed_port,
+		} as Deployment;
+	}
+
+	/**
 	 * Get all deployments
 	 */
 	async getDeployments(): Promise<Deployment[]> {
 		try {
 			logger.info('Getting deployments', { context: 'DeploymentService' });
 			
-			const deployments = await invoke<Deployment[]>('get_deployments_command');
+			const backendDeployments = await invoke<any[]>('get_deployments_command');
+			const deployments = backendDeployments.map(d => this.convertBackendDeployment(d));
 			
 			logger.info('Deployments retrieved', { 
 				context: 'DeploymentService', 
@@ -85,9 +125,15 @@ export class DeploymentService {
 				data: { deploymentId } 
 			});
 			
-			const deployment = await invoke<Deployment>('get_deployment_command', { 
+			const backendDeployment = await invoke<any>('get_deployment_command', { 
 				deploymentId 
 			});
+			
+			if (!backendDeployment) {
+				throw new Error('Deployment not found');
+			}
+			
+			const deployment = this.convertBackendDeployment(backendDeployment);
 			
 			logger.info('Deployment retrieved', { 
 				context: 'DeploymentService', 
@@ -115,9 +161,11 @@ export class DeploymentService {
 				data: { deploymentId } 
 			});
 			
-			const deployment = await invoke<Deployment>('start_deployment_command', { 
+			const backendDeployment = await invoke<any>('start_deployment_command', { 
 				deploymentId 
 			});
+			
+			const deployment = this.convertBackendDeployment(backendDeployment);
 			
 			logger.info('Deployment started successfully', { 
 				context: 'DeploymentService', 
@@ -145,9 +193,11 @@ export class DeploymentService {
 				data: { deploymentId } 
 			});
 			
-			const deployment = await invoke<Deployment>('stop_deployment_command', { 
+			const backendDeployment = await invoke<any>('stop_deployment_command', { 
 				deploymentId 
 			});
+			
+			const deployment = this.convertBackendDeployment(backendDeployment);
 			
 			logger.info('Deployment stopped successfully', { 
 				context: 'DeploymentService', 
@@ -201,10 +251,12 @@ export class DeploymentService {
 				data: { deploymentId } 
 			});
 			
-			const deployment = await invoke<Deployment>('update_deployment_command', {
+			const backendDeployment = await invoke<any>('update_deployment_command', {
 				deploymentId,
 				request
 			});
+			
+			const deployment = this.convertBackendDeployment(backendDeployment);
 			
 			logger.info('Deployment updated successfully', { 
 				context: 'DeploymentService', 
@@ -260,7 +312,8 @@ export class DeploymentService {
 		try {
 			logger.info('Refreshing deployment statuses', { context: 'DeploymentService' });
 			
-			const deployments = await invoke<Deployment[]>('refresh_deployment_statuses_command');
+			const backendDeployments = await invoke<any[]>('refresh_deployment_statuses_command');
+			const deployments = backendDeployments.map(d => this.convertBackendDeployment(d));
 			
 			logger.info('Deployment statuses refreshed', { 
 				context: 'DeploymentService', 
@@ -278,13 +331,47 @@ export class DeploymentService {
 	}
 
 	/**
+	 * Convert backend container to frontend format
+	 */
+	private convertBackendContainer(backendContainer: any): DockerContainer {
+		return {
+			...backendContainer,
+			status: backendContainer.status as any,
+			ports: Array.isArray(backendContainer.ports) 
+				? backendContainer.ports 
+				: (backendContainer.ports ? [backendContainer.ports] : []),
+			createdAt: (() => {
+				if (!backendContainer.created_at || backendContainer.created_at.trim() === '') {
+					return new Date();
+				}
+				const dateStr = backendContainer.created_at.trim();
+				// Try parsing as Unix timestamp (seconds) first
+				const unixTimestamp = parseInt(dateStr, 10);
+				if (!isNaN(unixTimestamp) && unixTimestamp > 0) {
+					// If it's a Unix timestamp in seconds, convert to milliseconds
+					const date = new Date(unixTimestamp * 1000);
+					if (!isNaN(date.getTime())) {
+						return date;
+					}
+				}
+				// Try parsing as ISO string or other date format
+				const date = new Date(dateStr);
+				return isNaN(date.getTime()) ? new Date() : date;
+			})(),
+			volumes: backendContainer.volumes || [],
+			environment: backendContainer.environment || {}
+		} as DockerContainer;
+	}
+
+	/**
 	 * List Docker containers
 	 */
 	async listContainers(): Promise<DockerContainer[]> {
 		try {
 			logger.info('Listing containers', { context: 'DeploymentService' });
 			
-			const containers = await invoke<DockerContainer[]>('list_containers_command');
+			const backendContainers = await invoke<any[]>('list_containers_command');
+			const containers = backendContainers.map(c => this.convertBackendContainer(c));
 			
 			logger.info('Containers retrieved', { 
 				context: 'DeploymentService', 
@@ -311,7 +398,8 @@ export class DeploymentService {
 			[DeploymentStatus.STOPPED]: 'text-gray-600',
 			[DeploymentStatus.FAILED]: 'text-red-600',
 			[DeploymentStatus.RESTARTING]: 'text-blue-600',
-			[DeploymentStatus.REMOVING]: 'text-gray-400'
+			[DeploymentStatus.REMOVING]: 'text-gray-400',
+			[DeploymentStatus.BUILDING]: 'text-yellow-600'
 		};
 		return colors[status] || 'text-gray-400';
 	}
@@ -326,7 +414,8 @@ export class DeploymentService {
 			[DeploymentStatus.STOPPED]: '⏹️',
 			[DeploymentStatus.FAILED]: '❌',
 			[DeploymentStatus.RESTARTING]: '🔄',
-			[DeploymentStatus.REMOVING]: '🗑️'
+			[DeploymentStatus.REMOVING]: '🗑️',
+			[DeploymentStatus.BUILDING]: '🔨'
 		};
 		return icons[status] || '❓';
 	}
@@ -390,6 +479,154 @@ export class DeploymentService {
 		if (projectPath.includes('requirements.txt') || projectPath.includes('pyproject.toml')) return 'python';
 		if (projectPath.includes('go.mod')) return 'go';
 		return 'unknown';
+	}
+
+	/**
+	 * Build Docker image with progress tracking
+	 */
+	async buildDockerImage(
+		contextPath: string,
+		imageName: string,
+		dockerfilePath?: string
+	): Promise<string> {
+		try {
+			logger.info('Building Docker image', { 
+				context: 'DeploymentService',
+				contextPath,
+				imageName,
+				dockerfilePath
+			});
+			
+			const result = await invoke<string>('build_docker_image_command', {
+				context_path: contextPath,
+				image_name: imageName,
+				dockerfile_path: dockerfilePath
+			});
+			
+			logger.info('Docker image built successfully', { 
+				context: 'DeploymentService',
+				imageName,
+				result
+			});
+			
+			return result;
+		} catch (error) {
+			logger.error('Failed to build Docker image', {
+				context: 'DeploymentService',
+				error,
+				data: { contextPath, imageName, dockerfilePath }
+			});
+			throw error;
+		}
+	}
+
+	/**
+	 * Check if CLI process is running
+	 */
+	async getProcessStatus(deploymentId: string): Promise<boolean> {
+		try {
+			logger.info('Checking process status', { 
+				context: 'DeploymentService',
+				deploymentId
+			});
+			
+			const isRunning = await invoke<boolean>('get_process_status_command', {
+				deployment_id: deploymentId
+			});
+			
+			return isRunning;
+		} catch (error) {
+			logger.error('Failed to check process status', {
+				context: 'DeploymentService',
+				error,
+				data: { deploymentId }
+			});
+			throw error;
+		}
+	}
+
+	/**
+	 * Start a Docker container
+	 */
+	async startContainer(containerId: string): Promise<void> {
+		try {
+			logger.info('Starting container', { 
+				context: 'DeploymentService',
+				containerId
+			});
+			
+		await invoke('start_container_command', {
+			containerId: containerId
+		});
+			
+			logger.info('Container started successfully', { 
+				context: 'DeploymentService',
+				containerId
+			});
+		} catch (error) {
+			logger.error('Failed to start container', {
+				context: 'DeploymentService',
+				error,
+				data: { containerId }
+			});
+			throw error;
+		}
+	}
+
+	/**
+	 * Stop a Docker container
+	 */
+	async stopContainer(containerId: string): Promise<void> {
+		try {
+			logger.info('Stopping container', { 
+				context: 'DeploymentService',
+				containerId
+			});
+			
+		await invoke('stop_container_command', {
+			containerId: containerId
+		});
+			
+			logger.info('Container stopped successfully', { 
+				context: 'DeploymentService',
+				containerId
+			});
+		} catch (error) {
+			logger.error('Failed to stop container', {
+				context: 'DeploymentService',
+				error,
+				data: { containerId }
+			});
+			throw error;
+		}
+	}
+
+	/**
+	 * Remove a Docker container
+	 */
+	async removeContainer(containerId: string): Promise<void> {
+		try {
+			logger.info('Removing container', { 
+				context: 'DeploymentService',
+				containerId
+			});
+			
+		await invoke('remove_container_command', {
+			containerId: containerId
+		});
+			
+			logger.info('Container removed successfully', { 
+				context: 'DeploymentService',
+				containerId
+			});
+		} catch (error) {
+			logger.error('Failed to remove container', {
+				context: 'DeploymentService',
+				error,
+				data: { containerId }
+			});
+			throw error;
+		}
 	}
 }
 

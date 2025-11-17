@@ -2,13 +2,19 @@
  * Deployments Domain Types
  */
 
+export enum DeploymentType {
+	DOCKER = 'docker',
+	CLI = 'cli'
+}
+
 export enum DeploymentStatus {
 	CREATING = 'creating',
 	RUNNING = 'running',
 	STOPPED = 'stopped',
 	FAILED = 'failed',
 	RESTARTING = 'restarting',
-	REMOVING = 'removing'
+	REMOVING = 'removing',
+	BUILDING = 'building'
 }
 
 export enum ContainerStatus {
@@ -95,10 +101,19 @@ export interface Deployment {
 	id: string;
 	name: string;
 	description?: string;
+	type: DeploymentType;
 	projectPath: string;
 	projectType: ProjectType;
 	status: DeploymentStatus;
+	// Docker-specific fields
 	container?: DockerContainer;
+	dockerImageName?: string;
+	dockerfilePath?: string;
+	// CLI-specific fields
+	command?: string;
+	workingDirectory?: string;
+	processId?: number;
+	// Shared fields
 	environment: EnvironmentConfig;
 	buildScript?: BuildScript;
 	createdAt: Date;
@@ -148,11 +163,19 @@ export interface DeploymentMetadata {
 export interface DeploymentCreateRequest {
 	name: string;
 	description?: string;
+	type: DeploymentType;
 	projectPath: string;
 	projectType: ProjectType;
 	environment: EnvironmentConfig;
 	buildScript?: string; // Build script ID
 	metadata?: Partial<DeploymentMetadata>;
+	// Docker-specific fields
+	dockerImageName?: string;
+	dockerfilePath?: string;
+	exposedPort?: number;
+	// CLI-specific fields
+	command?: string;
+	workingDirectory?: string;
 }
 
 export interface DeploymentUpdateRequest {

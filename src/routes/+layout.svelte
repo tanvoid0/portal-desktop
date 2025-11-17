@@ -20,6 +20,7 @@
 	import { logger, themeStore, resolvedTheme } from '@/lib/domains/shared';
 	import { breadcrumbItems, breadcrumbSettings, homeItem, showHome } from '@/lib/domains/shared/stores/breadcrumbStore';
 	import { terminalActions } from '@/lib/domains/terminal/stores/terminalStore';
+	import { learningService } from '@/lib/domains/learning';
 	import ToastContainer from '@/lib/components/ui/toast-container.svelte';
 	import { invoke } from '@tauri-apps/api/core';
 
@@ -36,8 +37,8 @@
 	let runningServicesCount = $state(0);
 	let sdkSubmenuOpen = $state(false);
 
-	// Main application navigation sections
-	const navigationSections = [
+	// Main application navigation sections - derived to react to runningServicesCount changes
+	const navigationSections = $derived([
 		{
 			title: 'Navigation',
 			items: [
@@ -133,10 +134,17 @@
 					badge: null
 				},
 				{
-					title: 'Deployments',
+					title: 'Cloud',
+					url: '/cloud',
+					icon: 'cloud',
+					description: 'Cloud resources management',
+					badge: null
+				},
+				{
+					title: 'Docker Containers',
 					url: '/deployments',
-					icon: 'rocket',
-					description: 'Local Docker deployments',
+					icon: 'container',
+					description: 'Local Docker container management',
 					badge: null
 				},
 				{
@@ -144,6 +152,27 @@
 					url: '/documents',
 					icon: 'file-text',
 					description: 'Workspace documentation',
+					badge: null
+				},
+				{
+					title: 'Pipeline Blocks',
+					url: '/blocks',
+					icon: 'blocks',
+					description: 'Manage reusable pipeline blocks',
+					badge: null
+				},
+				{
+					title: 'AI',
+					url: '/ai',
+					icon: 'sparkles',
+					description: 'AI chat and management',
+					badge: null
+				},
+				{
+					title: 'Utilities',
+					url: '/utilities',
+					icon: 'wrench',
+					description: 'Custom scripts and utilities',
 					badge: null
 				},
 				{
@@ -155,7 +184,7 @@
 				}
 			]
 		}
-	];
+	]);
 
 	let unsubscribe: (() => void) | undefined;
 
@@ -165,6 +194,9 @@
 			
 			// Initialize theme first (now synchronous)
 			themeStore.initialize();
+			
+			// Initialize learning service (should be early to start collecting patterns)
+			await learningService.initialize();
 			
 			// Initialize project service
 			await projectService.initialize();
@@ -186,7 +218,7 @@
 			loadSdkNavigation();
 		} else {
 			// Reset to main navigation for non-SDK pages
-			currentNavigationSections = navigationSections;
+			currentNavigationSections = [...navigationSections];
 			navigationLoading = false;
 			navigationError = null;
 		}
@@ -339,6 +371,10 @@
 									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
 									</svg>
+								{:else if item.icon === 'cloud'}
+									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+									</svg>
 								{:else if item.icon === 'globe'}
 									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
@@ -354,6 +390,18 @@
 								{:else if item.icon === 'play'}
 									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m-6-8h8a2 2 0 012 2v8a2 2 0 01-2 2H8a2 2 0 01-2-2v-8a2 2 0 012-2z"/>
+									</svg>
+								{:else if item.icon === 'blocks'}
+									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+									</svg>
+								{:else if item.icon === 'wrench'}
+									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655-5.653a2.548 2.548 0 010-3.586l4.94-4.94a2.548 2.548 0 013.586 0l4.94 4.94a2.548 2.548 0 010 3.586l-5.877 5.877"/>
+									</svg>
+								{:else if item.icon === 'sparkles'}
+									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
 									</svg>
 								<!-- SDK-specific language icons -->
 								{:else if item.icon === 'nodejs'}

@@ -11,19 +11,28 @@
     Terminal,
     Folder,
     Activity
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
 
-  export let onNewTab: () => void;
-  export let onCloseTab: (tabId: string) => void;
-  export let onActivateTab: (tabId: string) => void;
-  export let onDuplicateTab: (tabId: string) => void;
+  interface Props {
+    onNewTab: () => void;
+    onCloseTab: (tabId: string) => void;
+    onActivateTab: (tabId: string) => void;
+    onDuplicateTab: (tabId: string) => void;
+  }
 
-  let draggedTab: TerminalTab | null = null;
-  let dragOverIndex: number | null = null;
+  let {
+    onNewTab,
+    onCloseTab,
+    onActivateTab,
+    onDuplicateTab
+  }: Props = $props();
+
+  let draggedTab = $state<TerminalTab | null>(null);
+  let dragOverIndex = $state<number | null>(null);
 
   // Get reactive state
-  $: tabs = $tabStore.tabs;
-  $: activeTabId = $tabStore.activeTabId;
+  const tabs = $derived($tabStore.tabs);
+  const activeTabId = $derived($tabStore.activeTabId);
 
   function handleDragStart(event: DragEvent, tab: TerminalTab) {
     draggedTab = tab;
@@ -62,6 +71,13 @@
   function handleTabClick(tabId: string) {
     onActivateTab(tabId);
     tabStore.activateTab(tabId);
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent, tabId: string) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleTabClick(tabId);
+    }
   }
 
   function handleCloseTab(event: MouseEvent, tabId: string) {
@@ -107,6 +123,7 @@
         ondragleave={handleDragLeave}
         ondrop={(e) => handleDrop(e, index)}
         onclick={() => handleTabClick(tab.id)}
+        onkeydown={(e) => handleTabKeyDown(e, tab.id)}
         role="tab"
         aria-selected={tab.isActive}
         tabindex="0"

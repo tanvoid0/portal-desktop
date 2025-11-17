@@ -33,13 +33,13 @@ export class CredentialService {
 			
 			const credential = await invoke<Credential>('create_credential', {
 				name: request.name,
-				credentialType: request.type,
+				credential_type: request.type,
 				description: request.description,
 				tags: request.tags,
 				value: request.value,
 				fields: request.fields,
 				metadata: request.metadata,
-				expiresAt: request.expiresAt
+				expires_at: request.expiresAt
 			});
 			
 			logger.info('CredentialService', `Credential created successfully: ${credential.id}`);
@@ -103,7 +103,7 @@ export class CredentialService {
 				fields: request.fields,
 				metadata: request.metadata,
 				status: request.status,
-				expiresAt: request.expiresAt
+				expires_at: request.expiresAt
 			});
 			
 			logger.info('CredentialService', `Credential updated successfully: ${id}`);

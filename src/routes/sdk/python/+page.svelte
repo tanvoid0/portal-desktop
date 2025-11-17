@@ -24,7 +24,7 @@
 		XCircle,
 		AlertCircle,
 		RefreshCw
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import ServiceCard from '$lib/domains/sdk/components/ServiceCard.svelte';
 	import VersionList from '$lib/domains/sdk/components/VersionList.svelte';
 

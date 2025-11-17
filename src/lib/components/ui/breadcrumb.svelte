@@ -5,7 +5,7 @@
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { ChevronRight, Home } from 'lucide-svelte';
+	import { ChevronRight, Home } from '@lucide/svelte';
 	import { Button } from './button';
 	import { cn } from '$lib/utils';
 	import type { BreadcrumbItem } from '@/lib/domains/shared';

@@ -21,7 +21,7 @@
 		ShieldOff,
 		Wifi,
 		WifiOff
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface PathStatus {
 		sdk_type: string;

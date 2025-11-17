@@ -9,7 +9,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import Select from '$lib/components/ui/select.svelte';
 	import { Progress } from '$lib/components/ui/progress';
-	import { Power, Settings, Logs, ExternalLink, RefreshCw, Activity, X } from 'lucide-svelte';
+	import { Power, Settings, Logs, ExternalLink, RefreshCw, Activity, X } from '@lucide/svelte';
 	import ServiceLogViewer from './ServiceLogViewer.svelte';
 	import ServiceConfigEditor from './ServiceConfigEditor.svelte';
 	import ServiceHealthIndicator from './ServiceHealthIndicator.svelte';

@@ -10,7 +10,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { CheckCircle, XCircle, Download, Play, Square } from 'lucide-svelte';
+	import { CheckCircle, XCircle, Download, Play, Square } from '@lucide/svelte';
 
 	// Get database name from URL
 	let databaseName = $derived($page.params.name);
@@ -156,15 +156,15 @@
 				</CardHeader>
 				<CardContent class="space-y-4">
 					<div>
-						<label class="text-sm font-medium">Category</label>
+						<p class="text-sm font-medium">Category</p>
 						<p class="text-sm text-muted-foreground">{database.category}</p>
 					</div>
 					<div>
-						<label class="text-sm font-medium">Default Port</label>
+						<p class="text-sm font-medium">Default Port</p>
 						<p class="text-sm text-muted-foreground">{database.default_port || 'N/A'}</p>
 					</div>
 					<div>
-						<label class="text-sm font-medium">Website</label>
+						<p class="text-sm font-medium">Website</p>
 						<a 
 							href={database.website} 
 							target="_blank" 

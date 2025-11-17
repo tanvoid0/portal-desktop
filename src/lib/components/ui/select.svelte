@@ -44,6 +44,7 @@
 	interface Props {
 		options: string[] | SelectOption[] | ConstantArray | EnumType;
 		defaultValue?: string;
+		value?: string;
 		placeholder?: string;
 		onSelect?: (value: string) => void;
 		disabled?: boolean;
@@ -54,7 +55,8 @@
 
 	let { 
 		options = [], 
-		defaultValue = '', 
+		defaultValue = '',
+		value = $bindable(),
 		placeholder = 'Select an option...',
 		onSelect = () => {},
 		disabled = false,
@@ -63,9 +65,19 @@
 		class: className = ''
 	}: Props = $props();
 
-	let selectedValue = $state(defaultValue || '');
+	// Use value if provided (controlled), otherwise use defaultValue (uncontrolled)
+	let selectedValue = $state(value !== undefined && value !== null ? value : (defaultValue || ''));
 	let isOpen = $state(false);
 	let containerElement: HTMLDivElement;
+
+	// Update selectedValue when value or defaultValue changes (for reactive updates from parent)
+	$effect(() => {
+		if (value !== undefined && value !== null) {
+			selectedValue = value || '';
+		} else if (defaultValue !== undefined) {
+			selectedValue = defaultValue || '';
+		}
+	});
 
 	// Convert options to consistent format with memoization
 	// Supports: string[], SelectOption[], constant arrays, or TypeScript enums
@@ -94,9 +106,12 @@
 		return option ? option.label : selectedValue;
 	});
 
-	function handleSelect(value: string) {
-		selectedValue = value;
-		onSelect(value);
+	function handleSelect(newValue: string) {
+		selectedValue = newValue;
+		if (value !== undefined) {
+			value = newValue; // Update bindable value if controlled
+		}
+		onSelect(newValue);
 		isOpen = false;
 	}
 
