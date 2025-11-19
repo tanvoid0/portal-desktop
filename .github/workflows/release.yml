@@ -65,8 +65,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for git operations
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -85,17 +83,20 @@ jobs:
           git config --global url."https://".insteadOf git://
           git config --global credential.helper store
           echo "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+          chmod 600 ~/.git-credentials
       
       - name: Configure Cargo to use HTTPS for git
         run: |
           mkdir -p ~/.cargo
-          cat >> ~/.cargo/config.toml << 'EOF'
+          cat > ~/.cargo/config.toml << 'EOF'
           [net]
           git-fetch-with-cli = true
           [url "https://github.com/"]
           insteadOf = "ssh://git@github.com/"
           [url "https://github.com/"]
           insteadOf = "git@github.com:"
+          [url "https://"]
+          insteadOf = "git://"
           EOF
       
       - name: Install system dependencies
@@ -135,8 +136,6 @@ jobs:
         env:
           GIT_ASKPASS: "echo"
           GIT_TERMINAL_PROMPT: "0"
-          GIT_CONFIG_GLOBAL: "/dev/null"
-          GIT_CONFIG_SYSTEM: "/dev/null"
       
       - name: Build application
         run: |
@@ -165,5 +164,7 @@ jobs:
           path: |
             build-output/*.deb
             build-output/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 90
           if-no-files-found: warn
