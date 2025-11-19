@@ -19,7 +19,17 @@
 
   // Get reactive history for the current tab
   const tabHistoryStore = $derived(commandHistoryStore.getTabHistoryReactive(tabId));
-  const averageDuration = $derived(calculateAverageDuration(tabHistoryStore));
+  let tabHistory = $state<CommandHistoryEntry[]>([]);
+  
+  // Subscribe to store to get array
+  $effect(() => {
+    const unsubscribe = tabHistoryStore.subscribe((entries) => {
+      tabHistory = entries;
+    });
+    return unsubscribe;
+  });
+  
+  const averageDuration = $derived(calculateAverageDuration(tabHistory));
 
   function formatTimestamp(date: Date): string {
     return date.toLocaleTimeString();
@@ -83,7 +93,7 @@
 
   <!-- History List -->
   <div class="flex-1 overflow-y-auto">
-    {#each $tabHistoryStore as entry (entry.id)}
+    {#each tabHistory as entry (entry.id)}
       <Button
         variant="ghost"
         class="w-full p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition-colors text-left justify-start h-auto"

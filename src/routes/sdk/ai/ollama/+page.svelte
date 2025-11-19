@@ -871,7 +871,7 @@
 								<ModelList 
 									models={models}
 									isInstalled={true}
-									loading={modelsLoading}
+									
 									error={modelsError}
 									installingModel={installingModel}
 									installationProgress={installationProgress}
@@ -888,7 +888,7 @@
 						{:else if modelTab === 'library'}
 							<ModelTreeList 
 								models={availableModels}
-								loading={modelsLoading}
+								
 								error={modelsError}
 								installingModel={installingModel}
 								installationProgress={installationProgress}

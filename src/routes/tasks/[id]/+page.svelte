@@ -342,7 +342,7 @@
 						<Button
 							onclick={handleSave}
 							disabled={isSaving}
-							loading={isSaving}
+							
 						>
 							Save Changes
 						</Button>

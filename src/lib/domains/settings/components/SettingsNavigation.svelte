@@ -6,12 +6,12 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
-	import { Settings, Code, Terminal, Palette, Laptop, Brain, Package, Bot } from '@lucide/svelte';
+	import { Settings, Code, Terminal, Palette, Laptop, Brain, Package, Bot, Download } from '@lucide/svelte';
 
-	type SettingsSectionType = 'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'frameworks' | 'learning' | 'autonomy';
+	type SettingsSectionType = 'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'frameworks' | 'learning' | 'autonomy' | 'updates';
 
 	interface Props {
-		currentSection?: SettingsSectionType | 'framework-ides';
+		currentSection?: SettingsSectionType | 'framework-ides' | 'updates';
 		className?: string;
 	}
 
@@ -27,6 +27,13 @@
 			description: 'Application preferences',
 			icon: Settings,
 			path: '/settings/general'
+		},
+		{
+			id: 'updates' as const,
+			label: 'Updates',
+			description: 'Check for updates',
+			icon: Download,
+			path: '/settings/updates'
 		},
 		{
 			id: 'editor' as const,
@@ -92,7 +99,7 @@
 		if (section === 'framework-ides') return 'ides';
 		const normalizedSection = section || 'general';
 		// Type guard to ensure we return a valid section
-		if (['general', 'editor', 'terminal', 'theme', 'ides', 'frameworks', 'learning', 'autonomy'].includes(normalizedSection)) {
+		if (['general', 'editor', 'terminal', 'theme', 'ides', 'frameworks', 'learning', 'autonomy', 'updates'].includes(normalizedSection)) {
 			return normalizedSection as SettingsSectionType;
 		}
 		return 'general';

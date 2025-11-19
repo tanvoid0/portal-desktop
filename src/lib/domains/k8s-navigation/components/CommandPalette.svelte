@@ -7,6 +7,7 @@
 	import { Button } from '@/lib/components/ui/button';
 	import { ScrollArea } from '@/lib/components/ui/scroll-area';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	
 	interface Props {
 		commands: Command[];
@@ -16,6 +17,12 @@
 	let { commands, onClose }: Props = $props();
 	
 	const palette = useCommandPalette({ commands });
+	
+	// Extract stores for easier access
+	const isOpenStore = palette.isOpen;
+	const queryStore = palette.query;
+	const selectedIndexStore = palette.selectedIndex;
+	const filteredCommandsStore = palette.filteredCommands;
 	
 	let inputElement: HTMLInputElement | null = null;
 	
@@ -34,7 +41,7 @@
 	});
 	
 	$effect(() => {
-		if (palette.isOpen && inputElement) {
+		if ($isOpenStore && inputElement) {
 			setTimeout(() => {
 				inputElement?.focus();
 			}, 0);
@@ -47,7 +54,13 @@
 	}
 </script>
 
-<Dialog bind:open={palette.isOpen} onOpenChange={(open) => !open && handleClose()}>
+<Dialog open={$isOpenStore} onOpenChange={(open) => {
+	if (!open) {
+		handleClose();
+	} else {
+		isOpenStore.set(open);
+	}
+}}>
 	<DialogContent class="sm:max-w-[600px] p-0">
 		<div class="flex flex-col">
 			<!-- Search Input -->
@@ -56,8 +69,7 @@
 					bind:this={inputElement}
 					type="text"
 					placeholder="Type a command or search..."
-					value={palette.query}
-					oninput={(e) => palette.setQuery((e.target as HTMLInputElement).value)}
+					bind:value={$queryStore}
 					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 				/>
 			</div>
@@ -65,14 +77,14 @@
 			<!-- Command List -->
 			<ScrollArea class="max-h-[400px]">
 				<div class="p-2">
-					{#if palette.filteredCommands().length === 0}
+					{#if $filteredCommandsStore.length === 0}
 						<div class="p-4 text-center text-muted-foreground text-sm">
 							No commands found
 						</div>
 					{:else}
 						<div class="space-y-1">
-							{#each palette.filteredCommands() as command, index}
-								{@const isSelected = index === palette.selectedIndex}
+							{#each $filteredCommandsStore as command, index}
+								{@const isSelected = index === $selectedIndexStore}
 								<button
 									type="button"
 									class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors {isSelected
@@ -80,7 +92,7 @@
 										: 'hover:bg-muted'}"
 									onclick={async () => {
 										// Temporarily set selected index
-										const currentCommands = palette.filteredCommands();
+										const currentCommands = $filteredCommandsStore;
 										const commandIndex = currentCommands.indexOf(command);
 										if (commandIndex >= 0) {
 											// We need to update the hook's selectedIndex

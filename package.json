@@ -89,6 +89,8 @@
 		"@iconify/svelte": "^5.1.0",
 		"@tauri-apps/api": "^2.9.0",
 		"@tauri-apps/plugin-dialog": "^2.4.2",
+		"@tauri-apps/plugin-process": "^2.3.1",
+		"@tauri-apps/plugin-updater": "^2.9.0",
 		"@xterm/addon-fit": "^0.10.0",
 		"@xterm/xterm": "^5.5.0",
 		"devicons": "^1.8.0",

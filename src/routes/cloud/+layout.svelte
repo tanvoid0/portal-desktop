@@ -19,7 +19,7 @@
 	let showShortcutsHelp = $state(false);
 	
 	// Build command palette commands
-	const allCommands = $derived<Command[]>(() => {
+	const allCommands = $derived.by(() => {
 		const commands: Command[] = [];
 		
 		// Namespace switching commands
@@ -117,11 +117,11 @@
 </script>
 
 <CloudConnectionGuard>
-	<div class="flex flex-col h-full overflow-hidden">
+	<div class="flex flex-col h-full w-full min-h-0 overflow-hidden">
 		<!-- Main Content Area with Sidebar -->
-		<div class="flex flex-1 min-h-0 overflow-hidden">
-			<!-- Sidebar Navigation -->
-			<aside class="w-64 border-r bg-background flex-shrink-0 overflow-y-auto">
+		<div class="flex flex-1 min-h-0 overflow-hidden w-full">
+			<!-- Cloud Sidebar Navigation (appears after main sidebar) -->
+			<aside class="w-64 border-r bg-background flex-shrink-0 overflow-y-auto min-w-0">
 				<div class="p-4">
 					<Card class="p-3">
 						<CloudNavigation />
@@ -130,14 +130,14 @@
 			</aside>
 
 			<!-- Page Content -->
-			<main class="flex-1 overflow-y-auto min-w-0">
+			<main class="flex-1 overflow-y-auto min-w-0 min-h-0">
 				{@render children()}
 			</main>
 		</div>
 	</div>
 	
 	<!-- Navigation Enhancement Components (Additive) -->
-	<CommandPalette commands={allCommands()} />
+	<CommandPalette commands={allCommands} />
 	<ShortcutsHelp bind:open={showShortcutsHelp} context="table" />
 </CloudConnectionGuard>
 

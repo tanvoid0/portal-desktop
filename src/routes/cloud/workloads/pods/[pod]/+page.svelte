@@ -105,7 +105,7 @@
 			const forwards = await invoke<PortForwardInfo[]>('k8s_list_port_forwards');
 			// Filter to only show forwards for this pod
 			activePortForwards = forwards.filter(f => 
-				f.pod_name === pod.name && f.namespace === pod.namespace
+				pod && f.pod_name === pod.name && f.namespace === pod.namespace
 			);
 		} catch (error) {
 			console.error('Failed to load port forwards:', error);
@@ -183,7 +183,9 @@
 			
 			// Use the getLogs method from the pod resource if available
 			if (pod.getLogs) {
-				logs = await pod.getLogs(containerToUse || undefined, tailLinesToUse || undefined);
+				// Type assertion needed because type definition doesn't match implementation
+				const getLogsFn = pod.getLogs as (container?: string, tailLines?: number) => Promise<string>;
+				logs = await getLogsFn(containerToUse || undefined, tailLinesToUse || undefined);
 			} else {
 				// Fallback to direct invoke
 				logs = await invoke<string>('k8s_get_pod_logs', {
@@ -533,35 +535,39 @@ status:
 							</CardTitle>
 							<div class="flex items-center gap-2">
 								<!-- View Mode Toggle -->
-								<div class="flex items-center gap-1 border rounded-md">
-									<button
-										class="px-2 py-1 text-xs {logViewMode === 'detailed' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}"
+								<div class="flex items-center gap-1 border rounded-md p-1">
+									<Button
+										variant={logViewMode === 'detailed' ? 'default' : 'ghost'}
+										size="sm"
+										class="h-7 px-2 text-xs"
 										onclick={(e) => { e.preventDefault(); e.stopPropagation(); logViewMode = 'detailed'; }}
-										type="button"
 									>
 										Detailed
-									</button>
-									<button
-										class="px-2 py-1 text-xs {logViewMode === 'compact' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}"
+									</Button>
+									<Button
+										variant={logViewMode === 'compact' ? 'default' : 'ghost'}
+										size="sm"
+										class="h-7 px-2 text-xs"
 										onclick={(e) => { e.preventDefault(); e.stopPropagation(); logViewMode = 'compact'; }}
-										type="button"
 									>
 										Compact
-									</button>
-									<button
-										class="px-2 py-1 text-xs {logViewMode === 'raw' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}"
+									</Button>
+									<Button
+										variant={logViewMode === 'raw' ? 'default' : 'ghost'}
+										size="sm"
+										class="h-7 px-2 text-xs"
 										onclick={(e) => { e.preventDefault(); e.stopPropagation(); logViewMode = 'raw'; }}
-										type="button"
 									>
 										Raw
-									</button>
+									</Button>
 								</div>
 								<Button variant="outline" size="sm" onclick={() => loadLogs()} disabled={logsLoading}>
 									<RefreshCw class="mr-2 h-4 w-4 {logsLoading ? 'animate-spin' : ''}" />
 									Refresh
 								</Button>
-								{#if logs}
+								{#if logs && pod}
 									<Button variant="outline" size="sm" onclick={() => {
+										if (!pod) return;
 										const blob = new Blob([logs], { type: 'text/plain' });
 										const url = URL.createObjectURL(blob);
 										const a = document.createElement('a');
@@ -615,8 +621,9 @@ status:
 									<RefreshCw class="mr-2 h-4 w-4 {yamlLoading ? 'animate-spin' : ''}" />
 									Refresh
 								</Button>
-								{#if yaml}
+								{#if yaml && pod}
 									<Button variant="outline" size="sm" onclick={() => {
+										if (!pod) return;
 										const blob = new Blob([yaml], { type: 'text/yaml' });
 										const url = URL.createObjectURL(blob);
 										const a = document.createElement('a');
@@ -718,6 +725,7 @@ status:
 												{/if}
 											</div>
 											<Button onclick={() => {
+												if (!pod) return;
 												// Navigate to terminal with kubectl exec command
 												const containerFlag = container.name ? `-c ${container.name}` : '';
 												const execCommand = `kubectl exec -it ${pod.name} ${containerFlag} -n ${pod.namespace} -- sh`;

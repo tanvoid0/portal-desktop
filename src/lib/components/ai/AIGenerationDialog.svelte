@@ -486,7 +486,7 @@
 			<Button variant="outline" onclick={handleCancel} disabled={isGenerating}>
 				Cancel
 			</Button>
-			<Button onclick={handleGenerate} disabled={isGenerating || !inputText.trim()} loading={isGenerating}>
+			<Button onclick={handleGenerate} disabled={isGenerating || !inputText.trim()} >
 				<Icon icon="lucide:sparkles" class="h-4 w-4 mr-2" />
 				Generate
 			</Button>
@@ -550,7 +550,7 @@
 				<Button
 					onclick={handleRegenerate}
 					disabled={isRegenerating || !regenerateInstructions.trim()}
-					loading={isRegenerating}
+					
 				>
 					<Icon icon="lucide:refresh-cw" class="h-4 w-4 mr-2" />
 					Regenerate

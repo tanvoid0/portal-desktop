@@ -9,7 +9,6 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import type { Snippet } from 'svelte';
-	import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/lib/components/ui/sidebar';
 	import { Button } from '@/lib/components/ui/button';
 	import { Badge } from '@/lib/components/ui/badge';
 	import { Separator } from '@/lib/components/ui/separator';
@@ -23,6 +22,7 @@
 	import { learningService } from '@/lib/domains/learning';
 	import ToastContainer from '@/lib/components/ui/toast-container.svelte';
 	import { invoke } from '@tauri-apps/api/core';
+	import { ArrowLeft, ArrowRight, RefreshCw, Home } from 'lucide-svelte';
 
 	const log = logger.createScoped('AppLayout');
 
@@ -187,10 +187,67 @@
 	]);
 
 	let unsubscribe: (() => void) | undefined;
+	let popStateHandler: (() => void) | undefined;
+
+	// Browser navigation state
+	let canGoBack = $state(false);
+	let canGoForward = $state(false);
+	let hasNavigatedBack = $state(false);
+
+	function updateNavigationState() {
+		if (typeof window !== 'undefined') {
+			// Check if we can go back (history has more than 1 entry)
+			canGoBack = window.history.length > 1;
+		}
+	}
+
+	function goBack() {
+		if (typeof window !== 'undefined' && canGoBack) {
+			hasNavigatedBack = true;
+			canGoForward = true;
+			window.history.back();
+		}
+	}
+
+	function goForward() {
+		if (typeof window !== 'undefined' && canGoForward) {
+			window.history.forward();
+		}
+	}
+
+	function goHome() {
+		hasNavigatedBack = false;
+		canGoForward = false;
+		goto('/');
+	}
+
+	function refresh() {
+		if (typeof window !== 'undefined') {
+			window.location.reload();
+		}
+	}
 
 	onMount(async () => {
 		try {
 			log.info('Initializing application');
+			
+			// Initialize backend log listener to receive logs from Rust backend
+			logger.initBackendLogListener();
+			
+			// Initialize navigation state
+			updateNavigationState();
+			
+			// Listen to popstate events to track forward/back navigation
+			if (typeof window !== 'undefined') {
+				popStateHandler = () => {
+					updateNavigationState();
+					// If we navigated to a new page (not via back/forward), disable forward
+					if (!hasNavigatedBack) {
+						canGoForward = false;
+					}
+				};
+				window.addEventListener('popstate', popStateHandler);
+			}
 			
 			// Initialize theme first (now synchronous)
 			themeStore.initialize();
@@ -210,6 +267,25 @@
 		} catch (error) {
 			log.error('Failed to initialize application', error);
 		}
+	});
+
+	// Update navigation state when page changes
+	$effect(() => {
+		updateNavigationState();
+		// Reset forward state when navigating to a new page (not via back/forward)
+		if (!hasNavigatedBack) {
+			canGoForward = false;
+		}
+		// Reset hasNavigatedBack flag after navigation completes
+		// This allows detecting new navigation vs back/forward
+		const timeoutId = setTimeout(() => {
+			if (hasNavigatedBack) {
+				// Check if we're still in a back state or if we've navigated forward
+				hasNavigatedBack = false;
+			}
+		}, 100);
+		
+		return () => clearTimeout(timeoutId);
 	});
 
 	// Load domain-specific navigation based on current page
@@ -256,41 +332,101 @@
 		if (unsubscribe) {
 			unsubscribe();
 		}
+		if (typeof window !== 'undefined' && popStateHandler) {
+			window.removeEventListener('popstate', popStateHandler);
+		}
 	});
 </script>
 
-<SidebarProvider>
-	<Sidebar class="border-r">
-		<!-- Sidebar Header -->
-		<div class="flex items-center gap-3 px-4 py-4 border-b cursor-pointer hover:bg-sidebar-accent/50 transition-colors" role="button" tabindex="0" onclick={() => goto('/')} onkeydown={(e) => e.key === 'Enter' && goto('/')}>
-			<div class="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary">
-				{#if isSdkPage}
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-					</svg>
-				{:else}
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-					</svg>
-				{/if}
+<div class="flex flex-col h-screen w-full min-h-0 overflow-hidden">
+	<!-- Top Bar -->
+	<header class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
+		<div class="flex h-14 items-center px-4 gap-2">
+			<!-- Navigation Buttons -->
+			<div class="flex items-center gap-1 border-r pr-2 mr-2">
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8"
+					disabled={!canGoBack}
+					onclick={goBack}
+					title="Go back"
+					aria-label="Go back"
+				>
+					<ArrowLeft class="h-4 w-4" />
+				</Button>
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8"
+					disabled={!canGoForward}
+					onclick={goForward}
+					title="Go forward"
+					aria-label="Go forward"
+				>
+					<ArrowRight class="h-4 w-4" />
+				</Button>
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8"
+					onclick={refresh}
+					title="Refresh page"
+					aria-label="Refresh page"
+				>
+					<RefreshCw class="h-4 w-4" />
+				</Button>
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8"
+					disabled={$page.url.pathname === '/'}
+					onclick={goHome}
+					title="Go to home"
+					aria-label="Go to home"
+				>
+					<Home class="h-4 w-4" />
+				</Button>
 			</div>
-			<div class="flex-1 min-w-0">
-				<h1 class="text-sm font-semibold text-sidebar-foreground truncate">
-					{isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
-				</h1>
-				<p class="text-xs text-sidebar-foreground/60">
-					{isSdkPage ? 'Development Tools' : 'Development Environment'}
-				</p>
-			</div>
+			<Breadcrumb items={$breadcrumbItems} showHome={$showHome} homeItem={$homeItem} class="flex-1" />
 		</div>
+	</header>
 
-		<SidebarContent>
+	<!-- Main Content Area -->
+	<div class="flex flex-1 min-h-0 overflow-hidden w-full h-full">
+		<!-- Sidebar Navigation -->
+		<aside class="w-64 border-r bg-sidebar text-sidebar-foreground flex-shrink-0 overflow-y-auto min-w-0 flex flex-col">
+			<!-- Sidebar Header -->
+			<div class="flex items-center gap-3 px-4 py-4 border-b cursor-pointer hover:bg-sidebar-accent/50 transition-colors" role="button" tabindex="0" onclick={() => goto('/')} onkeydown={(e) => e.key === 'Enter' && goto('/')}>
+				<div class="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary">
+					{#if isSdkPage}
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+						</svg>
+					{:else}
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+					{/if}
+				</div>
+				<div class="flex-1 min-w-0">
+					<h1 class="text-sm font-semibold text-sidebar-foreground truncate">
+						{isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
+					</h1>
+					<p class="text-xs text-sidebar-foreground/60">
+						{isSdkPage ? 'Development Tools' : 'Development Environment'}
+					</p>
+				</div>
+			</div>
+
+			<!-- Sidebar Content -->
+			<div class="flex-1 overflow-y-auto min-h-0">
 			{#if isSdkPage}
 				<!-- Back to Home Button for SDK pages -->
-				<div class="px-4 py-2 border-b">
+				<div class="px-4 py-2 border-b border-sidebar-border">
 					<a 
 						href="/" 
-						class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+						class="flex items-center gap-2 text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -314,18 +450,16 @@
 				</div>
 			{:else}
 				{#each currentNavigationSections as section}
-				<SidebarGroup>
-					<SidebarGroupLabel>{section.title}</SidebarGroupLabel>
-					<SidebarMenu>
+				<div class="px-3 py-2">
+					<h2 class="px-2 text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider mb-1">
+						{section.title}
+					</h2>
+					<div class="space-y-1">
 						{#each section.items as item}
-							<SidebarMenuItem>
-								<SidebarMenuButton 
-									size="lg"
-									variant={$page.url.pathname === item.url ? 'default' : 'outline'}
-									isActive={$page.url.pathname === item.url}
-									class="h-12 px-4 py-3 text-base font-medium hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:font-medium"
-									onclick={() => goto(item.url)}
-								>
+							<button
+								class="w-full flex items-center gap-3 h-12 px-4 py-3 text-base font-medium rounded-md transition-colors {($page.url.pathname === item.url) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}"
+								onclick={() => goto(item.url)}
+							>
 								{#if item.icon === 'home'}
 									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
@@ -445,78 +579,69 @@
 										</Badge>
 									{/if}
 								</div>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-					{/each}
-				</SidebarMenu>
-			</SidebarGroup>
-		{/each}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/each}
 			{/if}
 
 			{#if !isSdkPage}
-				<Separator class="my-4" />
+				<Separator class="my-4 mx-3" />
 
-			<SidebarGroup>
-				<SidebarGroupLabel>Quick Stats</SidebarGroupLabel>
-				<div class="space-y-2">
-					<!-- Total Tasks -->
-					<div class="flex items-center justify-between px-2 py-1">
-						<span class="text-sm text-sidebar-foreground/70">Total Tasks</span>
-						<Badge variant="outline" class="text-xs">
-							{$taskStats.total}
-						</Badge>
-					</div>
-					
-					<!-- Completed Tasks -->
-					<div class="flex items-center justify-between px-2 py-1">
-						<span class="text-sm text-sidebar-foreground/70">Completed</span>
-						<Badge variant="outline" class="text-xs text-green-600">
-							{$taskStats.completed}
-						</Badge>
-					</div>
-					
-					<!-- Active Projects -->
-					<div class="flex items-center justify-between px-2 py-1">
-						<span class="text-sm text-sidebar-foreground/70">Projects</span>
-						<Badge variant="outline" class="text-xs">
-							{$projectStore.projects.length}
-						</Badge>
+				<div class="px-3 py-2">
+					<h2 class="px-2 text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider mb-1">
+						Quick Stats
+					</h2>
+					<div class="space-y-2">
+						<!-- Total Tasks -->
+						<div class="flex items-center justify-between px-2 py-1">
+							<span class="text-sm text-sidebar-foreground/70">Total Tasks</span>
+							<Badge variant="outline" class="text-xs">
+								{$taskStats.total}
+							</Badge>
+						</div>
+						
+						<!-- Completed Tasks -->
+						<div class="flex items-center justify-between px-2 py-1">
+							<span class="text-sm text-sidebar-foreground/70">Completed</span>
+							<Badge variant="outline" class="text-xs text-green-600">
+								{$taskStats.completed}
+							</Badge>
+						</div>
+						
+						<!-- Active Projects -->
+						<div class="flex items-center justify-between px-2 py-1">
+							<span class="text-sm text-sidebar-foreground/70">Projects</span>
+							<Badge variant="outline" class="text-xs">
+								{$projectStore.projects.length}
+							</Badge>
+						</div>
 					</div>
 				</div>
-			</SidebarGroup>
 			{/if}
-		</SidebarContent>
-
-		<!-- Sidebar Footer -->
-		<div class="border-t p-4">
-			<div class="flex items-center justify-between">
-				<ThemeToggle />
-				<Button variant="ghost" size="sm" onclick={() => goto('/settings')}>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-					</svg>
-				</Button>
 			</div>
-		</div>
-	</Sidebar>
 
-	<!-- Main Content Area -->
-	<div class="flex-1 flex flex-col min-h-screen">
-		<!-- Top Navigation Bar -->
-		<header class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-			<div class="flex h-14 items-center px-4">
-				<SidebarTrigger class="mr-2" />
-				<Breadcrumb items={$breadcrumbItems} showHome={$showHome} homeItem={$homeItem} class="flex-1" />
+			<!-- Sidebar Footer -->
+			<div class="border-t p-4 flex-shrink-0">
+				<div class="flex items-center justify-between">
+					<ThemeToggle />
+					<Button variant="ghost" size="sm" onclick={() => goto('/settings')}>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+						</svg>
+					</Button>
+				</div>
 			</div>
-		</header>
+		</aside>
 
-		<!-- Main Content -->
-		<main class="flex-1 overflow-auto">
+		<!-- Page Content -->
+		<main class="flex-1 overflow-y-auto min-w-0 min-h-0 bg-background">
 			{@render children()}
 		</main>
 	</div>
-</SidebarProvider>
+</div>
 
 <!-- Toast Container -->
 <ToastContainer />

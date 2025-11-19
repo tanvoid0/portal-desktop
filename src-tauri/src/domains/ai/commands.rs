@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{State, Emitter};
 use std::sync::Arc;
 use crate::domains::ai::providers::{
     AIError, ConfigurationStatus, GenerationOptions, GenerationResult, ProviderConfig, ProviderType,
@@ -8,15 +8,19 @@ use crate::domains::ai::chat;
 use crate::domains::ai::conversation::{Conversation, ConversationMessage, ConversationWithMessages};
 use crate::domains::ai::logging::{AILog, LogFilters};
 use crate::database::DatabaseManager;
-use sea_orm::{EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait, QuerySelect, QueryOrder};
+use sea_orm::{EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait, QuerySelect, QueryOrder, PaginatorTrait};
+// Use the centralized logger from utils
 use crate::domains::ai::entities::{
     ConversationEntity, ConversationActiveModel,
     ConversationMessageEntity, ConversationMessageActiveModel,
-    AILogEntity, AILogActiveModel, AILogColumn,
-    TrainingDataEntity, TrainingDataActiveModel,
+    AILogEntity, AILogColumn,
+    TrainingDataEntity,
 };
 use crate::domains::ai::entities::ai_conversation::Column as ConversationColumn;
 use crate::domains::ai::entities::ai_conversation_message::Column as ConversationMessageColumn;
+
+// Import logger macros
+use crate::{log_debug, log_info, log_warn, log_error};
 
 /// Get configuration status for a provider
 #[tauri::command]
@@ -176,7 +180,7 @@ pub async fn generate_ai_text_with_system(
         })
 }
 
-/// Send a message to AI (chat)
+/// Send a message to AI (chat) - non-streaming
 #[tauri::command]
 pub async fn ai_send_message(
     message: String,
@@ -200,6 +204,70 @@ pub async fn ai_send_message(
     chat::send_message(request, ai_service).await
 }
 
+/// Send a message to AI (chat) with streaming support
+#[tauri::command]
+pub async fn ai_send_message_stream(
+    message: String,
+    history: Vec<chat::ChatMessage>,
+    provider: Option<ProviderType>,
+    conversation_id: Option<String>,
+    temperature: Option<f64>,
+    max_tokens: Option<u32>,
+    model: Option<String>,
+    stream_id: String, // Unique ID for this stream
+    app_handle: tauri::AppHandle,
+    ai_service: State<'_, Arc<AIService>>,
+) -> Result<String, String> {
+    let options = GenerationOptions {
+        temperature,
+        max_tokens,
+        timeout_ms: None,
+        model,
+        extra_options: None,
+    };
+
+    // Convert history to prompt format
+    let mut prompt = String::new();
+    for msg in &history {
+        prompt.push_str(&format!("{}: {}\n", msg.role, msg.content));
+    }
+    prompt.push_str(&format!("user: {}\nassistant:", message));
+
+    // Get the provider
+    let provider_type = provider.or_else(|| {
+        // Try to get default provider synchronously
+        None // Will be handled in the service
+    });
+
+    let provider_result = ai_service.get_provider(provider_type).await;
+    let provider = match provider_result {
+        Ok(p) => p,
+        Err(e) => return Err(format!("Failed to get provider: {}", e)),
+    };
+
+    // Use streaming method from trait
+    let mut full_response = String::new();
+    let app_handle_clone = app_handle.clone();
+    let stream_id_clone = stream_id.clone();
+    let result = provider.generate_stream(&prompt, &options, Box::new(move |chunk: String| {
+        full_response.push_str(&chunk);
+        // Emit event for each chunk
+        app_handle_clone.emit(&format!("ai-stream-chunk-{}", stream_id_clone), &chunk)
+            .map_err(|e| AIError::GenericError(format!("Failed to emit event: {}", e)))?;
+        Ok(())
+    })).await;
+
+    match result {
+        Ok(gen_result) => {
+            // Emit completion event
+            app_handle.emit(&format!("ai-stream-complete-{}", stream_id), &gen_result.content)
+                .map_err(|e| format!("Failed to emit completion event: {}", e))?;
+            Ok(gen_result.content)
+        }
+        Err(e) => Err(format!("AI generation error: {}", e))
+    }
+}
+
 /// Create a new conversation
 #[tauri::command]
 pub async fn ai_create_conversation(
@@ -207,7 +275,11 @@ pub async fn ai_create_conversation(
     provider: ProviderType,
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Conversation, String> {
-    let conversation = Conversation::new(title, format!("{:?}", provider));
+    log_info!("AI", "Creating new conversation: title='{}', provider={:?}", title, provider);
+    
+    let conversation = Conversation::new(title.clone(), format!("{:?}", provider));
+    log_debug!("AI", "Generated conversation ID: {}", conversation.id);
+    
     let db = db_manager.get_connection();
     
     let active_model = ConversationActiveModel {
@@ -219,18 +291,45 @@ pub async fn ai_create_conversation(
     };
     
     // Insert the conversation
-    active_model.insert(db)
-        .await
-        .map_err(|e| format!("Failed to create conversation: {}", e))?;
-    
-    // For SQLite, we need to query the record after insertion since it doesn't support RETURNING
-    let inserted_model = ConversationEntity::find_by_id(&conversation.id)
-        .one(db)
-        .await
-        .map_err(|e| format!("Failed to retrieve created conversation: {}", e))?
-        .ok_or_else(|| format!("Failed to find inserted conversation with id: {}", conversation.id))?;
-    
-    Ok(Conversation::from(inserted_model))
+    // Note: For SQLite with string primary keys, insert() tries to return the inserted record
+    // which can fail with "RecordNotFound" even though the insert succeeded.
+    // We handle this by checking if the error is RecordNotFound and verifying the insert succeeded.
+    log_info!("AI", "Inserting conversation into database...");
+    match active_model.insert(db).await {
+        Ok(inserted_model) => {
+            // Insert succeeded and record was returned
+            log_info!("AI", "Successfully created conversation with ID: {}", inserted_model.id);
+            Ok(Conversation::from(inserted_model))
+        }
+        Err(e) => {
+            let error_str = e.to_string();
+            // If error is RecordNotFound, the insert likely succeeded but SeaORM
+            // couldn't retrieve it (SQLite limitation). Verify it exists.
+            if error_str.contains("RecordNotFound") || error_str.contains("Failed to find inserted item") {
+                log_debug!("AI", "Insert returned RecordNotFound, verifying conversation exists with ID: {}", conversation.id);
+                // Verify the insert actually succeeded
+                let inserted_model = ConversationEntity::find_by_id(&conversation.id)
+                    .one(db)
+                    .await
+                    .map_err(|e| {
+                        log_error!("AI", "Failed to verify conversation insert: {}", e);
+                        format!("Failed to verify created conversation: {}", e)
+                    })?
+                    .ok_or_else(|| {
+                        let err_msg = format!("Failed to find inserted conversation with id: {} after insert", conversation.id);
+                        log_error!("AI", "{}", err_msg);
+                        err_msg
+                    })?;
+                
+                log_info!("AI", "Successfully created conversation with ID: {} (verified after RecordNotFound)", inserted_model.id);
+                Ok(Conversation::from(inserted_model))
+            } else {
+                // Real error, return it
+                log_error!("AI", "Failed to insert conversation: {}", e);
+                Err(format!("Failed to create conversation: {}", e))
+            }
+        }
+    }
 }
 
 /// Save conversation messages
@@ -250,19 +349,46 @@ pub async fn ai_save_conversation(
         .map_err(|e| format!("Failed to delete existing messages: {}", e))?;
     
     // Insert new messages
+    // Note: For SQLite with string primary keys, insert() tries to return the inserted record
+    // which can fail with "RecordNotFound" even though the insert succeeded.
+    // We handle this by checking if the error is RecordNotFound and verifying the insert succeeded.
     for msg in messages {
         let active_model = ConversationMessageActiveModel {
-            id: Set(msg.id),
-            conversation_id: Set(msg.conversation_id),
-            role: Set(msg.role),
-            content: Set(msg.content),
-            timestamp: Set(msg.timestamp),
+            id: Set(msg.id.clone()),
+            conversation_id: Set(msg.conversation_id.clone()),
+            role: Set(msg.role.clone()),
+            content: Set(msg.content.clone()),
+            timestamp: Set(msg.timestamp.clone()),
             sequence: Set(msg.sequence),
         };
         
-        active_model.insert(db)
-            .await
-            .map_err(|e| format!("Failed to save message: {}", e))?;
+        // Attempt insert - may fail with RecordNotFound even if insert succeeded
+        match active_model.insert(db).await {
+            Ok(_) => {
+                // Insert succeeded and record was returned
+            }
+            Err(e) => {
+                let error_str = e.to_string();
+                // If error is RecordNotFound, the insert likely succeeded but SeaORM
+                // couldn't retrieve it (SQLite limitation). Verify it exists.
+                if error_str.contains("RecordNotFound") || error_str.contains("Failed to find inserted item") {
+                    // Verify the insert actually succeeded
+                    let exists = ConversationMessageEntity::find_by_id(&msg.id)
+                        .one(db)
+                        .await
+                        .map_err(|e| format!("Failed to verify message insert: {}", e))?
+                        .is_some();
+                    
+                    if !exists {
+                        return Err(format!("Failed to save message: insert failed - record not found after insert"));
+                    }
+                    // Insert succeeded, continue to next message
+                } else {
+                    // Real error, return it
+                    return Err(format!("Failed to save message: {}", e));
+                }
+            }
+        }
     }
     
     // Update conversation updated_at
@@ -321,7 +447,21 @@ pub async fn ai_list_conversations(
         .await
         .map_err(|e| format!("Failed to list conversations: {}", e))?;
     
-    Ok(conversations.into_iter().map(Conversation::from).collect())
+    // Calculate message count for each conversation
+    let mut result = Vec::new();
+    for conv_model in conversations {
+        let message_count: u64 = ConversationMessageEntity::find()
+            .filter(ConversationMessageColumn::ConversationId.eq(&conv_model.id))
+            .count(db)
+            .await
+            .map_err(|e| format!("Failed to count messages: {}", e))?;
+        
+        let mut conversation: Conversation = Conversation::from(conv_model);
+        conversation.message_count = Some(message_count as i32);
+        result.push(conversation);
+    }
+    
+    Ok(result)
 }
 
 /// Delete conversation

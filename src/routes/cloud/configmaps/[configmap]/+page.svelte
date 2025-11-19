@@ -145,7 +145,7 @@
 		window.history.replaceState({}, '', url.toString());
 	}
 	
-	const dataEntries = $derived(() => {
+	const dataEntries = $derived.by(() => {
 		if (!configMap || !configMap.metadata?.data) return [];
 		return Object.entries(configMap.metadata.data);
 	});
@@ -257,7 +257,7 @@
 												variant="ghost" 
 												size="sm"
 												onclick={() => {
-													navigator.clipboard.writeText(value);
+													navigator.clipboard.writeText(String(value));
 													toastActions.success('Value copied to clipboard');
 												}}
 											>

@@ -4,8 +4,10 @@ use crate::domains::learning::repositories::{
     LearnedPatternRepository, UserPreferenceRepository, LearningEventRepository,
 };
 use crate::domains::learning::services::{
-    MLIntensityManager, MLIntensity, PreferenceEngine,
+    MLIntensityManager, MLIntensity,
 };
+// FUTURE: PreferenceEngine is imported directly for now, will be re-exported when advanced learning features are fully implemented
+use crate::domains::learning::services::preference_engine::PreferenceEngine;
 
 /// Core learning orchestrator
 pub struct LearningService {

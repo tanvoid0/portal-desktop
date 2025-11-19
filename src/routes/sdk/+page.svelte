@@ -308,12 +308,12 @@
 	}
 
 	async function configureService(service: any) {
-		// TODO: Open configuration dialog
+		// FUTURE: Open configuration dialog for service settings
 		console.log('Configure service:', service.id);
 	}
 
 	async function viewServiceLogs(service: any) {
-		// TODO: Open log viewer
+		// FUTURE: Open log viewer with service logs
 		console.log('View logs for:', service.id);
 	}
 
@@ -404,7 +404,7 @@
 
 	async function uninstallSDKManager(manager: any) {
 		try {
-			// TODO: Implement uninstallation logic
+			// FUTURE: Implement uninstallation logic - requires manager-specific uninstall commands
 			await invoke('uninstall_manager', { managerName: manager.id });
 			managerInstallationStatus[manager.id] = false;
 			

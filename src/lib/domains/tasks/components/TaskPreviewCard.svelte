@@ -101,7 +101,7 @@
 						size="sm"
 						onclick={handleAddAll}
 						disabled={isAddingAll || !task.title.trim()}
-						loading={isAddingAll}
+						
 					>
 						<Icon icon={isUpdateMode ? "lucide:save-all" : "lucide:plus-circle"} class="h-4 w-4 mr-1" />
 						{isUpdateMode ? 'Update All' : 'Add All'}
@@ -112,7 +112,7 @@
 						size="sm"
 						onclick={handleAdd}
 						disabled={isAdding || isAddingAll || !task.title.trim()}
-						loading={isAdding}
+						
 					>
 						<Icon icon={isUpdateMode ? "lucide:save" : "lucide:plus"} class="h-4 w-4 mr-1" />
 						{isUpdateMode ? 'Update Task' : 'Add Task'}

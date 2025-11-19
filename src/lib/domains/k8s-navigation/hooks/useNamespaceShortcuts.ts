@@ -1,7 +1,7 @@
 // Hook for namespace switching shortcuts
 
+import { readable, get, type Readable } from 'svelte/store';
 import { NAVIGATION_SHORTCUTS } from '../utils/keyboardConstants';
-import { fuzzySearch } from '../utils/fuzzySearch';
 import type { NamespaceOption } from '../types';
 
 export interface UseNamespaceShortcutsOptions {
@@ -20,21 +20,27 @@ export function useNamespaceShortcuts(options: UseNamespaceShortcutsOptions) {
 		: () => options.namespaces;
 	
 	// Map namespaces to number shortcuts (0-9)
-	const namespaceShortcuts = $derived(() => {
-		const namespaces: NamespaceOption[] = getNamespaces();
-		const shortcuts = new Map<number, NamespaceOption>();
-		const allOption: NamespaceOption = { value: '', label: 'All Namespaces' };
-		shortcuts.set(0, allOption);
-		
-		namespaces.slice(0, 9).forEach((ns: NamespaceOption, index: number) => {
-			shortcuts.set(index + 1, ns);
-		});
-		
-		return shortcuts;
-	});
+	const namespaceShortcuts: Readable<Map<number, NamespaceOption>> = readable(
+		new Map<number, NamespaceOption>(),
+		(set) => {
+			// Compute shortcuts
+			const namespacesResult = getNamespaces();
+			const namespaces: NamespaceOption[] = Array.isArray(namespacesResult) ? namespacesResult : namespacesResult();
+			const shortcuts = new Map<number, NamespaceOption>();
+			const allOption: NamespaceOption = { value: '', label: 'All Namespaces' };
+			shortcuts.set(0, allOption);
+			
+			namespaces.slice(0, 9).forEach((ns: NamespaceOption, index: number) => {
+				shortcuts.set(index + 1, ns);
+			});
+			
+			set(shortcuts);
+		}
+	);
 	
 	function selectByNumber(number: number) {
-		const namespace = namespaceShortcuts().get(number);
+		const shortcuts = get(namespaceShortcuts);
+		const namespace = shortcuts.get(number);
 		if (namespace) {
 			onSelect(namespace.value);
 		}
@@ -59,7 +65,8 @@ export function useNamespaceShortcuts(options: UseNamespaceShortcutsOptions) {
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
 			const number = parseInt(event.key);
 			if (!isNaN(number) && number >= 0 && number <= 9) {
-				const namespace = namespaceShortcuts().get(number);
+				const shortcuts = get(namespaceShortcuts);
+				const namespace = shortcuts.get(number);
 				if (namespace) {
 					event.preventDefault();
 					selectByNumber(number);
@@ -77,4 +84,3 @@ export function useNamespaceShortcuts(options: UseNamespaceShortcutsOptions) {
 		handleKeydown
 	};
 }
-

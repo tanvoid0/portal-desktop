@@ -1,6 +1,7 @@
 // K8s-specific keyboard hook - wraps generic useKeyboard with K8s-specific functionality
 // This hook combines table navigation, resource actions, and command palette for K8s pages
 
+import { get } from 'svelte/store';
 import { useTableNavigation, type TableNavigationOptions } from './useTableNavigation';
 import { useResourceActions, type UseResourceActionsOptions } from './useResourceActions';
 import { useCommandPalette, type UseCommandPaletteOptions } from './useCommandPalette';
@@ -124,8 +125,10 @@ export function useK8sKeyboard(config: K8sKeyboardConfig): K8sKeyboardReturn {
 		
 		// Resource action shortcuts
 		if (resourceActionsHook) {
-			const actions = resourceActionsHook.actions;
-			actions.forEach((action: any) => {
+			// Note: actions is a store, so we need to get its value
+			// For display purposes, we'll get the current value
+			const currentActions = get(resourceActionsHook.actions);
+			currentActions.forEach((action: any) => {
 				shortcuts.push({
 					key: action.shortcut,
 					description: action.label,

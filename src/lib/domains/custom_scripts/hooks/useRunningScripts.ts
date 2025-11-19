@@ -54,7 +54,7 @@ class RunningScriptsManager {
 		stopCallback: () => Promise<void>,
 		outputUnsubscribe?: () => void
 	): string {
-		const id = `${script.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+		const id = `${script.id}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 		const runningScript: RunningScript = {
 			id,
 			scriptId: script.id,

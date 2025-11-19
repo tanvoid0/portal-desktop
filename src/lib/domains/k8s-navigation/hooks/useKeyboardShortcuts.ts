@@ -1,5 +1,6 @@
 // Hook for registering and handling keyboard shortcuts
 
+import { derived, get, type Readable } from 'svelte/store';
 import { matchShortcut, type ParsedShortcut } from '../utils/shortcutParser';
 import type { KeyboardShortcut } from '../types';
 
@@ -14,8 +15,9 @@ export function useKeyboardShortcuts(
 ) {
 	const { enabled = true, preventDefault = true } = options;
 	
-	const parsedShortcuts = $derived(
-		shortcuts.map(shortcut => ({
+	const parsedShortcuts: Readable<Array<KeyboardShortcut & { parsed: ParsedShortcut }>> = derived(
+		[],
+		() => shortcuts.map(shortcut => ({
 			...shortcut,
 			parsed: {
 				key: shortcut.key,
@@ -44,7 +46,8 @@ export function useKeyboardShortcuts(
 		}
 		
 		// Try to match shortcuts
-		for (const shortcut of parsedShortcuts) {
+		const currentShortcuts = get(parsedShortcuts);
+		for (const shortcut of currentShortcuts) {
 			if (matchShortcut(event, shortcut.parsed)) {
 				if (preventDefault) {
 					event.preventDefault();
@@ -58,9 +61,10 @@ export function useKeyboardShortcuts(
 		return false;
 	}
 	
+	const enabledStore: Readable<boolean> = derived([], () => enabled);
+	
 	return {
 		handleKeydown,
-		enabled: $derived(enabled)
+		enabled: enabledStore
 	};
 }
-

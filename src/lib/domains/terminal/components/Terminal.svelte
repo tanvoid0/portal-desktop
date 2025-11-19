@@ -12,12 +12,12 @@
   import CommandPalette from './CommandPalette.svelte';
   import ErrorSummary from './ErrorSummary.svelte';
   import { parseTerminalOutput, extractErrorSummary } from '../utils/outputParser';
-  import type { TerminalSettings, TerminalProcess, TerminalOutput, TerminalSystemInfo, TerminalOutputEvent } from '../types';
+  import type { TerminalConfig, TerminalProcess, TerminalOutput, TerminalSystemInfo, TerminalOutputEvent } from '../types';
   import type { CommandHistoryEntry } from '../stores/commandHistoryStore';
   
   interface Props {
     tabId: string;
-    settings: TerminalSettings;
+    settings: TerminalConfig;
   }
 
   let {
@@ -204,7 +204,7 @@
     if (terminal) {
       try {
         const buffer = terminal.buffer.active;
-        const lines = [];
+        const lines: string[] = [];
         for (let i = 0; i < terminal.rows; i++) {
           const line = buffer.getLine(i);
           if (line) {
@@ -317,7 +317,7 @@
         try {
           // Get terminal content using the correct xterm.js API
           const buffer = terminal.buffer.active;
-          const lines = [];
+          const lines: string[] = [];
           for (let i = 0; i < terminal.rows; i++) {
             const line = buffer.getLine(i);
             if (line) {
@@ -464,16 +464,17 @@
   }
 
   function handleOutput(output: TerminalOutput) {
+    if (!terminal) return;
     terminal.write(output.content);
     
     // Update error summary
     updateErrorSummary(output.content);
     
     // Save output periodically when new content arrives
-    if (currentProcess) {
+    if (currentProcess && terminal) {
       try {
         const buffer = terminal.buffer.active;
-        const lines = [];
+        const lines: string[] = [];
         for (let i = 0; i < terminal.rows; i++) {
           const line = buffer.getLine(i);
           if (line) {
@@ -510,6 +511,7 @@
 
   function handleSimulatedInput(data: string) {
     // Simulated terminal input handling
+    if (!terminal) return;
     if (data === '\r') {
       terminal.write('\r\n');
       const command = outputBuffer.trim();
@@ -530,6 +532,7 @@
   }
 
   async function processSimulatedCommand(command: string) {
+    if (!terminal) return;
     switch (command.toLowerCase()) {
       case 'clear':
         terminal.clear();
@@ -591,12 +594,12 @@
   }
 
   function writePrompt() {
-    if (!isConnected) {
-      terminal.write('$ ');
-    }
+    if (!terminal || isConnected) return;
+    terminal.write('$ ');
   }
 
   function clearTerminal() {
+    if (!terminal) return;
     terminal.clear();
     if (!isConnected) {
       writePrompt();
@@ -642,7 +645,6 @@
 
   async function saveSession() {
     if (!terminal) return;
-    
     try {
       // Get scrollback buffer
       const buffer = terminal.buffer.active;
@@ -684,7 +686,7 @@
   async function loadSession() {
     try {
       const session = await sessionStore.loadSession(tabId);
-      if (session) {
+      if (session && terminal) {
         // Restore scrollback buffer
         if (session.scrollback_buffer.length > 0) {
           terminal.clear();
@@ -704,6 +706,7 @@
   }
 
   function focusTerminal() {
+    if (!terminal) return;
     terminal.focus();
   }
 

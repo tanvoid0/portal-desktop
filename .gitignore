@@ -8,6 +8,7 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+/dist
 
 # OS
 .DS_Store
@@ -22,5 +23,55 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+# Tauri signing keys (NEVER commit private keys!)
+~/.tauri/
+*.key
+portal-desktop.key
+
+# Rust
+target/
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Database files (user-specific, never commit)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/
+portal_desktop.db
+logs-explorer.db
+
+# Test files
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+!vitest-setup-client.ts
+
+# Development files
+test-*.js
+*.rpm
+*.deb
+*.dmg
+
+# Build output (keep structure, ignore artifacts)
+build-output/*
+!build-output/.gitkeep
 
 raw/

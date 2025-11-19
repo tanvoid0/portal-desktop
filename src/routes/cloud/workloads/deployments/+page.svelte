@@ -13,6 +13,7 @@
 	import { invoke } from '@tauri-apps/api/core';
 	import { toastActions } from '$lib/domains/shared/stores/toastStore';
 	import { goto } from '$app/navigation';
+	import { get } from 'svelte/store';
 	import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 	
 	let searchQuery = $state('');
@@ -35,6 +36,8 @@
 			return matchesSearch && matchesStatus;
 		})
 	);
+	
+	const filteredDeploymentsLength = $derived(filteredDeployments.length);
 	
 	const deploymentStats = $derived({
 		total: $cloudStore.resources[ResourceType.DEPLOYMENT].length,
@@ -93,12 +96,13 @@
 	
 	// Table navigation
 	const tableNav = useTableNavigation({
-		totalItems: filteredDeployments.length,
+		totalItems: () => filteredDeploymentsLength,
 		onSelect: (index) => {
 			// Visual selection handled by CSS
 		},
 		onActivate: (index) => {
-			const deployment = filteredDeployments[index];
+			const deployments = filteredDeployments;
+			const deployment = deployments[index];
 			if (deployment) {
 				goto(`/cloud/workloads/deployments/${deployment.name}?namespace=${deployment.namespace}`);
 			}
@@ -109,7 +113,7 @@
 	// Resource actions
 	const resourceActions = useResourceActions({
 		selectedIndex: tableNav.selectedIndex,
-		resources: filteredDeployments,
+		resources: () => filteredDeployments,
 		handlers: {
 			onDescribe: (resource) => {
 				goto(`/cloud/workloads/deployments/${resource.name}?namespace=${resource.namespace}`);
@@ -248,7 +252,8 @@
 						</thead>
 						<tbody>
 							{#each filteredDeployments as deployment, index}
-								{@const isSelected = index === tableNav.selectedIndex}
+								{@const selectedIdx = get(tableNav.selectedIndex)}
+								{@const isSelected = index === selectedIdx}
 								<tr 
 									class="border-b hover:bg-muted/50 {isSelected ? 'bg-accent' : ''}"
 									data-selected={isSelected}

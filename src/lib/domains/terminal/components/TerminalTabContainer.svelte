@@ -4,10 +4,10 @@
   import TabContainer from './TabContainer.svelte';
   import Terminal from './Terminal.svelte';
   import { Button } from '@/lib/components/ui/button';
-  import type { TerminalSettings } from '../types';
+  import type { TerminalConfig } from '../types';
 
   // Props
-  export let settings: TerminalSettings = {
+  export let settings: TerminalConfig = {
     theme: 'dark',
     fontSize: 14,
     fontFamily: 'Monaco, Consolas, "Courier New", monospace',

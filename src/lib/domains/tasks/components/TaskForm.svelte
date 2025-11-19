@@ -462,7 +462,7 @@
 			<Button
 				onclick={handleSubmit}
 				disabled={isSubmitting}
-				loading={isSubmitting}
+				
 			>
 				{task ? 'Update Task' : 'Create Task'}
 			</Button>

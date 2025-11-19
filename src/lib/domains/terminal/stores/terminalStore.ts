@@ -4,7 +4,7 @@
  */
 
 import { writable, derived } from 'svelte/store';
-import type { TerminalSettings } from '../types/index';
+import type { TerminalConfig } from '../types/index';
 
 // Storage keys
 const STORAGE_KEY = 'portal-terminal-state';
@@ -68,7 +68,7 @@ function loadStateFromStorage(): TerminalState {
       error: null
     };
     
-    console.log('Restored terminal state from localStorage:', restoredState);
+    // State restored from localStorage (no sensitive data)
     return restoredState;
   } catch (error) {
     console.warn('Failed to load terminal state from localStorage:', error);
@@ -113,14 +113,14 @@ interface TerminalState {
   tabs: TerminalTab[];
   processes: TerminalProcess[];
   activeTabId: string | null;
-  settings: TerminalSettings;
+  settings: TerminalConfig;
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
 }
 
 // Default settings
-const defaultSettings: TerminalSettings = {
+const defaultSettings: TerminalConfig = {
   theme: 'dark',
   fontSize: 14,
   fontFamily: 'Monaco, Consolas, "Courier New", monospace',
@@ -322,7 +322,7 @@ export const terminalActions = {
   },
 
   // Settings
-  updateSettings: (settings: Partial<TerminalSettings>) => {
+  updateSettings: (settings: Partial<TerminalConfig>) => {
     terminalStore.update(state => ({
       ...state,
       settings: { ...state.settings, ...settings }

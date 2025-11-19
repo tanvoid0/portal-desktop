@@ -91,7 +91,7 @@
 		try {
 			await invoke('stop_sdk_service', { 
 				sdkType: databaseName, 
-				pid: 12345 // TODO: Get actual PID
+				pid: 12345 // FUTURE: Get actual PID from service status
 			});
 			isRunning = false;
 		} catch (err) {

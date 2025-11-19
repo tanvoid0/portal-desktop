@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Linux builds - FULLY SUPPORTED in Docker
+  build-linux:
+    build:
+      context: .
+      dockerfile: Dockerfile.linux
+    volumes:
+      - ./build-output:/app/build-output
+      - ./src-tauri/target:/app/src-tauri/target
+    environment:
+      - BUILD_COMMAND=${BUILD_COMMAND:-./scripts/build-linux.sh}
+      - VERSION=${VERSION}
+      - RELEASE_TYPE=${RELEASE_TYPE:-release}
+    command: /bin/bash -c "$$BUILD_COMMAND"
+
+  # Windows builds - REQUIRES WINDOWS HOST
+  # ⚠️ Windows builds in Docker require:
+  # - Windows host with Docker Desktop
+  # - Docker Desktop configured for Windows containers (not Linux containers)
+  # - RECOMMENDED: Use GitHub Actions windows-2022 runners (works from any host)
+  build-windows:
+    build:
+      context: .
+      dockerfile: Dockerfile.windows
+    volumes:
+      - ./build-output:/app/build-output
+      - ./src-tauri/target:/app/src-tauri/target
+    environment:
+      - VERSION=${VERSION}
+      - RELEASE_TYPE=${RELEASE_TYPE:-release}
+    # Windows containers use PowerShell
+    # The default CMD in Dockerfile.windows will run build-windows.ps1
+
+  # macOS builds - NOT SUPPORTED in Docker
+  # ⚠️ macOS builds CANNOT be done in Docker containers
+  # macOS requires macOS host with Xcode
+  # Use GitHub Actions macos-latest runners instead
+  build-macos:
+    build:
+      context: .
+      dockerfile: Dockerfile.macos
+    volumes:
+      - ./build-output:/app/build-output
+      - ./src-tauri/target:/app/src-tauri/target
+    environment:
+      - BUILD_COMMAND=${BUILD_COMMAND:-./scripts/build-macos.sh}
+      - VERSION=${VERSION}
+      - RELEASE_TYPE=${RELEASE_TYPE:-release}
+    command: /bin/bash -c "echo 'macOS builds require macOS host. Use GitHub Actions instead.' && exit 1"
+
+  build-all:
+    build:
+      context: .
+      dockerfile: Dockerfile.linux
+    volumes:
+      - ./build-output:/app/build-output
+      - ./src-tauri/target:/app/src-tauri/target
+    environment:
+      - VERSION=${VERSION}
+      - RELEASE_TYPE=${RELEASE_TYPE:-release}
+    command: /bin/bash -c "./scripts/build-all-platforms.sh"
+

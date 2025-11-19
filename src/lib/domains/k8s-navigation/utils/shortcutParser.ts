@@ -2,6 +2,9 @@
 
 import { normalizeKey, isModifierKey } from './keyboardConstants';
 
+// Re-export normalizeKey for use in other modules
+export { normalizeKey };
+
 export interface ParsedShortcut {
 	key: string;
 	ctrl?: boolean;

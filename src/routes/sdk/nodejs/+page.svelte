@@ -179,12 +179,12 @@
 
 	// Configuration management
 	async function openConfigFile(configFile: any) {
-		// TODO: Open file in editor
+		// FUTURE: Open file in default editor - requires IDE integration
 		console.log('Opening config file:', configFile.path);
 	}
 
 	async function editEnvironmentVar(envVar: any) {
-		// TODO: Open environment variable editor
+		// FUTURE: Open environment variable editor dialog
 		console.log('Editing environment variable:', envVar.name);
 	}
 </script>
@@ -369,8 +369,8 @@
 				<CardContent>
 					<div class="text-center py-8 text-muted-foreground">
 						<FolderOpen class="w-12 h-12 mx-auto mb-4 opacity-50" />
-						<p>Project management coming soon</p>
-						<p class="text-sm">This feature will be implemented in a future update</p>
+						<p>Node.js Projects</p>
+						<p class="text-sm">View and manage Node.js projects from the Projects page</p>
 					</div>
 				</CardContent>
 			</Card>

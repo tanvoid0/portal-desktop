@@ -37,6 +37,9 @@
 		enabled: $cloudStore.connection.isConnected
 	});
 	
+	// Extract the store for easier access
+	const namespaceShortcutsStore = namespaceShortcuts.namespaceShortcuts;
+	
 	function handleKeydown(event: KeyboardEvent) {
 		namespaceShortcuts.handleKeydown(event);
 	}
@@ -116,10 +119,10 @@
 				disabled={!$cloudStore.connection.isConnected}
 				class="w-64"
 			/>
-			{#if namespaceShortcuts.namespaceShortcuts().size > 1}
+			{#if $namespaceShortcutsStore.size > 1}
 				<div class="flex items-center gap-1 text-xs text-muted-foreground">
 					<span>Quick:</span>
-					{#each Array.from(namespaceShortcuts.namespaceShortcuts().entries()).slice(0, 5) as [number, namespace]}
+					{#each Array.from($namespaceShortcutsStore.entries()).slice(0, 5) as [number, namespace]}
 						<span class="px-1">
 							<KeyboardShortcutHint shortcut={number.toString()} variant="subtle" />
 							<span class="ml-1">{namespace.label.slice(0, 8)}</span>

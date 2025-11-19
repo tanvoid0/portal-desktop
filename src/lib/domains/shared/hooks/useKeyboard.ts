@@ -1,6 +1,7 @@
 // Generic keyboard hook - reusable anywhere
 // This is the base hook that can be customized for different domains
 
+import { writable, derived, get, type Readable, type Writable } from 'svelte/store';
 import { onMount, onDestroy } from 'svelte';
 
 export interface KeyboardShortcut {
@@ -28,7 +29,7 @@ export interface KeyboardConfig {
 export interface KeyboardReturn {
 	handleKeydown: (event: KeyboardEvent) => boolean;
 	getShortcuts: () => Array<{ key: string; description: string; category?: string }>;
-	enabled: boolean;
+	enabled: Readable<boolean>;
 	setEnabled: (enabled: boolean) => void;
 }
 
@@ -38,7 +39,7 @@ export interface KeyboardReturn {
 export function useKeyboard(config: KeyboardConfig): KeyboardReturn {
 	const { shortcuts, enabled: initialEnabled = true, context, ignoreInputs = true } = config;
 	
-	let enabled = $state(initialEnabled);
+	const enabled = writable(initialEnabled);
 	
 	function matchesShortcut(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
 		// Check context
@@ -110,7 +111,8 @@ export function useKeyboard(config: KeyboardConfig): KeyboardReturn {
 	}
 	
 	function handleKeydown(event: KeyboardEvent): boolean {
-		if (!enabled) return false;
+		const $enabled = get(enabled);
+		if (!$enabled) return false;
 		
 		for (const shortcut of shortcuts) {
 			if (matchesShortcut(event, shortcut)) {
@@ -139,27 +141,35 @@ export function useKeyboard(config: KeyboardConfig): KeyboardReturn {
 	}
 	
 	function setEnabled(newEnabled: boolean) {
-		enabled = newEnabled;
+		enabled.set(newEnabled);
 	}
 	
 	// Attach global listener
 	onMount(() => {
-		if (enabled) {
+		const $enabled = get(enabled);
+		if ($enabled) {
 			window.addEventListener('keydown', handleKeydown);
 		}
-	});
-	
-	onDestroy(() => {
-		if (enabled) {
+		
+		// Subscribe to enabled changes
+		const unsubscribe = enabled.subscribe($enabled => {
+			if ($enabled) {
+				window.addEventListener('keydown', handleKeydown);
+			} else {
+				window.removeEventListener('keydown', handleKeydown);
+			}
+		});
+		
+		return () => {
+			unsubscribe();
 			window.removeEventListener('keydown', handleKeydown);
-		}
+		};
 	});
 	
 	return {
 		handleKeydown,
 		getShortcuts,
-		enabled: $derived(enabled),
+		enabled,
 		setEnabled
 	};
 }
-

@@ -1,49 +1,62 @@
 // Hook for table row navigation with keyboard
 
+import { writable, derived, get, type Readable, type Writable } from 'svelte/store';
 import { KEY_CODES, VIM_KEYS } from '../utils/keyboardConstants';
 import type { NavigationState } from '../types';
 
 export interface TableNavigationOptions {
-	totalItems: number;
+	totalItems: number | (() => number);
 	onSelect?: (index: number) => void;
 	onActivate?: (index: number) => void;
 	enabled?: boolean;
 }
 
 export function useTableNavigation(options: TableNavigationOptions) {
-	const { totalItems, onSelect, onActivate, enabled = true } = options;
+	const { onSelect, onActivate, enabled = true } = options;
+	const getTotalItems = (): number => {
+		return typeof options.totalItems === 'function' ? options.totalItems() : options.totalItems;
+	};
 	
-	let selectedIndex = $state<number>(-1);
+	const selectedIndex = writable<number>(-1);
 	
-	const state = $derived<NavigationState>({
-		selectedIndex,
-		totalItems
-	});
+	const state: Readable<NavigationState> = derived(
+		[selectedIndex],
+		([$selectedIndex]) => ({
+			selectedIndex: $selectedIndex,
+			totalItems: getTotalItems()
+		})
+	);
 	
 	function selectIndex(index: number) {
+		const total = getTotalItems();
+		let newIndex: number;
 		if (index < 0) {
-			selectedIndex = -1;
-		} else if (index >= totalItems) {
-			selectedIndex = totalItems - 1;
+			newIndex = -1;
+		} else if (index >= total) {
+			newIndex = total - 1;
 		} else {
-			selectedIndex = index;
+			newIndex = index;
 		}
-		onSelect?.(selectedIndex);
+		selectedIndex.set(newIndex);
+		onSelect?.(newIndex);
 	}
 	
 	function moveUp() {
-		if (selectedIndex <= 0) {
+		const currentIndex = get(selectedIndex);
+		if (currentIndex <= 0) {
 			selectIndex(0);
 		} else {
-			selectIndex(selectedIndex - 1);
+			selectIndex(currentIndex - 1);
 		}
 	}
 	
 	function moveDown() {
-		if (selectedIndex >= totalItems - 1) {
-			selectIndex(totalItems - 1);
+		const currentIndex = get(selectedIndex);
+		const total = getTotalItems();
+		if (currentIndex >= total - 1) {
+			selectIndex(total - 1);
 		} else {
-			selectIndex(selectedIndex + 1);
+			selectIndex(currentIndex + 1);
 		}
 	}
 	
@@ -52,12 +65,15 @@ export function useTableNavigation(options: TableNavigationOptions) {
 	}
 	
 	function moveToBottom() {
-		selectIndex(totalItems - 1);
+		const total = getTotalItems();
+		selectIndex(total - 1);
 	}
 	
 	function activate() {
-		if (selectedIndex >= 0 && selectedIndex < totalItems) {
-			onActivate?.(selectedIndex);
+		const currentIndex = get(selectedIndex);
+		const total = getTotalItems();
+		if (currentIndex >= 0 && currentIndex < total) {
+			onActivate?.(currentIndex);
 		}
 	}
 	
@@ -82,7 +98,8 @@ export function useTableNavigation(options: TableNavigationOptions) {
 				return true;
 				
 			case KEY_CODES.ENTER:
-				if (selectedIndex >= 0) {
+				const currentIndex = get(selectedIndex);
+				if (currentIndex >= 0) {
 					event.preventDefault();
 					activate();
 					return true;
@@ -145,7 +162,7 @@ export function useTableNavigation(options: TableNavigationOptions) {
 	
 	return {
 		state,
-		selectedIndex: $derived(selectedIndex),
+		selectedIndex,
 		selectIndex,
 		moveUp,
 		moveDown,
@@ -155,4 +172,3 @@ export function useTableNavigation(options: TableNavigationOptions) {
 		handleKeydown
 	};
 }
-

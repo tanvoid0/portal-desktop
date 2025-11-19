@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Select from '$lib/components/ui/select.svelte';
 	import { Badge } from '$lib/components/ui/badge';
-	import Icon from '@iconify/svelte';
+	import { Loader } from 'lucide-svelte';
 	import type { ProviderType } from '../../types/index.js';
 	import { aiProviderService } from '../../services/aiProviderService.js';
 	import { onMount } from 'svelte';
@@ -86,7 +86,7 @@
 		<Badge variant="secondary" class="text-xs">Default</Badge>
 	{/if}
 	{#if isLoading}
-		<Icon icon="lucide:loader-2" class="h-4 w-4 animate-spin text-muted-foreground" />
+		<Loader class="h-4 w-4 animate-spin text-muted-foreground" />
 	{/if}
 </div>
 

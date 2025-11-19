@@ -419,11 +419,11 @@
 			{#each filteredProjects() as project (project.id)}
 				<Card class="cursor-pointer hover:shadow-lg transition-shadow" onclick={() => handleProjectClick(project)}>
 					<CardHeader>
-						<div class="flex items-start justify-between">
-							<div class="flex items-center gap-2">
-								<i class="text-2xl {getFrameworkIconClass(project.framework)}"></i>
-								<div>
-									<CardTitle class="text-lg">{project.name}</CardTitle>
+							<div class="flex items-start justify-between">
+							<div class="flex items-center gap-2 flex-1 min-w-0">
+								<i class="text-2xl {getFrameworkIconClass(project.framework)} flex-shrink-0"></i>
+								<div class="min-w-0 flex-1">
+									<CardTitle class="text-lg truncate" title={project.name}>{project.name}</CardTitle>
 									{#if project.description}
 										<CardDescription class="line-clamp-2">
 											{project.description}
@@ -506,7 +506,7 @@
 								{/if}
 							</div>
 
-							<div class="text-xs text-muted-foreground font-mono">
+							<div class="text-xs text-muted-foreground font-mono truncate" title={project.path}>
 								{project.path}
 							</div>
 						</div>

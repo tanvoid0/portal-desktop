@@ -72,7 +72,7 @@ pub struct ConversationMessage {
 
 #[tauri::command]
 pub async fn create_document(
-    db_manager: State<'_, DatabaseManager>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
     command: CreateDocumentCommand,
 ) -> Result<DocumentResponse, String> {
     let conn = db_manager.get_connection_clone();
@@ -94,7 +94,7 @@ pub async fn create_document(
 
 #[tauri::command]
 pub async fn get_document(
-    db_manager: State<'_, DatabaseManager>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
 ) -> Result<Option<DocumentResponse>, String> {
     let conn = db_manager.get_connection_clone();
@@ -109,7 +109,7 @@ pub async fn get_document(
 
 #[tauri::command]
 pub async fn get_documents(
-    db_manager: State<'_, DatabaseManager>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<DocumentResponse>, String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
@@ -123,7 +123,7 @@ pub async fn get_documents(
 
 #[tauri::command]
 pub async fn update_document(
-    db_manager: State<'_, DatabaseManager>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
     command: UpdateDocumentCommand,
 ) -> Result<DocumentResponse, String> {
@@ -146,7 +146,7 @@ pub async fn update_document(
 
 #[tauri::command]
 pub async fn update_document_draft(
-    db_manager: State<'_, DatabaseManager>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
     content_draft: String,
 ) -> Result<DocumentResponse, String> {
@@ -162,7 +162,7 @@ pub async fn update_document_draft(
 
 #[tauri::command]
 pub async fn save_document(
-    db_manager: State<'_, DatabaseManager>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
     title: Option<String>,
     content: Option<String>,
@@ -181,7 +181,7 @@ pub async fn save_document(
 
 #[tauri::command]
 pub async fn delete_document(
-    db_manager: State<'_, DatabaseManager>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
 ) -> Result<(), String> {
     let conn = db_manager.get_connection_clone();
@@ -195,7 +195,7 @@ pub async fn delete_document(
 
 #[tauri::command]
 pub async fn search_documents(
-    db_manager: State<'_, DatabaseManager>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
     query: String,
 ) -> Result<Vec<DocumentResponse>, String> {
     let conn = db_manager.get_connection_clone();

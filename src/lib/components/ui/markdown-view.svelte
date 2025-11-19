@@ -163,8 +163,8 @@
 				{@html displayContent}
 			</div>
 			<div class="mt-2">
-				<CollapsibleTrigger asChild let:builder>
-					<Button variant="ghost" size="sm" builders={[builder]} class="h-auto p-0 text-muted-foreground hover:text-foreground">
+				<CollapsibleTrigger>
+					<Button variant="ghost" size="sm" class="h-auto p-0 text-muted-foreground hover:text-foreground">
 						{#if isExpanded}
 							<Icon icon="lucide:chevron-up" class="h-4 w-4 mr-1" />
 							Show less

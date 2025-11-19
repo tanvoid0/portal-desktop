@@ -61,9 +61,7 @@
 	async function handleExecutePipeline(pipelineId: string) {
 		try {
 			const execution = await executionService.executePipeline({ 
-				pipelineId, 
-				projectId, 
-				triggeredBy: 'user' 
+				pipelineId
 			});
 			currentExecution = execution;
 		} catch (error) {

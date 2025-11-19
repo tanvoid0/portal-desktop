@@ -15,7 +15,8 @@
 	import type { Task, CreateTaskRequest, UpdateTaskRequest, TaskPriority, TaskStatus } from '../types';
 	import TaskPreviewCard from './TaskPreviewCard.svelte';
 	import TaskPreviewList from './TaskPreviewList.svelte';
-	import AIChatPanel, { type ChatMessage } from '@/lib/components/ai/AIChatPanel.svelte';
+	import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
+	import type { ChatMessage } from '$lib/domains/ai/types';
 	import InstructionTemplateManager from './InstructionTemplateManager.svelte';
 	import LoadingSpinner from '@/lib/components/ui/loading-spinner.svelte';
 
@@ -516,7 +517,7 @@
 							<Button
 								onclick={handleGenerate}
 								disabled={!storyText.trim() || isGenerating}
-								loading={isGenerating}
+								
 								class="w-full"
 							>
 								<Icon icon="lucide:sparkles" class="h-4 w-4 mr-2" />

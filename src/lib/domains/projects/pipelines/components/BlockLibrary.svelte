@@ -26,10 +26,12 @@
 		blockLibraryStore.setSelectedCategory(selectedCategory);
 	});
 
-	onMount(async () => {
-		loading = true;
-		await blockLibraryStore.loadBlocks();
-		loading = false;
+	onMount(() => {
+		(async () => {
+			loading = true;
+			await blockLibraryStore.loadBlocks();
+			loading = false;
+		})();
 		
 		// Subscribe to filtered blocks
 		const unsubscribe = filteredBlocks.subscribe((filtered) => {

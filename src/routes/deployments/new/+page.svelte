@@ -165,7 +165,7 @@
 				
 				<div>
 					<Label for="description">Description</Label>
-					<Textarea id="description" bind:value={description} placeholder="Optional description" rows="2" />
+					<Textarea id="description" bind:value={description} placeholder="Optional description" rows={2} />
 				</div>
 
 				<div>

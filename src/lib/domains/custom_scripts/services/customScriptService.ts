@@ -138,6 +138,23 @@ export class CustomScriptService {
 		}
 	}
 
+	/**
+	 * Sanitize parameter values to prevent command injection
+	 * Removes shell metacharacters and control characters
+	 */
+	private static sanitizeCommandValue(value: string): string {
+		if (!value) return '';
+		
+		// Remove shell metacharacters that could be used for injection
+		// This includes: ; & | ` $ ( ) { } [ ] < > \n \r
+		return value
+			.replace(/[;&|`$(){}[\]<>]/g, '')
+			.replace(/\n/g, '')
+			.replace(/\r/g, '')
+			.replace(/\0/g, '') // Null bytes
+			.trim();
+	}
+
 	static buildCommand(
 		commandTemplate: string,
 		parameters: ScriptParameter[],
@@ -150,9 +167,12 @@ export class CustomScriptService {
 		for (const param of parameters) {
 			const value = values[param.name];
 			if (value) {
+				// Sanitize value to prevent command injection
+				const sanitizedValue = CustomScriptService.sanitizeCommandValue(value);
+				
 				// Replace ${param_name} or $param_name
-				command = command.replace(new RegExp(`\\$\\{${param.name}\\}`, 'g'), value);
-				command = command.replace(new RegExp(`\\$${param.name}\\b`, 'g'), value);
+				command = command.replace(new RegExp(`\\$\\{${param.name}\\}`, 'g'), sanitizedValue);
+				command = command.replace(new RegExp(`\\$${param.name}\\b`, 'g'), sanitizedValue);
 			}
 		}
 		

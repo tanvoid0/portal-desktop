@@ -121,7 +121,6 @@
 				<div class="space-y-2">
 					<Label for="container-filter">Container</Label>
 					<Select
-						id="container-filter"
 						options={[
 							{ value: '', label: 'All Containers' },
 							...containers.map(c => ({ value: c, label: c }))
@@ -137,7 +136,6 @@
 			<div class="space-y-2">
 				<Label for="severity-filter">Severity</Label>
 				<Select
-					id="severity-filter"
 					options={[
 						{ value: '', label: 'All Severities' },
 						...severities.map(s => ({ value: s, label: s }))
@@ -152,7 +150,6 @@
 			<div class="space-y-2">
 				<Label for="tail-lines">Lines to Show</Label>
 				<Select
-					id="tail-lines"
 					options={tailOptions}
 					value={String(tailLines)}
 					onSelect={handleTailLinesChange}

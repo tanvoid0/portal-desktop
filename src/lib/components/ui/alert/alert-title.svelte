@@ -1,19 +1,20 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
-	import type { HTMLAttributes } from 'svelte/elements';
-	
-	interface AlertTitleProps extends HTMLAttributes<HTMLHeadingElement> {}
-	
+	import type { HTMLAttributes } from "svelte/elements";
+	import { cn, type WithElementRef } from "$lib/utils.js";
+
 	let {
+		ref = $bindable(null),
 		class: className,
 		children,
 		...restProps
-	}: AlertTitleProps = $props();
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> = $props();
 </script>
 
-<h5
-	class={cn('mb-1 font-medium leading-none tracking-tight', className)}
+<div
+	bind:this={ref}
+	data-slot="alert-title"
+	class={cn("col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight", className)}
 	{...restProps}
 >
-	{@render children()}
-</h5>
+	{@render children?.()}
+</div>

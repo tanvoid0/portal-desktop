@@ -151,8 +151,10 @@
           </div>
           
           <!-- Pane Content -->
-          {@const Component = pane.component}
-          <Component {...pane.props} />
+          {#if pane.component}
+            {@const Component = pane.component}
+            <Component {...pane.props} />
+          {/if}
         </div>
       </ResizablePane>
     {/each}

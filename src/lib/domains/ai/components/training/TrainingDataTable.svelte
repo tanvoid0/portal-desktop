@@ -35,7 +35,7 @@
 		<TableBody>
 			{#if data.length === 0}
 				<TableRow>
-					<TableCell colspan="5" class="text-center text-muted-foreground py-8">
+					<TableCell colspan={5} class="text-center text-muted-foreground py-8">
 						No training data found
 					</TableCell>
 				</TableRow>
