@@ -6,6 +6,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Separator } from '$lib/components/ui/separator';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import Select from '$lib/components/ui/select.svelte';
 	import Icon from '@iconify/svelte';
 	import { documentActions } from '../stores/documentStore';
@@ -118,11 +119,9 @@
 
 		<!-- Archived Toggle -->
 		<div class="flex items-center space-x-2">
-			<input
-				type="checkbox"
+			<Checkbox
 				id="isArchived"
 				bind:checked={isArchived}
-				class="h-4 w-4 rounded border-gray-300"
 			/>
 			<Label for="isArchived" class="cursor-pointer">Archived (soft delete)</Label>
 		</div>
@@ -190,7 +189,7 @@
 			<Button variant="outline" onclick={onCancel} disabled={isSaving}>
 				Cancel
 			</Button>
-			<Button onclick={handleSave} disabled={isSaving} loading={isSaving}>
+			<Button onclick={handleSave} disabled={isSaving}>
 				{isCreateMode ? 'Create Document' : 'Save Document'}
 			</Button>
 		</div>

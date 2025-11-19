@@ -107,7 +107,7 @@ pub async fn select_file(
     app_handle: tauri::AppHandle,
     title: Option<String>,
     filters: Option<Vec<(String, Vec<String>)>>, // e.g., [("Config Files", vec!["*.ovpn", "*.conf"])]
-    default_path: Option<String>, // Path to open the dialog at (simplified - just for reference)
+    _default_path: Option<String>, // FUTURE: Path to open the dialog at (simplified - just for reference)
     select_folder: Option<bool>, // If true, select folder instead of file
 ) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;

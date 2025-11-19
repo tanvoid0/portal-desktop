@@ -150,12 +150,27 @@ pub trait AIProvider: Send + Sync {
     /// Test the connection to the provider
     async fn test_connection(&self) -> Result<(), AIError>;
 
-    /// Generate text from a prompt
+    /// Generate text from a prompt (non-streaming)
     async fn generate(
         &self,
         prompt: &str,
         options: &GenerationOptions,
     ) -> Result<GenerationResult, AIError>;
+
+    /// Generate text from a prompt with streaming support
+    /// The callback is called for each chunk of text as it arrives
+    async fn generate_stream(
+        &self,
+        prompt: &str,
+        options: &GenerationOptions,
+        mut on_chunk: Box<dyn FnMut(String) -> Result<(), AIError> + Send>,
+    ) -> Result<GenerationResult, AIError> {
+        // Default implementation falls back to non-streaming
+        let result = self.generate(prompt, options).await?;
+        // Call callback with full result for compatibility
+        on_chunk(result.content.clone())?;
+        Ok(result)
+    }
 
     /// Generate text with system message (for chat-like interactions)
     async fn generate_with_system(

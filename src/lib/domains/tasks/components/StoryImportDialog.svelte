@@ -66,10 +66,10 @@
 			}
 			return parseError(error);
 		},
-	} as AIGenerationConfig<string, GeneratedTaskStructure>));
+	} as AIGenerationConfig<string, unknown>));
 
-	function handleSuccess(result: GeneratedTaskStructure, originalText: string) {
-		onGenerate(result, originalText);
+	function handleSuccess(result: unknown, originalText: string) {
+		onGenerate(result as GeneratedTaskStructure, originalText);
 	}
 </script>
 

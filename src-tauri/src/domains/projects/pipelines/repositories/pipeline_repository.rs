@@ -2,7 +2,6 @@ use crate::database::DatabaseManager;
 use crate::entities::pipeline::{Entity as PipelineEntity, ActiveModel as PipelineActiveModel, Model as PipelineModel};
 use sea_orm::{EntityTrait, ActiveModelTrait, Set, ColumnTrait, QueryFilter};
 use std::sync::Arc;
-use serde_json;
 
 pub struct PipelineRepository {
     db_manager: Arc<DatabaseManager>,

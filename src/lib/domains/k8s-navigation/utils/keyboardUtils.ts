@@ -1,13 +1,26 @@
 // Utility functions for keyboard shortcuts
 
-import { parseShortcut, formatShortcut } from './shortcutParser';
+import { parseShortcut, formatShortcut, normalizeKey } from './shortcutParser';
 import type { KeyboardShortcut } from '../types';
+
+/**
+ * Convert a KeyboardEvent to a string representation for comparison
+ */
+function eventToShortcutString(event: KeyboardEvent): string {
+	const parts: string[] = [];
+	if (event.ctrlKey) parts.push('Ctrl');
+	if (event.altKey) parts.push('Alt');
+	if (event.shiftKey) parts.push('Shift');
+	if (event.metaKey) parts.push('Cmd');
+	parts.push(normalizeKey(event.key));
+	return parts.join('+');
+}
 
 /**
  * Check if a keyboard event matches a shortcut
  */
 export function matchesShortcut(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
-	const eventKey = parseShortcut(event);
+	const eventKey = eventToShortcutString(event);
 	const shortcutKey = shortcut.key;
 	
 	// Direct match

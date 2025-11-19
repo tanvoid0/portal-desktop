@@ -107,7 +107,7 @@ impl AIProvider for OllamaProvider {
         let request = GenerateRequest {
             model: model.clone(),
             prompt: prompt.to_string(),
-            stream: false,
+            stream: false, // Non-streaming by default
             temperature: options.temperature,
             num_predict: options.max_tokens,
         };
@@ -155,6 +155,133 @@ impl AIProvider for OllamaProvider {
             content: result.response,
             model: result.model,
             tokens_used: result.eval_count,
+            generation_time_ms: Some(generation_time),
+        })
+    }
+
+    /// Generate text with streaming support (implements AIProvider trait)
+    async fn generate_stream(
+        &self,
+        prompt: &str,
+        options: &GenerationOptions,
+        mut on_chunk: Box<dyn FnMut(String) -> Result<(), AIError> + Send>,
+    ) -> Result<GenerationResult, AIError> {
+        let start_time = Instant::now();
+
+        // Check configuration first
+        let config_status = self.check_configuration();
+        if !config_status.is_configured {
+            return Err(AIError::ConfigurationIncomplete(config_status));
+        }
+
+        // Check if service is running
+        self.check_service_running().await?;
+
+        let model = options
+            .model
+            .as_ref()
+            .or_else(|| Some(&self.config.model))
+            .ok_or_else(|| AIError::ProviderNotAvailable("No model specified".to_string()))?;
+
+        let url = format!("{}/api/generate", self.base_url());
+
+        #[derive(Serialize)]
+        struct GenerateRequest {
+            model: String,
+            prompt: String,
+            stream: bool,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            temperature: Option<f64>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            num_predict: Option<u32>,
+        }
+
+        let request = GenerateRequest {
+            model: model.clone(),
+            prompt: prompt.to_string(),
+            stream: true, // Enable streaming
+            temperature: options.temperature,
+            num_predict: options.max_tokens,
+        };
+
+        let timeout = std::time::Duration::from_millis(options.timeout_ms.unwrap_or(60000));
+        let response = self
+            .client
+            .post(&url)
+            .json(&request)
+            .timeout(timeout)
+            .send()
+            .await
+            .map_err(|e| {
+                if e.is_timeout() {
+                    AIError::TimeoutError(format!("Request timed out after {:?}", timeout))
+                } else {
+                    AIError::NetworkError(format!("Network error: {}", e))
+                }
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AIError::InvalidResponse(format!(
+                "Ollama API returned status {}: {}",
+                status, error_text
+            )));
+        }
+
+        // Handle streaming response
+        let mut stream = response.bytes_stream();
+        let mut full_response = String::new();
+        let mut model_name = String::new();
+        let mut eval_count = None;
+
+        use futures_util::StreamExt;
+
+        while let Some(item) = stream.next().await {
+            let chunk = item.map_err(|e| {
+                AIError::NetworkError(format!("Stream error: {}", e))
+            })?;
+            
+            let text = String::from_utf8_lossy(&chunk);
+            for line in text.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                
+                #[derive(Deserialize)]
+                struct StreamChunk {
+                    response: Option<String>,
+                    model: Option<String>,
+                    #[serde(rename = "eval_count")]
+                    eval_count: Option<u32>,
+                    done: Option<bool>,
+                }
+                
+                if let Ok(chunk_data) = serde_json::from_str::<StreamChunk>(line) {
+                    if let Some(response_text) = chunk_data.response {
+                        full_response.push_str(&response_text);
+                        // Call the callback with the chunk
+                        on_chunk(response_text.clone())?;
+                    }
+                    if let Some(m) = chunk_data.model {
+                        model_name = m;
+                    }
+                    if let Some(count) = chunk_data.eval_count {
+                        eval_count = Some(count);
+                    }
+                    if chunk_data.done == Some(true) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let generation_time = start_time.elapsed().as_millis() as u64;
+
+        Ok(GenerationResult {
+            content: full_response,
+            model: model_name,
+            tokens_used: eval_count,
             generation_time_ms: Some(generation_time),
         })
     }

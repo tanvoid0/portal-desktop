@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Card } from '$lib/components/ui/card';
-	import Icon from '@iconify/svelte';
+	import { Bot, User } from 'lucide-svelte';
 	import type { ChatMessage as ChatMessageType } from '../../types/index.js';
 
 	interface Props {
@@ -18,9 +18,9 @@
 	>
 		<div class="flex items-start gap-2">
 			{#if message.role === 'assistant'}
-				<Icon icon="lucide:bot" class="h-4 w-4 mt-0.5 shrink-0" />
+				<Bot class="h-4 w-4 mt-0.5 shrink-0" />
 			{:else}
-				<Icon icon="lucide:user" class="h-4 w-4 mt-0.5 shrink-0" />
+				<User class="h-4 w-4 mt-0.5 shrink-0" />
 			{/if}
 			<div class="flex-1 text-sm whitespace-pre-wrap">{message.content}</div>
 		</div>

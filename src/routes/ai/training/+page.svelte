@@ -45,7 +45,7 @@
 		{#if isLoading}
 			<p class="text-muted-foreground">Loading...</p>
 		{:else}
-			<TrainingDataViewer bind:data onDelete={handleDelete} />
+			<TrainingDataViewer data={trainingData} onDelete={handleDelete} />
 		{/if}
 	</div>
 </div>

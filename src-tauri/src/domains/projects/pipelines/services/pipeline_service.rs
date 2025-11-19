@@ -3,7 +3,6 @@ use serde_json;
 use std::sync::Arc;
 use crate::database::DatabaseManager;
 use crate::domains::projects::pipelines::repositories::{PipelineRepository, BlockRepository};
-use crate::entities::pipeline::Model as PipelineModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineRequest {

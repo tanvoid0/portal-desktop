@@ -62,8 +62,17 @@ This project uses native dependencies that require compilation:
 
 ## 📖 Documentation
 
-- [Installation Guide](INSTALLATION.md) - Detailed setup instructions
-- [Build Tools Checker](scripts/check-build-tools.js) - Automated tool verification
+Comprehensive documentation is available in the [`docs/`](./docs/) directory:
+
+- **[Getting Started](./docs/getting-started/)** - Installation and setup guides
+- **[Security](./docs/security/)** - Security audits, fixes, and best practices
+- **[Development](./docs/development/)** - Architecture and development guides
+- **[Status](./docs/status/)** - Project status and release notes
+
+**Quick Links:**
+- [Installation Guide](./docs/getting-started/INSTALLATION.md) - Detailed setup instructions
+- [Security Documentation](./docs/security/) - Security reviews and fixes
+- [Project Blueprint](./docs/development/COMPLETE_PROJECT_BLUEPRINT.md) - Architecture overview
 
 ## 🔧 Troubleshooting
 

@@ -32,7 +32,7 @@
 		const section = path.replace('/settings/', '').replace(/\/$/, '');
 		// Redirect framework-ides to ides
 		if (section === 'framework-ides') return 'ides' as const;
-		return (section || 'general') as 'general' | 'editor' | 'terminal' | 'theme' | 'ides';
+		return (section || 'general') as 'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'updates';
 	});
 
 	onMount(async () => {
@@ -128,7 +128,7 @@
 	<title>Settings - Portal Desktop</title>
 </svelte:head>
 
-<div class="flex flex-col h-full overflow-hidden">
+<div class="flex flex-col h-full w-full min-h-0 overflow-hidden">
 	<!-- Top Bar -->
 	<div class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
 		<div class="flex items-center justify-between px-6 py-4">
@@ -189,9 +189,9 @@
 	</div>
 
 	<!-- Main Content Area -->
-	<div class="flex flex-1 min-h-0 overflow-hidden">
+	<div class="flex flex-1 min-h-0 overflow-hidden w-full h-full">
 		<!-- Sidebar Navigation -->
-		<aside class="w-80 border-r bg-background flex-shrink-0 overflow-y-auto">
+		<aside class="w-80 border-r bg-background flex-shrink-0 overflow-y-auto min-w-0">
 			<div class="p-4">
 				<Card class="p-3">
 					<SettingsNavigation currentSection={currentSection()} />
@@ -200,7 +200,7 @@
 		</aside>
 
 		<!-- Page Content -->
-		<main class="flex-1 overflow-y-auto min-w-0">
+		<main class="flex-1 overflow-y-auto min-w-0 min-h-0">
 			<div class="p-6 max-w-5xl">
 				{#if $isLoadingSettings}
 					<div class="flex items-center justify-center py-12">

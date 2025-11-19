@@ -38,7 +38,7 @@ export class DeploymentService {
 				project_id: request.metadata?.projectId || '',
 				name: request.name,
 				deployment_type: request.type === 'docker' ? 'Docker' : 'Cli',
-				sdk_version: 'latest', // TODO: Get from request if available
+				sdk_version: request.metadata?.sdkVersion || 'latest', // FUTURE: Add sdkVersion to request type
 				project_type: request.projectType,
 				project_path: request.projectPath,
 				environment: request.environment.variables || {},

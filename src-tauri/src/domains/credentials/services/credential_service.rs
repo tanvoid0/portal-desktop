@@ -9,6 +9,9 @@ use chrono::Utc;
 use crate::domains::credentials::entities::{Entity as CredentialEntity, Model as CredentialModel, ActiveModel as CredentialActive};
 use super::super::CredentialError;
 use super::encryption_service::{EncryptionService, EncryptionResult, DecryptionRequest};
+use sha2::{Sha256, Digest};
+use dirs;
+use crate::log_warn;
 
 #[derive(Debug, Clone)]
 pub struct CredentialService {
@@ -203,10 +206,39 @@ impl CredentialService {
         Ok(credentials)
     }
 
-    /// Get master encryption key (in production, this should be derived from user password)
+    /// Get master encryption key
+    /// Uses device-specific key derived from app data directory
+    /// SECURITY NOTE: In production, this should be derived from user's master password
+    /// For now, uses a device-specific persistent key (better than hardcoded placeholder)
     fn get_master_key(&self) -> Result<String, CredentialError> {
-        // This is a placeholder - in production, derive from user's master password
-        Ok("placeholder-master-key".to_string())
+        // Get app data directory (device-specific, persistent)
+        let app_data_dir = dirs::data_dir()
+            .ok_or_else(|| CredentialError::EncryptionFailed("Cannot determine app data directory".to_string()))?
+            .join("portal-desktop");
+        
+        // Create directory if it doesn't exist
+        std::fs::create_dir_all(&app_data_dir)
+            .map_err(|e| CredentialError::EncryptionFailed(format!("Cannot create app data directory: {}", e)))?;
+        
+        // Use app data directory path as seed for key derivation
+        // This ensures the key is device-specific and persistent
+        let seed = format!("{}-portal-credential-master-key-v1", app_data_dir.display());
+        
+        // Derive a 32-byte key from the seed using SHA-256
+        let mut hasher = Sha256::new();
+        hasher.update(seed.as_bytes());
+        let key_bytes = hasher.finalize();
+        
+        // Convert to hex string (64 characters for 32 bytes)
+        let key_hex = hex::encode(key_bytes);
+        
+        // Log warning in development mode
+        #[cfg(debug_assertions)]
+        {
+            log_warn!("Credentials", "Using device-specific master key. In production, implement user password-based key derivation.");
+        }
+        
+        Ok(key_hex)
     }
 }
 

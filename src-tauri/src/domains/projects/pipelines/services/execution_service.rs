@@ -49,7 +49,7 @@ impl ExecutionService {
             pipeline_id,
             pipeline.project_id,
             "pending".to_string(),
-            "user".to_string(), // TODO: Get actual user
+            "user".to_string(), // FUTURE: Get actual user from system/auth context
             serde_json::to_string(&Vec::<serde_json::Value>::new()).unwrap(),
             variables_json,
         ).await?;
@@ -62,8 +62,8 @@ impl ExecutionService {
             // Update status to running
             let _ = execution_repo.update_status(&execution_id_clone, "running".to_string(), None).await;
             
-            // TODO: Implement actual pipeline execution logic
-            // This would:
+            // FUTURE: Implement actual pipeline execution logic
+            // Planned for future release - this will:
             // 1. Load pipeline steps
             // 2. Resolve dependencies
             // 3. Execute steps using appropriate executor (SDK or Docker)

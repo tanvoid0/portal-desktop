@@ -1,5 +1,6 @@
 // Hook for command palette state and logic
 
+import { writable, derived, get, type Readable, type Writable } from 'svelte/store';
 import { fuzzySearch } from '../utils/fuzzySearch';
 import { NAVIGATION_SHORTCUTS } from '../utils/keyboardConstants';
 import type { Command } from '../types';
@@ -15,65 +16,74 @@ export interface UseCommandPaletteOptions {
 export function useCommandPalette(options: UseCommandPaletteOptions) {
 	const { commands, maxResults = 10 } = options;
 	
-	let isOpen = $state(false);
-	let query = $state('');
-	let selectedIndex = $state(0);
+	const isOpen = writable(false);
+	const query = writable('');
+	const selectedIndex = writable(0);
 	
-	const filteredCommands = $derived(() => {
-		if (!query.trim()) {
-			return commands.slice(0, maxResults);
+	const filteredCommands: Readable<Command[]> = derived(
+		[query],
+		([$query]) => {
+			if (!$query.trim()) {
+				return commands.slice(0, maxResults);
+			}
+			
+			const results = fuzzySearch(
+				$query,
+				commands,
+				(cmd) => cmd.label,
+				(cmd) => cmd.keywords || []
+			);
+			
+			return results
+				.slice(0, maxResults)
+				.map(result => result.item);
 		}
-		
-		const results = fuzzySearch(
-			query,
-			commands,
-			(cmd) => cmd.label,
-			(cmd) => cmd.keywords || []
-		);
-		
-		return results
-			.slice(0, maxResults)
-			.map(result => result.item);
-	});
+	);
 	
-	const selectedCommand = $derived(() => {
-		if (selectedIndex >= 0 && selectedIndex < filteredCommands().length) {
-			return filteredCommands()[selectedIndex];
+	const selectedCommand: Readable<Command | null> = derived(
+		[selectedIndex, filteredCommands],
+		([$selectedIndex, $filteredCommands]) => {
+			if ($selectedIndex >= 0 && $selectedIndex < $filteredCommands.length) {
+				return $filteredCommands[$selectedIndex];
+			}
+			return null;
 		}
-		return null;
-	});
+	);
 	
 	function open() {
-		isOpen = true;
-		query = '';
-		selectedIndex = 0;
+		isOpen.set(true);
+		query.set('');
+		selectedIndex.set(0);
 	}
 	
 	function close() {
-		isOpen = false;
-		query = '';
-		selectedIndex = 0;
+		isOpen.set(false);
+		query.set('');
+		selectedIndex.set(0);
 	}
 	
 	function setQuery(newQuery: string) {
-		query = newQuery;
-		selectedIndex = 0;
+		query.set(newQuery);
+		selectedIndex.set(0);
 	}
 	
 	function selectNext() {
-		if (selectedIndex < filteredCommands().length - 1) {
-			selectedIndex++;
+		const currentIndex = get(selectedIndex);
+		const currentFiltered = get(filteredCommands);
+		if (currentIndex < currentFiltered.length - 1) {
+			selectedIndex.set(currentIndex + 1);
 		}
 	}
 	
 	function selectPrevious() {
-		if (selectedIndex > 0) {
-			selectedIndex--;
+		const currentIndex = get(selectedIndex);
+		if (currentIndex > 0) {
+			selectedIndex.set(currentIndex - 1);
 		}
 	}
 	
 	async function executeSelected() {
-		const command = selectedCommand();
+		const command = get(selectedCommand);
 		if (command) {
 			await command.action();
 			close();
@@ -81,8 +91,10 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
 	}
 	
 	function handleKeydown(event: KeyboardEvent): boolean {
+		const $isOpen = get(isOpen);
+		
 		// Open command palette
-		if (NAVIGATION_SHORTCUTS.COMMAND_PALETTE.includes(event.key) && !isOpen) {
+		if (NAVIGATION_SHORTCUTS.COMMAND_PALETTE.includes(event.key as '/' | ':') && !$isOpen) {
 			// Only if not in input
 			const target = event.target as HTMLElement;
 			if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
@@ -92,7 +104,7 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
 			}
 		}
 		
-		if (!isOpen) return false;
+		if (!$isOpen) return false;
 		
 		switch (event.key) {
 			case 'Escape':
@@ -121,9 +133,9 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
 	}
 	
 	return {
-		isOpen: $derived(isOpen),
-		query: $derived(query),
-		selectedIndex: $derived(selectedIndex),
+		isOpen,
+		query,
+		selectedIndex,
 		filteredCommands,
 		selectedCommand,
 		open,
@@ -135,4 +147,3 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
 		handleKeydown
 	};
 }
-

@@ -9,7 +9,7 @@
 	import PodsFilters from '$lib/domains/cloud/components/workloads/PodsFilters.svelte';
 	import { Button } from '@/lib/components/ui/button';
 	import { Card } from '@/lib/components/ui/card';
-	import { useK8sKeyboard, KeyboardShortcutsPanel } from '$lib/domains/k8s-navigation';
+	import { useK8sKeyboard, KeyboardShortcutsPanel, useTableNavigation } from '$lib/domains/k8s-navigation';
 	import type { ICloudResource } from '$lib/domains/cloud/core/types';
 	
 	let searchQuery = $state('');
@@ -29,13 +29,29 @@
 		})
 	);
 	
+	const filteredPodsLength = $derived(filteredPods.length);
+	
 	// Unified keyboard handler - K8s-specific wrapper
+	const tableNav = useTableNavigation({
+		totalItems: () => filteredPodsLength,
+		onSelect: () => {},
+		onActivate: (index) => {
+			const pods = filteredPods;
+			const pod = pods[index];
+			if (pod) {
+				goto(`/cloud/workloads/pods/${pod.name}?namespace=${pod.namespace}`);
+			}
+		},
+		enabled: $cloudStore.connection.isConnected
+	});
+	
 	const keyboard = useK8sKeyboard({
 		tableNavigation: () => ({
-			totalItems: filteredPods.length,
+			totalItems: filteredPodsLength,
 			onSelect: () => {},
 			onActivate: (index) => {
-				const pod = filteredPods[index];
+				const pods = filteredPods;
+				const pod = pods[index];
 				if (pod) {
 					goto(`/cloud/workloads/pods/${pod.name}?namespace=${pod.namespace}`);
 				}
@@ -43,7 +59,7 @@
 			enabled: $cloudStore.connection.isConnected
 		}),
 		resourceActions: {
-			selectedIndex: () => keyboard.tableNav?.selectedIndex ?? -1,
+			selectedIndex: tableNav.selectedIndex,
 			resources: () => filteredPods,
 			handlers: {
 				onDescribe: (resource) => {

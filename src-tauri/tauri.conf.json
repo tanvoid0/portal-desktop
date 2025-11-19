@@ -13,12 +13,14 @@
 		"windows": [
 			{
 				"title": "portal-desktop",
-				"width": 800,
-				"height": 600
+				"width": 1280,
+				"height": 800,
+				"minWidth": 1024,
+				"minHeight": 600
 			}
 		],
 		"security": {
-			"csp": null
+			"csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss: http: https:;"
 		}
 	},
 	"bundle": {
@@ -31,5 +33,15 @@
 			"icons/icon.icns",
 			"icons/icon.ico"
 		]
+	},
+	"plugins": {
+		"updater": {
+			"active": true,
+			"endpoints": [
+				"https://github.com/tanvoid0/portal-desktop/releases/latest/download/latest.json"
+			],
+			"dialog": false,
+			"pubkey": "YOUR_PUBLIC_KEY_HERE"
+		}
 	}
 }

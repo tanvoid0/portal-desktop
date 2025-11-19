@@ -9,7 +9,8 @@
 	import { documentActions } from '../stores/documentStore';
 	import { toastActions } from '@/lib/domains/shared/stores/toastStore';
 	import type { Document } from '../types';
-	import AIChatPanel, { type ChatMessage } from '@/lib/components/ai/AIChatPanel.svelte';
+	import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
+	import type { ChatMessage } from '$lib/domains/ai/types';
 	import LoadingSpinner from '@/lib/components/ui/loading-spinner.svelte';
 	import { goto } from '$app/navigation';
 
@@ -188,7 +189,7 @@
 						<Button
 							onclick={handleGenerate}
 							disabled={!prompt.trim() || isGenerating}
-							loading={isGenerating}
+							
 							class="w-full"
 						>
 							<Icon icon="lucide:sparkles" class="h-4 w-4 mr-2" />

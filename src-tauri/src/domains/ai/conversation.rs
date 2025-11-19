@@ -10,6 +10,8 @@ pub struct Conversation {
     pub provider: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_count: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +32,7 @@ impl From<ConversationModel> for Conversation {
             provider: model.provider,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            message_count: None,
         }
     }
 }
@@ -56,6 +59,7 @@ impl Conversation {
             provider,
             created_at: now.clone(),
             updated_at: now,
+            message_count: None,
         }
     }
 }

@@ -5,9 +5,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { TerminalTabContainer, terminalActions } from '$lib/domains/terminal';
-	import type { TerminalSettings } from '$lib/domains/terminal';
+	import type { TerminalConfig } from '$lib/domains/terminal';
 
-	let settings: TerminalSettings = {
+	let settings: TerminalConfig = {
 		theme: 'dark',
 		fontSize: 14,
 		fontFamily: 'Monaco, Consolas, "Courier New", monospace',

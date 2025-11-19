@@ -16,7 +16,8 @@
 	import { pipelineTemplateService, type PipelineTemplate } from '@/lib/domains/projects/pipelines/services/pipelineTemplateService';
 	import { pipelineService } from '@/lib/domains/projects/pipelines';
 	import { projectService } from '@/lib/domains/projects/services/projectService';
-	import type { Project, Pipeline } from '@/lib/domains/projects';
+	import type { Project } from '@/lib/domains/projects';
+	import type { Pipeline } from '@/lib/domains/projects/pipelines/types';
 	import { toast } from 'svelte-sonner';
 
 	const projectId = $derived($page.params.id);
@@ -95,7 +96,8 @@
 	);
 	const allTemplates = $derived(pipelineTemplateService.getAllTemplates());
 
-	function getCategoryIcon(category: string) {
+	function getCategoryIcon(category: string | undefined) {
+		if (!category) return Code;
 		switch (category) {
 			case 'build':
 				return Package;
@@ -110,7 +112,8 @@
 		}
 	}
 
-	function getCategoryColor(category: string) {
+	function getCategoryColor(category: string | undefined) {
+		if (!category) return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
 		switch (category) {
 			case 'build':
 				return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
@@ -168,10 +171,10 @@
 						<div>
 							<h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
 								<Sparkles class="h-5 w-5" />
-								Recommended for {project.framework}
+								Recommended for {project?.framework || 'all frameworks'}
 							</h2>
 							<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-								{#each recommendedTemplates.filter((t) => t.framework === project.framework) as template}
+								{#each recommendedTemplates.filter((t) => project && t.framework === project.framework) as template}
 									{@const CategoryIcon = getCategoryIcon(template.category)}
 								<Card
 									class="cursor-pointer hover:border-primary transition-colors {selectedTemplate?.key === template.key ? 'border-primary' : ''}"
@@ -271,10 +274,10 @@
 					<div class="space-y-4">
 						<div class="flex items-center gap-2 mb-4">
 							<Sparkles class="h-5 w-5" />
-							<h2 class="text-lg font-semibold">Recommended for {project.framework}</h2>
+							<h2 class="text-lg font-semibold">Recommended for {project?.framework || 'all frameworks'}</h2>
 						</div>
 						<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-							{#each recommendedTemplates.filter((t) => t.framework === project.framework) as template}
+							{#each recommendedTemplates.filter((t) => project && t.framework === project.framework) as template}
 								{@const CategoryIcon = getCategoryIcon(template.category)}
 								<Card
 									class="cursor-pointer hover:border-primary transition-colors"

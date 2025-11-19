@@ -1,0 +1,303 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0, v1.0.0-beta.1
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+      release_type:
+        description: 'Release type'
+        type: choice
+        options:
+          - release
+          - beta
+        default: release
+
+jobs:
+  # Extract version and determine release type
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_type: ${{ steps.release_type.outputs.type }}
+      tag_name: ${{ steps.tag.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Extract version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+      
+      - name: Determine release type
+        id: release_type
+        run: |
+          if [ -n "${{ github.event.inputs.release_type }}" ]; then
+            TYPE="${{ github.event.inputs.release_type }}"
+          elif [[ "${{ github.ref }}" == *"beta"* ]] || [[ "${{ github.ref }}" == *"alpha"* ]]; then
+            TYPE="beta"
+          else
+            TYPE="release"
+          fi
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
+          echo "Release Type: $TYPE"
+      
+      - name: Set tag name
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v${{ steps.version.outputs.version }}-${{ steps.release_type.outputs.type }}"
+          fi
+          echo "name=$TAG" >> $GITHUB_OUTPUT
+
+  build-linux:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.pnpm-store
+            src-tauri/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/Cargo.lock') }}
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Build application
+        run: |
+          pnpm build
+          pnpm tauri build --target x86_64-unknown-linux-gnu
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      
+      - name: Rename artifacts
+        run: |
+          chmod +x scripts/*.sh
+          VERSION="${{ needs.prepare.outputs.version }}" \
+          RELEASE_TYPE="${{ needs.prepare.outputs.release_type }}" \
+          ./scripts/rename-artifacts.sh linux
+      
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: build-output/*.deb
+          retention-days: 90
+      
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: build-output/*.AppImage
+          retention-days: 90
+
+  build-windows:
+    needs: prepare
+    runs-on: windows-2022  # Latest Windows Server 2022
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.pnpm-store
+            src-tauri/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/Cargo.lock') }}
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Build application
+        run: |
+          pnpm build
+          pnpm tauri build --target x86_64-pc-windows-msvc
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      
+      - name: Rename artifacts
+        shell: bash
+        run: |
+          chmod +x scripts/*.sh
+          VERSION="${{ needs.prepare.outputs.version }}" \
+          RELEASE_TYPE="${{ needs.prepare.outputs.release_type }}" \
+          ./scripts/rename-artifacts.sh windows
+      
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: build-output/*.exe
+          retention-days: 90
+
+  build-macos:
+    needs: prepare
+    runs-on: macos-14  # Latest macOS 14 (Sonoma)
+    strategy:
+      matrix:
+        target: [x86_64-apple-darwin, aarch64-apple-darwin]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.pnpm-store
+            src-tauri/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/pnpm-lock.yaml', '**/Cargo.lock') }}
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Build application
+        run: |
+          pnpm build
+          pnpm tauri build --target ${{ matrix.target }}
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      
+      - name: Rename artifacts
+        run: |
+          chmod +x scripts/*.sh
+          VERSION="${{ needs.prepare.outputs.version }}" \
+          RELEASE_TYPE="${{ needs.prepare.outputs.release_type }}" \
+          ./scripts/rename-artifacts.sh macos
+      
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.target }}
+          path: build-output/*.dmg
+          retention-days: 90
+
+  create-release:
+    needs: [prepare, build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
+          name: Portal Desktop ${{ needs.prepare.outputs.version }} (${{ needs.prepare.outputs.release_type }})
+          body: |
+            ## Portal Desktop ${{ needs.prepare.outputs.version }}
+            
+            **Release Type:** ${{ needs.prepare.outputs.release_type }}
+            
+            ### Downloads
+            
+            - **Linux**: `.deb` and `.AppImage` packages
+            - **Windows**: `.exe` installer
+            - **macOS**: `.dmg` disk image
+            
+            ### Installation
+            
+            See [Installation Guide](https://github.com/${{ github.repository }}/blob/main/docs/getting-started/INSTALLATION.md) for detailed instructions.
+            
+            ### Changes
+            
+            See [Release Notes](https://github.com/${{ github.repository }}/blob/main/docs/status/RELEASE_NOTES.md) for full changelog.
+          files: |
+            artifacts/**/*
+          draft: ${{ needs.prepare.outputs.release_type == 'beta' }}
+          prerelease: ${{ needs.prepare.outputs.release_type == 'beta' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

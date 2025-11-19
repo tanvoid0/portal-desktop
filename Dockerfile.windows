@@ -1,0 +1,54 @@
+# Dockerfile for Windows builds (.exe)
+# 
+# ✅ Windows Docker images ARE available from Microsoft:
+# - mcr.microsoft.com/windows/servercore:ltsc2025 (latest)
+# - mcr.microsoft.com/windows/servercore:ltsc2022
+# - mcr.microsoft.com/windows/nanoserver:ltsc2025 (smaller, limited)
+#
+# ⚠️ CRITICAL LIMITATION: Windows containers require a Windows host
+# - Cannot run on Linux or macOS hosts
+# - Requires Windows Server or Windows 10/11 Pro with Docker Desktop
+# - Docker Desktop must be configured for Windows containers (not Linux containers)
+#
+# Options for Windows builds:
+# 1. ✅ Use GitHub Actions Windows runners (RECOMMENDED - works on any host)
+# 2. ⚠️ Use Windows containers (requires Windows host with Docker Desktop)
+#
+# This Dockerfile uses Windows Server Core LTSC 2025 (latest).
+# For Linux/Mac hosts, use GitHub Actions windows-2022 runners instead.
+
+FROM mcr.microsoft.com/windows/servercore:ltsc2025
+
+# Note: This will ONLY work on Windows hosts
+# On Linux/Mac, Docker will fail with "image operating system 'windows' cannot be used"
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install Chocolatey
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+# Install Node.js, Rust, build tools, Git, and bash via Chocolatey
+RUN choco install -y nodejs-lts git rust visualstudio2022buildtools bash --params '/InstallPath:"C:\BuildTools"'
+
+# Install pnpm
+RUN npm install -g pnpm@latest
+
+# Install Tauri CLI
+RUN cargo install tauri-cli --locked
+
+WORKDIR C:\app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY src-tauri/Cargo.toml src-tauri/Cargo.lock ./src-tauri/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code and scripts
+COPY . .
+
+# Default command (can be overridden)
+CMD ["powershell", "-File", "scripts/build-windows.ps1"]

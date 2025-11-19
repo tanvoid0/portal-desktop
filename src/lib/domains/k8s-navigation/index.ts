@@ -2,7 +2,7 @@
 // Note: Generic keyboard utilities are in src/lib/domains/shared
 
 export * from './types';
-export { type TableNavigationOptions } from './hooks/useTableNavigation';
+export { useTableNavigation, type TableNavigationOptions } from './hooks/useTableNavigation';
 export * from './hooks/useKeyboardShortcuts';
 export * from './hooks/useCommandPalette';
 export * from './hooks/useResourceActions';

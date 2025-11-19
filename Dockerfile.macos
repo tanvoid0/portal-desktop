@@ -1,0 +1,47 @@
+# Dockerfile for macOS builds (.dmg)
+# ⚠️ IMPORTANT: macOS builds CANNOT be done in Linux containers
+# 
+# macOS apps require:
+# - macOS host system
+# - Xcode and macOS SDK
+# - Code signing certificates
+#
+# This Dockerfile is NOT functional for macOS builds.
+# For production builds, use GitHub Actions macos-14 runners.
+#
+# This file exists only for documentation purposes.
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# This will NOT work - macOS builds require macOS host
+# Use GitHub Actions macos-14 runners instead
+
+# Install basic dependencies (for reference only)
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    build-essential \
+    libssl-dev \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 22
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs
+
+# Install pnpm
+RUN npm install -g pnpm@latest
+
+# Install Rust (for reference - won't work for macOS)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /app
+
+# This Dockerfile will fail if used - macOS requires macOS host
+CMD ["/bin/bash", "-c", "echo 'ERROR: macOS builds require macOS host. Use GitHub Actions macos-14 runners instead.' && exit 1"]

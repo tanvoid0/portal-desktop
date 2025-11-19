@@ -6,7 +6,6 @@
 
 // Types
 export type * from './types';
-export type { TerminalSystemInfo } from './types';
 
 // Services
 export { TerminalService } from './services/terminalService';

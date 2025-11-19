@@ -30,7 +30,7 @@
 	}: Props = $props();
 
 	let messageInput = $state('');
-	let messagesContainer: HTMLDivElement;
+	let messagesContainer: HTMLElement | null = $state(null);
 
 	async function handleSend() {
 		if (!messageInput.trim() || isLoading) return;
@@ -44,7 +44,9 @@
 	$effect(() => {
 		if (messagesContainer && messages.length > 0) {
 			setTimeout(() => {
-				messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				if (messagesContainer) {
+					messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				}
 			}, 100);
 		}
 	});
@@ -59,8 +61,8 @@
 		{onBack}
 		{onModelChange}
 	/>
-	<ScrollArea class="flex-1 px-4" bind:this={messagesContainer}>
-		<div class="space-y-4 py-4">
+	<ScrollArea class="flex-1 px-4">
+		<div class="space-y-4 py-4" bind:this={messagesContainer}>
 			{#if messages.length === 0}
 				<div class="text-center text-muted-foreground py-8">
 					<p class="text-sm">No messages yet. Start the conversation!</p>

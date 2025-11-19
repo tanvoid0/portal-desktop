@@ -17,7 +17,7 @@
 	
 	let { open = $bindable(false), onOpenChange, context = 'table' }: Props = $props();
 	
-	const shortcutGroups = $derived<ShortcutGroup[]>(() => {
+	const shortcutGroups = $derived.by<ShortcutGroup[]>(() => {
 		const groups: ShortcutGroup[] = [
 			{
 				title: 'Navigation',
@@ -88,7 +88,7 @@
 		</DialogHeader>
 		
 		<div class="space-y-6 py-4">
-			{#each shortcutGroups() as group}
+			{#each shortcutGroups as group}
 				<div>
 					<h3 class="text-sm font-semibold mb-2">{group.title}</h3>
 					<div class="space-y-1">

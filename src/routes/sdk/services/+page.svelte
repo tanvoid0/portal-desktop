@@ -112,12 +112,12 @@
 	}
 
 	async function configureService(service: any) {
-		// TODO: Open configuration dialog
+		// FUTURE: Open configuration dialog for service settings
 		console.log('Configure service:', service.id);
 	}
 
 	async function viewServiceLogs(service: any) {
-		// TODO: Open log viewer
+		// FUTURE: Open log viewer with service logs
 		console.log('View logs for:', service.id);
 	}
 

@@ -3,6 +3,9 @@ use crate::domains::learning::repositories::{
     LearnedPatternRepository, UserPreferenceRepository, LearningEventRepository,
 };
 
+// Import logger macros
+use crate::{log_info, log_warn};
+
 /// Memory and retention policies for learning data
 pub struct MemoryManager {
     // Retention days
@@ -91,26 +94,26 @@ impl MemoryManager {
         match LearningEventRepository::delete_older_than(db, self.event_retention_days).await {
             Ok(count) => {
                 stats.events_deleted = count;
-                log::info!("Cleaned {} old events (older than {} days)", count, self.event_retention_days);
+                log_info!("Learning", "Cleaned {} old events (older than {} days)", count, self.event_retention_days);
             }
             Err(e) => {
-                log::warn!("Failed to clean old events: {}", e);
+                log_warn!("Learning", "Failed to clean old events: {}", e);
             }
         }
 
         // Limit total events
         if let Err(e) = self.limit_events(db, self.max_events).await {
-            log::warn!("Failed to limit events: {}", e);
+            log_warn!("Learning", "Failed to limit events: {}", e);
         }
 
         // Clean up low-quality patterns
         if let Err(e) = self.cleanup_low_quality_patterns(db).await {
-            log::warn!("Failed to clean low-quality patterns: {}", e);
+            log_warn!("Learning", "Failed to clean low-quality patterns: {}", e);
         }
 
         // Consolidate similar patterns
         if let Err(e) = self.consolidate_patterns(db).await {
-            log::warn!("Failed to consolidate patterns: {}", e);
+            log_warn!("Learning", "Failed to consolidate patterns: {}", e);
         }
 
         Ok(stats)
@@ -147,7 +150,7 @@ impl MemoryManager {
         }
 
         if deleted > 0 {
-            log::info!("Limited events to {} most recent, deleted {} old events", max, deleted);
+            log_info!("Learning", "Limited events to {} most recent, deleted {} old events", max, deleted);
         }
 
         Ok(())
@@ -183,7 +186,7 @@ impl MemoryManager {
         }
 
         if deleted > 0 {
-            log::info!("Cleaned {} low-quality patterns", deleted);
+            log_info!("Learning", "Cleaned {} low-quality patterns", deleted);
         }
 
         Ok(())
@@ -283,7 +286,7 @@ impl MemoryManager {
         }
 
         if consolidated > 0 {
-            log::info!("Consolidated {} duplicate patterns", consolidated);
+            log_info!("Learning", "Consolidated {} duplicate patterns", consolidated);
         }
 
         Ok(())

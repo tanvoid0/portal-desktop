@@ -6,7 +6,7 @@
 		CollapsibleContent,
 		CollapsibleTrigger
 	} from '$lib/components/ui/collapsible';
-	import Icon from '@iconify/svelte';
+	import { ChevronUp, ChevronDown } from 'lucide-svelte';
 	import type { AILog } from '../../types/index.js';
 
 	interface Props {
@@ -16,7 +16,7 @@
 	let { log }: Props = $props();
 	let isOpen = $state(false);
 
-	function getLogTypeColor(type: string): string {
+	function getLogTypeColor(type: string): 'default' | 'secondary' | 'destructive' | 'outline' {
 		switch (type) {
 			case 'error':
 				return 'destructive';
@@ -44,10 +44,11 @@
 							{new Date(log.timestamp).toLocaleString()}
 						</span>
 					</div>
-					<Icon
-						icon={isOpen ? 'lucide:chevron-up' : 'lucide:chevron-down'}
-						class="h-4 w-4"
-					/>
+					{#if isOpen}
+						<ChevronUp class="h-4 w-4" />
+					{:else}
+						<ChevronDown class="h-4 w-4" />
+					{/if}
 				</div>
 			</CardHeader>
 		</CollapsibleTrigger>

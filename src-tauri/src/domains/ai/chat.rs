@@ -1,4 +1,4 @@
-use crate::domains::ai::providers::{AIError, ProviderType};
+use crate::domains::ai::providers::ProviderType;
 use crate::domains::ai::services::AIService;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

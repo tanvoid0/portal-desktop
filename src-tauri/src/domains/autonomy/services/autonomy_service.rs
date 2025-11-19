@@ -1,5 +1,7 @@
 use sea_orm::DatabaseConnection;
-use crate::domains::autonomy::services::{ActionClassifier, ApprovalManager};
+use crate::domains::autonomy::services::ApprovalManager;
+// FUTURE: ActionClassifier is imported directly for now, will be re-exported when autonomous actions are fully implemented
+use crate::domains::autonomy::services::action_classifier::ActionClassifier;
 use crate::domains::learning::services::LearningService;
 use crate::domains::learning::repositories::LearnedPatternRepository;
 use serde::{Deserialize, Serialize};

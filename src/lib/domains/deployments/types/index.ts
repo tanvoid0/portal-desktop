@@ -158,6 +158,7 @@ export interface DeploymentMetadata {
 	createdBy: string;
 	team?: string;
 	environment: 'development' | 'staging' | 'production';
+	sdkVersion?: string;
 }
 
 export interface DeploymentCreateRequest {

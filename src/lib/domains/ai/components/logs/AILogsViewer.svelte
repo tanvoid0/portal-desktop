@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
 	import LogEntry from './LogEntry.svelte';
-	import LogFilters from './LogFilters.svelte';
+	import LogFiltersComponent from './LogFilters.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import Icon from '@iconify/svelte';
 	import type { AILog, LogFilters } from '../../types/index.js';
@@ -28,7 +28,7 @@
 
 <div class="space-y-4">
 	<div class="flex items-center justify-between">
-		<LogFilters bind:filters onFiltersChange={onFiltersChange} onClear={handleClearFilters} />
+		<LogFiltersComponent bind:filters onFiltersChange={onFiltersChange} onClear={handleClearFilters} />
 		{#if onExport}
 			<Button variant="outline" onclick={onExport}>
 				<Icon icon="lucide:download" class="h-4 w-4 mr-2" />

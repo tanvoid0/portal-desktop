@@ -15,59 +15,65 @@ pub async fn get_pipeline_executions(
 
 #[tauri::command]
 pub async fn get_pipeline_variables(
-    scope: Value,
+    _scope: Value,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<Vec<Value>, String> {
-    // TODO: Implement variable retrieval
+    // FUTURE: Pipeline variables management - requires database schema for variable storage
+    // Planned for future release - variables will be stored per pipeline/execution scope
     Ok(vec![])
 }
 
 #[tauri::command]
 pub async fn set_pipeline_variable(
-    scope: Value,
+    _scope: Value,
     variable: Value,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<Value, String> {
-    // TODO: Implement variable setting
+    // FUTURE: Pipeline variables management - requires database schema for variable storage
+    // Planned for future release
     Ok(variable)
 }
 
 #[tauri::command]
 pub async fn delete_pipeline_variable(
-    scope: Value,
-    variable_name: String,
+    _scope: Value,
+    _variable_name: String,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<(), String> {
-    // TODO: Implement variable deletion
+    // FUTURE: Pipeline variables management - requires database schema for variable storage
+    // Planned for future release
     Ok(())
 }
 
 #[tauri::command]
 pub async fn get_pipeline_secrets(
-    scope: Value,
+    _scope: Value,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<Vec<String>, String> {
-    // TODO: Implement secret retrieval
+    // FUTURE: Pipeline secrets management - requires integration with credentials domain
+    // Planned for future release - secrets will reference credential vault entries
     Ok(vec![])
 }
 
 #[tauri::command]
 pub async fn add_pipeline_secret(
-    scope: Value,
-    secret_id: String,
+    _scope: Value,
+    _secret_id: String,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<(), String> {
-    // TODO: Implement secret addition
+    // FUTURE: Pipeline secrets management - requires integration with credentials domain
+    // Planned for future release
     Ok(())
 }
 
 #[tauri::command]
 pub async fn remove_pipeline_secret(
-    scope: Value,
-    secret_id: String,
+    _scope: Value,
+    _secret_id: String,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<(), String> {
-    // TODO: Implement secret removal
+    // FUTURE: Pipeline secrets management - requires integration with credentials domain
+    // Planned for future release
     Ok(())
 }
 
@@ -75,8 +81,8 @@ pub async fn remove_pipeline_secret(
 pub async fn get_blocks(
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<Vec<Value>, String> {
-    // TODO: Implement block retrieval from database
-    // For now, return empty array (default blocks are in frontend)
+    // FUTURE: Custom pipeline blocks - requires database schema for block storage
+    // For now, default blocks are managed in frontend. Custom blocks planned for future release.
     Ok(vec![])
 }
 
@@ -85,46 +91,51 @@ pub async fn create_block(
     request: Value,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<Value, String> {
-    // TODO: Implement block creation
+    // FUTURE: Custom pipeline blocks - requires database schema for block storage
+    // Planned for future release
     Ok(request)
 }
 
 #[tauri::command]
 pub async fn update_block(
-    block_id: String,
+    _block_id: String,
     request: Value,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<Value, String> {
-    // TODO: Implement block update
+    // FUTURE: Custom pipeline blocks - requires database schema for block storage
+    // Planned for future release
     Ok(request)
 }
 
 #[tauri::command]
 pub async fn delete_block(
-    block_id: String,
+    _block_id: String,
     _service: State<'_, Arc<PipelineService>>,
 ) -> Result<(), String> {
-    // TODO: Implement block deletion
+    // FUTURE: Custom pipeline blocks - requires database schema for block storage
+    // Planned for future release
     Ok(())
 }
 
 #[tauri::command]
 pub async fn get_step_execution_logs(
-    execution_id: String,
-    step_id: String,
+    _execution_id: String,
+    _step_id: String,
     _service: State<'_, Arc<ExecutionService>>,
 ) -> Result<Vec<String>, String> {
-    // TODO: Implement log retrieval
+    // FUTURE: Step execution logs - requires log storage system for pipeline steps
+    // Planned for future release - logs will be stored per step execution
     Ok(vec![])
 }
 
 #[tauri::command]
 pub async fn retry_step_execution(
-    execution_id: String,
-    step_id: String,
+    _execution_id: String,
+    _step_id: String,
     _service: State<'_, Arc<ExecutionService>>,
 ) -> Result<(), String> {
-    // TODO: Implement step retry
+    // FUTURE: Step retry functionality - requires execution state management
+    // Planned for future release - will allow retrying failed steps from checkpoint
     Ok(())
 }
 

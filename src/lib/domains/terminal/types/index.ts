@@ -36,7 +36,7 @@ export interface TerminalOutput {
   timestamp: string; // string to match Rust backend
 }
 
-export interface TerminalSettings {
+export interface TerminalConfig {
   theme: 'dark' | 'light' | 'auto';
   fontSize: number;
   fontFamily: string;
@@ -63,7 +63,7 @@ export interface TerminalState {
   tabs: TerminalTab[];
   processes: TerminalProcess[];
   activeTabId: string | null;
-  settings: TerminalSettings;
+  settings: TerminalConfig;
   isLoading: boolean;
   error: string | null;
   output: Record<string, TerminalOutput[]>; // processId -> outputs

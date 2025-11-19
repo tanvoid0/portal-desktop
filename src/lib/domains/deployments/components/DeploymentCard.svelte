@@ -25,7 +25,6 @@
 			case DeploymentStatus.CREATING:
 				return 'bg-yellow-100 text-yellow-800';
 			case DeploymentStatus.FAILED:
-			case DeploymentStatus.ERROR:
 				return 'bg-red-100 text-red-800';
 			default:
 				return 'bg-gray-100 text-gray-800';
@@ -76,10 +75,10 @@
 						{deployment.dockerImageName}
 					</span>
 				</div>
-				{#if deployment.exposedPort}
+				{#if deployment.container?.ports && deployment.container.ports.length > 0}
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">Port:</span>
-						<span class="text-sm">{deployment.exposedPort}</span>
+						<span class="text-sm">{deployment.container.ports[0].hostPort}:{deployment.container.ports[0].containerPort}</span>
 					</div>
 				{/if}
 			{:else if deployment.type === DeploymentType.CLI && deployment.command}

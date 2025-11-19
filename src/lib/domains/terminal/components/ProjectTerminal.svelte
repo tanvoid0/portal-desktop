@@ -4,14 +4,14 @@
   import TabContainer from './TabContainer.svelte';
   import Terminal from './Terminal.svelte';
   import { Button } from '@/lib/components/ui/button';
-  import type { TerminalSettings } from '../types';
+  import type { TerminalConfig } from '../types';
 
   // Props
   interface Props {
     projectId: string;
     projectName: string;
     projectPath: string;
-    settings?: TerminalSettings;
+    settings?: TerminalConfig;
   }
 
   let {

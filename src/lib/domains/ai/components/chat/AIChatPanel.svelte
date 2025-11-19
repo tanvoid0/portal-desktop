@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
-	import Icon from '@iconify/svelte';
+	import { MessageSquare, MessageCircle } from 'lucide-svelte';
 	import ChatMessage from './ChatMessage.svelte';
 	import ChatInput from './ChatInput.svelte';
 	import ChatProviderSelector from './ChatProviderSelector.svelte';
@@ -32,24 +32,19 @@
 	}: Props = $props();
 
 	let messageInput = $state('');
-	let messagesContainer: HTMLDivElement;
+	let messagesContainer: HTMLElement | null = $state(null);
+	let scrollViewport: HTMLElement | null = $state(null);
 	let selectedProvider = $state<ProviderType | null>(null);
 	let selectedModel = $state<string | null>(null);
 
 	async function handleSend() {
 		if (!messageInput.trim() || isLoading) return;
 
-		const userMessage: ChatMessageType = {
-			role: 'user',
-			content: messageInput.trim(),
-			timestamp: new Date()
-		};
-
-		messages = [...messages, userMessage];
 		const currentMessage = messageInput.trim();
 		messageInput = '';
 
 		if (onSendMessageWithHistory) {
+			// Don't add message here - parent will handle it
 			isLoading = true;
 			try {
 				await onSendMessageWithHistory(currentMessage, messages);
@@ -57,6 +52,7 @@
 				isLoading = false;
 			}
 		} else if (onSendMessage) {
+			// Don't add message here - parent will handle it
 			isLoading = true;
 			try {
 				await onSendMessage(currentMessage);
@@ -64,7 +60,14 @@
 				isLoading = false;
 			}
 		} else {
-			// Use default AI chat service
+			// Use default AI chat service - only add message here if no callback provided
+			const userMessage: ChatMessageType = {
+				role: 'user',
+				content: currentMessage,
+				timestamp: new Date()
+			};
+			messages = [...messages, userMessage];
+			
 			isLoading = true;
 			try {
 				const response = await aiChatService.sendMessage(currentMessage, messages, {
@@ -80,6 +83,8 @@
 				messages = [...messages, assistantMessage];
 			} catch (error) {
 				console.error('Failed to send message:', error);
+				// Remove user message on error
+				messages = messages.slice(0, -1);
 			} finally {
 				isLoading = false;
 			}
@@ -87,10 +92,14 @@
 	}
 
 	$effect(() => {
-		if (messagesContainer && messages.length > 0) {
-			setTimeout(() => {
-				messagesContainer.scrollTop = messagesContainer.scrollHeight;
-			}, 100);
+		// Scroll to bottom when messages change
+		if (scrollViewport && messages.length > 0) {
+			// Use requestAnimationFrame for smoother scrolling
+			requestAnimationFrame(() => {
+				if (scrollViewport) {
+					scrollViewport.scrollTop = scrollViewport.scrollHeight;
+				}
+			});
 		}
 	});
 </script>
@@ -99,7 +108,7 @@
 	<CardHeader class="pb-3">
 		<div class="flex items-center justify-between">
 			<CardTitle class="text-lg flex items-center gap-2">
-				<Icon icon="lucide:message-square" class="h-5 w-5" />
+				<MessageSquare class="h-5 w-5" />
 				{title}
 			</CardTitle>
 			<div class="flex items-center gap-2">
@@ -110,12 +119,12 @@
 			</div>
 		</div>
 	</CardHeader>
-	<CardContent class="flex-1 flex flex-col p-0 min-h-0">
-		<ScrollArea class="flex-1 px-4" bind:this={messagesContainer}>
-			<div class="space-y-4 py-4">
+	<CardContent class="flex-1 flex flex-col p-0 min-h-0 overflow-hidden">
+		<ScrollArea class="flex-1 min-h-0" bind:viewportRef={scrollViewport}>
+			<div class="px-4 py-4 space-y-4" bind:this={messagesContainer}>
 				{#if messages.length === 0}
 					<div class="text-center text-muted-foreground py-8">
-						<Icon icon="lucide:message-circle" class="h-12 w-12 mx-auto mb-2 opacity-50" />
+						<MessageCircle class="h-12 w-12 mx-auto mb-2 opacity-50" />
 						<p class="text-sm">Start a conversation</p>
 					</div>
 				{:else}
@@ -136,12 +145,14 @@
 				{/if}
 			</div>
 		</ScrollArea>
-		<ChatInput
-			bind:value={messageInput}
-			onSend={handleSend}
-			{placeholder}
-			disabled={isLoading}
-		/>
+		<div class="flex-shrink-0 border-t bg-background">
+			<ChatInput
+				bind:value={messageInput}
+				onSend={handleSend}
+				{placeholder}
+				disabled={isLoading}
+			/>
+		</div>
 	</CardContent>
 </Card>
 

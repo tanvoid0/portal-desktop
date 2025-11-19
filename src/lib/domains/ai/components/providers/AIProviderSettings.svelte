@@ -52,14 +52,16 @@
 	let isCheckingStatus = $state(false);
 	let statusCheckInterval: ReturnType<typeof setInterval> | null = $state(null);
 
-	onMount(async () => {
-		await loadProvider();
-		await checkServiceStatus();
-		
-		// Poll service status every 5 seconds
-		statusCheckInterval = setInterval(async () => {
+	onMount(() => {
+		(async () => {
+			await loadProvider();
 			await checkServiceStatus();
-		}, 5000);
+			
+			// Poll service status every 5 seconds
+			statusCheckInterval = setInterval(async () => {
+				await checkServiceStatus();
+			}, 5000);
+		})();
 		
 		return () => {
 			if (statusCheckInterval) {

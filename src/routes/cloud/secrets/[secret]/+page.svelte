@@ -160,7 +160,7 @@
 		}
 	}
 	
-	const dataEntries = $derived(() => {
+	const dataEntries = $derived.by(() => {
 		if (!secret || !secret.metadata?.data) return [];
 		return Object.entries(secret.metadata.data);
 	});
@@ -302,8 +302,8 @@
 													size="sm"
 													onclick={() => {
 														const value = showSecretValues[key] 
-															? decodeBase64(base64Value) 
-															: base64Value;
+															? decodeBase64(String(base64Value)) 
+															: String(base64Value);
 														copyToClipboard(value);
 													}}
 												>
@@ -313,7 +313,7 @@
 										</div>
 										<pre class="text-sm bg-muted p-3 rounded overflow-auto whitespace-pre-wrap break-words">
 											{#if showSecretValues[key]}
-												{decodeBase64(base64Value)}
+												{decodeBase64(String(base64Value))}
 											{:else}
 												{'*'.repeat(20)} (hidden)
 											{/if}

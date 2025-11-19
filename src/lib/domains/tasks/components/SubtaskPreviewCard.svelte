@@ -59,7 +59,7 @@
 					size="sm"
 					onclick={handleAdd}
 					disabled={isAdding || !subtask.title.trim()}
-					loading={isAdding}
+					
 				>
 					<Icon icon="lucide:plus" class="h-4 w-4 mr-1" />
 					Add

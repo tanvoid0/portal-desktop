@@ -2,5 +2,6 @@ pub mod commands;
 pub mod services;
 pub mod repositories;
 
-pub use commands::*;
+// Commands are registered in lib.rs, not re-exported here
+// pub use commands::*;
 

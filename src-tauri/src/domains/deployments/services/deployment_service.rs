@@ -408,7 +408,7 @@ impl DeploymentService {
         
         // Check status for each deployment
         let mut status_updates = Vec::new();
-        for (deployment_id, deployment_type, container_id, process_id) in deployment_info {
+        for (deployment_id, deployment_type, container_id, _process_id) in deployment_info {
             match deployment_type {
                 DeploymentType::Docker => {
                     if let Some(container_id) = container_id {

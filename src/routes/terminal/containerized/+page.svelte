@@ -8,38 +8,20 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Container, Terminal, Plus, Play, Square } from '@lucide/svelte';
+	import { containers, deploymentActions } from '$lib/domains/deployments/stores/deploymentStore';
+	import { deploymentService } from '$lib/domains/deployments/services/deploymentService';
+	import { ContainerStatus } from '$lib/domains/deployments/types';
+	import { goto } from '$app/navigation';
 
-	// Mock container data - in real implementation, this would come from a store
-	let containers = $state([
-		{
-			id: '1',
-			name: 'web-server',
-			image: 'nginx:latest',
-			status: 'running',
-			ports: ['80:80', '443:443'],
-			created: '2024-01-15T10:30:00Z'
-		},
-		{
-			id: '2',
-			name: 'database',
-			image: 'postgres:15',
-			status: 'stopped',
-			ports: ['5432:5432'],
-			created: '2024-01-14T15:45:00Z'
-		},
-		{
-			id: '3',
-			name: 'redis-cache',
-			image: 'redis:7-alpine',
-			status: 'running',
-			ports: ['6379:6379'],
-			created: '2024-01-16T09:15:00Z'
-		}
-	]);
+	let containerList = $derived($containers);
 
-	onMount(() => {
-		// Initialize container data
+	onMount(async () => {
+		await deploymentActions.loadContainers();
 	});
+
+	function openTerminal(containerId: string) {
+		goto(`/terminal?container=${containerId}`);
+	}
 </script>
 
 <div class="h-full w-full p-6">
@@ -57,16 +39,16 @@
 		</div>
 
 		<!-- Containers List -->
-		{#if containers.length > 0}
+		{#if containerList.length > 0}
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-				{#each containers as container}
+				{#each containerList as container}
 					<Card class="hover:shadow-md transition-shadow">
 						<CardHeader>
 							<CardTitle class="flex items-center space-x-2">
 								<Container class="h-5 w-5" />
 								<span>{container.name}</span>
 							</CardTitle>
-							<CardDescription>{container.image}</CardDescription>
+							<CardDescription>{container.image || 'No image specified'}</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<div class="space-y-2">
@@ -76,25 +58,27 @@
 										{container.status}
 									</Badge>
 								</div>
-								<div class="flex items-center justify-between">
-									<span class="text-sm text-muted-foreground">Ports:</span>
-									<div class="flex flex-wrap gap-1">
-										{#each container.ports as port}
-											<Badge variant="outline" class="text-xs">{port}</Badge>
-										{/each}
+								{#if container.ports && container.ports.length > 0}
+									<div class="flex items-center justify-between">
+										<span class="text-sm text-muted-foreground">Ports:</span>
+										<div class="flex flex-wrap gap-1">
+											{#each container.ports as port}
+												<Badge variant="outline" class="text-xs">{port}</Badge>
+											{/each}
+										</div>
 									</div>
-								</div>
+								{/if}
 								<div class="flex items-center space-x-2 pt-2">
 									{#if container.status === 'running'}
-										<Button size="sm" variant="outline" class="flex-1">
+										<Button size="sm" variant="outline" class="flex-1" onclick={() => openTerminal(container.id)}>
 											<Terminal class="h-4 w-4 mr-1" />
 											Open Terminal
 										</Button>
-										<Button size="sm" variant="outline" class="text-red-600 hover:text-red-700">
-											<Square class="h-4 w-4" />
-										</Button>
 									{:else}
-										<Button size="sm" variant="outline" class="flex-1">
+										<Button size="sm" variant="outline" class="flex-1" onclick={async () => {
+											await deploymentService.startContainer(container.id);
+											await deploymentActions.loadContainers();
+										}}>
 											<Play class="h-4 w-4 mr-1" />
 											Start Container
 										</Button>
@@ -125,7 +109,7 @@
 					<Container class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{containers.length}</div>
+					<div class="text-2xl font-bold">{containerList.length}</div>
 				</CardContent>
 			</Card>
 			<Card>
@@ -134,7 +118,7 @@
 					<Play class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{containers.filter(c => c.status === 'running').length}</div>
+					<div class="text-2xl font-bold">{containerList.filter(c => c.status === 'running').length}</div>
 				</CardContent>
 			</Card>
 			<Card>
@@ -143,7 +127,7 @@
 					<Square class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{containers.filter(c => c.status === 'stopped').length}</div>
+					<div class="text-2xl font-bold">{containerList.filter(c => c.status === ContainerStatus.EXITED || c.status === ContainerStatus.DEAD).length}</div>
 				</CardContent>
 			</Card>
 		</div>

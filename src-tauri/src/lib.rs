@@ -3,6 +3,7 @@ mod entities;
 mod migrations;
 mod domains;
 mod command_executor;
+mod utils;
 
 use database::DatabaseManager;
 use domains::terminal::manager::TerminalManager;
@@ -26,21 +27,36 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize logger
+    utils::logger::init_logger(None);
+    log_info!("Tauri", "Application starting...");
+    
     // Initialize domain managers
     let terminal_manager = TerminalManager::new();
     let kubernetes_manager = std::sync::Mutex::new(KubernetesManager::new());
     let navigation_service = NavigationService::new();
     
+    // Configure updater plugin
+    // Note: Endpoints and pubkey can be configured via environment variables or builder
+    // For now, using default configuration - endpoints and pubkey should be set via
+    // TAURI_UPDATER_ENDPOINTS and TAURI_UPDATER_PUBKEY environment variables,
+    // or configure in tauri.conf.json under plugins section if supported
+    let updater_builder = tauri_plugin_updater::Builder::new();
+    
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(updater_builder.build())
         .setup(|app| {
-            println!("[Tauri] Starting setup function...");
+            // Set app handle for logger to emit events to frontend
+            utils::logger::set_app_handle(app.handle().clone());
+            
+            log_info!("Tauri", "Starting setup function...");
             
             // Initialize database manager asynchronously in setup
             let app_handle = app.handle().clone();
             
-            println!("[Tauri] Initializing database manager...");
+            log_info!("Tauri", "Initializing database manager...");
             
             // Use block_on to make the async initialization synchronous
             let db_manager = tauri::async_runtime::block_on(async {
@@ -49,7 +65,7 @@ pub fn run() {
                     .expect("Failed to initialize database manager")
             });
             
-            println!("[Tauri] Database manager initialized, managing state...");
+            log_info!("Tauri", "Database manager initialized, managing state...");
             
             // Wrap in Arc for sharing
             let db_manager_arc = std::sync::Arc::new(db_manager);
@@ -101,13 +117,13 @@ pub fn run() {
             app.manage(Arc::new(pipeline_service));
             app.manage(Arc::new(execution_service));
             
-            println!("[Tauri] Automation service initialized");
-            println!("[Tauri] Settings service initialized");
-            println!("[Tauri] AI services initialized");
-            println!("[Tauri] IDE storage initialized");
-            println!("[Tauri] Deployment service initialized");
-            println!("[Tauri] Pipeline services initialized");
-            println!("[Tauri] Setup function completed");
+            log_info!("Tauri", "Automation service initialized");
+            log_info!("Tauri", "Settings service initialized");
+            log_info!("Tauri", "AI services initialized");
+            log_info!("Tauri", "IDE storage initialized");
+            log_info!("Tauri", "Deployment service initialized");
+            log_info!("Tauri", "Pipeline services initialized");
+            log_info!("Tauri", "Setup function completed");
             
             Ok(())
         })
@@ -396,6 +412,7 @@ pub fn run() {
             domains::ai::commands::generate_ai_text_with_system,
             // AI Chat commands
             domains::ai::commands::ai_send_message,
+            domains::ai::commands::ai_send_message_stream,
             // AI Conversation commands
             domains::ai::commands::ai_create_conversation,
             domains::ai::commands::ai_save_conversation,
@@ -418,7 +435,9 @@ pub fn run() {
             domains::custom_scripts::commands::delete_custom_script,
             domains::custom_scripts::commands::record_script_run,
             domains::custom_scripts::commands::select_file,
+            // Update commands
+            domains::updates::commands::get_app_version_command,
         ])
-        .run(tauri::generate_context!())
+        .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
         .expect("error while running tauri application");
 }

@@ -79,7 +79,7 @@
 
 	async function uninstallManager(manager: any) {
 		try {
-			// TODO: Implement uninstallation logic
+			// FUTURE: Implement uninstallation logic - requires manager-specific uninstall commands
 			await invoke('uninstall_manager', { managerName: manager.id });
 			installationStatus[manager.id] = false;
 			

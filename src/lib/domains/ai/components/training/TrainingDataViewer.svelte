@@ -4,6 +4,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+	import { Button } from '$lib/components/ui/button';
 	import type { TrainingData } from '../../types/index.js';
 
 	interface Props {
