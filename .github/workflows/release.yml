@@ -28,6 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
       - name: Extract version
         id: version
         run: |
@@ -80,6 +85,11 @@ jobs:
         with:
           targets: x86_64-unknown-linux-gnu
       
+      - name: Configure git for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf ssh://git@github.com/
+          git config --global url."https://github.com/".insteadOf git@github.com:
+      
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -112,6 +122,9 @@ jobs:
       
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          GIT_ASKPASS: "echo"
+          GIT_TERMINAL_PROMPT: "0"
       
       - name: Build application
         run: |
@@ -120,6 +133,8 @@ jobs:
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          GIT_ASKPASS: "echo"
+          GIT_TERMINAL_PROMPT: "0"
       
       - name: Rename artifacts
         run: |
@@ -127,6 +142,7 @@ jobs:
           VERSION="${{ needs.prepare.outputs.version }}" \
           RELEASE_TYPE="${{ needs.prepare.outputs.release_type }}" \
           ./scripts/rename-artifacts.sh linux
+        continue-on-error: true
       
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -158,6 +174,12 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
       
+      - name: Configure git for HTTPS
+        shell: bash
+        run: |
+          git config --global url."https://github.com/".insteadOf ssh://git@github.com/
+          git config --global url."https://github.com/".insteadOf git@github.com:
+      
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -176,6 +198,9 @@ jobs:
       
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          GIT_ASKPASS: "echo"
+          GIT_TERMINAL_PROMPT: "0"
       
       - name: Build application
         run: |
@@ -184,6 +209,8 @@ jobs:
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          GIT_ASKPASS: "echo"
+          GIT_TERMINAL_PROMPT: "0"
       
       - name: Rename artifacts
         shell: bash
@@ -192,6 +219,7 @@ jobs:
           VERSION="${{ needs.prepare.outputs.version }}" \
           RELEASE_TYPE="${{ needs.prepare.outputs.release_type }}" \
           ./scripts/rename-artifacts.sh windows
+        continue-on-error: true
       
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -219,6 +247,11 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       
+      - name: Configure git for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf ssh://git@github.com/
+          git config --global url."https://github.com/".insteadOf git@github.com:
+      
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -237,6 +270,9 @@ jobs:
       
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          GIT_ASKPASS: "echo"
+          GIT_TERMINAL_PROMPT: "0"
       
       - name: Build application
         run: |
@@ -245,6 +281,8 @@ jobs:
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          GIT_ASKPASS: "echo"
+          GIT_TERMINAL_PROMPT: "0"
       
       - name: Rename artifacts
         run: |
@@ -252,6 +290,7 @@ jobs:
           VERSION="${{ needs.prepare.outputs.version }}" \
           RELEASE_TYPE="${{ needs.prepare.outputs.release_type }}" \
           ./scripts/rename-artifacts.sh macos
+        continue-on-error: true
       
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
