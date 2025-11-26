@@ -9,7 +9,10 @@ pub struct ProjectModel {
     pub path: String,
     pub status: String,
     pub framework: Option<String>,
+    pub framework_id: Option<i32>,
     pub package_manager: Option<String>,
+    pub package_manager_id: Option<i32>,
+    pub language_id: Option<i32>,
     pub build_command: Option<String>,
     pub start_command: Option<String>,
     pub test_command: Option<String>,
@@ -42,8 +45,9 @@ pub struct GitInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectAnalysis {
     pub name: String,
-    pub framework: Option<String>,
-    pub package_manager: Option<String>,
+    pub frameworks: Vec<String>, // Multiple frameworks detected
+    pub languages: Vec<String>, // Multiple languages detected
+    pub package_managers: Vec<String>, // Multiple package managers detected
     pub build_command: Option<String>,
     pub start_command: Option<String>,
     pub test_command: Option<String>,

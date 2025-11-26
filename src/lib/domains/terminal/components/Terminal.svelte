@@ -6,6 +6,7 @@
   import { TerminalService } from '../services/terminalService';
   import { commandHistoryStore } from '../stores/commandHistoryStore';
   import { sessionStore, type TerminalSession } from '../stores/sessionStore';
+  import { logger } from '@/lib/domains/shared';
   import CommandHistory from './CommandHistory.svelte';
   import CommandHistorySearch from './CommandHistorySearch.svelte';
   import CommandBlocks from './CommandBlocks.svelte';
@@ -14,6 +15,11 @@
   import { parseTerminalOutput, extractErrorSummary } from '../utils/outputParser';
   import type { TerminalConfig, TerminalProcess, TerminalOutput, TerminalSystemInfo, TerminalOutputEvent } from '../types';
   import type { CommandHistoryEntry } from '../stores/commandHistoryStore';
+  import { isTauriEnvironment } from '@/lib/utils/tauri';
+  import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/lib/components/ui/tooltip';
+  import { Info } from '@lucide/svelte';
+
+  const log = logger.createScoped('Terminal');
   
   interface Props {
     tabId: string;
@@ -45,6 +51,9 @@
   let recentErrors = $state<string[]>([]);
   let terminalOutput = $state('');
   let sessionSaveTimeout = $state<NodeJS.Timeout | null>(null);
+  
+  // Check if running in Tauri environment (backend-dependent features require this)
+  const isTauri = isTauriEnvironment();
 
   // Shell-specific Quick Commands
   const quickCommands = {
@@ -154,7 +163,7 @@
   };
 
   onMount(async () => {
-    console.log('Terminal component mounted for tab:', tabId);
+    log.info('Terminal component mounted', { tabId });
     await loadSystemInfo();
     setupCommandInterceptors();
     setupOutputParsers();
@@ -181,7 +190,7 @@
     // Check for saved terminal output first
     const savedData = terminalActions.getSavedTerminalOutput(tabId);
     if (savedData && (savedData as any).output) {
-      console.log('Restoring saved terminal output for tab:', tabId);
+      log.debug('Restoring saved terminal output', { tabId });
       savedOutput = (savedData as any).output;
       
       // Write the saved output to the terminal
@@ -198,7 +207,7 @@
   });
 
   onDestroy(() => {
-    console.log('Terminal component destroyed for tab:', tabId);
+    log.info('Terminal component destroyed', { tabId });
     
     // Save current terminal output before destroying
     if (terminal) {
@@ -214,7 +223,7 @@
         const currentOutput = lines.join('\n');
         terminalActions.saveTerminalOutput(tabId, currentOutput, currentProcess?.working_directory);
       } catch (error) {
-        console.warn('Failed to save terminal output on destroy:', error);
+        log.warn('Failed to save terminal output on destroy', { error });
       }
     }
     
@@ -236,13 +245,13 @@
     }
     // Don't kill the process - keep it running in the background
     // The process will only be killed when the tab is explicitly closed
-    console.log('Terminal component destroyed, keeping process running for tab:', tabId);
+    log.info('Terminal component destroyed, keeping process running', { tabId });
   });
 
   // Handle tab switching - ensure terminal is properly sized when shown
   $effect(() => {
     if (tabId) {
-      console.log('Tab ID changed to:', tabId);
+      log.debug('Tab ID changed', { tabId });
       // Resize terminal when tab becomes active
       setTimeout(() => {
         if (fitAddon) {
@@ -254,10 +263,8 @@
 
   async function loadSystemInfo() {
     try {
-      console.log('Terminal: Loading system info for tab:', tabId);
-      const info = await TerminalService.getSystemInfo();
+      const info = await TerminalService.getSystemInfo() as any;
       systemInfo = info as unknown as TerminalSystemInfo;
-      console.log('Terminal: System info loaded:', systemInfo);
     } catch (error) {
       console.error('Terminal: Failed to load system info:', error);
     }
@@ -267,13 +274,14 @@
     // Check if there's an existing process for this tab
     const existingProcess = terminalActions.getProcessByTabId(tabId);
     if (existingProcess) {
-      console.log('Found existing process for tab:', tabId, existingProcess);
+      log.debug('Found existing process', { tabId, existingProcess });
       
       try {
         // Check if the process is still alive by trying to get its info
-        const processInfo = await TerminalService.getProcess((existingProcess as any).id);
+        const processInfoResult = await TerminalService.getProcess((existingProcess as any).id);
+        const processInfo = processInfoResult as any;
         if (processInfo && processInfo.status === 'running') {
-          console.log('Process is still alive, reconnecting to PID:', processInfo.pid);
+          log.info('Process is still alive, reconnecting', { pid: processInfo.pid });
           currentProcess = processInfo;
           isConnected = true;
           
@@ -289,19 +297,18 @@
           // Set up periodic output saving
           setupOutputSaving();
           
-          console.log('Successfully reconnected to existing process with PID:', processInfo.pid);
+          log.info('Successfully reconnected to existing process', { pid: processInfo.pid });
           return; // Successfully reconnected, don't create new process
-        } else {
-          console.log('Process is dead (backend restarted), creating new process with restored state...');
         }
-      } catch (error) {
-        console.log('Failed to reconnect to process (backend restarted), creating new process with restored state:', error);
+        // Process is dead (backend restarted), will create new process below
+      } catch (error: any) {
+        log.warn('Failed to reconnect to process', { error });
       }
     }
     
     // If we get here, either no existing process or reconnection failed
     // This is expected after page reload since backend processes are killed
-    console.log('Creating new terminal process with restored state...');
+    log.info('Creating new terminal process with restored state');
     onLoad();
   }
 
@@ -341,7 +348,7 @@
       // Use the shell from settings (set by the tab creation)
       const shellCommand = settings.defaultShell;
       
-      console.log('Creating terminal process with shell:', shellCommand);
+      log.info('Creating terminal process', { shell: shellCommand });
       
       // Create real terminal process using domain-specific backend
       currentProcess = await TerminalService.createProcess(tabId, {
@@ -378,9 +385,9 @@
       setupOutputSaving();
       
       // Don't inject custom messages - let the shell show its natural prompt
-      console.log('Terminal connected successfully');
+      log.info('Terminal connected successfully');
     } catch (error) {
-      console.error('Failed to initialize terminal:', error);
+      log.error('Failed to initialize terminal', { error });
       if (terminal) {
         terminal.write('\r\n❌ Failed to connect to terminal process!\r\n');
         terminal.write('🔄 Falling back to simulated terminal...\r\n\r\n');
@@ -582,6 +589,14 @@
           terminal.write(`📢 ${text}\r\n`);
         } else {
           // Try to execute as a real command using Tauri backend
+          if (!isTauri) {
+            terminal.write(`❌ Command execution requires the desktop app\r\n`);
+            terminal.write('💡 Terminal commands need system access which is not available in browser mode.\r\n');
+            terminal.write('💡 Please use the Tauri desktop application to execute commands.\r\n');
+            writePrompt();
+            return;
+          }
+          
           try {
             const result = await TerminalService.executeCommand(command);
             terminal.write(result + '\r\n');
@@ -846,6 +861,23 @@
 </script>
 
 <div class="terminal-wrapper h-full w-full bg-gray-900">
+  {#if !isTauri}
+    <!-- Browser Mode Warning -->
+    <div class="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800 px-4 py-3">
+      <div class="flex items-start gap-2">
+        <Info class="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+        <div class="text-sm text-yellow-800 dark:text-yellow-200">
+          <p class="font-medium mb-1">Terminal functionality limited in browser mode</p>
+          <p>
+            Real terminal processes, command execution, and process management require the desktop app. 
+            Terminal features that need system access are disabled. Please use the Tauri desktop application 
+            for full terminal functionality.
+          </p>
+        </div>
+      </div>
+    </div>
+  {/if}
+  
   <!-- Terminal Header -->
   <div class="terminal-header bg-gray-800 px-4 py-2 border-b border-gray-700">
     <!-- Top Row: Terminal Controls -->
@@ -1023,24 +1055,50 @@
                         </h3>
           <div class="space-y-2">
             {#each randomCommands as cmd (cmd.command)}
-              <button
-                onclick={() => executeQuickCommand(cmd.command)}
-                class="w-full text-left p-2 rounded hover:bg-gray-700 transition-colors group"
-                disabled={!isConnected}
-                title={cmd.description}
-              >
-                <div class="flex items-center space-x-2">
-                  <span class="text-sm">{getCategoryIcon(cmd.category)}</span>
-                  <div class="flex-1 min-w-0">
-                    <div class="font-mono text-xs {isConnected ? 'text-gray-200' : 'text-gray-500'} group-hover:text-white transition-colors">
-                      {cmd.command}
-            </div>
-                    <div class="text-xs {getCategoryColor(cmd.category)} truncate">
-                      {cmd.description}
-            </div>
-          </div>
-        </div>
-              </button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    {#snippet child({ props })}
+                      <button
+                        {...props}
+                        onclick={() => executeQuickCommand(cmd.command)}
+                        class="w-full text-left p-2 rounded hover:bg-gray-700 transition-colors group"
+                        disabled={!isConnected || !isTauri}
+                        title={cmd.description}
+                      >
+                        <div class="flex items-center space-x-2">
+                          <span class="text-sm">{getCategoryIcon(cmd.category)}</span>
+                          <div class="flex-1 min-w-0">
+                            <div class="font-mono text-xs {isConnected && isTauri ? 'text-gray-200' : 'text-gray-500'} group-hover:text-white transition-colors">
+                              {cmd.command}
+                            </div>
+                            <div class="text-xs {getCategoryColor(cmd.category)} truncate">
+                              {cmd.description}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    {/snippet}
+                  </TooltipTrigger>
+                  {#if !isTauri}
+                    <TooltipContent>
+                      <p class="max-w-xs">
+                        Terminal command execution requires the desktop app. This feature needs 
+						access to the system shell which is not available in browser mode. 
+						Please use the Tauri desktop application to execute terminal commands.
+                      </p>
+                    </TooltipContent>
+                  {:else if !isConnected}
+                    <TooltipContent>
+                      <p>Connect to terminal first to execute commands</p>
+                    </TooltipContent>
+                  {:else}
+                    <TooltipContent>
+                      <p>{cmd.description}</p>
+                    </TooltipContent>
+                  {/if}
+                </Tooltip>
+              </TooltipProvider>
             {/each}
                           <button
                             onclick={() => {
@@ -1073,20 +1131,66 @@
               Focus Terminal
             </button>
             {#if !isConnected}
-              <button
-                onclick={initializeTerminal}
-                class="w-full text-left text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
-              >
-                Connect to Real Terminal
-              </button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    {#snippet child({ props })}
+                      <button
+                        {...props}
+                        onclick={initializeTerminal}
+                        disabled={!isTauri}
+                        class="w-full text-left text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Connect to Real Terminal
+                      </button>
+                    {/snippet}
+                  </TooltipTrigger>
+                  {#if !isTauri}
+                    <TooltipContent>
+                      <p class="max-w-xs">
+                        Terminal connection requires the desktop app. Real terminal processes 
+						need access to the system shell which is not available in browser mode. 
+						Please use the Tauri desktop application to connect to a real terminal.
+                      </p>
+                    </TooltipContent>
+                  {:else}
+                    <TooltipContent>
+                      <p>Connect to a real terminal process</p>
+                    </TooltipContent>
+                  {/if}
+                </Tooltip>
+              </TooltipProvider>
             {/if}
             {#if currentProcess}
-              <button
-                onclick={() => currentProcess && TerminalService.killProcess(currentProcess.id)}
-                class="w-full text-left text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
-              >
-                Kill Process
-              </button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    {#snippet child({ props })}
+                      <button
+                        {...props}
+                        onclick={() => currentProcess && TerminalService.killProcess(currentProcess.id)}
+                        disabled={!isTauri}
+                        class="w-full text-left text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Kill Process
+                      </button>
+                    {/snippet}
+                  </TooltipTrigger>
+                  {#if !isTauri}
+                    <TooltipContent>
+                      <p class="max-w-xs">
+                        Process management requires the desktop app. Killing terminal processes 
+						needs access to the system which is not available in browser mode. 
+						Please use the Tauri desktop application for process management.
+                      </p>
+                    </TooltipContent>
+                  {:else}
+                    <TooltipContent>
+                      <p>Kill the current terminal process</p>
+                    </TooltipContent>
+                  {/if}
+                </Tooltip>
+              </TooltipProvider>
             {/if}
           </div>
         </div>

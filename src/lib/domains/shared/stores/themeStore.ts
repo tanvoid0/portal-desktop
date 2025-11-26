@@ -48,7 +48,7 @@ function createThemeStore() {
 				
 				log.info('Theme initialized:', { current: savedTheme, resolved: this.getResolvedTheme() });
 			} catch (error) {
-				log.error('Failed to initialize theme:', error);
+				log.error('Failed to initialize theme:', { error });
 				// Fallback to system theme
 				this.setTheme('system');
 			}

@@ -109,6 +109,7 @@ pub struct EncryptionResult {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // tag and algorithm are stored but not used in current decrypt implementation
 pub struct DecryptionRequest {
     pub encrypted: String,
     pub iv: String,

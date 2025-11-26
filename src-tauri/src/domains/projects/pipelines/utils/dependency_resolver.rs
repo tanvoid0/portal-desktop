@@ -1,5 +1,6 @@
 use serde_json::Value;
 
+#[allow(dead_code)]
 pub fn resolve_dependencies(steps: &[Value]) -> Vec<Vec<String>> {
     // Simplified dependency resolution
     // In a real implementation, this would do topological sorting

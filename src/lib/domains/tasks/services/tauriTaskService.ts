@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invokeClient } from '$lib/utils/invokeClient';
 import type { Task, CreateTaskRequest, UpdateTaskRequest, TaskFilters } from '../types';
 
 export interface TauriTaskResponse {
@@ -184,13 +184,13 @@ function convertFiltersToTauriFilters(filters: TaskFilters): TauriTaskFiltersCom
 export class TauriTaskService {
   async createTask(task: CreateTaskRequest): Promise<Task> {
     const command = convertTaskToTauriCreateCommand(task);
-    const response = await invoke<TauriTaskResponse>('create_task', { command });
+    const response = await invokeClient.post<TauriTaskResponse>('create_task', { command });
     return convertTauriTaskToTask(response);
   }
 
   async updateTask(id: string, task: UpdateTaskRequest): Promise<Task> {
     const command = convertTaskToTauriUpdateCommand(task);
-    const response = await invoke<TauriTaskResponse>('update_task', { 
+    const response = await invokeClient.post<TauriTaskResponse>('update_task', { 
       id: parseInt(id), 
       command 
     });
@@ -198,47 +198,57 @@ export class TauriTaskService {
   }
 
   async deleteTask(id: string): Promise<void> {
-    await invoke('delete_task', { id: parseInt(id) });
+    await invokeClient.post<void>('delete_task', { id: parseInt(id) });
   }
 
   async getTask(id: string): Promise<Task | null> {
-    const response = await invoke<TauriTaskResponse | null>('get_task', { id: parseInt(id) });
+    const response = await invokeClient.post<TauriTaskResponse | null>('get_task', { id: parseInt(id) });
     return response ? convertTauriTaskToTask(response) : null;
   }
 
   async getTasks(filters?: TaskFilters): Promise<Task[]> {
     const tauriFilters = filters ? convertFiltersToTauriFilters(filters) : null;
-    const response = await invoke<TauriTaskResponse[]>('get_tasks', { filters: tauriFilters });
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_tasks', { filters: tauriFilters });
+    // Handle null/undefined response (for localhost browser)
+    if (!response || !Array.isArray(response)) {
+      return [];
+    }
     return response.map(convertTauriTaskToTask);
   }
 
   async getSubtasks(parentId: string): Promise<Task[]> {
-    const response = await invoke<TauriTaskResponse[]>('get_subtasks', { parent_id: parseInt(parentId) });
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_subtasks', { parent_id: parseInt(parentId) });
+    if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 
   async getMainTasks(): Promise<Task[]> {
-    const response = await invoke<TauriTaskResponse[]>('get_main_tasks');
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_main_tasks');
+    if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 
   async getTaskCount(): Promise<number> {
-    return await invoke<number>('get_task_count');
+    const response = await invokeClient.post<number>('get_task_count');
+    return response ?? 0;
   }
 
   // New advanced methods
   async getOverdueTasks(): Promise<Task[]> {
-    const response = await invoke<TauriTaskResponse[]>('get_overdue_tasks');
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_overdue_tasks');
+    if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 
   async getDueTodayTasks(): Promise<Task[]> {
-    const response = await invoke<TauriTaskResponse[]>('get_due_today_tasks');
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_due_today_tasks');
+    if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 
   async getUnestimatedTasks(): Promise<Task[]> {
-    const response = await invoke<TauriTaskResponse[]>('get_unestimated_tasks');
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_unestimated_tasks');
+    if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 }

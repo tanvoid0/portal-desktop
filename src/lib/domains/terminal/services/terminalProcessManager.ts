@@ -3,7 +3,7 @@
  * Full control over terminal processes, commands, and output
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invokeClient } from '@/lib/utils/invokeClient';
 import type { TerminalProcess, TerminalOutput, TerminalCommand } from '../types';
 
 export interface ProcessConfig {
@@ -46,7 +46,7 @@ export class TerminalProcessManager {
     config: ProcessConfig
   ): Promise<TerminalProcess> {
     try {
-      const process = await invoke<TerminalProcess>('create_terminal_process', {
+      const process = await invokeClient.post<TerminalProcess>('create_terminal_process', {
         tabId,
         config
       });
@@ -75,7 +75,7 @@ export class TerminalProcessManager {
     }
 
     // Send to actual process
-    await invoke('send_terminal_input', { processId, input });
+    await invokeClient.post('send_terminal_input', { processId, input });
   }
 
   /**
@@ -83,7 +83,7 @@ export class TerminalProcessManager {
    */
   async killProcess(processId: string): Promise<void> {
     try {
-      await invoke('kill_terminal_process', { processId });
+      await invokeClient.post('kill_terminal_process', { processId });
       this.processes.delete(processId);
       this.outputCallbacks.delete(processId);
     } catch (error) {
@@ -116,7 +116,9 @@ export class TerminalProcessManager {
     this.outputCallbacks.set(processId, callback);
 
     // Subscribe to backend output
-    const unsubscribe = await invoke<() => void>('subscribe_terminal_output', {
+    // Note: subscribe_terminal_output returns a function, but InvokeClient doesn't support function returns
+    // This might need special handling or the backend should use events instead
+    const unsubscribe = await invokeClient.post<() => void>('subscribe_terminal_output', {
       processId,
       callback: (output: TerminalOutput) => {
         // Parse output before calling callback
@@ -189,7 +191,7 @@ export class TerminalProcessManager {
     }
 
     // Execute normally
-    return await invoke<TerminalCommand>('execute_terminal_command', {
+    return await invokeClient.post<TerminalCommand>('execute_terminal_command', {
       processId,
       command
     });
@@ -204,21 +206,21 @@ export class TerminalProcessManager {
     workingDirectory: string;
     availableShells: string[];
   }> {
-    return await invoke('get_system_info');
+    return await invokeClient.post('get_system_info');
   }
 
   /**
    * Resize terminal
    */
   async resizeTerminal(processId: string, cols: number, rows: number): Promise<void> {
-    await invoke('resize_terminal', { processId, cols, rows });
+    await invokeClient.post('resize_terminal', { processId, cols, rows });
   }
 
   /**
    * Get process output history
    */
   async getOutputHistory(processId: string): Promise<TerminalOutput[]> {
-    return await invoke<TerminalOutput[]>('get_terminal_output_history', {
+    return await invokeClient.post<TerminalOutput[]>('get_terminal_output_history', {
       processId
     });
   }
@@ -227,7 +229,7 @@ export class TerminalProcessManager {
    * Clear process output history
    */
   async clearOutputHistory(processId: string): Promise<void> {
-    await invoke('clear_terminal_output_history', { processId });
+    await invokeClient.post('clear_terminal_output_history', { processId });
   }
 
   /**

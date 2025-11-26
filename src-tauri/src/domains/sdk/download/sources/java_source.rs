@@ -12,6 +12,7 @@ use std::collections::HashMap;
 #[derive(Deserialize)]
 struct AdoptiumRelease {
     version: AdoptiumVersion,
+    #[allow(dead_code)]
     release_name: String,
     release_type: String,
     timestamp: String,
@@ -35,6 +36,7 @@ struct AdoptiumBinary {
 
 #[derive(Deserialize)]
 struct AdoptiumPackage {
+    #[allow(dead_code)]
     name: String,
     link: String,
     checksum: String,

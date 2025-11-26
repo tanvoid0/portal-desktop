@@ -258,7 +258,6 @@ pub async fn get_suggested_frameworks(
         FrameworkGroup {
             category: "Python".to_string(),
             frameworks: vec![
-                SuggestedFramework { name: "Python".to_string(), icon: "logos:python".to_string(), category: "Python".to_string() },
                 SuggestedFramework { name: "Django".to_string(), icon: "logos:django-icon".to_string(), category: "Python".to_string() },
                 SuggestedFramework { name: "Flask".to_string(), icon: "logos:flask".to_string(), category: "Python".to_string() },
                 SuggestedFramework { name: "FastAPI".to_string(), icon: "logos:fastapi-icon".to_string(), category: "Python".to_string() },
@@ -286,6 +285,14 @@ pub async fn get_suggested_frameworks(
                 SuggestedFramework { name: "Java".to_string(), icon: "logos:java".to_string(), category: "Java".to_string() },
                 SuggestedFramework { name: "Spring".to_string(), icon: "logos:spring-icon".to_string(), category: "Java".to_string() },
                 SuggestedFramework { name: "Quarkus".to_string(), icon: "logos:quarkus-icon".to_string(), category: "Java".to_string() },
+            ],
+        },
+        FrameworkGroup {
+            category: "Desktop".to_string(),
+            frameworks: vec![
+                SuggestedFramework { name: "Tauri".to_string(), icon: "logos:tauri".to_string(), category: "Desktop".to_string() },
+                SuggestedFramework { name: "Electron".to_string(), icon: "logos:electron".to_string(), category: "Desktop".to_string() },
+                SuggestedFramework { name: "Flutter".to_string(), icon: "logos:flutter".to_string(), category: "Desktop".to_string() },
             ],
         },
         FrameworkGroup {

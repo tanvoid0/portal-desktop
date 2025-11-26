@@ -40,7 +40,7 @@ export class VariableService {
 			log.info('Variables loaded', { scope, count: variables.length });
 			return variables;
 		} catch (error) {
-			log.error('Failed to load variables', error);
+			log.error('Failed to load variables', { error });
 			throw error;
 		}
 	}
@@ -61,7 +61,7 @@ export class VariableService {
 			log.info('Variable set', { scope, name: variable.name });
 			return result;
 		} catch (error) {
-			log.error('Failed to set variable', error);
+			log.error('Failed to set variable', { error });
 			throw error;
 		}
 	}
@@ -75,7 +75,7 @@ export class VariableService {
 			await invoke('delete_pipeline_variable', { scope, variableName });
 			log.info('Variable deleted', { scope, variableName });
 		} catch (error) {
-			log.error('Failed to delete variable', error);
+			log.error('Failed to delete variable', { error });
 			throw error;
 		}
 	}
@@ -106,7 +106,7 @@ export class VariableService {
 			log.info('Secrets loaded', { scope, count: secrets.length });
 			return secrets;
 		} catch (error) {
-			log.error('Failed to load secrets', error);
+			log.error('Failed to load secrets', { error });
 			throw error;
 		}
 	}
@@ -120,7 +120,7 @@ export class VariableService {
 			await invoke('add_pipeline_secret', { scope, secretId });
 			log.info('Secret added', { scope, secretId });
 		} catch (error) {
-			log.error('Failed to add secret', error);
+			log.error('Failed to add secret', { error });
 			throw error;
 		}
 	}
@@ -134,7 +134,7 @@ export class VariableService {
 			await invoke('remove_pipeline_secret', { scope, secretId });
 			log.info('Secret removed', { scope, secretId });
 		} catch (error) {
-			log.error('Failed to remove secret', error);
+			log.error('Failed to remove secret', { error });
 			throw error;
 		}
 	}

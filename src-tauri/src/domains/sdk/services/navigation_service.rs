@@ -37,6 +37,7 @@ pub struct NavigationResponse {
 }
 
 pub struct NavigationService {
+    #[allow(dead_code)]
     factory: SDKManagerFactory,
 }
 

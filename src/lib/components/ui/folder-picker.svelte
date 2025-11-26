@@ -7,8 +7,10 @@
 	import { Button } from './button';
 	import { Input } from './input';
 	import { Label } from './label';
-	import { invoke } from '@tauri-apps/api/core';
-	import { FolderOpen } from '@lucide/svelte';
+	import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './tooltip';
+	import { invokeClient } from '$lib/utils/invokeClient';
+	import { FolderOpen, Info } from '@lucide/svelte';
+	import { isTauriEnvironment } from '$lib/utils/tauri';
 
 	interface Props {
 		value?: string;
@@ -31,13 +33,14 @@
 	}: Props = $props();
 
 	let isSelecting = $state(false);
+	const isTauri = isTauriEnvironment();
 
 	async function handleSelectDirectory() {
-		if (disabled || isSelecting) return;
+		if (disabled || isSelecting || !isTauri) return;
 
 		try {
 			isSelecting = true;
-			const selectedPath = await invoke<string | null>('select_directory');
+			const selectedPath = await invokeClient.post<string | null>('select_directory');
 			
 			if (selectedPath) {
 				value = selectedPath;
@@ -77,18 +80,39 @@
 			{required}
 			class="flex-1"
 		/>
-		<Button
-			type="button"
-			variant="outline"
-			size="sm"
-			onclick={handleSelectDirectory}
-			disabled={disabled || isSelecting}
-			class="px-3"
-			title="Browse for directory"
-		>
-			<FolderOpen class="h-4 w-4" />
-			<span class="sr-only">Select Directory</span>
-		</Button>
+		<TooltipProvider>
+			<Tooltip>
+				<TooltipTrigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							type="button"
+							variant="outline"
+							size="sm"
+							onclick={handleSelectDirectory}
+							disabled={disabled || isSelecting || !isTauri}
+							class="px-3"
+						>
+							<FolderOpen class="h-4 w-4" />
+							<span class="sr-only">Select Directory</span>
+						</Button>
+					{/snippet}
+				</TooltipTrigger>
+				{#if !isTauri}
+					<TooltipContent>
+						<p class="max-w-xs">
+							File browser is only available in the desktop app. This feature requires 
+							access to the file system which is not available in browser mode. 
+							Please use the Tauri desktop application to browse and select directories.
+						</p>
+					</TooltipContent>
+				{:else}
+					<TooltipContent>
+						<p>Browse for directory</p>
+					</TooltipContent>
+				{/if}
+			</Tooltip>
+		</TooltipProvider>
 	</div>
 	
 	{#if description}

@@ -111,7 +111,7 @@
 		const settingsData = get(settings);
 		if (!settingsData) return { total: 0, configured: 0 };
 		
-		const total = 5; // general, editor, terminal, theme, ides (framework mappings included)
+		const total = 7; // general, editor, terminal, theme, ides, frameworks, package-managers, languages (framework mappings included)
 		let configured = 0;
 		
 		if (settingsData.app) configured++;

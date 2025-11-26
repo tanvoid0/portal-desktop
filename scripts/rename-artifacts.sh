@@ -12,7 +12,11 @@ mkdir -p build-output
 
 # Function to rename Linux artifacts
 rename_linux() {
-    local bundle_dir="src-tauri/target/release/bundle"
+    # Try both paths: with target architecture and without
+    local bundle_dir="src-tauri/target/x86_64-unknown-linux-gnu/release/bundle"
+    if [ ! -d "$bundle_dir" ]; then
+        bundle_dir="src-tauri/target/release/bundle"
+    fi
     
     if [ -d "$bundle_dir/deb" ]; then
         find "$bundle_dir/deb" -name "*.deb" -type f | while read deb_file; do

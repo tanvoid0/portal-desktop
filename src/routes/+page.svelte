@@ -6,7 +6,7 @@
 	import { Separator } from '@/lib/components/ui/separator';
 	import { projectStore, recentProjects } from '@/lib/domains/projects';
 	import { taskStats } from '@/lib/domains/tasks';
-	import { invoke } from '@tauri-apps/api/core';
+	import { isTauriEnvironment, tauriInvoke } from '@/lib/utils/tauri';
 
 	// Get current time for greeting
 	const currentHour = new Date().getHours();
@@ -104,8 +104,13 @@
 	// Load running services count
 	async function loadRunningServicesCount() {
 		try {
-			const result = await invoke('get_running_services_count') as number;
-			runningServicesCount = result || 0;
+			if (isTauriEnvironment()) {
+				const result = await tauriInvoke<number>('get_running_services_count');
+				runningServicesCount = result || 0;
+			} else {
+				// Browser environment - Tauri commands not available
+				runningServicesCount = 0;
+			}
 		} catch (err) {
 			console.error('Failed to load running services count:', err);
 			runningServicesCount = 0;

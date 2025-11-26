@@ -30,6 +30,7 @@ static WATCH_TASKS: OnceLock<WatchTaskMap> = OnceLock::new();
 
 pub struct KubernetesManager {
     pub(crate) current_cluster: Option<KubernetesCluster>,
+    #[allow(dead_code)]
     kubeconfig_path: Option<String>,
 }
 

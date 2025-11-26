@@ -3,8 +3,6 @@
 	import { Badge } from './ui/badge';
 	import { parseAndFormatSize } from '$lib/utils/fileSize';
 	
-	console.log('ModelTreeList: Component mounted');
-	
 	let {
 		models = {},
 		loading = false,
@@ -29,16 +27,7 @@
 		onCancel?: (() => void) | undefined;
 	} = $props();
 	
-	// Debug: Log props on mount and changes
-	$effect(() => {
-		console.log('ModelTreeList: props changed', { 
-			models, 
-			modelsType: typeof models,
-			modelsKeys: Object.keys(models || {}),
-			loading, 
-			error 
-		});
-	});
+	// Debug: Log props on mount and changes (removed for build compatibility)
 	
 	// Search functionality
 	let searchQuery = $state('');
@@ -49,16 +38,10 @@
 	
 	// Update filtered models when models or search query changes
 	$effect(() => {
-		console.log('ModelTreeList: filtering models called', { 
-			models, 
-			modelsType: typeof models,
-			modelsKeys: Object.keys(models || {}),
-			searchQuery,
-			modelsIsEmpty: Object.keys(models || {}).length === 0
-		});
+		// Filter models based on search query
 		
 		if (!searchQuery.trim()) {
-			console.log('ModelTreeList: returning all models (no search)', models);
+			// No search query, return all models
 			filteredModels = models;
 			return;
 		}
@@ -77,7 +60,7 @@
 			}
 		}
 		
-		console.log('ModelTreeList: filtered models', filtered);
+		// Update filtered models
 		filteredModels = filtered;
 	});
 	

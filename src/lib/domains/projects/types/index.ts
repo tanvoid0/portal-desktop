@@ -9,8 +9,9 @@ export interface Project extends BaseEntity {
 	description?: string;
 	path: string;
 	status: ProjectStatus;
-	framework?: string;
-	package_manager?: string;
+	framework_ids?: number[]; // Many-to-many: array of framework IDs
+	package_manager_ids?: number[]; // Many-to-many: array of package manager IDs
+	language_ids?: number[]; // Many-to-many: array of language IDs
 	build_command?: string;
 	start_command?: string;
 	test_command?: string;
@@ -82,8 +83,9 @@ export interface CreateProjectRequest {
 	name: string;
 	description?: string;
 	path: string;
-	framework?: string;
-	package_manager?: string;
+	framework_ids?: number[]; // Many-to-many: array of framework IDs
+	package_manager_ids?: number[]; // Many-to-many: array of package manager IDs
+	language_ids?: number[]; // Many-to-many: array of language IDs
 	build_command?: string;
 	start_command?: string;
 	test_command?: string;
@@ -98,8 +100,9 @@ export interface UpdateProjectRequest {
 	description?: string;
 	path?: string;
 	status?: ProjectStatus;
-	framework?: string;
-	package_manager?: string;
+	framework_ids?: number[]; // Many-to-many: array of framework IDs
+	package_manager_ids?: number[]; // Many-to-many: array of package manager IDs
+	language_ids?: number[]; // Many-to-many: array of language IDs
 	build_command?: string;
 	start_command?: string;
 	test_command?: string;

@@ -175,10 +175,56 @@ class LoggerService {
 		// Format data for better console output
 		let dataStr = '';
 		if (entry.data) {
-			if (typeof entry.data === 'string') {
+			// Handle different error types properly
+			if (entry.data instanceof Error) {
+				dataStr = entry.data.message;
+				// Include stack trace in debug mode
+				if (entry.level === LogLevel.DEBUG && entry.data.stack) {
+					dataStr += `\n${entry.data.stack}`;
+				}
+			} else if (typeof entry.data === 'string') {
 				dataStr = entry.data;
+			} else if (typeof entry.data === 'object' && entry.data !== null) {
+				// Check if it's an object with an error property (Error object or string)
+				if ('error' in entry.data) {
+					const errorValue = entry.data.error;
+					if (errorValue instanceof Error) {
+						dataStr = errorValue.message;
+						if (entry.level === LogLevel.DEBUG && errorValue.stack) {
+							dataStr += `\n${errorValue.stack}`;
+						}
+					} else if (typeof errorValue === 'string') {
+						dataStr = errorValue;
+					} else {
+						// For non-string, non-Error values, try to extract meaningful info
+						try {
+							// If it's an object, try to find a message property
+							if (typeof errorValue === 'object' && errorValue !== null) {
+								if ('message' in errorValue && typeof errorValue.message === 'string') {
+									dataStr = errorValue.message;
+								} else {
+									dataStr = JSON.stringify(errorValue, null, 2);
+								}
+							} else {
+								dataStr = String(errorValue);
+							}
+						} catch {
+							dataStr = String(errorValue);
+						}
+					}
+				} else if ('message' in entry.data && typeof entry.data.message === 'string') {
+					dataStr = entry.data.message;
+				} else {
+					// Try to safely stringify, handling circular references
+					try {
+						dataStr = JSON.stringify(entry.data, null, 2);
+					} catch (e) {
+						// If stringification fails (circular reference, etc.), use a safe fallback
+						dataStr = '[Object]';
+					}
+				}
 			} else {
-				dataStr = JSON.stringify(entry.data, null, 2);
+				dataStr = String(entry.data);
 			}
 		}
 		const fullMessage = dataStr ? `${entry.message} ${dataStr}` : entry.message;

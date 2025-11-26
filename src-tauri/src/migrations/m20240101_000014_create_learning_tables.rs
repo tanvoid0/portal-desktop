@@ -50,6 +50,12 @@ impl MigrationTrait for Migration {
                             .default(1.0),
                     )
                     .col(
+                        ColumnDef::new(LearnedPatterns::IsImportant)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
                         ColumnDef::new(LearnedPatterns::CreatedAt)
                             .timestamp_with_time_zone()
                             .not_null()
@@ -127,6 +133,12 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
+                    .col(
+                        ColumnDef::new(UserPreferences::IsImportant)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -139,6 +151,30 @@ impl MigrationTrait for Migration {
                     .table(UserPreferences::Table)
                     .col(UserPreferences::PreferenceType)
                     .col(UserPreferences::Context)
+                    .if_not_exists()
+                    .to_owned(),
+            )
+            .await?;
+
+        // Create index on is_important for learned_patterns
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_learned_patterns_important")
+                    .table(LearnedPatterns::Table)
+                    .col(LearnedPatterns::IsImportant)
+                    .if_not_exists()
+                    .to_owned(),
+            )
+            .await?;
+
+        // Create index on is_important for user_preferences
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_user_preferences_important")
+                    .table(UserPreferences::Table)
+                    .col(UserPreferences::IsImportant)
                     .if_not_exists()
                     .to_owned(),
             )
@@ -218,6 +254,7 @@ enum LearnedPatterns {
     Frequency,
     LastUsed,
     SuccessRate,
+    IsImportant,
     CreatedAt,
 }
 
@@ -232,6 +269,7 @@ enum UserPreferences {
     LearnedFrom,
     CreatedAt,
     UpdatedAt,
+    IsImportant,
 }
 
 #[derive(DeriveIden)]

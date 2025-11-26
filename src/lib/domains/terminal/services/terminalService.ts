@@ -3,8 +3,8 @@
  * High-level API for terminal operations with full Tauri backend integration
  */
 
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { invokeClient } from '@/lib/utils/invokeClient';
+import { isTauriEnvironment } from '@/lib/utils/tauri';
 import type { TerminalProcess, TerminalOutput, TerminalCommand, TerminalContext, CreateProcessRequest } from '../types';
 import { commandHistoryStore } from '../stores/commandHistoryStore';
 import { patternCollector } from '@/lib/domains/learning';
@@ -75,8 +75,10 @@ export class TerminalService {
     };
 
     try {
-      const process = await invoke<TerminalProcess>('create_terminal_process', {
-        request: defaultConfig
+      const process = await invokeClient.request<TerminalProcess>('create_terminal_process', {
+        data: {
+          request: defaultConfig
+        }
       });
 
       // Set up output listener for this process
@@ -118,9 +120,11 @@ export class TerminalService {
       }
 
       // Send input directly to backend
-      await invoke('send_terminal_input', {
-        processId,
-        input
+      await invokeClient.request('send_terminal_input', {
+        data: {
+          processId,
+          input
+        }
       });
     } catch (error) {
       console.error('Failed to send input:', error);
@@ -133,7 +137,7 @@ export class TerminalService {
    */
   static async killProcess(processId: string): Promise<void> {
     try {
-      await invoke('kill_terminal_process', { processId });
+      await invokeClient.request('kill_terminal_process', { data: { processId } });
     } catch (error) {
       console.error('Failed to kill process:', error);
       throw error;
@@ -145,7 +149,7 @@ export class TerminalService {
    */
   static async getProcess(processId: string): Promise<TerminalProcess | null> {
     try {
-      return await invoke<TerminalProcess | null>('get_terminal_process', { processId });
+      return await invokeClient.request<TerminalProcess | null>('get_terminal_process', { data: { processId } });
     } catch (error) {
       console.error('Failed to get process:', error);
       return null;
@@ -157,7 +161,7 @@ export class TerminalService {
    */
   static async getAllProcesses(): Promise<TerminalProcess[]> {
     try {
-      return await invoke<TerminalProcess[]>('get_terminal_processes');
+      return await invokeClient.request<TerminalProcess[]>('get_terminal_processes');
     } catch (error) {
       console.error('Failed to get processes:', error);
       return [];
@@ -193,7 +197,7 @@ export class TerminalService {
         environment: {}
       };
 
-      return await invoke<string>('execute_command', { request });
+      return await invokeClient.request<string>('execute_command', { data: { request } });
     } catch (error) {
       console.error('Failed to execute command:', error);
       throw error;
@@ -212,7 +216,7 @@ export class TerminalService {
     terminalProfiles: any;
   }> {
     try {
-      return await invoke('get_system_info');
+      return await invokeClient.request('get_system_info');
     } catch (error) {
       console.error('Failed to get system info:', error);
       return {
@@ -230,7 +234,7 @@ export class TerminalService {
    */
   static async resizeTerminal(processId: string, cols: number, rows: number): Promise<void> {
     try {
-      await invoke('resize_terminal', { processId, cols, rows });
+      await invokeClient.request('resize_terminal', { data: { processId, cols, rows } });
     } catch (error) {
       console.error('Failed to resize terminal:', error);
       throw error;
@@ -273,7 +277,13 @@ export class TerminalService {
       return; // Already set up
     }
 
+    if (!isTauriEnvironment()) {
+      console.warn('Tauri environment not available, skipping terminal output listener setup');
+      return;
+    }
+
     try {
+      const { listen } = await import('@tauri-apps/api/event');
       const unsubscribe = await listen<TerminalOutput>('terminal-output', (event) => {
         const output = event.payload;
         const processId = output.process_id;
@@ -317,7 +327,7 @@ export class TerminalService {
       const tabId = process?.tab_id;
       
       // Get the actual exit code from the backend
-      const exitCode = await invoke<number | null>('get_process_exit_code', { processId });
+      const exitCode = await invokeClient.request<number | null>('get_process_exit_code', { data: { processId } });
       console.log(`Process ${processId} exited with code:`, exitCode);
       
       // Complete the current command with the real exit code

@@ -154,7 +154,11 @@ jobs:
           mkdir -p build-output
           VERSION="${{ needs.prepare.outputs.version }}" \
           RELEASE_TYPE="${{ needs.prepare.outputs.release_type }}" \
-          ./scripts/rename-artifacts.sh linux || true
+          ./scripts/rename-artifacts.sh linux || {
+            echo "⚠️  Artifact renaming failed, but build may have succeeded"
+            echo "Checking for artifacts in original location..."
+            find src-tauri/target -name "*.deb" -o -name "*.AppImage" 2>/dev/null || true
+          }
       
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -164,6 +168,8 @@ jobs:
           path: |
             build-output/*.deb
             build-output/*.AppImage
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 90

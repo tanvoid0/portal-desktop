@@ -12,15 +12,21 @@ use std::collections::HashMap;
 #[derive(Deserialize)]
 struct GoRelease {
     version: String,
+    #[allow(dead_code)]
     stable: bool,
+    #[allow(dead_code)]
     files: Vec<GoFile>,
 }
 
 #[derive(Deserialize)]
 struct GoFile {
+    #[allow(dead_code)]
     filename: String,
+    #[allow(dead_code)]
     os: String,
+    #[allow(dead_code)]
     arch: String,
+    #[allow(dead_code)]
     sha256: String,
 }
 

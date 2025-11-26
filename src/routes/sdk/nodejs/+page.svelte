@@ -5,7 +5,7 @@
 
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { invoke } from '@tauri-apps/api/core';
+	import { invokeClient } from '@/lib/utils/invokeClient';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
@@ -59,11 +59,11 @@
 		
 		try {
 			// Load services
-			const serviceStatus = await invoke('get_service_status', { sdkType: 'nodejs' });
+			const serviceStatus = await invokeClient.post('get_service_status', { sdkType: 'nodejs' });
 			services = Array.isArray(serviceStatus) ? serviceStatus : [];
 			
 			// Load versions
-			const versionData = await invoke('fetch_available_versions', { sdkType: 'nodejs' });
+			const versionData = await invokeClient.post('fetch_available_versions', { sdkType: 'nodejs' });
 			versions = Array.isArray(versionData) ? versionData : [];
 			availableVersions = versions.filter(v => !v.installed);
 			
@@ -101,7 +101,7 @@
 	async function toggleService(service: any) {
 		try {
 			if (service.status === 'running') {
-				await invoke('stop_sdk_service', { 
+				await invokeClient.post('stop_sdk_service', { 
 					sdkType: 'nodejs', 
 					pid: service.pid 
 				});
@@ -115,7 +115,7 @@
 					config_file: null,
 					environment: {}
 				};
-				const pid = await invoke('start_sdk_service', { 
+				const pid = await invokeClient.post('start_sdk_service', { 
 					sdkType: 'nodejs', 
 					version: service.version,
 					config
@@ -135,7 +135,7 @@
 		version.progress = 0;
 		
 		try {
-			await invoke('download_and_install_version', { 
+			await invokeClient.post('download_and_install_version', { 
 				sdkType: 'nodejs', 
 				version: version.version,
 				use_manager: false
@@ -152,7 +152,7 @@
 
 	async function uninstallVersion(version: any) {
 		try {
-			await invoke('uninstall_sdk_version', { 
+			await invokeClient.post('uninstall_sdk_version', { 
 				sdkType: 'nodejs', 
 				version: version.version 
 			});
@@ -165,7 +165,7 @@
 
 	async function setActiveVersion(version: any) {
 		try {
-			await invoke('switch_sdk_version', { 
+			await invokeClient.post('switch_sdk_version', { 
 				sdkType: 'nodejs', 
 				version: version.version 
 			});
@@ -260,10 +260,10 @@
 								{service}
 								availableVersions={versions.map(v => v.version)}
 								onToggle={toggleService}
-								onVersionChange={(s, v) => console.log('Version change:', s, v)}
-								onConfigure={(s) => console.log('Configure:', s)}
-								onViewLogs={(s) => console.log('View logs:', s)}
-								onOpenUrl={(s) => console.log('Open URL:', s)}
+								onVersionChange={(s, v) => { console.log('Version change:', s, v); }}
+								onConfigure={(s) => { console.log('Configure:', s); }}
+								onViewLogs={(s) => { console.log('View logs:', s); }}
+								onOpenUrl={(s) => { console.log('Open URL:', s); }}
 							/>
 						{:else}
 							<div class="text-center py-8 text-muted-foreground">

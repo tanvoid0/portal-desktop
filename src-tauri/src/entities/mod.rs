@@ -15,4 +15,10 @@ pub mod block;
 pub mod pipeline_execution;
 pub mod document;
 pub mod custom_script;
+pub mod package_manager;
+pub mod language;
+pub mod project_framework;
+pub mod project_language;
+pub mod project_package_manager;
+pub mod device_approval;
 

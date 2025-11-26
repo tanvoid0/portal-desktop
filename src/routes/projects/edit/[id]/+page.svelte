@@ -49,8 +49,9 @@
 				name: project.name,
 				description: project.description,
 				path: project.path,
-				framework: project.framework,
-				package_manager: project.package_manager
+				framework_ids: project.framework_ids,
+				package_manager_ids: project.package_manager_ids,
+				language_ids: project.language_ids
 			};
 			
 		} catch (err) {

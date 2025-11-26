@@ -1,6 +1,5 @@
 use sea_orm::{Database, DatabaseConnection};
 use sea_orm_migration::prelude::*;
-use tauri::{AppHandle, Manager};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 
@@ -16,40 +15,38 @@ pub struct DatabaseManager {
 }
 
 impl DatabaseManager {
-    /// Initialize database manager with secure, user-specific database
-    /// Database is created in user's app data directory and migrated on startup
-    pub async fn new(app_handle: &AppHandle) -> Result<Self, sea_orm::DbErr> {
+    /// Initialize database manager
+    /// Database is created in project's data directory and migrated on startup
+    pub async fn new() -> Result<Self, sea_orm::DbErr> {
         log_info!("DatabaseManager", "Starting database initialization...");
         
-        // Get the app data directory (user-specific, secure location)
-        let app_data_dir = app_handle
-            .path()
-            .app_data_dir()
+        // Get the project directory (where the app is running from)
+        let project_dir = std::env::current_dir()
             .map_err(|e| {
-                log_error!("DatabaseManager", "Failed to get app data dir: {}", e);
-                sea_orm::DbErr::Custom(format!("Failed to get app data dir: {}", e))
+                log_error!("DatabaseManager", "Failed to get current directory: {}", e);
+                sea_orm::DbErr::Custom(format!("Failed to get current directory: {}", e))
             })?;
         
-        log_info!("DatabaseManager", "App data directory: {}", app_data_dir.display());
+        log_info!("DatabaseManager", "Project directory: {}", project_dir.display());
         
-        // Create the directory if it doesn't exist with secure permissions
-        std::fs::create_dir_all(&app_data_dir)
+        // Create a data directory in the project if it doesn't exist
+        let data_dir = project_dir.join("data");
+        std::fs::create_dir_all(&data_dir)
             .map_err(|e| {
-                log_error!("DatabaseManager", "Failed to create app data dir: {}", e);
-                sea_orm::DbErr::Custom(format!("Failed to create app data dir: {}", e))
+                log_error!("DatabaseManager", "Failed to create data dir: {}", e);
+                sea_orm::DbErr::Custom(format!("Failed to create data dir: {}", e))
             })?;
         
         // Set secure file permissions on directory (Unix-like systems)
         #[cfg(unix)]
         {
-            if let Err(e) = fs::set_permissions(&app_data_dir, fs::Permissions::from_mode(0o700)) {
+            if let Err(e) = fs::set_permissions(&data_dir, fs::Permissions::from_mode(0o700)) {
                 log_warn!("DatabaseManager", "Failed to set directory permissions: {}", e);
             }
         }
         
-        // Set up the database path (user-specific, not shared, never committed to git)
-        // Database is stored in user's app data directory, outside the project
-        let db_path = app_data_dir.join("portal_desktop.db");
+        // Set up the database path in the project's data directory
+        let db_path = data_dir.join("portal_desktop.db");
         let database_url = format!("sqlite://{}?mode=rwc", db_path.display());
         
         log_info!("DatabaseManager", "Database path: {} (user-specific, secure)", db_path.display());

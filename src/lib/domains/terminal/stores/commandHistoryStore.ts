@@ -5,7 +5,7 @@
 
 import { writable } from 'svelte/store';
 import { cleanTerminalOutput } from '../utils/textUtils';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeClient } from '@/lib/utils/invokeClient';
 
 export interface CommandHistoryEntry {
   id: string;
@@ -169,12 +169,14 @@ function createCommandHistoryStore() {
     saveToBackend: async (tabId: string) => {
       try {
         const entries = commandHistoryStore.getTabHistory(tabId);
-        await invoke('save_command_history', { 
-          tabId, 
-          entries: entries.map(entry => ({
-            ...entry,
-            timestamp: entry.timestamp.toISOString()
-          }))
+        await invokeClient.request('save_command_history', { 
+          data: {
+            tabId, 
+            entries: entries.map(entry => ({
+              ...entry,
+              timestamp: entry.timestamp.toISOString()
+            }))
+          }
         });
         console.log('Command history saved to backend for tab:', tabId);
       } catch (error) {
@@ -184,7 +186,7 @@ function createCommandHistoryStore() {
 
     loadFromBackend: async (tabId: string) => {
       try {
-        const entries = await invoke<CommandHistoryEntry[]>('load_command_history', { tabId });
+        const entries = await invokeClient.request<CommandHistoryEntry[]>('load_command_history', { data: { tabId } });
         update(state => ({
           ...state,
           entries: {

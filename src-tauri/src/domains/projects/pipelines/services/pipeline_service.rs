@@ -18,6 +18,7 @@ pub struct PipelineRequest {
 
 pub struct PipelineService {
     pipeline_repo: PipelineRepository,
+    #[allow(dead_code)]
     block_repo: BlockRepository,
 }
 

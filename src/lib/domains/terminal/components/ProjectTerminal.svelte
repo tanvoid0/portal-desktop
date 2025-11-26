@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { logger } from '@/lib/domains/shared';
+  
+  const log = logger.createScoped('ProjectTerminal');
   import { onMount, onDestroy } from 'svelte';
   import { terminalStore, terminalActions } from '../stores/terminalStore';
   import TabContainer from './TabContainer.svelte';
@@ -43,7 +46,7 @@
 
   // Create a new terminal tab for this project
   function createNewTerminalTab(shellCommand?: string) {
-    console.log('Creating new project terminal tab for project:', projectId);
+    log.debug('Creating new project terminal tab', { projectId });
     const tabNumber = tabs.length + 1;
     
     // Use the provided shell command or fallback to default shell
@@ -60,7 +63,7 @@
       resourceId: projectId
     });
 
-    console.log('Created project terminal tab with ID:', tabId);
+    log.info('Created project terminal tab', { tabId, projectId });
 
     // Create a process for the new tab
     const processId = terminalActions.createProcess({
@@ -71,7 +74,7 @@
       status: 'running'
     });
 
-    console.log('Created process with ID:', processId);
+    log.info('Created process', { processId, tabId });
     return tabId;
   }
 
@@ -82,7 +85,7 @@
 
   // Load existing project terminals on mount
   onMount(() => {
-    console.log('ProjectTerminal mounted for project:', projectId);
+    log.info('ProjectTerminal mounted', { projectId });
     
     // Clean up stale data on mount
     terminalActions.cleanupStaleData();
@@ -91,7 +94,7 @@
     if (tabs.length === 0) {
       createNewTerminalTab();
     } else {
-      console.log(`Restored ${tabs.length} existing terminal tabs for project ${projectId}`);
+      log.info('Restored existing terminal tabs', { count: tabs.length, projectId });
       
       // Ensure at least one tab is active
       if (!$terminalStore.activeTabId || !tabs.some(tab => tab.id === $terminalStore.activeTabId)) {
@@ -105,7 +108,7 @@
 
   // Cleanup project terminals when component is destroyed
   onDestroy(() => {
-    console.log('ProjectTerminal destroyed for project:', projectId);
+    log.info('ProjectTerminal destroyed', { projectId });
     // Note: We don't automatically close tabs here as the user might want to keep them
     // The tabs will be cleaned up when the project is closed or the app is closed
   });

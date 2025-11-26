@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { listen } from '@tauri-apps/api/event';
+  import { isTauriEnvironment } from '@/lib/utils/tauri';
   import CommandBlock from './CommandBlock.svelte';
   import { Button } from '@/lib/components/ui/button';
   import { Badge } from '@/lib/components/ui/badge';
@@ -32,29 +32,40 @@
   onMount(async () => {
     console.log('CommandBlocks mounted with processId:', processId);
     
-    // Listen for shell integration events
-    const shellIntegrationUnsubscribe = await listen('shell-integration-event', (event) => {
-      console.log('Shell integration event:', event.payload);
-      handleShellIntegrationEvent(event.payload as ShellIntegrationEvent);
-    });
+    if (!isTauriEnvironment()) {
+      console.warn('Tauri environment not available, skipping event listeners');
+      return;
+    }
     
-    // Also listen for terminal output to detect commands
-    const terminalOutputUnsubscribe = await listen('terminal-output', (event) => {
-      // console.log('Terminal output event received:', event.payload);
-      // If processId is empty, listen to all events for debugging
-      if (!processId || (event.payload as any).process_id === processId) {
-        // console.log('Processing terminal output (processId:', processId, ')');
-        handleTerminalOutput(event.payload as any);
-      } else {
-        // console.log('Process ID mismatch:', (event.payload as any).process_id, 'vs', processId);
-      }
-    });
-    
-    // Store both unsubscribe functions
-    unsubscribe = () => {
-      shellIntegrationUnsubscribe();
-      terminalOutputUnsubscribe();
-    };
+    try {
+      const { listen } = await import('@tauri-apps/api/event');
+      
+      // Listen for shell integration events
+      const shellIntegrationUnsubscribe = await listen('shell-integration-event', (event) => {
+        console.log('Shell integration event:', event.payload);
+        handleShellIntegrationEvent(event.payload as ShellIntegrationEvent);
+      });
+      
+      // Also listen for terminal output to detect commands
+      const terminalOutputUnsubscribe = await listen('terminal-output', (event) => {
+        // console.log('Terminal output event received:', event.payload);
+        // If processId is empty, listen to all events for debugging
+        if (!processId || (event.payload as any).process_id === processId) {
+          // console.log('Processing terminal output (processId:', processId, ')');
+          handleTerminalOutput(event.payload as any);
+        } else {
+          // console.log('Process ID mismatch:', (event.payload as any).process_id, 'vs', processId);
+        }
+      });
+      
+      // Store both unsubscribe functions
+      unsubscribe = () => {
+        shellIntegrationUnsubscribe();
+        terminalOutputUnsubscribe();
+      };
+    } catch (error) {
+      console.error('Failed to set up event listeners:', error);
+    }
     
     // Add a test command block for demonstration
     const testBlock = {

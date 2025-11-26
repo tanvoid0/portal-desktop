@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { invoke } from '@tauri-apps/api/core';
+	import { invokeClient } from '@/lib/utils/invokeClient';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/tabs';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/lib/components/ui/card';
 	import { Badge } from '@/lib/components/ui/badge';
@@ -76,16 +76,10 @@
 			serviceError = null;
 			
 			// Get real service information from backend
-			const info = await invoke('get_service_status', { sdkType: 'ollama' }) as any;
+			const info = await invokeClient.post('get_service_status', { sdkType: 'ollama' }) as any;
 			serviceInfo = info;
 			
 			log.info('Ollama service info loaded', info);
-			console.log('Service status details:', {
-				running: info.running,
-				status: info.status,
-				port: info.port,
-				pid: info.pid
-			});
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			serviceError = errorMessage;
@@ -102,8 +96,8 @@
 			versionsError = null;
 			
 			// Get real Ollama versions from GitHub API
-			const versionsData = await invoke('get_ollama_versions');
-			versions = versionsData as any[];
+			const versionsData = await invokeClient.post('get_ollama_versions') as any[];
+			versions = versionsData;
 			
 			log.info('Ollama versions loaded', versionsData);
 		} catch (error) {
@@ -124,7 +118,7 @@
 
 	async function loadModels() {
 		try {
-			console.log('Loading local models...', { serviceRunning: serviceInfo?.running });
+			log.debug('Loading local models', { serviceRunning: serviceInfo?.running });
 			modelsLoading = true;
 			modelsError = null;
 			
@@ -136,20 +130,16 @@
 			}
 			
 			// Get real installed Ollama models
-			console.log('Calling get_ollama_models...');
-			const modelsData = await invoke('get_ollama_models');
-			console.log('Received models data:', modelsData);
-			models = modelsData as any[];
+			const modelsData = await invokeClient.post('get_ollama_models') as any[];
+			models = modelsData;
 			
-			log.info('Ollama models loaded', modelsData);
-			console.log('Models array updated:', $state.snapshot(models));
+			log.info('Ollama models loaded', { count: modelsData.length });
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Failed to load models';
 			modelsError = errorMessage;
 			log.error('Failed to load Ollama models', error);
-			console.error('Error loading models:', error);
 			
-			// Show user-friendly error
+			// Show user-friendly error (toast already logs)
 			if (errorMessage.includes('not installed') || errorMessage.includes('program not found')) {
 				toast.error('Ollama Not Installed', 'Please install Ollama first to manage models.');
 			} else {
@@ -157,36 +147,31 @@
 			}
 		} finally {
 			modelsLoading = false;
-			console.log('Models loading finished:', { modelsLoading, modelsError, modelsCount: models.length });
 		}
 	}
 
 	async function loadAvailableModels() {
 		try {
-			console.log('Loading available models from library...');
+			log.debug('Loading available models from library');
 			modelsLoading = true;
 			modelsError = null;
 			
 			// Available models can be loaded without service running - they're from online library
 			// Get available models from Ollama library
-			console.log('Calling get_available_ollama_models...');
-			const availableModelsData = await invoke('get_available_ollama_models');
-			console.log('Received available models data:', availableModelsData);
-			availableModels = availableModelsData as Record<string, any[]>;
+			const availableModelsData = await invokeClient.post('get_available_ollama_models') as Record<string, any[]>;
+			availableModels = availableModelsData;
 			
-			log.info('Available Ollama models loaded', availableModelsData);
-			console.log('Available models array updated:', $state.snapshot(availableModels));
+			const totalModels = Object.values(availableModelsData).flat().length;
+			log.info('Available Ollama models loaded', { categories: Object.keys(availableModelsData).length, totalModels });
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Failed to load available models';
 			modelsError = errorMessage;
 			log.error('Failed to load available Ollama models', error);
-			console.error('Error loading available models:', error);
 			
-			// Show user-friendly error
+			// Show user-friendly error (toast already logs)
 			toast.error('Failed to Load Available Models', errorMessage);
 		} finally {
 			modelsLoading = false;
-			console.log('Available models loading finished:', { modelsLoading, modelsError, availableModelsCount: Object.keys(availableModels).length });
 		}
 	}
 
@@ -203,8 +188,7 @@
 			installationProgress = 0;
 			installationStatus = 'Starting download...';
 			
-			log.info('Installing model:', modelName);
-			console.log('Starting model installation:', modelName);
+			log.info('Starting model installation', { modelName });
 			
 			// Show initial progress
 			toast.info('Download Started', `Starting download of ${modelName}...`);
@@ -217,16 +201,16 @@
 			installationStatus = 'Downloading model from Ollama registry...';
 			installationProgress = 50;
 			
-			// Show honest status - this is a long-running operation
-			installationStatus = `Downloading ${modelName}... This may take several minutes for large models`;
-			
-			// Start the installation with a timeout
-			const installPromise = invoke('install_ollama_model', { modelName });
-			const timeoutPromise = new Promise((_, reject) => 
-				setTimeout(() => reject(new Error('Installation timeout - this may take several minutes for large models')), 300000) // 5 minutes
-			);
-			
-			const result = await Promise.race([installPromise, timeoutPromise]);
+		// Show honest status - this is a long-running operation
+		installationStatus = `Downloading ${modelName}... This may take several minutes for large models`;
+		
+		// Start the installation with a timeout
+		const installPromise = invokeClient.post('install_ollama_model', { modelName });
+		const timeoutPromise = new Promise((_, reject) => 
+			setTimeout(() => reject(new Error('Installation timeout - this may take several minutes for large models')), 300000) // 5 minutes
+		);
+		
+		const result = await Promise.race([installPromise, timeoutPromise]);
 			
 			// Installation completed
 			installationProgress = 100;
@@ -253,8 +237,7 @@
 	function cancelInstallation() {
 		if (installingModel) {
 			const modelName = installingModel;
-			log.info('Cancelling installation:', modelName);
-			console.log('Cancelling installation:', modelName);
+			log.info('Cancelling installation', { modelName });
 			
 			// Reset installation state
 			installingModel = null;
@@ -273,11 +256,11 @@
 				return;
 			}
 			
-			log.info('Removing model:', modelName);
-			const result = await invoke('remove_ollama_model', { modelName });
-			await loadModels(); // Refresh models list
-			log.info('Model removed successfully', { modelName, result });
-			toast.success('Model Removed', `${modelName} has been removed successfully`);
+		log.info('Removing model:', modelName);
+		const result = await invokeClient.post('remove_ollama_model', { modelName });
+		await loadModels(); // Refresh models list
+		log.info('Model removed successfully', { modelName, result });
+		toast.success('Model Removed', `${modelName} has been removed successfully`);
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			log.error('Failed to remove model', { modelName, error: errorMessage });
@@ -310,7 +293,7 @@
 	async function startService() {
 		try {
 			serviceError = null; // Clear any previous errors
-			const result = await invoke('start_service', { sdkType: 'ollama' });
+			const result = await invokeClient.post('start_service', { sdkType: 'ollama' });
 			
 			// Wait a moment for the service to start
 			await new Promise(resolve => setTimeout(resolve, 500));
@@ -360,7 +343,7 @@
 	async function stopService() {
 		try {
 			serviceError = null; // Clear any previous errors
-			const result = await invoke('stop_service', { sdkType: 'ollama' });
+			const result = await invokeClient.post('stop_service', { sdkType: 'ollama' });
 			
 			// Wait a moment for the service to fully stop
 			await new Promise(resolve => setTimeout(resolve, 500));
@@ -410,9 +393,9 @@
 	async function restartService() {
 		try {
 			// Stop first, then start
-			await invoke('stop_service', { sdkType: 'ollama' });
+			await invokeClient.post('stop_service', { sdkType: 'ollama' });
 			await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for graceful shutdown
-			await invoke('start_service', { sdkType: 'ollama' });
+			await invokeClient.post('start_service', { sdkType: 'ollama' });
 			await loadServiceInfo(); // Refresh service info
 			log.info('Ollama service restarted successfully');
 			toast.success('Service Restarted', 'Ollama service has been restarted');
@@ -445,7 +428,7 @@
 	async function checkUpdates() {
 		try {
 			log.info('Checking for Ollama updates...');
-			const result = await invoke('check_ollama_updates');
+			const result = await invokeClient.post('check_ollama_updates');
 			log.info('Update check result:', result);
 			// Show update status to user
 			toast.success('Update Check Complete', result ? String(result) : 'No updates available');
@@ -459,7 +442,7 @@
 	async function updateOllama() {
 		try {
 			log.info('Updating Ollama...');
-			const result = await invoke('update_ollama');
+			const result = await invokeClient.post('update_ollama');
 			log.info('Update result:', result);
 			toast.success('Ollama Updated', String(result));
 			// Refresh service info after update
@@ -819,7 +802,6 @@
 									size="sm"
 									onclick={() => {
 										modelTab = 'local';
-										console.log('Switched to local tab');
 										loadModels();
 									}}
 								>
@@ -829,9 +811,7 @@
 									variant={modelTab === 'library' ? 'default' : 'outline'} 
 									size="sm"
 									onclick={() => {
-										console.log('Library button clicked, current modelTab:', modelTab);
 										modelTab = 'library';
-										console.log('Switched to library tab, new modelTab:', modelTab);
 										loadAvailableModels();
 									}}
 								>

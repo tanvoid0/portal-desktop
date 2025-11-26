@@ -464,7 +464,7 @@ export class BlockLibraryService {
 			log.info('Block created', { id: block.id });
 			return block;
 		} catch (error) {
-			log.error('Failed to create block', error);
+			log.error('Failed to create block', { error });
 			throw error;
 		}
 	}
@@ -479,7 +479,7 @@ export class BlockLibraryService {
 			log.info('Block updated', { blockId });
 			return block;
 		} catch (error) {
-			log.error('Failed to update block', error);
+			log.error('Failed to update block', { error });
 			throw error;
 		}
 	}
@@ -493,7 +493,7 @@ export class BlockLibraryService {
 			await invoke('delete_block', { blockId });
 			log.info('Block deleted', { blockId });
 		} catch (error) {
-			log.error('Failed to delete block', error);
+			log.error('Failed to delete block', { error });
 			throw error;
 		}
 	}

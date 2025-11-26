@@ -21,13 +21,27 @@
 	import { terminalActions } from '@/lib/domains/terminal/stores/terminalStore';
 	import { learningService } from '@/lib/domains/learning';
 	import ToastContainer from '@/lib/components/ui/toast-container.svelte';
-	import { invoke } from '@tauri-apps/api/core';
-	import { ArrowLeft, ArrowRight, RefreshCw, Home } from 'lucide-svelte';
+	import QRCodeDialog from '@/lib/components/QRCodeDialog.svelte';
+	import DeviceApprovalDialog from '@/lib/components/DeviceApprovalDialog.svelte';
+	import DeviceAuthGuard from '@/lib/components/DeviceAuthGuard.svelte';
+	import { isTauriEnvironment, tauriInvoke } from '@/lib/utils/tauri';
+	import { InvokeClient } from '@/lib/utils/invokeClient';
+	import { ArrowLeft, ArrowRight, RefreshCw, Home, QrCode } from 'lucide-svelte';
 
 	const log = logger.createScoped('AppLayout');
 
 	// Get children snippet from props for Svelte 5
 	let { children }: { children: Snippet<[]> } = $props();
+
+	// Show QR code button in Tauri environment or when accessed via network IP (not localhost)
+	let isTauri = isTauriEnvironment();
+	let isLocalhost = $state(false);
+	let showQRButton = $derived(isTauri || !isLocalhost);
+	
+	// Check if accessing from localhost
+	$effect(() => {
+		isLocalhost = InvokeClient.isLocalhost();
+	});
 
 	// Dynamic navigation state
 	let currentNavigationSections: any[] = $state([]);
@@ -36,6 +50,8 @@
 	let isSdkPage = $derived($page.url.pathname.startsWith('/sdk'));
 	let runningServicesCount = $state(0);
 	let sdkSubmenuOpen = $state(false);
+	let qrCodeDialogOpen = $state(false);
+	let deviceApprovalDialogOpen = $state(false);
 
 	// Main application navigation sections - derived to react to runningServicesCount changes
 	const navigationSections = $derived([
@@ -117,7 +133,7 @@
 					url: '/projects',
 					icon: 'folder',
 					description: 'Project management',
-					badge: $projectStore.projects.length
+					badge: ($projectStore.projects ?? []).length
 				},
 				{
 					title: 'Tasks',
@@ -307,7 +323,10 @@
 			navigationLoading = true;
 			navigationError = null;
 			
-			const response = await invoke('get_sdk_navigation_items') as any;
+			let response: any = [];
+			if (isTauriEnvironment()) {
+				response = await tauriInvoke<any>('get_sdk_navigation_items');
+			}
 			currentNavigationSections = response.sections || [];
 		} catch (err) {
 			console.error('Failed to load SDK navigation:', err);
@@ -320,8 +339,13 @@
 
 	async function loadRunningServicesCount() {
 		try {
-			const result = await invoke('get_running_services_count') as number;
-			runningServicesCount = result || 0;
+			if (isTauriEnvironment()) {
+				const result = await tauriInvoke<number>('get_running_services_count');
+				runningServicesCount = result || 0;
+			} else {
+				// Browser environment - Tauri commands not available
+				runningServicesCount = 0;
+			}
 		} catch (err) {
 			console.error('Failed to load running services count:', err);
 			runningServicesCount = 0;
@@ -338,6 +362,7 @@
 	});
 </script>
 
+<DeviceAuthGuard>
 <div class="flex flex-col h-screen w-full min-h-0 overflow-hidden">
 	<!-- Top Bar -->
 	<header class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
@@ -585,53 +610,25 @@
 				</div>
 			{/each}
 			{/if}
-
-			{#if !isSdkPage}
-				<Separator class="my-4 mx-3" />
-
-				<div class="px-3 py-2">
-					<h2 class="px-2 text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider mb-1">
-						Quick Stats
-					</h2>
-					<div class="space-y-2">
-						<!-- Total Tasks -->
-						<div class="flex items-center justify-between px-2 py-1">
-							<span class="text-sm text-sidebar-foreground/70">Total Tasks</span>
-							<Badge variant="outline" class="text-xs">
-								{$taskStats.total}
-							</Badge>
-						</div>
-						
-						<!-- Completed Tasks -->
-						<div class="flex items-center justify-between px-2 py-1">
-							<span class="text-sm text-sidebar-foreground/70">Completed</span>
-							<Badge variant="outline" class="text-xs text-green-600">
-								{$taskStats.completed}
-							</Badge>
-						</div>
-						
-						<!-- Active Projects -->
-						<div class="flex items-center justify-between px-2 py-1">
-							<span class="text-sm text-sidebar-foreground/70">Projects</span>
-							<Badge variant="outline" class="text-xs">
-								{$projectStore.projects.length}
-							</Badge>
-						</div>
-					</div>
-				</div>
-			{/if}
 			</div>
 
 			<!-- Sidebar Footer -->
 			<div class="border-t p-4 flex-shrink-0">
-				<div class="flex items-center justify-between">
+				<div class="flex items-center justify-between gap-2">
 					<ThemeToggle />
-					<Button variant="ghost" size="sm" onclick={() => goto('/settings')}>
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-						</svg>
-					</Button>
+					<div class="flex items-center gap-1">
+						{#if showQRButton}
+							<Button variant="ghost" size="sm" onclick={() => qrCodeDialogOpen = true} title="Share via QR Code">
+								<QrCode class="w-4 h-4" />
+							</Button>
+						{/if}
+						<Button variant="ghost" size="sm" onclick={() => goto('/settings')} title="Settings">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+							</svg>
+						</Button>
+					</div>
 				</div>
 			</div>
 		</aside>
@@ -645,3 +642,12 @@
 
 <!-- Toast Container -->
 <ToastContainer />
+
+<!-- QR Code Dialog -->
+<QRCodeDialog bind:open={qrCodeDialogOpen} onDeviceRequest={() => deviceApprovalDialogOpen = true} />
+
+<!-- Device Approval Dialog -->
+{#if showQRButton}
+	<DeviceApprovalDialog bind:open={deviceApprovalDialogOpen} />
+{/if}
+</DeviceAuthGuard>

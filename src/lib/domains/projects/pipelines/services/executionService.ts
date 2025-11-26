@@ -40,7 +40,7 @@ export class ExecutionService {
 				}
 			});
 		} catch (error) {
-			log.error('Failed to setup execution event listeners', error);
+			log.error('Failed to setup execution event listeners', { error });
 		}
 	}
 
@@ -68,7 +68,7 @@ export class ExecutionService {
 			log.info('Pipeline execution started', { executionId: execution.id });
 			return execution;
 		} catch (error) {
-			log.error('Failed to execute pipeline', error);
+			log.error('Failed to execute pipeline', { error });
 			throw error;
 		}
 	}
@@ -83,7 +83,7 @@ export class ExecutionService {
 			});
 			return execution;
 		} catch (error) {
-			log.error('Failed to get execution', error);
+			log.error('Failed to get execution', { error });
 			throw error;
 		}
 	}
@@ -97,7 +97,7 @@ export class ExecutionService {
 			await invoke('cancel_pipeline_execution', { executionId });
 			log.info('Execution cancelled', { executionId });
 		} catch (error) {
-			log.error('Failed to cancel execution', error);
+			log.error('Failed to cancel execution', { error });
 			throw error;
 		}
 	}
@@ -126,7 +126,7 @@ export class ExecutionService {
 			});
 			return logs;
 		} catch (error) {
-			log.error('Failed to get step logs', error);
+			log.error('Failed to get step logs', { error });
 			return [];
 		}
 	}
@@ -140,7 +140,7 @@ export class ExecutionService {
 			await invoke('retry_step_execution', { executionId, stepId });
 			log.info('Step retry initiated', { executionId, stepId });
 		} catch (error) {
-			log.error('Failed to retry step', error);
+			log.error('Failed to retry step', { error });
 			throw error;
 		}
 	}

@@ -2,6 +2,7 @@ use std::process::Command;
 use std::time::Instant;
 use crate::domains::projects::pipelines::executors::{Executor, ExecutionRequest, ExecutionResult};
 
+#[allow(dead_code)]
 pub struct SDKExecutor {
     pub sdk_type: String,
     pub sdk_version: Option<String>,

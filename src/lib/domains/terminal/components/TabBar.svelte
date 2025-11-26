@@ -5,6 +5,9 @@
   import { Button } from '@/lib/components/ui/button';
   import Select from '@/lib/components/ui/select.svelte';
   import { onMount } from 'svelte';
+  import { logger } from '@/lib/domains/shared';
+
+  const log = logger.createScoped('TabBar');
 
   // Props
   interface Props {
@@ -41,19 +44,19 @@
   }
 
   function handleNewTab() {
-    console.log('TabBar: New tab button clicked');
+    // New tab button clicked
     if (onNewTab) {
-      console.log('TabBar: Calling onNewTab callback');
+      // Calling onNewTab callback
       onNewTab();
     } else {
-      console.log('TabBar: No onNewTab callback provided');
+      // No onNewTab callback provided
     }
   }
 
   async function loadSystemInfo() {
     try {
-      console.log('TabBar: Loading system info for profile selector');
-      systemInfo = await TerminalService.getSystemInfo();
+      // Loading system info for profile selector
+      systemInfo = await TerminalService.getSystemInfo() as any;
       
       if (systemInfo?.terminal_profiles) {
         // Extract available profiles from system info
@@ -89,18 +92,17 @@
         );
         
         availableProfiles = uniqueProfiles;
-        console.log('TabBar: Available profiles:', availableProfiles);
         
         // Set default profile
         if (availableProfiles.length > 0) {
           selectedProfile = availableProfiles[0].name;
         }
       } else {
-        console.log('TabBar: No terminal profiles found in system info');
+        // No terminal profiles found in system info
         availableProfiles = [];
       }
-    } catch (error) {
-      console.error('TabBar: Failed to load system info:', error);
+    } catch (error: any) {
+      log.error('Failed to load system info', { error });
       availableProfiles = [];
     }
   }
@@ -118,22 +120,22 @@
 
   function handleProfileChange(value: string) {
     selectedProfile = value;
-    console.log('TabBar: Profile changed to:', selectedProfile);
+    // Profile changed
   }
 
   function createNewTabWithProfile() {
-    console.log('TabBar: Creating new tab with profile:', selectedProfile);
+    // Creating new tab with profile
     
     // Find the profile and extract just the raw command
     const profile = availableProfiles.find(p => p.name === selectedProfile);
     
     if (profile) {
-      console.log('TabBar: Using raw shell command:', profile.command);
+      // Using raw shell command
       if (onNewTab) {
         onNewTab(profile.command); // Pass just the raw shell command
       }
     } else {
-      console.warn('TabBar: Profile not found:', selectedProfile);
+      // Profile not found
     }
   }
 

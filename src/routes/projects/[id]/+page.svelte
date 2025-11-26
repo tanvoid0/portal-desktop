@@ -29,7 +29,7 @@
 	} from '@lucide/svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/tabs';
 	import { ProjectTerminal } from '@/lib/domains/terminal';
-	import { projectService } from '@/lib/domains/projects/services/projectService';
+	import { projectService, projectStore } from '@/lib/domains/projects';
 	import { breadcrumbActions } from '@/lib/domains/shared/stores/breadcrumbStore';
 	import { logger } from '@/lib/domains/shared/services/logger';
 	import type { Project } from '@/lib/domains/projects/types';
@@ -41,7 +41,7 @@
 	const log = logger.createScoped('ProjectDetailsPage');
 
 	// Get project ID from URL
-	const projectId = $page.params.id;
+	const projectIdParam = $page.params.id;
 	
 	// State
 	let project = $state<Project | null>(null);
@@ -62,11 +62,46 @@
 	let currentExecution: PipelineExecution | null = $state(null);
 	let pipelinesLoading = $state(false);
 
+	// Validate and normalize project ID
+	function getValidProjectId(idParam: string | undefined): string | null {
+		if (!idParam) {
+			return null;
+		}
+
+		// Check if it's a valid numeric ID
+		const numericId = parseInt(idParam, 10);
+		if (!isNaN(numericId)) {
+			return String(numericId);
+		}
+
+		// If not numeric, try to find project by name
+		// This handles cases where the URL might have been constructed with a name
+		const projects = $projectStore.projects;
+		const projectByName = projects.find(p => p.name === idParam);
+		
+		if (projectByName) {
+			log.warn('Project ID was a name, redirecting to numeric ID', { 
+				name: idParam, 
+				id: projectByName.id 
+			});
+			// Redirect to the correct URL with numeric ID
+			goto(`/projects/${projectByName.id}`, { replaceState: true });
+			return projectByName.id;
+		}
+
+		return null;
+	}
+
 	// Load project details
 	async function loadProject() {
+		const projectId = getValidProjectId(projectIdParam);
+		
 		if (!projectId) {
-			error = 'Project ID is required';
+			error = 'Invalid project ID';
 			loading = false;
+			log.error('Invalid project ID', { projectIdParam });
+			// Redirect to projects list after a short delay
+			setTimeout(() => goto('/projects'), 2000);
 			return;
 		}
 
@@ -136,11 +171,13 @@
 	// Switch to terminal tab
 	function switchToTerminal() {
 		activeTab = 'terminal';
+		const projectId = getValidProjectId(projectIdParam);
 		log.info('Switched to terminal tab for project', { projectId });
 	}
 
 	// Refresh project metadata
 	async function handleRefreshMetadata() {
+		const projectId = getValidProjectId(projectIdParam);
 		if (!projectId || !project) return;
 
 		try {
@@ -164,6 +201,7 @@
 
 	// Toggle star status
 	async function handleToggleStar() {
+		const projectId = getValidProjectId(projectIdParam);
 		if (!projectId || !project) return;
 
 		try {
@@ -200,6 +238,7 @@
 
 	// Save inline edit
 	async function saveField(field: string) {
+		const projectId = getValidProjectId(projectIdParam);
 		if (!projectId || !project) return;
 
 		try {
@@ -229,6 +268,7 @@
 	}
 
 	async function loadPipelines() {
+		const projectId = getValidProjectId(projectIdParam);
 		if (!projectId) return;
 		pipelinesLoading = true;
 		try {
@@ -902,7 +942,10 @@
 						<div class="flex items-center justify-between">
 							<h2 class="text-xl font-semibold">Pipelines</h2>
 							<div class="flex gap-2">
-								<Button variant="outline" onclick={() => goto(`/projects/${projectId}/pipelines/new`)}>
+								<Button variant="outline" onclick={() => {
+									const projectId = getValidProjectId(projectIdParam);
+									if (projectId) goto(`/projects/${projectId}/pipelines/new`);
+								}}>
 									Create from Template
 								</Button>
 								<Button onclick={handleCreatePipeline}>Create Pipeline</Button>
@@ -912,7 +955,7 @@
 						{#if showBuilder}
 							<PipelineBuilder
 								pipeline={selectedPipeline || undefined}
-								projectId={projectId}
+								projectId={getValidProjectId(projectIdParam) || ''}
 								onSave={handleBuilderClose}
 								onCancel={handleBuilderClose}
 							/>

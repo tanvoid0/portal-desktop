@@ -33,8 +33,9 @@ impl ProjectService {
         name: String,
         description: Option<String>,
         path: String,
-        framework: Option<String>,
-        package_manager: Option<String>,
+        framework_ids: Vec<i32>,
+        package_manager_ids: Vec<i32>,
+        language_ids: Vec<i32>,
         build_command: Option<String>,
         start_command: Option<String>,
         test_command: Option<String>,
@@ -45,19 +46,13 @@ impl ProjectService {
         // Validate project path
         self.validate_project_path(&path).await?;
 
-        // Auto-detect framework if not provided
-        let detected_framework = if framework.is_none() {
-            self.detect_framework(&path).await.ok()
-        } else {
-            Some(framework)
-        };
-
         self.repository.create(
             name,
             description,
             path,
-            detected_framework.flatten(),
-            package_manager,
+            framework_ids,
+            package_manager_ids,
+            language_ids,
             build_command,
             start_command,
             test_command,
@@ -74,8 +69,9 @@ impl ProjectService {
         description: Option<String>,
         path: Option<String>,
         status: Option<String>,
-        framework: Option<String>,
-        package_manager: Option<String>,
+        framework_ids: Option<Vec<i32>>,
+        package_manager_ids: Option<Vec<i32>>,
+        language_ids: Option<Vec<i32>>,
         build_command: Option<String>,
         start_command: Option<String>,
         test_command: Option<String>,
@@ -89,8 +85,9 @@ impl ProjectService {
             description,
             path,
             status,
-            framework,
-            package_manager,
+            framework_ids,
+            package_manager_ids,
+            language_ids,
             build_command,
             start_command,
             test_command,
@@ -125,8 +122,9 @@ impl ProjectService {
                 None, // description
                 None, // path
                 None, // status
-                None, // framework
-                None, // package_manager
+                None, // framework_ids
+                None, // package_manager_ids
+                None, // language_ids
                 None, // build_command
                 None, // start_command
                 None, // test_command
@@ -160,8 +158,9 @@ impl ProjectService {
                 None, // description
                 None, // path
                 None, // status
-                None, // framework
-                None, // package_manager
+                None, // framework_ids
+                None, // package_manager_ids
+                None, // language_ids
                 None, // build_command
                 None, // start_command
                 None, // test_command
@@ -199,8 +198,9 @@ impl ProjectService {
                 None, // description
                 None, // path
                 None, // status
-                None, // framework
-                None, // package_manager
+                None, // framework_ids
+                None, // package_manager_ids
+                None, // language_ids
                 None, // build_command
                 None, // start_command
                 None, // test_command
@@ -265,16 +265,9 @@ impl ProjectService {
 
 
     pub async fn get_frameworks(&self) -> Result<Vec<String>, String> {
-        // Use repository methods instead of direct database access
-        let projects = self.repository.get_all().await?;
-        
-        let mut frameworks: Vec<String> = projects.into_iter()
-            .filter_map(|p| p.framework)
-            .collect();
-        
-        frameworks.sort();
-        frameworks.dedup();
-        Ok(frameworks)
+        // TODO: Load frameworks from junction tables using find_with_related
+        // For now, return empty since we're using many-to-many relationships
+        Ok(vec![])
     }
 
     pub async fn validate_project_path(&self, path: &str) -> Result<(), String> {
@@ -299,12 +292,25 @@ impl ProjectService {
         Ok(name)
     }
 
-    pub async fn detect_framework(&self, path: &str) -> Result<Option<String>, String> {
+    pub async fn detect_frameworks(&self, path: &str) -> Result<Vec<String>, String> {
         let path_obj = Path::new(path);
+        let mut frameworks = Vec::new();
         
-        // Check for common framework indicators
+        // Check for common framework indicators (check ALL, not just first)
         let framework_indicators = [
-            ("package.json", "Node.js"),
+            ("tauri.conf.json", "Tauri"),
+            ("angular.json", "Angular"),
+            ("vue.config.js", "Vue.js"),
+            ("next.config.js", "Next.js"),
+            ("nuxt.config.js", "Nuxt.js"),
+            ("svelte.config.js", "Svelte"),
+            ("svelte.config.ts", "Svelte"),
+            ("vite.config.js", "Vite"),
+            ("vite.config.ts", "Vite"),
+            ("webpack.config.js", "Webpack"),
+            ("remix.config.js", "Remix"),
+            ("gatsby-config.js", "Gatsby"),
+            ("package.json", "Node.js"), // Keep this for general Node.js detection
             ("requirements.txt", "Python"),
             ("pom.xml", "Java/Maven"),
             ("build.gradle", "Java/Gradle"),
@@ -312,43 +318,85 @@ impl ProjectService {
             ("go.mod", "Go"),
             ("composer.json", "PHP"),
             ("Gemfile", "Ruby"),
-            ("angular.json", "Angular"),
-            ("vue.config.js", "Vue.js"),
-            ("next.config.js", "Next.js"),
-            ("nuxt.config.js", "Nuxt.js"),
-            ("svelte.config.js", "Svelte"),
-            ("vite.config.js", "Vite"),
-            ("webpack.config.js", "Webpack"),
-            ("tsconfig.json", "TypeScript"),
             ("Dockerfile", "Docker"),
             ("docker-compose.yml", "Docker Compose"),
-            ("tauri.conf.json", "Tauri"),
         ];
 
         for (file, framework) in framework_indicators.iter() {
             if path_obj.join(file).exists() {
-                return Ok(Some((*framework).to_string()));
+                frameworks.push((*framework).to_string());
             }
         }
 
-        // Check for framework-specific directories
-        let framework_dirs = [
-            ("node_modules", "Node.js"),
-            ("vendor", "PHP"),
-            ("target", "Java/Maven"),
-            ("build", "Java/Gradle"),
-            ("dist", "Build Output"),
-            ("public", "Web Assets"),
-            ("src", "Source Code"),
+        // Check for framework-specific directories (only if no frameworks found yet)
+        if frameworks.is_empty() {
+            let framework_dirs = [
+                ("node_modules", "Node.js"),
+                ("vendor", "PHP"),
+                ("target", "Java/Maven"),
+                ("build", "Java/Gradle"),
+            ];
+
+            for (dir, framework) in framework_dirs.iter() {
+                if path_obj.join(dir).exists() {
+                    frameworks.push((*framework).to_string());
+                }
+            }
+        }
+
+        Ok(frameworks)
+    }
+
+    pub async fn detect_languages(&self, path: &str) -> Result<Vec<String>, String> {
+        let path_obj = Path::new(path);
+        let mut languages = Vec::new();
+        
+        // Language detection based on file extensions and config files
+        let language_indicators = [
+            ("Cargo.toml", "Rust"),
+            ("go.mod", "Go"),
+            ("package.json", "JavaScript"), // JavaScript if package.json exists
+            ("tsconfig.json", "TypeScript"),
+            ("requirements.txt", "Python"),
+            ("pom.xml", "Java"),
+            ("build.gradle", "Java"),
+            ("composer.json", "PHP"),
+            ("Gemfile", "Ruby"),
+            ("mix.exs", "Elixir"),
         ];
 
-        for (dir, framework) in framework_dirs.iter() {
-            if path_obj.join(dir).exists() {
-                return Ok(Some((*framework).to_string()));
+        for (file, language) in language_indicators.iter() {
+            if path_obj.join(file).exists() {
+                languages.push((*language).to_string());
             }
         }
 
-        Ok(None)
+        // Also check for source files in common directories (more efficient than scanning all files)
+        let source_dirs = ["src", "src-tauri/src", "lib", "app"];
+        for dir in &source_dirs {
+            let dir_path = path_obj.join(dir);
+            if dir_path.is_dir() {
+                if let Ok(entries) = std::fs::read_dir(&dir_path) {
+                    for entry in entries.flatten().take(20) { // Limit to first 20 files for performance
+                        if let Some(ext) = entry.path().extension().and_then(|e| e.to_str()) {
+                            match ext {
+                                "rs" if !languages.contains(&"Rust".to_string()) => languages.push("Rust".to_string()),
+                                "go" if !languages.contains(&"Go".to_string()) => languages.push("Go".to_string()),
+                                "js" if !languages.contains(&"JavaScript".to_string()) => languages.push("JavaScript".to_string()),
+                                "ts" | "tsx" if !languages.contains(&"TypeScript".to_string()) => languages.push("TypeScript".to_string()),
+                                "py" if !languages.contains(&"Python".to_string()) => languages.push("Python".to_string()),
+                                "java" if !languages.contains(&"Java".to_string()) => languages.push("Java".to_string()),
+                                "php" if !languages.contains(&"PHP".to_string()) => languages.push("PHP".to_string()),
+                                "rb" if !languages.contains(&"Ruby".to_string()) => languages.push("Ruby".to_string()),
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(languages)
     }
 
     pub async fn analyze_project_directory(&self, path: &str) -> Result<ProjectAnalysis, String> {
@@ -364,26 +412,33 @@ impl ProjectService {
         // Format name with proper capitalization and spaces
         let formatted_name = self.format_project_name(&name);
 
-        // Detect framework
-        let framework = self.detect_framework(path).await.ok().flatten();
+        // Detect multiple frameworks
+        let frameworks = self.detect_frameworks(path).await.unwrap_or_default();
 
+        // Detect multiple languages
+        let languages = self.detect_languages(path).await.unwrap_or_default();
 
-        // Detect package manager
-        let package_manager = self.detect_package_manager(path).await;
+        // Detect multiple package managers
+        let package_managers = self.detect_package_managers(path).await;
+
+        // For backward compatibility with command detection, use first framework/package manager
+        let primary_framework = frameworks.first().cloned();
+        let primary_package_manager = package_managers.first().cloned();
 
         // Detect build/start/test commands
-        let (build_command, start_command, test_command) = self.detect_commands(path, &framework, &package_manager).await;
+        let (build_command, start_command, test_command) = self.detect_commands(path, &primary_framework, &primary_package_manager).await;
 
         // Detect output directory
-        let output_directory = self.detect_output_directory(path, &framework).await;
+        let output_directory = self.detect_output_directory(path, &primary_framework).await;
 
         // Detect ports
-        let (dev_port, prod_port) = self.detect_ports(path, &framework).await;
+        let (dev_port, prod_port) = self.detect_ports(path, &primary_framework).await;
 
         Ok(ProjectAnalysis {
             name: formatted_name,
-            framework,
-            package_manager,
+            frameworks,
+            languages,
+            package_managers,
             build_command,
             start_command,
             test_command,
@@ -414,44 +469,46 @@ impl ProjectService {
     }
 
 
-    async fn detect_package_manager(&self, path: &str) -> Option<String> {
+    async fn detect_package_managers(&self, path: &str) -> Vec<String> {
         use std::path::Path;
         
         let path_obj = Path::new(path);
+        let mut package_managers = Vec::new();
         
+        // Check for all package manager indicators (not just first)
         if path_obj.join("package-lock.json").exists() {
-            return Some("npm".to_string());
+            package_managers.push("npm".to_string());
         }
         
         if path_obj.join("yarn.lock").exists() {
-            return Some("yarn".to_string());
+            package_managers.push("yarn".to_string());
         }
         
         if path_obj.join("pnpm-lock.yaml").exists() {
-            return Some("pnpm".to_string());
+            package_managers.push("pnpm".to_string());
         }
         
         if path_obj.join("requirements.txt").exists() {
-            return Some("pip".to_string());
+            package_managers.push("pip".to_string());
         }
         
         if path_obj.join("Cargo.toml").exists() {
-            return Some("cargo".to_string());
+            package_managers.push("cargo".to_string());
         }
         
         if path_obj.join("go.mod").exists() {
-            return Some("go".to_string());
+            package_managers.push("go".to_string());
         }
         
         if path_obj.join("composer.json").exists() {
-            return Some("composer".to_string());
+            package_managers.push("composer".to_string());
         }
         
         if path_obj.join("Gemfile").exists() {
-            return Some("bundle".to_string());
+            package_managers.push("bundle".to_string());
         }
         
-        None
+        package_managers
     }
 
     async fn detect_commands(&self, path: &str, _framework: &Option<String>, package_manager: &Option<String>) -> (Option<String>, Option<String>, Option<String>) {
@@ -590,12 +647,9 @@ impl ProjectService {
         let total_size: i64 = projects.iter().map(|p| p.size).sum();
         
         // Count frameworks
-        let mut framework_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-        for project in &projects {
-            if let Some(framework) = &project.framework {
-                *framework_counts.entry(framework.clone()).or_insert(0) += 1;
-            }
-        }
+        // TODO: Load frameworks from junction tables using find_with_related
+        // For now, return empty since we're using many-to-many relationships
+        let framework_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
         
         let most_used_framework = framework_counts.iter()
             .max_by_key(|(_, count)| *count)

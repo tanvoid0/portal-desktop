@@ -24,8 +24,9 @@ pub async fn create_project(
     name: String,
     description: Option<String>,
     path: String,
-    framework: Option<String>,
-    package_manager: Option<String>,
+    framework_ids: Option<Vec<i32>>,
+    package_manager_ids: Option<Vec<i32>>,
+    language_ids: Option<Vec<i32>>,
     build_command: Option<String>,
     start_command: Option<String>,
     test_command: Option<String>,
@@ -39,8 +40,9 @@ pub async fn create_project(
         name,
         description,
         path,
-        framework,
-        package_manager,
+        framework_ids.unwrap_or_default(),
+        package_manager_ids.unwrap_or_default(),
+        language_ids.unwrap_or_default(),
         build_command,
         start_command,
         test_command,
@@ -57,8 +59,9 @@ pub async fn update_project(
     description: Option<String>,
     path: Option<String>,
     status: Option<String>,
-    framework: Option<String>,
-    package_manager: Option<String>,
+    framework_ids: Option<Vec<i32>>,
+    package_manager_ids: Option<Vec<i32>>,
+    language_ids: Option<Vec<i32>>,
     build_command: Option<String>,
     start_command: Option<String>,
     test_command: Option<String>,
@@ -74,8 +77,9 @@ pub async fn update_project(
         description,
         path,
         status,
-        framework,
-        package_manager,
+        framework_ids,
+        package_manager_ids,
+        language_ids,
         build_command,
         start_command,
         test_command,
@@ -167,9 +171,9 @@ pub async fn generate_project_name(
 pub async fn detect_framework(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>
-) -> Result<Option<String>, String> {
+) -> Result<Vec<String>, String> {
     let service = ProjectService::new(&db_manager);
-    service.detect_framework(&path).await
+    service.detect_frameworks(&path).await
 }
 
 #[command]

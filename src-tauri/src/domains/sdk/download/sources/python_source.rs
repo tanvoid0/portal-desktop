@@ -12,13 +12,17 @@ use std::collections::HashMap;
 #[derive(Deserialize)]
 struct GitHubRelease {
     tag_name: String,
+    #[allow(dead_code)]
     published_at: String,
+    #[allow(dead_code)]
     assets: Vec<GitHubAsset>,
 }
 
 #[derive(Deserialize)]
 struct GitHubAsset {
+    #[allow(dead_code)]
     name: String,
+    #[allow(dead_code)]
     browser_download_url: String,
 }
 

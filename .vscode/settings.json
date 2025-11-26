@@ -1,17 +1,40 @@
 {
-  "css.lint.unknownAtRules": "ignore",
-  "scss.lint.unknownAtRules": "ignore",
-  "less.lint.unknownAtRules": "ignore",
-  "css.validate": false,
-  "scss.validate": false,
-  "less.validate": false,
-  "tailwindCSS.includeLanguages": {
-    "svelte": "html"
-  },
-  "tailwindCSS.experimental.classRegex": [
-    ["class:list=\\{([^}]*)\\}", "'([^']*)'"],
-    ["class:list=\\{([^}]*)\\}", "\"([^\"]*)\""],
-    ["class=\\{([^}]*)\\}", "'([^']*)'"],
-    ["class=\\{([^}]*)\\}", "\"([^\"]*)\""]
-  ]
+	"code-runner.executorMap": {
+		"javascript": "node",
+		"typescript": "ts-node",
+		"shellscript": "bash",
+		"rust": "cd $dir && cargo run",
+		"json": "node"
+	},
+	"code-runner.executorMapByFileExtension": {
+		".js": "node",
+		".ts": "ts-node",
+		".mjs": "node",
+		".cjs": "node",
+		".sh": "bash",
+		".bash": "bash",
+		".zsh": "zsh",
+		".rs": "cd $dir && cargo run",
+		".json": "node"
+	},
+	"code-runner.executorMapByGlob": {
+		"package.json": "cd $dir && pnpm run",
+		"*.test.ts": "cd $dir && pnpm test:unit",
+		"*.test.js": "cd $dir && pnpm test:unit",
+		"*.spec.ts": "cd $dir && pnpm test:unit",
+		"*.spec.js": "cd $dir && pnpm test:unit",
+		"scripts/*.sh": "cd $dir && bash",
+		"scripts/*.js": "cd $dir && node"
+	},
+	"code-runner.runInTerminal": true,
+	"code-runner.saveFileBeforeRun": true,
+	"code-runner.clearPreviousOutput": true,
+	"code-runner.saveAllFilesBeforeRun": false,
+	"code-runner.fileDirectoryAsCwd": true,
+	"code-runner.showExecutionMessage": true,
+	"code-runner.preserveFocus": false,
+	"code-runner.showIcon": true,
+	"code-runner.ignoreSelection": false,
+	"code-runner.customCommand": "",
+	"code-runner.terminalRoot": "/"
 }

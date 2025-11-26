@@ -313,8 +313,10 @@ impl AIProvider for OllamaProvider {
         struct ModelInfo {
             model: String,
             #[serde(default)]
+            #[allow(dead_code)]
             size: Option<u64>,
             #[serde(default)]
+            #[allow(dead_code)]
             digest: Option<String>,
         }
 

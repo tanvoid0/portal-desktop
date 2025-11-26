@@ -2,6 +2,7 @@ use std::process::Command;
 use std::time::Instant;
 use crate::domains::projects::pipelines::executors::{Executor, ExecutionRequest, ExecutionResult};
 
+#[allow(dead_code)]
 pub struct DockerExecutor {
     pub image: String,
     pub dockerfile: Option<String>,

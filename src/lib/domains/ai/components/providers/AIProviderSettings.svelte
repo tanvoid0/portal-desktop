@@ -15,7 +15,7 @@
 	import { toastActions } from '$lib/domains/shared/stores/toastStore';
 	import { aiProviderService } from '../../services/aiProviderService.js';
 	import type { ProviderConfig, ProviderType, ConfigurationStatus } from '../../types/index.js';
-	import { invoke } from '@tauri-apps/api/core';
+	import { invokeClient } from '$lib/utils/invokeClient';
 	import { 
 		Brain, 
 		CheckCircle2, 
@@ -310,7 +310,7 @@
 		try {
 			toastActions.info('Installing model', `Starting download of ${modelName}... This may take several minutes.`);
 			
-			await invoke('install_ollama_model', { modelName });
+			await invokeClient.post('install_ollama_model', { modelName });
 			
 			// Wait a moment for installation to complete
 			await new Promise(resolve => setTimeout(resolve, 2000));

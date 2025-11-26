@@ -4,7 +4,7 @@
  */
 
 import { writable } from 'svelte/store';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeClient } from '@/lib/utils/invokeClient';
 
 export interface TerminalSession {
   tab_id: string;
@@ -37,7 +37,7 @@ function createSessionStore() {
     
     saveSession: async (session: TerminalSession) => {
       try {
-        await invoke('save_terminal_session', { session });
+        await invokeClient.request('save_terminal_session', { data: { session } });
         update(state => ({
           ...state,
           sessions: {
@@ -53,7 +53,7 @@ function createSessionStore() {
     
     loadSession: async (tabId: string): Promise<TerminalSession | null> => {
       try {
-        const session = await invoke<TerminalSession | null>('load_terminal_session', { tabId });
+        const session = await invokeClient.request<TerminalSession | null>('load_terminal_session', { data: { tabId } });
         if (session) {
           update(state => ({
             ...state,
@@ -74,7 +74,7 @@ function createSessionStore() {
     
     deleteSession: async (tabId: string) => {
       try {
-        await invoke('delete_terminal_session', { tabId });
+        await invokeClient.request('delete_terminal_session', { data: { tabId } });
         update(state => {
           const newSessions = { ...state.sessions };
           delete newSessions[tabId];
@@ -92,7 +92,7 @@ function createSessionStore() {
     
     listSessions: async (): Promise<string[]> => {
       try {
-        const tabIds = await invoke<string[]>('list_terminal_sessions');
+        const tabIds = await invokeClient.request<string[]>('list_terminal_sessions');
         return tabIds;
       } catch (error) {
         console.error('Failed to list sessions:', error);
@@ -102,7 +102,7 @@ function createSessionStore() {
     
     clearAllSessions: async () => {
       try {
-        await invoke('clear_all_sessions');
+        await invokeClient.request('clear_all_sessions');
         update(state => ({
           ...state,
           sessions: {},

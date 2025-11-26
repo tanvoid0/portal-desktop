@@ -4,7 +4,10 @@
   import TabContainer from './TabContainer.svelte';
   import Terminal from './Terminal.svelte';
   import { Button } from '@/lib/components/ui/button';
+  import { logger } from '@/lib/domains/shared';
   import type { TerminalConfig } from '../types';
+
+  const log = logger.createScoped('TerminalTabContainer');
 
   // Props
   export let settings: TerminalConfig = {
@@ -25,9 +28,9 @@
   $: activeTab = $terminalStore.activeTabId;
 
   function createNewTerminalTab(shellCommand?: string) {
-    console.log('Creating new terminal tab with shell command:', shellCommand);
+    log.debug('Creating new terminal tab', { shellCommand });
     const tabNumber = tabs.length + 1;
-    console.log('Current tabs:', tabs.length, 'New tab number:', tabNumber);
+    log.debug('Tab creation', { currentTabs: tabs.length, newTabNumber: tabNumber });
     
     // Use the provided shell command or fallback to default shell
     const actualShellCommand = shellCommand || settings.defaultShell;
@@ -42,7 +45,7 @@
       // No resourceName or resourceId - this is a global terminal
     });
 
-    console.log('Created tab with ID:', tabId, 'using shell:', actualShellCommand);
+    log.info('Created tab', { tabId, shell: actualShellCommand });
 
     // Create a process for the new tab
     const processId = terminalActions.createProcess({
@@ -53,7 +56,7 @@
       status: 'running'
     });
 
-    console.log('Created process with ID:', processId);
+    log.info('Created process', { processId });
     return tabId;
   }
 

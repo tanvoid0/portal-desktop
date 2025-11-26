@@ -14,7 +14,7 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import { toastActions } from '$lib/domains/shared/stores/toastStore';
 	import { aiProviderService, type ProviderConfig, type ProviderType, type ConfigurationStatus } from '$lib/domains/shared/services/aiProviderService';
-	import { invoke } from '@tauri-apps/api/core';
+	import { invokeClient } from '$lib/utils/invokeClient';
 	import { 
 		Brain, 
 		CheckCircle2, 
@@ -211,7 +211,7 @@
 		
 		isCheckingStatus = true;
 		try {
-			const status = await invoke<{ running: boolean; status: string; port?: number; pid?: number }>('get_service_status', {
+			const status = await invokeClient.post<{ running: boolean; status: string; port?: number; pid?: number }>('get_service_status', {
 				sdkType: 'ollama'
 			});
 			serviceStatus = status;
@@ -309,7 +309,7 @@
 		try {
 			toastActions.info('Installing model', `Starting download of ${modelName}... This may take several minutes.`);
 			
-			await invoke('install_ollama_model', { modelName });
+			await invokeClient.post('install_ollama_model', { modelName });
 			
 			// Wait a moment for installation to complete
 			await new Promise(resolve => setTimeout(resolve, 2000));

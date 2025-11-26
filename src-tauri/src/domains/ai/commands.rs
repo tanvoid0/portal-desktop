@@ -20,7 +20,7 @@ use crate::domains::ai::entities::ai_conversation::Column as ConversationColumn;
 use crate::domains::ai::entities::ai_conversation_message::Column as ConversationMessageColumn;
 
 // Import logger macros
-use crate::{log_debug, log_info, log_warn, log_error};
+use crate::{log_debug, log_info, log_error};
 
 /// Get configuration status for a provider
 #[tauri::command]
@@ -210,7 +210,7 @@ pub async fn ai_send_message_stream(
     message: String,
     history: Vec<chat::ChatMessage>,
     provider: Option<ProviderType>,
-    conversation_id: Option<String>,
+    #[allow(unused_variables)] conversation_id: Option<String>,
     temperature: Option<f64>,
     max_tokens: Option<u32>,
     model: Option<String>,

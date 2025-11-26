@@ -69,6 +69,7 @@ pub enum WorkflowTrigger {
 pub struct WorkflowContext {
     pub project_path: Option<PathBuf>,
     pub variables: HashMap<String, String>,
+    #[allow(dead_code)]
     pub trigger_data: Option<serde_json::Value>,
 }
 

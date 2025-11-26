@@ -138,7 +138,7 @@ impl CliService {
     /// Stop a process
     pub async fn stop_process(&self, deployment_id: &str) -> Result<(), String> {
         // Remove child from HashMap first, then release lock before await
-        let mut child_opt = {
+        let child_opt = {
             let mut processes = self.processes.lock().unwrap();
             processes.remove(deployment_id).map(|(child, _)| child)
         }; // Lock is released here

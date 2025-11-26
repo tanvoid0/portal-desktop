@@ -5,6 +5,8 @@ pub mod automation;
 pub mod deployments;
 pub mod credentials;
 pub mod ide;
+pub mod package_managers;
+pub mod languages;
 pub mod settings;
 pub mod sdk;
 pub mod learning;
@@ -15,6 +17,7 @@ pub mod documents;
 pub mod ai;
 pub mod custom_scripts;
 pub mod updates;
+pub mod network;
 
 // Future domains will be added here:
 // pub mod notifications;

@@ -14,6 +14,7 @@ pub struct MemoryManager {
     // Limits
     max_events: usize,
     max_patterns_per_type: usize,
+    #[allow(dead_code)]
     max_preferences_per_type: usize,
 }
 

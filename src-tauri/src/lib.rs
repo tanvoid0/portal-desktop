@@ -60,7 +60,7 @@ pub fn run() {
             
             // Use block_on to make the async initialization synchronous
             let db_manager = tauri::async_runtime::block_on(async {
-                DatabaseManager::new(&app_handle)
+                DatabaseManager::new()
                     .await
                     .expect("Failed to initialize database manager")
             });
@@ -334,6 +334,18 @@ pub fn run() {
             domains::ide::commands::create_framework,
             domains::ide::commands::update_framework,
             domains::ide::commands::delete_framework,
+            // Package manager commands
+            domains::package_managers::commands::get_suggested_package_managers,
+            domains::package_managers::commands::get_all_package_managers,
+            domains::package_managers::commands::create_package_manager,
+            domains::package_managers::commands::update_package_manager,
+            domains::package_managers::commands::delete_package_manager,
+            // Language commands
+            domains::languages::commands::get_suggested_languages,
+            domains::languages::commands::get_all_languages,
+            domains::languages::commands::create_language,
+            domains::languages::commands::update_language,
+            domains::languages::commands::delete_language,
             // Learning commands
             domains::learning::commands::record_learning_event,
             domains::learning::commands::learn_pattern,
@@ -437,6 +449,14 @@ pub fn run() {
             domains::custom_scripts::commands::select_file,
             // Update commands
             domains::updates::commands::get_app_version_command,
+            // Network commands
+            domains::network::commands::get_local_network_ip,
+            domains::network::commands::generate_device_passcode,
+            domains::network::commands::verify_device_passcode,
+            domains::network::commands::approve_device,
+            domains::network::commands::verify_access_token,
+            domains::network::commands::get_pending_device_approvals,
+            domains::network::commands::get_device_status,
         ])
         .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
         .expect("error while running tauri application");

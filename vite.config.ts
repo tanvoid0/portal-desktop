@@ -31,7 +31,11 @@ export default defineConfig({
 	server: {
 		port: 1420,
 		strictPort: true,
-		host: host || false,
+		// Allow network access for QR code sharing feature
+		// Set TAURI_DEV_HOST environment variable to your local IP for network access
+		// Example: TAURI_DEV_HOST=192.168.1.100 pnpm dev
+		// Or set to '0.0.0.0' to allow access from any network interface
+		host: host || '0.0.0.0',
 		hmr: host
 			? {
 					protocol: 'ws',

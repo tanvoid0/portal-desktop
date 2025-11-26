@@ -29,12 +29,28 @@ export class PipelineService {
 	 */
 	async getPipelines(projectId: string): Promise<Pipeline[]> {
 		try {
-			log.info('Loading pipelines', { projectId });
-			const pipelines = await invoke<Pipeline[]>('get_pipelines', { projectId });
-			log.info('Pipelines loaded', { projectId, count: pipelines.length });
+			if (!projectId) {
+				throw new Error('Project ID is required');
+			}
+			
+			const projectIdInt = parseInt(projectId, 10);
+			if (isNaN(projectIdInt)) {
+				throw new Error(`Invalid project ID: ${projectId}`);
+			}
+			
+			log.info('Loading pipelines', { projectId: projectIdInt });
+			const pipelines = await invoke<Pipeline[]>('get_pipelines', { 
+				projectId: projectIdInt 
+			});
+			log.info('Pipelines loaded', { projectId: projectIdInt, count: pipelines.length });
 			return pipelines;
 		} catch (error) {
-			log.error('Failed to load pipelines', error);
+			// Extract error message properly for logging
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			log.error('Failed to load pipelines', { 
+				error: errorMessage,
+				projectId 
+			});
 			throw error;
 		}
 	}
@@ -49,7 +65,7 @@ export class PipelineService {
 			log.info('Pipeline loaded', { pipelineId, found: !!pipeline });
 			return pipeline;
 		} catch (error) {
-			log.error('Failed to load pipeline', error);
+			log.error('Failed to load pipeline', { error });
 			throw error;
 		}
 	}
@@ -64,7 +80,7 @@ export class PipelineService {
 			log.info('Pipeline created', { id: pipeline.id });
 			return pipeline;
 		} catch (error) {
-			log.error('Failed to create pipeline', error);
+			log.error('Failed to create pipeline', { error });
 			throw error;
 		}
 	}
@@ -79,7 +95,7 @@ export class PipelineService {
 			log.info('Pipeline updated', { pipelineId });
 			return pipeline;
 		} catch (error) {
-			log.error('Failed to update pipeline', error);
+			log.error('Failed to update pipeline', { error });
 			throw error;
 		}
 	}
@@ -93,7 +109,7 @@ export class PipelineService {
 			await invoke('delete_pipeline', { pipelineId });
 			log.info('Pipeline deleted', { pipelineId });
 		} catch (error) {
-			log.error('Failed to delete pipeline', error);
+			log.error('Failed to delete pipeline', { error });
 			throw error;
 		}
 	}
@@ -108,7 +124,7 @@ export class PipelineService {
 			log.info('Pipeline execution started', { executionId: execution.id });
 			return execution;
 		} catch (error) {
-			log.error('Failed to execute pipeline', error);
+			log.error('Failed to execute pipeline', { error });
 			throw error;
 		}
 	}
@@ -124,7 +140,7 @@ export class PipelineService {
 			});
 			return execution;
 		} catch (error) {
-			log.error('Failed to load execution', error);
+			log.error('Failed to load execution', { error });
 			throw error;
 		}
 	}
@@ -140,7 +156,7 @@ export class PipelineService {
 			});
 			return executions;
 		} catch (error) {
-			log.error('Failed to load executions', error);
+			log.error('Failed to load executions', { error });
 			throw error;
 		}
 	}
@@ -154,7 +170,7 @@ export class PipelineService {
 			await invoke('cancel_pipeline_execution', { executionId });
 			log.info('Execution cancelled', { executionId });
 		} catch (error) {
-			log.error('Failed to cancel execution', error);
+			log.error('Failed to cancel execution', { error });
 			throw error;
 		}
 	}
@@ -172,7 +188,7 @@ export class PipelineService {
 			log.info('Pipeline duplicated', { originalId: pipelineId, newId: pipeline.id });
 			return pipeline;
 		} catch (error) {
-			log.error('Failed to duplicate pipeline', error);
+			log.error('Failed to duplicate pipeline', { error });
 			throw error;
 		}
 	}
@@ -186,7 +202,7 @@ export class PipelineService {
 			await invoke('set_pipeline_enabled', { pipelineId, enabled });
 			log.info('Pipeline enabled state updated', { pipelineId, enabled });
 		} catch (error) {
-			log.error('Failed to set pipeline enabled state', error);
+			log.error('Failed to set pipeline enabled state', { error });
 			throw error;
 		}
 	}

@@ -8,9 +8,8 @@ use sea_orm_migration::prelude::*;
 /// - description: Project description (optional)
 /// - path: File system path to the project
 /// - status: Project status (active, inactive, etc.)
-/// - framework: Detected or manually set framework (optional)
-/// - package_manager: Package manager used (npm, yarn, pnpm, etc.)
 /// - build_command: Build command for the project
+/// Note: Frameworks, languages, and package managers are linked via junction tables
 /// - start_command: Start command for the project
 /// - test_command: Test command for the project
 /// - output_directory: Output directory for builds
@@ -50,8 +49,6 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Projects::Description).string().null())
                     .col(ColumnDef::new(Projects::Path).string().not_null())
                     .col(ColumnDef::new(Projects::Status).string().not_null().default("active"))
-                    .col(ColumnDef::new(Projects::Framework).string().null())
-                    .col(ColumnDef::new(Projects::PackageManager).string().null())
                     .col(ColumnDef::new(Projects::BuildCommand).string().null())
                     .col(ColumnDef::new(Projects::StartCommand).string().null())
                     .col(ColumnDef::new(Projects::TestCommand).string().null())
@@ -90,8 +87,6 @@ enum Projects {
     Description,
     Path,
     Status,
-    Framework,
-    PackageManager,
     BuildCommand,
     StartCommand,
     TestCommand,
@@ -111,3 +106,4 @@ enum Projects {
     CreatedAt,
     UpdatedAt,
 }
+
