@@ -400,6 +400,336 @@ class PipelineTemplateService {
 			},
 			tags: ['docker', 'deploy'],
 		});
+
+		// Spring Boot - Maven Templates
+		this.addTemplate({
+			key: 'spring-boot-maven-full',
+			name: 'Spring Boot Maven Full Pipeline',
+			description: 'Complete Spring Boot CI/CD pipeline with Maven (clean, test, build, package, docker)',
+			framework: 'spring-boot',
+			category: 'ci-cd',
+			packageManager: 'maven',
+			steps: [
+				{
+					key: 'maven-clean',
+					name: 'Maven Clean',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn clean' },
+					enabled: true,
+				},
+				{
+					key: 'maven-compile',
+					name: 'Maven Compile',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn compile' },
+					dependsOn: ['maven-clean'],
+					enabled: true,
+				},
+				{
+					key: 'maven-test',
+					name: 'Maven Test',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn test' },
+					dependsOn: ['maven-compile'],
+					enabled: true,
+				},
+				{
+					key: 'maven-package',
+					name: 'Maven Package',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn package -DskipTests' },
+					dependsOn: ['maven-test'],
+					enabled: true,
+				},
+				{
+					key: 'docker-build',
+					name: 'Build Docker Image',
+					type: PipelineStepType.DOCKER_COMMAND,
+					config: {
+						image: '${PROJECT_NAME}:${BUILD_NUMBER}',
+						buildContext: '${PROJECT_PATH}',
+						dockerfilePath: 'Dockerfile',
+					},
+					dependsOn: ['maven-package'],
+					enabled: true,
+				},
+				{
+					key: 'manual-verification',
+					name: 'Manual Verification',
+					type: PipelineStepType.MANUAL_APPROVAL,
+					config: {
+						message: 'Please verify the build artifacts and Docker image before deployment. Review test results, build logs, and image contents.',
+					},
+					dependsOn: ['docker-build'],
+					enabled: true,
+					requiresApproval: true,
+					approvalMessage: 'Please verify the build artifacts and Docker image before deployment. Review test results, build logs, and image contents.',
+				},
+			],
+			variables: [
+				{ name: 'JAVA_VERSION', type: 'string', defaultValue: '17', description: 'Java version' },
+				{ name: 'SPRING_PROFILE', type: 'string', defaultValue: 'prod', description: 'Spring profile' },
+				{ name: 'BUILD_NUMBER', type: 'string', defaultValue: '${GIT_COMMIT_SHORT}', description: 'Build number' },
+			],
+			executionContext: {
+				type: 'sdk',
+				sdkType: 'java',
+				sdkVersion: '${JAVA_VERSION}',
+				workingDirectory: '${PROJECT_PATH}',
+			},
+			tags: ['spring-boot', 'maven', 'java', 'ci-cd', 'docker'],
+		});
+
+		// Spring Boot - Gradle Templates
+		this.addTemplate({
+			key: 'spring-boot-gradle-full',
+			name: 'Spring Boot Gradle Full Pipeline',
+			description: 'Complete Spring Boot CI/CD pipeline with Gradle (clean, test, build, bootJar, docker)',
+			framework: 'spring-boot',
+			category: 'ci-cd',
+			packageManager: 'gradle',
+			steps: [
+				{
+					key: 'gradle-clean',
+					name: 'Gradle Clean',
+					type: PipelineStepType.COMMAND,
+					config: { command: './gradlew clean' },
+					enabled: true,
+				},
+				{
+					key: 'gradle-test',
+					name: 'Gradle Test',
+					type: PipelineStepType.COMMAND,
+					config: { command: './gradlew test' },
+					dependsOn: ['gradle-clean'],
+					enabled: true,
+				},
+				{
+					key: 'gradle-bootJar',
+					name: 'Gradle BootJar',
+					type: PipelineStepType.COMMAND,
+					config: { command: './gradlew bootJar' },
+					dependsOn: ['gradle-test'],
+					enabled: true,
+				},
+				{
+					key: 'docker-build',
+					name: 'Build Docker Image',
+					type: PipelineStepType.DOCKER_COMMAND,
+					config: {
+						image: '${PROJECT_NAME}:${BUILD_NUMBER}',
+						buildContext: '${PROJECT_PATH}',
+						dockerfilePath: 'Dockerfile',
+					},
+					dependsOn: ['gradle-bootJar'],
+					enabled: true,
+				},
+				{
+					key: 'manual-verification',
+					name: 'Manual Verification',
+					type: PipelineStepType.MANUAL_APPROVAL,
+					config: {
+						message: 'Please verify the build artifacts and Docker image before deployment. Review test results, build logs, and image contents.',
+					},
+					dependsOn: ['docker-build'],
+					enabled: true,
+					requiresApproval: true,
+					approvalMessage: 'Please verify the build artifacts and Docker image before deployment. Review test results, build logs, and image contents.',
+				},
+			],
+			variables: [
+				{ name: 'JAVA_VERSION', type: 'string', defaultValue: '17', description: 'Java version' },
+				{ name: 'SPRING_PROFILE', type: 'string', defaultValue: 'prod', description: 'Spring profile' },
+				{ name: 'BUILD_NUMBER', type: 'string', defaultValue: '${GIT_COMMIT_SHORT}', description: 'Build number' },
+			],
+			executionContext: {
+				type: 'sdk',
+				sdkType: 'java',
+				sdkVersion: '${JAVA_VERSION}',
+				workingDirectory: '${PROJECT_PATH}',
+			},
+			tags: ['spring-boot', 'gradle', 'java', 'ci-cd', 'docker'],
+		});
+
+		// Spring Boot Microservices Template
+		this.addTemplate({
+			key: 'spring-boot-microservices',
+			name: 'Spring Boot Microservices Pipeline',
+			description: 'Complete microservices pipeline with service discovery, API gateway, and database migrations',
+			framework: 'spring-boot',
+			category: 'full-stack',
+			steps: [
+				{
+					key: 'maven-clean',
+					name: 'Maven Clean',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn clean' },
+					enabled: true,
+				},
+				{
+					key: 'maven-compile',
+					name: 'Maven Compile',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn compile' },
+					dependsOn: ['maven-clean'],
+					enabled: true,
+				},
+				{
+					key: 'liquibase-validate',
+					name: 'Liquibase Validate',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn liquibase:validate' },
+					dependsOn: ['maven-compile'],
+					enabled: true,
+				},
+				{
+					key: 'liquibase-test',
+					name: 'Liquibase Test',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn liquibase:updateTestingRollback' },
+					dependsOn: ['liquibase-validate'],
+					enabled: true,
+				},
+				{
+					key: 'liquibase-update',
+					name: 'Liquibase Update',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn liquibase:update' },
+					dependsOn: ['liquibase-test'],
+					enabled: true,
+				},
+				{
+					key: 'maven-test',
+					name: 'Maven Test',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn test' },
+					dependsOn: ['maven-compile'],
+					enabled: true,
+				},
+				{
+					key: 'maven-package',
+					name: 'Maven Package',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn package -DskipTests' },
+					dependsOn: ['maven-test', 'liquibase-update'],
+					enabled: true,
+				},
+				{
+					key: 'docker-build',
+					name: 'Build Docker Image',
+					type: PipelineStepType.DOCKER_COMMAND,
+					config: {
+						image: '${SERVICE_NAME}:${BUILD_NUMBER}',
+						buildContext: '${PROJECT_PATH}',
+						dockerfilePath: 'Dockerfile',
+					},
+					dependsOn: ['maven-package'],
+					enabled: true,
+				},
+				{
+					key: 'manual-verification',
+					name: 'Manual Verification',
+					type: PipelineStepType.MANUAL_APPROVAL,
+					config: {
+						message: 'Please verify the build artifacts and Docker image before deployment. Check logs, test results, and image contents.',
+					},
+					dependsOn: ['docker-build'],
+					enabled: true,
+					requiresApproval: true,
+					approvalMessage: 'Please verify the build artifacts and Docker image before deployment. Check logs, test results, and image contents.',
+				},
+				{
+					key: 'docker-push',
+					name: 'Push Docker Image',
+					type: PipelineStepType.DOCKER_COMMAND,
+					config: {
+						image: '${SERVICE_NAME}:${BUILD_NUMBER}',
+					},
+					dependsOn: ['manual-verification'],
+					enabled: true,
+				},
+			],
+			variables: [
+				{ name: 'JAVA_VERSION', type: 'string', defaultValue: '17', description: 'Java version' },
+				{ name: 'SPRING_PROFILE', type: 'string', defaultValue: 'prod', description: 'Spring profile' },
+				{ name: 'SERVICE_NAME', type: 'string', defaultValue: '${PROJECT_NAME}', description: 'Microservice name' },
+				{ name: 'BUILD_NUMBER', type: 'string', defaultValue: '${GIT_COMMIT_SHORT}', description: 'Build number' },
+				{ name: 'EUREKA_URL', type: 'string', defaultValue: 'http://eureka-server:8761/eureka', description: 'Eureka server URL' },
+			],
+			executionContext: {
+				type: 'sdk',
+				sdkType: 'java',
+				sdkVersion: '${JAVA_VERSION}',
+				workingDirectory: '${PROJECT_PATH}',
+			},
+			tags: ['spring-boot', 'microservices', 'maven', 'docker', 'eureka', 'liquibase'],
+		});
+
+		// Spring Boot API Gateway Template
+		this.addTemplate({
+			key: 'spring-boot-api-gateway',
+			name: 'Spring Boot API Gateway Pipeline',
+			description: 'Pipeline for Spring Cloud Gateway or Zuul API Gateway service',
+			framework: 'spring-boot',
+			category: 'full-stack',
+			steps: [
+				{
+					key: 'maven-clean',
+					name: 'Maven Clean',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn clean' },
+					enabled: true,
+				},
+				{
+					key: 'maven-compile',
+					name: 'Maven Compile',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn compile' },
+					dependsOn: ['maven-clean'],
+					enabled: true,
+				},
+				{
+					key: 'maven-test',
+					name: 'Maven Test',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn test' },
+					dependsOn: ['maven-compile'],
+					enabled: true,
+				},
+				{
+					key: 'maven-package',
+					name: 'Maven Package',
+					type: PipelineStepType.COMMAND,
+					config: { command: 'mvn package -DskipTests' },
+					dependsOn: ['maven-test'],
+					enabled: true,
+				},
+				{
+					key: 'docker-build',
+					name: 'Build Docker Image',
+					type: PipelineStepType.DOCKER_COMMAND,
+					config: {
+						image: '${GATEWAY_NAME}:${BUILD_NUMBER}',
+						buildContext: '${PROJECT_PATH}',
+						dockerfilePath: 'Dockerfile',
+					},
+					dependsOn: ['maven-package'],
+					enabled: true,
+				},
+			],
+			variables: [
+				{ name: 'JAVA_VERSION', type: 'string', defaultValue: '17', description: 'Java version' },
+				{ name: 'GATEWAY_NAME', type: 'string', defaultValue: 'api-gateway', description: 'API Gateway service name' },
+				{ name: 'BUILD_NUMBER', type: 'string', defaultValue: '${GIT_COMMIT_SHORT}', description: 'Build number' },
+			],
+			executionContext: {
+				type: 'sdk',
+				sdkType: 'java',
+				sdkVersion: '${JAVA_VERSION}',
+				workingDirectory: '${PROJECT_PATH}',
+			},
+			tags: ['spring-boot', 'api-gateway', 'spring-cloud-gateway', 'microservices'],
+		});
 	}
 
 	private addTemplate(template: PipelineTemplate) {
@@ -474,7 +804,7 @@ class PipelineTemplateService {
 
 		// Second pass: create steps with proper dependency IDs
 		// For template-generated steps, we use a special blockId pattern based on step type
-		const steps: PipelineStep[] = template.steps.map((step: { key: string; name: string; type: PipelineStepType; config: Record<string, any>; dependsOn?: string[] }) => {
+		const steps: PipelineStep[] = template.steps.map((step: { key: string; name: string; type: PipelineStepType; config: Record<string, any>; dependsOn?: string[]; requiresApproval?: boolean; approvalMessage?: string }) => {
 			// Use step key as ID, or generate from name
 			const stepId = step.key || step.name.toLowerCase().replace(/\s+/g, '-');
 			const dependsOn = step.dependsOn?.map((depKey: string) => {
@@ -484,7 +814,9 @@ class PipelineTemplateService {
 
 			// Generate a blockId based on step type for template-generated steps
 			// This allows the execution engine to handle them appropriately
-			const blockId = `template-${step.type}-${stepId}`;
+			const blockId = step.type === PipelineStepType.MANUAL_APPROVAL 
+				? 'manual-approval' 
+				: `template-${step.type}-${stepId}`;
 
 			return {
 				id: stepId,
@@ -492,6 +824,8 @@ class PipelineTemplateService {
 				name: step.name,
 				config: step.config,
 				dependsOn: dependsOn || [],
+				requiresApproval: step.requiresApproval || false,
+				approvalMessage: step.approvalMessage,
 			};
 		});
 

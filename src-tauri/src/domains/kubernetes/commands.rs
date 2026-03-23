@@ -1,5 +1,5 @@
 use tauri::State;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 use crate::domains::kubernetes::manager::KubernetesManager;
 use crate::domains::kubernetes::types::{*, JobInfo, CronJobInfo, ConfigMapInfo, SecretInfo, IngressInfo, ResourceMetrics, StatefulSetInfo, DaemonSetInfo, EventInfo};
 
@@ -29,7 +29,7 @@ pub async fn k8s_connect_cluster(
     
     // Then update the shared state
     let cluster = temp_mgr.current_cluster.clone();
-    let mut mgr = manager.lock().unwrap();
+    let mut mgr = manager.lock().await;
     mgr.current_cluster = cluster;
     
     Ok(())
@@ -236,7 +236,7 @@ pub async fn k8s_list_namespaces(
 pub async fn k8s_get_current_cluster(
     manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<Option<KubernetesCluster>, String> {
-    let mgr = manager.lock().unwrap();
+    let mgr = manager.lock().await;
     Ok(mgr.get_current_cluster().cloned())
 }
 
@@ -244,7 +244,7 @@ pub async fn k8s_get_current_cluster(
 pub async fn k8s_is_connected(
     manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<bool, String> {
-    let mgr = manager.lock().unwrap();
+    let mgr = manager.lock().await;
     Ok(mgr.is_connected())
 }
 

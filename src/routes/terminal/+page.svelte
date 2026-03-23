@@ -1,45 +1,33 @@
 <!--
-	Terminal - Global Terminal (Default Page)
+	Terminal - AI-Enhanced Terminal (Default Page)
+	Supports both regular commands and AI queries in unified interface
 -->
-
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { TerminalTabContainer, terminalActions } from '$lib/domains/terminal';
-	import type { TerminalConfig } from '$lib/domains/terminal';
+	import AITerminalContainer from '$lib/domains/terminal/components/ai/AITerminalContainer.svelte';
 
-	let settings: TerminalConfig = {
-		theme: 'dark',
-		fontSize: 14,
-		fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-		cursorStyle: 'block',
-		scrollbackLines: 1000,
-		bellSound: false,
-		autoClose: true,
-		confirmClose: true,
-		defaultShell: navigator.userAgent.includes('Windows') ? 'cmd.exe' : 'bash',
-		workingDirectory: navigator.userAgent.includes('Windows') ? 'C:\\' : '/'
-	};
+	let error = $state<string | null>(null);
 
 	onMount(() => {
-		// Clean up stale terminal data on app startup
-		terminalActions.cleanupStaleData();
+		console.log('AI Terminal page mounted');
+		try {
+			console.log('AITerminalContainer imported successfully');
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Unknown error';
+			console.error('Error loading AI Terminal:', e);
+		}
 	});
 </script>
 
-<div class="h-screen w-full bg-gray-900 flex flex-col">
-	<!-- Header -->
-	<div class="terminal-header bg-gray-800 border-b border-gray-700 px-4 py-2">
-		<div class="flex items-center space-x-4">
-			<h1 class="text-lg font-semibold text-gray-100">Global Terminal</h1>
-			<div class="flex items-center space-x-2">
-				<div class="w-2 h-2 bg-green-500 rounded-full"></div>
-				<span class="text-sm text-gray-400">System Terminal</span>
+<div class="h-full w-full bg-gray-900 flex flex-col overflow-hidden">
+	{#if error}
+		<div class="flex items-center justify-center h-full text-red-400">
+			<div class="text-center">
+				<p class="text-lg font-semibold mb-2">Error loading Terminal</p>
+				<p class="text-sm">{error}</p>
 			</div>
 		</div>
-	</div>
-
-	<!-- Terminal Content -->
-	<div class="flex-1 min-h-0">
-		<TerminalTabContainer {settings} />
-	</div>
+	{:else}
+		<AITerminalContainer />
+	{/if}
 </div>

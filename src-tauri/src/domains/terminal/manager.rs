@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::process::Command;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tauri::{Window, Emitter};
 use uuid::Uuid;
 use crate::domains::terminal::types::*;
@@ -9,11 +10,11 @@ use crate::domains::terminal::shell_integration::ShellIntegrationParser;
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem, MasterPty};
 
 // Global state for interactive processes (PTY-backed)
-use std::sync::OnceLock;
-static INTERACTIVE_PROCESSES: OnceLock<std::sync::Mutex<HashMap<String, Box<dyn portable_pty::Child + Send>>>> = 
-    OnceLock::new();
-static MASTER_PTYS: OnceLock<std::sync::Mutex<HashMap<String, Box<dyn MasterPty + Send>>>> =
-    OnceLock::new();
+use once_cell::sync::Lazy;
+static INTERACTIVE_PROCESSES: Lazy<Mutex<HashMap<String, Box<dyn portable_pty::Child + Send>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static MASTER_PTYS: Lazy<Mutex<HashMap<String, Box<dyn MasterPty + Send>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub type ProcessMap = Arc<Mutex<HashMap<String, TerminalProcess>>>;
 pub type StdinHandles = Arc<Mutex<HashMap<String, Box<dyn Write + Send>>>>;
@@ -104,7 +105,7 @@ impl TerminalManager {
 
         // Store the process
         {
-            let mut processes = self.processes.lock().unwrap();
+            let mut processes = self.processes.lock().await;
             processes.insert(process_id.clone(), process.clone());
         }
 
@@ -206,7 +207,7 @@ impl TerminalManager {
         // PID (if available)
         let pid = child.process_id();
         {
-            let mut processes = self.processes.lock().unwrap();
+            let mut processes = self.processes.lock().await;
             if let Some(proc) = processes.get_mut(&process_id) {
                 proc.pid = pid;
                 proc.status = "running".to_string();
@@ -216,7 +217,7 @@ impl TerminalManager {
         // Take writer for input handling and store
         let master = pair.master;
         if let Ok(writer) = master.take_writer() {
-            let mut stdin_handles = self.stdin_handles.lock().unwrap();
+            let mut stdin_handles = self.stdin_handles.lock().await;
             stdin_handles.insert(process_id.clone(), writer);
             println!("Stdin writer stored for process: {}", process_id);
         } else {
@@ -225,12 +226,12 @@ impl TerminalManager {
 
         // Store the PTY child for lifecycle management
         {
-            let mut processes = INTERACTIVE_PROCESSES.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
+            let mut processes = INTERACTIVE_PROCESSES.lock().await;
             processes.insert(process_id.clone(), child);
         }
         // Store the Master PTY for resize operations
         {
-            let mut masters = MASTER_PTYS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
+            let mut masters = MASTER_PTYS.lock().await;
             masters.insert(process_id.clone(), master);
         }
 
@@ -245,13 +246,13 @@ impl TerminalManager {
 
         // Initialize shell integration parser for this process
         {
-            let mut parsers = self.shell_integration_parsers.lock().unwrap();
+            let mut parsers = self.shell_integration_parsers.lock().await;
             parsers.insert(process_id.clone(), ShellIntegrationParser::new());
         }
 
         // Start PTY output streaming with shell integration
         {
-            let mut masters = MASTER_PTYS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
+            let mut masters = MASTER_PTYS.lock().await;
             if let Some(m) = masters.get_mut(&process_id) {
                 if let Ok(mut reader) = m.try_clone_reader() {
                     println!("Starting output streaming for process: {}", process_id);
@@ -266,13 +267,12 @@ impl TerminalManager {
                                 Ok(0) => {
                                     println!("PTY reader reached EOF for process: {}", pid_for_thread);
                                     // Flush any remaining content from shell integration parser
-                                    if let Ok(mut parsers) = parsers.lock() {
-                                        if let Some(parser) = parsers.get_mut(&pid_for_thread) {
-                                            let events = parser.flush();
-                                            for event in events {
-                                                if let Err(e) = window_for_reader.emit("shell-integration-event", &event) {
-                                                    eprintln!("Failed to emit shell integration event: {}", e);
-                                                }
+                                    let mut parsers = parsers.blocking_lock();
+                                    if let Some(parser) = parsers.get_mut(&pid_for_thread) {
+                                        let events = parser.flush();
+                                        for event in events {
+                                            if let Err(e) = window_for_reader.emit("shell-integration-event", &event) {
+                                                eprintln!("Failed to emit shell integration event: {}", e);
                                             }
                                         }
                                     }
@@ -280,20 +280,20 @@ impl TerminalManager {
                                 }
                                 Ok(n) => {
                                     let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
-                                    
+
                                     // Process through shell integration parser
-                                    if let Ok(mut parsers) = parsers.lock() {
-                                        if let Some(parser) = parsers.get_mut(&pid_for_thread) {
-                                            let events = parser.process_output(&chunk);
-                                            
-                                            // Emit shell integration events
-                                            for event in events {
-                                                if let Err(e) = window_for_reader.emit("shell-integration-event", &event) {
-                                                    eprintln!("Failed to emit shell integration event: {}", e);
-                                                }
+                                    let mut parsers = parsers.blocking_lock();
+                                    if let Some(parser) = parsers.get_mut(&pid_for_thread) {
+                                        let events = parser.process_output(&chunk);
+
+                                        // Emit shell integration events
+                                        for event in events {
+                                            if let Err(e) = window_for_reader.emit("shell-integration-event", &event) {
+                                                eprintln!("Failed to emit shell integration event: {}", e);
                                             }
                                         }
                                     }
+                                    drop(parsers); // Release lock before emitting output
                                     
                                     // Emit raw output as before
                                     let output = TerminalOutput {
@@ -334,8 +334,8 @@ impl TerminalManager {
         input: String,
     ) -> Result<(), String> {
         println!("send_input called: process_id={}, input={:?}", process_id, input);
-        
-        let mut stdin_handles = self.stdin_handles.lock().unwrap();
+
+        let mut stdin_handles = self.stdin_handles.lock().await;
         
         if let Some(stdin) = stdin_handles.get_mut(&process_id) {
             println!("Writing to stdin: '{}' (bytes: {:?})", input, input.as_bytes());
@@ -365,7 +365,7 @@ impl TerminalManager {
     }
 
     pub async fn kill_process(&self, process_id: String) -> Result<(), String> {
-        let mut processes = INTERACTIVE_PROCESSES.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
+        let mut processes = INTERACTIVE_PROCESSES.lock().await;
         
         if let Some(mut child) = processes.remove(&process_id) {
             if let Err(e) = child.kill() {
@@ -376,7 +376,7 @@ impl TerminalManager {
         
         // Update process status
         {
-            let mut processes = self.processes.lock().unwrap();
+            let mut processes = self.processes.lock().await;
             if let Some(proc) = processes.get_mut(&process_id) {
                 proc.status = "killed".to_string();
                 proc.end_time = Some(chrono::Utc::now().to_rfc3339());
@@ -387,12 +387,12 @@ impl TerminalManager {
     }
 
     pub async fn get_process(&self, process_id: String) -> Result<Option<TerminalProcess>, String> {
-        let processes = self.processes.lock().unwrap();
+        let processes = self.processes.lock().await;
         Ok(processes.get(&process_id).cloned())
     }
 
     pub async fn get_all_processes(&self) -> Result<Vec<TerminalProcess>, String> {
-        let processes = self.processes.lock().unwrap();
+        let processes = self.processes.lock().await;
         Ok(processes.values().cloned().collect())
     }
 
@@ -435,33 +435,33 @@ impl TerminalManager {
     }
 
     pub async fn add_command_interceptor(&self, interceptor: CommandInterceptor) -> Result<(), String> {
-        let mut interceptors = self.command_interceptors.lock().unwrap();
+        let mut interceptors = self.command_interceptors.lock().await;
         interceptors.push(interceptor);
         Ok(())
     }
 
     pub async fn remove_command_interceptor(&self, _id: String) -> Result<(), String> {
         // For now, just clear all interceptors
-        let mut interceptors = self.command_interceptors.lock().unwrap();
+        let mut interceptors = self.command_interceptors.lock().await;
         interceptors.clear();
         Ok(())
     }
 
     pub async fn add_output_parser(&self, parser: OutputParser) -> Result<(), String> {
-        let mut parsers = self.output_parsers.lock().unwrap();
+        let mut parsers = self.output_parsers.lock().await;
         parsers.push(parser);
         Ok(())
     }
 
     pub async fn remove_output_parser(&self, _id: String) -> Result<(), String> {
         // For now, just clear all parsers
-        let mut parsers = self.output_parsers.lock().unwrap();
+        let mut parsers = self.output_parsers.lock().await;
         parsers.clear();
         Ok(())
     }
 
     pub async fn resize_terminal(&self, process_id: String, cols: u32, rows: u32) -> Result<(), String> {
-        let mut masters = MASTER_PTYS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
+        let mut masters = MASTER_PTYS.lock().await;
         if let Some(m) = masters.get_mut(&process_id) {
             let size = PtySize { cols: cols as u16, rows: rows as u16, pixel_width: 0, pixel_height: 0 };
             if let Err(e) = m.resize(size) {
@@ -477,11 +477,11 @@ impl TerminalManager {
 
     fn start_process_monitoring(&self, process_id: String, window: Window) {
         let processes = self.processes.clone();
-        std::thread::spawn(move || {
+        tokio::spawn(async move {
             loop {
-                std::thread::sleep(std::time::Duration::from_millis(1000));
-                
-                let mut interactive_processes = INTERACTIVE_PROCESSES.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().unwrap();
+                tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
+                let mut interactive_processes = INTERACTIVE_PROCESSES.lock().await;
                 if let Some(child) = interactive_processes.get_mut(&process_id) {
                     match child.try_wait() {
                         Ok(Some(status)) => {
@@ -489,29 +489,29 @@ impl TerminalManager {
                             // portable_pty::ExitStatus doesn't expose the raw exit code
                             // For now, we'll use success/failure, but we can improve this later
                             let exit_code = if status.success() { 0 } else { 1 };
-                            
+
                             // TODO: Find a way to get the actual exit code from portable_pty
                             // This might require switching to a different PTY library or
                             // using platform-specific code to get the real exit code
                             println!("Process {} exited with code: {}", process_id, exit_code);
-                            
+
                             // Update process record with exit code
                             {
-                                let mut process_map = processes.lock().unwrap();
+                                let mut process_map = processes.lock().await;
                                 if let Some(proc) = process_map.get_mut(&process_id) {
                                     proc.exit_code = Some(exit_code);
                                     proc.status = "exited".to_string();
                                     proc.end_time = Some(chrono::Utc::now().to_rfc3339());
                                 }
                             }
-                            
+
                             let output = TerminalOutput {
                                 process_id: process_id.clone(),
                                 content: format!("\nProcess exited with code: {}\n", exit_code),
                                 output_type: "exit".to_string(),
                                 timestamp: chrono::Utc::now().to_rfc3339(),
                             };
-                            
+
                             let _ = window.emit("terminal-output", &output);
                             interactive_processes.remove(&process_id);
                             break;

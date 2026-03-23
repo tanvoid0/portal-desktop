@@ -114,7 +114,10 @@
 </script>
 
 <Card 
-	class="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 ease-out {isSelected ? 'ring-2 ring-warning-500 bg-warning-50 dark:bg-warning-900/20 shadow-lg' : 'hover:shadow-md'}"
+	class="cursor-pointer transition-all duration-200 ease-out {isSelected ? 'ring-2 ring-warning-500 bg-warning-50 dark:bg-warning-900/20 shadow-lg' : ''}"
+	elevation={isSelected ? 'elevated' : 'raised'}
+	gradient={task.status === 'in-progress'}
+	borderAccent={task.priority === 'high' ? 'left' : 'none'}
 	onclick={onClick}
 >
 	<CardContent class="p-4">

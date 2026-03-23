@@ -6,7 +6,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
+	import { MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
 	import NamespaceSelector from '$lib/domains/cloud/components/NamespaceSelector.svelte';
 	import { Container, Network, Settings, Globe } from '@lucide/svelte';
 	import { useKeyboardShortcuts } from '$lib/domains/k8s-navigation';
@@ -221,7 +221,7 @@
 
 <div class="space-y-6">
 	<!-- Namespace Selector -->
-	<div class="pb-4 border-b border-border">
+	<div class="pb-4 border-b border-border group-data-[collapsible=icon]:hidden">
 		<NamespaceSelector />
 	</div>
 
@@ -229,33 +229,30 @@
 	<nav class="space-y-6">
 		{#each navGroups as group}
 		<div>
-			<h3 class="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+			<h3 class="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider group-data-[collapsible=icon]:hidden">
 				{group.title}
 			</h3>
 			<div class="space-y-1">
 				{#each group.items as item}
 					{@const isActive = isActiveTab(item.route)}
-					<Button
-						type="button"
-						variant="ghost"
+					<SidebarMenuButton
+						size="default"
+						isActive={isActive}
+						tooltipContent={item.label}
 						onclick={() => handleItemClick(item.route)}
-						class="w-full flex items-start px-3 py-2.5 text-sm font-medium rounded-md transition-colors justify-start h-auto whitespace-normal {isActive
-							? 'bg-accent text-accent-foreground' 
-							: 'text-muted-foreground hover:text-foreground hover:bg-accent/50'}"
+						class="items-start"
 					>
-						<span class="text-lg mr-2.5 flex-shrink-0">{item.icon}</span>
-						<div class="flex-1 text-left min-w-0">
+						<span class="text-lg flex-shrink-0">{item.icon}</span>
+						<div class="flex-1 text-left min-w-0 group-data-[collapsible=icon]:hidden">
 							<div class="font-medium text-sm leading-tight">{item.label}</div>
-							<p class="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-								{item.description}
-							</p>
+							<p class="text-xs opacity-70 mt-0.5 leading-relaxed">{item.description}</p>
 						</div>
-					</Button>
+					</SidebarMenuButton>
 				{/each}
 			</div>
 		</div>
 		{#if group !== navGroups[navGroups.length - 1]}
-			<div class="border-t border-border"></div>
+			<div class="border-t border-border group-data-[collapsible=icon]:hidden"></div>
 		{/if}
 		{/each}
 	</nav>

@@ -50,8 +50,9 @@ function createProjectStore() {
 				description: projectData.description,
 				path: projectData.path,
 				status: ProjectStatus.ACTIVE,
-				framework: projectData.framework,
-				package_manager: projectData.package_manager,
+				framework_ids: projectData.framework_ids,
+				package_manager_ids: projectData.package_manager_ids,
+				language_ids: projectData.language_ids,
 				build_command: projectData.build_command,
 				start_command: projectData.start_command,
 				test_command: projectData.test_command,
@@ -179,8 +180,8 @@ export const recentProjects = derived(
 	$store => [...$store.projects]
 		.filter(p => p.status === 'active')
 		.sort((a, b) => {
-			const aTime = a.metadata.lastOpened?.getTime() || 0;
-			const bTime = b.metadata.lastOpened?.getTime() || 0;
+			const aTime = a.last_opened?.getTime() || 0;
+			const bTime = b.last_opened?.getTime() || 0;
 			return bTime - aTime;
 		})
 		.slice(0, 5)
@@ -192,16 +193,9 @@ export const projectStats = derived(
 		const active = $store.projects.filter(p => p.status === 'active');
 		const archived = $store.projects.filter(p => p.status === 'archived');
 		
-		const frameworkCounts: Record<string, number> = {};
-
-		$store.projects.forEach(project => {
-			const framework = project.framework || 'Unknown';
-			frameworkCounts[framework] = (frameworkCounts[framework] || 0) + 1;
-		});
-
-		const mostUsedFramework = Object.entries(frameworkCounts)
-			.reduce((max, [framework, count]) => count > max.count ? { framework, count } : max, { framework: 'Unknown', count: 0 })
-			.framework;
+		// Framework counting is now based on framework_ids array
+		// For now, we'll use a placeholder since we'd need to resolve IDs to names
+		const mostUsedFramework = 'Unknown';
 
 		return {
 			totalProjects: $store.projects.length,

@@ -128,20 +128,11 @@
 						<p class="text-sm">Start a conversation</p>
 					</div>
 				{:else}
-					{#each messages as message}
-						<ChatMessage {message} />
+					{#each messages as message, index}
+						{@const isLastMessage = index === messages.length - 1}
+						{@const shouldShowLoader = isLoading && isLastMessage && message.role === 'assistant' && !message.content}
+						<ChatMessage {message} showLoader={shouldShowLoader} />
 					{/each}
-				{/if}
-				{#if isLoading}
-					<div class="flex items-start">
-						<div class="bg-muted px-4 py-2 rounded-lg">
-							<div class="flex gap-1">
-								<span class="w-2 h-2 rounded-full bg-foreground/50 animate-pulse"></span>
-								<span class="w-2 h-2 rounded-full bg-foreground/50 animate-pulse" style="animation-delay: 0.2s"></span>
-								<span class="w-2 h-2 rounded-full bg-foreground/50 animate-pulse" style="animation-delay: 0.4s"></span>
-							</div>
-						</div>
-					</div>
 				{/if}
 			</div>
 		</ScrollArea>

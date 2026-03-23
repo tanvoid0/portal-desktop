@@ -635,7 +635,7 @@ impl NavigationService {
             badge: None,
             installed: ollama_installed,
             version: ollama_version,
-            latest_version: Some("0.12.6".to_string()), // Mock latest version
+            latest_version: None, // Latest version detection not yet implemented
             manager_type: Some("ollama".to_string()),
         });
 

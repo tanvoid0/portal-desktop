@@ -9,7 +9,9 @@
 	import { Button } from '@/lib/components/ui/button';
 	import { Input } from '@/lib/components/ui/input';
 	import { Badge } from '@/lib/components/ui/badge';
-	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/lib/components/ui/card';
+	import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardInfo } from '@/lib/components/ui/card';
+	import { FolderOpen, CheckCircle, Database, Code } from '@lucide/svelte';
+	import ProjectCard from '@/lib/domains/projects/components/ProjectCard.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/tabs';
 	import Select from '@/lib/components/ui/select.svelte';
 	import { projectStore, projectService } from '@/lib/domains/projects';
@@ -68,7 +70,7 @@
 
 		// Filter by framework
 		if (filterFramework) {
-			filtered = filtered.filter(project => project.framework === filterFramework);
+			filtered = filtered.filter(project => project.metadata?.framework === filterFramework);
 		}
 
 		// Filter by status
@@ -78,7 +80,8 @@
 
 		// Filter by package manager
 		if (filterPackageManager) {
-			filtered = filtered.filter(project => project.package_manager === filterPackageManager);
+			// Package manager filtering would need to resolve package_manager_ids
+			// For now, skip this filter
 		}
 
 		// Sort projects
@@ -113,15 +116,13 @@
 	// Get unique values for filter options
 	const uniqueFrameworks = $derived(() => {
 		const frameworks = $projectStore.projects
-			.map(p => p.framework)
+			.map(p => p.metadata?.framework)
 			.filter((f): f is string => !!f);
 		return [...new Set(frameworks)].sort();
 	});
 
 	const uniquePackageManagers = $derived(() => {
-		const managers = $projectStore.projects
-			.map(p => p.package_manager)
-			.filter((m): m is string => !!m);
+		const managers: string[] = []; // Package managers would need to be resolved from package_manager_ids
 		return [...new Set(managers)].sort();
 	});
 
@@ -244,65 +245,39 @@
 
 	<!-- Stats Cards -->
 	<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Total Projects</CardTitle>
-				<svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-				</svg>
-			</CardHeader>
-			<CardContent>
-				<div class="text-2xl font-bold">{$projectStore.projects.length}</div>
-			</CardContent>
-		</Card>
+		<CardInfo
+			title="Total Projects"
+			value={$projectStore.projects.length}
+			icon={FolderOpen}
+			gradient={true}
+		/>
 
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Active Projects</CardTitle>
-				<svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-				</svg>
-			</CardHeader>
-			<CardContent>
-				<div class="text-2xl font-bold">
-					{$projectStore.projects.filter(p => p.status === 'active').length}
-				</div>
-			</CardContent>
-		</Card>
+		<CardInfo
+			title="Active Projects"
+			value={$projectStore.projects.filter(p => p.status === 'active').length}
+			icon={CheckCircle}
+			gradient={true}
+		/>
 
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Total Size</CardTitle>
-				<svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-				</svg>
-			</CardHeader>
-			<CardContent>
-				<div class="text-2xl font-bold">
-					{formatBytes($projectStore.projects.reduce((sum, p) => sum + p.size, 0))}
-				</div>
-			</CardContent>
-		</Card>
+		<CardInfo
+			title="Total Size"
+			value={formatBytes($projectStore.projects.reduce((sum, p) => sum + p.size, 0))}
+			icon={Database}
+			gradient={true}
+		/>
 
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Most Used Type</CardTitle>
-				<svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-				</svg>
-			</CardHeader>
-			<CardContent>
-				<div class="text-2xl font-bold capitalize">
-					{Object.entries(
-						$projectStore.projects.reduce((acc, p) => {
-							const framework = p.framework || 'Unknown';
-							acc[framework] = (acc[framework] || 0) + 1;
-							return acc;
-						}, {} as Record<string, number>)
-					).sort(([,a], [,b]) => b - a)[0]?.[0] || 'none'}
-				</div>
-			</CardContent>
-		</Card>
+		<CardInfo
+			title="Most Used Type"
+			value={Object.entries(
+				$projectStore.projects.reduce((acc, p) => {
+					const framework = p.metadata?.framework || 'Unknown';
+					acc[framework] = (acc[framework] || 0) + 1;
+					return acc;
+				}, {} as Record<string, number>)
+			).sort(([,a], [,b]) => (b as number) - (a as number))[0]?.[0] || 'none'}
+			icon={Code}
+			gradient={true}
+		/>
 	</div>
 
 	<!-- Filters -->
@@ -435,101 +410,13 @@
 	{:else}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each filteredProjects() as project (project.id)}
-				<Card class="cursor-pointer hover:shadow-lg transition-shadow" onclick={() => handleProjectClick(project)}>
-					<CardHeader>
-							<div class="flex items-start justify-between">
-							<div class="flex items-center gap-2 flex-1 min-w-0">
-								<i class="text-2xl {getFrameworkIconClass(project.framework)} flex-shrink-0"></i>
-								<div class="min-w-0 flex-1">
-									<CardTitle class="text-lg truncate" title={project.name}>{project.name}</CardTitle>
-									{#if project.description}
-										<CardDescription class="line-clamp-2">
-											{project.description}
-										</CardDescription>
-									{/if}
-								</div>
-							</div>
-							<div class="flex gap-1">
-								<Button
-									variant="ghost"
-									size="sm"
-									onclick={(e) => {
-										e.stopPropagation();
-										goto(`/projects/edit/${project.id}`);
-									}}
-									class="text-muted-foreground hover:text-foreground"
-									title="Edit project"
-								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-									</svg>
-								</Button>
-								<Button
-									variant="ghost"
-									size="sm"
-									onclick={(e) => handleAutomationClick(project, e)}
-									class="text-blue-600 hover:text-blue-700"
-									title="Automate project"
-								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-									</svg>
-								</Button>
-								<Button
-									variant="ghost"
-									size="sm"
-									onclick={(e) => {
-										e.stopPropagation();
-										handleProjectDelete(project);
-									}}
-									class="text-destructive hover:text-destructive"
-									title="Delete project"
-								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-									</svg>
-								</Button>
-							</div>
-						</div>
-					</CardHeader>
-					<CardContent>
-						<div class="space-y-3">
-							<div class="flex items-center gap-2">
-								{#if project.framework}
-									<Badge class={getFrameworkColor(project.framework)}>
-										{project.framework}
-									</Badge>
-								{/if}
-								{#if project.git_branch}
-									<Badge variant="outline">
-										{project.git_branch}
-									</Badge>
-								{/if}
-							</div>
-
-							<div class="text-sm text-muted-foreground space-y-1">
-								<div class="flex items-center justify-between">
-									<span>Size:</span>
-									<span>{formatBytes(project.size)}</span>
-								</div>
-								<div class="flex items-center justify-between">
-									<span>Files:</span>
-									<span>{project.file_count}</span>
-								</div>
-								{#if project.last_opened}
-									<div class="flex items-center justify-between">
-										<span>Last opened:</span>
-										<span>{formatRelativeTime(project.last_opened)}</span>
-									</div>
-								{/if}
-							</div>
-
-							<div class="text-xs text-muted-foreground font-mono truncate" title={project.path}>
-								{project.path}
-							</div>
-						</div>
-					</CardContent>
-				</Card>
+				<ProjectCard
+					{project}
+					onClick={(p) => handleProjectClick(p)}
+					onEdit={(p) => goto(`/projects/${p.id}`)}
+					onDelete={handleProjectDelete}
+					showActions={true}
+				/>
 			{/each}
 		</div>
 	{/if}

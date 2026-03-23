@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::Utc;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateDeploymentRequest {
@@ -36,7 +37,7 @@ pub struct DeploymentService {
     pub cli_service: CliService,
     // In a real application, this would interact with a database
     // For now, we'll use an in-memory store for demonstration
-    deployments: std::sync::Mutex<Vec<Deployment>>,
+    deployments: Mutex<Vec<Deployment>>,
 }
 
 impl DeploymentService {
@@ -44,7 +45,7 @@ impl DeploymentService {
         Self {
             docker_service: DockerService::new(),
             cli_service: CliService::new(),
-            deployments: std::sync::Mutex::new(Vec::new()),
+            deployments: Mutex::new(Vec::new()),
         }
     }
 
@@ -111,7 +112,7 @@ impl DeploymentService {
                 };
 
                 // Store deployment
-                self.deployments.lock().unwrap().push(deployment.clone());
+                self.deployments.lock().await.push(deployment.clone());
 
                 Ok(deployment)
             }
@@ -147,7 +148,7 @@ impl DeploymentService {
                 };
 
                 // Store deployment
-                self.deployments.lock().unwrap().push(deployment.clone());
+                self.deployments.lock().await.push(deployment.clone());
 
                 Ok(deployment)
             }
@@ -158,7 +159,7 @@ impl DeploymentService {
     pub async fn start_deployment(&self, deployment_id: &str) -> Result<Deployment, String> {
         // Get deployment info and release lock
         let deployment_type = {
-            let deployments = self.deployments.lock().unwrap();
+            let deployments = self.deployments.lock().await;
             let deployment = deployments.iter().find(|d| d.id == deployment_id)
                 .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
             deployment.deployment_type.clone()
@@ -168,7 +169,7 @@ impl DeploymentService {
             DeploymentType::Docker => {
                 // Get deployment info and release lock
                 let (docker_image_name, container_name, ports, volumes, environment_variables) = {
-                    let deployments = self.deployments.lock().unwrap();
+                    let deployments = self.deployments.lock().await;
                     
                     let deployment = deployments.iter().find(|d| d.id == deployment_id)
                         .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
@@ -198,7 +199,7 @@ impl DeploymentService {
                 ).await?;
 
                 // Update deployment with container_id
-                let mut deployments = self.deployments.lock().unwrap();
+                let mut deployments = self.deployments.lock().await;
                 let deployment = deployments.iter_mut().find(|d| d.id == deployment_id)
                     .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
                     
@@ -211,7 +212,7 @@ impl DeploymentService {
             DeploymentType::Cli => {
                 // Get deployment info and release lock
                 let (command, working_dir, environment) = {
-                    let deployments = self.deployments.lock().unwrap();
+                    let deployments = self.deployments.lock().await;
                     let deployment = deployments.iter().find(|d| d.id == deployment_id)
                         .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
                     
@@ -233,7 +234,7 @@ impl DeploymentService {
                 ).await?;
 
                 // Update deployment with process_id
-                let mut deployments = self.deployments.lock().unwrap();
+                let mut deployments = self.deployments.lock().await;
                 let deployment = deployments.iter_mut().find(|d| d.id == deployment_id)
                     .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
                     
@@ -250,7 +251,7 @@ impl DeploymentService {
     pub async fn stop_deployment(&self, deployment_id: &str) -> Result<Deployment, String> {
         // Get deployment type and relevant info
         let deployment_type = {
-            let deployments = self.deployments.lock().unwrap();
+            let deployments = self.deployments.lock().await;
             let deployment = deployments.iter().find(|d| d.id == deployment_id)
                 .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
             deployment.deployment_type.clone()
@@ -260,7 +261,7 @@ impl DeploymentService {
             DeploymentType::Docker => {
                 // Get container_id and release lock
                 let container_id = {
-                    let deployments = self.deployments.lock().unwrap();
+                    let deployments = self.deployments.lock().await;
                     deployments.iter()
                         .find(|d| d.id == deployment_id)
                         .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?
@@ -278,7 +279,7 @@ impl DeploymentService {
         }
 
         // Update deployment status
-        let mut deployments = self.deployments.lock().unwrap();
+        let mut deployments = self.deployments.lock().await;
         let deployment = deployments.iter_mut()
             .find(|d| d.id == deployment_id)
             .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
@@ -293,7 +294,7 @@ impl DeploymentService {
     pub async fn delete_deployment(&self, deployment_id: &str) -> Result<(), String> {
         // Get deployment type and relevant info
         let deployment_type = {
-            let deployments = self.deployments.lock().unwrap();
+            let deployments = self.deployments.lock().await;
             let deployment = deployments.iter().find(|d| d.id == deployment_id)
                 .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
             deployment.deployment_type.clone()
@@ -303,7 +304,7 @@ impl DeploymentService {
             DeploymentType::Docker => {
                 // Get container_id and release lock
                 let container_id = {
-                    let deployments = self.deployments.lock().unwrap();
+                    let deployments = self.deployments.lock().await;
                     deployments.iter()
                         .find(|d| d.id == deployment_id)
                         .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?
@@ -324,26 +325,26 @@ impl DeploymentService {
         }
 
         // Remove from deployments list
-        let mut deployments = self.deployments.lock().unwrap();
+        let mut deployments = self.deployments.lock().await;
         deployments.retain(|d| d.id != deployment_id);
         Ok(())
     }
 
     /// Get all deployments
-    pub fn get_deployments(&self) -> Result<Vec<Deployment>, String> {
-        Ok(self.deployments.lock().unwrap().clone())
+    pub async fn get_deployments(&self) -> Result<Vec<Deployment>, String> {
+        Ok(self.deployments.lock().await.clone())
     }
 
     /// Get deployment by ID
-    pub fn get_deployment(&self, deployment_id: &str) -> Result<Option<Deployment>, String> {
-        Ok(self.deployments.lock().unwrap().iter().find(|d| d.id == deployment_id).cloned())
+    pub async fn get_deployment(&self, deployment_id: &str) -> Result<Option<Deployment>, String> {
+        Ok(self.deployments.lock().await.iter().find(|d| d.id == deployment_id).cloned())
     }
 
     /// Get deployment logs
     pub async fn get_deployment_logs(&self, deployment_id: &str, tail: Option<usize>) -> Result<Vec<String>, String> {
         // Get deployment type and relevant info
         let deployment_type = {
-            let deployments = self.deployments.lock().unwrap();
+            let deployments = self.deployments.lock().await;
             let deployment = deployments.iter().find(|d| d.id == deployment_id)
                 .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
             deployment.deployment_type.clone()
@@ -353,7 +354,7 @@ impl DeploymentService {
             DeploymentType::Docker => {
                 // Get container_id and logs, then release lock
                 let container_id = {
-                    let deployments = self.deployments.lock().unwrap();
+                    let deployments = self.deployments.lock().await;
                     let deployment = deployments.iter()
                         .find(|d| d.id == deployment_id)
                         .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
@@ -375,7 +376,7 @@ impl DeploymentService {
 
     /// Update deployment
     pub async fn update_deployment(&self, request: UpdateDeploymentRequest) -> Result<Deployment, String> {
-        let mut deployments = self.deployments.lock().unwrap();
+        let mut deployments = self.deployments.lock().await;
         
         if let Some(deployment) = deployments.iter_mut().find(|d| d.id == request.id) {
             if let Some(name) = request.name {
@@ -399,7 +400,7 @@ impl DeploymentService {
     pub async fn refresh_deployment_statuses(&self) -> Result<Vec<Deployment>, String> {
         // Get all deployments with their types and relevant info
         let deployment_info: Vec<(String, DeploymentType, Option<String>, Option<u32>)> = {
-            let deployments = self.deployments.lock().unwrap();
+            let deployments = self.deployments.lock().await;
             deployments
                 .iter()
                 .map(|d| (d.id.clone(), d.deployment_type.clone(), d.container_id.clone(), d.process_id))
@@ -446,7 +447,7 @@ impl DeploymentService {
         }
         
         // Update deployment statuses
-        let mut deployments = self.deployments.lock().unwrap();
+        let mut deployments = self.deployments.lock().await;
         for (deployment_id, new_status) in status_updates {
             if let Some(deployment) = deployments.iter_mut().find(|d| d.id == deployment_id) {
                 deployment.status = new_status;

@@ -17,94 +17,66 @@ pub struct ServiceStatus {
 pub async fn update_project_version(project_path: String, sdk_type: String, version: String) -> Result<String, String> {
     println!("[SDK] Updating project version: {} to {} for {}", project_path, version, sdk_type);
     
-    // Mock implementation - in real implementation, this would update the project's SDK version
-    Ok(format!("Updated {} to version {} for project at {}", sdk_type, version, project_path))
+    Err("Project version management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn remove_project_version(project_path: String, sdk_type: String, version: String) -> Result<String, String> {
     println!("[SDK] Removing project version: {} from {} for {}", version, sdk_type, project_path);
     
-    // Mock implementation - in real implementation, this would remove the SDK version from the project
-    Ok(format!("Removed {} version {} from project at {}", sdk_type, version, project_path))
+    Err("Project version management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn get_project_versions(project_path: String) -> Result<Vec<SDKVersion>, String> {
     println!("[SDK] Getting project versions for: {}", project_path);
     
-    // Mock implementation - in real implementation, this would read the project's SDK versions
-    let versions = vec![
-        SDKVersion {
-            version: "18.17.0".to_string(),
-            installed: true,
-            active: true,
-            size: Some("25.2 MB".to_string()),
-            release_date: Some("2023-07-18".to_string()),
-        },
-        SDKVersion {
-            version: "20.5.0".to_string(),
-            installed: false,
-            active: false,
-            size: Some("26.1 MB".to_string()),
-            release_date: Some("2023-07-11".to_string()),
-        },
-    ];
-    
-    Ok(versions)
+    // Return empty array - project version detection not yet implemented
+    Ok(vec![])
 }
 
 #[tauri::command]
 pub async fn setup_shell_integration(sdk_type: String) -> Result<String, String> {
     println!("[SDK] Setting up shell integration for: {}", sdk_type);
     
-    // Mock implementation - in real implementation, this would set up shell integration
-    Ok(format!("Shell integration set up for {}", sdk_type))
+    Err("Shell integration is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn activate_project_environment(project_path: String, sdk_type: String) -> Result<String, String> {
     println!("[SDK] Activating project environment: {} for {}", project_path, sdk_type);
     
-    // Mock implementation - in real implementation, this would activate the project environment
-    Ok(format!("Activated {} environment for project at {}", sdk_type, project_path))
+    Err("Project environment activation is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn deactivate_project_environment(project_path: String, sdk_type: String) -> Result<String, String> {
     println!("[SDK] Deactivating project environment: {} for {}", project_path, sdk_type);
     
-    // Mock implementation - in real implementation, this would deactivate the project environment
-    Ok(format!("Deactivated {} environment for project at {}", sdk_type, project_path))
+    Err("Project environment deactivation is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn find_projects_with_versions(sdk_type: String) -> Result<Vec<String>, String> {
     println!("[SDK] Finding projects with versions for: {}", sdk_type);
     
-    // Mock implementation - in real implementation, this would scan for projects with version files
-    let projects = vec![
-        "/path/to/project1".to_string(),
-        "/path/to/project2".to_string(),
-    ];
-    
-    Ok(projects)
+    // Return empty array - project scanning not yet implemented
+    Ok(vec![])
 }
 
 #[tauri::command]
 pub async fn get_terminal_integration_status() -> Result<bool, String> {
     println!("[SDK] Getting terminal integration status");
     
-    // Mock implementation - in real implementation, this would check if terminal integration is active
-    Ok(true)
+    // Terminal integration not yet implemented
+    Ok(false)
 }
 
 #[tauri::command]
 pub async fn remove_terminal_integration() -> Result<String, String> {
     println!("[SDK] Removing terminal integration");
     
-    // Mock implementation - in real implementation, this would remove terminal integration
-    Ok("Terminal integration removed".to_string())
+    Err("Terminal integration is not yet implemented".to_string())
 }
 
 // Real version fetching
@@ -161,44 +133,111 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     detect_managers().await
 }
 
-// Service management commands
+// Service management commands (legacy - delegates to start_service/stop_service)
 #[tauri::command]
 pub async fn start_sdk_service(sdk_type: String) -> Result<String, String> {
     println!("[SDK] Starting SDK service: {}", sdk_type);
-    
-    // Mock implementation - in real implementation, this would start the SDK service
-    Ok(format!("Started {} service", sdk_type))
+    // Delegate to the real start_service implementation
+    start_service(sdk_type).await
 }
 
 #[tauri::command]
 pub async fn stop_sdk_service(sdk_type: String) -> Result<String, String> {
     println!("[SDK] Stopping SDK service: {}", sdk_type);
-    
-    // Mock implementation - in real implementation, this would stop the SDK service
-    Ok(format!("Stopped {} service", sdk_type))
+    // Delegate to the real stop_service implementation
+    stop_service(sdk_type).await
 }
 
 #[tauri::command]
 pub async fn get_service_status(sdk_type: String) -> Result<ServiceStatus, String> {
     println!("[SDK] Getting service status for {}", sdk_type);
     
-    if sdk_type == "ollama" {
-        let ollama_status = OllamaManager::get_service_status().await?;
-        Ok(ServiceStatus {
-            running: ollama_status.running,
-            pid: ollama_status.pid,
-            port: ollama_status.port,
-            status: if ollama_status.running { "running".to_string() } else { "stopped".to_string() },
-        })
-    } else {
-        // Mock implementation for other services
-        Ok(ServiceStatus {
-            running: false,
-            pid: None,
-            port: None,
-            status: "stopped".to_string(),
-        })
+    match sdk_type.as_str() {
+        "ollama" => {
+            let ollama_status = OllamaManager::get_service_status().await?;
+            Ok(ServiceStatus {
+                running: ollama_status.running,
+                pid: ollama_status.pid,
+                port: ollama_status.port,
+                status: if ollama_status.running { "running".to_string() } else { "stopped".to_string() },
+            })
+        }
+        "docker" => {
+            let running = check_docker_running().await;
+            Ok(ServiceStatus {
+                running,
+                pid: None,
+                port: None,
+                status: if running { "running".to_string() } else { "stopped".to_string() },
+            })
+        }
+        _ => {
+            // For system services, check via systemctl or service command
+            let running = check_system_service_status(&sdk_type).await;
+            // Get port from SDK config if available
+            let port = get_service_port(&sdk_type).await;
+            Ok(ServiceStatus {
+                running,
+                pid: None,
+                port,
+                status: if running { "running".to_string() } else { "stopped".to_string() },
+            })
+        }
     }
+}
+
+/// Check if Docker is running
+async fn check_docker_running() -> bool {
+    use std::process::Command;
+    
+    let result = Command::new("docker")
+        .args(&["info"])
+        .output();
+    
+    if let Ok(output) = result {
+        output.status.success()
+    } else {
+        false
+    }
+}
+
+/// Check system service status
+async fn check_system_service_status(service_name: &str) -> bool {
+    use std::process::Command;
+    
+    // Try systemctl first
+    let systemctl_result = Command::new("systemctl")
+        .args(&["is-active", service_name])
+        .output();
+    
+    if let Ok(output) = systemctl_result {
+        if output.status.success() {
+            let status_str = String::from_utf8_lossy(&output.stdout);
+            let status = status_str.trim();
+            return status == "active";
+        }
+    }
+    
+    // Fallback: check if process is running by checking port
+    // This is a simplified check - in production, you'd want more robust detection
+    false
+}
+
+/// Get service port from SDK config
+async fn get_service_port(sdk_type: &str) -> Option<u16> {
+    use crate::domains::sdk::configs::language_config::get_sdk_config;
+    
+    if let Some(config) = get_sdk_config(sdk_type) {
+        if let Some(service_config) = &config.service_config {
+            if let Some(port) = service_config.get("port") {
+                if let Some(port_num) = port.as_u64() {
+                    return Some(port_num as u16);
+                }
+            }
+        }
+    }
+    
+    None
 }
 
 // Additional commands for FlyEnv-style functionality
@@ -206,17 +245,26 @@ pub async fn get_service_status(sdk_type: String) -> Result<ServiceStatus, Strin
 pub async fn setup_project_version_file(project_path: String, sdk_type: String, version: String) -> Result<String, String> {
     println!("[SDK] Setting up project version file: {} for {} at {}", sdk_type, version, project_path);
     
-    // Mock implementation - in real implementation, this would create version files
-    Ok(format!("Version file created for {} version {} in {}", sdk_type, version, project_path))
+    Err("Project version file management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn get_running_services_count() -> Result<u32, String> {
     println!("[SDK] Getting running services count");
     
-    // TODO: Implement actual service count retrieval
-    // For now, return a mock count
-    Ok(3)
+    // Count running services by checking status for known service types
+    let service_types = vec!["ollama", "docker", "postgresql", "mysql", "mongodb", "redis", "nginx", "apache"];
+    let mut count = 0u32;
+    
+    for service_type in service_types {
+        if let Ok(status) = get_service_status(service_type.to_string()).await {
+            if status.running {
+                count += 1;
+            }
+        }
+    }
+    
+    Ok(count)
 }
 
 // Real Ollama commands using OllamaManager
@@ -290,11 +338,19 @@ pub async fn get_available_ollama_models() -> Result<std::collections::HashMap<S
 pub async fn start_service(sdk_type: String) -> Result<String, String> {
     println!("[SDK] Starting service: {}", sdk_type);
     
-    if sdk_type == "ollama" {
-        OllamaManager::start_service().await
-    } else {
-        // Mock implementation for other services
-        Ok(format!("Started {} service", sdk_type))
+    match sdk_type.as_str() {
+        "ollama" => OllamaManager::start_service().await,
+        "docker" => start_docker_service().await,
+        "postgresql" | "postgres" => start_system_service("postgresql").await,
+        "mysql" => start_system_service("mysql").await,
+        "mongodb" | "mongo" => start_system_service("mongod").await,
+        "redis" => start_system_service("redis").await,
+        "nginx" => start_system_service("nginx").await,
+        "apache" | "httpd" => start_system_service("apache2").await,
+        _ => {
+            // Try systemctl first, then fallback to direct command
+            start_system_service(&sdk_type).await
+        }
     }
 }
 
@@ -302,12 +358,136 @@ pub async fn start_service(sdk_type: String) -> Result<String, String> {
 pub async fn stop_service(sdk_type: String) -> Result<String, String> {
     println!("[SDK] Stopping service: {}", sdk_type);
     
-    if sdk_type == "ollama" {
-        OllamaManager::stop_service().await
-    } else {
-        // Mock implementation for other services
-        Ok(format!("Stopped {} service", sdk_type))
+    match sdk_type.as_str() {
+        "ollama" => OllamaManager::stop_service().await,
+        "docker" => stop_docker_service().await,
+        "postgresql" | "postgres" => stop_system_service("postgresql").await,
+        "mysql" => stop_system_service("mysql").await,
+        "mongodb" | "mongo" => stop_system_service("mongod").await,
+        "redis" => stop_system_service("redis").await,
+        "nginx" => stop_system_service("nginx").await,
+        "apache" | "httpd" => stop_system_service("apache2").await,
+        _ => {
+            // Try systemctl first, then fallback to direct command
+            stop_system_service(&sdk_type).await
+        }
     }
+}
+
+/// Start a system service using systemctl or service command
+async fn start_system_service(service_name: &str) -> Result<String, String> {
+    use std::process::Command;
+    
+    // Try systemctl first (systemd)
+    let systemctl_result = Command::new("systemctl")
+        .args(&["start", service_name])
+        .output();
+    
+    if let Ok(output) = systemctl_result {
+        if output.status.success() {
+            return Ok(format!("Started {} service via systemctl", service_name));
+        }
+    }
+    
+    // Fallback to service command (SysV init)
+    let service_result = Command::new("service")
+        .args(&[service_name, "start"])
+        .output();
+    
+    if let Ok(output) = service_result {
+        if output.status.success() {
+            return Ok(format!("Started {} service via service command", service_name));
+        } else {
+            let error_msg = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("Failed to start {} service: {}", service_name, error_msg));
+        }
+    }
+    
+    Err(format!("Failed to start {} service: systemctl and service commands both failed", service_name))
+}
+
+/// Stop a system service using systemctl or service command
+async fn stop_system_service(service_name: &str) -> Result<String, String> {
+    use std::process::Command;
+    
+    // Try systemctl first (systemd)
+    let systemctl_result = Command::new("systemctl")
+        .args(&["stop", service_name])
+        .output();
+    
+    if let Ok(output) = systemctl_result {
+        if output.status.success() {
+            return Ok(format!("Stopped {} service via systemctl", service_name));
+        }
+    }
+    
+    // Fallback to service command (SysV init)
+    let service_result = Command::new("service")
+        .args(&[service_name, "stop"])
+        .output();
+    
+    if let Ok(output) = service_result {
+        if output.status.success() {
+            return Ok(format!("Stopped {} service via service command", service_name));
+        } else {
+            let error_msg = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("Failed to stop {} service: {}", service_name, error_msg));
+        }
+    }
+    
+    Err(format!("Failed to stop {} service: systemctl and service commands both failed", service_name))
+}
+
+/// Start Docker service
+async fn start_docker_service() -> Result<String, String> {
+    use std::process::Command;
+    
+    // Check if Docker is already running
+    let check_result = Command::new("docker")
+        .args(&["info"])
+        .output();
+    
+    if let Ok(output) = check_result {
+        if output.status.success() {
+            return Ok("Docker service is already running".to_string());
+        }
+    }
+    
+    // Try to start Docker daemon via systemctl
+    let systemctl_result = Command::new("systemctl")
+        .args(&["start", "docker"])
+        .output();
+    
+    if let Ok(output) = systemctl_result {
+        if output.status.success() {
+            // Wait a moment for Docker to start
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            return Ok("Docker service started successfully".to_string());
+        }
+    }
+    
+    Err("Failed to start Docker service. Please ensure Docker is installed and you have permission to start system services.".to_string())
+}
+
+/// Stop Docker service
+async fn stop_docker_service() -> Result<String, String> {
+    use std::process::Command;
+    
+    // Try to stop Docker daemon via systemctl
+    let systemctl_result = Command::new("systemctl")
+        .args(&["stop", "docker"])
+        .output();
+    
+    if let Ok(output) = systemctl_result {
+        if output.status.success() {
+            return Ok("Docker service stopped successfully".to_string());
+        } else {
+            let error_msg = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("Failed to stop Docker service: {}", error_msg));
+        }
+    }
+    
+    Err("Failed to stop Docker service. Please ensure you have permission to stop system services.".to_string())
 }
 
 #[tauri::command]
@@ -332,62 +512,30 @@ pub async fn add_custom_sdk_directory(
 ) -> Result<String, String> {
     println!("[SDK] Adding custom directory: {} for {}", path, sdk_type);
     
-    // Mock implementation - in real implementation, this would add the directory
-    Ok(format!("Added custom directory: {} for {}", path, sdk_type))
+    Err("Custom SDK directory management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn remove_custom_sdk_directory(path: String, sdk_type: String) -> Result<String, String> {
     println!("[SDK] Removing custom directory: {} for {}", path, sdk_type);
     
-    // Mock implementation - in real implementation, this would remove the directory
-    Ok(format!("Removed custom directory: {} for {}", path, sdk_type))
+    Err("Custom SDK directory management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn get_custom_directories(sdk_type: String) -> Result<Vec<serde_json::Value>, String> {
     println!("[SDK] Getting custom directories for: {}", sdk_type);
     
-    // Mock implementation - in real implementation, this would return actual directories
-    let directories = vec![
-        serde_json::json!({
-            "id": "custom-1",
-            "path": "/custom/path/1",
-            "sdk_type": sdk_type,
-            "active": true
-        }),
-        serde_json::json!({
-            "id": "custom-2", 
-            "path": "/custom/path/2",
-            "sdk_type": sdk_type,
-            "active": false
-        })
-    ];
-    
-    Ok(directories)
+    // Return empty array - custom directory management not yet implemented
+    Ok(vec![])
 }
 
 #[tauri::command]
 pub async fn get_service_logs(service_id: String, lines: usize) -> Result<Vec<serde_json::Value>, String> {
     println!("[SDK] Getting service logs for: {} (last {} lines)", service_id, lines);
     
-    // Mock implementation - in real implementation, this would return actual logs
-    let logs = vec![
-        serde_json::json!({
-            "timestamp": "2024-01-15T10:30:00Z",
-            "level": "INFO",
-            "message": "Service started successfully",
-            "service_id": service_id
-        }),
-        serde_json::json!({
-            "timestamp": "2024-01-15T10:31:00Z",
-            "level": "DEBUG",
-            "message": "Processing request",
-            "service_id": service_id
-        })
-    ];
-    
-    Ok(logs)
+    // Service log retrieval not yet implemented
+    Ok(vec![])
 }
 
 #[tauri::command]
@@ -397,30 +545,38 @@ pub async fn update_service_config(
 ) -> Result<String, String> {
     println!("[SDK] Updating service config for: {}", service_id);
     
-    // Mock implementation - in real implementation, this would update the config
-    Ok(format!("Updated config for service: {}", service_id))
+    Err("Service configuration management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn restart_service(service_id: String) -> Result<String, String> {
     println!("[SDK] Restarting service: {}", service_id);
     
-    // Mock implementation - in real implementation, this would restart the service
-    Ok(format!("Restarted service: {}", service_id))
+    // Try to restart by stopping and starting
+    let stop_result = stop_service(service_id.clone()).await;
+    if stop_result.is_err() {
+        return stop_result;
+    }
+    
+    // Wait a moment before starting
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    
+    start_service(service_id).await
 }
 
 #[tauri::command]
 pub async fn get_service_health(service_id: String) -> Result<serde_json::Value, String> {
     println!("[SDK] Getting service health for: {}", service_id);
     
-    // Mock implementation - in real implementation, this would return actual health data
+    // Get basic status - detailed health metrics not yet implemented
+    let status = get_service_status(service_id.clone()).await?;
+    
     let health = serde_json::json!({
         "service_id": service_id,
-        "status": "healthy",
-        "cpu_usage": 15.5,
-        "memory_usage": 256.7,
-        "uptime": 3600,
-        "last_check": "2024-01-15T10:30:00Z"
+        "status": if status.running { "healthy" } else { "stopped" },
+        "running": status.running,
+        "port": status.port,
+        "pid": status.pid
     });
     
     Ok(health)
@@ -433,25 +589,18 @@ pub async fn set_path_environment(
 ) -> Result<String, String> {
     println!("[SDK] Setting PATH environment for: {} version {}", sdk_type, version);
     
-    // Mock implementation - in real implementation, this would update PATH
-    Ok(format!("Set PATH for {} version {}", sdk_type, version))
+    Err("PATH environment management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn get_path_status(sdk_type: String) -> Result<serde_json::Value, String> {
     println!("[SDK] Getting PATH status for: {}", sdk_type);
     
-    // Mock implementation - in real implementation, this would return actual PATH status
+    // Basic PATH status - detailed management not yet implemented
     let status = serde_json::json!({
         "sdk_type": sdk_type,
-        "in_path": true,
-        "path_entries": [
-            {
-                "path": "/usr/local/bin",
-                "active": true,
-                "priority": 1
-            }
-        ]
+        "in_path": false,
+        "path_entries": []
     });
     
     Ok(status)
@@ -465,62 +614,30 @@ pub async fn create_alias(
 ) -> Result<String, String> {
     println!("[SDK] Creating alias: {} -> {} for {}", alias_name, version, sdk_type);
     
-    // Mock implementation - in real implementation, this would create the alias
-    Ok(format!("Created alias: {} -> {} for {}", alias_name, version, sdk_type))
+    Err("Version alias management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn remove_alias(alias_name: String) -> Result<String, String> {
     println!("[SDK] Removing alias: {}", alias_name);
     
-    // Mock implementation - in real implementation, this would remove the alias
-    Ok(format!("Removed alias: {}", alias_name))
+    Err("Version alias management is not yet implemented".to_string())
 }
 
 #[tauri::command]
 pub async fn list_aliases(sdk_type: String) -> Result<Vec<serde_json::Value>, String> {
     println!("[SDK] Listing aliases for: {}", sdk_type);
     
-    // Mock implementation - in real implementation, this would return actual aliases
-    let aliases = vec![
-        serde_json::json!({
-            "name": "stable",
-            "version": "18.17.0",
-            "sdk_type": sdk_type,
-            "active": true
-        }),
-        serde_json::json!({
-            "name": "lts",
-            "version": "16.20.0", 
-            "sdk_type": sdk_type,
-            "active": false
-        })
-    ];
-    
-    Ok(aliases)
+    // Return empty array - alias management not yet implemented
+    Ok(vec![])
 }
 
 #[tauri::command]
 pub async fn detect_version_files(project_path: String) -> Result<Vec<serde_json::Value>, String> {
     println!("[SDK] Detecting version files in: {}", project_path);
     
-    // Mock implementation - in real implementation, this would scan for version files
-    let files = vec![
-        serde_json::json!({
-            "file": ".nvmrc",
-            "sdk_type": "nodejs",
-            "version": "18.17.0",
-            "path": format!("{}/.nvmrc", project_path)
-        }),
-        serde_json::json!({
-            "file": ".python-version",
-            "sdk_type": "python", 
-            "version": "3.11.0",
-            "path": format!("{}/.python-version", project_path)
-        })
-    ];
-    
-    Ok(files)
+    // Version file detection not yet implemented
+    Ok(vec![])
 }
 
 #[tauri::command]
@@ -531,8 +648,7 @@ pub async fn create_version_file(
 ) -> Result<String, String> {
     println!("[SDK] Creating version file: {} for {} at {}", sdk_type, version, project_path);
     
-    // Mock implementation - in real implementation, this would create the version file
-    Ok(format!("Created version file for {} version {} in {}", sdk_type, version, project_path))
+    Err("Version file creation is not yet implemented".to_string())
 }
 
 #[tauri::command]

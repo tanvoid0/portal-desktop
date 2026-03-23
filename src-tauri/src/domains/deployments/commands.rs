@@ -17,7 +17,7 @@ pub async fn get_deployments_command(
     _app_handle: tauri::AppHandle,
     _state: State<'_, Arc<DeploymentService>>,
 ) -> Result<Vec<Deployment>, String> {
-    _state.get_deployments()
+    _state.get_deployments().await
 }
 
 #[tauri::command]
@@ -26,7 +26,7 @@ pub async fn get_deployment_command(
     _state: State<'_, Arc<DeploymentService>>,
     deployment_id: String,
 ) -> Result<Option<Deployment>, String> {
-    _state.get_deployment(&deployment_id)
+    _state.get_deployment(&deployment_id).await
 }
 
 #[tauri::command]

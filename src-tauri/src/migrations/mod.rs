@@ -23,6 +23,8 @@ pub mod m20240101_000020_create_project_frameworks_table;
 pub mod m20240101_000021_create_project_languages_table;
 pub mod m20240101_000022_create_project_package_managers_table;
 pub mod m20240101_000023_create_device_approvals_table;
+pub mod m20240101_000024_create_sdk_tables;
+pub mod m20240101_000025_create_script_executions_table;
 
 // Re-export all migrations for easy access
 pub use m20240101_000001_create_frameworks_table::Migration as createFrameworksTable;
@@ -48,6 +50,8 @@ pub use m20240101_000020_create_project_frameworks_table::Migration as createPro
 pub use m20240101_000021_create_project_languages_table::Migration as createProjectLanguagesTable;
 pub use m20240101_000022_create_project_package_managers_table::Migration as createProjectPackageManagersTable;
 pub use m20240101_000023_create_device_approvals_table::Migration as createDeviceApprovalsTable;
+pub use m20240101_000024_create_sdk_tables::Migration as createSdkTables;
+pub use m20240101_000025_create_script_executions_table::Migration as createScriptExecutionsTable;
 
 // Create a function to get all migrations
 // Organized by logical dependency order:
@@ -104,5 +108,11 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         
         // 10. Device approvals table (for browser authentication)
         Box::new(createDeviceApprovalsTable),
+        
+        // 11. SDK management tables
+        Box::new(createSdkTables),
+
+        // 12. Script executions table (depends on blocks)
+        Box::new(createScriptExecutionsTable),
     ]
 }

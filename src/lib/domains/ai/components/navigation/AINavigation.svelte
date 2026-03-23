@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
+	import { MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
 	import { Sparkles, MessageSquare, Settings, Database, FileText } from 'lucide-svelte';
-	import { cn } from '$lib/utils';
 
 	const navItems = [
 		{
@@ -38,27 +37,26 @@
 </script>
 
 <nav class="space-y-1">
-	<div class="px-3 py-2 mb-2">
-		<h2 class="text-lg font-semibold flex items-center gap-2">
-			<Sparkles class="h-5 w-5" />
+	<div class="px-3 py-2 mb-3 group-data-[collapsible=icon]:hidden">
+		<h2 class="text-lg font-semibold flex items-center gap-2 text-foreground">
+			<Sparkles class="h-5 w-5 text-primary" />
 			AI
 		</h2>
 	</div>
 	{#each navItems as item}
-		<Button
-			variant={isActive(item.url) ? 'secondary' : 'ghost'}
-			class={cn(
-				'w-full justify-start',
-				isActive(item.url) && 'bg-secondary'
-			)}
+		<SidebarMenuButton
+			size="default"
+			isActive={isActive(item.url)}
+			tooltipContent={item.title}
 			onclick={() => goto(item.url)}
+			class="items-start"
 		>
-			<svelte:component this={item.icon} class="h-4 w-4 mr-2" />
-			<div class="flex flex-col items-start">
-				<span>{item.title}</span>
-				<span class="text-xs text-muted-foreground">{item.description}</span>
+			<svelte:component this={item.icon} class="h-4 w-4 flex-shrink-0" />
+			<div class="flex flex-col items-start gap-0.5 min-w-0 group-data-[collapsible=icon]:hidden">
+				<span class="text-sm font-medium">{item.title}</span>
+				<span class="text-xs opacity-70">{item.description}</span>
 			</div>
-		</Button>
+		</SidebarMenuButton>
 	{/each}
 </nav>
 

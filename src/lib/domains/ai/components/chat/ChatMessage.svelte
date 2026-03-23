@@ -6,9 +6,10 @@
 
 	interface Props {
 		message: ChatMessageType;
+		showLoader?: boolean;
 	}
 
-	let { message }: Props = $props();
+	let { message, showLoader = false }: Props = $props();
 
 	// Configure marked options
 	marked.setOptions({
@@ -36,15 +37,23 @@
 			{:else}
 				<User class="h-4 w-4 mt-0.5 shrink-0" />
 			{/if}
-			<div
-				class="flex-1 text-sm prose prose-sm max-w-none dark:prose-invert {message.role === 'user'
-					? 'prose-invert' : ''} 
-					prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 
-					prose-code:text-xs prose-pre:my-2 prose-pre:p-2 prose-pre:rounded prose-pre:overflow-x-auto
-					prose-a:underline prose-strong:font-semibold prose-em:italic"
-			>
-				{@html renderedContent}
-			</div>
+			{#if showLoader && message.role === 'assistant' && !message.content}
+				<div class="flex gap-1">
+					<span class="w-2 h-2 rounded-full bg-foreground/50 animate-pulse"></span>
+					<span class="w-2 h-2 rounded-full bg-foreground/50 animate-pulse" style="animation-delay: 0.2s"></span>
+					<span class="w-2 h-2 rounded-full bg-foreground/50 animate-pulse" style="animation-delay: 0.4s"></span>
+				</div>
+			{:else}
+				<div
+					class="flex-1 text-sm prose prose-sm max-w-none dark:prose-invert {message.role === 'user'
+						? 'prose-invert' : ''} 
+						prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 
+						prose-code:text-xs prose-pre:my-2 prose-pre:p-2 prose-pre:rounded prose-pre:overflow-x-auto
+						prose-a:underline prose-strong:font-semibold prose-em:italic"
+				>
+					{@html renderedContent}
+				</div>
+			{/if}
 		</div>
 	</Card>
 	{#if message.timestamp}

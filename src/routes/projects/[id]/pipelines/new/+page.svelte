@@ -92,7 +92,7 @@
 	}
 
 	const recommendedTemplates = $derived(
-		project ? pipelineTemplateService.getRecommendedTemplates(project.framework) : []
+		project ? pipelineTemplateService.getRecommendedTemplates(project.metadata?.framework || '') : []
 	);
 	const allTemplates = $derived(pipelineTemplateService.getAllTemplates());
 
@@ -167,14 +167,14 @@
 			
 			<TabsContent value="templates" class="mt-6">
 				<div class="space-y-6">
-					{#if project?.framework && recommendedTemplates.length > 0}
+					{#if project?.metadata?.framework && recommendedTemplates.length > 0}
 						<div>
 							<h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
 								<Sparkles class="h-5 w-5" />
-								Recommended for {project?.framework || 'all frameworks'}
+								Recommended for {project?.metadata?.framework || 'all frameworks'}
 							</h2>
 							<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-								{#each recommendedTemplates.filter((t) => project && t.framework === project.framework) as template}
+								{#each recommendedTemplates.filter((t) => project && t.framework === project.metadata?.framework) as template}
 									{@const CategoryIcon = getCategoryIcon(template.category)}
 								<Card
 									class="cursor-pointer hover:border-primary transition-colors {selectedTemplate?.key === template.key ? 'border-primary' : ''}"
@@ -270,14 +270,14 @@
 			</TabsList>
 
 			<TabsContent value="recommended" class="mt-6">
-				{#if project?.framework && recommendedTemplates.length > 0}
+				{#if project?.metadata?.framework && recommendedTemplates.length > 0}
 					<div class="space-y-4">
 						<div class="flex items-center gap-2 mb-4">
 							<Sparkles class="h-5 w-5" />
-							<h2 class="text-lg font-semibold">Recommended for {project?.framework || 'all frameworks'}</h2>
+							<h2 class="text-lg font-semibold">Recommended for {project?.metadata?.framework || 'all frameworks'}</h2>
 						</div>
 						<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-							{#each recommendedTemplates.filter((t) => project && t.framework === project.framework) as template}
+							{#each recommendedTemplates.filter((t) => project && t.framework === project.metadata?.framework) as template}
 								{@const CategoryIcon = getCategoryIcon(template.category)}
 								<Card
 									class="cursor-pointer hover:border-primary transition-colors"

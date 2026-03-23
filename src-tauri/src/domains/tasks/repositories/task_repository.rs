@@ -232,6 +232,23 @@ impl TaskRepository {
             .await
     }
 
+    /// Count all "main tasks" (tasks without a parent).
+    pub async fn count_main_tasks(&self) -> Result<u64, sea_orm::DbErr> {
+        TaskEntity::find()
+            .filter(Column::ParentId.is_null())
+            .count(&self.db)
+            .await
+    }
+
+    /// Count main tasks by a specific status (e.g. pending, in-progress).
+    pub async fn count_main_tasks_by_status(&self, status: &str) -> Result<u64, sea_orm::DbErr> {
+        TaskEntity::find()
+            .filter(Column::ParentId.is_null())
+            .filter(Column::Status.eq(status))
+            .count(&self.db)
+            .await
+    }
+
     pub async fn count(&self) -> Result<u64, sea_orm::DbErr> {
         TaskEntity::find().count(&self.db).await
     }

@@ -7,7 +7,8 @@
 	import type { Project } from '@/lib/domains/projects/types';
 	import { formatRelativeTime, formatBytes } from '@/lib/domains/shared/utils';
 	import { Button } from '@/lib/components/ui/button';
-	import { Edit, Trash2 } from '@lucide/svelte';
+	import { CardInfo } from '@/lib/components/ui/card';
+	import { Edit, Trash2, Folder } from '@lucide/svelte';
 
 	interface Props {
 		project: Project;
@@ -107,52 +108,40 @@
 
 </script>
 
-<div 
-	class="card card-hover cursor-pointer group"
+<CardInfo
+	title={project.name}
+	description={project.description}
+	icon={Folder}
+	value={project.metadata?.fileCount?.toString()}
 	onclick={handleClick}
+	class="cursor-pointer group h-full"
 	role="button"
-	tabindex="0"
+	tabindex={0}
 	onkeydown={(e) => e.key === 'Enter' && handleClick()}
 >
-	<div class="flex items-start justify-between">
-		<div class="flex-1 min-w-0">
-			<div class="flex items-center gap-2 mb-2">
-				<i class="text-lg {getFrameworkIconClass(project.framework)}"></i>
-				<h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 truncate">
-					{project.name}
-				</h3>
-			</div>
-			
-			{#if project.description}
-				<p class="text-sm text-neutral-600 dark:text-neutral-400 mb-3 line-clamp-2">
-					{project.description}
-				</p>
+	<div class="space-y-3">
+		<div class="flex items-center gap-2 flex-wrap">
+			{#if project.metadata?.framework}
+				<span class="badge {getFrameworkColor(project.metadata.framework)}">
+					{project.metadata.framework}
+				</span>
 			{/if}
+			{#if project.metadata?.gitInfo?.branch}
+				<span class="badge badge-neutral">
+					{project.metadata.gitInfo.branch}
+				</span>
+			{/if}
+		</div>
 
-			<div class="flex items-center gap-2 mb-3">
-				{#if project.framework}
-					<span class="badge {getFrameworkColor(project.framework)}">
-						{project.framework}
-					</span>
-				{/if}
-				{#if project.metadata.gitInfo?.branch}
-					<span class="badge badge-neutral">
-						{project.metadata.gitInfo.branch}
-					</span>
-				{/if}
-			</div>
-
-			<div class="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
-				{#if project.metadata.lastOpened}
-					<span>Last opened {formatRelativeTime(project.metadata.lastOpened)}</span>
-				{/if}
-				<span>{formatBytes(project.metadata.size)}</span>
-				<span>{project.metadata.fileCount} files</span>
-			</div>
+		<div class="flex items-center gap-4 text-xs text-muted-foreground">
+			{#if project.last_opened}
+				<span>Last opened {formatRelativeTime(project.last_opened)}</span>
+			{/if}
+			<span>{formatBytes(project.size ?? 0)}</span>
 		</div>
 
 		{#if showActions}
-			<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+			<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pt-2 border-t">
 				<Button
 					variant="ghost"
 					size="sm"
@@ -176,4 +165,4 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</CardInfo>

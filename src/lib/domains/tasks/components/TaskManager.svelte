@@ -266,7 +266,9 @@
 
 	// Initialize
 	onMount(() => {
-		// Tasks are automatically loaded from database on app start
+		// Load tasks only when this page is opened.
+		// This avoids pulling full task data when other pages import `taskStats`.
+		void taskActions.loadTasks();
 	});
 </script>
 

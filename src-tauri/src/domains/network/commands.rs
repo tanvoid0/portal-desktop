@@ -1,6 +1,7 @@
 use tauri::command;
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, OnceLock};
+use tokio::sync::Mutex;
 use chrono::{Utc, Duration};
 use sea_orm::{EntityTrait, Set, ColumnTrait, QueryFilter, QueryOrder};
 use uuid::Uuid;
@@ -32,16 +33,16 @@ impl PasscodeStore {
         format!("{:06}", rng.gen_range(0..1000000))
     }
 
-    fn store_passcode(&self, device_id: String, passcode: String) {
+    async fn store_passcode(&self, device_id: String, passcode: String) {
         let expires_at = Utc::now() + Duration::minutes(5);
-        let mut store = self.passcodes.lock().unwrap();
+        let mut store = self.passcodes.lock().await;
         store.insert(device_id, (passcode, expires_at));
         // Clean up expired passcodes
         store.retain(|_, (_, exp)| *exp > Utc::now());
     }
 
-    fn verify_passcode(&self, device_id: &str, passcode: &str) -> bool {
-        let store = self.passcodes.lock().unwrap();
+    async fn verify_passcode(&self, device_id: &str, passcode: &str) -> bool {
+        let store = self.passcodes.lock().await;
         if let Some((stored_passcode, expires_at)) = store.get(device_id) {
             if expires_at > &Utc::now() && stored_passcode == passcode {
                 return true;
@@ -50,14 +51,16 @@ impl PasscodeStore {
         false
     }
 
-    fn remove_passcode(&self, device_id: &str) {
-        let mut store = self.passcodes.lock().unwrap();
+    async fn remove_passcode(&self, device_id: &str) {
+        let mut store = self.passcodes.lock().await;
         store.remove(device_id);
     }
 }
 
-lazy_static::lazy_static! {
-    static ref PASSCODE_STORE: PasscodeStore = PasscodeStore::new();
+static PASSCODE_STORE: OnceLock<PasscodeStore> = OnceLock::new();
+
+fn get_passcode_store() -> &'static PasscodeStore {
+    PASSCODE_STORE.get_or_init(|| PasscodeStore::new())
 }
 
 /// Get the local network IP address (non-loopback, private network preferred)
@@ -122,8 +125,9 @@ pub async fn generate_device_passcode(
 ) -> Result<GeneratePasscodeResponse, String> {
     log_info!("device_auth", "Generating passcode for device_id: {}", request.device_id);
     
-    let passcode = PASSCODE_STORE.generate_passcode();
-    PASSCODE_STORE.store_passcode(request.device_id.clone(), passcode.clone());
+    let store = get_passcode_store();
+    let passcode = store.generate_passcode();
+    store.store_passcode(request.device_id.clone(), passcode.clone()).await;
 
     // Store device approval request in database
     let conn = db.get_connection_clone();
@@ -230,7 +234,8 @@ pub async fn verify_device_passcode(
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<VerifyPasscodeResponse, String> {
     // Verify passcode
-    if !PASSCODE_STORE.verify_passcode(&request.device_id, &request.passcode) {
+    let store = get_passcode_store();
+    if !store.verify_passcode(&request.device_id, &request.passcode).await {
         return Ok(VerifyPasscodeResponse {
             approved: false,
             access_token: None,
@@ -240,7 +245,7 @@ pub async fn verify_device_passcode(
     }
 
     // Remove passcode after verification
-    PASSCODE_STORE.remove_passcode(&request.device_id);
+    store.remove_passcode(&request.device_id).await;
 
     // Check if device already exists in database
     let conn = db.get_connection_clone();

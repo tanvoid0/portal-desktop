@@ -3,17 +3,17 @@
  */
 
 import { invokeClient } from '@/lib/utils/invokeClient';
-import type { 
-	Project, 
-	CreateProjectRequest, 
-	UpdateProjectRequest, 
-	ProjectTemplate,
+import type {
+	Project,
+	CreateProjectRequest,
+	UpdateProjectRequest,
 	ProjectStats,
 	ProjectMetadata
 } from '@/lib/domains/projects/types';
 import { projectStore } from '@/lib/domains/projects/stores/projectStore';
 import { logger } from '@/lib/domains/shared/services/logger';
 import { cache } from '@/lib/domains/shared/services/cache';
+import { dashboardStore } from '@/lib/domains/dashboard/stores/dashboardStore';
 import { patternCollector, suggestionEngine } from '@/lib/domains/learning';
 
 const log = logger.createScoped('ProjectService');
@@ -196,6 +196,10 @@ class ProjectService {
 			
 			// Update cache
 			cache.delete('projects');
+
+			// Keep dashboard badges/cards consistent (TTL cache invalidation + refresh).
+			dashboardStore.invalidate();
+			void dashboardStore.refresh(true);
 			
 			// Learn from project creation pattern
 			// TODO: Update learning pattern collection to work with framework_ids and package_manager_ids arrays
@@ -238,6 +242,10 @@ class ProjectService {
 			
 			// Update cache
 			cache.delete('projects');
+
+			// Keep dashboard badges/cards consistent.
+			dashboardStore.invalidate();
+			void dashboardStore.refresh(true);
 			
 			log.info('Project updated successfully', { id });
 			return project;
@@ -270,6 +278,10 @@ class ProjectService {
 			
 			// Update cache
 			cache.delete('projects');
+
+			// Keep dashboard badges/cards consistent.
+			dashboardStore.invalidate();
+			void dashboardStore.refresh(true);
 			
 			log.info('Project deleted successfully', { id });
 		} catch (error) {
@@ -308,54 +320,8 @@ class ProjectService {
 		}
 	}
 
-	/**
-	 * Get project templates
-	 */
-	async getTemplates(): Promise<ProjectTemplate[]> {
-		try {
-			// Check cache first
-			const cached = cache.get<ProjectTemplate[]>('project_templates');
-			if (cached) {
-				return cached;
-			}
-
-			const templates = await invokeClient.post<ProjectTemplate[]>('get_project_templates');
-			
-			// Cache for 1 hour
-			cache.set('project_templates', templates, 60 * 60 * 1000);
-			
-			return templates;
-		} catch (error) {
-			log.error('Failed to get project templates', { error });
-			throw error;
-		}
-	}
-
-	/**
-	 * Create project from template
-	 */
-	async createFromTemplate(templateId: string, projectData: Omit<CreateProjectRequest, 'type'>): Promise<Project> {
-		try {
-			log.info('Creating project from template', { templateId, name: projectData.name });
-			
-			const project = await invokeClient.post<Project>('create_project_from_template', {
-				templateId,
-				projectData
-			});
-			
-			// Update store
-			projectStore.setProjects(prev => [...prev, project]);
-			
-			// Update cache
-			cache.delete('projects');
-			
-			log.info('Project created from template successfully', { id: project.id });
-			return project;
-		} catch (error) {
-			log.error('Failed to create project from template', { error });
-			throw error;
-		}
-	}
+	// Note: getTemplates() and createFromTemplate() removed - no backend support
+	// These features can be implemented when backend commands are added
 
 	/**
 	 * Get project statistics
@@ -387,7 +353,23 @@ class ProjectService {
 		try {
 			log.info('Refreshing project metadata', { id });
 			
-			const metadata = await invokeClient.post<Partial<ProjectMetadata>>('get_project_metadata', { id });
+			const result = await invokeClient.post<Project>('refresh_project_metadata', { id: parseInt(id) });
+
+			if (!result) {
+				throw new Error('Project not found');
+			}
+
+			const metadata: Partial<ProjectMetadata> = {
+				size: result.size,
+				fileCount: result.file_count,
+				gitInfo: result.git_repository ? {
+					repository: result.git_repository,
+					branch: result.git_branch,
+					commit: result.git_commit,
+					hasUncommittedChanges: result.has_uncommitted_changes,
+					lastCommit: result.last_commit ? new Date(result.last_commit) : undefined
+				} : undefined
+			};
 			
 			// Update store
 			projectStore.updateProjectMetadata(id, metadata);
@@ -399,18 +381,8 @@ class ProjectService {
 		}
 	}
 
-	/**
-	 * Search projects
-	 */
-	async searchProjects(query: string): Promise<Project[]> {
-		try {
-			const projects = await invokeClient.post<Project[]>('search_projects', { query });
-			return projects;
-		} catch (error) {
-			log.error('Failed to search projects', { error });
-			throw error;
-		}
-	}
+	// Note: searchProjects() removed - no backend support
+	// Use getProjects() with filters instead, or implement backend command
 
 	/**
 	 * Open project in file explorer
@@ -428,49 +400,8 @@ class ProjectService {
 		}
 	}
 
-	/**
-	 * Export project
-	 */
-	async exportProject(id: string, format: 'zip' | 'tar' = 'zip'): Promise<string> {
-		try {
-			log.info('Exporting project', { id, format });
-			
-			const exportPath = await invokeClient.post<string>('export_project', { id, format });
-			
-			log.info('Project exported successfully', { id, exportPath });
-			return exportPath;
-		} catch (error) {
-			log.error('Failed to export project', { error });
-			throw error;
-		}
-	}
-
-	/**
-	 * Import project
-	 */
-	async importProject(filePath: string): Promise<Project> {
-		try {
-			log.info('Importing project', { filePath });
-			
-			const project = await invokeClient.post<Project>('import_project', { filePath });
-			
-			// Update store
-			projectStore.setProjects(prev => [...prev, project]);
-			
-			// Update cache
-			cache.delete('projects');
-			
-			// Learn from imported project
-			// TODO: Update learning pattern collection to work with framework_ids and package_manager_ids arrays
-			// For now, we skip this since we need to fetch framework/package manager names from IDs
-			
-			log.info('Project imported successfully', { id: project.id });
-			return project;
-		} catch (error) {
-			log.error('Failed to import project', { error });
-			throw error;
-		}
-	}
+	// Note: exportProject() and importProject() removed - no backend support
+	// These features can be implemented when backend commands are added
 
 	/**
 	 * Get intelligent suggestions for new project setup

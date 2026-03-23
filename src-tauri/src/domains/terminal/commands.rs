@@ -1,6 +1,7 @@
 use std::process::Command;
 use std::collections::HashMap;
 use std::sync::OnceLock;
+use tokio::sync::Mutex;
 use tauri::{command, State, Window};
 use crate::domains::terminal::types::*;
 use crate::domains::terminal::manager::TerminalManager;
@@ -62,7 +63,7 @@ pub async fn get_process_exit_code(
     manager: State<'_, TerminalManager>,
 ) -> Result<Option<i32>, String> {
     let processes = manager.get_processes();
-    let processes = processes.lock().unwrap();
+    let processes = processes.lock().await;
     if let Some(process) = processes.get(&process_id) {
         Ok(process.exit_code)
     } else {
@@ -412,11 +413,11 @@ pub struct CommandHistoryEntry {
 }
 
 // In-memory storage for command history (in production, use a database)
-static COMMAND_HISTORY: OnceLock<std::sync::Mutex<HashMap<String, Vec<CommandHistoryEntry>>>> = OnceLock::new();
+static COMMAND_HISTORY: OnceLock<Mutex<HashMap<String, Vec<CommandHistoryEntry>>>> = OnceLock::new();
 
 #[command]
 pub async fn save_command_history(tab_id: String, entries: Vec<CommandHistoryEntry>) -> Result<(), String> {
-    let mut history = COMMAND_HISTORY.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().map_err(|e| format!("Failed to lock history: {}", e))?;
+    let mut history = COMMAND_HISTORY.get_or_init(|| Mutex::new(HashMap::new())).lock().await;
     let tab_id_clone = tab_id.clone();
     history.insert(tab_id, entries);
     println!("Saved command history for tab: {}", tab_id_clone);
@@ -425,7 +426,7 @@ pub async fn save_command_history(tab_id: String, entries: Vec<CommandHistoryEnt
 
 #[command]
 pub async fn load_command_history(tab_id: String) -> Result<Vec<CommandHistoryEntry>, String> {
-    let history = COMMAND_HISTORY.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().map_err(|e| format!("Failed to lock history: {}", e))?;
+    let history = COMMAND_HISTORY.get_or_init(|| Mutex::new(HashMap::new())).lock().await;
     let entries = history.get(&tab_id).cloned().unwrap_or_default();
     println!("Loaded {} command history entries for tab: {}", entries.len(), tab_id);
     Ok(entries)
@@ -433,7 +434,7 @@ pub async fn load_command_history(tab_id: String) -> Result<Vec<CommandHistoryEn
 
 #[command]
 pub async fn clear_command_history(tab_id: Option<String>) -> Result<(), String> {
-    let mut history = COMMAND_HISTORY.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().map_err(|e| format!("Failed to lock history: {}", e))?;
+    let mut history = COMMAND_HISTORY.get_or_init(|| Mutex::new(HashMap::new())).lock().await;
     if let Some(tab) = tab_id {
         history.remove(&tab);
         println!("Cleared command history for tab: {}", tab);
@@ -458,11 +459,11 @@ pub struct TerminalSession {
 }
 
 // In-memory storage for terminal sessions
-static TERMINAL_SESSIONS: OnceLock<std::sync::Mutex<HashMap<String, TerminalSession>>> = OnceLock::new();
+static TERMINAL_SESSIONS: OnceLock<Mutex<HashMap<String, TerminalSession>>> = OnceLock::new();
 
 #[command]
 pub async fn save_terminal_session(session: TerminalSession) -> Result<(), String> {
-    let mut sessions = TERMINAL_SESSIONS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    let mut sessions = TERMINAL_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())).lock().await;
     let tab_id = session.tab_id.clone();
     sessions.insert(tab_id.clone(), session);
     println!("Saved terminal session for tab: {}", tab_id);
@@ -471,7 +472,7 @@ pub async fn save_terminal_session(session: TerminalSession) -> Result<(), Strin
 
 #[command]
 pub async fn load_terminal_session(tab_id: String) -> Result<Option<TerminalSession>, String> {
-    let sessions = TERMINAL_SESSIONS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    let sessions = TERMINAL_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())).lock().await;
     let session = sessions.get(&tab_id).cloned();
     if session.is_some() {
         println!("Loaded terminal session for tab: {}", tab_id);
@@ -481,14 +482,14 @@ pub async fn load_terminal_session(tab_id: String) -> Result<Option<TerminalSess
 
 #[command]
 pub async fn list_terminal_sessions() -> Result<Vec<String>, String> {
-    let sessions = TERMINAL_SESSIONS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    let sessions = TERMINAL_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())).lock().await;
     let tab_ids: Vec<String> = sessions.keys().cloned().collect();
     Ok(tab_ids)
 }
 
 #[command]
 pub async fn delete_terminal_session(tab_id: String) -> Result<(), String> {
-    let mut sessions = TERMINAL_SESSIONS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    let mut sessions = TERMINAL_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())).lock().await;
     sessions.remove(&tab_id);
     println!("Deleted terminal session for tab: {}", tab_id);
     Ok(())
@@ -496,7 +497,7 @@ pub async fn delete_terminal_session(tab_id: String) -> Result<(), String> {
 
 #[command]
 pub async fn clear_all_sessions() -> Result<(), String> {
-    let mut sessions = TERMINAL_SESSIONS.get_or_init(|| std::sync::Mutex::new(HashMap::new())).lock().map_err(|e| format!("Failed to lock sessions: {}", e))?;
+    let mut sessions = TERMINAL_SESSIONS.get_or_init(|| Mutex::new(HashMap::new())).lock().await;
     sessions.clear();
     println!("Cleared all terminal sessions");
     Ok(())

@@ -61,6 +61,7 @@ export interface ProjectMetadata {
 	fileCount: number;
 	gitInfo?: GitInfo;
 	dependencies?: DependencyInfo;
+	framework?: string;
 }
 
 export interface GitInfo {

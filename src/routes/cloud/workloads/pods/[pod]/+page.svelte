@@ -15,7 +15,7 @@
 	import { Label } from '@/lib/components/ui/label';
 	import { Input } from '@/lib/components/ui/input';
 	import { ArrowLeft, RefreshCw, Download, Terminal, FileCode, Network } from '@lucide/svelte';
-	import { invoke } from '@tauri-apps/api/core';
+	import { invokeClient } from '@/lib/utils/invokeClient';
 	import Loading from '@/lib/components/ui/loading.svelte';
 	import { toastActions } from '$lib/domains/shared/stores/toastStore';
 	import type { PortForwardInfo } from '$lib/domains/cloud/providers/gcp/GCPTypes';
@@ -102,7 +102,7 @@
 		
 		loadingPortForwards = true;
 		try {
-			const forwards = await invoke<PortForwardInfo[]>('k8s_list_port_forwards');
+			const forwards = await invokeClient.post<PortForwardInfo[]>('k8s_list_port_forwards');
 			// Filter to only show forwards for this pod
 			activePortForwards = forwards.filter(f => 
 				pod && f.pod_name === pod.name && f.namespace === pod.namespace
@@ -116,7 +116,7 @@
 	
 	async function stopPortForward(id: string) {
 		try {
-			await invoke('k8s_stop_port_forward', { id });
+			await invokeClient.post('k8s_stop_port_forward', { id });
 			toastActions.success('Port forward stopped');
 			await loadPortForwards();
 		} catch (error) {
@@ -125,7 +125,7 @@
 	}
 	
 	$effect(() => {
-		if (activeTab === 'logs' && !logs && !logsLoading) {
+		if (activeTab === 'logs' && !logs && !logsLoading && !logsError?.includes('waiting to start')) {
 			loadLogs();
 		} else if (activeTab === 'yaml' && !yaml && !yamlLoading) {
 			loadYAML();
@@ -187,8 +187,8 @@
 				const getLogsFn = pod.getLogs as (container?: string, tailLines?: number) => Promise<string>;
 				logs = await getLogsFn(containerToUse || undefined, tailLinesToUse || undefined);
 			} else {
-				// Fallback to direct invoke
-				logs = await invoke<string>('k8s_get_pod_logs', {
+				// Fallback to invokeClient
+				logs = await invokeClient.post<string>('k8s_get_pod_logs', {
 					namespace: pod.namespace,
 					podName: pod.name,
 					container: containerToUse,
@@ -197,9 +197,22 @@
 				});
 			}
 		} catch (err) {
-			logsError = err instanceof Error ? err.message : 'Failed to load logs';
+			const errorMessage = err instanceof Error ? err.message : String(err);
+			const isPodInitializing = errorMessage.includes('PodInitializing') || 
+			                        errorMessage.includes('waiting to start') ||
+			                        errorMessage.includes('is waiting to start');
+			
+			if (isPodInitializing) {
+				// Pod is still initializing - show user-friendly message, don't spam error toasts
+				logsError = 'Container is waiting to start. Logs will be available once the pod is ready.';
+				logs = ''; // Keep logs empty so we can retry later
+				// Don't show error toast for PodInitializing - it's expected behavior
+			} else {
+				// Other errors - show error toast
+				logsError = errorMessage;
 			console.error('Failed to load logs:', err);
 			toastActions.error(`Failed to load logs: ${logsError}`);
+			}
 		} finally {
 			logsLoading = false;
 		}
@@ -243,7 +256,7 @@
 			yamlLoading = true;
 			yamlError = null;
 			
-			yaml = await invoke<string>('k8s_get_pod_yaml', {
+			yaml = await invokeClient.post<string>('k8s_get_pod_yaml', {
 				namespace: pod.namespace,
 				podName: pod.name
 			});
@@ -292,7 +305,7 @@ status:
 		
 		if (confirm(`Are you sure you want to delete pod "${pod.name}"?`)) {
 			try {
-				await invoke('k8s_delete_pod', {
+				await invokeClient.post('k8s_delete_pod', {
 					namespace: pod.namespace,
 					podName: pod.name
 				});
@@ -310,9 +323,9 @@ status:
 		try {
 			metricsLoading = true;
 			metricsError = null;
-			const metrics = await invoke<any>('k8s_get_pod_metrics', {
+			const metrics = await invokeClient.post<any>('k8s_get_pod_metrics', {
 				namespace: pod.namespace,
-				pod_name: pod.name
+				podName: pod.name
 			});
 			podMetrics = metrics;
 		} catch (err) {
@@ -589,7 +602,18 @@ status:
 								<Loading text="Loading logs..." />
 							</div>
 						{:else if logsError}
-							<div class="text-destructive">{logsError}</div>
+							<div class="flex flex-col items-center justify-center py-8 space-y-4">
+								<div class="text-muted-foreground text-center">{logsError}</div>
+								{#if logsError.includes('waiting to start')}
+									<Button variant="outline" size="sm" onclick={() => {
+										logsError = null;
+										loadLogs();
+									}}>
+										<RefreshCw class="mr-2 h-4 w-4" />
+										Retry
+									</Button>
+								{/if}
+							</div>
 						{:else if parsedLogs.length > 0}
 							<LogsDisplay
 								logs={parsedLogs}
@@ -793,7 +817,7 @@ status:
 						try {
 							isPortForwarding = true;
 							portForwardMessage = null;
-							const result = await invoke<PortForwardInfo>('k8s_start_port_forward', {
+							const result = await invokeClient.post<PortForwardInfo>('k8s_start_port_forward', {
 								namespace: pod.namespace,
 								podName: pod.name,
 								localPort: portForwardLocalPort,

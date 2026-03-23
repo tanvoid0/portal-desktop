@@ -21,4 +21,5 @@ pub mod project_framework;
 pub mod project_language;
 pub mod project_package_manager;
 pub mod device_approval;
+pub mod script_execution;
 

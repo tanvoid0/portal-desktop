@@ -4,20 +4,17 @@
 -->
 
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Switch } from '$lib/components/ui/switch';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Separator } from '$lib/components/ui/separator';
-	import { Settings, Database, Code, Globe, Container, Package, Download } from '@lucide/svelte';
+	import { Settings, Database, Code, Globe, Container, Package, Download, CheckCircle, XCircle, ArrowLeft } from '@lucide/svelte';
 	import Devicon from '$lib/components/ui/devicon.svelte';
 	import { logger } from '$lib/domains/shared';
-	import { sdkService } from '$lib/domains/sdk/services/sdkService';
-	import { sdkManagers, installedSDKs } from '$lib/domains/sdk/stores/sdkStore';
-	import type { SDKManagerInfo } from '$lib/domains/sdk/types';
+	import { sdkConfigService, type ProcessedSDKConfig } from '$lib/domains/sdk/services/sdkConfigService';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
 
 	interface Props {
 		selectedSDK?: string;
@@ -28,10 +25,35 @@
 
 	const { selectedSDK, selectedView = 'overview', onSDKSelect, onViewSelect }: Props = $props();
 
-	// Get real data from stores
-	let managers = $derived($sdkManagers);
-	let sdks = $derived($installedSDKs);
+	// State
+	let sdkConfigs = $state<ProcessedSDKConfig[]>([]);
+	let loading = $state(true);
 	let currentPath = $derived($page.url.pathname);
+	const sidebar = useSidebar();
+
+	// Load SDK configs
+	$effect(() => {
+		loadSDKConfigs();
+	});
+
+	async function loadSDKConfigs() {
+		try {
+			loading = true;
+			const configs = await sdkConfigService.getAllSDKConfigs();
+			sdkConfigs = configs;
+			logger.info('SDK configs loaded', { 
+				context: 'SDKSidebar', 
+				data: { count: configs.length } 
+			});
+		} catch (error) {
+			logger.error('Failed to load SDK configs', {
+				context: 'SDKSidebar',
+				error
+			});
+		} finally {
+			loading = false;
+		}
+	}
 
 	// Navigation items - using actual routes
 	const navigationItems = [
@@ -42,10 +64,16 @@
 			description: 'SDK overview and statistics'
 		},
 		{
-			id: '/sdk/managers',
+			id: '/sdk/manager',
 			name: 'SDK Managers',
 			icon: 'lucide:settings',
 			description: 'Manage SDK version managers'
+		},
+		{
+			id: '/sdk/software-installer',
+			name: 'Software Installer',
+			icon: 'lucide:package',
+			description: 'Install and manage software via package managers'
 		},
 		{
 			id: '/sdk/installations',
@@ -66,108 +94,127 @@
 		version?: string;
 		description?: string;
 		hasToggle?: boolean;
+		port?: number | null;
+		isRunning?: boolean;
 	}
 
-	// Convert real managers and SDKs to SDKItem format
+	// Convert SDK configs to SDKItem format
 	let languageSDKs = $derived(() => {
-		return managers
-			.filter((manager: SDKManagerInfo) => {
-				const category = manager.category || '';
-				return category === 'language';
-			})
-			.map((manager: SDKManagerInfo) => ({
-				id: manager.type || manager.name,
-				name: manager.type || manager.name,
-				displayName: manager.display_name || manager.name,
-				icon: getSDKIcon(manager.type || manager.name),
-				category: 'language',
-				installed: manager.installed === true || manager.installed === 'true',
-				enabled: manager.installed === true || manager.installed === 'true',
-				version: manager.version || 'Not installed',
-				description: manager.description,
-				hasToggle: true
-			}));
+		return sdkConfigs
+			.filter((config) => config.category === 'language')
+			.map((config) => {
+				// Get version, preferring SDK version over manager version
+				const rawVersion = config.sdk_version || config.sdk_managers.find(m => m.installed)?.version || null;
+				// Format version (remove 'v' prefix if present, but keep it clean)
+				const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
+				
+				return {
+					id: config.id,
+					name: config.name,
+					displayName: config.display_name,
+					icon: config.icon,
+					category: 'language',
+					installed: config.sdk_installed || config.sdk_managers.some(m => m.installed) || false,
+					enabled: true,
+					version: version || undefined,
+					description: config.description,
+					hasToggle: true
+				};
+			});
 	});
 
 	let databaseSDKs = $derived(() => {
-		return managers
-			.filter((manager: SDKManagerInfo) => {
-				const category = manager.category || '';
-				return category === 'database';
-			})
-			.map((manager: SDKManagerInfo) => ({
-				id: manager.type || manager.name,
-				name: manager.type || manager.name,
-				displayName: manager.display_name || manager.name,
-				icon: getSDKIcon(manager.type || manager.name),
-				category: 'database',
-				installed: manager.installed === true || manager.installed === 'true',
-				enabled: manager.installed === true || manager.installed === 'true',
-				version: manager.version,
-				description: manager.description,
-				hasToggle: true
-			}));
+		return sdkConfigs
+			.filter((config) => config.category === 'database')
+			.map((config) => {
+				// Get version, preferring SDK version
+				const rawVersion = config.sdk_version || null;
+				const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
+				
+				return {
+					id: config.id,
+					name: config.name,
+					displayName: config.display_name,
+					icon: config.icon,
+					category: 'database',
+					installed: config.sdk_installed || false,
+					enabled: true,
+					version: version || undefined,
+					description: config.description,
+					hasToggle: true,
+					port: config.service_port ?? null,
+					isRunning: config.service_running ?? false
+				} as SDKItem;
+			});
 	});
 
 	let webServerSDKs = $derived(() => {
-		return managers
-			.filter((manager: SDKManagerInfo) => {
-				const category = manager.category || '';
-				return category === 'web';
-			})
-			.map((manager: SDKManagerInfo) => ({
-				id: manager.type || manager.name,
-				name: manager.type || manager.name,
-				displayName: manager.display_name || manager.name,
-				icon: getSDKIcon(manager.type || manager.name),
-				category: 'web',
-				installed: manager.installed === true || manager.installed === 'true',
-				enabled: manager.installed === true || manager.installed === 'true',
-				version: manager.version,
-				description: manager.description,
-				hasToggle: true
-			}));
+		return sdkConfigs
+			.filter((config) => config.category === 'server')
+			.map((config) => {
+				// Get version, preferring SDK version
+				const rawVersion = config.sdk_version || null;
+				const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
+				
+				return {
+					id: config.id,
+					name: config.name,
+					displayName: config.display_name,
+					icon: config.icon,
+					category: 'server',
+					installed: config.sdk_installed || false,
+					enabled: true,
+					version: version || undefined,
+					description: config.description,
+					hasToggle: true
+				} as SDKItem;
+			});
 	});
 
 	let containerSDKs = $derived(() => {
-		return managers
-			.filter((manager: SDKManagerInfo) => {
-				const category = manager.category || '';
-				return category === 'container';
-			})
-			.map((manager: SDKManagerInfo) => ({
-				id: manager.type || manager.name,
-				name: manager.type || manager.name,
-				displayName: manager.display_name || manager.name,
-				icon: getSDKIcon(manager.type || manager.name),
-				category: 'container',
-				installed: manager.installed === true || manager.installed === 'true',
-				enabled: manager.installed === true || manager.installed === 'true',
-				version: manager.version,
-				description: manager.description,
-				hasToggle: true
-			}));
+		return sdkConfigs
+			.filter((config) => config.category === 'container')
+			.map((config) => {
+				// Get version, preferring SDK version
+				const rawVersion = config.sdk_version || null;
+				const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
+				
+				return {
+					id: config.id,
+					name: config.name,
+					displayName: config.display_name,
+					icon: config.icon,
+					category: 'container',
+					installed: config.sdk_installed || false,
+					enabled: true,
+					version: version || undefined,
+					description: config.description,
+					hasToggle: true
+				} as SDKItem;
+			});
 	});
 
-	// SDK Managers (tools that manage multiple SDKs)
-	let sdkManagersList = $derived(() => {
-		return managers
-			.filter((manager: SDKManagerInfo) => {
-				const category = manager.category || '';
-				return category === 'manager';
-			})
-			.map((manager: SDKManagerInfo) => ({
-				id: manager.name,
-				name: manager.name,
-				displayName: manager.display_name || manager.name,
-				icon: getSDKIcon(manager.name),
-				category: 'manager',
-				installed: manager.installed === true || manager.installed === 'true',
-				enabled: manager.installed === true || manager.installed === 'true',
-				version: manager.version,
-				description: manager.description,
-				hasToggle: true
-			}));
+	let aiSDKs = $derived(() => {
+		return sdkConfigs
+			.filter((config) => config.category === 'ai')
+			.map((config) => {
+				// Get version, preferring SDK version
+				const rawVersion = config.sdk_version || null;
+				const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
+				
+				return {
+					id: config.id,
+					name: config.name,
+					displayName: config.display_name,
+					icon: config.icon,
+					category: 'ai',
+					installed: config.sdk_installed || false,
+					enabled: true,
+					version: version || undefined,
+					description: config.description,
+					hasToggle: true
+				} as SDKItem;
+			});
 	});
 
 	// Reactive state
@@ -175,10 +222,15 @@
 		...languageSDKs(),
 		...databaseSDKs(),
 		...webServerSDKs(),
-		...containerSDKs()
+		...containerSDKs(),
+		...aiSDKs()
 	]);
 
-	let selectedItem = $state<string | null>(selectedSDK || null);
+	let selectedItem = $state<string | null>(null);
+
+	$effect(() => {
+		selectedItem = selectedSDK || null;
+	});
 
 	// Category icons
 	const categoryIcons = {
@@ -189,39 +241,17 @@
 		package: Package
 	};
 
-	// Map SDK types to their route paths
+	// Map SDK types to their route paths - use dynamic route
 	function getSDKRoute(sdkId: string, category: string): string {
 		// Normalize SDK ID for routing
 		const normalizedId = sdkId.toLowerCase().trim();
 		
-		// SDK Managers go to /sdk/managers/[name]
+		// SDK Managers go to /sdk/manager/[name] (singular, matches route structure)
 		if (category === 'manager') {
-			return `/sdk/managers/${normalizedId}`;
+			return `/sdk/manager/${normalizedId}`;
 		}
 		
-		// Map common SDK IDs to their route paths
-		const routeMap: Record<string, string> = {
-			'node': '/sdk/nodejs',
-			'nodejs': '/sdk/nodejs',
-			'python': '/sdk/python',
-			'java': '/sdk/java',
-			'rust': '/sdk/rust',
-			'go': '/sdk/go',
-			'php': '/sdk/php',
-			'ruby': '/sdk/ruby'
-		};
-		
-		// Check if we have a specific route for this SDK
-		if (routeMap[normalizedId]) {
-			return routeMap[normalizedId];
-		}
-		
-		// For database SDKs, check if there's a database route
-		if (category === 'database') {
-			return `/sdk/database/${normalizedId}`;
-		}
-		
-		// Default: try the SDK ID as a route (fallback)
+		// Use the new dynamic route for all SDKs (language, database, ai, server, container, etc.)
 		return `/sdk/${normalizedId}`;
 	}
 
@@ -322,24 +352,306 @@
 		return iconMap[sdkType.toLowerCase()] || 'devicon-devicon-plain';
 	}
 
-	onMount(() => {
-		logger.info('SDK Sidebar mounted', { context: 'SDKSidebar' });
-		logger.info('Managers data', { context: 'SDKSidebar', data: { managers: managers.length, sdks: sdks.length } });
-		logger.info('Language SDKs', { context: 'SDKSidebar', data: { count: languageSDKs().length } });
-		logger.info('SDK Managers', { context: 'SDKSidebar', data: { count: sdkManagersList().length } });
-	});
+	function getSDKIconColor(sdkId: string): string {
+		const colorMap: Record<string, string> = {
+			// Language & Runtime - colored icons
+			'java': 'text-orange-600',
+			'node': 'text-green-600',
+			'nodejs': 'text-green-600',
+			'python': 'text-blue-600',
+			'rust': 'text-orange-600',
+			'go': 'text-blue-500',
+			'php': 'text-purple-600',
+			'ruby': 'text-red-600',
+			'bun': 'text-yellow-600',
+			'deno': 'text-gray-800',
+			'gradle': 'text-blue-500',
+			'kotlin': 'text-purple-600',
+			'scala': 'text-red-600',
+			'erlang': 'text-red-500',
+			'perl': 'text-blue-700',
+			
+			// Database
+			'mysql': 'text-blue-600',
+			'postgresql': 'text-blue-700',
+			'mongodb': 'text-green-600',
+			'mariadb': 'text-blue-500',
+			
+			// Web Server
+			'nginx': 'text-green-600',
+			'apache': 'text-red-600',
+			'caddy': 'text-blue-600',
+			
+			// Container
+			'docker': 'text-blue-500',
+			'kubernetes': 'text-blue-600',
+			'podman': 'text-blue-600',
+			
+			// Package Managers
+			'npm': 'text-red-600',
+			'yarn': 'text-blue-600',
+			'pip': 'text-blue-600',
+			'cargo': 'text-orange-600',
+			'composer': 'text-gray-700',
+			'gem': 'text-red-600',
+			
+			// SDK Managers
+			'nvm': 'text-green-600',
+			'pyenv': 'text-blue-600',
+			'rustup': 'text-orange-600',
+			'sdkman': 'text-blue-600',
+			'goenv': 'text-blue-500',
+			'rbenv': 'text-red-600',
+			'phpenv': 'text-purple-600'
+		};
+		
+		return colorMap[sdkId.toLowerCase()] || '';
+	}
+
 </script>
 
-<div class="w-80 h-full bg-background border-r border-border flex flex-col">
+<div class="flex flex-col h-full min-h-0 overflow-hidden">
+	{#if sidebar.state === 'collapsed'}
+		<!-- Header (icon-only) -->
+		<div class="p-2 border-b border-border flex-shrink-0">
+			<SidebarMenuButton
+				size="sm"
+				tooltipContent="Back to Portal Desktop"
+				onclick={() => goto('/')}
+			>
+				<ArrowLeft class="h-4 w-4" />
+			</SidebarMenuButton>
+		</div>
+
+		<!-- Sidebar Content -->
+		<ScrollArea class="flex-1 min-h-0 overflow-hidden">
+			<div class="p-2 space-y-4">
+				<!-- Navigation Section (icon-only) -->
+				<div class="space-y-1">
+					{#each navigationItems as item}
+						<SidebarMenuButton
+							size="default"
+							isActive={currentPath === item.id}
+							tooltipContent={item.name}
+							onclick={() => goto(item.id)}
+						>
+							<div class="h-4 w-4 flex items-center justify-center">
+								{#if item.icon === 'lucide:layout-dashboard'}
+									<Settings class="h-4 w-4" />
+								{:else if item.icon === 'lucide:settings'}
+									<Settings class="h-4 w-4" />
+								{:else if item.icon === 'lucide:download'}
+									<Download class="h-4 w-4" />
+								{:else if item.icon === 'lucide:package'}
+									<Package class="h-4 w-4" />
+								{/if}
+							</div>
+						</SidebarMenuButton>
+					{/each}
+				</div>
+
+				<Separator />
+
+				{#if loading}
+					<div class="text-center text-muted-foreground py-8">
+						<div class="text-2xl mb-2">⏳</div>
+						<h3 class="font-medium">Loading SDKs...</h3>
+					</div>
+				{:else if languageSDKs().length === 0 && databaseSDKs().length === 0 && webServerSDKs().length === 0 && containerSDKs().length === 0 && aiSDKs().length === 0}
+					<div class="text-center text-muted-foreground py-8">
+						<div class="text-2xl mb-2">🔍</div>
+						<h3 class="font-medium mb-2">No SDKs Detected</h3>
+						<p class="text-sm">
+							Install SDK managers like NVM, Pyenv, or SDKMAN to get started.
+						</p>
+					</div>
+				{:else}
+					<!-- Language & Runtime -->
+					{#if languageSDKs().length > 0}
+						<div class="space-y-1">
+							<SidebarMenuButton
+								size="sm"
+								tooltipContent={getCategoryName('language')}
+								onclick={() => {}}
+							>
+								{@const LanguageIcon = getCategoryIcon('language')}
+								<LanguageIcon class="h-4 w-4" />
+							</SidebarMenuButton>
+							<div class="space-y-1 pl-1">
+								{#each languageSDKs() as sdk}
+									{@const iconColor = getSDKIconColor(sdk.id)}
+									<SidebarMenuButton
+										size="default"
+										isActive={selectedItem === sdk.id}
+										tooltipContent={sdk.version ? `${sdk.displayName} (${sdk.version})` : sdk.displayName}
+										onclick={() => handleSDKClick(sdk)}
+									>
+										<Devicon icon={sdk.icon} size="sm" class={iconColor} />
+										{#if sdk.installed}
+											<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
+										{:else}
+											<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
+										{/if}
+									</SidebarMenuButton>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					{#if databaseSDKs().length > 0}
+						<Separator />
+						<div class="space-y-1">
+							<SidebarMenuButton
+								size="sm"
+								tooltipContent={getCategoryName('database')}
+								onclick={() => {}}
+							>
+								{@const DatabaseIcon = getCategoryIcon('database')}
+								<DatabaseIcon class="h-4 w-4" />
+							</SidebarMenuButton>
+							<div class="space-y-1 pl-1">
+								{#each databaseSDKs() as sdk}
+									{@const iconColor = getSDKIconColor(sdk.id)}
+									<SidebarMenuButton
+										size="default"
+										isActive={selectedItem === sdk.id}
+										tooltipContent={sdk.version ? `${sdk.displayName} (${sdk.version})` : sdk.displayName}
+										onclick={() => handleSDKClick(sdk)}
+									>
+										<Devicon icon={sdk.icon} size="sm" class={iconColor} />
+										{#if sdk.installed}
+											<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
+										{:else}
+											<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
+										{/if}
+										{#if sdk.installed && sdk.isRunning}
+											<div class="h-2 w-2 rounded-full bg-green-500" title="Running"></div>
+										{:else if sdk.installed && !sdk.isRunning}
+											<div class="h-2 w-2 rounded-full bg-yellow-500" title="Installed but not running"></div>
+										{/if}
+									</SidebarMenuButton>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					{#if webServerSDKs().length > 0}
+						<Separator />
+						<div class="space-y-1">
+							<SidebarMenuButton
+								size="sm"
+								tooltipContent={getCategoryName('web')}
+								onclick={() => {}}
+							>
+								{@const WebIcon = getCategoryIcon('web')}
+								<WebIcon class="h-4 w-4" />
+							</SidebarMenuButton>
+							<div class="space-y-1 pl-1">
+								{#each webServerSDKs() as sdk}
+									{@const iconColor = getSDKIconColor(sdk.id)}
+									<SidebarMenuButton
+										size="default"
+										isActive={selectedItem === sdk.id}
+										tooltipContent={sdk.version ? `${sdk.displayName} (${sdk.version})` : sdk.displayName}
+										onclick={() => handleSDKClick(sdk)}
+									>
+										<Devicon icon={sdk.icon} size="sm" class={iconColor} />
+										{#if sdk.installed}
+											<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
+										{:else}
+											<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
+										{/if}
+									</SidebarMenuButton>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					{#if containerSDKs().length > 0}
+						<Separator />
+						<div class="space-y-1">
+							<SidebarMenuButton
+								size="sm"
+								tooltipContent={getCategoryName('container')}
+								onclick={() => {}}
+							>
+								{@const ContainerIcon = getCategoryIcon('container')}
+								<ContainerIcon class="h-4 w-4" />
+							</SidebarMenuButton>
+							<div class="space-y-1 pl-1">
+								{#each containerSDKs() as sdk}
+									{@const iconColor = getSDKIconColor(sdk.id)}
+									<SidebarMenuButton
+										size="default"
+										isActive={selectedItem === sdk.id}
+										tooltipContent={sdk.version ? `${sdk.displayName} (${sdk.version})` : sdk.displayName}
+										onclick={() => handleSDKClick(sdk)}
+									>
+										<Devicon icon={sdk.icon} size="sm" class={iconColor} />
+										{#if sdk.installed}
+											<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
+										{:else}
+											<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
+										{/if}
+									</SidebarMenuButton>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					{#if aiSDKs().length > 0}
+						<Separator />
+						<div class="space-y-1">
+							<SidebarMenuButton
+								size="sm"
+								tooltipContent="AI SDKs"
+								onclick={() => {}}
+							>
+								{@const AIIcon = getCategoryIcon('ai')}
+								<AIIcon class="h-4 w-4" />
+							</SidebarMenuButton>
+							<div class="space-y-1 pl-1">
+								{#each aiSDKs() as sdk}
+									{@const iconColor = getSDKIconColor(sdk.id)}
+									<SidebarMenuButton
+										size="default"
+										isActive={selectedItem === sdk.id}
+										tooltipContent={sdk.version ? `${sdk.displayName} (${sdk.version})` : sdk.displayName}
+										onclick={() => handleSDKClick(sdk)}
+									>
+										<Devicon icon={sdk.icon} size="sm" class={iconColor} />
+										{#if sdk.installed}
+											<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
+										{:else}
+											<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
+										{/if}
+									</SidebarMenuButton>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				{/if}
+			</div>
+		</ScrollArea>
+	{:else}
 	<!-- Header -->
-	<div class="p-4 border-b border-border">
+	<div class="p-4 border-b border-border bg-background flex-shrink-0">
+		<Button 
+			variant="ghost" 
+			size="sm" 
+			class="w-full justify-start mb-3"
+			onclick={() => goto('/')}
+		>
+			<ArrowLeft class="h-4 w-4 mr-2" />
+			Back to Portal Desktop
+		</Button>
 		<h2 class="text-lg font-semibold">SDK Manager</h2>
 		<p class="text-sm text-muted-foreground">Manage your development environment</p>
 	</div>
 
 
 	<!-- Sidebar Content -->
-	<ScrollArea class="flex-1">
+	<ScrollArea class="flex-1 min-h-0 overflow-hidden">
 		<div class="p-4 space-y-6">
 			<!-- Navigation Section -->
 			<div class="space-y-3">
@@ -358,6 +670,8 @@
 									<Settings class="h-4 w-4" />
 								{:else if item.icon === 'lucide:download'}
 									<Download class="h-4 w-4" />
+								{:else if item.icon === 'lucide:package'}
+									<Package class="h-4 w-4" />
 								{/if}
 							</div>
 							<div class="flex-1 min-w-0">
@@ -372,51 +686,6 @@
 			<Separator />
 
 
-			<!-- SDK Managers Section -->
-			{#if sdkManagersList().length > 0}
-				<div class="space-y-3">
-					<div class="flex items-center gap-2">
-						{#if true}
-							{@const ManagerIcon = getCategoryIcon('package')}
-							<ManagerIcon class="h-4 w-4" />
-						{/if}
-						<h3 class="font-medium text-sm">SDK Managers</h3>
-					</div>
-					<div class="space-y-1">
-						{#each sdkManagersList() as manager}
-							<div 
-								class="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors
-									{selectedItem === manager.id ? 'bg-muted' : ''}"
-								role="button"
-								tabindex="0"
-								onclick={() => handleSDKClick(manager)}
-								onkeydown={(e) => {
-									if (e.key === 'Enter' || e.key === ' ') {
-										e.preventDefault();
-										handleSDKClick(manager);
-									}
-								}}
-							>
-								<Devicon icon={manager.icon} size="sm" />
-								<div class="flex-1 min-w-0">
-									<div class="text-sm font-medium truncate">{manager.displayName}</div>
-									{#if manager.version}
-										<div class="text-xs text-muted-foreground">{manager.version}</div>
-									{/if}
-								</div>
-								{#if manager.hasToggle}
-								<Switch 
-									checked={manager.installed}
-									disabled={true}
-									onclick={(e) => e.stopPropagation()}
-								/>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</div>
-				<Separator />
-			{/if}
 
 			<!-- Language & Runtime Section -->
 			{#if languageSDKs().length > 0}
@@ -430,6 +699,7 @@
 					</div>
 					<div class="space-y-1">
 						{#each languageSDKs() as sdk}
+							{@const iconColor = getSDKIconColor(sdk.id)}
 							<div 
 								class="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors
 									{selectedItem === sdk.id ? 'bg-muted' : ''}"
@@ -443,20 +713,31 @@
 									}
 								}}
 							>
-							<Devicon icon={sdk.icon} size="sm" />
+							<Devicon icon={sdk.icon} size="sm" class={iconColor} />
 							<div class="flex-1 min-w-0">
 								<div class="text-sm font-medium truncate">{sdk.displayName}</div>
 								{#if sdk.version}
 									<div class="text-xs text-muted-foreground">{sdk.version}</div>
+								{:else if !sdk.installed}
+									<div class="text-xs text-muted-foreground">Not installed</div>
+								{/if}
+								{#if sdk.category === 'database' && (sdk as SDKItem).port}
+									<div class="text-xs text-muted-foreground">Port: {(sdk as SDKItem).port}</div>
 								{/if}
 							</div>
-							{#if sdk.hasToggle}
-								<Switch 
-									checked={sdk.installed}
-									disabled={true}
-									onclick={(e) => e.stopPropagation()}
-								/>
-							{/if}
+							<!-- Installation and Running Status Icons -->
+							<div class="flex items-center gap-1 flex-shrink-0">
+								{#if sdk.installed}
+									<CheckCircle class="h-4 w-4 text-green-500" />
+								{:else}
+									<XCircle class="h-4 w-4 text-red-500" />
+								{/if}
+								{#if sdk.category === 'database' && (sdk as SDKItem).isRunning}
+									<div class="h-2 w-2 rounded-full bg-green-500" title="Running"></div>
+								{:else if sdk.category === 'database' && sdk.installed && !(sdk as SDKItem).isRunning}
+									<div class="h-2 w-2 rounded-full bg-yellow-500" title="Installed but not running"></div>
+								{/if}
+							</div>
 						</div>
 					{/each}
 					</div>
@@ -476,6 +757,7 @@
 				</div>
 				<div class="space-y-1">
 					{#each databaseSDKs() as sdk}
+						{@const iconColor = getSDKIconColor(sdk.id)}
 						<div 
 							class="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors
 								{selectedItem === sdk.id ? 'bg-muted' : ''}"
@@ -489,21 +771,18 @@
 								}
 							}}
 						>
-							<Devicon icon={sdk.icon} size="sm" />
+							<Devicon icon={sdk.icon} size="sm" class={iconColor} />
 							<div class="flex-1 min-w-0">
 								<div class="text-sm font-medium truncate">{sdk.displayName}</div>
 								{#if sdk.version}
 									<div class="text-xs text-muted-foreground">{sdk.version}</div>
 								{/if}
 							</div>
-							{#if sdk.hasToggle}
-								<Switch 
-									checked={sdk.installed}
-									disabled={true}
-									onclick={(e) => e.stopPropagation()}
-								/>
+							<!-- Installation Status Icon -->
+							{#if sdk.installed}
+								<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
 							{:else}
-								<Settings class="h-4 w-4 text-muted-foreground" />
+								<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
 							{/if}
 						</div>
 					{/each}
@@ -523,6 +802,7 @@
 				</div>
 				<div class="space-y-1">
 					{#each webServerSDKs() as sdk}
+						{@const iconColor = getSDKIconColor(sdk.id)}
 						<div 
 							class="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors
 								{selectedItem === sdk.id ? 'bg-muted' : ''}"
@@ -536,20 +816,31 @@
 								}
 							}}
 						>
-							<Devicon icon={sdk.icon} size="sm" />
+							<Devicon icon={sdk.icon} size="sm" class={iconColor} />
 							<div class="flex-1 min-w-0">
 								<div class="text-sm font-medium truncate">{sdk.displayName}</div>
 								{#if sdk.version}
 									<div class="text-xs text-muted-foreground">{sdk.version}</div>
+								{:else if !sdk.installed}
+									<div class="text-xs text-muted-foreground">Not installed</div>
+								{/if}
+								{#if sdk.category === 'database' && (sdk as SDKItem).port}
+									<div class="text-xs text-muted-foreground">Port: {(sdk as SDKItem).port}</div>
 								{/if}
 							</div>
-							{#if sdk.hasToggle}
-								<Switch 
-									checked={sdk.installed}
-									disabled={true}
-									onclick={(e) => e.stopPropagation()}
-								/>
-							{/if}
+							<!-- Installation and Running Status Icons -->
+							<div class="flex items-center gap-1 flex-shrink-0">
+								{#if sdk.installed}
+									<CheckCircle class="h-4 w-4 text-green-500" />
+								{:else}
+									<XCircle class="h-4 w-4 text-red-500" />
+								{/if}
+								{#if sdk.category === 'database' && (sdk as SDKItem).isRunning}
+									<div class="h-2 w-2 rounded-full bg-green-500" title="Running"></div>
+								{:else if sdk.category === 'database' && sdk.installed && !(sdk as SDKItem).isRunning}
+									<div class="h-2 w-2 rounded-full bg-yellow-500" title="Installed but not running"></div>
+								{/if}
+							</div>
 						</div>
 					{/each}
 				</div>
@@ -568,6 +859,7 @@
 				</div>
 				<div class="space-y-1">
 					{#each containerSDKs() as sdk}
+						{@const iconColor = getSDKIconColor(sdk.id)}
 						<div 
 							class="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors
 								{selectedItem === sdk.id ? 'bg-muted' : ''}"
@@ -581,27 +873,89 @@
 								}
 							}}
 						>
-							<Devicon icon={sdk.icon} size="sm" />
+							<Devicon icon={sdk.icon} size="sm" class={iconColor} />
 							<div class="flex-1 min-w-0">
 								<div class="text-sm font-medium truncate">{sdk.displayName}</div>
 								{#if sdk.version}
 									<div class="text-xs text-muted-foreground">{sdk.version}</div>
+								{:else if !sdk.installed}
+									<div class="text-xs text-muted-foreground">Not installed</div>
+								{/if}
+								{#if sdk.category === 'database' && (sdk as SDKItem).port}
+									<div class="text-xs text-muted-foreground">Port: {(sdk as SDKItem).port}</div>
 								{/if}
 							</div>
-							{#if sdk.hasToggle}
-								<Switch 
-									checked={sdk.installed}
-									disabled={true}
-									onclick={(e) => e.stopPropagation()}
-								/>
-							{/if}
+							<!-- Installation and Running Status Icons -->
+							<div class="flex items-center gap-1 flex-shrink-0">
+								{#if sdk.installed}
+									<CheckCircle class="h-4 w-4 text-green-500" />
+								{:else}
+									<XCircle class="h-4 w-4 text-red-500" />
+								{/if}
+								{#if sdk.category === 'database' && (sdk as SDKItem).isRunning}
+									<div class="h-2 w-2 rounded-full bg-green-500" title="Running"></div>
+								{:else if sdk.category === 'database' && sdk.installed && !(sdk as SDKItem).isRunning}
+									<div class="h-2 w-2 rounded-full bg-yellow-500" title="Installed but not running"></div>
+								{/if}
+							</div>
 						</div>
 					{/each}
 				</div>
 			</div>
 
+			<!-- AI SDKs Section -->
+			{#if aiSDKs().length > 0}
+				<div class="space-y-3">
+					<div class="flex items-center gap-2">
+						{#if true}
+							{@const AIIcon = getCategoryIcon('ai')}
+							<AIIcon class="h-4 w-4" />
+						{/if}
+						<h3 class="font-medium text-sm">AI SDKs</h3>
+					</div>
+					<div class="space-y-1">
+						{#each aiSDKs() as sdk}
+							{@const iconColor = getSDKIconColor(sdk.id)}
+							<div 
+								class="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors
+									{selectedItem === sdk.id ? 'bg-muted' : ''}"
+								role="button"
+								tabindex="0"
+								onclick={() => handleSDKClick(sdk)}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										handleSDKClick(sdk);
+									}
+								}}
+							>
+							<Devicon icon={sdk.icon} size="sm" class={iconColor} />
+								<div class="flex-1 min-w-0">
+									<div class="text-sm font-medium truncate">{sdk.displayName}</div>
+									{#if sdk.version}
+										<div class="text-xs text-muted-foreground">{sdk.version}</div>
+									{/if}
+								</div>
+							<!-- Installation Status Icon -->
+							{#if sdk.installed}
+								<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
+							{:else}
+								<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
+							{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
+				<Separator />
+			{/if}
+
 			<!-- No Data Fallback -->
-			{#if sdkManagersList().length === 0 && languageSDKs().length === 0 && databaseSDKs().length === 0 && webServerSDKs().length === 0 && containerSDKs().length === 0}
+			{#if loading}
+				<div class="text-center text-muted-foreground py-8">
+					<div class="text-4xl mb-4">⏳</div>
+					<h3 class="font-medium mb-2">Loading SDKs...</h3>
+				</div>
+			{:else if languageSDKs().length === 0 && databaseSDKs().length === 0 && webServerSDKs().length === 0 && containerSDKs().length === 0 && aiSDKs().length === 0}
 				<div class="text-center text-muted-foreground py-8">
 					<div class="text-4xl mb-4">🔍</div>
 					<h3 class="font-medium mb-2">No SDKs Detected</h3>
@@ -618,11 +972,9 @@
 	<div class="p-4 border-t border-border">
 		<div class="text-xs text-muted-foreground text-center space-y-1">
 			<div>
-				{sdkManagersList().filter(m => m.installed).length} of {sdkManagersList().length} SDK Managers
-			</div>
-			<div>
 				{allSDKs().filter(sdk => sdk.installed).length} of {allSDKs().length} SDKs
 			</div>
 		</div>
 	</div>
+	{/if}
 </div>

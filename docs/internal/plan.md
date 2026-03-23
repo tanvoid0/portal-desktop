@@ -701,96 +701,437 @@ This approach preserves a vanilla shell while giving you structure.
 
 # 13) Current Status & Next Steps
 
-## 📊 **Overall Progress Summary**
+## 📊 **Overall Progress Summary** (Updated 2026-01-13)
 
-### **Terminal Features**: ✅ **75% Complete**
+### **Terminal Features**: ✅ **90% Complete** ⬆️ (was 85%)
 - **Core Infrastructure**: ✅ 100% (8/8 features)
-- **Shell Integration**: ✅ 90% (5/6 features)
-- **UX Improvements**: ❌ 0% (0/4 features)
-- **Multiplexing**: ❌ 0% (0/5 features)
+- **Shell Integration**: ✅ 90% (5/6 features) - OSC markers, command history, persistence
+- **Unified Terminal**: ✅ 100% - **CONSOLIDATED** - Single AI-enhanced terminal supports both regular commands and AI queries
+- **Command History**: ✅ 100% - Persistence, search, filtering complete
+- **AI Integration**: ✅ 90% - Command-block interface, AI mode toggle, command interception complete
+- **UX Improvements**: ✅ 90% - Enhanced command input, view modes (terminal/AI-terminal/AI-only), welcome screen with tips
+- **Command Blocks**: ✅ 100% - Warp-style command blocks with output parsing, input prompts, status tracking
 
-### **Kubernetes Features**: ✅ **85% Complete**
+**Recent Improvements (2026-01-16):**
+- ✅ **Terminal Consolidation**: Removed duplicate Global Terminal, unified on AI Terminal as primary interface
+- ✅ **Enhanced UX**: Improved welcome screen with tips, better AI mode discoverability
+- ✅ **Simplified Navigation**: Reduced terminal tabs from 4 to 3 (Terminal, Project Terminals, Containerized)
+- ✅ **Dual-mode Support**: Single terminal supports both regular shell commands AND AI queries seamlessly
+
+**Known Issues:**
+- 1 TODO: parseTerminalOutput implementation (minor enhancement)
+- Linux PTY connection still has fallback mode (deprioritized)
+
+### **Kubernetes Features**: ✅ **70% Complete** ⬇️ (was 85%, recalibrated)
 - **Core Infrastructure**: ✅ 100% (4/4 features)
-- **Resource Management**: ✅ 95% (11/12 resource types)
-- **Real-time Monitoring**: ✅ 75% (Watch API ✅, Events ❌)
+- **Resource Management**: ✅ 95% (11/12 resource types - all major types covered)
+- **Real-time Monitoring**: ⚠️ 60% (Watch API ✅, Streaming logs ❌, Events ❌)
 - **Developer Experience**: ✅ 80% (Port-forward ✅, Exec ✅, YAML ✅, File transfer ❌)
 - **Advanced Features**: ⚠️ 30% (Metrics partial, Helm ❌, Topology ❌)
 
-### **AI Features**: ✅ **90% Complete**
-- **AI Provider Infrastructure**: ✅ 100% (AI service exists)
-- **AI Chat Components**: ✅ 100% (AIChatPanel integrated and working)
-- **Dedicated AI Page**: ✅ 100% (AI hub with navigation, stats, and quick actions)
-- **AI Content Management**: ✅ 100% (training data, logs, history pages exist)
-- **AI Settings**: ✅ 100% (AI settings in dedicated AI page, not in general settings)
+**Known Issues:**
+- Streaming logs not implemented (TODO line 243 in GCPProvider.ts)
+- Uses non-streaming fallback for log retrieval
+- Event monitoring not started
 
-### **Overall Project**: ✅ **80% Complete**
+### **AI Features**: ✅ **75% Complete** ⬇️ (was 90%, recalibrated)
+- **AI Provider Infrastructure**: ✅ 100% (Multi-provider: OpenAI, Anthropic, Gemini, Ollama)
+- **AI Chat Components**: ✅ 100% (AIChatPanel, ChatMessage, ChatInput fully integrated)
+- **Conversation Management**: ✅ 100% (Full CRUD with conversation service)
+- **Dedicated AI Page**: ✅ 100% (AI hub with navigation, stats, quick actions)
+- **AI Content Management**: ⚠️ 70% (Training data viewer exists, backend integration unclear)
+- **AI Settings**: ✅ 100% (Consolidated in AI page, duplicate removed)
+- **AI Logging**: ✅ 100% (aiLogService.ts with filtering and viewing)
+- **Avatar System**: ⚠️ 60% (FloatingAvatar, AvatarSpeechBubble exist, basic integration)
 
-### **Code Quality & Cleanup**: ✅ **100% Complete**
-- ✅ **Domain exports** - All active domains properly exported (deployments, credentials, settings)
-- ✅ **Duplicate components** - Removed duplicate AIChatPanel component
+**Issues Fixed:**
+- ✅ Removed duplicate AIProviderSettings.svelte
+- ✅ Confirmed single AIGenerationDialog
+
+### **SDK/Package Manager Features**: ✅ **90% Complete** 🆕
+- **Version Managers**: ✅ 100% (nvm, rustup, pyenv, rbenv, phpenv, sdkman, etc.)
+- **Package Managers**: ✅ 100% (npm, pip, cargo, homebrew, chocolatey, winget, scoop)
+- **Language Support**: ✅ 100% (Node, Python, Ruby, PHP, Go, Java, Rust, Kotlin, Scala)
+- **SDK Commands**: ✅ 100% (Detection, version listing, installation, switching)
+- **Configuration System**: ✅ 100% (Language configs, environment management)
+- **Services**: ✅ 95% (process_tracker, terminal_integration, service_manager, port_manager)
+
+**Recent Additions (Commit 6fb2c41):**
+- ✅ Unified invokeClient architecture for all SDK commands
+- ✅ Language configuration commands (language_config_commands.rs)
+- ✅ Manager commands (manager_commands.rs)
+- ✅ Package manager commands (package_manager_commands.rs)
+- ✅ Environment variable and path entry entities
+- ✅ Version alias support
+- ✅ Modular factory pattern (replaced old factory.rs)
+
+### **Project/Pipeline Features**: ✅ **80% Complete** 🆕
+- **Project CRUD**: ✅ 100% (Full project management with metadata tracking)
+- **Pipeline Builder**: ✅ 90% (Visual interface, block library, execution monitoring)
+- **Execution Tracking**: ✅ 85% (History, monitoring, Docker/SDK executors)
+- **Templates**: ✅ 100% (Project templates system)
+- **Backend Services**: ✅ 100% (All repositories and services implemented)
+
+**Known Issues:**
+- ⚠️ **Non-atomic pipeline execution** - Creates record then spawns task (no retry mechanism)
+- ⚠️ No persistent job queue
+- Risk of "pending" executions with no actual execution
+
+### **Settings & Configuration**: ✅ **85% Complete** 🆕
+- **All Settings Panels**: ✅ 100% (General, Terminal, Editor, IDE, Framework IDE, Theme, Autonomy, Learning, AI Provider, Package Managers, Languages, Frameworks)
+- **Backend Integration**: ✅ 100% (Settings service with CRUD and persistence)
+- **ItemSettings Component**: ✅ 100% (Reusable shared UI pattern)
+
+### **UI Components**: ✅ **95% Complete** 🆕
+- **Active Components**: ✅ 100% (Modern UI components in use)
+- **Component Cleanup**: ✅ 100% (300+ archived components removed from ui-archive/)
+- **Domain Components**: ✅ 95% (AI, projects, logs, cloud, etc.)
+
+### **Additional Domains**: ✅ **80% Complete** 🆕
+- **Documents**: ✅ 85% (Document card, generation page)
+- **Tasks**: ✅ 90% (Task card, details page - 902 lines)
+- **Cloud**: ✅ 75% (Navigation, workload types, metrics, logs)
+- **Network**: ✅ 100% (Device authentication, connectivity checks)
+- **Learning**: ✅ 80% (Memory manager, pattern collector, suggestion engine)
+- **Credentials**: ✅ 95% (Encryption service)
+- **IDE**: ✅ 85% (IDE commands and integration)
+- **Deployments**: ⚠️ 60% (In-memory storage only, no persistence)
+- **Autonomy**: ✅ 90% (Autonomy settings)
+- **Automation**: ⚠️ 70% (Workflow trigger component)
+
+### **Overall Project**: ✅ **83% Complete** ⬆️ (was 82%)
+
+### **Code Quality & Cleanup**: ⚠️ **75% Complete** ⬇️ (was 100%, issues identified)
+- ✅ **Domain exports** - All active domains properly exported
+- ✅ **Duplicate components** - Removed 300+ archived UI components, AIProviderSettings duplicate
 - ✅ **Placeholder code** - Removed mock data and "coming soon" placeholders
-- ✅ **Pipeline TODOs** - Documented as future features with clear explanations
-- ✅ **Remaining TODOs** - All converted to FUTURE comments with context
-- ✅ **AI Page** - Transformed from redirect to full hub with dashboard
+- ✅ **Pipeline TODOs** - Documented as future features
+- ✅ **Unified Architecture** - invokeClient for all backend calls
+- ✅ **Device Authentication** - Complete device approval system
+- ✅ **Error Handling** - New unified AppError system (error.rs)
+- ⚠️ **Async Mutex Issues** - 3 files use std::sync::Mutex in async context (network fixed, 2 remain)
+- ⚠️ **Unwrap Calls** - 26 files with potential panic issues
+- ⚠️ **Svelte 5 Migration** - Mixed adoption, no clear documentation
+- ⚠️ **Missing Database Transactions** - Multi-step operations not atomic
 
 ---
 
-## 🎯 **IMMEDIATE PRIORITIES (Next 2-3 weeks)**
+## 🎯 **IMMEDIATE PRIORITIES (Next 2-4 weeks)**
 
-### **🚨 Priority 0: AI Dedicated Page** 🚨 **HIGHEST PRIORITY**
-- **Create dedicated AI page** (`/ai`) with full chat interface
-- **AI chat functionality** - Chat with AI assistants (Ollama, OpenAI, Anthropic, Gemini)
-- **AI content management**:
-  - View and manage training data
-  - View AI interaction logs
-  - Manage AI provider configurations
-  - View conversation history
-- **Move AI-related content from settings** to dedicated AI page
-- **Unified AI experience** - Single place for all AI interactions and management
+### **🚨 Priority 0: Critical Bug Fixes** 🚨 **HIGHEST PRIORITY**
 
-### **Priority 1: Kubernetes & Terminal Improvements** 🚧
-- **Kubernetes log search** - **Backend search implementation** (currently only client-side filtering)
-- **Terminal state persistence** - **CRITICAL FOR UX**
-- **Session restoration** across app restarts
-- **Scrollback persistence** across sessions
+#### **Async Mutex Issues** (CRITICAL - Can cause deadlocks)
+1. **deployment_service.rs** - Replace `std::sync::Mutex` with `tokio::sync::Mutex`
+2. **terminal/manager.rs** - Replace `std::sync::Mutex` with `tokio::sync::Mutex`
+3. **kubernetes/commands.rs** - Replace OnceLock with async-safe alternative
 
-### **Priority 2: Terminal UX Improvements** 🚧
-- **Command palette** with quick actions (kill, rerun, clear)
-- **Better error detection** and hyperlink parsing
-- **Session management** improvements
+#### **Unwrap Panic Risks** (HIGH - 26 files identified)
+Priority files to fix:
+1. **execution_service.rs** - Add proper error handling
+2. **deployment_service.rs** - Remove unwrap calls
+3. **sdk_commands.rs** - Add error propagation
+4. **kubernetes/commands.rs** - Handle errors gracefully
+
+#### **Non-Atomic Pipeline Execution** (HIGH)
+- Implement database transactions for pipeline execution
+- Add persistent job queue (consider using tokio-cron or similar)
+- Implement retry mechanism for failed executions
+- Handle panics in background tasks gracefully
+
+### **Priority 1: Stability & Data Integrity** 🛡️
+
+#### **Deployment Service Persistence** (MEDIUM-HIGH)
+- ⚠️ **All deployment data stored in memory only**
+- Implement database persistence layer
+- Add migrations for deployment tables
+- Prevent data loss on restart
+
+#### **Database Transactions** (MEDIUM)
+- Identify multi-step operations (project creation, pipeline execution, etc.)
+- Wrap in transactions for atomicity
+- Add rollback handling
+- Prevent concurrent modification issues
+
+#### **Terminal State Persistence** (MEDIUM)
+- ✅ Command history persistence - **COMPLETED**
+- ❌ Terminal scrollback persistence - **TODO**
+- ❌ Session restoration across restarts - **TODO**
+- ❌ Tab state restoration - **TODO**
+
+### **Priority 2: Complete Existing Features** 🔨
+
+#### **AI Features** (75% → 90%)
+- Complete AI training data backend integration (currently unclear)
+- Enhance avatar system integration in chat
+- Implement AI command processing (Terminal.svelte TODO line 644)
+- Complete parseTerminalOutput function (Terminal.svelte)
+
+#### **Kubernetes Features** (70% → 85%)
+- ⚠️ Implement streaming logs (GCPProvider.ts TODO line 243)
+- Add event monitoring with filtering
+- Build resource metrics UI (types exist, visualization missing)
+- Add hierarchical resource tree view (currently flat lists)
+
+#### **Terminal Features** (90% → 95%)
+- ✅ **COMPLETED (2026-01-16)**: Terminal consolidation - removed duplicate Global Terminal
+- ✅ **COMPLETED (2026-01-16)**: Enhanced AI Terminal UX with improved welcome screen and tips
+- ✅ **COMPLETED (2026-01-16)**: Dual-mode support (regular commands + AI queries in same interface)
+- Complete parseTerminalOutput enhancement (minor improvement - currently functional)
+- Improve session management and restoration (scrollback persistence)
+
+### **Priority 3: Code Quality & Migration** 📚
+
+#### **Svelte 5 Migration**
+- Document migration strategy
+- Identify Svelte 4 patterns still in use
+- Create migration guide for components
+- Update components to use Svelte 5 runes consistently
+
+#### **Error Handling Consistency**
+- Ensure all services use unified AppError system
+- Remove remaining `.unwrap()` calls (26 files)
+- Add proper error propagation
+- Implement user-friendly error messages
+
+#### **Documentation**
+- Document async mutex fixes
+- Create architecture decision records (ADRs)
+- Update README with current feature status
+- Document known issues and workarounds
+
+### **Priority 4: Advanced Kubernetes Features** 🚀 (70% → 100%)
+- ❌ **Event monitoring** with filtering and alerting
+- ❌ **Resource metrics visualization** (CPU, memory, network)
+- ❌ **Network topology** visualization
+- ❌ **Helm chart management** (install, upgrade, rollback)
+- ❌ **File transfer** to/from containers
+- ❌ **Resource templates** and deployment wizards
+- ❌ **Bulk operations** (delete, scale, restart multiple resources)
+
+### **Priority 5: Terminal UX Polish** ✨
+- ✅ **Multi-tab support** - **COMPLETED**
+- ⚠️ **Command palette** - Basic exists, needs enhancement (kill, rerun, clear)
+- ❌ **Better error detection** and hyperlink parsing
+- ❌ **Process tree view** for debugging
+- ❌ **Detach/restore sessions** across app restarts
+
+### **Priority 6: Linux PTY Fix** 🔧 **DEPRIORITIZED**
+- **Fix Linux PTY connection failures** - **COMPLEX ISSUE** (moved to lower priority)
+- **Investigate portable-pty Linux compatibility** - **LOW PRIORITY**
+- **Note**: Currently has workaround (simulated terminal), not blocking core functionality
 
 ### **Shell Integration & Command History** ✅ **COMPLETED**
 - ✅ **Implement OSC markers** for command start/end detection
 - ✅ **Command history persistence** with backend storage
 - ✅ **Search functionality** for command history
 - ✅ **Shell integration infrastructure** with OSC parsing
-- 🔄 **Add command duration** tracking and display - **IN PROGRESS**
-- 🔄 **Command blocks** with foldable outputs and exit codes - **CANCELLED/BACKLOG**
+- 🔄 **Add command duration** tracking and display - **FUTURE ENHANCEMENT**
+- 🔄 **Command blocks** with foldable outputs and exit codes - **BACKLOG**
 
-### **Priority 3: Kubernetes Integration** ✅ **85% COMPLETE**
-- ✅ **Kubernetes API client** with kubeconfig management - **COMPLETED**
-- ✅ **Cluster browser** with multi-cluster support - **COMPLETED**
-- ✅ **Resource management** (pods, services, deployments, StatefulSets, DaemonSets, Jobs, CronJobs, ConfigMaps, Secrets, Ingress) - **COMPLETED**
-- ✅ **Real-time monitoring** and log streaming - **COMPLETED** (Watch API + log streaming with filtering)
-- ✅ **Port forwarding** and exec capabilities - **COMPLETED**
-- ✅ **YAML editing** for all resources - **COMPLETED**
-- ✅ **Deployment rollback** - **COMPLETED**
-- ⚠️ **Log search** - **PARTIAL** (client-side filtering exists, backend search not fully implemented)
-- ❌ **Event monitoring** - **NOT STARTED**
-- ❌ **Resource metrics UI** - **NOT STARTED** (types exist)
-- ❌ **Network topology** - **NOT STARTED**
-- ❌ **Helm chart management** - **NOT STARTED**
+## 🔍 **UNSTABLE, INCOMPLETE & DUPLICATE COMPONENTS AUDIT**
 
-### **Priority 4: Advanced Features** 📋
-- **Multiple tabs/panes** support
-- **Process tree view** for better debugging
-- **Settings UI** for customization
-- **Windows-specific polish**
+### **🚨 Critical Issues Requiring Immediate Attention**
 
-### **Priority 5: Linux PTY Fix** 🔧 **DEPRIORITIZED**
-- **Fix Linux PTY connection failures** - **COMPLEX ISSUE** (moved to lower priority)
-- **Investigate portable-pty Linux compatibility** - **LOW PRIORITY**
-- **Note**: Currently has workaround (simulated terminal), not blocking core functionality
+#### **Async Mutex Issues** (all fixed)
+**Location**: Backend Rust files
+**Severity**: CRITICAL - Can cause deadlocks in async context
+
+1. ~~**src-tauri/src/domains/deployments/services/deployment_service.rs**~~ ✅ Already used `tokio::sync::Mutex`
+2. ~~**src-tauri/src/domains/terminal/manager.rs**~~ ✅ Already used `tokio::sync::Mutex` for statics
+3. ~~**src-tauri/src/domains/kubernetes/commands.rs**~~ ✅ FIXED - Switched to `tokio::sync::Mutex`, use `.lock().await`
+4. ~~**src-tauri/src/domains/network/commands.rs**~~ ✅ FIXED
+5. ~~**src-tauri/src/domains/kubernetes/manager.rs**~~ ✅ FIXED - PortForwardMap/WatchTaskMap use `tokio::sync::Mutex`, `.lock().await` / `.blocking_lock()` in sync fns
+6. ~~**src-tauri/src/domains/terminal/commands.rs**~~ ✅ FIXED - COMMAND_HISTORY and TERMINAL_SESSIONS use `tokio::sync::Mutex`, `.lock().await`
+7. ~~**lib.rs**~~ ✅ FIXED - KubernetesManager registered with `tokio::sync::Mutex::new(...)`
+
+#### **Unwrap Panic Risks** (26 files)
+**Severity**: HIGH - Can cause application crashes
+
+Priority files (most critical):
+1. **src-tauri/src/domains/projects/services/execution_service.rs** - Execution can panic
+2. **src-tauri/src/domains/deployments/services/deployment_service.rs** - Deployment can panic
+3. **src-tauri/src/domains/sdk/commands/sdk_commands.rs** - SDK operations can panic
+4. **src-tauri/src/domains/kubernetes/commands.rs** - K8s operations can panic
+5. **Additional 22 files** - See IMPROVEMENTS.md for full list
+
+**Recommended Action**: Replace all `.unwrap()` with proper error handling using `?` operator or `match`
+
+#### **Non-Atomic Pipeline Execution**
+**Location**: src-tauri/src/domains/projects/services/pipeline_service.rs
+**Severity**: HIGH - Data integrity issue
+
+**Problem**:
+1. Creates execution record in database
+2. Spawns background task
+3. If task panics, database shows "pending" but no execution happens
+4. No retry mechanism
+5. No persistent job queue
+
+**Impact**: Silent execution failures, inconsistent state
+
+**Recommended Action**:
+- Wrap in database transaction
+- Implement persistent job queue (tokio-cron, lapin, or similar)
+- Add retry mechanism with exponential backoff
+- Handle panics gracefully with Result types
+
+### **⚠️ Incomplete Components**
+
+#### **AI Features** (75% Complete)
+
+1. **AI Training Data Backend Integration**
+   - Location: src/lib/domains/ai/
+   - Frontend UI exists (training data viewer, filters)
+   - Backend integration unclear/incomplete
+   - Status: UNCLEAR
+
+2. **Avatar System Integration**
+   - Location: src/lib/components/ai/FloatingAvatar.svelte, AvatarSpeechBubble.svelte
+   - Components exist with service (avatarService.ts) and store (avatarStore.ts)
+   - Integration in chat is basic/minimal
+   - Status: INCOMPLETE (60%)
+
+3. **AI Command Processing**
+   - Location: src/lib/domains/terminal/components/ai/AITerminalContainer.svelte (line 239)
+   - TODO: "Implement AI command processing"
+   - Status: TODO
+
+4. **Terminal Output Parsing**
+   - Location: src/lib/domains/terminal/components/Terminal.svelte (line 644)
+   - TODO: "Implement parseTerminalOutput and extractErrorSummary functions"
+   - Status: TODO
+
+#### **Kubernetes Features** (70% Complete)
+
+1. **Streaming Logs**
+   - Location: src/lib/domains/cloud/providers/gcp/GCPProvider.ts (line 243)
+   - TODO: "Implement streaming logs using invokeClient.live when backend supports it"
+   - Currently uses non-streaming fallback
+   - Status: FALLBACK ONLY
+
+2. **Event Monitoring**
+   - No implementation found
+   - Status: NOT STARTED
+
+3. **Resource Metrics UI**
+   - Types exist in backend
+   - UI visualization missing
+   - Status: TYPES ONLY
+
+4. **Hierarchical Resource Tree View**
+   - Currently only flat lists
+   - Tree view missing
+   - Status: NOT STARTED
+
+5. **Helm Chart Management**
+   - Status: NOT STARTED
+
+6. **Network Topology Visualization**
+   - Status: NOT STARTED
+
+7. **File Transfer to/from Containers**
+   - Status: NOT STARTED
+
+8. **Bulk Operations**
+   - Status: NOT STARTED
+
+#### **Terminal Features** (85% Complete)
+
+1. **Terminal State Persistence**
+   - ✅ Command history persistence - COMPLETED
+   - ❌ Scrollback buffer persistence - TODO
+   - ❌ Session restoration on restart - TODO
+   - ❌ Tab state restoration - TODO
+   - Status: PARTIAL
+
+2. **Command Blocks**
+   - Foldable output feature
+   - Exit code badges
+   - Command durations
+   - Status: BACKLOG/CANCELLED
+
+3. **Command Palette Enhancements**
+   - Basic palette exists
+   - Missing: kill process, rerun command, clear terminal
+   - Status: INCOMPLETE
+
+#### **Deployment Service** (60% Complete)
+
+**Location**: src-tauri/src/domains/deployments/services/deployment_service.rs
+**Severity**: MEDIUM-HIGH - Data loss on restart
+
+**Problem**:
+- All deployment data stored in `Arc<Mutex<HashMap>>` (in-memory only)
+- No database persistence
+- No migrations for deployment tables
+- Data lost on application restart
+
+**Status**: IN-MEMORY ONLY
+
+**Recommended Action**:
+- Add database tables for deployments
+- Create migrations
+- Implement repository pattern
+- Persist all deployment state
+
+### **✅ Duplicate Components RESOLVED**
+
+#### **Removed Duplicates**
+
+1. **AIProviderSettings.svelte** ✅ FIXED
+   - Previously in: src/lib/domains/ai/components/providers/ AND src/lib/domains/settings/components/
+   - Resolution: Consolidated into single version in ai domain
+   - Status: RESOLVED
+
+2. **UI Archive Components** ✅ FIXED
+   - Removed: 300+ archived component files from src/lib/components/ui-archive/
+   - Included: accordion, alert-dialog, alert, avatar, badge, breadcrumb, button, calendar, card, carousel, chart, checkbox, collapsible, command, context-menu, data-table, dialog, drawer, dropdown-menu, form, hover-card, input-otp, input, label, menubar, navigation-menu, pagination, popover, progress, radio-group, range-calendar, resizable, scroll-area, separator, sheet, sidebar, skeleton, slider, sonner, switch, table, tabs, textarea, toggle-group, toggle, tooltip
+   - Status: CLEANED UP
+
+3. **Old SDK Factory** ✅ REFACTORED
+   - Deleted: src-tauri/src/domains/sdk/factory.rs
+   - Replaced with: Modular factory pattern (factory/sdk_manager_factory.rs, factory/package_manager_factory.rs)
+   - Status: REFACTORED
+
+### **🔄 Svelte 5 Migration Issues**
+
+**Severity**: MEDIUM - Inconsistent patterns
+
+**Problem**:
+- Mixed adoption of Svelte 4 and 5 patterns throughout codebase
+- No clear migration strategy documented
+- Some components use runes ($state, $derived, $effect)
+- Others still use legacy reactive statements ($:)
+
+**Impact**:
+- Code inconsistency
+- Harder maintenance
+- Potential bugs from mixing patterns
+
+**Recommended Action**:
+1. Document migration strategy
+2. Create migration guide
+3. Identify all Svelte 4 components
+4. Systematic migration to Svelte 5 runes
+
+### **📊 Database Transaction Issues**
+
+**Severity**: MEDIUM - Data integrity risk
+
+**Problem**:
+- Multi-step operations not wrapped in transactions
+- Examples:
+  - Project creation with relationships
+  - Pipeline execution with status updates
+  - Resource CRUD with cascading updates
+- Risk of partial updates on failure
+- Risk of concurrent modification issues
+
+**Recommended Action**:
+- Identify all multi-step operations
+- Wrap in database transactions
+- Add proper rollback handling
+- Test concurrent scenarios
 
 ## 🏗️ **TECHNICAL DEBT & IMPROVEMENTS**
 
@@ -798,12 +1139,18 @@ This approach preserves a vanilla shell while giving you structure.
 - ✅ **PTY Implementation**: Using `portable-pty` correctly
 - ✅ **Architecture**: Clean separation of concerns
 - ✅ **UI Framework**: Modern Svelte + Tauri setup
-- 🔄 **Error Handling**: Needs improvement in terminal operations
+- ✅ **Unified Architecture**: invokeClient for all backend calls
+- ✅ **Device Authentication**: Complete device approval system
+- ⚠️ **Error Handling**: Needs improvement (26 files with unwrap)
+- ⚠️ **Async Safety**: 2-3 files with std::sync::Mutex in async
+- ⚠️ **Database Transactions**: Multi-step operations not atomic
+- ⚠️ **Svelte 5 Migration**: Mixed adoption, needs documentation
 - 🔄 **Testing**: Need comprehensive test coverage
 
 ### **Performance**
 - ✅ **Streaming**: Real-time PTY output streaming
 - ✅ **Memory Management**: Proper cleanup of PTY processes
+- ⚠️ **In-Memory Storage**: Deployment service has no persistence
 - 🔄 **Large Output**: Need better handling of large command outputs
 - 🔄 **Multiple Sessions**: Need optimization for many concurrent terminals
 
@@ -890,8 +1237,165 @@ This approach preserves a vanilla shell while giving you structure.
 
 ---
 
+## 📋 **COMPREHENSIVE ISSUE SUMMARY**
+
+### **Critical (Fix Immediately)**
+1. ⚠️ **3 Async Mutex Issues** - deployment_service.rs, terminal/manager.rs, kubernetes/commands.rs
+2. ⚠️ **26 Unwrap Panic Risks** - Top priority: execution_service.rs, deployment_service.rs, sdk_commands.rs
+3. ⚠️ **Non-Atomic Pipeline Execution** - Data integrity issue with no retry mechanism
+
+### **High Priority (Fix This Sprint)**
+4. ⚠️ **Deployment Service In-Memory Storage** - Data loss on restart
+5. ⚠️ **Missing Database Transactions** - Risk of partial updates and data corruption
+6. ⚠️ **Kubernetes Streaming Logs** - Using fallback, needs proper streaming implementation
+
+### **Medium Priority (Plan for Next Sprint)**
+7. ⚠️ **Svelte 5 Migration** - Inconsistent patterns, needs documentation
+8. ⚠️ **Terminal State Persistence** - Scrollback and session restoration missing
+9. ⚠️ **AI Training Data Backend** - Frontend exists, backend unclear
+10. ⚠️ **Avatar System Integration** - Basic implementation, needs enhancement
+
+### **Low Priority (Backlog)**
+11. 🔧 **Linux PTY Connection** - Has workaround (simulated terminal)
+12. 📋 **Command Blocks** - Foldable outputs feature (backlog/cancelled)
+13. 📋 **Advanced K8s Features** - Event monitoring, Helm, topology, metrics UI
+
+### **Resolved Issues** ✅
+- ✅ 300+ UI Archive Components Removed
+- ✅ Duplicate AIProviderSettings.svelte Consolidated
+- ✅ Old SDK Factory Refactored
+- ✅ Command History Persistence Complete
+- ✅ Multi-tab Terminal Support Complete
+- ✅ Unified invokeClient Architecture
+- ✅ Device Authentication System
+- ✅ Shell Integration Infrastructure
+
+---
+
+## 🎯 **RECOMMENDED WORK SEQUENCE (Next 4 Weeks)**
+
+### **Week 1: Critical Bug Fixes**
+**Goal**: Eliminate crash risks and deadlock potential
+
+1. Day 1-2: Fix 3 async mutex issues (deployment_service, terminal/manager, kubernetes/commands)
+2. Day 3-4: Fix top 5 unwrap panic risks (execution_service, deployment_service, sdk_commands, kubernetes/commands, + 1 more)
+3. Day 5: Add error handling tests and validation
+
+**Success Criteria**: No more std::sync::Mutex in async, top panic risks resolved
+
+### **Week 2: Data Integrity & Persistence**
+**Goal**: Prevent data loss and ensure atomicity
+
+1. Day 1-2: Implement deployment service database persistence (migrations + repository)
+2. Day 3-4: Fix non-atomic pipeline execution (transactions + retry mechanism)
+3. Day 5: Wrap multi-step operations in database transactions (project creation, resource updates)
+
+**Success Criteria**: No in-memory-only data, all multi-step operations atomic
+
+### **Week 3: Complete Incomplete Features**
+**Goal**: Bring partially implemented features to completion
+
+1. Day 1-2: Implement Kubernetes streaming logs (replace fallback)
+2. Day 2-3: Complete AI training data backend integration
+3. Day 4: Implement terminal state persistence (scrollback + session restoration)
+4. Day 5: Complete AI command processing and parseTerminalOutput
+
+**Success Criteria**: All TODOs in core features resolved
+
+### **Week 4: Code Quality & Documentation**
+**Goal**: Improve maintainability and consistency
+
+1. Day 1-2: Document Svelte 5 migration strategy and identify remaining Svelte 4 patterns
+2. Day 3: Fix remaining 21 unwrap calls (beyond top 5)
+3. Day 4: Create architecture decision records (ADRs) for key decisions
+4. Day 5: Update README, document known issues, create contribution guide
+
+**Success Criteria**: Consistent patterns, comprehensive documentation, <10 unwrap calls remaining
+
+---
+
+## 📊 **COMPLETION METRICS**
+
+### **Current State (2026-01-13)**
+- **Overall Project**: 82% Complete
+- **Terminal**: 85% Complete
+- **Kubernetes**: 70% Complete
+- **AI**: 75% Complete
+- **SDK/Package Manager**: 90% Complete
+- **Project/Pipeline**: 80% Complete
+- **Code Quality**: 75% Complete
+
+### **Target State (After 4-Week Plan)**
+- **Overall Project**: 90% Complete (+8%)
+- **Terminal**: 95% Complete (+10%)
+- **Kubernetes**: 85% Complete (+15%)
+- **AI**: 90% Complete (+15%)
+- **SDK/Package Manager**: 95% Complete (+5%)
+- **Project/Pipeline**: 90% Complete (+10%)
+- **Code Quality**: 95% Complete (+20%)
+
+### **Remaining After 4 Weeks**
+- Advanced K8s features (Helm, topology, events)
+- Enhanced terminal UX (process tree, enhanced palette)
+- Avatar system full integration
+- Svelte 5 migration execution (strategy done, full migration pending)
+- Comprehensive test coverage
+
+---
+
+## 🎓 **LESSONS LEARNED & BEST PRACTICES**
+
+### **What Went Well** ✅
+1. **Clean Domain Architecture** - Separation of concerns is excellent
+2. **Unified invokeClient** - Consistent backend communication pattern
+3. **Device Authentication** - Well-implemented security feature
+4. **Component Cleanup** - Removed 300+ unused components proactively
+5. **Multi-tab Terminal** - Complex feature implemented successfully
+6. **SDK Support** - Comprehensive language and package manager support
+
+### **What Needs Improvement** ⚠️
+1. **Error Handling** - Too many unwrap calls (26 files)
+2. **Async Safety** - Mixing sync primitives in async context
+3. **Data Persistence** - Some services store data in memory only
+4. **Database Transactions** - Multi-step operations not atomic
+5. **Migration Strategy** - Svelte 5 adoption inconsistent
+6. **Testing** - Limited test coverage
+
+### **Recommended Practices Going Forward** 📚
+1. **Always use `tokio::sync::Mutex`** in async context, never `std::sync::Mutex`
+2. **Prefer `?` operator** over `.unwrap()` for error handling
+3. **Wrap multi-step operations** in database transactions
+4. **Document migration strategies** before starting large refactors
+5. **Persist state to database** unless there's a compelling reason not to
+6. **Add tests for critical paths** (pipeline execution, terminal operations, k8s commands)
+7. **Use unified error types** (AppError) consistently across all domains
+8. **Follow Svelte 5 patterns** exclusively for new components
+
+---
+
 # 15) Can you make it "exactly like Warp"?
 
 You can match the **terminal feel** (latency, interactivity, blocks, palette) with the above approach. Warp’s GPU text engine, collaboration, and some IDE-like features are substantial engineering, but nothing here is proprietary magic—you’ll just trade time for polish. Start with PTY + xterm.js + shell hooks, and iterate.
 
 If you want, tell me your current stack (Rust/Node/Go + Electron/Tauri/etc.) and I’ll tailor the spawn/IPC code and shell hooks to your exact setup.
+
+---
+
+## 🚀 Page Data Loading Refactor Progress (2026-03-23)
+
+Objective: ensure pages only fetch the data they need, while keeping shared dashboard badge data fresh via a lightweight TTL summary API and explicit invalidation after mutations.
+
+Status: completed for the “page-data-loading” scope described in the project planning artifacts.
+
+What was implemented:
+- Backend: added `get_dashboard_overview` (lightweight dashboard summary) returning project totals/recent, main-task counts + completion percentage, and running SDK services count.
+- Frontend: added `dashboardStore` with TTL caching (5-minute default) and explicit `invalidate()` / `refresh()` helpers.
+- Home (`/`): now uses `dashboardStore` only (no direct dependency on full `projectStore` or derived `taskStats` loads).
+- Global layout (`+layout.svelte`): no longer initializes `projectService` on app mount; instead it loads `dashboardStore` for nav badges.
+- Tasks: removed module-level auto-loading from `taskStore.ts`; tasks load only when `TaskManager` mounts on `/tasks`.
+- Consistency: after project/task mutations, dashboard overview is invalidated and refreshed so badges and home cards update without full reloads.
+
+Expected load behavior after these changes:
+- Opening `/sdk/manager` triggers only the SDK manager page’s SDK-specific fetches.
+- Opening `/` triggers only the lightweight dashboard overview request (served from TTL cache when possible).
+- Opening `/tasks` triggers the full tasks load only for that page.

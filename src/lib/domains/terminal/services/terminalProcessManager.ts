@@ -167,6 +167,7 @@ export class TerminalProcessManager {
 
   /**
    * Execute command with full control and interception
+   * Uses one-off command execution via the backend
    */
   async executeCommand(
     processId: string,
@@ -190,11 +191,35 @@ export class TerminalProcessManager {
       };
     }
 
-    // Execute normally
-    return await invokeClient.post<TerminalCommand>('execute_terminal_command', {
-      processId,
-      command
-    });
+    // Execute using the one-off command execution backend
+    // Note: This executes independently, not within the process's shell session
+    try {
+      const output = await invokeClient.post<string>('execute_command', {
+        request: {
+          command,
+          workingDirectory: process.working_directory,
+          environment: process.environment || {}
+        }
+      });
+
+      return {
+        id: crypto.randomUUID(),
+        processId,
+        command,
+        timestamp: new Date(),
+        status: 'completed',
+        output
+      };
+    } catch (error) {
+      return {
+        id: crypto.randomUUID(),
+        processId,
+        command,
+        timestamp: new Date(),
+        status: 'failed',
+        output: error instanceof Error ? error.message : String(error)
+      };
+    }
   }
 
   /**
@@ -216,21 +241,8 @@ export class TerminalProcessManager {
     await invokeClient.post('resize_terminal', { processId, cols, rows });
   }
 
-  /**
-   * Get process output history
-   */
-  async getOutputHistory(processId: string): Promise<TerminalOutput[]> {
-    return await invokeClient.post<TerminalOutput[]>('get_terminal_output_history', {
-      processId
-    });
-  }
-
-  /**
-   * Clear process output history
-   */
-  async clearOutputHistory(processId: string): Promise<void> {
-    await invokeClient.post('clear_terminal_output_history', { processId });
-  }
+  // Note: getOutputHistory and clearOutputHistory removed - no backend support
+  // Output is managed client-side via the outputCallbacks mechanism
 
   /**
    * Private: Intercept commands before execution

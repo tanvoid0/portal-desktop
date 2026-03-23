@@ -4,6 +4,10 @@ mod migrations;
 mod domains;
 mod command_executor;
 mod utils;
+mod error;
+
+// Re-export error types for use throughout the codebase
+pub use error::{AppError, AppResult};
 
 use database::DatabaseManager;
 use domains::terminal::manager::TerminalManager;
@@ -15,6 +19,7 @@ use domains::ai::services::AIService;
 use domains::ai::services::AISettingsService;
 use domains::deployments::services::deployment_service::DeploymentService;
 use domains::projects::pipelines::services::{PipelineService, ExecutionService};
+use domains::scripts::commands::ScriptExecutionState;
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -33,7 +38,7 @@ pub fn run() {
     
     // Initialize domain managers
     let terminal_manager = TerminalManager::new();
-    let kubernetes_manager = std::sync::Mutex::new(KubernetesManager::new());
+    let kubernetes_manager = tokio::sync::Mutex::new(KubernetesManager::new());
     let navigation_service = NavigationService::new();
     
     // Configure updater plugin
@@ -116,7 +121,20 @@ pub fn run() {
             let execution_service = ExecutionService::new(db_manager_arc.clone());
             app.manage(Arc::new(pipeline_service));
             app.manage(Arc::new(execution_service));
-            
+
+            // Initialize script execution state
+            let script_execution_state = ScriptExecutionState::new();
+            app.manage(script_execution_state);
+
+            // Sync any running script executions from previous session
+            let db_for_sync = db_manager_arc.clone();
+            tauri::async_runtime::spawn(async move {
+                let service = domains::scripts::ScriptExecutionService::new(db_for_sync);
+                if let Err(e) = service.sync_running_executions().await {
+                    log_warn!("Scripts", "Failed to sync script executions: {}", e);
+                }
+            });
+
             log_info!("Tauri", "Automation service initialized");
             log_info!("Tauri", "Settings service initialized");
             log_info!("Tauri", "AI services initialized");
@@ -169,6 +187,7 @@ pub fn run() {
             domains::projects::get_projects_with_filters,
             domains::projects::get_frameworks,
             domains::projects::get_project_stats,
+            domains::dashboard::commands::get_dashboard_overview,
             domains::projects::validate_project_path,
             domains::projects::generate_project_name,
             domains::projects::detect_framework,
@@ -264,6 +283,32 @@ pub fn run() {
             // SDK Navigation commands
             domains::sdk::commands::navigation_commands::get_sdk_navigation_items,
             domains::sdk::commands::navigation_commands::get_sdk_details,
+            // SDK Configuration commands
+            domains::sdk::commands::language_config_commands::get_sdk_config,
+            domains::sdk::commands::language_config_commands::get_all_sdk_configs,
+            domains::sdk::commands::language_config_commands::get_sdks_by_category,
+            domains::sdk::commands::language_config_commands::get_all_sdk_managers,
+            // SDK Manager version management commands
+            domains::sdk::commands::manager_commands::get_manager_installed_versions,
+            domains::sdk::commands::manager_commands::get_manager_available_versions,
+            domains::sdk::commands::manager_commands::get_manager_current_version,
+            domains::sdk::commands::manager_commands::install_version_via_manager,
+            domains::sdk::commands::manager_commands::switch_version_via_manager,
+            domains::sdk::commands::manager_commands::uninstall_version_via_manager,
+            domains::sdk::commands::manager_commands::is_manager_version_installed,
+            // Package manager commands
+            domains::sdk::commands::package_manager_commands::get_available_package_managers,
+            domains::sdk::commands::package_manager_commands::package_manager_search,
+            domains::sdk::commands::package_manager_commands::package_manager_list_installed,
+            domains::sdk::commands::package_manager_commands::package_manager_get_details,
+            domains::sdk::commands::package_manager_commands::package_manager_install,
+            domains::sdk::commands::package_manager_commands::package_manager_upgrade,
+            domains::sdk::commands::package_manager_commands::package_manager_uninstall,
+            domains::sdk::commands::package_manager_commands::package_manager_check_updates,
+            domains::sdk::commands::package_manager_commands::package_manager_info,
+            // Legacy language config commands (for backward compatibility)
+            domains::sdk::commands::language_config_commands::get_language_config,
+            domains::sdk::commands::language_config_commands::get_all_language_configs,
             // FlyEnv-style download commands
             domains::sdk::commands::sdk_commands::fetch_available_versions,
             domains::sdk::commands::sdk_commands::download_and_install_version,
@@ -457,6 +502,16 @@ pub fn run() {
             domains::network::commands::verify_access_token,
             domains::network::commands::get_pending_device_approvals,
             domains::network::commands::get_device_status,
+            // Script execution commands
+            domains::scripts::commands::execute_script,
+            domains::scripts::commands::get_script_execution,
+            domains::scripts::commands::get_script_execution_live_output,
+            domains::scripts::commands::cancel_script_execution,
+            domains::scripts::commands::get_script_executions_by_block,
+            domains::scripts::commands::get_running_script_executions,
+            domains::scripts::commands::get_recent_script_executions,
+            domains::scripts::commands::sync_script_executions,
+            domains::scripts::commands::delete_script_execution,
         ])
         .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
         .expect("error while running tauri application");

@@ -29,6 +29,8 @@ export interface PipelineStep {
 	parallel?: boolean; // Can run in parallel with other steps
 	onSuccess?: string[]; // Step IDs to run on success
 	onFailure?: string[]; // Step IDs to run on failure
+	requiresApproval?: boolean; // If true, pipeline pauses and waits for manual approval before continuing
+	approvalMessage?: string; // Message shown to user when approval is required
 }
 
 export interface ExecutionContext {
@@ -160,6 +162,7 @@ export enum PipelineStepType {
 	COMMAND = 'command',
 	SDK_COMMAND = 'sdk_command',
 	DOCKER_COMMAND = 'docker_command',
+	MANUAL_APPROVAL = 'manual_approval',
 }
 
 export interface PipelineTemplate {
@@ -177,6 +180,8 @@ export interface PipelineTemplate {
 		config: Record<string, any>;
 		dependsOn?: string[]; // Array of step keys this step depends on
 		enabled?: boolean;
+		requiresApproval?: boolean; // If true, pipeline pauses for manual approval
+		approvalMessage?: string; // Message shown when approval is required
 	}>;
 	variables?: Array<{
 		name: string;

@@ -174,9 +174,18 @@ export async function connectToCluster(
   }));
   
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:176',message:'connectToCluster start',data:{providerType,clusterId},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
     const provider = await CloudServiceFactory.getProvider(providerType);
     await provider.connect(clusterId);
+    // #region agent log
+    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:178',message:'after provider.connect',data:{clusterId},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
     const cluster = await provider.getCluster(clusterId);
+    // #region agent log
+    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:180',message:'after provider.getCluster',data:{clusterFound:Boolean(cluster)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
     
     if (!cluster) {
       throw new Error(`Cluster ${clusterId} not found`);
@@ -200,7 +209,10 @@ export async function connectToCluster(
     
     // Start watching for real-time updates
     await startWatchingResources(namespaceToUse || undefined);
-    
+    // #region agent log
+    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:202',message:'after startWatchingResources',data:{},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
+
     toastActions.success(`Connected to cluster: ${cluster.name}`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to connect to cluster';
@@ -215,6 +227,9 @@ export async function connectToCluster(
     }));
     
     toastActions.error(errorMessage);
+    // #region agent log
+    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:205',message:'connectToCluster error',data:{error:errorMessage},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
     throw error;
   }
 }

@@ -1,0 +1,49 @@
+{
+  "id": "vpn-connect",
+  "name": "VPN Connect",
+  "description": "Connect to OpenVPN server with authentication",
+  "category": "utility",
+  "version": "1.0.0",
+  "parameters": [
+    {
+      "name": "configDir",
+      "type": "directory",
+      "description": "Directory containing VPN config files",
+      "required": true,
+      "defaultValue": "/path/to/vpn/config"
+    },
+    {
+      "name": "configFile",
+      "type": "string",
+      "description": "OpenVPN config filename (.ovpn)",
+      "required": true,
+      "defaultValue": "gcp.ovpn"
+    },
+    {
+      "name": "authFile",
+      "type": "string",
+      "description": "Auth credentials filename",
+      "required": false,
+      "defaultValue": "auth.txt"
+    },
+    {
+      "name": "action",
+      "type": "select",
+      "description": "VPN action to perform",
+      "required": true,
+      "defaultValue": "connect",
+      "options": ["connect", "disconnect", "status"]
+    }
+  ],
+  "command": "sudo openvpn --config \"${configDir}/${configFile}\" --auth-retry interact --auth-user-pass \"${configDir}/${authFile}\"",
+  "executionType": "script",
+  "defaultConfig": {
+    "configDir": "/path/to/vpn/config",
+    "configFile": "gcp.ovpn",
+    "authFile": "auth.txt",
+    "action": "connect"
+  },
+  "tags": ["vpn", "openvpn", "network", "security", "gcp"],
+  "icon": "shield",
+  "author": "portal-desktop"
+}

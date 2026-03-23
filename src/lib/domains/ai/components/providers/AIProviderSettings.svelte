@@ -16,6 +16,7 @@
 	import { aiProviderService } from '../../services/aiProviderService.js';
 	import type { ProviderConfig, ProviderType, ConfigurationStatus } from '../../types/index.js';
 	import { invokeClient } from '$lib/utils/invokeClient';
+	import { invoke } from '@tauri-apps/api/core';
 	import { 
 		Brain, 
 		CheckCircle2, 

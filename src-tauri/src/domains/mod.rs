@@ -16,8 +16,10 @@ pub mod shared;
 pub mod documents;
 pub mod ai;
 pub mod custom_scripts;
+pub mod scripts;
 pub mod updates;
 pub mod network;
+pub mod dashboard;
 
 // Future domains will be added here:
 // pub mod notifications;

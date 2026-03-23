@@ -35,7 +35,16 @@
 	let activeTab = $state<'blocks' | 'templates'>('blocks');
 	let showTemplateImportDialog = $state(false);
 	let showTemplateExportDialog = $state(false);
+	let showEditTemplateDialog = $state(false);
 	let selectedTemplateForExport: PipelineTemplate | null = $state(null);
+	let editingTemplate: PipelineTemplate | null = $state(null);
+	let templateFormData = $state<Partial<PipelineTemplate>>({
+		name: '',
+		description: '',
+		framework: '',
+		category: undefined,
+		tags: [],
+	});
 
 	// Form state
 	let formData = $state<CreateBlockRequest>({
@@ -48,6 +57,10 @@
 		defaultConfig: {},
 		tags: [],
 	});
+
+	// JSON import state
+	let jsonImportText = $state('');
+	let jsonImportError = $state('');
 
 	onMount(async () => {
 		await loadBlocks();
@@ -92,7 +105,49 @@
 			defaultConfig: {},
 			tags: [],
 		};
+		jsonImportText = '';
+		jsonImportError = '';
 		showCreateDialog = true;
+	}
+
+	function handleJsonImport() {
+		jsonImportError = '';
+		if (!jsonImportText.trim()) {
+			jsonImportError = 'Please paste JSON content';
+			return;
+		}
+		try {
+			const parsed = JSON.parse(jsonImportText);
+			// Map JSON fields to form data
+			formData = {
+				name: parsed.name || '',
+				description: parsed.description || '',
+				category: parsed.category || 'utility',
+				parameters: parsed.parameters || [],
+				command: parsed.command || '',
+				executionType: parsed.executionType || 'command',
+				defaultConfig: parsed.defaultConfig || {},
+				tags: parsed.tags || [],
+			};
+			jsonImportText = '';
+			toast.success('JSON imported - review and save');
+		} catch (e) {
+			jsonImportError = 'Invalid JSON format';
+		}
+	}
+
+	function handleJsonFileImport(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			jsonImportText = e.target?.result as string;
+			handleJsonImport();
+		};
+		reader.readAsText(file);
+		target.value = '';
 	}
 
 	function handleEditBlock(block: Block) {
@@ -307,6 +362,37 @@
 		} catch (error) {
 			console.error('Failed to delete template', error);
 			toast.error(error instanceof Error ? error.message : 'Failed to delete template');
+		}
+	}
+
+	function handleEditTemplate(template: PipelineTemplate) {
+		if (!template.id) {
+			toast.error('Built-in templates cannot be edited. Export and import as a custom template to edit.');
+			return;
+		}
+		editingTemplate = template;
+		templateFormData = {
+			name: template.name,
+			description: template.description,
+			framework: template.framework,
+			category: template.category,
+			tags: template.tags || [],
+		};
+		showEditTemplateDialog = true;
+	}
+
+	async function handleSaveTemplate() {
+		if (!editingTemplate) return;
+		
+		try {
+			pipelineTemplateService.updateTemplate(editingTemplate.key, templateFormData);
+			toast.success('Template updated successfully');
+			showEditTemplateDialog = false;
+			editingTemplate = null;
+			loadTemplates();
+		} catch (error) {
+			console.error('Failed to update template', error);
+			toast.error(error instanceof Error ? error.message : 'Failed to update template');
 		}
 	}
 
@@ -586,12 +672,19 @@
 										size="sm"
 										variant="outline"
 										onclick={() => handleExportTemplate(template)}
-										class="flex-1"
 									>
-										<Download class="h-3 w-3 mr-1" />
-										Export
+										<Download class="h-3 w-3" />
 									</Button>
 									{#if template.id}
+										<Button
+											size="sm"
+											variant="outline"
+											onclick={() => handleEditTemplate(template)}
+											class="flex-1"
+										>
+											<Edit class="h-3 w-3 mr-1" />
+											Edit
+										</Button>
 										<Button
 											size="sm"
 											variant="destructive"
@@ -612,7 +705,7 @@
 
 <!-- Create/Edit Block Dialog -->
 <Dialog.Root bind:open={showCreateDialog}>
-	<Dialog.Content class="max-w-2xl max-h-[90vh] overflow-y-auto">
+	<Dialog.Content class="max-w-3xl max-h-[90vh] overflow-y-auto">
 		<Dialog.Header>
 			<Dialog.Title>{editingBlock ? 'Edit Block' : 'Create New Block'}</Dialog.Title>
 			<Dialog.Description>
@@ -620,6 +713,48 @@
 			</Dialog.Description>
 		</Dialog.Header>
 		<div class="space-y-4">
+			<!-- JSON Import Section -->
+			{#if !editingBlock}
+				<div class="rounded-lg border border-dashed p-4 space-y-3">
+					<div class="flex items-center justify-between">
+						<Label class="text-sm font-medium">Import from JSON</Label>
+						<input
+							type="file"
+							id="json-file-import"
+							accept=".json"
+							class="hidden"
+							onchange={handleJsonFileImport}
+						/>
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() => document.getElementById('json-file-import')?.click()}
+						>
+							<Upload class="h-3 w-3 mr-1" />
+							Load File
+						</Button>
+					</div>
+					<Textarea
+						bind:value={jsonImportText}
+						placeholder={'Paste JSON here, e.g.: {"name": "My Block", "command": "echo hello", ...}'}
+						rows={3}
+						class="font-mono text-xs"
+					/>
+					{#if jsonImportError}
+						<p class="text-sm text-destructive">{jsonImportError}</p>
+					{/if}
+					<Button
+						variant="secondary"
+						size="sm"
+						onclick={handleJsonImport}
+						disabled={!jsonImportText.trim()}
+					>
+						Import & Preview
+					</Button>
+				</div>
+			{/if}
+
+			<!-- Form Fields -->
 			<div class="grid grid-cols-2 gap-4">
 				<div>
 					<Label for="name">Name *</Label>
@@ -685,6 +820,43 @@
 					placeholder="e.g., node, npm, install"
 				/>
 			</div>
+
+			<!-- Parameters Section -->
+			{#if formData.parameters && formData.parameters.length > 0}
+				<div class="space-y-2">
+					<Label>Parameters ({formData.parameters.length})</Label>
+					<div class="rounded-md border p-3 space-y-2 max-h-40 overflow-y-auto">
+						{#each formData.parameters as param, i}
+							<div class="flex items-center justify-between text-sm bg-muted/50 rounded p-2">
+								<div>
+									<span class="font-medium">{param.name}</span>
+									<span class="text-muted-foreground ml-2">({param.type})</span>
+									{#if param.required}
+										<Badge variant="outline" class="ml-2 text-xs">required</Badge>
+									{/if}
+								</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									onclick={() => {
+										formData.parameters = formData.parameters.filter((_, idx) => idx !== i);
+									}}
+								>
+									<Trash2 class="h-3 w-3" />
+								</Button>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Default Config Preview -->
+			{#if formData.defaultConfig && Object.keys(formData.defaultConfig).length > 0}
+				<div class="space-y-2">
+					<Label>Default Config</Label>
+					<pre class="rounded-md bg-muted p-3 text-xs overflow-x-auto">{JSON.stringify(formData.defaultConfig, null, 2)}</pre>
+				</div>
+			{/if}
 		</div>
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (showCreateDialog = false)}>Cancel</Button>
@@ -784,6 +956,92 @@
 			<Button onclick={handleImportBlock}>
 				<Upload class="h-4 w-4 mr-2" />
 				Select File
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Edit Template Dialog -->
+<Dialog.Root bind:open={showEditTemplateDialog}>
+	<Dialog.Content class="max-w-2xl max-h-[90vh] overflow-y-auto">
+		<Dialog.Header>
+			<Dialog.Title>Edit Template</Dialog.Title>
+			<Dialog.Description>
+				Update template details. Note: Steps and variables cannot be edited here. Export and re-import to modify the full template structure.
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="space-y-4">
+			<div>
+				<Label for="template-name">Name *</Label>
+				<Input
+					id="template-name"
+					bind:value={templateFormData.name}
+					placeholder="e.g., Spring Boot Full Pipeline"
+				/>
+			</div>
+			<div>
+				<Label for="template-description">Description *</Label>
+				<Textarea
+					id="template-description"
+					bind:value={templateFormData.description}
+					placeholder="Describe what this template does..."
+					rows={3}
+				/>
+			</div>
+			<div class="grid grid-cols-2 gap-4">
+				<div>
+					<Label for="template-framework">Framework</Label>
+					<Input
+						id="template-framework"
+						bind:value={templateFormData.framework}
+						placeholder="e.g., spring-boot, react"
+					/>
+				</div>
+				<div>
+					<Label for="template-category">Category</Label>
+					<Select
+						options={[
+							{ value: 'build', label: 'Build' },
+							{ value: 'test', label: 'Test' },
+							{ value: 'deploy', label: 'Deploy' },
+							{ value: 'ci-cd', label: 'CI/CD' },
+							{ value: 'full-stack', label: 'Full Stack' },
+						]}
+						bind:value={templateFormData.category}
+						placeholder="Select category"
+					/>
+				</div>
+			</div>
+			<div>
+				<Label for="template-tags">Tags (comma-separated)</Label>
+				<Input
+					id="template-tags"
+					value={(templateFormData.tags || []).join(', ')}
+					oninput={(e) => {
+						templateFormData.tags = (e.target as HTMLInputElement).value
+							.split(',')
+							.map((t) => t.trim())
+							.filter((t) => t.length > 0);
+					}}
+					placeholder="e.g., spring-boot, maven, docker"
+				/>
+			</div>
+			<div class="rounded-md bg-muted p-4">
+				<p class="text-sm text-muted-foreground">
+					<strong>Note:</strong> To edit steps, variables, or the full template structure, export the template, modify the JSON file, and import it back.
+				</p>
+			</div>
+		</div>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => {
+				showEditTemplateDialog = false;
+				editingTemplate = null;
+			}}>Cancel</Button>
+			<Button
+				onclick={handleSaveTemplate}
+				disabled={!templateFormData.name || !templateFormData.description}
+			>
+				Update Template
 			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>

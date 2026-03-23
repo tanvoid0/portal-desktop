@@ -8,12 +8,14 @@ pub mod services;
 pub mod traits;
 pub mod managers;
 pub mod factory;
+pub mod package_managers;
 pub mod download;
 pub mod project;
 pub mod version_fetcher;
 pub mod version_installer;
 pub mod manager_detector;
 pub mod ollama_manager;
+pub mod configs;
 
 
 #[derive(Debug, thiserror::Error)]

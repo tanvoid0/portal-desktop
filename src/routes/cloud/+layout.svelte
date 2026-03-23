@@ -13,6 +13,7 @@
 	import { cloudStore } from '$lib/domains/cloud/stores';
 	import { ResourceType } from '$lib/domains/cloud/core/types';
 	import type { Command } from '$lib/domains/k8s-navigation';
+	import { Sidebar as SidebarRoot } from '$lib/components/ui/sidebar';
 	
 	let { children }: { children: Snippet<[]> } = $props();
 	
@@ -121,13 +122,15 @@
 		<!-- Main Content Area with Sidebar -->
 		<div class="flex flex-1 min-h-0 overflow-hidden w-full">
 			<!-- Cloud Sidebar Navigation (appears after main sidebar) -->
-			<aside class="w-64 border-r bg-background flex-shrink-0 overflow-y-auto min-w-0">
-				<div class="p-4">
-					<Card class="p-3">
-						<CloudNavigation />
-					</Card>
+			<SidebarRoot collapsible="icon">
+				<div class="flex h-full flex-col min-h-0 overflow-hidden">
+					<div class="p-4 flex-1 overflow-y-auto min-h-0">
+						<Card class="p-3">
+							<CloudNavigation />
+						</Card>
+					</div>
 				</div>
-			</aside>
+			</SidebarRoot>
 
 			<!-- Page Content -->
 			<main class="flex-1 overflow-y-auto min-w-0 min-h-0">

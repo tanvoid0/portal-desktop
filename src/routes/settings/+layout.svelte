@@ -8,6 +8,7 @@
 	import { goto } from '$app/navigation';
 	import type { Snippet } from 'svelte';
 	import SettingsNavigation from '$lib/domains/settings/components/SettingsNavigation.svelte';
+	import { Sidebar as SidebarRoot } from '$lib/components/ui/sidebar';
 	import { settingsActions, settings, isLoadingSettings, settingsError } from '$lib/domains/settings/stores/settingsStore';
 	import { Button } from '$lib/components/ui/button';
 	import { Card } from '$lib/components/ui/card';
@@ -191,13 +192,15 @@
 	<!-- Main Content Area -->
 	<div class="flex flex-1 min-h-0 overflow-hidden w-full h-full">
 		<!-- Sidebar Navigation -->
-		<aside class="w-80 border-r bg-background flex-shrink-0 overflow-y-auto min-w-0">
-			<div class="p-4">
-				<Card class="p-3">
-					<SettingsNavigation currentSection={currentSection()} />
-				</Card>
+		<SidebarRoot collapsible="icon">
+			<div class="flex h-full flex-col min-h-0 overflow-hidden">
+				<div class="p-4 flex-1 overflow-y-auto min-h-0">
+					<Card class="p-3">
+						<SettingsNavigation currentSection={currentSection()} />
+					</Card>
 			</div>
-		</aside>
+			</div>
+		</SidebarRoot>
 
 		<!-- Page Content -->
 		<main class="flex-1 overflow-y-auto min-w-0 min-h-0">

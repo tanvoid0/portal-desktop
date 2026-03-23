@@ -455,17 +455,17 @@
 							<p class="text-sm font-mono bg-muted p-2 rounded mt-1 break-all">{project.path}</p>
 						</div>
 						
-						{#if project.framework}
+						{#if project.metadata?.framework}
 							<div>
 								<p class="text-sm font-medium text-muted-foreground">Framework</p>
-								<p class="text-sm mt-1">{project.framework}</p>
+								<p class="text-sm mt-1">{project.metadata.framework}</p>
 							</div>
 						{/if}
 						
-						{#if project.package_manager}
+						{#if project.package_manager_ids && project.package_manager_ids.length > 0}
 							<div>
-								<p class="text-sm font-medium text-muted-foreground">Package Manager</p>
-								<p class="text-sm mt-1">{project.package_manager}</p>
+								<p class="text-sm font-medium text-muted-foreground">Package Managers</p>
+								<p class="text-sm mt-1">{project.package_manager_ids.length} package manager(s)</p>
 							</div>
 						{/if}
 					</CardContent>

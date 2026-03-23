@@ -6,4 +6,5 @@
  */
 
 pub mod sdk_manager;
+pub mod package_manager;
 

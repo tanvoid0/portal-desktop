@@ -1,7 +1,7 @@
 // GCP Provider implementation
 // Maps GCP/GKE (Kubernetes) backend to abstract cloud provider interface
 
-import { invoke } from '@tauri-apps/api/core';
+import { invokeClient } from '@/lib/utils/invokeClient';
 import { BaseProvider } from '../base/BaseProvider';
 import type {
   ICluster,
@@ -28,16 +28,25 @@ export class GCPProvider extends BaseProvider {
   
   async initialize(): Promise<void> {
     try {
-      await invoke('k8s_initialize_manager');
+      // #region agent log
+      fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H2',location:'GCPProvider.ts:29',message:'GCPProvider.initialize start',data:{},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
+      await invokeClient.post('k8s_initialize_manager');
+      // #region agent log
+      fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H2',location:'GCPProvider.ts:31',message:'GCPProvider.initialize after invoke',data:{},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
     } catch (error) {
       console.error('Failed to initialize GCP provider:', error);
+      // #region agent log
+      fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H2',location:'GCPProvider.ts:33',message:'GCPProvider.initialize error',data:{error:String(error)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       throw error;
     }
   }
   
   async connect(clusterId: string): Promise<void> {
     try {
-      await invoke('k8s_connect_cluster', { clusterName: clusterId });
+      await invokeClient.post('k8s_connect_cluster', { clusterName: clusterId });
       this.connected = true;
       
       // Update current cluster
@@ -57,10 +66,34 @@ export class GCPProvider extends BaseProvider {
   
   async listClusters(): Promise<ICluster[]> {
     try {
-      const clusters = await invoke<KubernetesCluster[]>('k8s_load_clusters');
+      // #region agent log
+      fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H3',location:'GCPProvider.ts:58',message:'listClusters start',data:{},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
+      const clusters = await invokeClient.post<KubernetesCluster[]>('k8s_load_clusters');
+      // #region agent log
+      fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H3',location:'GCPProvider.ts:60',message:'listClusters after invoke',data:{clusterCount:Array.isArray(clusters)?clusters.length:null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
+      // Handle null/undefined response (can happen with localhost strategy or errors)
+      if (!clusters || !Array.isArray(clusters)) {
+        // In browser/localhost mode, this might be expected
+        // In Tauri mode, empty array means no kubeconfig or no clusters
+        return [];
+      }
       return clusters.map(c => this.mapToCluster(c));
     } catch (error) {
+      // Log the error but still return empty array to allow UI to show helpful message
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Failed to list clusters:', error);
+      // #region agent log
+      fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H3',location:'GCPProvider.ts:69',message:'listClusters error',data:{error:errorMessage},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
+      
+      // Re-throw if it's a meaningful error (not just "empty" or localhost strategy)
+      // This allows the UI to show the actual error
+      if (!errorMessage.includes('localhost') && !errorMessage.includes('empty')) {
+        throw error;
+      }
+      
       return [];
     }
   }
@@ -74,47 +107,58 @@ export class GCPProvider extends BaseProvider {
     try {
       switch (type) {
         case ResourceType.POD:
-          const pods = await invoke<PodInfo[]>('k8s_list_pods', { namespace });
+          const pods = await invokeClient.post<PodInfo[]>('k8s_list_pods', { namespace });
+          if (!pods || !Array.isArray(pods)) return [];
           return pods.map(p => this.mapToPod(p));
           
         case ResourceType.SERVICE:
-          const services = await invoke<ServiceInfo[]>('k8s_list_services', { namespace });
+          const services = await invokeClient.post<ServiceInfo[]>('k8s_list_services', { namespace });
+          if (!services || !Array.isArray(services)) return [];
           return services.map(s => this.mapToService(s));
           
         case ResourceType.DEPLOYMENT:
-          const deployments = await invoke<DeploymentInfo[]>('k8s_list_deployments', { namespace });
+          const deployments = await invokeClient.post<DeploymentInfo[]>('k8s_list_deployments', { namespace });
+          if (!deployments || !Array.isArray(deployments)) return [];
           return deployments.map(d => this.mapToDeployment(d));
           
         case ResourceType.STATEFULSET:
-          const statefulsets = await invoke<any[]>('k8s_list_statefulsets', { namespace });
+          const statefulsets = await invokeClient.post<any[]>('k8s_list_statefulsets', { namespace });
+          if (!statefulsets || !Array.isArray(statefulsets)) return [];
           return statefulsets.map(ss => this.mapToStatefulSet(ss));
           
         case ResourceType.DAEMONSET:
-          const daemonsets = await invoke<any[]>('k8s_list_daemonsets', { namespace });
+          const daemonsets = await invokeClient.post<any[]>('k8s_list_daemonsets', { namespace });
+          if (!daemonsets || !Array.isArray(daemonsets)) return [];
           return daemonsets.map(ds => this.mapToDaemonSet(ds));
           
         case ResourceType.JOB:
-          const jobs = await invoke<any[]>('k8s_list_jobs', { namespace });
+          const jobs = await invokeClient.post<any[]>('k8s_list_jobs', { namespace });
+          if (!jobs || !Array.isArray(jobs)) return [];
           return jobs.map(j => this.mapToJob(j));
           
         case ResourceType.CRONJOB:
-          const cronjobs = await invoke<any[]>('k8s_list_cronjobs', { namespace });
+          const cronjobs = await invokeClient.post<any[]>('k8s_list_cronjobs', { namespace });
+          if (!cronjobs || !Array.isArray(cronjobs)) return [];
           return cronjobs.map(cj => this.mapToCronJob(cj));
           
         case ResourceType.CONFIGMAP:
-          const configmaps = await invoke<any[]>('k8s_list_configmaps', { namespace });
+          const configmaps = await invokeClient.post<any[]>('k8s_list_configmaps', { namespace });
+          if (!configmaps || !Array.isArray(configmaps)) return [];
           return configmaps.map(cm => this.mapToConfigMap(cm));
           
         case ResourceType.SECRET:
-          const secrets = await invoke<any[]>('k8s_list_secrets', { namespace });
+          const secrets = await invokeClient.post<any[]>('k8s_list_secrets', { namespace });
+          if (!secrets || !Array.isArray(secrets)) return [];
           return secrets.map(s => this.mapToSecret(s));
           
         case ResourceType.INGRESS:
-          const ingresses = await invoke<any[]>('k8s_list_ingresses', { namespace });
+          const ingresses = await invokeClient.post<any[]>('k8s_list_ingresses', { namespace });
+          if (!ingresses || !Array.isArray(ingresses)) return [];
           return ingresses.map(i => this.mapToIngress(i));
           
         case ResourceType.NAMESPACE:
-          const namespaces = await invoke<NamespaceInfo[]>('k8s_list_namespaces');
+          const namespaces = await invokeClient.post<NamespaceInfo[]>('k8s_list_namespaces');
+          if (!namespaces || !Array.isArray(namespaces)) return [];
           return namespaces.map(n => this.mapToNamespace(n));
           
         default:
@@ -141,7 +185,8 @@ export class GCPProvider extends BaseProvider {
   
   async listNamespaces(): Promise<string[]> {
     try {
-      const namespaces = await invoke<NamespaceInfo[]>('k8s_list_namespaces');
+      const namespaces = await invokeClient.post<NamespaceInfo[]>('k8s_list_namespaces');
+      if (!namespaces || !Array.isArray(namespaces)) return [];
       return namespaces.map(n => n.name);
     } catch (error) {
       console.error('Failed to list namespaces:', error);
@@ -198,9 +243,25 @@ export class GCPProvider extends BaseProvider {
     };
     
     // Add optional methods
-    resource.getLogs = async (container?: string, tailLines?: number) => {
+    resource.getLogs = async (container?: string, tailLines?: number, follow?: boolean) => {
       try {
-        return await invoke<string>('k8s_get_pod_logs', {
+        // For non-streaming logs (follow: false), use regular post
+        if (!follow) {
+          return await invokeClient.post<string>('k8s_get_pod_logs', {
+            namespace: data.namespace,
+            podName: data.name,
+            container: container || null,
+            follow: false,
+            tailLines: tailLines || null
+          });
+        }
+        
+        // For streaming logs (follow: true), use live method
+        // Note: Backend needs to emit events with pattern: k8s_get_pod_logs:stream:{streamId}
+        // TODO: Implement streaming logs using invokeClient.live when backend supports it
+        // For now, fall back to non-streaming
+        console.warn('Streaming logs (follow: true) not yet implemented, falling back to non-streaming');
+        return await invokeClient.post<string>('k8s_get_pod_logs', {
           namespace: data.namespace,
           podName: data.name,
           container: container || null,
@@ -208,14 +269,45 @@ export class GCPProvider extends BaseProvider {
           tailLines: tailLines || null
         });
       } catch (error) {
-        console.error('Failed to get pod logs:', error);
+        // Don't log PodInitializing errors - they're expected and handled in the UI
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isPodInitializing = errorMessage.includes('PodInitializing') || 
+                                  errorMessage.includes('waiting to start') ||
+                                  errorMessage.includes('is waiting to start');
+        
+        if (!isPodInitializing) {
+          console.error('Failed to get pod logs:', error);
+        }
         throw error;
       }
     };
     
+    // Add method for streaming logs (using type assertion since it's not in the interface)
+    // TODO: Add getLogsStream to ICloudResource interface when streaming is fully implemented
+    (resource as any).getLogsStream = async (
+      onData: (data: string) => void,
+      onError?: (error: Error) => void,
+      container?: string,
+      tailLines?: number
+    ): Promise<() => void> => {
+      // Use invokeClient.live for streaming logs
+      // Backend should emit events: k8s_get_pod_logs:stream:{streamId}
+      return await invokeClient.live<string>('k8s_get_pod_logs', {
+        data: {
+          namespace: data.namespace,
+          podName: data.name,
+          container: container || null,
+          follow: true,
+          tailLines: tailLines || null
+        },
+        onData,
+        onError
+      });
+    };
+    
     resource.exec = async (command: string[]) => {
       try {
-        return await invoke<string>('k8s_exec_pod', {
+        return await invokeClient.post<string>('k8s_exec_pod', {
           namespace: data.namespace,
           podName: data.name,
           container: null,
@@ -229,7 +321,7 @@ export class GCPProvider extends BaseProvider {
     
     resource.delete = async () => {
       try {
-        await invoke('k8s_delete_pod', {
+        await invokeClient.post('k8s_delete_pod', {
           namespace: data.namespace,
           podName: data.name
         });
@@ -285,7 +377,7 @@ export class GCPProvider extends BaseProvider {
     // Add optional methods
     resource.scale = async (replicas: number) => {
       try {
-        await invoke('k8s_scale_deployment', {
+        await invokeClient.post('k8s_scale_deployment', {
           namespace: data.namespace,
           deploymentName: data.name,
           replicas: replicas

@@ -35,6 +35,10 @@
 	} from '@lucide/svelte';
 	import ServiceCard from '$lib/domains/sdk/components/ServiceCard.svelte';
 	import VersionList from '$lib/domains/sdk/components/VersionList.svelte';
+	import Devicon from '$lib/components/ui/devicon.svelte';
+	import { sdkManagers as sdkManagersStore, installedSDKs as installedSDKsStore, sdkActions } from '$lib/domains/sdk/stores/sdkStore';
+	import { goto } from '$app/navigation';
+	import type { SDKManagerInfo } from '$lib/domains/sdk/types';
 
 	// State
 	let loading = $state(false);
@@ -56,6 +60,34 @@
 	// SDK Managers data
 	let sdkManagers = $state<any[]>([]);
 	let managerInstallationStatus = $state<Record<string, boolean>>({});
+	
+	// Get real SDK managers from store
+	let realSDKManagers = $derived($sdkManagersStore);
+	let realInstalledSDKs = $derived($installedSDKsStore);
+	
+	// Also use the directly loaded managers data as fallback
+	let allManagers = $derived.by(() => {
+		// Combine store data with directly loaded data
+		const storeManagers = realSDKManagers || [];
+		const loadedManagers = installedSDKs || [];
+		
+		// If store has data, use it; otherwise use loaded data
+		if (storeManagers.length > 0) {
+			return storeManagers;
+		}
+		
+		// Convert loaded data to SDKManagerInfo format
+		return loadedManagers.map((m: any) => ({
+			name: m.name || m.type || m.id || '',
+			type: m.type || m.name || m.id || '',
+			display_name: m.display_name || m.name || m.type || '',
+			category: m.category || 'language',
+			installed: m.installed === true || m.installed === 'true' || m.installed === true,
+			version: m.version || null,
+			description: m.description || '',
+			sdk_type: m.sdk_type || m.type || m.name || ''
+		}));
+	});
 
 	// Handle URL parameters
 	$effect(() => {
@@ -87,6 +119,21 @@
 			
 			// Process available SDKs
 			availableSDKs = Array.isArray(availableData) ? availableData : [];
+			
+			// Populate stores with detected managers (convert to SDKManagerInfo format)
+			if (Array.isArray(managersData)) {
+				const managers: SDKManagerInfo[] = managersData.map((m: any) => ({
+					name: m.name || m.type || m.id || '',
+					type: m.type || m.name || m.id || '',
+					display_name: m.display_name || m.name || m.type || '',
+					category: m.category || 'language',
+					installed: m.installed === true || m.installed === 'true' || m.installed === true,
+					version: m.version || null,
+					description: m.description || '',
+					sdk_type: m.sdk_type || m.type || m.name || ''
+				}));
+				sdkActions.setManagers(managers);
+			}
 			
 			// Initialize SDK Managers list
 			sdkManagers = [
@@ -423,10 +470,108 @@
 	let activeVersions = $derived(versions.filter(v => v.active).length);
 	let totalManagers = $derived(sdkManagers.length);
 	let installedManagers = $derived(Object.values(managerInstallationStatus).filter(Boolean).length);
+
+	// Helper functions to organize SDKs by category (similar to sidebar)
+	function getSDKIcon(sdkType: string): string {
+		const iconMap: Record<string, string> = {
+			'java': 'devicon-java-plain',
+			'node': 'devicon-nodejs-plain',
+			'nodejs': 'devicon-nodejs-plain',
+			'python': 'devicon-python-plain',
+			'rust': 'devicon-rust-plain',
+			'go': 'devicon-go-plain',
+			'php': 'devicon-php-plain',
+			'ruby': 'devicon-ruby-plain',
+			'bun': 'devicon-bun-plain',
+			'deno': 'devicon-deno-plain',
+			'mysql': 'devicon-mysql-plain',
+			'postgresql': 'devicon-postgresql-plain',
+			'mongodb': 'devicon-mongodb-plain',
+			'mariadb': 'devicon-mariadb-plain',
+			'nginx': 'devicon-nginx-original',
+			'apache': 'devicon-apache-plain',
+			'docker': 'devicon-docker-plain',
+			'kubernetes': 'devicon-kubernetes-plain',
+			'nvm': 'devicon-nodejs-plain',
+			'pyenv': 'devicon-python-plain',
+			'rustup': 'devicon-rust-plain',
+			'sdkman': 'devicon-sdkman-plain',
+			'rbenv': 'devicon-ruby-plain',
+			'phpenv': 'devicon-php-plain'
+		};
+		return iconMap[sdkType.toLowerCase()] || 'devicon-devicon-plain';
+	}
+
+	function getSDKRoute(sdkId: string, category: string): string {
+		const normalizedId = sdkId.toLowerCase().trim();
+		
+		// SDK Managers go to /sdk/manager/[name] (singular, matches route structure)
+		if (category === 'manager') {
+			return `/sdk/manager/${normalizedId}`;
+		}
+		
+		// Use the new dynamic route for all SDKs (language, database, ai, server, container, etc.)
+		// The dynamic route /sdk/[sdk]/+page.svelte handles all SDKs
+		return `/sdk/${normalizedId}`;
+	}
+
+	// Organize SDKs by category
+	let quickNavSDKs = $derived(() => {
+		const categories: Record<string, any[]> = {
+			manager: [],
+			language: [],
+			database: [],
+			web: [],
+			container: []
+		};
+
+		allManagers.forEach((manager: SDKManagerInfo) => {
+			const category = manager.category || '';
+			const sdkItem = {
+				id: manager.type || manager.name,
+				name: manager.type || manager.name,
+				displayName: manager.display_name || manager.name,
+				icon: getSDKIcon(manager.type || manager.name),
+				category: category || 'language',
+				installed: manager.installed === true || manager.installed === 'true',
+				version: manager.version,
+				description: manager.description
+			};
+
+			if (category === 'manager') {
+				categories.manager.push(sdkItem);
+			} else if (category === 'language') {
+				categories.language.push(sdkItem);
+			} else if (category === 'database') {
+				categories.database.push(sdkItem);
+			} else if (category === 'web') {
+				categories.web.push(sdkItem);
+			} else if (category === 'container') {
+				categories.container.push(sdkItem);
+			} else {
+				// Default to language if category is not specified
+				categories.language.push(sdkItem);
+			}
+		});
+
+		return categories;
+	});
+
+	function handleSDKClick(sdk: any) {
+		const route = getSDKRoute(sdk.id, sdk.category);
+		goto(route);
+	}
+
+	// Check if a service is running for an SDK
+	function isServiceRunning(sdkId: string): boolean {
+		return services.some(s => 
+			(s.sdkType === sdkId || s.sdkName === sdkId) && 
+			s.status === 'running'
+		);
+	}
 </script>
 
-{#snippet children()}
-	<div class="space-y-6">
+<div class="p-6">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
@@ -437,6 +582,7 @@
 		</div>
 		<div class="flex items-center gap-2">
 			<Button variant="outline" onclick={loadData} disabled={loading}>
+				<RefreshCw class="w-4 h-4 mr-2" />
 				Refresh
 			</Button>
 			<Button>
@@ -534,8 +680,249 @@
 		</TabsList>
 
 		<TabsContent value="overview" class="space-y-6">
+			<!-- Loading State -->
+			{#if loading}
+				<Card>
+					<CardContent class="py-8">
+						<div class="flex flex-col items-center justify-center space-y-4">
+							<RefreshCw class="w-8 h-8 animate-spin text-muted-foreground" />
+							<p class="text-sm text-muted-foreground">Loading SDK data...</p>
+						</div>
+					</CardContent>
+				</Card>
+			{/if}
+
+			<!-- Quick Navigation Section -->
+			{#if !loading}
+				<Card>
+					<CardHeader>
+						<CardTitle class="flex items-center gap-2">
+							<Activity class="w-5 h-5" />
+							Quick Navigation
+						</CardTitle>
+						<p class="text-sm text-muted-foreground mt-1">
+							Quick access to all SDKs and managers. Green indicates installed/active, gray indicates not installed.
+						</p>
+					</CardHeader>
+					<CardContent>
+						<div class="space-y-6">
+							<!-- SDK Managers -->
+							{#if quickNavSDKs().manager.length > 0}
+								<div class="space-y-3">
+									<div class="flex items-center gap-2">
+										<Package class="h-4 w-4 text-muted-foreground" />
+										<h3 class="font-medium text-sm">SDK Managers</h3>
+									</div>
+									<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+										{#each quickNavSDKs().manager as sdk}
+											<button
+												onclick={() => handleSDKClick(sdk)}
+												class="relative p-3 rounded-lg border transition-all hover:shadow-md text-left
+													{sdk.installed ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : 'border-border bg-muted/30'}"
+											>
+												<div class="flex items-center gap-2 mb-2">
+													<Devicon icon={sdk.icon} size="sm" />
+													<span class="text-sm font-medium truncate">{sdk.displayName}</span>
+												</div>
+												<div class="flex items-center justify-between">
+													{#if sdk.version}
+														<span class="text-xs text-muted-foreground truncate">{sdk.version}</span>
+													{:else}
+														<span class="text-xs text-muted-foreground">Not installed</span>
+													{/if}
+													{#if sdk.installed}
+														<CheckCircle class="w-3 h-3 text-green-600 flex-shrink-0" />
+													{:else}
+														<AlertCircle class="w-3 h-3 text-muted-foreground flex-shrink-0" />
+													{/if}
+												</div>
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Language & Runtime -->
+							{#if quickNavSDKs().language.length > 0}
+								<div class="space-y-3">
+									<div class="flex items-center gap-2">
+										<Code class="h-4 w-4 text-muted-foreground" />
+										<h3 class="font-medium text-sm">Language & Runtime</h3>
+									</div>
+									<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+										{#each quickNavSDKs().language as sdk}
+											<button
+												onclick={() => handleSDKClick(sdk)}
+												class="relative p-3 rounded-lg border transition-all hover:shadow-md text-left
+													{sdk.installed ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : 'border-border bg-muted/30'}"
+											>
+												<div class="flex items-center gap-2 mb-2">
+													<Devicon icon={sdk.icon} size="sm" />
+													<span class="text-sm font-medium truncate">{sdk.displayName}</span>
+												</div>
+												<div class="flex items-center justify-between">
+													{#if sdk.version}
+														<span class="text-xs text-muted-foreground truncate">{sdk.version}</span>
+													{:else}
+														<span class="text-xs text-muted-foreground">Not installed</span>
+													{/if}
+													<div class="flex items-center gap-1">
+														{#if isServiceRunning(sdk.id)}
+															<Badge variant="default" class="bg-blue-500 text-xs px-1 py-0">Running</Badge>
+														{/if}
+														{#if sdk.installed}
+															<CheckCircle class="w-3 h-3 text-green-600 flex-shrink-0" />
+														{:else}
+															<AlertCircle class="w-3 h-3 text-muted-foreground flex-shrink-0" />
+														{/if}
+													</div>
+												</div>
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Database Server -->
+							{#if quickNavSDKs().database.length > 0}
+								<div class="space-y-3">
+									<div class="flex items-center gap-2">
+										<Database class="h-4 w-4 text-muted-foreground" />
+										<h3 class="font-medium text-sm">Database Server</h3>
+									</div>
+									<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+										{#each quickNavSDKs().database as sdk}
+											<button
+												onclick={() => handleSDKClick(sdk)}
+												class="relative p-3 rounded-lg border transition-all hover:shadow-md text-left
+													{sdk.installed ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : 'border-border bg-muted/30'}"
+											>
+												<div class="flex items-center gap-2 mb-2">
+													<Devicon icon={sdk.icon} size="sm" />
+													<span class="text-sm font-medium truncate">{sdk.displayName}</span>
+												</div>
+												<div class="flex items-center justify-between">
+													{#if sdk.version}
+														<span class="text-xs text-muted-foreground truncate">{sdk.version}</span>
+													{:else}
+														<span class="text-xs text-muted-foreground">Not installed</span>
+													{/if}
+													<div class="flex items-center gap-1">
+														{#if isServiceRunning(sdk.id)}
+															<Badge variant="default" class="bg-blue-500 text-xs px-1 py-0">Running</Badge>
+														{/if}
+														{#if sdk.installed}
+															<CheckCircle class="w-3 h-3 text-green-600 flex-shrink-0" />
+														{:else}
+															<AlertCircle class="w-3 h-3 text-muted-foreground flex-shrink-0" />
+														{/if}
+													</div>
+												</div>
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Web Server -->
+							{#if quickNavSDKs().web.length > 0}
+								<div class="space-y-3">
+									<div class="flex items-center gap-2">
+										<Globe class="h-4 w-4 text-muted-foreground" />
+										<h3 class="font-medium text-sm">Web Server</h3>
+									</div>
+									<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+										{#each quickNavSDKs().web as sdk}
+											<button
+												onclick={() => handleSDKClick(sdk)}
+												class="relative p-3 rounded-lg border transition-all hover:shadow-md text-left
+													{sdk.installed ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : 'border-border bg-muted/30'}"
+											>
+												<div class="flex items-center gap-2 mb-2">
+													<Devicon icon={sdk.icon} size="sm" />
+													<span class="text-sm font-medium truncate">{sdk.displayName}</span>
+												</div>
+												<div class="flex items-center justify-between">
+													{#if sdk.version}
+														<span class="text-xs text-muted-foreground truncate">{sdk.version}</span>
+													{:else}
+														<span class="text-xs text-muted-foreground">Not installed</span>
+													{/if}
+													<div class="flex items-center gap-1">
+														{#if isServiceRunning(sdk.id)}
+															<Badge variant="default" class="bg-blue-500 text-xs px-1 py-0">Running</Badge>
+														{/if}
+														{#if sdk.installed}
+															<CheckCircle class="w-3 h-3 text-green-600 flex-shrink-0" />
+														{:else}
+															<AlertCircle class="w-3 h-3 text-muted-foreground flex-shrink-0" />
+														{/if}
+													</div>
+												</div>
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Container Platform -->
+							{#if quickNavSDKs().container.length > 0}
+								<div class="space-y-3">
+									<div class="flex items-center gap-2">
+										<Container class="h-4 w-4 text-muted-foreground" />
+										<h3 class="font-medium text-sm">Container Platform</h3>
+									</div>
+									<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+										{#each quickNavSDKs().container as sdk}
+											<button
+												onclick={() => handleSDKClick(sdk)}
+												class="relative p-3 rounded-lg border transition-all hover:shadow-md text-left
+													{sdk.installed ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : 'border-border bg-muted/30'}"
+											>
+												<div class="flex items-center gap-2 mb-2">
+													<Devicon icon={sdk.icon} size="sm" />
+													<span class="text-sm font-medium truncate">{sdk.displayName}</span>
+												</div>
+												<div class="flex items-center justify-between">
+													{#if sdk.version}
+														<span class="text-xs text-muted-foreground truncate">{sdk.version}</span>
+													{:else}
+														<span class="text-xs text-muted-foreground">Not installed</span>
+													{/if}
+													<div class="flex items-center gap-1">
+														{#if isServiceRunning(sdk.id)}
+															<Badge variant="default" class="bg-blue-500 text-xs px-1 py-0">Running</Badge>
+														{/if}
+														{#if sdk.installed}
+															<CheckCircle class="w-3 h-3 text-green-600 flex-shrink-0" />
+														{:else}
+															<AlertCircle class="w-3 h-3 text-muted-foreground flex-shrink-0" />
+														{/if}
+													</div>
+												</div>
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Empty State -->
+							{#if quickNavSDKs().manager.length === 0 && quickNavSDKs().language.length === 0 && 
+								quickNavSDKs().database.length === 0 && quickNavSDKs().web.length === 0 && 
+								quickNavSDKs().container.length === 0}
+								<div class="text-center py-8 text-muted-foreground">
+									<AlertCircle class="w-12 h-12 mx-auto mb-2 opacity-50" />
+									<p class="text-sm mb-2">No SDKs detected.</p>
+									<p class="text-xs">Click "Refresh" to detect installed SDKs, or install SDK managers to get started.</p>
+								</div>
+							{/if}
+						</div>
+					</CardContent>
+				</Card>
+			{/if}
+
 			<!-- Quick Start Section -->
-			{#if installedSDKs.length === 0}
+			{#if installedSDKs.length === 0 && !loading}
 				<Card class="border-dashed">
 					<CardHeader>
 						<CardTitle class="flex items-center gap-2">
@@ -564,155 +951,157 @@
 			{/if}
 
 			<!-- System Status Card -->
-			<Card>
-				<CardHeader>
-					<CardTitle class="flex items-center gap-2">
-						<Activity class="w-5 h-5" />
-						System Status
-					</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div class="grid gap-4 md:grid-cols-3">
-						<div class="flex items-center gap-3">
-							<div class="w-3 h-3 rounded-full bg-green-500"></div>
-							<div>
-								<div class="font-medium">System Health</div>
-								<div class="text-sm text-muted-foreground">All systems operational</div>
+			{#if !loading}
+				<Card>
+					<CardHeader>
+						<CardTitle class="flex items-center gap-2">
+							<Activity class="w-5 h-5" />
+							System Status
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div class="grid gap-4 md:grid-cols-3">
+							<div class="flex items-center gap-3">
+								<div class="w-3 h-3 rounded-full bg-green-500"></div>
+								<div>
+									<div class="font-medium">System Health</div>
+									<div class="text-sm text-muted-foreground">All systems operational</div>
+								</div>
 							</div>
-						</div>
-						<div class="flex items-center gap-3">
-							<div class="w-3 h-3 rounded-full bg-blue-500"></div>
-							<div>
-								<div class="font-medium">Services</div>
-								<div class="text-sm text-muted-foreground">
-									{services.filter(s => s.status === 'running').length} running
+							<div class="flex items-center gap-3">
+								<div class="w-3 h-3 rounded-full bg-blue-500"></div>
+								<div>
+									<div class="font-medium">Services</div>
+									<div class="text-sm text-muted-foreground">
+										{services.filter(s => s.status === 'running').length} running
+									</div>
+								</div>
+							</div>
+							<div class="flex items-center gap-3">
+								<div class="w-3 h-3 rounded-full bg-purple-500"></div>
+								<div>
+									<div class="font-medium">SDK Managers</div>
+									<div class="text-sm text-muted-foreground">
+										{sdkManagers.filter(m => managerInstallationStatus[m.id]).length} installed
+									</div>
 								</div>
 							</div>
 						</div>
-						<div class="flex items-center gap-3">
-							<div class="w-3 h-3 rounded-full bg-purple-500"></div>
-							<div>
-								<div class="font-medium">SDK Managers</div>
-								<div class="text-sm text-muted-foreground">
-									{sdkManagers.filter(m => m.installed).length} installed
-								</div>
-							</div>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
+					</CardContent>
+				</Card>
 
-			<!-- Quick Actions -->
-			<Card>
-				<CardHeader>
-					<CardTitle class="flex items-center gap-2">
-						<Plus class="w-5 h-5" />
-						Quick Actions
-					</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-						<Button 
-							variant="outline" 
-							class="h-20 flex flex-col gap-2"
-							onclick={() => activeTab = 'services'}
-						>
-							<Play class="w-6 h-6" />
-							<span>Start All</span>
-						</Button>
-						<Button 
-							variant="outline" 
-							class="h-20 flex flex-col gap-2"
-							onclick={() => activeTab = 'services'}
-						>
-							<Square class="w-6 h-6" />
-							<span>Stop All</span>
-						</Button>
-						<Button 
-							variant="outline" 
-							class="h-20 flex flex-col gap-2"
-							onclick={() => activeTab = 'versions'}
-						>
-							<Download class="w-6 h-6" />
-							<span>Install Latest</span>
-						</Button>
-						<Button 
-							variant="outline" 
-							class="h-20 flex flex-col gap-2"
-							onclick={() => activeTab = 'versions'}
-						>
-							<Settings class="w-6 h-6" />
-							<span>Configure</span>
-						</Button>
-					</div>
-				</CardContent>
-			</Card>
-
-			<!-- Recommended Versions -->
-			<Card>
-				<CardHeader>
-					<CardTitle class="flex items-center gap-2">
-						<Star class="w-5 h-5" />
-						Recommended Versions
-					</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div class="grid gap-3 md:grid-cols-2">
-						<div class="flex items-center justify-between p-3 border rounded-lg">
-							<div>
-								<div class="font-medium">Node.js LTS</div>
-								<div class="text-sm text-muted-foreground">18.17.0 - Long Term Support</div>
-							</div>
-							<Button size="sm" variant="outline">
-								<Download class="w-4 h-4 mr-2" />
-								Install
+				<!-- Quick Actions -->
+				<Card>
+					<CardHeader>
+						<CardTitle class="flex items-center gap-2">
+							<Plus class="w-5 h-5" />
+							Quick Actions
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+							<Button 
+								variant="outline" 
+								class="h-20 flex flex-col gap-2"
+								onclick={() => activeTab = 'services'}
+							>
+								<Play class="w-6 h-6" />
+								<span>Start All</span>
+							</Button>
+							<Button 
+								variant="outline" 
+								class="h-20 flex flex-col gap-2"
+								onclick={() => activeTab = 'services'}
+							>
+								<Square class="w-6 h-6" />
+								<span>Stop All</span>
+							</Button>
+							<Button 
+								variant="outline" 
+								class="h-20 flex flex-col gap-2"
+								onclick={() => activeTab = 'versions'}
+							>
+								<Download class="w-6 h-6" />
+								<span>Install Latest</span>
+							</Button>
+							<Button 
+								variant="outline" 
+								class="h-20 flex flex-col gap-2"
+								onclick={() => activeTab = 'versions'}
+							>
+								<Settings class="w-6 h-6" />
+								<span>Configure</span>
 							</Button>
 						</div>
-						<div class="flex items-center justify-between p-3 border rounded-lg">
-							<div>
-								<div class="font-medium">Python 3.11</div>
-								<div class="text-sm text-muted-foreground">Latest stable release</div>
-							</div>
-							<Button size="sm" variant="outline">
-								<Download class="w-4 h-4 mr-2" />
-								Install
-							</Button>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
+					</CardContent>
+				</Card>
 
-			<!-- Recent Activity -->
-			<Card>
-				<CardHeader>
-					<CardTitle>Recent Activity</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div class="space-y-4">
-						{#if recentActivity.length > 0}
-							{#each recentActivity as activity}
-								<div class="flex items-center gap-3">
-									{#if activity.type === 'version_activated'}
-										<CheckCircle class="w-4 h-4 text-green-600" />
-									{:else if activity.type === 'service_started'}
-										<Play class="w-4 h-4 text-blue-600" />
-									{:else if activity.type === 'version_installed'}
-										<Download class="w-4 h-4 text-purple-600" />
-									{:else}
-										<AlertCircle class="w-4 h-4 text-gray-600" />
-									{/if}
-									<span class="text-sm">{activity.message}</span>
-									<Badge variant="outline" class="text-xs">{activity.timestamp}</Badge>
+				<!-- Recommended Versions -->
+				<Card>
+					<CardHeader>
+						<CardTitle class="flex items-center gap-2">
+							<Star class="w-5 h-5" />
+							Recommended Versions
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div class="grid gap-3 md:grid-cols-2">
+							<div class="flex items-center justify-between p-3 border rounded-lg">
+								<div>
+									<div class="font-medium">Node.js LTS</div>
+									<div class="text-sm text-muted-foreground">18.17.0 - Long Term Support</div>
 								</div>
-							{/each}
-						{:else}
-							<div class="text-center text-muted-foreground py-4">
-								No recent activity
+								<Button size="sm" variant="outline">
+									<Download class="w-4 h-4 mr-2" />
+									Install
+								</Button>
 							</div>
-						{/if}
-					</div>
-				</CardContent>
-			</Card>
+							<div class="flex items-center justify-between p-3 border rounded-lg">
+								<div>
+									<div class="font-medium">Python 3.11</div>
+									<div class="text-sm text-muted-foreground">Latest stable release</div>
+								</div>
+								<Button size="sm" variant="outline">
+									<Download class="w-4 h-4 mr-2" />
+									Install
+								</Button>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				<!-- Recent Activity -->
+				<Card>
+					<CardHeader>
+						<CardTitle>Recent Activity</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div class="space-y-4">
+							{#if recentActivity.length > 0}
+								{#each recentActivity as activity}
+									<div class="flex items-center gap-3">
+										{#if activity.type === 'version_activated'}
+											<CheckCircle class="w-4 h-4 text-green-600" />
+										{:else if activity.type === 'service_started'}
+											<Play class="w-4 h-4 text-blue-600" />
+										{:else if activity.type === 'version_installed'}
+											<Download class="w-4 h-4 text-purple-600" />
+										{:else}
+											<AlertCircle class="w-4 h-4 text-gray-600" />
+										{/if}
+										<span class="text-sm">{activity.message}</span>
+										<Badge variant="outline" class="text-xs">{activity.timestamp}</Badge>
+									</div>
+								{/each}
+							{:else}
+								<div class="text-center text-muted-foreground py-4">
+									No recent activity
+								</div>
+							{/if}
+						</div>
+					</CardContent>
+				</Card>
+			{/if}
 		</TabsContent>
 
 		<TabsContent value="managers" class="space-y-6">
@@ -873,5 +1262,4 @@
 			/>
 		</TabsContent>
 	</Tabs>
-	</div>
-{/snippet}
+</div>

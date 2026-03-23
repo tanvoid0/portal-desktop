@@ -1,10 +1,13 @@
 use sea_orm::{Database, DatabaseConnection};
 use sea_orm_migration::prelude::*;
-use std::fs;
+
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
+use std::fs;
 
 use crate::entities::project as project_entity;
-use crate::{log_info, log_warn, log_error};
+use crate::{log_info, log_error, log_warn};
 
 // Re-export the ProjectModel and TaskModel from the entity for compatibility
 pub use project_entity::Model as ProjectModel;

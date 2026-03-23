@@ -128,7 +128,7 @@
 			const doc = await documentActions.createDocument(
 				generatedData.title,
 				generatedData.content,
-				generatedData.suggestedTags
+				generatedData.suggestedTags || []
 			);
 			toastActions.success('Document created successfully');
 			goto(`/documents/${doc.id}`);
@@ -220,7 +220,7 @@
 									<pre class="whitespace-pre-wrap text-sm">{generatedData.content}</pre>
 								</div>
 							</div>
-							{#if generatedData.suggestedTags.length > 0}
+							{#if generatedData.suggestedTags && generatedData.suggestedTags.length > 0}
 								<div class="flex flex-wrap gap-2">
 									<span class="text-sm text-muted-foreground">Tags:</span>
 									{#each generatedData.suggestedTags as tag}

@@ -8,8 +8,9 @@
 		id: string; 
 		name: string; 
 		path: string; 
-		framework?: string; 
-		package_manager?: string;
+		metadata?: { framework?: string };
+		framework_ids?: number[];
+		package_manager_ids?: number[];
 		build_command?: string;
 		start_command?: string;
 		test_command?: string;
@@ -32,8 +33,8 @@
 		if (!project) return;
 		
 		await automationStore.getSuggestedWorkflows(
-			project.framework,
-			project.package_manager
+			project.metadata?.framework,
+			undefined // package_manager would need to be resolved from package_manager_ids
 		);
 		
 		suggestedWorkflows = $automationStore.suggestedWorkflows;
@@ -51,8 +52,8 @@
 				id: project.id,
 				name: project.name,
 				path: project.path,
-				framework: project.framework,
-				package_manager: project.package_manager,
+				framework: project.metadata?.framework,
+				package_manager: undefined, // Would need to resolve from package_manager_ids
 				build_command: project.build_command,
 				start_command: project.start_command,
 				test_command: project.test_command,

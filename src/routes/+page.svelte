@@ -1,12 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/lib/components/ui/card';
 	import { Button } from '@/lib/components/ui/button';
 	import { Badge } from '@/lib/components/ui/badge';
 	import { Separator } from '@/lib/components/ui/separator';
-	import { projectStore, recentProjects } from '@/lib/domains/projects';
-	import { taskStats } from '@/lib/domains/tasks';
-	import { isTauriEnvironment, tauriInvoke } from '@/lib/utils/tauri';
+	import { dashboardStore } from '@/lib/domains/dashboard/stores/dashboardStore';
 
 	// Get current time for greeting
 	const currentHour = new Date().getHours();
@@ -66,13 +65,13 @@
 	];
 
 	// Main navigation items
-	const mainNavItems = [
+	const mainNavItems = $derived([
 		{
 			title: 'Projects',
 			description: 'Manage your projects',
 			url: '/projects',
 			icon: 'folder',
-			badge: $projectStore.projects.length,
+			badge: $dashboardStore.overview?.project_stats.total_projects ?? 0,
 			color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
 		},
 		{
@@ -80,7 +79,7 @@
 			description: 'View and manage tasks',
 			url: '/tasks',
 			icon: 'check-square',
-			badge: $taskStats.total,
+			badge: $dashboardStore.overview?.task_stats.total ?? 0,
 			color: 'bg-green-500/10 text-green-600 dark:text-green-400'
 		},
 		{
@@ -97,27 +96,11 @@
 			icon: 'cloud',
 			color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
 		}
-	];
+	]);
 
-	let runningServicesCount = $state(0);
-
-	// Load running services count
-	async function loadRunningServicesCount() {
-		try {
-			if (isTauriEnvironment()) {
-				const result = await tauriInvoke<number>('get_running_services_count');
-				runningServicesCount = result || 0;
-			} else {
-				// Browser environment - Tauri commands not available
-				runningServicesCount = 0;
-			}
-		} catch (err) {
-			console.error('Failed to load running services count:', err);
-			runningServicesCount = 0;
-		}
-	}
-
-	loadRunningServicesCount();
+	onMount(() => {
+		void dashboardStore.load();
+	});
 
 	// Icon component helper
 	function getIcon(iconName: string) {
@@ -153,10 +136,10 @@
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm text-muted-foreground mb-1">Total Tasks</p>
-						<p class="text-3xl font-bold">{$taskStats.total}</p>
-						{#if $taskStats.completed > 0}
+						<p class="text-3xl font-bold">{$dashboardStore.overview?.task_stats.total ?? 0}</p>
+						{#if ($dashboardStore.overview?.task_stats.completed ?? 0) > 0}
 							<p class="text-xs text-green-600 dark:text-green-400 mt-1">
-								{$taskStats.completed} completed
+								{$dashboardStore.overview?.task_stats.completed ?? 0} completed
 							</p>
 						{/if}
 					</div>
@@ -174,10 +157,10 @@
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm text-muted-foreground mb-1">Projects</p>
-						<p class="text-3xl font-bold">{$projectStore.projects.length}</p>
-						{#if $recentProjects.length > 0}
+						<p class="text-3xl font-bold">{$dashboardStore.overview?.project_stats.total_projects ?? 0}</p>
+						{#if ($dashboardStore.overview?.project_stats.recent_projects.length ?? 0) > 0}
 							<p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-								{$recentProjects.length} recent
+								{$dashboardStore.overview?.project_stats.recent_projects.length ?? 0} recent
 							</p>
 						{/if}
 					</div>
@@ -195,7 +178,7 @@
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm text-muted-foreground mb-1">Running Services</p>
-						<p class="text-3xl font-bold">{runningServicesCount}</p>
+						<p class="text-3xl font-bold">{$dashboardStore.overview?.running_services_count ?? 0}</p>
 						<p class="text-xs text-muted-foreground mt-1">
 							SDK services
 						</p>
@@ -214,9 +197,7 @@
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm text-muted-foreground mb-1">Completion Rate</p>
-						<p class="text-3xl font-bold">
-							{$taskStats.total > 0 ? Math.round(($taskStats.completed / $taskStats.total) * 100) : 0}%
-						</p>
+						<p class="text-3xl font-bold">{$dashboardStore.overview?.task_stats.completion_percentage ?? 0}%</p>
 						<p class="text-xs text-muted-foreground mt-1">
 							Tasks completed
 						</p>
@@ -268,8 +249,10 @@
 						</div>
 						Projects
 					</CardTitle>
-					{#if $projectStore.projects.length > 0}
-						<Badge variant="secondary">{$projectStore.projects.length}</Badge>
+					{#if ($dashboardStore.overview?.project_stats.total_projects ?? 0) > 0}
+						<Badge variant="secondary">
+							{$dashboardStore.overview?.project_stats.total_projects ?? 0}
+						</Badge>
 					{/if}
 				</div>
 				<CardDescription>
@@ -278,12 +261,13 @@
 			</CardHeader>
 			<CardContent>
 				<p class="text-sm text-muted-foreground">
-					{#if $projectStore.projects.length === 0}
+					{#if ($dashboardStore.overview?.project_stats.total_projects ?? 0) === 0}
 						No projects yet. Create your first project to get started.
-					{:else if $recentProjects.length > 0}
-						Recent: {$recentProjects[0].name}
+					{:else if ($dashboardStore.overview?.project_stats.recent_projects.length ?? 0) > 0}
+						Recent: {$dashboardStore.overview?.project_stats.recent_projects[0]?.name}
 					{:else}
-						{$projectStore.projects.length} project{$projectStore.projects.length !== 1 ? 's' : ''} available
+						{$dashboardStore.overview?.project_stats.total_projects ?? 0} project
+						{($dashboardStore.overview?.project_stats.total_projects ?? 0) !== 1 ? 's' : ''} available
 					{/if}
 				</p>
 			</CardContent>
@@ -300,8 +284,8 @@
 						</div>
 						Tasks
 					</CardTitle>
-					{#if $taskStats.total > 0}
-						<Badge variant="secondary">{$taskStats.total}</Badge>
+					{#if ($dashboardStore.overview?.task_stats.total ?? 0) > 0}
+						<Badge variant="secondary">{$dashboardStore.overview?.task_stats.total ?? 0}</Badge>
 					{/if}
 				</div>
 				<CardDescription>
@@ -312,17 +296,19 @@
 				<div class="space-y-2">
 					<div class="flex items-center justify-between text-sm">
 						<span class="text-muted-foreground">Total</span>
-						<span class="font-medium">{$taskStats.total}</span>
+						<span class="font-medium">{$dashboardStore.overview?.task_stats.total ?? 0}</span>
 					</div>
 					<div class="flex items-center justify-between text-sm">
 						<span class="text-muted-foreground">Completed</span>
-						<span class="font-medium text-green-600 dark:text-green-400">{$taskStats.completed}</span>
+						<span class="font-medium text-green-600 dark:text-green-400">
+							{$dashboardStore.overview?.task_stats.completed ?? 0}
+						</span>
 					</div>
-					{#if $taskStats.total > 0}
+					{#if ($dashboardStore.overview?.task_stats.total ?? 0) > 0}
 						<div class="w-full bg-secondary rounded-full h-2 mt-2">
 							<div 
 								class="bg-green-600 h-2 rounded-full transition-all"
-								style="width: {($taskStats.completed / $taskStats.total) * 100}%"
+								style="width: {((($dashboardStore.overview?.task_stats.completed ?? 0) / ($dashboardStore.overview?.task_stats.total ?? 1)) * 100)}%"
 							></div>
 						</div>
 					{/if}

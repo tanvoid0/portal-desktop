@@ -1,6 +1,7 @@
 import { writable, derived, type Writable } from 'svelte/store';
 import type { Task, TaskFilters, TaskStats, CreateTaskRequest, UpdateTaskRequest, TimeTrackingSession, ProductivityMetrics, TaskTemplate } from '../types';
 import { tauriTaskService } from '../services/tauriTaskService';
+import { dashboardStore } from '@/lib/domains/dashboard/stores/dashboardStore';
 
 // Core stores
 export const tasks: Writable<Task[]> = writable([]);
@@ -287,6 +288,11 @@ export const taskActions = {
 			
 			const newTask = await tauriTaskService.createTask(request);
 			await this.loadTasks();
+
+			// Keep dashboard overview (badges + home cards) consistent.
+			dashboardStore.invalidate();
+			void dashboardStore.refresh(true);
+
 			return newTask;
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to create task';
@@ -324,6 +330,11 @@ export const taskActions = {
 			
 			const updatedTask = await tauriTaskService.updateTask(taskId, request);
 			await this.loadTasks();
+
+			// Keep dashboard overview consistent after mutation.
+			dashboardStore.invalidate();
+			void dashboardStore.refresh(true);
+
 			return updatedTask;
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to update task';
@@ -348,6 +359,10 @@ export const taskActions = {
 			
 			await tauriTaskService.deleteTask(taskId);
 			await this.loadTasks();
+
+			// Keep dashboard overview consistent after mutation.
+			dashboardStore.invalidate();
+			void dashboardStore.refresh(true);
 			
 			// Clear selection if the deleted task was selected
 			selectedTask.update(current => 
@@ -387,6 +402,10 @@ export const taskActions = {
 			await Promise.all(deletePromises);
 			
 			await this.loadTasks();
+
+			// Keep dashboard overview consistent after mutation.
+			dashboardStore.invalidate();
+			void dashboardStore.refresh(true);
 
 			// Clear selection if any selected tasks were deleted
 			selectedTaskIds.update(current => {
@@ -431,6 +450,8 @@ export const taskActions = {
 			
 			// Update the task status via the API
 			await this.updateTask(taskId, { status: nextStatus });
+
+			// `updateTask` already reloads tasks and triggers dashboard invalidation.
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to toggle task status';
 			error.set(errorMessage);
@@ -639,6 +660,3 @@ export const taskActions = {
 	}
 
 };
-
-// Initialize tasks from database on app start
-taskActions.loadTasks();

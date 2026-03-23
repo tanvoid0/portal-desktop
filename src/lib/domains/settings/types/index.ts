@@ -22,6 +22,9 @@ export interface AppSettings {
 	
 	// Updates
 	updates: UpdateSettings;
+	
+	// AI Avatar
+	avatarEnabled?: boolean;
 }
 
 export interface WindowState {

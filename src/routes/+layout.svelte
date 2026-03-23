@@ -14,8 +14,7 @@
 	import { Separator } from '@/lib/components/ui/separator';
 	import ThemeToggle from '@/lib/components/ui/theme-toggle.svelte';
 	import Breadcrumb from '@/lib/components/ui/breadcrumb.svelte';
-	import { projectStore, projectService } from '@/lib/domains/projects';
-	import { taskStats } from '@/lib/domains/tasks';
+	import { dashboardStore } from '@/lib/domains/dashboard/stores/dashboardStore';
 	import { logger, themeStore, resolvedTheme } from '@/lib/domains/shared';
 	import { breadcrumbItems, breadcrumbSettings, homeItem, showHome } from '@/lib/domains/shared/stores/breadcrumbStore';
 	import { terminalActions } from '@/lib/domains/terminal/stores/terminalStore';
@@ -24,9 +23,12 @@
 	import QRCodeDialog from '@/lib/components/QRCodeDialog.svelte';
 	import DeviceApprovalDialog from '@/lib/components/DeviceApprovalDialog.svelte';
 	import DeviceAuthGuard from '@/lib/components/DeviceAuthGuard.svelte';
+	import FloatingAvatar from '@/lib/components/ai/FloatingAvatar.svelte';
 	import { isTauriEnvironment, tauriInvoke } from '@/lib/utils/tauri';
 	import { InvokeClient } from '@/lib/utils/invokeClient';
 	import { ArrowLeft, ArrowRight, RefreshCw, Home, QrCode } from 'lucide-svelte';
+	import { Provider as SidebarProvider, Trigger as SidebarTrigger, Sidebar as SidebarRoot, MenuButton as SidebarMenuButton } from '@/lib/components/ui/sidebar';
+	import { SIDEBAR_COOKIE_NAME } from '@/lib/components/ui/sidebar/constants';
 
 	const log = logger.createScoped('AppLayout');
 
@@ -48,12 +50,17 @@
 	let navigationLoading = $state(false);
 	let navigationError: string | null = $state(null);
 	let isSdkPage = $derived($page.url.pathname.startsWith('/sdk'));
-	let runningServicesCount = $state(0);
+	let isMainSidebarHidden = $derived(() => {
+		const path = $page.url.pathname;
+		// Nested route groups manage their own sidebars.
+		return path.startsWith('/ai') || path.startsWith('/cloud') || path.startsWith('/settings') || path.startsWith('/sdk');
+	});
+	let sidebarOpen = $state(true);
 	let sdkSubmenuOpen = $state(false);
 	let qrCodeDialogOpen = $state(false);
 	let deviceApprovalDialogOpen = $state(false);
 
-	// Main application navigation sections - derived to react to runningServicesCount changes
+	// Main application navigation sections - derived from the dashboard overview store.
 	const navigationSections = $derived([
 		{
 			title: 'Navigation',
@@ -70,7 +77,9 @@
 					url: '/sdk',
 					icon: 'code',
 					description: 'SDK version management',
-					badge: runningServicesCount > 0 ? runningServicesCount : null,
+						badge: ($dashboardStore.overview?.running_services_count ?? 0) > 0
+							? $dashboardStore.overview?.running_services_count
+							: null,
 					submenu: [
 						{
 							title: 'Node.js',
@@ -101,18 +110,6 @@
 							url: '/sdk/go',
 							icon: 'go',
 							description: 'Go SDK management'
-						},
-						{
-							title: 'PHP',
-							url: '/sdk/php',
-							icon: 'php',
-							description: 'PHP SDK management'
-						},
-						{
-							title: 'Ruby',
-							url: '/sdk/ruby',
-							icon: 'ruby',
-							description: 'Ruby SDK management'
 						}
 					]
 				}
@@ -125,7 +122,7 @@
 					title: 'Terminal',
 					url: '/terminal',
 					icon: 'terminal',
-					description: 'Integrated terminal',
+					description: 'AI-enhanced terminal with command execution and AI queries',
 					badge: null
 				},
 				{
@@ -133,14 +130,18 @@
 					url: '/projects',
 					icon: 'folder',
 					description: 'Project management',
-					badge: ($projectStore.projects ?? []).length
+					badge: ($dashboardStore.overview?.project_stats.total_projects ?? 0) > 0
+						? $dashboardStore.overview?.project_stats.total_projects
+						: null
 				},
 				{
 					title: 'Tasks',
 					url: '/tasks',
 					icon: 'check-square',
 					description: 'Task management',
-					badge: null
+					badge: ($dashboardStore.overview?.task_stats.total ?? 0) > 0
+						? $dashboardStore.overview?.task_stats.total
+						: null
 				},
 				{
 					title: 'Credentials',
@@ -175,6 +176,13 @@
 					url: '/blocks',
 					icon: 'blocks',
 					description: 'Manage reusable pipeline blocks',
+					badge: null
+				},
+				{
+					title: 'Scripts',
+					url: '/scripts',
+					icon: 'file-code',
+					description: 'Manage reusable scripts',
 					badge: null
 				},
 				{
@@ -243,9 +251,29 @@
 		}
 	}
 
+	function handleSidebarOpenChange(open: boolean) {
+		sidebarOpen = open;
+	}
+
+	function readSidebarCookieOpen(): boolean | null {
+		if (typeof document === 'undefined') return null;
+		const match = document.cookie.match(new RegExp(`(?:^|; )${SIDEBAR_COOKIE_NAME}=([^;]*)`));
+		if (!match) return null;
+		const raw = match[1];
+		if (raw === 'true') return true;
+		if (raw === 'false') return false;
+		return null;
+	}
+
 	onMount(async () => {
 		try {
 			log.info('Initializing application');
+
+			// Initialize sidebar open/closed state from cookie.
+			const cookieOpen = readSidebarCookieOpen();
+			if (cookieOpen !== null) {
+				sidebarOpen = cookieOpen;
+			}
 			
 			// Initialize backend log listener to receive logs from Rust backend
 			logger.initBackendLogListener();
@@ -270,9 +298,9 @@
 			
 			// Initialize learning service (should be early to start collecting patterns)
 			await learningService.initialize();
-			
-			// Initialize project service
-			await projectService.initialize();
+
+			// Load lightweight dashboard overview for badges/cards (TTL cached)
+			void dashboardStore.load();
 			
 			// Sync terminal theme with global theme
 			unsubscribe = resolvedTheme.subscribe((theme) => {
@@ -314,8 +342,6 @@
 			navigationLoading = false;
 			navigationError = null;
 		}
-		// Always load running services count
-		loadRunningServicesCount();
 	});
 
 	async function loadSdkNavigation() {
@@ -337,21 +363,6 @@
 		}
 	}
 
-	async function loadRunningServicesCount() {
-		try {
-			if (isTauriEnvironment()) {
-				const result = await tauriInvoke<number>('get_running_services_count');
-				runningServicesCount = result || 0;
-			} else {
-				// Browser environment - Tauri commands not available
-				runningServicesCount = 0;
-			}
-		} catch (err) {
-			console.error('Failed to load running services count:', err);
-			runningServicesCount = 0;
-		}
-	}
-
 	onDestroy(() => {
 		if (unsubscribe) {
 			unsubscribe();
@@ -363,6 +374,7 @@
 </script>
 
 <DeviceAuthGuard>
+<SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
 <div class="flex flex-col h-screen w-full min-h-0 overflow-hidden">
 	<!-- Top Bar -->
 	<header class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
@@ -413,16 +425,19 @@
 					<Home class="h-4 w-4" />
 				</Button>
 			</div>
+			<SidebarTrigger />
 			<Breadcrumb items={$breadcrumbItems} showHome={$showHome} homeItem={$homeItem} class="flex-1" />
 		</div>
 	</header>
 
 	<!-- Main Content Area -->
 	<div class="flex flex-1 min-h-0 overflow-hidden w-full h-full">
-		<!-- Sidebar Navigation -->
-		<aside class="w-64 border-r bg-sidebar text-sidebar-foreground flex-shrink-0 overflow-y-auto min-w-0 flex flex-col">
+		<!-- Sidebar Navigation (nested route groups manage their own sidebars) -->
+		{#if !isMainSidebarHidden}
+		<SidebarRoot collapsible="icon">
+			<div class="flex flex-col h-full min-h-0 min-w-0">
 			<!-- Sidebar Header -->
-			<div class="flex items-center gap-3 px-4 py-4 border-b cursor-pointer hover:bg-sidebar-accent/50 transition-colors" role="button" tabindex="0" onclick={() => goto('/')} onkeydown={(e) => e.key === 'Enter' && goto('/')}>
+			<div class="flex items-center gap-3 px-4 py-4 border-b cursor-pointer hover:bg-sidebar-accent/50 transition-colors group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center" role="button" tabindex="0" onclick={() => goto('/')} onkeydown={(e) => e.key === 'Enter' && goto('/')}>
 				<div class="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary">
 					{#if isSdkPage}
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -434,7 +449,7 @@
 						</svg>
 					{/if}
 				</div>
-				<div class="flex-1 min-w-0">
+				<div class="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
 					<h1 class="text-sm font-semibold text-sidebar-foreground truncate">
 						{isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
 					</h1>
@@ -476,13 +491,15 @@
 			{:else}
 				{#each currentNavigationSections as section}
 				<div class="px-3 py-2">
-					<h2 class="px-2 text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider mb-1">
+					<h2 class="px-2 text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider mb-1 group-data-[collapsible=icon]:hidden">
 						{section.title}
 					</h2>
 					<div class="space-y-1">
 						{#each section.items as item}
-							<button
-								class="w-full flex items-center gap-3 h-12 px-4 py-3 text-base font-medium rounded-md transition-colors {($page.url.pathname === item.url) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}"
+							<SidebarMenuButton
+								size="lg"
+								isActive={$page.url.pathname === item.url}
+								tooltipContent={item.title}
 								onclick={() => goto(item.url)}
 							>
 								{#if item.icon === 'home'}
@@ -562,6 +579,10 @@
 									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
 									</svg>
+								{:else if item.icon === 'file-code'}
+									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+									</svg>
 								<!-- SDK-specific language icons -->
 								{:else if item.icon === 'nodejs'}
 									<i class="devicon-nodejs-plain w-5 h-5 text-green-600"></i>
@@ -583,8 +604,8 @@
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
 									</svg>
 								{/if}
-								<span class="text-base">{item.title}</span>
-								<div class="ml-auto flex items-center gap-2">
+								<span class="text-base group-data-[collapsible=icon]:hidden">{item.title}</span>
+								<div class="ml-auto flex items-center gap-2 group-data-[collapsible=icon]:hidden">
 									{#if isSdkPage && (item as any).category !== 'sdk-navigation' && (item as any).installed !== undefined}
 										{#if (item as any).installed}
 											<!-- Green checkmark for installed -->
@@ -604,7 +625,7 @@
 										</Badge>
 									{/if}
 								</div>
-							</button>
+							</SidebarMenuButton>
 						{/each}
 					</div>
 				</div>
@@ -631,7 +652,9 @@
 					</div>
 				</div>
 			</div>
-		</aside>
+			</div>
+		</SidebarRoot>
+		{/if}
 
 		<!-- Page Content -->
 		<main class="flex-1 overflow-y-auto min-w-0 min-h-0 bg-background">
@@ -639,9 +662,13 @@
 		</main>
 	</div>
 </div>
+</SidebarProvider>
 
 <!-- Toast Container -->
 <ToastContainer />
+
+<!-- Floating Avatar Assistant -->
+<FloatingAvatar />
 
 <!-- QR Code Dialog -->
 <QRCodeDialog bind:open={qrCodeDialogOpen} onDeviceRequest={() => deviceApprovalDialogOpen = true} />

@@ -1,9 +1,12 @@
 use kube::{Client, Config, Api};
+use kube::config::{Kubeconfig, KubeConfigOptions};
 use kube::api::{ListParams, LogParams, Patch, PatchParams, PostParams};
 use kube::runtime::watcher::{watcher, Config as WatcherConfig, Event};
 use futures_util::StreamExt;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tauri::{Window, Emitter};
 use crate::domains::kubernetes::types::*;
 use k8s_openapi::api::core::v1::{Pod, Service, Namespace, ConfigMap, Secret};
@@ -49,66 +52,85 @@ impl KubernetesManager {
             .ok_or_else(|| "Kubernetes client not initialized".to_string())
     }
 
+    /// Resolve kubeconfig path: KUBECONFIG env (first path if multiple) or ~/.kube/config.
+    /// Desktop apps often don't inherit shell env, so we explicitly use dirs::home_dir() for ~.
+    fn kubeconfig_path() -> Option<PathBuf> {
+        std::env::var("KUBECONFIG")
+            .ok()
+            .and_then(|s| s.split(':').next().map(|p| PathBuf::from(p)))
+            .filter(|p| p.exists())
+            .or_else(|| {
+                dirs::home_dir().map(|h| h.join(".kube").join("config"))
+                    .filter(|p| p.exists())
+            })
+    }
+
+    /// Load Config from kubeconfig, trying infer first then explicit path (for GUI/desktop env).
+    async fn load_config() -> Result<Config, String> {
+        if let Ok(config) = Config::infer().await {
+            return Ok(config);
+        }
+        if let Some(path) = Self::kubeconfig_path() {
+            let kubeconfig = Kubeconfig::read_from(&path)
+                .map_err(|e| format!("Failed to read kubeconfig from {}: {}", path.display(), e))?;
+            let config = Config::from_custom_kubeconfig(kubeconfig, &KubeConfigOptions::default())
+                .await
+                .map_err(|e| format!("Failed to build config from kubeconfig: {}", e))?;
+            return Ok(config);
+        }
+        Err("No kubeconfig found. Set KUBECONFIG or ensure ~/.kube/config exists.".to_string())
+    }
+
     pub async fn initialize() -> Result<(), String> {
-        // If already initialized, return success
         if K8S_CLIENT.get().is_some() {
             return Ok(());
         }
-
-        match Client::try_default().await {
-            Ok(client) => {
-                K8S_CLIENT.set(client)
-                    .map_err(|_| "K8S client already initialized".to_string())?;
-                Ok(())
-            }
-            Err(e) => Err(format!("Failed to initialize Kubernetes client: {}", e))
+        if let Ok(client) = Client::try_default().await {
+            K8S_CLIENT.set(client)
+                .map_err(|_| "K8S client already initialized".to_string())?;
+            return Ok(());
         }
+        let config = Self::load_config().await?;
+        let client = Client::try_from(config)
+            .map_err(|e| format!("Failed to create Kubernetes client: {}", e))?;
+        K8S_CLIENT.set(client)
+            .map_err(|_| "K8S client already initialized".to_string())?;
+        Ok(())
     }
 
     pub async fn load_clusters(&self) -> Result<Vec<KubernetesCluster>, String> {
-        // Try to load kubeconfig using Config::infer which automatically finds kubeconfig
-        match Config::infer().await {
-            Ok(config) => {
-                let mut clusters = Vec::new();
-                
-                // Try to get current context
-                if let Ok(client) = Client::try_from(config.clone()) {
-                    // Test connection by getting API server version
-                    if let Ok(version) = client.apiserver_version().await {
-                        let cluster = KubernetesCluster {
-                            name: "default".to_string(),
-                            context: "default".to_string(),
-                            namespace: config.default_namespace.clone(),
-                            status: ClusterStatus::Connected,
-                            server: Some(config.cluster_url.to_string()),
-                            version: Some(version.git_version),
-                            last_connected: Some(chrono::Utc::now().to_rfc3339()),
-                        };
-                        clusters.push(cluster);
-                    }
-                }
-
-                Ok(clusters)
+        let config = match Self::load_config().await {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Kubernetes load_config: {}", e);
+                return Err(e);
             }
-            Err(_) => {
-                // No kubeconfig found or invalid, return empty list
-                Ok(vec![])
+        };
+        let mut clusters = Vec::new();
+        if let Ok(client) = Client::try_from(config.clone()) {
+            if let Ok(version) = client.apiserver_version().await {
+                let cluster = KubernetesCluster {
+                    name: "default".to_string(),
+                    context: "default".to_string(),
+                    namespace: config.default_namespace.clone(),
+                    status: ClusterStatus::Connected,
+                    server: Some(config.cluster_url.to_string()),
+                    version: Some(version.git_version),
+                    last_connected: Some(chrono::Utc::now().to_rfc3339()),
+                };
+                clusters.push(cluster);
             }
         }
+        Ok(clusters)
     }
 
     pub async fn connect_cluster(&mut self, cluster_name: &str) -> Result<(), String> {
-        // Ensure client is initialized
         Self::initialize().await?;
-        
         let client = Self::get_client()?;
-        
-        // Test connection
         match client.apiserver_version().await {
             Ok(version) => {
-                let config = Config::infer().await
+                let config = Self::load_config().await
                     .map_err(|e| format!("Failed to load kubeconfig: {}", e))?;
-                
                 self.current_cluster = Some(KubernetesCluster {
                     name: cluster_name.to_string(),
                     context: "default".to_string(),
@@ -235,7 +257,7 @@ impl KubernetesManager {
         // Store the task handle
         let watch_tasks = WATCH_TASKS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
         let task_key = format!("pods:{}", namespace);
-        watch_tasks.lock().unwrap().insert(task_key, handle);
+        watch_tasks.lock().await.insert(task_key, handle);
         
         Ok(())
     }
@@ -305,7 +327,7 @@ impl KubernetesManager {
         // Store the task handle
         let watch_tasks = WATCH_TASKS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
         let task_key = format!("services:{}", namespace);
-        watch_tasks.lock().unwrap().insert(task_key, handle);
+        watch_tasks.lock().await.insert(task_key, handle);
         
         Ok(())
     }
@@ -375,7 +397,7 @@ impl KubernetesManager {
         // Store the task handle
         let watch_tasks = WATCH_TASKS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
         let task_key = format!("deployments:{}", namespace);
-        watch_tasks.lock().unwrap().insert(task_key, handle);
+        watch_tasks.lock().await.insert(task_key, handle);
         
         Ok(())
     }
@@ -1634,7 +1656,7 @@ fn parse_memory(memory_str: &str) -> f64 {
 
         // Check if port is already in use
         {
-            let forwards = port_forwards.lock().unwrap();
+            let forwards = port_forwards.lock().await;
             for (_, info) in forwards.values() {
                 if info.local_port == local_port {
                     return Err(format!("Local port {} is already in use", local_port));
@@ -1686,7 +1708,7 @@ fn parse_memory(memory_str: &str) -> f64 {
 
                         // Store the process and info
                         {
-                            let mut forwards = port_forwards.lock().unwrap();
+                            let mut forwards = port_forwards.lock().await;
                             forwards.insert(id.clone(), (child, info.clone()));
                         }
 
@@ -1704,7 +1726,7 @@ fn parse_memory(memory_str: &str) -> f64 {
             Arc::new(Mutex::new(HashMap::new()))
         }).clone();
 
-        let mut forwards = port_forwards.lock().unwrap();
+        let mut forwards = port_forwards.lock().await;
         let mut active_forwards = Vec::new();
         let mut dead_ids = Vec::new();
 
@@ -1742,7 +1764,7 @@ fn parse_memory(memory_str: &str) -> f64 {
 
         // Remove the child from the map first
         let child_option = {
-            let mut forwards = port_forwards.lock().unwrap();
+            let mut forwards = port_forwards.lock().await;
             forwards.remove(id).map(|(child, _)| child)
         };
         
@@ -1762,7 +1784,7 @@ fn parse_memory(memory_str: &str) -> f64 {
         let watch_tasks = WATCH_TASKS.get();
         if let Some(tasks) = watch_tasks {
             let task_key = format!("{}:{}", resource_type, namespace);
-            if let Some(handle) = tasks.lock().unwrap().remove(&task_key) {
+            if let Some(handle) = tasks.blocking_lock().remove(&task_key) {
                 handle.abort();
                 eprintln!("Stopped watch for {} in {}", resource_type, namespace);
             }
@@ -1773,7 +1795,7 @@ fn parse_memory(memory_str: &str) -> f64 {
     pub fn stop_all_watches(&self) {
         let watch_tasks = WATCH_TASKS.get();
         if let Some(tasks) = watch_tasks {
-            let mut tasks_guard = tasks.lock().unwrap();
+            let mut tasks_guard = tasks.blocking_lock();
             for (key, handle) in tasks_guard.drain() {
                 handle.abort();
                 eprintln!("Stopped watch task: {}", key);

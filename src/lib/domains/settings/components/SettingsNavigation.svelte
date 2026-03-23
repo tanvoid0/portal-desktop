@@ -7,6 +7,7 @@
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '$lib/components/ui/collapsible';
+	import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
 	import { Settings, Code, Terminal, Palette, Laptop, Brain, Package, Bot, Download, Box, FileCode, ChevronDown, Languages } from '@lucide/svelte';
 
 	type SettingsSectionType = 'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'frameworks-languages' | 'frameworks' | 'package-managers' | 'languages' | 'learning' | 'autonomy' | 'updates';
@@ -36,6 +37,8 @@
 	$effect(() => {
 		collapsibleOpen = isFrameworksLanguagesSection();
 	});
+
+	const sidebar = useSidebar();
 
 	const sections = [
 		{
@@ -165,12 +168,38 @@
 	function handleSubSectionClick(path: string) {
 		goto(path);
 	}
+
+	function handleCollapsedSectionClick(sectionId: string, path: string) {
+		// Preserve the "tab" query param when collapsing from a sub-section.
+		if (sectionId === 'frameworks-languages') {
+			const tab = activeSubSection();
+			if (tab) {
+				goto(`${path}?tab=${tab}`);
+				return;
+			}
+		}
+
+		goto(path);
+	}
 </script>
 
 <nav class="space-y-2 {className}">
-	{#each sections as section}
-		{@const isActive = activeSection() === section.id}
-		{#if section.subSections}
+	{#if sidebar.state === 'collapsed'}
+		{#each sections as section}
+			{@const isActive = activeSection() === section.id}
+			{@const Icon = section.icon}
+			<SidebarMenuButton
+				isActive={isActive}
+				tooltipContent={section.label}
+				onclick={() => handleCollapsedSectionClick(section.id, section.path)}
+			>
+				<Icon class="h-4 w-4 flex-shrink-0" />
+			</SidebarMenuButton>
+		{/each}
+	{:else}
+		{#each sections as section}
+			{@const isActive = activeSection() === section.id}
+			{#if section.subSections}
 			<Collapsible bind:open={collapsibleOpen} class="w-full">
 				<CollapsibleTrigger
 					type="button"
@@ -227,5 +256,6 @@
 			</Button>
 		{/if}
 	{/each}
+	{/if}
 </nav>
 

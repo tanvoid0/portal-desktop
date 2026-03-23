@@ -44,13 +44,16 @@ impl ExecutionService {
             .map_err(|e| format!("Failed to serialize variables: {}", e))?;
         
         // Create execution record
+        let empty_steps_json = serde_json::to_string(&Vec::<serde_json::Value>::new())
+            .map_err(|e| format!("Failed to serialize empty steps: {}", e))?;
+
         let _execution = self.execution_repo.create(
             execution_id.clone(),
             pipeline_id,
             pipeline.project_id,
             "pending".to_string(),
             "user".to_string(), // FUTURE: Get actual user from system/auth context
-            serde_json::to_string(&Vec::<serde_json::Value>::new()).unwrap(),
+            empty_steps_json,
             variables_json,
         ).await?;
         

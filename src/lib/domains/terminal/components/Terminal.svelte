@@ -12,7 +12,7 @@
   import CommandBlocks from './CommandBlocks.svelte';
   import CommandPalette from './CommandPalette.svelte';
   import ErrorSummary from './ErrorSummary.svelte';
-  import { parseTerminalOutput, extractErrorSummary } from '../utils/outputParser';
+  // import { parseTerminalOutput, extractErrorSummary } from '../utils/outputParser';
   import type { TerminalConfig, TerminalProcess, TerminalOutput, TerminalSystemInfo, TerminalOutputEvent } from '../types';
   import type { CommandHistoryEntry } from '../stores/commandHistoryStore';
   import { isTauriEnvironment } from '@/lib/utils/tauri';
@@ -640,14 +640,15 @@
     if (terminalOutput.length > 100000) {
       terminalOutput = terminalOutput.slice(-50000); // Keep last 50k characters
     }
-    
-    const parsed = parseTerminalOutput(terminalOutput);
-    const summary = extractErrorSummary(parsed);
-    
-    errorCount = summary.errorCount;
-    warningCount = summary.warningCount;
-    infoCount = summary.infoCount;
-    recentErrors = summary.errors;
+
+    // TODO: Implement parseTerminalOutput and extractErrorSummary functions
+    // const parsed = parseTerminalOutput(terminalOutput);
+    // const summary = extractErrorSummary(parsed);
+
+    // errorCount = summary.errorCount;
+    // warningCount = summary.warningCount;
+    // infoCount = summary.infoCount;
+    // recentErrors = summary.errors;
   }
 
   function clearErrorSummary() {

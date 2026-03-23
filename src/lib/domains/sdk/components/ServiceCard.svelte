@@ -51,6 +51,17 @@
 	let showHealth = $state(false);
 
 	// Derived state
+	let statusType = $derived(() => {
+		switch (service.status) {
+			case 'running': return 'success';
+			case 'stopped': return 'info';
+			case 'error': return 'error';
+			case 'starting': return 'warning';
+			case 'stopping': return 'warning';
+			default: return 'info';
+		}
+	});
+
 	let statusColor = $derived(() => {
 		switch (service.status) {
 			case 'running': return 'text-green-600';
@@ -125,7 +136,13 @@
 	}
 </script>
 
-<Card class="w-full hover:shadow-md transition-shadow">
+<Card 
+	class="w-full"
+	variant="default"
+	elevation="raised"
+	gradient={service.status === 'running'}
+	borderAccent={service.status === 'running' ? 'left' : 'none'}
+>
 	<CardHeader class="pb-3">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-3">

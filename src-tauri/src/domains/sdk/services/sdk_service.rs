@@ -4,8 +4,8 @@
 
 use std::process::{Command, Stdio};
 use std::collections::HashMap;
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait};
-use crate::domains::sdk::entities::ActiveModel as SDKInstallationActive;
+use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait};
+// use crate::domains::sdk::entities::ActiveModel as SDKInstallationActive; // TODO: Use when entities are needed
 use super::super::SDKError;
 use super::super::factory::SDKManagerFactory;
 // Using println! for logging as per codebase convention
@@ -527,20 +527,22 @@ impl SDKService {
     }
 
     /// Save SDK installation to database
-    async fn save_sdk_installation(&self, sdk_type: &str, version: &str, project_path: Option<&str>) -> Result<(), SDKError> {
-        let installation = SDKInstallationActive {
-            id: Set(format!("{}-{}", sdk_type, version)),
-            sdk_type: Set(sdk_type.to_string()),
-            manager_type: Set(self.get_manager_type(sdk_type)),
-            version: Set(version.to_string()),
-            path: Set(None),
-            active: Set(true),
-            installed_at: Set(chrono::Utc::now().naive_utc()),
-            last_used: Set(Some(chrono::Utc::now().naive_utc())),
-            project_path: Set(project_path.map(|s| s.to_string())),
-        };
+    #[allow(dead_code)]
+    async fn save_sdk_installation(&self, _sdk_type: &str, _version: &str, _project_path: Option<&str>) -> Result<(), SDKError> {
+        // TODO: Implement using new entities when ready
+        // let installation = SDKInstallationActive {
+        //     id: Set(format!("{}-{}", sdk_type, version)),
+        //     sdk_type: Set(sdk_type.to_string()),
+        //     manager_type: Set(self.get_manager_type(sdk_type)),
+        //     version: Set(version.to_string()),
+        //     path: Set(None),
+        //     active: Set(true),
+        //     installed_at: Set(chrono::Utc::now().naive_utc()),
+        //     last_used: Set(Some(chrono::Utc::now().naive_utc())),
+        //     project_path: Set(project_path.map(|s| s.to_string())),
+        // };
 
-        installation.insert(&self.db).await?;
+        // installation.insert(&self.db).await?;
         Ok(())
     }
 
@@ -710,28 +712,29 @@ impl SDKService {
     /// Get SDK installations from database
     #[allow(dead_code)]
     pub async fn get_installations(&self) -> Result<Vec<HashMap<String, String>>, SDKError> {
-        use crate::domains::sdk::entities::Entity as SDKInstallationEntity;
+        // TODO: Implement using new entities when ready
+        // use crate::domains::sdk::entities::Entity as SDKInstallationEntity;
         
-        let installations = SDKInstallationEntity::find().all(&self.db).await
-            .map_err(|e| SDKError::CommandFailed(e.to_string()))?;
+        // let installations = SDKInstallationEntity::find().all(&self.db).await
+        //     .map_err(|e| SDKError::CommandFailed(e.to_string()))?;
 
-        let result: Vec<HashMap<String, String>> = installations
-            .into_iter()
-            .map(|installation| {
-                HashMap::from([
-                    ("id".to_string(), installation.id),
-                    ("sdk_type".to_string(), installation.sdk_type),
-                    ("manager_type".to_string(), installation.manager_type),
-                    ("version".to_string(), installation.version),
-                    ("path".to_string(), installation.path.unwrap_or_default()),
-                    ("active".to_string(), installation.active.to_string()),
-                    ("installed_at".to_string(), installation.installed_at.to_string()),
-                    ("last_used".to_string(), installation.last_used.map(|d| d.to_string()).unwrap_or_default()),
-                    ("project_path".to_string(), installation.project_path.unwrap_or_default()),
-                ])
-            })
-            .collect();
+        // let result: Vec<HashMap<String, String>> = installations
+        //     .into_iter()
+        //     .map(|installation| {
+        //         HashMap::from([
+        //             ("id".to_string(), installation.id),
+        //             ("sdk_type".to_string(), installation.sdk_type),
+        //             ("manager_type".to_string(), installation.manager_type),
+        //             ("version".to_string(), installation.version),
+        //             ("path".to_string(), installation.path.unwrap_or_default()),
+        //             ("active".to_string(), installation.active.to_string()),
+        //             ("installed_at".to_string(), installation.installed_at.to_string()),
+        //             ("last_used".to_string(), installation.last_used.map(|d| d.to_string()).unwrap_or_default()),
+        //             ("project_path".to_string(), installation.project_path.unwrap_or_default()),
+        //         ])
+        //     })
+        //     .collect();
 
-        Ok(result)
+        Ok(vec![])
     }
 }
