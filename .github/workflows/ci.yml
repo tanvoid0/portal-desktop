@@ -52,8 +52,12 @@ jobs:
         run: pnpm lint
         continue-on-error: true
 
+      # Browser test project (svelte components) runs in headless chromium.
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Unit tests
-        run: pnpm test:unit -- --run
+        run: pnpm vitest run
 
   rust:
     name: Rust checks
