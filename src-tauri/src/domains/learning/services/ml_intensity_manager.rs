@@ -44,10 +44,10 @@ impl MLIntensity {
     /// Lower intensity = larger batches (less frequent processing)
     pub fn batch_size(&self) -> usize {
         match self {
-            MLIntensity::Fast => 100,      // Process in large batches
-            MLIntensity::Light => 50,       // Medium batches
-            MLIntensity::Medium => 25,      // Smaller batches
-            MLIntensity::Deep => 10,        // Small batches for detailed analysis
+            MLIntensity::Fast => 100,  // Process in large batches
+            MLIntensity::Light => 50,  // Medium batches
+            MLIntensity::Medium => 25, // Smaller batches
+            MLIntensity::Deep => 10,   // Small batches for detailed analysis
         }
     }
 
@@ -55,10 +55,10 @@ impl MLIntensity {
     /// Higher intensity = more frequent processing
     pub fn processing_delay_ms(&self) -> u64 {
         match self {
-            MLIntensity::Fast => 60000,     // Process every 60 seconds
-            MLIntensity::Light => 30000,    // Process every 30 seconds
-            MLIntensity::Medium => 15000,   // Process every 15 seconds
-            MLIntensity::Deep => 5000,      // Process every 5 seconds
+            MLIntensity::Fast => 60000,   // Process every 60 seconds
+            MLIntensity::Light => 30000,  // Process every 30 seconds
+            MLIntensity::Medium => 15000, // Process every 15 seconds
+            MLIntensity::Deep => 5000,    // Process every 5 seconds
         }
     }
 
@@ -133,4 +133,3 @@ impl MLIntensityManager {
         }
     }
 }
-

@@ -19,7 +19,7 @@ pub enum Relation {
         to = "super::project::Column::Id"
     )]
     Project,
-    
+
     #[sea_orm(
         belongs_to = "super::framework::Entity",
         from = "Column::FrameworkId",
@@ -41,4 +41,3 @@ impl Related<super::framework::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-

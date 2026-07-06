@@ -23,4 +23,3 @@ pub trait Executor: Send + Sync {
     fn execute(&self, request: ExecutionRequest) -> Result<ExecutionResult, String>;
     fn can_execute(&self, execution_type: &str) -> bool;
 }
-

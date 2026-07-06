@@ -1,13 +1,12 @@
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait};
+use std::collections::HashMap;
 /**
  * SDK Service - Business logic for SDK management
  */
-
 use std::process::{Command, Stdio};
-use std::collections::HashMap;
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait};
 // use crate::domains::sdk::entities::ActiveModel as SDKInstallationActive; // TODO: Use when entities are needed
-use super::super::SDKError;
 use super::super::factory::SDKManagerFactory;
+use super::super::SDKError;
 // Using println! for logging as per codebase convention
 
 #[derive(Debug)]
@@ -18,7 +17,7 @@ pub struct SDKService {
 
 impl SDKService {
     pub fn new(db: DatabaseConnection) -> Self {
-        Self { 
+        Self {
             db,
             factory: SDKManagerFactory::new(),
         }
@@ -32,12 +31,17 @@ impl SDKService {
     /// Get all available SDKs and languages (both installed and not installed)
     pub async fn get_all_available_sdks(&self) -> Result<Vec<HashMap<String, String>>, SDKError> {
         let mut all_sdks = Vec::new();
-        
+
         // Define all available programming languages and tools
         let available_languages = vec![
             // Language & Runtime
             ("java", "Java", "language", "Java Development Kit"),
-            ("python", "Python", "language", "Python Programming Language"),
+            (
+                "python",
+                "Python",
+                "language",
+                "Python Programming Language",
+            ),
             ("node", "Node.js", "language", "JavaScript Runtime"),
             ("rust", "Rust", "language", "Systems Programming Language"),
             ("go", "Go", "language", "Go Programming Language"),
@@ -47,35 +51,71 @@ impl SDKService {
             ("cpp", "C++", "language", "C++ Programming Language"),
             ("c", "C", "language", "C Programming Language"),
             ("swift", "Swift", "language", "Swift Programming Language"),
-            ("kotlin", "Kotlin", "language", "Kotlin Programming Language"),
+            (
+                "kotlin",
+                "Kotlin",
+                "language",
+                "Kotlin Programming Language",
+            ),
             ("scala", "Scala", "language", "Scala Programming Language"),
-            ("clojure", "Clojure", "language", "Clojure Programming Language"),
-            ("haskell", "Haskell", "language", "Haskell Programming Language"),
-            ("elixir", "Elixir", "language", "Elixir Programming Language"),
-            ("erlang", "Erlang", "language", "Erlang Programming Language"),
+            (
+                "clojure",
+                "Clojure",
+                "language",
+                "Clojure Programming Language",
+            ),
+            (
+                "haskell",
+                "Haskell",
+                "language",
+                "Haskell Programming Language",
+            ),
+            (
+                "elixir",
+                "Elixir",
+                "language",
+                "Elixir Programming Language",
+            ),
+            (
+                "erlang",
+                "Erlang",
+                "language",
+                "Erlang Programming Language",
+            ),
             ("dart", "Dart", "language", "Dart Programming Language"),
-            ("typescript", "TypeScript", "language", "TypeScript Programming Language"),
+            (
+                "typescript",
+                "TypeScript",
+                "language",
+                "TypeScript Programming Language",
+            ),
             ("deno", "Deno", "language", "Deno JavaScript Runtime"),
             ("bun", "Bun", "language", "Bun JavaScript Runtime"),
-            
             // Database
-            ("postgresql", "PostgreSQL", "database", "PostgreSQL Database"),
+            (
+                "postgresql",
+                "PostgreSQL",
+                "database",
+                "PostgreSQL Database",
+            ),
             ("mysql", "MySQL", "database", "MySQL Database"),
             ("mongodb", "MongoDB", "database", "MongoDB Database"),
             ("redis", "Redis", "database", "Redis Database"),
             ("sqlite", "SQLite", "database", "SQLite Database"),
             ("mariadb", "MariaDB", "database", "MariaDB Database"),
-            
             // Web Server
             ("nginx", "Nginx", "web", "Nginx Web Server"),
             ("apache", "Apache", "web", "Apache HTTP Server"),
             ("caddy", "Caddy", "web", "Caddy Web Server"),
-            
             // Container
             ("docker", "Docker", "container", "Docker Container Platform"),
             ("podman", "Podman", "container", "Podman Container Platform"),
-            ("kubernetes", "Kubernetes", "container", "Kubernetes Container Orchestration"),
-            
+            (
+                "kubernetes",
+                "Kubernetes",
+                "container",
+                "Kubernetes Container Orchestration",
+            ),
             // Package Managers
             ("npm", "npm", "package", "Node Package Manager"),
             ("yarn", "Yarn", "package", "Yarn Package Manager"),
@@ -84,7 +124,7 @@ impl SDKService {
             ("maven", "Maven", "package", "Java Build Tool"),
             ("gradle", "Gradle", "package", "Java Build Tool"),
         ];
-        
+
         // Add all predefined languages and tools
         for (id, name, category, description) in available_languages {
             let mut sdk_info = HashMap::new();
@@ -96,21 +136,27 @@ impl SDKService {
             sdk_info.insert("description".to_string(), description.to_string());
             sdk_info.insert("installed".to_string(), "false".to_string());
             sdk_info.insert("version".to_string(), "Not installed".to_string());
-            
+
             all_sdks.push(sdk_info);
         }
-        
+
         // Add SDK managers as a separate category
         let managers = self.factory.get_all_managers();
         for (name, manager) in managers {
             let mut sdk_info = HashMap::new();
             sdk_info.insert("name".to_string(), manager.name().to_string());
-            sdk_info.insert("display_name".to_string(), manager.display_name().to_string());
+            sdk_info.insert(
+                "display_name".to_string(),
+                manager.display_name().to_string(),
+            );
             sdk_info.insert("sdk_type".to_string(), manager.sdk_type().to_string());
             sdk_info.insert("category".to_string(), "manager".to_string());
             sdk_info.insert("type".to_string(), name.clone());
-            sdk_info.insert("description".to_string(), format!("{} - {}", manager.display_name(), manager.sdk_type()));
-            
+            sdk_info.insert(
+                "description".to_string(),
+                format!("{} - {}", manager.display_name(), manager.sdk_type()),
+            );
+
             // Check if this manager is installed
             match manager.is_installed().await {
                 Ok(true) => {
@@ -118,18 +164,18 @@ impl SDKService {
                     if let Ok(version) = manager.get_manager_version().await {
                         sdk_info.insert("version".to_string(), version);
                     }
-                },
+                }
                 Ok(false) => {
                     sdk_info.insert("installed".to_string(), "false".to_string());
-                },
+                }
                 Err(_) => {
                     sdk_info.insert("installed".to_string(), "false".to_string());
                 }
             }
-            
+
             all_sdks.push(sdk_info);
         }
-        
+
         Ok(all_sdks)
     }
 
@@ -155,19 +201,31 @@ impl SDKService {
     }
 
     /// Switch to a specific version (system-wide or project-specific)
-    pub async fn switch_version(&self, sdk_type: &str, version: &str, project_path: Option<&str>) -> Result<(), SDKError> {
+    pub async fn switch_version(
+        &self,
+        sdk_type: &str,
+        version: &str,
+        project_path: Option<&str>,
+    ) -> Result<(), SDKError> {
         let managers = self.factory.get_managers_by_sdk_type(sdk_type);
         if let Some(manager) = managers.first() {
             if let Some(path) = project_path {
-                println!("[SDKService] Performing project-specific switch for {} to version {}", sdk_type, version);
+                println!(
+                    "[SDKService] Performing project-specific switch for {} to version {}",
+                    sdk_type, version
+                );
                 manager.switch_version_for_project(version, path).await?;
             } else {
-                println!("[SDKService] Performing system-wide switch for {} to version {}", sdk_type, version);
+                println!(
+                    "[SDKService] Performing system-wide switch for {} to version {}",
+                    sdk_type, version
+                );
                 manager.switch_version(version).await?;
             }
-            
+
             // Save to database with project context
-            self.save_sdk_installation(sdk_type, version, project_path).await?;
+            self.save_sdk_installation(sdk_type, version, project_path)
+                .await?;
             Ok(())
         } else {
             Err(SDKError::ManagerNotFound(sdk_type.to_string()))
@@ -176,7 +234,12 @@ impl SDKService {
 
     /// Check if a switch should be system-wide or project-specific
     #[allow(dead_code)]
-    pub async fn determine_switch_scope(&self, sdk_type: &str, version: &str, project_path: Option<&str>) -> Result<bool, SDKError> {
+    pub async fn determine_switch_scope(
+        &self,
+        sdk_type: &str,
+        version: &str,
+        project_path: Option<&str>,
+    ) -> Result<bool, SDKError> {
         // If project_path is provided, it's project-specific
         if project_path.is_some() {
             return Ok(true);
@@ -186,8 +249,12 @@ impl SDKService {
         if let Some(path) = project_path {
             let project_path = std::path::Path::new(path);
             let config_files = vec![
-                ".nvmrc", ".python-version", ".ruby-version", 
-                ".php-version", "rust-toolchain", "go.mod"
+                ".nvmrc",
+                ".python-version",
+                ".ruby-version",
+                ".php-version",
+                "rust-toolchain",
+                "go.mod",
             ];
 
             for config_file in config_files {
@@ -229,7 +296,13 @@ impl SDKService {
             .lines()
             .filter_map(|line| {
                 if line.contains("v") {
-                    Some(line.trim().replace("v", "").replace("*", "").trim().to_string())
+                    Some(
+                        line.trim()
+                            .replace("v", "")
+                            .replace("*", "")
+                            .trim()
+                            .to_string(),
+                    )
                 } else {
                     None
                 }
@@ -243,7 +316,11 @@ impl SDKService {
         Ok(Some(output.trim().replace("v", "")))
     }
 
-    async fn switch_node_version(&self, version: &str, project_path: Option<&str>) -> Result<(), SDKError> {
+    async fn switch_node_version(
+        &self,
+        version: &str,
+        project_path: Option<&str>,
+    ) -> Result<(), SDKError> {
         let command = if let Some(path) = project_path {
             format!("nvm use {} --directory {}", version, path)
         } else {
@@ -254,17 +331,17 @@ impl SDKService {
     }
 
     async fn install_node_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("nvm install {}", version)).await?;
+        self.execute_shell_command(&format!("nvm install {}", version))
+            .await?;
         Ok(())
     }
 
     // Rust specific methods
     async fn list_rustup_versions(&self) -> Result<Vec<String>, SDKError> {
-        let output = self.execute_command("rustup", &["toolchain", "list"]).await?;
-        let versions: Vec<String> = output
-            .lines()
-            .map(|line| line.trim().to_string())
-            .collect();
+        let output = self
+            .execute_command("rustup", &["toolchain", "list"])
+            .await?;
+        let versions: Vec<String> = output.lines().map(|line| line.trim().to_string()).collect();
         Ok(versions)
     }
 
@@ -274,22 +351,21 @@ impl SDKService {
     }
 
     async fn switch_rust_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_command("rustup", &["default", version]).await?;
+        self.execute_command("rustup", &["default", version])
+            .await?;
         Ok(())
     }
 
     async fn install_rust_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_command("rustup", &["toolchain", "install", version]).await?;
+        self.execute_command("rustup", &["toolchain", "install", version])
+            .await?;
         Ok(())
     }
 
     // Python specific methods
     async fn list_pyenv_versions(&self) -> Result<Vec<String>, SDKError> {
         let output = self.execute_shell_command("pyenv versions --bare").await?;
-        let versions: Vec<String> = output
-            .lines()
-            .map(|line| line.trim().to_string())
-            .collect();
+        let versions: Vec<String> = output.lines().map(|line| line.trim().to_string()).collect();
         Ok(versions)
     }
 
@@ -299,18 +375,22 @@ impl SDKService {
     }
 
     async fn switch_python_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("pyenv global {}", version)).await?;
+        self.execute_shell_command(&format!("pyenv global {}", version))
+            .await?;
         Ok(())
     }
 
     async fn install_python_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("pyenv install {}", version)).await?;
+        self.execute_shell_command(&format!("pyenv install {}", version))
+            .await?;
         Ok(())
     }
 
     // Java specific methods
     async fn list_sdkman_versions(&self, sdk: &str) -> Result<Vec<String>, SDKError> {
-        let output = self.execute_shell_command(&format!("sdk list {}", sdk)).await?;
+        let output = self
+            .execute_shell_command(&format!("sdk list {}", sdk))
+            .await?;
         let versions: Vec<String> = output
             .lines()
             .filter_map(|line| {
@@ -335,12 +415,14 @@ impl SDKService {
     }
 
     async fn switch_java_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("sdk use java {}", version)).await?;
+        self.execute_shell_command(&format!("sdk use java {}", version))
+            .await?;
         Ok(())
     }
 
     async fn install_java_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("sdk install java {}", version)).await?;
+        self.execute_shell_command(&format!("sdk install java {}", version))
+            .await?;
         Ok(())
     }
 
@@ -369,10 +451,7 @@ impl SDKService {
     // Ruby specific methods
     async fn list_rbenv_versions(&self) -> Result<Vec<String>, SDKError> {
         let output = self.execute_shell_command("rbenv versions --bare").await?;
-        let versions: Vec<String> = output
-            .lines()
-            .map(|line| line.trim().to_string())
-            .collect();
+        let versions: Vec<String> = output.lines().map(|line| line.trim().to_string()).collect();
         Ok(versions)
     }
 
@@ -383,23 +462,22 @@ impl SDKService {
     }
 
     async fn switch_ruby_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("rbenv global {}", version)).await?;
+        self.execute_shell_command(&format!("rbenv global {}", version))
+            .await?;
         Ok(())
     }
 
     #[allow(dead_code)]
     async fn install_ruby_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("rbenv install {}", version)).await?;
+        self.execute_shell_command(&format!("rbenv install {}", version))
+            .await?;
         Ok(())
     }
 
     // PHP specific methods
     async fn list_phpenv_versions(&self) -> Result<Vec<String>, SDKError> {
         let output = self.execute_shell_command("phpenv versions --bare").await?;
-        let versions: Vec<String> = output
-            .lines()
-            .map(|line| line.trim().to_string())
-            .collect();
+        let versions: Vec<String> = output.lines().map(|line| line.trim().to_string()).collect();
         Ok(versions)
     }
 
@@ -410,13 +488,15 @@ impl SDKService {
     }
 
     async fn switch_php_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("phpenv global {}", version)).await?;
+        self.execute_shell_command(&format!("phpenv global {}", version))
+            .await?;
         Ok(())
     }
 
     #[allow(dead_code)]
     async fn install_php_version(&self, version: &str) -> Result<(), SDKError> {
-        self.execute_shell_command(&format!("phpenv install {}", version)).await?;
+        self.execute_shell_command(&format!("phpenv install {}", version))
+            .await?;
         Ok(())
     }
 
@@ -528,7 +608,12 @@ impl SDKService {
 
     /// Save SDK installation to database
     #[allow(dead_code)]
-    async fn save_sdk_installation(&self, _sdk_type: &str, _version: &str, _project_path: Option<&str>) -> Result<(), SDKError> {
+    async fn save_sdk_installation(
+        &self,
+        _sdk_type: &str,
+        _version: &str,
+        _project_path: Option<&str>,
+    ) -> Result<(), SDKError> {
         // TODO: Implement using new entities when ready
         // let installation = SDKInstallationActive {
         //     id: Set(format!("{}-{}", sdk_type, version)),
@@ -566,19 +651,19 @@ impl SDKService {
     /// Automatically switch SDK versions when entering project directories
     /// This creates temporary project-specific environment overrides
     pub async fn setup_project_environment(&self, project_path: &str) -> Result<(), SDKError> {
-        use std::path::Path;
         use std::fs;
+        use std::path::Path;
 
         let project_path = Path::new(project_path);
-        
+
         // Check for project-specific configuration files
         let config_files = vec![
-            ".nvmrc",           // Node.js
-            ".python-version",  // Python
-            ".ruby-version",    // Ruby
-            ".php-version",     // PHP
-            "rust-toolchain",   // Rust
-            "go.mod",           // Go
+            ".nvmrc",          // Node.js
+            ".python-version", // Python
+            ".ruby-version",   // Ruby
+            ".php-version",    // PHP
+            "rust-toolchain",  // Rust
+            "go.mod",          // Go
         ];
 
         for config_file in config_files {
@@ -587,13 +672,14 @@ impl SDKService {
                 if let Ok(content) = fs::read_to_string(&config_path) {
                     let version = content.trim();
                     let sdk_type = self.get_sdk_type_from_config(&config_file);
-                    
+
                     if let Some(sdk_type) = sdk_type {
                         println!("[SDKService] Auto-switching {} to version {} for project {} (temporary)", 
                                     sdk_type, version, project_path.display());
-                        
+
                         // Create temporary project-specific environment
-                        self.create_temporary_project_environment(project_path, &sdk_type, version).await?;
+                        self.create_temporary_project_environment(project_path, &sdk_type, version)
+                            .await?;
                     }
                 }
             }
@@ -604,7 +690,12 @@ impl SDKService {
 
     /// Create temporary project-specific environment override
     /// This doesn't change the system-wide environment, only affects terminals in this project
-    async fn create_temporary_project_environment(&self, project_path: &std::path::Path, sdk_type: &str, version: &str) -> Result<(), SDKError> {
+    async fn create_temporary_project_environment(
+        &self,
+        project_path: &std::path::Path,
+        sdk_type: &str,
+        version: &str,
+    ) -> Result<(), SDKError> {
         use std::fs;
 
         // Create project-specific environment script
@@ -620,47 +711,57 @@ impl SDKService {
                      nvm use {}\n",
                     version
                 ));
-            },
+            }
             "python" => {
                 env_script.push_str(&format!(
                     "export PYENV_VERSION={}\n\
                      export PATH=\"$(pyenv root)/versions/{}/bin:$PATH\"\n",
                     version, version
                 ));
-            },
+            }
             "rust" => {
                 env_script.push_str(&format!(
                     "export RUSTUP_TOOLCHAIN={}\n\
                      export PATH=\"$HOME/.rustup/toolchains/{}/bin:$PATH\"\n",
                     version, version
                 ));
-            },
+            }
             "ruby" => {
                 env_script.push_str(&format!(
                     "export RBENV_VERSION={}\n\
                      export PATH=\"$(rbenv root)/versions/{}/bin:$PATH\"\n",
                     version, version
                 ));
-            },
+            }
             "php" => {
                 env_script.push_str(&format!(
                     "export PHPENV_VERSION={}\n\
                      export PATH=\"$(phpenv root)/versions/{}/bin:$PATH\"\n",
                     version, version
                 ));
-            },
+            }
             _ => {
-                println!("[SDKService] No specific environment setup for {}", sdk_type);
+                println!(
+                    "[SDKService] No specific environment setup for {}",
+                    sdk_type
+                );
                 return Ok(());
             }
         }
 
         // Write the environment script
-        fs::write(&env_script_path, env_script)
-            .map_err(|e| SDKError::CommandFailed(format!("Failed to create project environment script: {}", e)))?;
+        fs::write(&env_script_path, env_script).map_err(|e| {
+            SDKError::CommandFailed(format!(
+                "Failed to create project environment script: {}",
+                e
+            ))
+        })?;
 
-        println!("[SDKService] Created temporary environment script for project {}: {}", 
-              project_path.display(), env_script_path.display());
+        println!(
+            "[SDKService] Created temporary environment script for project {}: {}",
+            project_path.display(),
+            env_script_path.display()
+        );
 
         Ok(())
     }
@@ -679,9 +780,14 @@ impl SDKService {
     }
 
     /// Create project-specific environment configuration
-    pub async fn create_project_config(&self, project_path: &str, sdk_type: &str, version: &str) -> Result<(), SDKError> {
-        use std::path::Path;
+    pub async fn create_project_config(
+        &self,
+        project_path: &str,
+        sdk_type: &str,
+        version: &str,
+    ) -> Result<(), SDKError> {
         use std::fs;
+        use std::path::Path;
 
         let project_path = Path::new(project_path);
         let config_file = self.get_config_file_for_sdk(sdk_type);
@@ -690,8 +796,12 @@ impl SDKService {
         fs::write(&config_path, version)
             .map_err(|e| SDKError::CommandFailed(format!("Failed to create config file: {}", e)))?;
 
-        println!("[SDKService] Created {} config file for project {} with version {}", 
-                    config_file, project_path.display(), version);
+        println!(
+            "[SDKService] Created {} config file for project {} with version {}",
+            config_file,
+            project_path.display(),
+            version
+        );
 
         Ok(())
     }
@@ -714,7 +824,7 @@ impl SDKService {
     pub async fn get_installations(&self) -> Result<Vec<HashMap<String, String>>, SDKError> {
         // TODO: Implement using new entities when ready
         // use crate::domains::sdk::entities::Entity as SDKInstallationEntity;
-        
+
         // let installations = SDKInstallationEntity::find().all(&self.db).await
         //     .map_err(|e| SDKError::CommandFailed(e.to_string()))?;
 

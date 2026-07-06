@@ -1,25 +1,26 @@
-mod database;
-mod entities;
-mod migrations;
-mod domains;
 mod command_executor;
-mod utils;
+mod database;
+mod domains;
+mod entities;
 mod error;
+mod invoke_handler;
+mod migrations;
+mod utils;
 
 // Re-export error types for use throughout the codebase
 pub use error::{AppError, AppResult};
 
 use database::DatabaseManager;
-use domains::terminal::manager::TerminalManager;
-use domains::kubernetes::manager::KubernetesManager;
-use domains::automation::services::automation_service::AutomationService;
-use domains::sdk::services::navigation_service::NavigationService;
-use domains::settings::services::settings_service::SettingsService;
 use domains::ai::services::AIService;
 use domains::ai::services::AISettingsService;
+use domains::automation::services::automation_service::AutomationService;
 use domains::deployments::services::deployment_service::DeploymentService;
-use domains::projects::pipelines::services::{PipelineService, ExecutionService};
+use domains::kubernetes::manager::KubernetesManager;
+use domains::projects::pipelines::services::{ExecutionService, PipelineService};
 use domains::scripts::commands::ScriptExecutionState;
+use domains::sdk::services::navigation_service::NavigationService;
+use domains::settings::services::settings_service::SettingsService;
+use domains::terminal::manager::TerminalManager;
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -29,25 +30,24 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize logger
     utils::logger::init_logger(None);
     log_info!("Tauri", "Application starting...");
-    
+
     // Initialize domain managers
     let terminal_manager = TerminalManager::new();
     let kubernetes_manager = tokio::sync::Mutex::new(KubernetesManager::new());
     let navigation_service = NavigationService::new();
-    
+
     // Configure updater plugin
     // Note: Endpoints and pubkey can be configured via environment variables or builder
     // For now, using default configuration - endpoints and pubkey should be set via
     // TAURI_UPDATER_ENDPOINTS and TAURI_UPDATER_PUBKEY environment variables,
     // or configure in tauri.conf.json under plugins section if supported
     let updater_builder = tauri_plugin_updater::Builder::new();
-    
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -55,67 +55,87 @@ pub fn run() {
         .setup(|app| {
             // Set app handle for logger to emit events to frontend
             utils::logger::set_app_handle(app.handle().clone());
-            
+
             log_info!("Tauri", "Starting setup function...");
-            
-            // Initialize database manager asynchronously in setup
-            let app_handle = app.handle().clone();
-            
+
             log_info!("Tauri", "Initializing database manager...");
-            
-            // Use block_on to make the async initialization synchronous
+
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| format!("Failed to resolve app data directory: {}", e))?;
+
             let db_manager = tauri::async_runtime::block_on(async {
-                DatabaseManager::new()
-                    .await
-                    .expect("Failed to initialize database manager")
-            });
-            
+                DatabaseManager::new(app_data_dir).await
+            })
+            .map_err(|e| format!("Failed to initialize database manager: {}", e))?;
+
             log_info!("Tauri", "Database manager initialized, managing state...");
-            
+
             // Wrap in Arc for sharing
             let db_manager_arc = std::sync::Arc::new(db_manager);
-            
+
             // Manage the database manager wrapped in Arc
             app.manage(db_manager_arc.clone());
-            
+
             // Initialize automation service
             let automation_service = AutomationService::new(
                 "http://localhost:5678".to_string(),
                 None, // No API key for local n8n
             );
             app.manage(std::sync::Arc::new(automation_service));
-            
+
             // Initialize settings service
             let settings_service = SettingsService::new();
             app.manage(std::sync::Arc::new(settings_service));
-            
+
             // Initialize AI services
             let ai_settings_service = AISettingsService::new();
             let ai_service = AIService::new();
-            
+
             // Load AI provider configurations and register them
             let settings = ai_settings_service.load_settings().unwrap_or_default();
             for (_, config) in &settings.providers {
                 if config.enabled {
-                    let _ = tauri::async_runtime::block_on(ai_service.register_provider_from_config(config.clone()));
+                    let _ = tauri::async_runtime::block_on(
+                        ai_service.register_provider_from_config(config.clone()),
+                    );
                 }
             }
-            
+
             // Set default provider if configured
             if let Ok(Some(default_type)) = ai_settings_service.get_default_provider() {
-                let _ = tauri::async_runtime::block_on(ai_service.set_default_provider(default_type));
+                let _ =
+                    tauri::async_runtime::block_on(ai_service.set_default_provider(default_type));
             }
-            
+
             app.manage(std::sync::Arc::new(ai_settings_service));
             app.manage(std::sync::Arc::new(ai_service));
-            
+
+            // Initialize disk-cleanup domain (ported from portal_disk_utility).
+            // Own rusqlite DB alongside the main app data; state for scan/verify
+            // cancellation flags. See docs/development/DISK_UTILITY_MIGRATION.md.
+            let disk_data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| format!("Failed to resolve app data directory: {}", e))?;
+            let disk_db = domains::disk::db::Db::open(disk_data_dir.join("disk_utility.db"))
+                .map_err(|e| format!("Failed to initialize disk utility database: {}", e))?;
+            app.manage(std::sync::Arc::new(disk_db));
+            app.manage(domains::disk::commands::ScanControl::default());
+            app.manage(domains::disk::commands::VerifyControl::default());
+            log_info!("Tauri", "Disk utility domain initialized");
+
             // Initialize IDE storage
             domains::ide::commands::init_ide_storage(app.handle());
-            
+
             // Initialize deployment service
-            let deployment_service = DeploymentService::new();
+            let deployment_service = tauri::async_runtime::block_on(async {
+                DeploymentService::new(db_manager_arc.clone()).await
+            })
+            .map_err(|e| format!("Failed to initialize deployment service: {}", e))?;
             app.manage(std::sync::Arc::new(deployment_service));
-            
+
             // Initialize pipeline services
             let pipeline_service = PipelineService::new(db_manager_arc.clone());
             let execution_service = ExecutionService::new(db_manager_arc.clone());
@@ -142,7 +162,7 @@ pub fn run() {
             log_info!("Tauri", "Deployment service initialized");
             log_info!("Tauri", "Pipeline services initialized");
             log_info!("Tauri", "Setup function completed");
-            
+
             Ok(())
         })
         .manage(terminal_manager)
@@ -175,6 +195,9 @@ pub fn run() {
             domains::terminal::list_terminal_sessions,
             domains::terminal::delete_terminal_session,
             domains::terminal::clear_all_sessions,
+            // Terminal Notes Persistence
+            domains::terminal::save_terminal_note,
+            domains::terminal::load_terminal_note,
             // Project commands
             domains::projects::get_all_projects,
             domains::projects::get_project,
@@ -204,6 +227,8 @@ pub fn run() {
             domains::projects::pipelines::execute_pipeline,
             domains::projects::pipelines::get_pipeline_execution,
             domains::projects::pipelines::get_pipeline_executions,
+            domains::projects::pipelines::get_project_pipeline_executions,
+            domains::projects::pipelines::get_all_pipeline_executions,
             domains::projects::pipelines::cancel_pipeline_execution,
             domains::projects::pipelines::get_pipeline_variables,
             domains::projects::pipelines::set_pipeline_variable,
@@ -272,6 +297,8 @@ pub fn run() {
             domains::deployments::commands::get_deployment_logs_command,
             domains::deployments::commands::refresh_deployment_statuses_command,
             domains::deployments::commands::list_containers_command,
+            domains::deployments::commands::get_docker_status_command,
+            domains::deployments::commands::start_docker_command,
             domains::deployments::commands::build_docker_image_command,
             domains::deployments::commands::get_process_status_command,
             domains::deployments::commands::start_container_command,
@@ -324,6 +351,11 @@ pub fn run() {
             domains::sdk::commands::sdk_commands::install_ollama_model,
             domains::sdk::commands::sdk_commands::remove_ollama_model,
             domains::sdk::commands::sdk_commands::get_available_ollama_models,
+            // Runtime (AI) model management wrappers
+            domains::sdk::commands::sdk_commands::get_runtime_models,
+            domains::sdk::commands::sdk_commands::install_runtime_model,
+            domains::sdk::commands::sdk_commands::remove_runtime_model,
+            domains::sdk::commands::sdk_commands::get_runtime_available_models,
             // Service management commands
             domains::sdk::commands::sdk_commands::start_service,
             domains::sdk::commands::sdk_commands::stop_service,
@@ -374,7 +406,6 @@ pub fn run() {
             domains::ide::commands::set_framework_ide_mapping,
             domains::ide::commands::get_framework_ide_mapping,
             domains::ide::commands::delete_framework_ide_mapping,
-            domains::ide::commands::get_suggested_frameworks,
             domains::ide::commands::get_all_frameworks,
             domains::ide::commands::create_framework,
             domains::ide::commands::update_framework,
@@ -512,6 +543,24 @@ pub fn run() {
             domains::scripts::commands::get_recent_script_executions,
             domains::scripts::commands::sync_script_executions,
             domains::scripts::commands::delete_script_execution,
+            // Disk-cleanup commands (ported from portal_disk_utility)
+            domains::disk::commands::scan_directory,
+            domains::disk::commands::scan_projects,
+            domains::disk::commands::cancel_scan,
+            domains::disk::commands::get_cached_scan,
+            domains::disk::commands::remove_cached_scan,
+            domains::disk::commands::quarantine_paths,
+            domains::disk::commands::get_audit_log,
+            domains::disk::commands::list_protected,
+            domains::disk::commands::add_protected,
+            domains::disk::commands::remove_protected,
+            domains::disk::commands::list_locations,
+            domains::disk::commands::disk_usage,
+            domains::disk::commands::verify_proposals,
+            domains::disk::commands::cancel_verify,
+            domains::disk::commands::list_ai_teams,
+            domains::disk::commands::provision_ai_team,
+            domains::disk::commands::open_recycle_bin,
         ])
         .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
         .expect("error while running tauri application");

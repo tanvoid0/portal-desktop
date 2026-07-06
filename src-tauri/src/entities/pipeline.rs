@@ -18,6 +18,8 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub execution_context_json: String,
     pub enabled: bool,
+    pub preset_key: Option<String>,
+    pub category: Option<String>,
     pub created_at: Option<DateTimeWithTimeZone>,
     pub updated_at: Option<DateTimeWithTimeZone>,
 }
@@ -33,4 +35,3 @@ pub enum Relation {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-

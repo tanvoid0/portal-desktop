@@ -49,4 +49,3 @@ pub async fn send_message(
 
     Ok(result.content)
 }
-

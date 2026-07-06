@@ -1,14 +1,15 @@
+use super::super::traits::package_manager::{
+    InstalledPackage, Package, PackageDetails, PackageManager, PackageUpdate,
+};
+use super::super::SDKError;
+use crate::command_executor::CommandExecutor;
 /**
  * NPM Package Manager Implementation
- * 
+ *
  * NPM (Node.js) implementation - cross-platform
  */
-
 use async_trait::async_trait;
 use serde_json::Value;
-use crate::command_executor::CommandExecutor;
-use super::super::SDKError;
-use super::super::traits::package_manager::{PackageManager, Package, InstalledPackage, PackageDetails, PackageUpdate};
 
 pub struct NpmManager;
 
@@ -18,13 +19,17 @@ impl NpmManager {
     }
 
     async fn execute_npm(&self, args: &[&str]) -> Result<String, SDKError> {
-        let result = CommandExecutor::execute_with_args("npm", args, None).await
+        let result = CommandExecutor::execute_with_args("npm", args, None)
+            .await
             .map_err(|e| SDKError::CommandFailed(format!("NPM command failed: {}", e)))?;
 
         if result.success {
             Ok(result.stdout)
         } else {
-            Err(SDKError::CommandFailed(format!("NPM error: {}", result.stderr)))
+            Err(SDKError::CommandFailed(format!(
+                "NPM error: {}",
+                result.stderr
+            )))
         }
     }
 }
@@ -57,21 +62,28 @@ impl PackageManager for NpmManager {
 
     async fn search_packages(&self, query: &str) -> Result<Vec<Package>, SDKError> {
         let output = self.execute_npm(&["search", query, "--json"]).await?;
-        
+
         let json: Value = serde_json::from_str(&output)
             .map_err(|e| SDKError::CommandFailed(format!("Failed to parse NPM JSON: {}", e)))?;
 
         let mut packages = Vec::new();
-        
+
         if let Some(array) = json.as_array() {
             for item in array {
                 if let (Some(name), Some(desc)) = (
                     item.get("name").and_then(|v| v.as_str()),
                     item.get("description").and_then(|v| v.as_str()),
                 ) {
-                    let version = item.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
-                    let publisher = item.get("publisher").and_then(|v| v.get("username")).and_then(|v| v.as_str()).map(|s| s.to_string());
-                    
+                    let version = item
+                        .get("version")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let publisher = item
+                        .get("publisher")
+                        .and_then(|v| v.get("username"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+
                     packages.push(Package {
                         id: name.to_string(),
                         name: name.to_string(),
@@ -85,25 +97,28 @@ impl PackageManager for NpmManager {
                 }
             }
         }
-        
+
         Ok(packages)
     }
 
     async fn get_installed_packages(&self) -> Result<Vec<InstalledPackage>, SDKError> {
-        let output = self.execute_npm(&["list", "-g", "--depth=0", "--json"]).await?;
-        
+        let output = self
+            .execute_npm(&["list", "-g", "--depth=0", "--json"])
+            .await?;
+
         let json: Value = serde_json::from_str(&output)
             .map_err(|e| SDKError::CommandFailed(format!("Failed to parse NPM JSON: {}", e)))?;
 
         let mut packages = Vec::new();
-        
+
         if let Some(dependencies) = json.get("dependencies").and_then(|v| v.as_object()) {
             for (name, info) in dependencies {
-                let version = info.get("version")
+                let version = info
+                    .get("version")
                     .and_then(|v| v.as_str())
                     .unwrap_or("unknown")
                     .to_string();
-                
+
                 packages.push(InstalledPackage {
                     id: name.clone(),
                     name: name.clone(),
@@ -114,31 +129,46 @@ impl PackageManager for NpmManager {
                 });
             }
         }
-        
+
         Ok(packages)
     }
 
     async fn get_package_details(&self, id: &str) -> Result<PackageDetails, SDKError> {
         let output = self.execute_npm(&["view", id, "--json"]).await?;
-        
+
         let json: Value = serde_json::from_str(&output)
             .map_err(|e| SDKError::CommandFailed(format!("Failed to parse NPM JSON: {}", e)))?;
 
-        let name = json.get("name")
+        let name = json
+            .get("name")
             .and_then(|v| v.as_str())
             .unwrap_or(id)
             .to_string();
-        
-        let version = json.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let description = json.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let homepage = json.get("homepage").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let license = json.get("license").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let publisher = json.get("publisher")
+
+        let version = json
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let description = json
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let homepage = json
+            .get("homepage")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let license = json
+            .get("license")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let publisher = json
+            .get("publisher")
             .and_then(|v| v.get("name"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let dependencies = if let Some(deps) = json.get("dependencies").and_then(|v| v.as_object()) {
+        let dependencies = if let Some(deps) = json.get("dependencies").and_then(|v| v.as_object())
+        {
             deps.keys().map(|k| k.clone()).collect()
         } else {
             Vec::new()
@@ -174,12 +204,12 @@ impl PackageManager for NpmManager {
 
     async fn check_updates(&self) -> Result<Vec<PackageUpdate>, SDKError> {
         let output = self.execute_npm(&["outdated", "-g", "--json"]).await?;
-        
+
         let json: Value = serde_json::from_str(&output)
             .map_err(|e| SDKError::CommandFailed(format!("Failed to parse NPM JSON: {}", e)))?;
 
         let mut updates = Vec::new();
-        
+
         if let Some(obj) = json.as_object() {
             for (name, info) in obj {
                 if let (Some(current), Some(latest)) = (
@@ -196,7 +226,7 @@ impl PackageManager for NpmManager {
                 }
             }
         }
-        
+
         Ok(updates)
     }
 
@@ -212,4 +242,3 @@ impl PackageManager for NpmManager {
         false
     }
 }
-

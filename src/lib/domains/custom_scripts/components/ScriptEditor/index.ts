@@ -1,2 +1,1 @@
-export { default as ScriptEditor } from './ScriptEditor.svelte';
-
+export { default as ScriptEditor } from "./ScriptEditor.svelte";

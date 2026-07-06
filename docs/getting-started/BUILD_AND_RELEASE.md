@@ -5,6 +5,7 @@ This guide explains how to build Portal Desktop for all platforms and create rel
 ## Overview
 
 Portal Desktop uses Docker (for Linux) and GitHub Actions (for all platforms) for cross-platform builds. The build system automatically:
+
 - Extracts version from `tauri.conf.json` or `package.json`
 - Builds executables for Linux (.deb, .AppImage), Windows (.exe), and macOS (.dmg)
 - Names artifacts with version and release type (beta/release)
@@ -13,11 +14,13 @@ Portal Desktop uses Docker (for Linux) and GitHub Actions (for all platforms) fo
 ## Platform Build Support
 
 ### ✅ Linux - Full Docker Support
+
 - **Docker**: Fully supported
 - **Base Image**: Ubuntu 24.04 (latest LTS)
 - **Outputs**: `.deb` and `.AppImage`
 
 ### ⚠️ Windows - Docker Support (Requires Windows Host)
+
 - **Docker**: ✅ Supported, but requires Windows host
 - **Windows Images**: `mcr.microsoft.com/windows/servercore:ltsc2025` (latest)
 - **Limitation**: Cannot run on Linux/Mac hosts
@@ -26,6 +29,7 @@ Portal Desktop uses Docker (for Linux) and GitHub Actions (for all platforms) fo
 - **See**: [Windows Docker Guide](./DOCKER_WINDOWS.md) for details
 
 ### ❌ macOS - No Docker Support
+
 - **Docker**: Not supported (requires macOS host)
 - **Required**: GitHub Actions `macos-14` runners
 - **Outputs**: `.dmg` disk image
@@ -50,18 +54,21 @@ docker-compose run --rm build-linux
 ```
 
 **Output:**
+
 - `build-output/portal-desktop-1.0.0-release-linux.deb`
 - `build-output/portal-desktop-1.0.0-release-linux.AppImage`
 
 ### Windows Build (Limited)
 
 **Option 1: Windows Container (requires Windows host)**
+
 ```bash
 # On Windows host with Docker Desktop
 docker-compose run --rm build-windows
 ```
 
 **Option 2: Cross-compilation from Linux (LIMITED)**
+
 ```bash
 # May fail for some Tauri features
 docker-compose run --rm build-windows-cross
@@ -72,6 +79,7 @@ docker-compose run --rm build-windows-cross
 ### macOS Build
 
 **❌ Not supported in Docker** - macOS builds require:
+
 - macOS host system
 - Xcode installed
 - Code signing certificates
@@ -83,12 +91,14 @@ docker-compose run --rm build-windows-cross
 ### Automatic Release on Tag
 
 1. **Create and push a version tag:**
+
    ```bash
    git tag v1.0.0
    git push origin v1.0.0
    ```
 
 2. **For beta releases:**
+
    ```bash
    git tag v1.0.0-beta.1
    git push origin v1.0.0-beta.1
@@ -133,11 +143,13 @@ npm version $VERSION --no-git-tag-version
 ## Release Types
 
 ### Release
+
 - **Tag format**: `v1.0.0`
 - **Artifact naming**: `portal-desktop-1.0.0-release-*.{ext}`
 - **GitHub Release**: Published (not draft, not prerelease)
 
 ### Beta
+
 - **Tag format**: `v1.0.0-beta.1` or `v1.0.0-alpha.1`
 - **Artifact naming**: `portal-desktop-1.0.0-beta-*.{ext}`
 - **GitHub Release**: Draft and prerelease
@@ -145,6 +157,7 @@ npm version $VERSION --no-git-tag-version
 ## Platform-Specific Notes
 
 ### Linux
+
 - **Base**: Ubuntu 24.04 LTS
 - Generates both `.deb` and `.AppImage`
 - `.deb` for Debian/Ubuntu-based systems
@@ -152,6 +165,7 @@ npm version $VERSION --no-git-tag-version
 - ✅ Fully supported in Docker
 
 ### Windows
+
 - **Base**: Windows Server 2022
 - Generates `.exe` installer (NSIS)
 - May also generate `.msi` (Windows Installer)
@@ -159,6 +173,7 @@ npm version $VERSION --no-git-tag-version
 - Requires Windows host for Docker containers
 
 ### macOS
+
 - **Base**: macOS 14 (Sonoma)
 - Generates `.dmg` disk image
 - Supports both Intel (x86_64) and Apple Silicon (aarch64)
@@ -229,10 +244,10 @@ git push origin v1.0.0
 
 ## Docker vs GitHub Actions
 
-| Platform | Docker Support | GitHub Actions | Recommended |
-|----------|---------------|----------------|-------------|
-| Linux    | ✅ Full       | ✅ Full        | Either      |
-| Windows  | ⚠️ Limited    | ✅ Full        | GitHub Actions |
-| macOS    | ❌ None       | ✅ Full        | GitHub Actions |
+| Platform | Docker Support | GitHub Actions | Recommended    |
+| -------- | -------------- | -------------- | -------------- |
+| Linux    | ✅ Full        | ✅ Full        | Either         |
+| Windows  | ⚠️ Limited     | ✅ Full        | GitHub Actions |
+| macOS    | ❌ None        | ✅ Full        | GitHub Actions |
 
 **Recommendation**: Use Docker for local Linux builds, GitHub Actions for all production releases.

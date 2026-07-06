@@ -5,21 +5,24 @@ A cross-platform desktop application built with SvelteKit and Tauri, featuring A
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 This project requires native compilation for some dependencies. Please ensure you have the required build tools installed:
 
 - **Windows**: Python 3.x + Visual Studio Build Tools
-- **macOS**: Xcode Command Line Tools + Python 3.x  
+- **macOS**: Xcode Command Line Tools + Python 3.x
 - **Linux**: build-essential + Python 3.x
 
 ### Installation
 
 #### Automated Setup (Recommended)
+
 ```bash
 # Single command for all platforms
 npm run install
 ```
 
 #### Manual Setup
+
 ```bash
 # Install dependencies (will check build tools automatically)
 npm install
@@ -56,6 +59,7 @@ npm run tauri:build
 ## 🛠️ Dependencies
 
 This project uses native dependencies that require compilation:
+
 - `node-pty` - Pseudo-terminal functionality
 - `ws` - WebSocket library
 - `esbuild` - JavaScript bundler
@@ -70,6 +74,7 @@ Comprehensive documentation is available in the [`docs/`](./docs/) directory:
 - **[Status](./docs/status/)** - Project status and release notes
 
 **Quick Links:**
+
 - [Installation Guide](./docs/getting-started/INSTALLATION.md) - Detailed setup instructions
 - [Security Documentation](./docs/security/) - Security reviews and fixes
 - [Project Blueprint](./docs/development/COMPLETE_PROJECT_BLUEPRINT.md) - Architecture overview

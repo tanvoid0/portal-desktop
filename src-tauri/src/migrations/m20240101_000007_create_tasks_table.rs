@@ -36,26 +36,60 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Tasks::Title).string().not_null())
                     .col(ColumnDef::new(Tasks::Description).string().null())
-                    .col(ColumnDef::new(Tasks::Status).string().not_null().default("pending"))
-                    .col(ColumnDef::new(Tasks::Priority).string().not_null().default("medium"))
+                    .col(
+                        ColumnDef::new(Tasks::Status)
+                            .string()
+                            .not_null()
+                            .default("pending"),
+                    )
+                    .col(
+                        ColumnDef::new(Tasks::Priority)
+                            .string()
+                            .not_null()
+                            .default("medium"),
+                    )
                     .col(ColumnDef::new(Tasks::Type).string().null())
                     .col(ColumnDef::new(Tasks::ParentId).integer().null())
                     .col(ColumnDef::new(Tasks::ResourceId).string().null())
                     .col(ColumnDef::new(Tasks::ResourceType).string().null())
-                    .col(ColumnDef::new(Tasks::DueDate).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(Tasks::CompletedAt).timestamp_with_time_zone().null())
+                    .col(
+                        ColumnDef::new(Tasks::DueDate)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(Tasks::CompletedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     .col(ColumnDef::new(Tasks::EstimatedTime).integer().null())
                     .col(ColumnDef::new(Tasks::ActualTime).integer().null())
                     .col(ColumnDef::new(Tasks::Tags).text().null())
                     .col(ColumnDef::new(Tasks::Assignee).text().null())
                     .col(ColumnDef::new(Tasks::RecurringPattern).text().null())
                     .col(ColumnDef::new(Tasks::RecurringInterval).integer().null())
-                    .col(ColumnDef::new(Tasks::RecurringEndDate).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(Tasks::RecurringLastGenerated).timestamp_with_time_zone().null())
+                    .col(
+                        ColumnDef::new(Tasks::RecurringEndDate)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(Tasks::RecurringLastGenerated)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     .col(ColumnDef::new(Tasks::BlockedBy).text().null())
                     .col(ColumnDef::new(Tasks::Blocks).text().null())
-                    .col(ColumnDef::new(Tasks::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Tasks::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(Tasks::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Tasks::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_tasks_parent_id")
@@ -103,4 +137,3 @@ enum Tasks {
     CreatedAt,
     UpdatedAt,
 }
-

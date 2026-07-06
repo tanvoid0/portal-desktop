@@ -1,11 +1,26 @@
 use crate::database::{DatabaseManager, ProjectModel};
-use crate::entities::project::{Entity as ProjectEntity, ActiveModel as ProjectActiveModel};
-use crate::entities::project_framework::{Entity as ProjectFrameworkEntity, ActiveModel as ProjectFrameworkActiveModel, Column as ProjectFrameworkColumn};
-use crate::entities::project_language::{Entity as ProjectLanguageEntity, ActiveModel as ProjectLanguageActiveModel, Column as ProjectLanguageColumn};
-use crate::entities::project_package_manager::{Entity as ProjectPackageManagerEntity, ActiveModel as ProjectPackageManagerActiveModel, Column as ProjectPackageManagerColumn};
-use sea_orm::{EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait};
+use crate::domains::projects::entities::ProjectResponse;
+use crate::entities::project::{ActiveModel as ProjectActiveModel, Entity as ProjectEntity};
+use crate::entities::project_framework::{
+    ActiveModel as ProjectFrameworkActiveModel, Column as ProjectFrameworkColumn,
+    Entity as ProjectFrameworkEntity,
+};
+use crate::entities::project_language::{
+    ActiveModel as ProjectLanguageActiveModel, Column as ProjectLanguageColumn,
+    Entity as ProjectLanguageEntity,
+};
+use crate::entities::project_package_manager::{
+    ActiveModel as ProjectPackageManagerActiveModel, Column as ProjectPackageManagerColumn,
+    Entity as ProjectPackageManagerEntity,
+};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use std::sync::Arc;
 
+fn junction_created_at() -> sea_orm::prelude::DateTimeWithTimeZone {
+    chrono::Utc::now().into()
+}
+
+#[derive(Clone)]
 pub struct ProjectRepository {
     db_manager: Arc<DatabaseManager>,
 }
@@ -15,22 +30,78 @@ impl ProjectRepository {
         Self { db_manager }
     }
 
-    pub async fn get_all(&self) -> Result<Vec<ProjectModel>, String> {
+    pub async fn get_all(&self) -> Result<Vec<ProjectResponse>, String> {
         let connection = self.db_manager.get_connection();
         let projects = ProjectEntity::find()
             .all(connection)
             .await
             .map_err(|e| format!("Failed to fetch projects: {}", e))?;
-        Ok(projects)
+
+        let mut responses = Vec::with_capacity(projects.len());
+        for project in projects {
+            responses.push(self.to_response(project).await?);
+        }
+
+        Ok(responses)
     }
 
-    pub async fn get_by_id(&self, id: i32) -> Result<Option<ProjectModel>, String> {
+    pub async fn get_by_id(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
         let connection = self.db_manager.get_connection();
         let project = ProjectEntity::find_by_id(id)
             .one(connection)
             .await
             .map_err(|e| format!("Failed to fetch project: {}", e))?;
-        Ok(project)
+
+        match project {
+            Some(project) => Ok(Some(self.to_response(project).await?)),
+            None => Ok(None),
+        }
+    }
+
+    async fn to_response(&self, project: ProjectModel) -> Result<ProjectResponse, String> {
+        let framework_ids = self.get_framework_ids(project.id).await?;
+        let package_manager_ids = self.get_package_manager_ids(project.id).await?;
+        let language_ids = self.get_language_ids(project.id).await?;
+
+        Ok(ProjectResponse::from_model(
+            project,
+            framework_ids,
+            package_manager_ids,
+            language_ids,
+        ))
+    }
+
+    async fn get_framework_ids(&self, project_id: i32) -> Result<Vec<i32>, String> {
+        let connection = self.db_manager.get_connection();
+        let rows = ProjectFrameworkEntity::find()
+            .filter(ProjectFrameworkColumn::ProjectId.eq(project_id))
+            .all(connection)
+            .await
+            .map_err(|e| format!("Failed to fetch project frameworks: {}", e))?;
+
+        Ok(rows.into_iter().map(|row| row.framework_id).collect())
+    }
+
+    async fn get_package_manager_ids(&self, project_id: i32) -> Result<Vec<i32>, String> {
+        let connection = self.db_manager.get_connection();
+        let rows = ProjectPackageManagerEntity::find()
+            .filter(ProjectPackageManagerColumn::ProjectId.eq(project_id))
+            .all(connection)
+            .await
+            .map_err(|e| format!("Failed to fetch project package managers: {}", e))?;
+
+        Ok(rows.into_iter().map(|row| row.package_manager_id).collect())
+    }
+
+    async fn get_language_ids(&self, project_id: i32) -> Result<Vec<i32>, String> {
+        let connection = self.db_manager.get_connection();
+        let rows = ProjectLanguageEntity::find()
+            .filter(ProjectLanguageColumn::ProjectId.eq(project_id))
+            .all(connection)
+            .await
+            .map_err(|e| format!("Failed to fetch project languages: {}", e))?;
+
+        Ok(rows.into_iter().map(|row| row.language_id).collect())
     }
 
     pub async fn create(
@@ -47,9 +118,9 @@ impl ProjectRepository {
         output_directory: Option<String>,
         dev_port: Option<i32>,
         prod_port: Option<i32>,
-    ) -> Result<ProjectModel, String> {
+    ) -> Result<ProjectResponse, String> {
         let connection = self.db_manager.get_connection();
-        
+
         let project = ProjectActiveModel {
             name: Set(name),
             description: Set(description),
@@ -75,16 +146,20 @@ impl ProjectRepository {
             updated_at: Set(None), // Will be set by database
             ..Default::default()
         };
-        
-        let result = project.insert(connection).await
+
+        let result = project
+            .insert(connection)
+            .await
             .map_err(|e| format!("Failed to create project: {}", e))?;
-        
+
         // Create junction table records
-        self.set_project_frameworks(result.id, &framework_ids).await?;
+        self.set_project_frameworks(result.id, &framework_ids)
+            .await?;
         self.set_project_languages(result.id, &language_ids).await?;
-        self.set_project_package_managers(result.id, &package_manager_ids).await?;
-        
-        Ok(result)
+        self.set_project_package_managers(result.id, &package_manager_ids)
+            .await?;
+
+        self.to_response(result).await
     }
 
     pub async fn update(
@@ -113,9 +188,9 @@ impl ProjectRepository {
         git_commit: Option<String>,
         has_uncommitted_changes: Option<bool>,
         last_commit: Option<chrono::DateTime<chrono::Utc>>,
-    ) -> Result<Option<ProjectModel>, String> {
+    ) -> Result<Option<ProjectResponse>, String> {
         let connection = self.db_manager.get_connection();
-        
+
         let mut project: ProjectActiveModel = ProjectEntity::find_by_id(id)
             .one(connection)
             .await
@@ -185,9 +260,11 @@ impl ProjectRepository {
             project.last_commit = Set(Some(last_commit.into()));
         }
 
-        let result = project.update(connection).await
+        let result = project
+            .update(connection)
+            .await
             .map_err(|e| format!("Failed to update project: {}", e))?;
-        
+
         // Update junction table records if provided
         if let Some(framework_ids) = framework_ids {
             self.set_project_frameworks(id, &framework_ids).await?;
@@ -196,85 +273,101 @@ impl ProjectRepository {
             self.set_project_languages(id, &language_ids).await?;
         }
         if let Some(package_manager_ids) = package_manager_ids {
-            self.set_project_package_managers(id, &package_manager_ids).await?;
+            self.set_project_package_managers(id, &package_manager_ids)
+                .await?;
         }
-        
-        Ok(Some(result))
+
+        Ok(Some(self.to_response(result).await?))
     }
-    
+
     // Helper methods for managing many-to-many relationships
-    async fn set_project_frameworks(&self, project_id: i32, framework_ids: &[i32]) -> Result<(), String> {
+    async fn set_project_frameworks(
+        &self,
+        project_id: i32,
+        framework_ids: &[i32],
+    ) -> Result<(), String> {
         let connection = self.db_manager.get_connection();
-        
+
         // Delete existing relationships
         ProjectFrameworkEntity::delete_many()
             .filter(ProjectFrameworkColumn::ProjectId.eq(project_id))
             .exec(connection)
             .await
             .map_err(|e| format!("Failed to delete project frameworks: {}", e))?;
-        
+
         // Insert new relationships
         for framework_id in framework_ids {
             let pf = ProjectFrameworkActiveModel {
                 project_id: Set(project_id),
                 framework_id: Set(*framework_id),
-                created_at: Set(None),
+                created_at: Set(Some(junction_created_at())),
                 ..Default::default()
             };
-            pf.insert(connection).await
+            pf.insert(connection)
+                .await
                 .map_err(|e| format!("Failed to create project framework: {}", e))?;
         }
-        
+
         Ok(())
     }
-    
-    async fn set_project_languages(&self, project_id: i32, language_ids: &[i32]) -> Result<(), String> {
+
+    async fn set_project_languages(
+        &self,
+        project_id: i32,
+        language_ids: &[i32],
+    ) -> Result<(), String> {
         let connection = self.db_manager.get_connection();
-        
+
         // Delete existing relationships
         ProjectLanguageEntity::delete_many()
             .filter(ProjectLanguageColumn::ProjectId.eq(project_id))
             .exec(connection)
             .await
             .map_err(|e| format!("Failed to delete project languages: {}", e))?;
-        
+
         // Insert new relationships
         for language_id in language_ids {
             let pl = ProjectLanguageActiveModel {
                 project_id: Set(project_id),
                 language_id: Set(*language_id),
-                created_at: Set(None),
+                created_at: Set(Some(junction_created_at())),
                 ..Default::default()
             };
-            pl.insert(connection).await
+            pl.insert(connection)
+                .await
                 .map_err(|e| format!("Failed to create project language: {}", e))?;
         }
-        
+
         Ok(())
     }
-    
-    async fn set_project_package_managers(&self, project_id: i32, package_manager_ids: &[i32]) -> Result<(), String> {
+
+    async fn set_project_package_managers(
+        &self,
+        project_id: i32,
+        package_manager_ids: &[i32],
+    ) -> Result<(), String> {
         let connection = self.db_manager.get_connection();
-        
+
         // Delete existing relationships
         ProjectPackageManagerEntity::delete_many()
             .filter(ProjectPackageManagerColumn::ProjectId.eq(project_id))
             .exec(connection)
             .await
             .map_err(|e| format!("Failed to delete project package managers: {}", e))?;
-        
+
         // Insert new relationships
         for package_manager_id in package_manager_ids {
             let ppm = ProjectPackageManagerActiveModel {
                 project_id: Set(project_id),
                 package_manager_id: Set(*package_manager_id),
-                created_at: Set(None),
+                created_at: Set(Some(junction_created_at())),
                 ..Default::default()
             };
-            ppm.insert(connection).await
+            ppm.insert(connection)
+                .await
                 .map_err(|e| format!("Failed to create project package manager: {}", e))?;
         }
-        
+
         Ok(())
     }
 
@@ -286,5 +379,4 @@ impl ProjectRepository {
             .map_err(|e| format!("Failed to delete project: {}", e))?;
         Ok(result.rows_affected > 0)
     }
-
 }

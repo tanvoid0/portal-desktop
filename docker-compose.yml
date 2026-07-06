@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Linux builds - FULLY SUPPORTED in Docker
@@ -61,4 +61,3 @@ services:
       - VERSION=${VERSION}
       - RELEASE_TYPE=${RELEASE_TYPE:-release}
     command: /bin/bash -c "./scripts/build-all-platforms.sh"
-

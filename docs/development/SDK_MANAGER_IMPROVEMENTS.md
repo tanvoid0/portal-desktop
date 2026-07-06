@@ -29,6 +29,7 @@
 ## 🎯 **1. Simplified Single Trait System**
 
 ### **Before (Complex):**
+
 ```rust
 // 6 separate traits to implement
 impl SDKManager for NvmManager { /* 7 methods */ }
@@ -41,6 +42,7 @@ impl CompleteSDKManager for NvmManager { /* 3 methods */ }
 ```
 
 ### **After (Simple):**
+
 ```rust
 // Single trait with default implementations
 impl BaseSDKManager for NvmManager {
@@ -54,12 +56,14 @@ impl BaseSDKManager for NvmManager {
 ## 🏗️ **2. Smart Default Implementations**
 
 ### **Key Benefits:**
+
 - **Optional Features**: Installation, configuration, etc. are optional
 - **Sensible Defaults**: Methods return appropriate errors or empty results
 - **Easy Override**: Override only what you need
 - **No Boilerplate**: 90% less code per manager
 
 ### **Example Defaults:**
+
 ```rust
 // Default implementation for installation
 async fn install_version(&self, _version: &str) -> Result<(), SDKError> {
@@ -75,6 +79,7 @@ async fn get_help(&self) -> Result<String, SDKError> {
 ## 🏭 **3. Simplified Factory Pattern**
 
 ### **Before (Complex Registry):**
+
 ```rust
 // Complex registry with unused methods
 let registry = SDKManagerRegistry::new();
@@ -84,6 +89,7 @@ let installed = registry.detect_installed_managers().await?;
 ```
 
 ### **After (Simple Factory):**
+
 ```rust
 // Simple factory with clear purpose
 let factory = SDKManagerFactory::new();
@@ -94,17 +100,18 @@ factory.switch_version_for_project("nvm", "18.17.0", "/path/to/project").await?;
 
 ## 📈 **4. Code Reduction Comparison**
 
-| Aspect | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| **Lines per Manager** | ~200 lines | ~50 lines | **75% reduction** |
-| **Traits to Implement** | 6 traits | 1 trait | **83% reduction** |
-| **Required Methods** | 31 methods | 8 methods | **74% reduction** |
-| **Boilerplate Code** | High | Minimal | **90% reduction** |
-| **Error Handling** | Inconsistent | Unified | **100% consistent** |
+| Aspect                  | Before       | After     | Improvement         |
+| ----------------------- | ------------ | --------- | ------------------- |
+| **Lines per Manager**   | ~200 lines   | ~50 lines | **75% reduction**   |
+| **Traits to Implement** | 6 traits     | 1 trait   | **83% reduction**   |
+| **Required Methods**    | 31 methods   | 8 methods | **74% reduction**   |
+| **Boilerplate Code**    | High         | Minimal   | **90% reduction**   |
+| **Error Handling**      | Inconsistent | Unified   | **100% consistent** |
 
 ## 🎨 **5. Manager Implementation Examples**
 
 ### **Full-Featured Manager (NVM):**
+
 ```rust
 impl BaseSDKManager for NvmManager {
     // Core identity (required)
@@ -112,12 +119,12 @@ impl BaseSDKManager for NvmManager {
     fn display_name(&self) -> &'static str { "Node Version Manager" }
     fn sdk_type(&self) -> &'static str { "node" }
     fn category(&self) -> &'static str { "language" }
-    
+
     // Core functionality (required)
     async fn is_installed(&self) -> Result<bool, SDKError> { /* ... */ }
     async fn list_versions(&self) -> Result<Vec<String>, SDKError> { /* ... */ }
     async fn switch_version(&self, version: &str) -> Result<(), SDKError> { /* ... */ }
-    
+
     // Optional features (override defaults)
     async fn install_version(&self, version: &str) -> Result<(), SDKError> { /* ... */ }
     fn supports_installation(&self) -> bool { true }
@@ -125,17 +132,18 @@ impl BaseSDKManager for NvmManager {
 ```
 
 ### **Minimal Manager (Simple Tool):**
+
 ```rust
 impl BaseSDKManager for SimpleTool {
     fn name(&self) -> &'static str { "simple-tool" }
     fn display_name(&self) -> &'static str { "Simple Tool" }
     fn sdk_type(&self) -> &'static str { "tool" }
     fn category(&self) -> &'static str { "utility" }
-    
+
     async fn is_installed(&self) -> Result<bool, SDKError> { /* ... */ }
     async fn list_versions(&self) -> Result<Vec<String>, SDKError> { /* ... */ }
     async fn switch_version(&self, version: &str) -> Result<(), SDKError> { /* ... */ }
-    
+
     // Everything else uses sensible defaults!
 }
 ```
@@ -143,12 +151,14 @@ impl BaseSDKManager for SimpleTool {
 ## 🔧 **6. Easy Extension Points**
 
 ### **Adding New Managers:**
+
 1. **Create struct**: `pub struct NewManager;`
 2. **Implement trait**: `impl BaseSDKManager for NewManager { /* only what you need */ }`
 3. **Register**: `factory.register_manager("new", Box::new(NewManager::new()));`
 4. **Done!** ✨
 
 ### **Adding New Features:**
+
 1. **Add method to trait**: `async fn new_feature(&self) -> Result<(), SDKError>;`
 2. **Provide default**: `async fn new_feature(&self) -> Result<(), SDKError> { Ok(()) }`
 3. **Override where needed**: Implement in specific managers
@@ -157,6 +167,7 @@ impl BaseSDKManager for SimpleTool {
 ## 🎯 **7. Benefits Summary**
 
 ### **For Developers:**
+
 - ✅ **90% less code** to write new managers
 - ✅ **Single trait** to understand and implement
 - ✅ **Sensible defaults** for optional features
@@ -164,12 +175,14 @@ impl BaseSDKManager for SimpleTool {
 - ✅ **Easy to extend** with new features
 
 ### **For Users:**
+
 - ✅ **Consistent interface** across all managers
 - ✅ **Better error handling** with clear messages
 - ✅ **Faster development** of new managers
 - ✅ **More reliable** with fewer bugs
 
 ### **For Maintenance:**
+
 - ✅ **Less code to maintain**
 - ✅ **Consistent patterns** across all managers
 - ✅ **Easy to test** with clear interfaces

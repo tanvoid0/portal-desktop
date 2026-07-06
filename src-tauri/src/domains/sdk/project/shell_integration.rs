@@ -1,13 +1,12 @@
 /**
  * Shell Integration Module
- * 
+ *
  * Provides shell integration for automatic version switching
  */
-
 use super::super::SDKError;
-use std::path::Path;
-use std::fs;
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 
 pub struct ShellIntegration;
 
@@ -18,12 +17,15 @@ impl ShellIntegration {
         environment: &HashMap<String, String>,
     ) -> Result<(), SDKError> {
         let shell = Self::detect_shell()?;
-        
+
         match shell.as_str() {
             "zsh" => Self::setup_zsh_integration(project_path, environment).await,
             "bash" => Self::setup_bash_integration(project_path, environment).await,
             "fish" => Self::setup_fish_integration(project_path, environment).await,
-            _ => Err(SDKError::ManagerNotFound(format!("Unsupported shell: {}", shell))),
+            _ => Err(SDKError::ManagerNotFound(format!(
+                "Unsupported shell: {}",
+                shell
+            ))),
         }
     }
 
@@ -38,7 +40,7 @@ impl ShellIntegration {
                 return Ok("fish".to_string());
             }
         }
-        
+
         // Default to bash if detection fails
         Ok("bash".to_string())
     }
@@ -95,11 +97,11 @@ impl ShellIntegration {
         script.push_str("portal_chpwd() {\n");
         script.push_str("  if [[ -f .portal-version ]]; then\n");
         script.push_str("    source .portal-version\n");
-        
+
         for (key, value) in environment {
             script.push_str(&format!("    export {}={}\n", key, value));
         }
-        
+
         script.push_str("    echo \"Portal environment activated\"\n");
         script.push_str("  else\n");
         script.push_str("    # Deactivate portal environment\n");
@@ -110,7 +112,7 @@ impl ShellIntegration {
         script.push_str("add-zsh-hook chpwd portal_chpwd\n");
         script.push_str("# Run on startup\n");
         script.push_str("portal_chpwd\n");
-        
+
         script
     }
 
@@ -121,11 +123,11 @@ impl ShellIntegration {
         script.push_str("portal_chpwd() {\n");
         script.push_str("  if [[ -f .portal-version ]]; then\n");
         script.push_str("    source .portal-version\n");
-        
+
         for (key, value) in environment {
             script.push_str(&format!("    export {}={}\n", key, value));
         }
-        
+
         script.push_str("    echo \"Portal environment activated\"\n");
         script.push_str("  else\n");
         script.push_str("    # Deactivate portal environment\n");
@@ -135,7 +137,7 @@ impl ShellIntegration {
         script.push_str("PROMPT_COMMAND=\"portal_chpwd; $PROMPT_COMMAND\"\n");
         script.push_str("# Run on startup\n");
         script.push_str("portal_chpwd\n");
-        
+
         script
     }
 
@@ -146,11 +148,11 @@ impl ShellIntegration {
         script.push_str("function portal_chpwd --on-variable PWD\n");
         script.push_str("  if test -f .portal-version\n");
         script.push_str("    source .portal-version\n");
-        
+
         for (key, value) in environment {
             script.push_str(&format!("    set -gx {} {}\n", key, value));
         }
-        
+
         script.push_str("    echo \"Portal environment activated\"\n");
         script.push_str("  else\n");
         script.push_str("    # Deactivate portal environment\n");
@@ -159,7 +161,7 @@ impl ShellIntegration {
         script.push_str("end\n");
         script.push_str("# Run on startup\n");
         script.push_str("portal_chpwd\n");
-        
+
         script
     }
 
@@ -187,12 +189,15 @@ impl ShellIntegration {
     /// Remove shell integration
     pub async fn remove_shell_integration() -> Result<(), SDKError> {
         let shell = Self::detect_shell()?;
-        
+
         match shell.as_str() {
             "zsh" => Self::remove_zsh_integration().await,
             "bash" => Self::remove_bash_integration().await,
             "fish" => Self::remove_fish_integration().await,
-            _ => Err(SDKError::ManagerNotFound(format!("Unsupported shell: {}", shell))),
+            _ => Err(SDKError::ManagerNotFound(format!(
+                "Unsupported shell: {}",
+                shell
+            ))),
         }
     }
 
@@ -209,7 +214,7 @@ impl ShellIntegration {
                 .into_iter()
                 .filter(|line| !line.contains("# Portal SDK Environment Hook"))
                 .collect();
-            
+
             fs::write(&hook_file, filtered_lines.join("\n"))?;
         }
         Ok(())
@@ -228,7 +233,7 @@ impl ShellIntegration {
                 .into_iter()
                 .filter(|line| !line.contains("# Portal SDK Environment Hook"))
                 .collect();
-            
+
             fs::write(&hook_file, filtered_lines.join("\n"))?;
         }
         Ok(())
@@ -256,14 +261,18 @@ impl ShellIntegration {
     /// Get current portal environment
     pub fn get_current_environment() -> HashMap<String, String> {
         let mut env = HashMap::new();
-        
+
         for (key, value) in std::env::vars() {
-            if key.starts_with("PORTAL_") || key.starts_with("GOROOT") || key.starts_with("GOPATH") 
-                || key.starts_with("NODE_VERSION") || key.starts_with("PYTHON_VERSION") {
+            if key.starts_with("PORTAL_")
+                || key.starts_with("GOROOT")
+                || key.starts_with("GOPATH")
+                || key.starts_with("NODE_VERSION")
+                || key.starts_with("PYTHON_VERSION")
+            {
                 env.insert(key, value);
             }
         }
-        
+
         env
     }
 }

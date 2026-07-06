@@ -1,11 +1,9 @@
 /**
  * Credentials Domain Module
  */
-
 pub mod commands;
 pub mod entities;
 pub mod services;
-
 
 #[derive(Debug)]
 pub enum CredentialError {
@@ -35,7 +33,9 @@ impl std::fmt::Display for CredentialError {
             CredentialError::DatabaseError(err) => write!(f, "Database error: {}", err),
             CredentialError::IOError(err) => write!(f, "IO error: {}", err),
             CredentialError::SerializationError(err) => write!(f, "Serialization error: {}", err),
-            CredentialError::DeserializationError(err) => write!(f, "Deserialization error: {}", err),
+            CredentialError::DeserializationError(err) => {
+                write!(f, "Deserialization error: {}", err)
+            }
         }
     }
 }

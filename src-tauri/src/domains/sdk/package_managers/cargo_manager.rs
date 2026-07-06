@@ -1,13 +1,14 @@
+use super::super::traits::package_manager::{
+    InstalledPackage, Package, PackageDetails, PackageManager, PackageUpdate,
+};
+use super::super::SDKError;
+use crate::command_executor::CommandExecutor;
 /**
  * Cargo Package Manager Implementation
- * 
+ *
  * Cargo (Rust) implementation - cross-platform
  */
-
 use async_trait::async_trait;
-use crate::command_executor::CommandExecutor;
-use super::super::SDKError;
-use super::super::traits::package_manager::{PackageManager, Package, InstalledPackage, PackageDetails, PackageUpdate};
 
 pub struct CargoManager;
 
@@ -17,13 +18,17 @@ impl CargoManager {
     }
 
     async fn execute_cargo(&self, args: &[&str]) -> Result<String, SDKError> {
-        let result = CommandExecutor::execute_with_args("cargo", args, None).await
+        let result = CommandExecutor::execute_with_args("cargo", args, None)
+            .await
             .map_err(|e| SDKError::CommandFailed(format!("Cargo command failed: {}", e)))?;
 
         if result.success {
             Ok(result.stdout)
         } else {
-            Err(SDKError::CommandFailed(format!("Cargo error: {}", result.stderr)))
+            Err(SDKError::CommandFailed(format!(
+                "Cargo error: {}",
+                result.stderr
+            )))
         }
     }
 }
@@ -55,29 +60,27 @@ impl PackageManager for CargoManager {
     }
 
     async fn search_packages(&self, query: &str) -> Result<Vec<Package>, SDKError> {
-        let output = self.execute_cargo(&["search", query, "--limit", "50"]).await?;
-        
+        let output = self
+            .execute_cargo(&["search", query, "--limit", "50"])
+            .await?;
+
         let mut packages = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with("    Updating") {
                 continue;
             }
-            
+
             // Cargo search format: package_name = "version" # description
             if let Some(equals_pos) = line.find('=') {
                 let name = line[..equals_pos].trim().to_string();
                 let rest = &line[equals_pos + 1..];
-                
-                let version = rest.split('"')
-                    .nth(1)
-                    .map(|s| s.to_string());
-                
-                let description = rest.split('#')
-                    .nth(1)
-                    .map(|s| s.trim().to_string());
-                
+
+                let version = rest.split('"').nth(1).map(|s| s.to_string());
+
+                let description = rest.split('#').nth(1).map(|s| s.trim().to_string());
+
                 packages.push(Package {
                     id: name.clone(),
                     name,
@@ -90,28 +93,28 @@ impl PackageManager for CargoManager {
                 });
             }
         }
-        
+
         Ok(packages)
     }
 
     async fn get_installed_packages(&self) -> Result<Vec<InstalledPackage>, SDKError> {
         let output = self.execute_cargo(&["install", "--list"]).await?;
-        
+
         let mut packages = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            
+
             // Format: package_name version: ...
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() >= 2 {
                 let name = parts[0].to_string();
                 let version_part = parts[1];
                 let version = version_part.trim_start_matches("v").to_string();
-                
+
                 packages.push(InstalledPackage {
                     id: name.clone(),
                     name,
@@ -122,17 +125,17 @@ impl PackageManager for CargoManager {
                 });
             }
         }
-        
+
         Ok(packages)
     }
 
     async fn get_package_details(&self, id: &str) -> Result<PackageDetails, SDKError> {
         let output = self.execute_cargo(&["search", id, "--limit", "1"]).await?;
-        
+
         let mut name = id.to_string();
         let mut version = None;
         let mut description = None;
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.contains('=') {
@@ -145,7 +148,7 @@ impl PackageManager for CargoManager {
                 break;
             }
         }
-        
+
         Ok(PackageDetails {
             id: id.to_string(),
             name,
@@ -192,4 +195,3 @@ impl PackageManager for CargoManager {
         false
     }
 }
-

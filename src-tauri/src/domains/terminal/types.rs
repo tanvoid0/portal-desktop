@@ -41,6 +41,12 @@ pub struct CreateProcessRequest {
     pub environment: HashMap<String, String>,
     pub cols: u32,
     pub rows: u32,
+    /// When set, the PTY runs this single command (via the shell's `-c`/`/C`
+    /// facility) and exits with the command's real exit code instead of
+    /// starting a long-lived interactive shell. Used by oneshot terminals
+    /// (script runners, install progress panes).
+    #[serde(default)]
+    pub command: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

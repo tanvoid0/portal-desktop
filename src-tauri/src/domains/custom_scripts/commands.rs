@@ -1,8 +1,8 @@
-use tauri::command;
-use crate::domains::custom_scripts::services::CustomScriptService;
 use crate::database::DatabaseManager;
-use std::sync::Arc;
+use crate::domains::custom_scripts::services::CustomScriptService;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tauri::command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScriptParameter {
@@ -17,7 +17,7 @@ pub struct ScriptParameter {
 
 #[command]
 pub async fn get_all_custom_scripts(
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<crate::entities::custom_script::Model>, String> {
     let service = CustomScriptService::new(&db_manager);
     service.get_all_scripts().await
@@ -26,7 +26,7 @@ pub async fn get_all_custom_scripts(
 #[command]
 pub async fn get_custom_script(
     id: i32,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Option<crate::entities::custom_script::Model>, String> {
     let service = CustomScriptService::new(&db_manager);
     service.get_script(id).await
@@ -42,19 +42,21 @@ pub async fn create_custom_script(
     icon: Option<String>,
     requires_sudo: bool,
     is_interactive: bool,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<crate::entities::custom_script::Model, String> {
     let service = CustomScriptService::new(&db_manager);
-    service.create_script(
-        name,
-        description,
-        command,
-        parameters_json,
-        category,
-        icon,
-        requires_sudo,
-        is_interactive,
-    ).await
+    service
+        .create_script(
+            name,
+            description,
+            command,
+            parameters_json,
+            category,
+            icon,
+            requires_sudo,
+            is_interactive,
+        )
+        .await
 }
 
 #[command]
@@ -68,26 +70,28 @@ pub async fn update_custom_script(
     icon: Option<String>,
     requires_sudo: Option<bool>,
     is_interactive: Option<bool>,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<crate::entities::custom_script::Model, String> {
     let service = CustomScriptService::new(&db_manager);
-    service.update_script(
-        id,
-        name,
-        description,
-        command,
-        parameters_json,
-        category,
-        icon,
-        requires_sudo,
-        is_interactive,
-    ).await
+    service
+        .update_script(
+            id,
+            name,
+            description,
+            command,
+            parameters_json,
+            category,
+            icon,
+            requires_sudo,
+            is_interactive,
+        )
+        .await
 }
 
 #[command]
 pub async fn delete_custom_script(
     id: i32,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<(), String> {
     let service = CustomScriptService::new(&db_manager);
     service.delete_script(id).await
@@ -96,7 +100,7 @@ pub async fn delete_custom_script(
 #[command]
 pub async fn record_script_run(
     id: i32,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<crate::entities::custom_script::Model, String> {
     let service = CustomScriptService::new(&db_manager);
     service.record_script_run(id).await
@@ -108,13 +112,13 @@ pub async fn select_file(
     title: Option<String>,
     filters: Option<Vec<(String, Vec<String>)>>, // e.g., [("Config Files", vec!["*.ovpn", "*.conf"])]
     _default_path: Option<String>, // FUTURE: Path to open the dialog at (simplified - just for reference)
-    select_folder: Option<bool>, // If true, select folder instead of file
+    select_folder: Option<bool>,   // If true, select folder instead of file
 ) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
     use std::sync::mpsc;
-    
+    use tauri_plugin_dialog::DialogExt;
+
     let (tx, rx) = mpsc::channel();
-    
+
     let dialog_title = title.unwrap_or_else(|| {
         if select_folder.unwrap_or(false) {
             "Select Folder".to_string()
@@ -122,7 +126,7 @@ pub async fn select_file(
             "Select File".to_string()
         }
     });
-    
+
     if select_folder.unwrap_or(false) {
         // Select folder
         let mut dialog = app_handle.dialog().file();
@@ -134,7 +138,7 @@ pub async fn select_file(
         // Select file
         let mut dialog = app_handle.dialog().file();
         dialog = dialog.set_title(&dialog_title);
-        
+
         if let Some(filters) = filters {
             for (name, extensions) in filters {
                 // Convert Vec<String> to &[&str]
@@ -142,12 +146,12 @@ pub async fn select_file(
                 dialog = dialog.add_filter(name, &ext_refs);
             }
         }
-        
+
         dialog.pick_file(move |path| {
             let _ = tx.send(path);
         });
     }
-    
+
     // Wait for the result
     match rx.recv() {
         Ok(Some(path)) => Ok(Some(path.to_string())),
@@ -155,4 +159,3 @@ pub async fn select_file(
         Err(_) => Ok(None),
     }
 }
-

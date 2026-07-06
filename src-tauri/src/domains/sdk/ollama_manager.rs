@@ -1,13 +1,13 @@
-use serde::{Deserialize, Serialize};
-use std::process::{Command, Stdio};
-use std::path::PathBuf;
-use std::fs;
 use reqwest;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use which::which;
+use std::fs;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
-use tauri::{AppHandle, Emitter};
+use which::which;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OllamaVersion {
@@ -47,39 +47,45 @@ impl OllamaManager {
         let home = std::env::var("HOME")
             .or_else(|_| std::env::var("USERPROFILE"))
             .map_err(|_| "Could not determine home directory".to_string())?;
-        
+
         let pid_dir = if cfg!(target_os = "windows") {
-            PathBuf::from(home).join("AppData").join("Local").join("portal-desktop").join("ollama")
+            PathBuf::from(home)
+                .join("AppData")
+                .join("Local")
+                .join("portal-desktop")
+                .join("ollama")
         } else {
             PathBuf::from(home).join(".portal-desktop").join("ollama")
         };
-        
+
         // Create directory if it doesn't exist
         if !pid_dir.exists() {
             fs::create_dir_all(&pid_dir)
                 .map_err(|e| format!("Failed to create PID directory: {}", e))?;
         }
-        
+
         Ok(pid_dir.join("ollama.pid"))
     }
-    
+
     /// Read PID from file
     fn read_pid_file() -> Result<Option<u32>, String> {
         let pid_path = Self::get_pid_file_path()?;
-        
+
         if !pid_path.exists() {
             return Ok(None);
         }
-        
-        let pid_str = fs::read_to_string(&pid_path)
-            .map_err(|e| format!("Failed to read PID file: {}", e))?;
-        
-        let pid = pid_str.trim().parse::<u32>()
+
+        let pid_str =
+            fs::read_to_string(&pid_path).map_err(|e| format!("Failed to read PID file: {}", e))?;
+
+        let pid = pid_str
+            .trim()
+            .parse::<u32>()
             .map_err(|e| format!("Invalid PID in file: {}", e))?;
-        
+
         Ok(Some(pid))
     }
-    
+
     /// Write PID to file
     fn write_pid_file(pid: u32) -> Result<(), String> {
         let pid_path = Self::get_pid_file_path()?;
@@ -87,17 +93,16 @@ impl OllamaManager {
             .map_err(|e| format!("Failed to write PID file: {}", e))?;
         Ok(())
     }
-    
+
     /// Delete PID file
     fn delete_pid_file() -> Result<(), String> {
         let pid_path = Self::get_pid_file_path()?;
         if pid_path.exists() {
-            fs::remove_file(&pid_path)
-                .map_err(|e| format!("Failed to delete PID file: {}", e))?;
+            fs::remove_file(&pid_path).map_err(|e| format!("Failed to delete PID file: {}", e))?;
         }
         Ok(())
     }
-    
+
     /// Check if a process with given PID is still running
     fn is_pid_running(pid: u32) -> bool {
         if cfg!(target_os = "windows") {
@@ -171,32 +176,44 @@ impl OllamaManager {
             }
         }
 
-        let response_text = response.text().await
+        let response_text = response
+            .text()
+            .await
             .map_err(|e| format!("Failed to read response body: {}", e))?;
 
         if response_text.is_empty() {
             return Err("Empty response from GitHub API".to_string());
         }
 
-        let releases: Vec<Value> = serde_json::from_str(&response_text)
-            .map_err(|e| format!("Failed to parse releases JSON: {}. Response: {}", e, &response_text[..response_text.len().min(200)]))?;
+        let releases: Vec<Value> = serde_json::from_str(&response_text).map_err(|e| {
+            format!(
+                "Failed to parse releases JSON: {}. Response: {}",
+                e,
+                &response_text[..response_text.len().min(200)]
+            )
+        })?;
 
         let mut versions = Vec::new();
         let installed_version = Self::get_installed_version().await.ok();
 
-        for release in releases.iter().take(10) { // Limit to latest 10 releases
+        for release in releases.iter().take(10) {
+            // Limit to latest 10 releases
             if let Some(tag_name) = release.get("tag_name").and_then(|v| v.as_str()) {
                 let version = tag_name.trim_start_matches('v');
-                let installed = installed_version.as_ref().map_or(false, |v| v.contains(version));
-                
-                let size = release.get("assets")
+                let installed = installed_version
+                    .as_ref()
+                    .map_or(false, |v| v.contains(version));
+
+                let size = release
+                    .get("assets")
                     .and_then(|assets| assets.as_array())
                     .and_then(|assets| assets.first())
                     .and_then(|asset| asset.get("size"))
                     .and_then(|size| size.as_u64())
                     .map(|size| format!("{:.1} MB", size as f64 / 1024.0 / 1024.0));
 
-                let release_date = release.get("published_at")
+                let release_date = release
+                    .get("published_at")
                     .and_then(|date| date.as_str())
                     .map(|date| date.split('T').next().unwrap_or(date).to_string());
 
@@ -222,7 +239,9 @@ impl OllamaManager {
 
         // Check if service is running first
         if !Self::is_service_running().await {
-            return Err("Ollama service is not running. Please start the service first.".to_string());
+            return Err(
+                "Ollama service is not running. Please start the service first.".to_string(),
+            );
         }
 
         // Try HTTP API first (faster and more reliable)
@@ -234,9 +253,7 @@ impl OllamaManager {
         // Fallback to CLI if API fails (like FlyEnv does)
         let timeout_duration = std::time::Duration::from_secs(10);
         let output = tokio::time::timeout(timeout_duration, async {
-            Command::new("ollama")
-                .arg("list")
-                .output()
+            Command::new("ollama").arg("list").output()
         })
         .await
         .map_err(|_| "Command timed out after 10 seconds")?;
@@ -269,7 +286,7 @@ impl OllamaManager {
             if parts.len() >= 3 {
                 let name = parts[0].to_string();
                 let size = parts[2].to_string(); // FlyEnv uses index 2 for size
-                
+
                 models.push(OllamaModel {
                     name,
                     size,
@@ -290,59 +307,77 @@ impl OllamaManager {
     async fn get_models_via_api() -> Result<Vec<OllamaModel>, String> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(5);
-        
-        let response = tokio::time::timeout(timeout, client.get("http://localhost:11434/api/tags").send())
-            .await
-            .map_err(|_| "API request timed out")?
-            .map_err(|e| format!("Failed to connect to Ollama API: {}", e))?;
+
+        let response = tokio::time::timeout(
+            timeout,
+            client.get("http://localhost:11434/api/tags").send(),
+        )
+        .await
+        .map_err(|_| "API request timed out")?
+        .map_err(|e| format!("Failed to connect to Ollama API: {}", e))?;
 
         if !response.status().is_success() {
             return Err(format!("Ollama API returned status: {}", response.status()));
         }
 
-        let response_text = response.text().await
+        let response_text = response
+            .text()
+            .await
             .map_err(|e| format!("Failed to read API response: {}", e))?;
 
         let json_response: serde_json::Value = serde_json::from_str(&response_text)
             .map_err(|e| format!("Failed to parse API response: {}", e))?;
 
         let mut models = Vec::new();
-        
+
         if let Some(models_array) = json_response.get("models").and_then(|v| v.as_array()) {
             for model_data in models_array {
                 if let Some(name) = model_data.get("name").and_then(|v| v.as_str()) {
-                    let size = model_data.get("size")
+                    let size = model_data
+                        .get("size")
                         .and_then(|v| v.as_u64())
                         .map(|s| format!("{} bytes", s))
                         .unwrap_or_else(|| "Unknown".to_string());
-                    
-                    let modified_at = model_data.get("modified_at")
+
+                    let modified_at = model_data
+                        .get("modified_at")
                         .and_then(|v| v.as_str())
                         .unwrap_or("Unknown")
                         .to_string();
-                    
-                    let family = model_data.get("family")
+
+                    let family = model_data
+                        .get("family")
                         .and_then(|v| v.as_str())
                         .unwrap_or("Unknown")
                         .to_string();
-                    
-                    let format = model_data.get("format")
+
+                    let format = model_data
+                        .get("format")
                         .and_then(|v| v.as_str())
                         .unwrap_or("gguf")
                         .to_string();
-                    
-                    let families = model_data.get("families")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect());
-                    
-                    let parameter_size = model_data.get("parameter_size")
+
+                    let families =
+                        model_data
+                            .get("families")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_str())
+                                    .map(|s| s.to_string())
+                                    .collect()
+                            });
+
+                    let parameter_size = model_data
+                        .get("parameter_size")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
-                    
-                    let quantization_level = model_data.get("quantization_level")
+
+                    let quantization_level = model_data
+                        .get("quantization_level")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
-                    
+
                     models.push(OllamaModel {
                         name: name.to_string(),
                         size,
@@ -368,7 +403,9 @@ impl OllamaManager {
 
         // Check if service is running first
         if !Self::is_service_running().await {
-            return Err("Ollama service is not running. Please start the service first.".to_string());
+            return Err(
+                "Ollama service is not running. Please start the service first.".to_string(),
+            );
         }
 
         // Use spawn to stream output in real-time
@@ -380,16 +417,20 @@ impl OllamaManager {
             .spawn()
             .map_err(|e| format!("Failed to start ollama pull command: {}", e))?;
 
-        let mut stdout = child.stdout.take()
+        let mut stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| "Failed to capture stdout".to_string())?;
-        
-        let mut stderr = child.stderr.take()
+
+        let mut stderr = child
+            .stderr
+            .take()
             .ok_or_else(|| "Failed to capture stderr".to_string())?;
 
         // Read output line by line to parse progress
         let stdout_reader = BufReader::new(&mut stdout);
         let mut stdout_lines = stdout_reader.lines();
-        
+
         let stderr_reader = BufReader::new(&mut stderr);
         let mut stderr_lines = stderr_reader.lines();
 
@@ -473,30 +514,42 @@ impl OllamaManager {
                     Ok(format!("Model {} installed successfully", model_name))
                 } else {
                     let error_output = output_lines.join("\n");
-                    Err(format!("Failed to install model. Exit code: {:?}\nOutput: {}", status.code(), error_output))
+                    Err(format!(
+                        "Failed to install model. Exit code: {:?}\nOutput: {}",
+                        status.code(),
+                        error_output
+                    ))
                 }
             }
-            Err(e) => Err(format!("Failed to wait for process: {}", e))
+            Err(e) => Err(format!("Failed to wait for process: {}", e)),
         }
     }
 
     /// Install an Ollama model with progress tracking via Tauri events
-    pub async fn install_model_with_progress(model_name: &str, app: AppHandle) -> Result<String, String> {
+    pub async fn install_model_with_progress(
+        model_name: &str,
+        app: AppHandle,
+    ) -> Result<String, String> {
         if !Self::is_installed().await {
             return Err("Ollama is not installed".to_string());
         }
 
         if !Self::is_service_running().await {
-            return Err("Ollama service is not running. Please start the service first.".to_string());
+            return Err(
+                "Ollama service is not running. Please start the service first.".to_string(),
+            );
         }
 
         // Emit start event to all windows
-        let _ = app.emit("ollama-model-progress", serde_json::json!({
-            "model": model_name,
-            "status": "started",
-            "message": "Starting download...",
-            "progress": 0
-        }));
+        let _ = app.emit(
+            "ollama-model-progress",
+            serde_json::json!({
+                "model": model_name,
+                "status": "started",
+                "message": "Starting download...",
+                "progress": 0
+            }),
+        );
 
         // Use spawn to stream output in real-time
         let mut child = TokioCommand::new("ollama")
@@ -507,15 +560,19 @@ impl OllamaManager {
             .spawn()
             .map_err(|e| format!("Failed to start ollama pull command: {}", e))?;
 
-        let mut stdout = child.stdout.take()
+        let mut stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| "Failed to capture stdout".to_string())?;
-        
-        let mut stderr = child.stderr.take()
+
+        let mut stderr = child
+            .stderr
+            .take()
             .ok_or_else(|| "Failed to capture stderr".to_string())?;
 
         let stdout_reader = BufReader::new(&mut stdout);
         let mut stdout_lines = stdout_reader.lines();
-        
+
         let stderr_reader = BufReader::new(&mut stderr);
         let mut stderr_lines = stderr_reader.lines();
 
@@ -526,12 +583,15 @@ impl OllamaManager {
         loop {
             if start_time.elapsed() > timeout_duration {
                 let _ = child.kill().await;
-                let _ = app.emit("ollama-model-progress", serde_json::json!({
-                    "model": model_name,
-                    "status": "error",
-                    "message": "Command timed out after 5 minutes",
-                    "progress": 0
-                }));
+                let _ = app.emit(
+                    "ollama-model-progress",
+                    serde_json::json!({
+                        "model": model_name,
+                        "status": "error",
+                        "message": "Command timed out after 5 minutes",
+                        "progress": 0
+                    }),
+                );
                 return Err("Command timed out after 5 minutes".to_string());
             }
 
@@ -540,18 +600,18 @@ impl OllamaManager {
                     match line {
                         Ok(Some(line_str)) => {
                             output_lines.push(line_str.clone());
-                            
+
                             // Parse and emit progress
                             let progress = Self::parse_progress_from_line(&line_str);
                             let message = line_str.clone();
-                            
+
                             let _ = app.emit("ollama-model-progress", serde_json::json!({
                                 "model": model_name,
                                 "status": "downloading",
                                 "message": message.clone(),
                                 "progress": progress
                             }));
-                            
+
                             println!("[Ollama Progress] {}% - {}", progress, line_str);
                         }
                         Ok(None) => break,
@@ -608,25 +668,34 @@ impl OllamaManager {
         match child.wait().await {
             Ok(status) => {
                 if status.success() {
-                    let _ = app.emit("ollama-model-progress", serde_json::json!({
-                        "model": model_name,
-                        "status": "completed",
-                        "message": "Installation complete!",
-                        "progress": 100
-                    }));
+                    let _ = app.emit(
+                        "ollama-model-progress",
+                        serde_json::json!({
+                            "model": model_name,
+                            "status": "completed",
+                            "message": "Installation complete!",
+                            "progress": 100
+                        }),
+                    );
                     Ok(format!("Model {} installed successfully", model_name))
                 } else {
                     let error_output = output_lines.join("\n");
-                    let _ = app.emit("ollama-model-progress", serde_json::json!({
-                        "model": model_name,
-                        "status": "error",
-                        "message": error_output.clone(),
-                        "progress": 0
-                    }));
-                    Err(format!("Failed to install model. Exit code: {:?}", status.code()))
+                    let _ = app.emit(
+                        "ollama-model-progress",
+                        serde_json::json!({
+                            "model": model_name,
+                            "status": "error",
+                            "message": error_output.clone(),
+                            "progress": 0
+                        }),
+                    );
+                    Err(format!(
+                        "Failed to install model. Exit code: {:?}",
+                        status.code()
+                    ))
                 }
             }
-            Err(e) => Err(format!("Failed to wait for process: {}", e))
+            Err(e) => Err(format!("Failed to wait for process: {}", e)),
         }
     }
 
@@ -638,7 +707,7 @@ impl OllamaManager {
             let mut num_str = String::new();
             let chars: Vec<char> = line.chars().collect();
             let mut i = percent_pos.saturating_sub(1);
-            
+
             while i < chars.len() && i > 0 && chars[i].is_ascii_digit() {
                 num_str.insert(0, chars[i]);
                 if i == 0 {
@@ -646,12 +715,12 @@ impl OllamaManager {
                 }
                 i -= 1;
             }
-            
+
             if let Ok(percent) = num_str.parse::<u8>() {
                 return percent;
             }
         }
-        
+
         // If no percentage found, estimate based on keywords
         if line.contains("pulling manifest") {
             10
@@ -681,16 +750,15 @@ impl OllamaManager {
 
         // Check if service is running first
         if !Self::is_service_running().await {
-            return Err("Ollama service is not running. Please start the service first.".to_string());
+            return Err(
+                "Ollama service is not running. Please start the service first.".to_string(),
+            );
         }
 
         // Execute ollama rm with timeout
         let timeout_duration = std::time::Duration::from_secs(30);
         let output = tokio::time::timeout(timeout_duration, async {
-            Command::new("ollama")
-                .arg("rm")
-                .arg(model_name)
-                .output()
+            Command::new("ollama").arg("rm").arg(model_name).output()
         })
         .await
         .map_err(|_| "Command timed out after 30 seconds")?
@@ -713,8 +781,13 @@ impl OllamaManager {
         // Try to connect to Ollama API - use the correct endpoint
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(2);
-        
-        match tokio::time::timeout(timeout, client.get("http://localhost:11434/api/tags").send()).await {
+
+        match tokio::time::timeout(
+            timeout,
+            client.get("http://localhost:11434/api/tags").send(),
+        )
+        .await
+        {
             Ok(Ok(response)) => response.status().is_success(),
             _ => false,
         }
@@ -725,10 +798,10 @@ impl OllamaManager {
         println!("[OllamaManager] Checking service status...");
         let running = Self::is_service_running().await;
         println!("[OllamaManager] Service running: {}", running);
-        
+
         // Try to get PID from file
         let pid = Self::read_pid_file().ok().flatten();
-        
+
         // Verify PID is still running if we have one
         let verified_pid = if let Some(p) = pid {
             if Self::is_pid_running(p) {
@@ -741,7 +814,7 @@ impl OllamaManager {
         } else {
             None
         };
-        
+
         let version = if running {
             Self::get_installed_version().await.ok()
         } else {
@@ -754,10 +827,12 @@ impl OllamaManager {
             port: if running { Some(11434) } else { None },
             pid: verified_pid,
         };
-        
-        println!("[OllamaManager] Service status: running={}, port={:?}, pid={:?}", 
-                 status.running, status.port, status.pid);
-        
+
+        println!(
+            "[OllamaManager] Service status: running={}, port={:?}, pid={:?}",
+            status.running, status.port, status.pid
+        );
+
         Ok(status)
     }
 
@@ -779,7 +854,10 @@ impl OllamaManager {
                 let _ = Self::delete_pid_file();
             } else {
                 // Process is still running, don't start a new one
-                return Ok(format!("Ollama service is already running (PID: {})", old_pid));
+                return Ok(format!(
+                    "Ollama service is already running (PID: {})",
+                    old_pid
+                ));
             }
         }
 
@@ -790,7 +868,7 @@ impl OllamaManager {
             .map_err(|e| format!("Failed to start Ollama service: {}", e))?;
 
         let pid = child.id();
-        
+
         // Store PID in file for later use when stopping
         if let Err(e) = Self::write_pid_file(pid) {
             eprintln!("Warning: Failed to write PID file: {}", e);
@@ -817,20 +895,24 @@ impl OllamaManager {
                         .arg("/PID")
                         .arg(pid.to_string())
                         .output()
-                        .map_err(|e| format!("Failed to stop Ollama service (PID {}): {}", pid, e))?
+                        .map_err(|e| {
+                            format!("Failed to stop Ollama service (PID {}): {}", pid, e)
+                        })?
                 } else {
                     // Unix/Linux: Use kill with PID
                     Command::new("kill")
                         .arg("-TERM") // Try graceful shutdown first
                         .arg(pid.to_string())
                         .output()
-                        .map_err(|e| format!("Failed to stop Ollama service (PID {}): {}", pid, e))?
+                        .map_err(|e| {
+                            format!("Failed to stop Ollama service (PID {}): {}", pid, e)
+                        })?
                 };
 
                 if output.status.success() {
                     // Wait a bit for graceful shutdown
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    
+
                     // If still running, force kill
                     if Self::is_pid_running(pid) {
                         let force_output = if cfg!(target_os = "windows") {
@@ -847,20 +929,23 @@ impl OllamaManager {
                                 .output()
                                 .ok()
                         };
-                        
+
                         if let Some(out) = force_output {
                             if !out.status.success() {
                                 eprintln!("Warning: Force kill also failed for PID {}", pid);
                             }
                         }
                     }
-                    
+
                     // Clean up PID file
                     let _ = Self::delete_pid_file();
-                    
+
                     // Verify service is stopped
                     if !Self::is_service_running().await {
-                        return Ok(format!("Ollama service stopped successfully (PID: {})", pid));
+                        return Ok(format!(
+                            "Ollama service stopped successfully (PID: {})",
+                            pid
+                        ));
                     }
                 } else {
                     // PID-based kill failed, but might be stopped already
@@ -891,12 +976,12 @@ impl OllamaManager {
                     .arg("ollama serve")
                     .output()
                     .ok();
-                
+
                 if let Some(pgrep) = pgrep_output {
                     if pgrep.status.success() {
                         let stdout_str = String::from_utf8_lossy(&pgrep.stdout);
                         let pids: Vec<&str> = stdout_str.trim().split('\n').collect();
-                        
+
                         // Kill each PID
                         for pid_str in pids {
                             if let Ok(pid) = pid_str.trim().parse::<u32>() {
@@ -906,22 +991,22 @@ impl OllamaManager {
                                     .output();
                             }
                         }
-                        
+
                         // Wait for graceful shutdown
                         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                        
+
                         // Force kill if still running
                         let pgrep_output2 = Command::new("pgrep")
                             .arg("-f")
                             .arg("ollama serve")
                             .output()
                             .ok();
-                        
+
                         if let Some(pgrep2) = pgrep_output2 {
                             if pgrep2.status.success() {
                                 let stdout_str2 = String::from_utf8_lossy(&pgrep2.stdout);
                                 let pids2: Vec<&str> = stdout_str2.trim().split('\n').collect();
-                                
+
                                 for pid_str in pids2 {
                                     if let Ok(pid) = pid_str.trim().parse::<u32>() {
                                         let _ = Command::new("kill")
@@ -932,14 +1017,14 @@ impl OllamaManager {
                                 }
                             }
                         }
-                        
+
                         // Return success if service is no longer running
                         if !Self::is_service_running().await {
                             return Ok("Ollama service stopped successfully".to_string());
                         }
                     }
                 }
-                
+
                 // Last resort: use pkill (less precise but should work)
                 Command::new("pkill")
                     .arg("-f")
@@ -951,7 +1036,7 @@ impl OllamaManager {
             if output.status.success() {
                 // Clean up PID file if it exists
                 let _ = Self::delete_pid_file();
-                
+
                 // Verify service is stopped
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 if !Self::is_service_running().await {
@@ -970,10 +1055,10 @@ impl OllamaManager {
                 break;
             }
         }
-        
+
         // Clean up PID file regardless (we already tried to stop the process)
         let _ = Self::delete_pid_file();
-        
+
         // If service is stopped (verified), return success
         if service_stopped || !Self::is_service_running().await {
             Ok("Ollama service stopped successfully".to_string())
@@ -994,26 +1079,33 @@ impl OllamaManager {
     }
 
     /// Get available models from Ollama library
-    pub async fn get_available_models() -> Result<std::collections::HashMap<String, Vec<serde_json::Value>>, String> {
+    pub async fn get_available_models(
+    ) -> Result<std::collections::HashMap<String, Vec<serde_json::Value>>, String> {
         println!("[OllamaManager] Getting available models...");
-        
+
         // Try multiple sources for available models
-        
+
         // 1. Try FlyEnv's custom API (like they do)
         println!("[OllamaManager] Trying FlyEnv API...");
         if let Ok(models) = Self::fetch_from_flyenv_api().await {
-            println!("[OllamaManager] FlyEnv API returned {} families", models.len());
+            println!(
+                "[OllamaManager] FlyEnv API returned {} families",
+                models.len()
+            );
             if !models.is_empty() {
                 return Ok(models);
             }
         } else {
             println!("[OllamaManager] FlyEnv API failed");
         }
-        
+
         // 2. Try Ollama's official registry (if available)
         println!("[OllamaManager] Trying Ollama registry...");
         if let Ok(models) = Self::fetch_from_ollama_registry().await {
-            println!("[OllamaManager] Ollama registry returned {} models", models.len());
+            println!(
+                "[OllamaManager] Ollama registry returned {} models",
+                models.len()
+            );
             if !models.is_empty() {
                 // Convert flat array to hierarchical structure
                 let mut hierarchical = std::collections::HashMap::new();
@@ -1023,27 +1115,34 @@ impl OllamaManager {
                     } else {
                         &model_name
                     };
-                    
+
                     let model_obj = serde_json::json!({
                         "name": model_name,
                         "size": Self::estimate_model_size(&model_name)
                     });
-                    
-                    hierarchical.entry(family.to_string())
+
+                    hierarchical
+                        .entry(family.to_string())
                         .or_insert_with(Vec::new)
                         .push(model_obj);
                 }
-                println!("[OllamaManager] Converted to {} families", hierarchical.len());
+                println!(
+                    "[OllamaManager] Converted to {} families",
+                    hierarchical.len()
+                );
                 return Ok(hierarchical);
             }
         } else {
             println!("[OllamaManager] Ollama registry failed");
         }
-        
+
         // 3. Fall back to curated list of popular models
         println!("[OllamaManager] Falling back to curated list...");
         let curated_models = Self::get_curated_models_list();
-        println!("[OllamaManager] Curated list has {} models", curated_models.len());
+        println!(
+            "[OllamaManager] Curated list has {} models",
+            curated_models.len()
+        );
         let mut hierarchical = std::collections::HashMap::new();
         for model_name in curated_models {
             let family = if let Some(colon_pos) = model_name.find(':') {
@@ -1051,60 +1150,80 @@ impl OllamaManager {
             } else {
                 &model_name
             };
-            
+
             let model_obj = serde_json::json!({
                 "name": model_name,
                 "size": Self::estimate_model_size(&model_name)
             });
-            
-            hierarchical.entry(family.to_string())
+
+            hierarchical
+                .entry(family.to_string())
                 .or_insert_with(Vec::new)
                 .push(model_obj);
         }
-        println!("[OllamaManager] Final result: {} families", hierarchical.len());
+        println!(
+            "[OllamaManager] Final result: {} families",
+            hierarchical.len()
+        );
         Ok(hierarchical)
     }
-    
+
     /// Fetch models from FlyEnv's custom API (similar to their approach)
-    async fn fetch_from_flyenv_api() -> Result<std::collections::HashMap<String, Vec<serde_json::Value>>, String> {
+    async fn fetch_from_flyenv_api(
+    ) -> Result<std::collections::HashMap<String, Vec<serde_json::Value>>, String> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(15);
-        
+
         // Get system architecture
-        let arch = if cfg!(target_arch = "x86_64") { "x86" } else { "arm" };
-        let os = if cfg!(target_os = "windows") { "win" } else if cfg!(target_os = "macos") { "mac" } else { "linux" };
-        
-        let response = tokio::time::timeout(timeout, client
-            .post("https://api.one-env.com/api/version/fetch")
-            .json(&serde_json::json!({
-                "app": "ollama_models",
-                "os": os,
-                "arch": arch
-            }))
-            .send())
-            .await
-            .map_err(|_| "FlyEnv API request timed out")?
-            .map_err(|e| format!("Failed to connect to FlyEnv API: {}", e))?;
+        let arch = if cfg!(target_arch = "x86_64") {
+            "x86"
+        } else {
+            "arm"
+        };
+        let os = if cfg!(target_os = "windows") {
+            "win"
+        } else if cfg!(target_os = "macos") {
+            "mac"
+        } else {
+            "linux"
+        };
+
+        let response = tokio::time::timeout(
+            timeout,
+            client
+                .post("https://api.one-env.com/api/version/fetch")
+                .json(&serde_json::json!({
+                    "app": "ollama_models",
+                    "os": os,
+                    "arch": arch
+                }))
+                .send(),
+        )
+        .await
+        .map_err(|_| "FlyEnv API request timed out")?
+        .map_err(|e| format!("Failed to connect to FlyEnv API: {}", e))?;
 
         if !response.status().is_success() {
             return Err(format!("FlyEnv API returned status: {}", response.status()));
         }
 
-        let response_text = response.text().await
+        let response_text = response
+            .text()
+            .await
             .map_err(|e| format!("Failed to read FlyEnv API response: {}", e))?;
 
         let json_response: serde_json::Value = serde_json::from_str(&response_text)
             .map_err(|e| format!("Failed to parse FlyEnv API response: {}", e))?;
 
         let mut models = std::collections::HashMap::new();
-        
+
         // FlyEnv API returns: { "data": [...] } - we need to extract the data array
         let models_array = if let Some(data) = json_response.get("data") {
             data.as_array()
         } else {
             json_response.as_array()
         };
-        
+
         // Parse the response structure - FlyEnv returns a flat array of model names
         // We need to group them by family to create a hierarchical structure
         if let Some(models_array) = models_array {
@@ -1116,24 +1235,25 @@ impl OllamaManager {
                     } else {
                         name
                     };
-                    
+
                     // Create model object with name and size (we'll estimate size based on model type)
                     let model_obj = serde_json::json!({
                         "name": name,
                         "size": Self::estimate_model_size(name)
                     });
-                    
+
                     // Add to family group
-                    models.entry(family.to_string())
+                    models
+                        .entry(family.to_string())
                         .or_insert_with(Vec::new)
                         .push(model_obj);
                 }
             }
         }
-        
+
         Ok(models)
     }
-    
+
     /// Estimate model size based on model name
     fn estimate_model_size(model_name: &str) -> u64 {
         // Estimate sizes based on common model patterns
@@ -1171,34 +1291,42 @@ impl OllamaManager {
             2 * 1024 * 1024 * 1024 // Default ~2GB
         }
     }
-    
+
     /// Fetch models from Ollama's official registry (if available)
     async fn fetch_from_ollama_registry() -> Result<Vec<String>, String> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(10);
-        
+
         // Try Ollama's registry API (if it exists)
-        let response = tokio::time::timeout(timeout, client
-            .get("https://ollama.com/api/library")
-            .header("User-Agent", "portal-desktop/1.0")
-            .header("Accept", "application/json")
-            .send())
-            .await
-            .map_err(|_| "Ollama registry request timed out")?
-            .map_err(|e| format!("Failed to connect to Ollama registry: {}", e))?;
+        let response = tokio::time::timeout(
+            timeout,
+            client
+                .get("https://ollama.com/api/library")
+                .header("User-Agent", "portal-desktop/1.0")
+                .header("Accept", "application/json")
+                .send(),
+        )
+        .await
+        .map_err(|_| "Ollama registry request timed out")?
+        .map_err(|e| format!("Failed to connect to Ollama registry: {}", e))?;
 
         if !response.status().is_success() {
-            return Err(format!("Ollama registry returned status: {}", response.status()));
+            return Err(format!(
+                "Ollama registry returned status: {}",
+                response.status()
+            ));
         }
 
-        let response_text = response.text().await
+        let response_text = response
+            .text()
+            .await
             .map_err(|e| format!("Failed to read Ollama registry response: {}", e))?;
 
         let json_response: serde_json::Value = serde_json::from_str(&response_text)
             .map_err(|e| format!("Failed to parse Ollama registry response: {}", e))?;
 
         let mut models = Vec::new();
-        
+
         // Parse the response structure
         if let Some(library) = json_response.get("library").and_then(|v| v.as_array()) {
             for item in library {
@@ -1207,10 +1335,10 @@ impl OllamaManager {
                 }
             }
         }
-        
+
         Ok(models)
     }
-    
+
     /// Get curated list of popular Ollama models
     fn get_curated_models_list() -> Vec<String> {
         vec![
@@ -1228,7 +1356,6 @@ impl OllamaManager {
             "llama3.2".to_string(),
             "llama3.2:3b".to_string(),
             "llama3.2:1b".to_string(),
-            
             // Code models
             "codellama".to_string(),
             "codellama:7b".to_string(),
@@ -1238,14 +1365,12 @@ impl OllamaManager {
             "codegemma".to_string(),
             "codegemma:7b".to_string(),
             "codegemma:2b".to_string(),
-            
             // Mistral models
             "mistral".to_string(),
             "mistral:7b".to_string(),
             "mixtral".to_string(),
             "mixtral:8x7b".to_string(),
             "mixtral:8x22b".to_string(),
-            
             // Google models
             "gemma".to_string(),
             "gemma:2b".to_string(),
@@ -1253,13 +1378,11 @@ impl OllamaManager {
             "gemma2".to_string(),
             "gemma2:9b".to_string(),
             "gemma2:27b".to_string(),
-            
             // Microsoft models
             "phi".to_string(),
             "phi3".to_string(),
             "phi3:mini".to_string(),
             "phi3:medium".to_string(),
-            
             // Other popular models
             "neural-chat".to_string(),
             "starling-lm".to_string(),
@@ -1277,7 +1400,6 @@ impl OllamaManager {
             "qwen2.5:72b".to_string(),
             "tinyllama".to_string(),
             "tinyllama:1.1b".to_string(),
-            
             // Specialized models
             "nomic-embed-text".to_string(),
             "nomic-embed-text:latest".to_string(),
@@ -1297,7 +1419,10 @@ impl OllamaManager {
 
         if let Some(latest) = available_versions.first() {
             if latest.version != current_version {
-                Ok(format!("Update available: {} -> {}", current_version, latest.version))
+                Ok(format!(
+                    "Update available: {} -> {}",
+                    current_version, latest.version
+                ))
             } else {
                 Ok("Ollama is up to date".to_string())
             }

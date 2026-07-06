@@ -1,32 +1,59 @@
 /**
  * Terminal Domain Exports
- * 
- * Centralized exports for the terminal domain with full control
  */
 
 // Types
-export type * from './types';
+export type * from "./types";
+
+// Config
+export { defaultTerminalConfig } from "./config/defaultTerminalConfig";
 
 // Services
-export { TerminalService } from './services/terminalService';
-export { terminalProcessManager, type ProcessConfig, type CommandInterceptor, type OutputParser } from './services/terminalProcessManager';
+export { TerminalService } from "./services/terminalService";
+export {
+  CommandInterceptionService,
+  type InputPrompt,
+  type InterceptionResult,
+} from "./services/commandInterceptionService";
 
 // Stores
-export { terminalStore, terminalActions, activeTab, activeProcess, tabCount, runningProcesses } from './stores/terminalStore';
-export { commandHistoryStore, type CommandHistoryEntry } from './stores/commandHistoryStore';
+export {
+  terminalStore,
+  terminalActions,
+  activeTab,
+  activeProcess,
+  tabCount,
+  runningProcesses,
+} from "./stores/terminalStore";
+export {
+  commandHistoryStore,
+  type CommandHistoryEntry,
+} from "./stores/commandHistoryStore";
+export {
+  commandBlockStore,
+  type CapturedCommand,
+  type CommandBlockSource,
+} from "./stores/commandBlockStore";
+
+// Composables
+export { XtermSession } from "./composables/useXtermSession";
+export {
+  createTerminalProcess,
+  subscribeProcessOutput,
+  sendProcessInput,
+  killTerminalProcess,
+  getProcessExitCode,
+} from "./composables/useTerminalProcess";
+export { resolveXtermTheme } from "./theme";
+export { disposeTerminalOutputBus } from "./services/terminalOutputBus";
 
 // Components
-export { default as Terminal } from './components/Terminal.svelte';
-export { default as CommandHistory } from './components/CommandHistory.svelte';
-export { default as TabBar } from './components/TabBar.svelte';
-export { default as TabContainer } from './components/TabContainer.svelte';
-export { default as TerminalTabContainer } from './components/TerminalTabContainer.svelte';
-export { default as ProjectTerminal } from './components/ProjectTerminal.svelte';
-
-// AI Terminal exports
-export { aiTerminalStore, activeCommandBlock, runningBlocks, completedBlocks, type CommandBlock } from './stores/aiTerminalStore';
-export { CommandInterceptionService, type InputPrompt, type InterceptionResult } from './services/commandInterceptionService';
-export { default as AITerminalContainer } from './components/ai/AITerminalContainer.svelte';
-export { default as CommandBlockComponent } from './components/ai/CommandBlock.svelte';
-export { default as CommandInput } from './components/ai/CommandInput.svelte';
-export { default as InlineAIAssistant } from './components/ai/InlineAIAssistant.svelte';
+export { default as CommandHistory } from "./components/CommandHistory.svelte";
+export { default as TabBar } from "./components/TabBar.svelte";
+export { default as TabContainer } from "./components/TabContainer.svelte";
+export { default as TerminalWorkspace } from "./components/TerminalWorkspace.svelte";
+export { default as ProjectTerminal } from "./components/ProjectTerminal.svelte";
+export { default as Terminal } from "./components/core/Terminal.svelte";
+export { default as TerminalSession } from "./components/core/TerminalSession.svelte";
+export { default as CommandPalette } from "./components/CommandPalette.svelte";
+export { default as CommandInput } from "./components/ai/CommandInput.svelte";

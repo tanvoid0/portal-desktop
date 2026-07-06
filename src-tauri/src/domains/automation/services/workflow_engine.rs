@@ -15,10 +15,7 @@ pub enum WorkflowStep {
         env: Option<HashMap<String, String>>,
     },
     /// Create a file with content
-    CreateFile {
-        path: String,
-        content: String,
-    },
+    CreateFile { path: String, content: String },
     /// Conditional step execution
     Condition {
         condition: String, // Expression to evaluate
@@ -32,9 +29,7 @@ pub enum WorkflowStep {
         on_no_match: Option<Vec<WorkflowStep>>,
     },
     /// Wait/delay step
-    Wait {
-        seconds: u64,
-    },
+    Wait { seconds: u64 },
 }
 
 /// Complete workflow definition
@@ -120,8 +115,8 @@ impl WorkflowEngine {
 
     /// Load workflows from YAML/JSON
     pub fn load_from_json(&mut self, json: &str) -> Result<(), String> {
-        let workflows: Vec<Workflow> = serde_json::from_str(json)
-            .map_err(|e| format!("Failed to parse workflows: {}", e))?;
+        let workflows: Vec<Workflow> =
+            serde_json::from_str(json).map_err(|e| format!("Failed to parse workflows: {}", e))?;
 
         for workflow in workflows {
             self.register_workflow(workflow);
@@ -136,7 +131,9 @@ impl WorkflowEngine {
         workflow_id: &str,
         context: WorkflowContext,
     ) -> Result<WorkflowExecutionResult, String> {
-        let workflow = self.workflows.get(workflow_id)
+        let workflow = self
+            .workflows
+            .get(workflow_id)
             .ok_or_else(|| format!("Workflow not found: {}", workflow_id))?;
 
         if !workflow.enabled {
@@ -154,12 +151,12 @@ impl WorkflowEngine {
 
         for (index, step) in workflow.steps.iter().enumerate() {
             let step_result = self.execute_step(step, &context, index).await;
-            
+
             match step_result {
                 Ok(output) => {
                     result.steps_executed += 1;
                     result.output.push(output.clone());
-                    
+
                     if !output.success {
                         result.steps_failed += 1;
                         // Optionally stop on first failure
@@ -197,17 +194,30 @@ impl WorkflowEngine {
         let start = std::time::Instant::now();
 
         match step {
-            WorkflowStep::Command { command, args, working_dir, env } => {
-                self.execute_command(command, args, working_dir, env, context).await
+            WorkflowStep::Command {
+                command,
+                args,
+                working_dir,
+                env,
+            } => {
+                self.execute_command(command, args, working_dir, env, context)
+                    .await
             }
             WorkflowStep::CreateFile { path, content } => {
                 self.create_file(path, content, context).await
             }
-            WorkflowStep::Condition { condition, then, else_ } => {
-                Box::pin(self.execute_condition(condition, then, else_, context, index)).await
-            }
-            WorkflowStep::PatternMatch { pattern, on_match, on_no_match } => {
-                Box::pin(self.execute_pattern_match(pattern, on_match, on_no_match, context, index)).await
+            WorkflowStep::Condition {
+                condition,
+                then,
+                else_,
+            } => Box::pin(self.execute_condition(condition, then, else_, context, index)).await,
+            WorkflowStep::PatternMatch {
+                pattern,
+                on_match,
+                on_no_match,
+            } => {
+                Box::pin(self.execute_pattern_match(pattern, on_match, on_no_match, context, index))
+                    .await
             }
             WorkflowStep::Wait { seconds } => {
                 tokio::time::sleep(tokio::time::Duration::from_secs(*seconds)).await;
@@ -233,10 +243,11 @@ impl WorkflowEngine {
         context: &WorkflowContext,
     ) -> Result<StepOutput, String> {
         let start = std::time::Instant::now();
-        
+
         // Substitute variables in command and args
         let cmd = self.substitute_variables(command, context);
-        let cmd_args: Vec<String> = args.iter()
+        let cmd_args: Vec<String> = args
+            .iter()
             .map(|a| self.substitute_variables(a, context))
             .collect();
 
@@ -267,7 +278,9 @@ impl WorkflowEngine {
             cmd_builder.env(format!("WF_{}", key), value);
         }
 
-        let output = cmd_builder.output().await
+        let output = cmd_builder
+            .output()
+            .await
             .map_err(|e| format!("Command execution failed: {}", e))?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
@@ -296,7 +309,7 @@ impl WorkflowEngine {
         context: &WorkflowContext,
     ) -> Result<StepOutput, String> {
         let start = std::time::Instant::now();
-        
+
         let file_path = self.substitute_variables(path, context);
         let file_content = self.substitute_variables(content, context);
 
@@ -308,11 +321,13 @@ impl WorkflowEngine {
 
         // Create parent directories if needed
         if let Some(parent) = final_path.parent() {
-            tokio::fs::create_dir_all(parent).await
+            tokio::fs::create_dir_all(parent)
+                .await
                 .map_err(|e| format!("Failed to create directory: {}", e))?;
         }
 
-        tokio::fs::write(&final_path, file_content).await
+        tokio::fs::write(&final_path, file_content)
+            .await
             .map_err(|e| format!("Failed to write file: {}", e))?;
 
         Ok(StepOutput {
@@ -333,7 +348,8 @@ impl WorkflowEngine {
         else_: &Option<Vec<WorkflowStep>>,
         context: &WorkflowContext,
         index: usize,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<StepOutput, String>> + Send + '_>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<StepOutput, String>> + Send + '_>>
+    {
         let condition = condition.to_string();
         let then = then.to_vec();
         let else_ = else_.clone();
@@ -373,7 +389,8 @@ impl WorkflowEngine {
         on_no_match: &Option<Vec<WorkflowStep>>,
         context: &WorkflowContext,
         index: usize,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<StepOutput, String>> + Send + '_>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<StepOutput, String>> + Send + '_>>
+    {
         let pattern = pattern.to_string();
         let on_match = on_match.to_vec();
         let on_no_match = on_no_match.clone();
@@ -381,7 +398,9 @@ impl WorkflowEngine {
         let self_ref = self;
         Box::pin(async move {
             // Simple pattern matching (can be enhanced with regex)
-            let matches = context.variables.iter()
+            let matches = context
+                .variables
+                .iter()
                 .any(|(k, v)| k.contains(&pattern) || v.contains(&pattern));
 
             let steps_to_execute = if matches {
@@ -408,7 +427,7 @@ impl WorkflowEngine {
     /// Substitute variables in a string
     fn substitute_variables(&self, text: &str, context: &WorkflowContext) -> String {
         let mut result = text.to_string();
-        
+
         for (key, value) in &context.variables {
             result = result.replace(&format!("${{{}}}", key), value);
             result = result.replace(&format!("${}", key), value);
@@ -427,11 +446,13 @@ impl WorkflowEngine {
         // Simple evaluation - check if variable exists or equals value
         // Format: "${VAR}" or "${VAR} == value"
         let parts: Vec<&str> = condition.split("==").map(|s| s.trim()).collect();
-        
+
         if parts.len() == 2 {
             let var_name = parts[0].trim_matches(|c| c == '$' || c == '{' || c == '}');
             let expected = parts[1].trim_matches('"').trim_matches('\'');
-            return context.variables.get(var_name)
+            return context
+                .variables
+                .get(var_name)
                 .map(|v| v == expected)
                 .unwrap_or(false);
         }
@@ -465,30 +486,26 @@ impl WorkflowEngine {
     /// Check if a trigger matches the context
     fn matches_trigger(&self, trigger: &WorkflowTrigger, data: &serde_json::Value) -> bool {
         match trigger {
-            WorkflowTrigger::CommandPattern { pattern } => {
-                data.get("command")
-                    .and_then(|v| v.as_str())
-                    .map(|cmd| cmd.contains(pattern))
-                    .unwrap_or(false)
-            }
-            WorkflowTrigger::FilePattern { pattern } => {
-                data.get("file")
-                    .and_then(|v| v.as_str())
-                    .map(|file| file.contains(pattern))
-                    .unwrap_or(false)
-            }
-            WorkflowTrigger::ProjectType { project_type } => {
-                data.get("project_type")
-                    .and_then(|v| v.as_str())
-                    .map(|pt| pt == project_type)
-                    .unwrap_or(false)
-            }
-            WorkflowTrigger::Event { event_type } => {
-                data.get("event_type")
-                    .and_then(|v| v.as_str())
-                    .map(|et| et == event_type)
-                    .unwrap_or(false)
-            }
+            WorkflowTrigger::CommandPattern { pattern } => data
+                .get("command")
+                .and_then(|v| v.as_str())
+                .map(|cmd| cmd.contains(pattern))
+                .unwrap_or(false),
+            WorkflowTrigger::FilePattern { pattern } => data
+                .get("file")
+                .and_then(|v| v.as_str())
+                .map(|file| file.contains(pattern))
+                .unwrap_or(false),
+            WorkflowTrigger::ProjectType { project_type } => data
+                .get("project_type")
+                .and_then(|v| v.as_str())
+                .map(|pt| pt == project_type)
+                .unwrap_or(false),
+            WorkflowTrigger::Event { event_type } => data
+                .get("event_type")
+                .and_then(|v| v.as_str())
+                .map(|et| et == event_type)
+                .unwrap_or(false),
             WorkflowTrigger::Manual => true,
         }
     }
@@ -501,15 +518,13 @@ mod tests {
     #[tokio::test]
     async fn test_basic_workflow() {
         let mut engine = WorkflowEngine::new();
-        
+
         let workflow = Workflow {
             id: "test".to_string(),
             name: "Test Workflow".to_string(),
             description: None,
             triggers: vec![WorkflowTrigger::Manual],
-            steps: vec![
-                WorkflowStep::Wait { seconds: 0 },
-            ],
+            steps: vec![WorkflowStep::Wait { seconds: 0 }],
             enabled: true,
         };
 

@@ -1,5 +1,7 @@
-use crate::domains::tasks::repositories::task_repository::{TaskRepository, CreateTaskRequest, UpdateTaskRequest, TaskFilters};
 use crate::domains::tasks::entities::task::Model as TaskModel;
+use crate::domains::tasks::repositories::task_repository::{
+    CreateTaskRequest, TaskFilters, TaskRepository, UpdateTaskRequest,
+};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 
@@ -14,11 +16,18 @@ impl TaskService {
         }
     }
 
-    pub async fn create_task(&self, request: CreateTaskRequest) -> Result<TaskModel, sea_orm::DbErr> {
+    pub async fn create_task(
+        &self,
+        request: CreateTaskRequest,
+    ) -> Result<TaskModel, sea_orm::DbErr> {
         self.repository.create(request).await
     }
 
-    pub async fn update_task(&self, id: i32, request: UpdateTaskRequest) -> Result<TaskModel, sea_orm::DbErr> {
+    pub async fn update_task(
+        &self,
+        id: i32,
+        request: UpdateTaskRequest,
+    ) -> Result<TaskModel, sea_orm::DbErr> {
         self.repository.update(id, request).await
     }
 
@@ -30,7 +39,10 @@ impl TaskService {
         self.repository.find_by_id(id).await
     }
 
-    pub async fn get_tasks(&self, filters: Option<TaskFilters>) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+    pub async fn get_tasks(
+        &self,
+        filters: Option<TaskFilters>,
+    ) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
         self.repository.find_all(filters).await
     }
 
@@ -51,10 +63,22 @@ impl TaskService {
     pub async fn get_main_task_stats(&self) -> Result<MainTaskStats, sea_orm::DbErr> {
         let total = self.repository.count_main_tasks().await?;
 
-        let pending = self.repository.count_main_tasks_by_status("pending").await?;
-        let in_progress = self.repository.count_main_tasks_by_status("in-progress").await?;
-        let completed = self.repository.count_main_tasks_by_status("completed").await?;
-        let cancelled = self.repository.count_main_tasks_by_status("cancelled").await?;
+        let pending = self
+            .repository
+            .count_main_tasks_by_status("pending")
+            .await?;
+        let in_progress = self
+            .repository
+            .count_main_tasks_by_status("in-progress")
+            .await?;
+        let completed = self
+            .repository
+            .count_main_tasks_by_status("completed")
+            .await?;
+        let cancelled = self
+            .repository
+            .count_main_tasks_by_status("cancelled")
+            .await?;
 
         let completion_percentage = if total > 0 {
             // Keep rounding consistent with the frontend (Math.round).

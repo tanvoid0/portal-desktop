@@ -31,9 +31,22 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(SavedViews::Name).text().not_null())
                     .col(ColumnDef::new(SavedViews::Description).text().null())
                     .col(ColumnDef::new(SavedViews::Filters).text().not_null())
-                    .col(ColumnDef::new(SavedViews::IsDefault).boolean().not_null().default(false))
-                    .col(ColumnDef::new(SavedViews::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(SavedViews::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(SavedViews::IsDefault)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(SavedViews::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(SavedViews::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .to_owned(),
             )
             .await

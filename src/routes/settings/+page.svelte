@@ -3,14 +3,14 @@
 -->
 
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
 
-	onMount(() => {
-		goto('/settings/general', { replaceState: true });
-	});
+  onMount(() => {
+    goto("/settings/general", { replaceState: true });
+  });
 </script>
 
 <div class="flex items-center justify-center py-12">
-	<p class="text-muted-foreground">Redirecting to settings...</p>
+  <p class="text-muted-foreground">Redirecting to settings...</p>
 </div>

@@ -30,8 +30,16 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(TaskComments::TaskId).integer().not_null())
                     .col(ColumnDef::new(TaskComments::Content).text().not_null())
                     .col(ColumnDef::new(TaskComments::Author).text().not_null())
-                    .col(ColumnDef::new(TaskComments::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(TaskComments::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(TaskComments::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(TaskComments::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_task_comments_task_id")

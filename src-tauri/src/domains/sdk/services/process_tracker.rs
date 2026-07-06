@@ -1,12 +1,11 @@
 /**
  * Process Tracker
- * 
+ *
  * Tracks running SDK services and their PIDs
  */
-
 use crate::domains::sdk::SDKError;
 use std::collections::HashMap;
-use sysinfo::{System, Pid};
+use sysinfo::{Pid, System};
 
 pub struct ProcessTracker {
     tracked_processes: HashMap<u32, String>, // PID -> Service ID
@@ -33,7 +32,8 @@ impl ProcessTracker {
 
     /// Get service ID for a PID
     pub async fn get_service_id(&self, pid: u32) -> Result<String, SDKError> {
-        self.tracked_processes.get(&pid)
+        self.tracked_processes
+            .get(&pid)
             .ok_or_else(|| SDKError::ManagerNotFound(format!("Process {} not tracked", pid)))
             .map(|id| id.clone())
     }
@@ -42,7 +42,7 @@ impl ProcessTracker {
     pub async fn is_process_running(&self, pid: u32) -> bool {
         let mut sys = System::new_all();
         sys.refresh_processes();
-        
+
         if let Some(_process) = sys.process(Pid::from(pid as usize)) {
             true // Process exists, assume it's running
         } else {

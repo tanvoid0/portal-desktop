@@ -1,5 +1,6 @@
 use crate::domains::ai::providers::{
-    AIError, AIProvider, ConfigurationStatus, GenerationOptions, GenerationResult, ProviderConfig, ProviderType,
+    AIError, AIProvider, ConfigurationStatus, GenerationOptions, GenerationResult, ProviderConfig,
+    ProviderType,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -130,7 +131,10 @@ impl AIProvider for OllamaProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AIError::InvalidResponse(format!(
                 "Ollama API returned status {}: {}",
                 status, error_text
@@ -222,7 +226,10 @@ impl AIProvider for OllamaProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AIError::InvalidResponse(format!(
                 "Ollama API returned status {}: {}",
                 status, error_text
@@ -238,16 +245,14 @@ impl AIProvider for OllamaProvider {
         use futures_util::StreamExt;
 
         while let Some(item) = stream.next().await {
-            let chunk = item.map_err(|e| {
-                AIError::NetworkError(format!("Stream error: {}", e))
-            })?;
-            
+            let chunk = item.map_err(|e| AIError::NetworkError(format!("Stream error: {}", e)))?;
+
             let text = String::from_utf8_lossy(&chunk);
             for line in text.lines() {
                 if line.trim().is_empty() {
                     continue;
                 }
-                
+
                 #[derive(Deserialize)]
                 struct StreamChunk {
                     response: Option<String>,
@@ -256,7 +261,7 @@ impl AIProvider for OllamaProvider {
                     eval_count: Option<u32>,
                     done: Option<bool>,
                 }
-                
+
                 if let Ok(chunk_data) = serde_json::from_str::<StreamChunk>(line) {
                     if let Some(response_text) = chunk_data.response {
                         full_response.push_str(&response_text);
@@ -354,9 +359,7 @@ impl AIProvider for OllamaProvider {
 
     fn update_config(&mut self, config: ProviderConfig) -> Result<(), AIError> {
         if config.provider_type != ProviderType::Ollama {
-            return Err(AIError::GenericError(
-                "Provider type mismatch".to_string(),
-            ));
+            return Err(AIError::GenericError("Provider type mismatch".to_string()));
         }
         self.config = config;
         // Recreate client to ensure clean state
@@ -364,4 +367,3 @@ impl AIProvider for OllamaProvider {
         Ok(())
     }
 }
-

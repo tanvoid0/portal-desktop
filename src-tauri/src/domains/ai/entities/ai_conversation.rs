@@ -29,4 +29,3 @@ impl Related<crate::domains::ai::entities::ai_conversation_message::Entity> for 
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-

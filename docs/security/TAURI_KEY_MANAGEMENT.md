@@ -5,11 +5,13 @@
 ### If You Lose the Private Key File
 
 **Consequences:**
+
 - ❌ **Cannot sign new updates** - You won't be able to create signed update bundles
 - ❌ **Cannot verify existing updates** - Users won't be able to verify update integrity
 - ⚠️ **Breaking change** - You'll need to generate a NEW key pair and update the public key
 
 **Recovery Options:**
+
 - **None** - Cryptographic keys cannot be recovered if lost
 - **Workaround**: Generate a new key pair and update `tauri.conf.json` with the new public key
 - **User Impact**: Existing users will need to manually update or reinstall (their app has the old public key)
@@ -17,10 +19,12 @@
 ### If You Lose the Password (for password-protected keys)
 
 **Consequences:**
+
 - ❌ **Key is permanently unusable** - The private key cannot be decrypted without the password
 - ❌ **Same as losing the key file** - You'll need to generate a new key pair
 
 **Recovery Options:**
+
 - **None** - Passwords cannot be recovered (by design, for security)
 - **Workaround**: Generate a new key pair (same as losing the key file)
 
@@ -29,20 +33,24 @@
 ### Option 1: No Password (Recommended for CI/CD)
 
 **Pros:**
+
 - ✅ No password to lose
 - ✅ Easier for automated builds
 - ✅ Can be stored in secure CI/CD secrets
 
 **Cons:**
+
 - ⚠️ If key file is compromised, it's immediately usable
 - ⚠️ Requires strict file system security
 
 **Generate:**
+
 ```bash
 npx @tauri-apps/cli signer generate -w ~/.tauri/portal-desktop.key -p ''
 ```
 
 **Storage:**
+
 - Store in secure CI/CD secrets (GitHub Secrets, GitLab CI Variables, etc.)
 - Use encrypted backups
 - Restrict file permissions: `chmod 600 ~/.tauri/portal-desktop.key`
@@ -50,20 +58,24 @@ npx @tauri-apps/cli signer generate -w ~/.tauri/portal-desktop.key -p ''
 ### Option 2: With Password (More Secure)
 
 **Pros:**
+
 - ✅ Extra layer of security
 - ✅ Even if key file is stolen, password is needed
 
 **Cons:**
+
 - ⚠️ Password must be remembered/stored securely
 - ⚠️ If password is lost, key is unusable
 - ⚠️ Requires password input during builds
 
 **Generate:**
+
 ```bash
 npx @tauri-apps/cli signer generate -w ~/.tauri/portal-desktop.key -p 'your-strong-password'
 ```
 
 **Storage:**
+
 - Store password in password manager (1Password, Bitwarden, etc.)
 - Document password location in secure team vault
 - Use environment variable: `export TAURI_KEY_PASSWORD="your-password"`
@@ -73,12 +85,14 @@ npx @tauri-apps/cli signer generate -w ~/.tauri/portal-desktop.key -p 'your-stro
 ### Essential Backups
 
 1. **Private Key File**
+
    ```bash
    # Backup to secure location
    cp ~/.tauri/portal-desktop.key ~/secure-backup/portal-desktop.key.backup
    ```
 
 2. **Public Key** (already in `tauri.conf.json`, but keep a separate copy)
+
    ```bash
    # Extract and save separately
    grep -A 1 "pubkey" src-tauri/tauri.conf.json > ~/secure-backup/public-key.txt
@@ -102,10 +116,13 @@ npx @tauri-apps/cli signer generate -w ~/.tauri/portal-desktop.key -p 'your-stro
 ### Scenario 1: Lost Private Key
 
 **Steps:**
+
 1. Generate new key pair:
+
    ```bash
    npx @tauri-apps/cli signer generate -w ~/.tauri/portal-desktop.key -f
    ```
+
    (Use `-f` flag to overwrite if file exists)
 
 2. Update `tauri.conf.json` with new public key
@@ -114,7 +131,7 @@ npx @tauri-apps/cli signer generate -w ~/.tauri/portal-desktop.key -p 'your-stro
 
 4. Build and release new version with new public key
 
-5. **User Communication**: 
+5. **User Communication**:
    - Announce breaking change
    - Provide manual update instructions
    - Consider major version bump (e.g., 1.0.0 → 2.0.0)
@@ -127,6 +144,7 @@ Same as Scenario 1 - you'll need to generate a new key pair.
 ### Scenario 3: Compromised Key
 
 **Steps:**
+
 1. Immediately generate new key pair
 2. Update public key in config
 3. Revoke/remove old signed releases if possible
@@ -166,19 +184,21 @@ Same as Scenario 1 - you'll need to generate a new key pair.
 ## 💡 Recommendations
 
 **For Solo Developer:**
+
 - Use password-protected key
 - Store password in password manager
 - Create encrypted backup on external drive
 
 **For Team:**
+
 - Use password-less key (easier for CI/CD)
 - Store in secure CI/CD secrets
 - Document in team knowledge base
 - Use key rotation schedule
 
 **For Enterprise:**
+
 - Use hardware security module (HSM) if available
 - Implement key rotation policy
 - Use separate keys for dev/staging/production
 - Maintain key escrow/backup procedures
-

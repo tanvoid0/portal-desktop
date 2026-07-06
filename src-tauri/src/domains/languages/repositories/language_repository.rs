@@ -1,5 +1,5 @@
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait};
-use crate::entities::language::{Entity, Model, ActiveModel, Column};
+use crate::entities::language::{ActiveModel, Column, Entity, Model};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 pub struct LanguageRepository;
 
@@ -10,16 +10,19 @@ impl LanguageRepository {
     }
 
     /// Get language by ID
-    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Model>, sea_orm::DbErr> {
+    pub async fn get_by_id(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
     /// Get language by name
-    pub async fn get_by_name(db: &DatabaseConnection, name: &str) -> Result<Option<Model>, sea_orm::DbErr> {
-        Entity::find()
-            .filter(Column::Name.eq(name))
-            .one(db)
-            .await
+    pub async fn get_by_name(
+        db: &DatabaseConnection,
+        name: &str,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
+        Entity::find().filter(Column::Name.eq(name)).one(db).await
     }
 
     /// Create a new language
@@ -81,4 +84,3 @@ impl LanguageRepository {
         Ok(())
     }
 }
-

@@ -1,9 +1,9 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::process::{Command, Child};
-use tokio::io::{AsyncBufReadExt, BufReader};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::{Child, Command};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessInfo {
@@ -142,19 +142,22 @@ impl CliService {
             let mut processes = self.processes.lock().unwrap();
             processes.remove(deployment_id).map(|(child, _)| child)
         }; // Lock is released here
-        
+
         if let Some(mut child) = child_opt {
             // Try graceful shutdown first
             if let Err(e) = child.kill().await {
                 return Err(format!("Failed to kill process: {}", e));
             }
-            
+
             // Wait for process to exit
             let _ = child.wait().await;
-            
+
             Ok(())
         } else {
-            Err(format!("Process not found for deployment: {}", deployment_id))
+            Err(format!(
+                "Process not found for deployment: {}",
+                deployment_id
+            ))
         }
     }
 
@@ -181,13 +184,13 @@ impl CliService {
                 return Ok(false);
             }
         }; // Lock is released here
-        
+
         // Remove the process if it exited
         if should_remove {
             let mut processes = self.processes.lock().unwrap();
             processes.remove(deployment_id);
         }
-        
+
         Ok(false)
     }
 
@@ -202,7 +205,13 @@ impl CliService {
         let logs = self.logs.lock().unwrap();
         if let Some(log_vec) = logs.get(deployment_id) {
             if let Some(tail_count) = tail {
-                log_vec.iter().rev().take(tail_count).rev().cloned().collect()
+                log_vec
+                    .iter()
+                    .rev()
+                    .take(tail_count)
+                    .rev()
+                    .cloned()
+                    .collect()
             } else {
                 log_vec.clone()
             }
@@ -215,7 +224,7 @@ impl CliService {
     pub async fn cleanup_process(&self, deployment_id: &str) {
         let mut processes = self.processes.lock().unwrap();
         processes.remove(deployment_id);
-        
+
         let mut logs = self.logs.lock().unwrap();
         logs.remove(deployment_id);
     }
@@ -229,4 +238,3 @@ impl CliService {
             .collect()
     }
 }
-

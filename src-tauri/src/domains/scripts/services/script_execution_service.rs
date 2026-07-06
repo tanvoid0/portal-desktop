@@ -95,7 +95,12 @@ impl ScriptExecutionService {
         let parts: Vec<&str> = resolved_command.split_whitespace().collect();
         if parts.is_empty() {
             self.repository
-                .update_status(&execution_id, "failed".to_string(), None, Some("Empty command".to_string()))
+                .update_status(
+                    &execution_id,
+                    "failed".to_string(),
+                    None,
+                    Some("Empty command".to_string()),
+                )
                 .await?;
             return Err("Command cannot be empty".to_string());
         }
@@ -242,7 +247,10 @@ impl ScriptExecutionService {
     }
 
     /// Get execution details
-    pub async fn get_execution(&self, execution_id: &str) -> Result<Option<ScriptExecutionInfo>, String> {
+    pub async fn get_execution(
+        &self,
+        execution_id: &str,
+    ) -> Result<Option<ScriptExecutionInfo>, String> {
         let execution = self.repository.get_by_id(execution_id).await?;
 
         Ok(execution.map(|e| ScriptExecutionInfo {
@@ -347,7 +355,10 @@ impl ScriptExecutionService {
     }
 
     /// Get recent executions
-    pub async fn get_recent_executions(&self, limit: u64) -> Result<Vec<ScriptExecutionInfo>, String> {
+    pub async fn get_recent_executions(
+        &self,
+        limit: u64,
+    ) -> Result<Vec<ScriptExecutionInfo>, String> {
         let executions = self.repository.get_recent(limit).await?;
 
         Ok(executions

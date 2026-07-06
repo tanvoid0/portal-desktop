@@ -12,4 +12,3 @@ pub struct PackageManagerGroup {
     pub category: String,
     pub package_managers: Vec<SuggestedPackageManager>,
 }
-

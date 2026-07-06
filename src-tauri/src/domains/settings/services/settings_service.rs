@@ -1,8 +1,8 @@
-use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use chrono::{Utc, DateTime};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppSettings {
@@ -12,17 +12,17 @@ pub struct AppSettings {
     pub timezone: String,
     pub date_format: String,
     pub time_format: String,
-    
+
     // Window settings
     pub window_state: WindowState,
     pub startup_behavior: StartupBehavior,
-    
+
     // Notifications
     pub notifications: NotificationSettings,
-    
+
     // Privacy
     pub privacy: PrivacySettings,
-    
+
     // Updates
     pub updates: UpdateSettings,
 }
@@ -96,21 +96,21 @@ pub struct EditorSettings {
     pub show_line_numbers: bool,
     pub show_minimap: bool,
     pub show_whitespace: bool,
-    
+
     // Syntax highlighting
     pub syntax_highlighting: bool,
     pub bracket_matching: bool,
     pub auto_indent: bool,
-    
+
     // Code completion
     pub auto_complete: bool,
     pub suggestions: bool,
     pub parameter_hints: bool,
-    
+
     // Themes
     pub editor_theme: String,
     pub terminal_theme: String,
-    
+
     // Keybindings
     pub keybindings: HashMap<String, String>,
 }
@@ -123,21 +123,21 @@ pub struct TerminalSettings {
     pub line_height: f32,
     pub cursor_style: String,
     pub cursor_blink: bool,
-    
+
     // Terminal behavior
     pub scrollback: u32,
     pub bell_style: String,
     pub right_click_selects_word: bool,
     pub selection_mode: String,
-    
+
     // Shell integration
     pub shell_integration: bool,
     pub command_history: bool,
     pub command_suggestions: bool,
-    
+
     // Terminal themes
     pub theme: TerminalTheme,
-    
+
     // Advanced
     pub encoding: String,
     pub locale: String,
@@ -182,12 +182,12 @@ pub struct ThemeSettings {
     pub background_color: String,
     pub surface_color: String,
     pub text_color: String,
-    
+
     // UI elements
     pub border_radius: f32,
     pub shadow_intensity: f32,
     pub animation_speed: String,
-    
+
     // Custom themes
     pub custom_themes: Vec<CustomTheme>,
     pub active_theme: String,
@@ -223,7 +223,7 @@ impl SettingsService {
         let mut settings_path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
         settings_path.push("portal-desktop");
         settings_path.push("settings.json");
-        
+
         Self { settings_path }
     }
 
@@ -262,7 +262,7 @@ impl SettingsService {
     /// Get default settings
     pub fn get_default_settings(&self) -> Settings {
         let now = Utc::now();
-        
+
         Settings {
             id: "default".to_string(),
             app: AppSettings {
@@ -396,7 +396,11 @@ impl SettingsService {
     }
 
     /// Update settings
-    pub fn update_settings(&self, mut settings: Settings, updates: SettingsUpdate) -> Result<Settings, String> {
+    pub fn update_settings(
+        &self,
+        mut settings: Settings,
+        updates: SettingsUpdate,
+    ) -> Result<Settings, String> {
         if let Some(app) = updates.app {
             settings.app = app;
         }
@@ -409,9 +413,9 @@ impl SettingsService {
         if let Some(theme) = updates.theme {
             settings.theme = theme;
         }
-        
+
         settings.updated_at = Utc::now();
-        
+
         self.save_settings(&settings)?;
         Ok(settings)
     }
@@ -433,7 +437,7 @@ impl SettingsService {
     pub fn import_settings(&self, settings_json: &str) -> Result<Settings, String> {
         let settings: Settings = serde_json::from_str(settings_json)
             .map_err(|e| format!("Failed to import settings: {}", e))?;
-        
+
         self.save_settings(&settings)?;
         Ok(settings)
     }

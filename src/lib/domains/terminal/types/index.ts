@@ -8,7 +8,7 @@ export interface TerminalTab {
   projectId?: string;
   workingDirectory: string;
   shell?: string; // Terminal shell/profile for this tab
-  status: 'idle' | 'running' | 'completed' | 'error' | 'killed';
+  status: "idle" | "running" | "completed" | "error" | "killed";
   processId?: string;
   startTime?: Date;
   endTime?: Date;
@@ -37,10 +37,10 @@ export interface TerminalOutput {
 }
 
 export interface TerminalConfig {
-  theme: 'dark' | 'light' | 'auto';
+  theme: "dark" | "light" | "auto";
   fontSize: number;
   fontFamily: string;
-  cursorStyle: 'block' | 'underline' | 'bar';
+  cursorStyle: "block" | "underline" | "bar";
   scrollbackLines: number;
   bellSound: boolean;
   autoClose: boolean;
@@ -54,7 +54,7 @@ export interface TerminalCommand {
   processId: string;
   command: string;
   timestamp: Date;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   output?: string;
   error?: string;
 }
@@ -83,6 +83,8 @@ export interface CreateProcessRequest {
   environment: Record<string, string>;
   cols: number;
   rows: number;
+  /** When set, the PTY runs this single command and exits (oneshot mode). */
+  command?: string;
 }
 
 export interface TerminalSystemInfo {
@@ -104,8 +106,12 @@ export interface TerminalProfile {
 }
 
 export interface ShellIntegrationEvent {
-  type: 'CommandStart' | 'CommandOutput' | 'CommandEnd' | 'CommandDetected';
-  payload: CommandStartEvent | CommandOutputEvent | CommandEndEvent | CommandDetectedEvent;
+  type: "CommandStart" | "CommandOutput" | "CommandEnd" | "CommandDetected";
+  payload:
+    | CommandStartEvent
+    | CommandOutputEvent
+    | CommandEndEvent
+    | CommandDetectedEvent;
 }
 
 export interface CommandStartEvent {

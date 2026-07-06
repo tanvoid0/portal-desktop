@@ -1,11 +1,9 @@
+use crate::domains::learning::repositories::{
+    LearnedPatternRepository, LearningEventRepository, UserPreferenceRepository,
+};
+use crate::domains::learning::services::{MLIntensity, MLIntensityManager};
 use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
-use crate::domains::learning::repositories::{
-    LearnedPatternRepository, UserPreferenceRepository, LearningEventRepository,
-};
-use crate::domains::learning::services::{
-    MLIntensityManager, MLIntensity,
-};
 // FUTURE: PreferenceEngine is imported directly for now, will be re-exported when advanced learning features are fully implemented
 use crate::domains::learning::services::preference_engine::PreferenceEngine;
 
@@ -32,7 +30,9 @@ impl LearningService {
     }
 
     fn max_patterns_per_context(&self) -> usize {
-        self.intensity_manager.get_intensity().max_patterns_per_context()
+        self.intensity_manager
+            .get_intensity()
+            .max_patterns_per_context()
     }
 
     /// Record a learning event
@@ -73,14 +73,10 @@ impl LearningService {
         let pattern_str = serde_json::to_string(&pattern_data)
             .map_err(|e| format!("Failed to serialize pattern data: {}", e))?;
 
-        let pattern = LearnedPatternRepository::find_or_create(
-            db,
-            pattern_type,
-            pattern_str,
-            context,
-        )
-        .await
-        .map_err(|e| format!("Failed to create pattern: {}", e))?;
+        let pattern =
+            LearnedPatternRepository::find_or_create(db, pattern_type, pattern_str, context)
+                .await
+                .map_err(|e| format!("Failed to create pattern: {}", e))?;
 
         // Increment frequency if pattern already existed
         if pattern.frequency == 1 {
@@ -114,13 +110,9 @@ impl LearningService {
         pattern_type: &str,
         context: Option<&str>,
     ) -> Result<Vec<Value>, String> {
-        let patterns = LearnedPatternRepository::get_by_type_and_context(
-            db,
-            pattern_type,
-            context,
-        )
-        .await
-        .map_err(|e| format!("Failed to get patterns: {}", e))?;
+        let patterns = LearnedPatternRepository::get_by_type_and_context(db, pattern_type, context)
+            .await
+            .map_err(|e| format!("Failed to get patterns: {}", e))?;
 
         // Use pattern matcher to score and rank patterns
         let mut scored_patterns: Vec<(f64, _)> = patterns
@@ -128,12 +120,15 @@ impl LearningService {
             .map(|pattern| {
                 // Calculate score: frequency * success_rate with context matching bonus
                 let base_score = pattern.frequency as f64 * pattern.success_rate;
-                
+
                 // Context matching bonus (higher score for exact context match)
-                let context_bonus = if let (Some(ctx), Some(pattern_ctx)) = (context, &pattern.context) {
+                let context_bonus = if let (Some(ctx), Some(pattern_ctx)) =
+                    (context, &pattern.context)
+                {
                     if ctx == pattern_ctx.as_str() {
                         1.5 // Exact match
-                    } else if pattern_ctx.starts_with(ctx) || ctx.starts_with(pattern_ctx.as_str()) {
+                    } else if pattern_ctx.starts_with(ctx) || ctx.starts_with(pattern_ctx.as_str())
+                    {
                         1.2 // Partial match
                     } else {
                         1.0
@@ -141,7 +136,7 @@ impl LearningService {
                 } else {
                     1.0
                 };
-                
+
                 let final_score = base_score * context_bonus;
                 (final_score, pattern)
             })
@@ -198,11 +193,11 @@ impl LearningService {
 
         let confidence = if let Some(existing) = existing_pref {
             // Check if the values match - if they do, increase confidence; if not, decrease
-            let existing_value: Value = serde_json::from_str(&existing.preference_value)
-                .unwrap_or_else(|_| json!(null));
-            
+            let existing_value: Value =
+                serde_json::from_str(&existing.preference_value).unwrap_or_else(|_| json!(null));
+
             let values_match = existing_value == preference_value;
-            
+
             if values_match {
                 // Same value: increase confidence (capped at 1.0)
                 PreferenceEngine::update_confidence_from_feedback(existing.confidence, true)
@@ -216,8 +211,8 @@ impl LearningService {
             match learned_from.as_deref() {
                 Some("user_selection") => 0.8, // High confidence for explicit user choices
                 Some("pattern_analysis") => 0.6, // Medium for inferred patterns
-                Some("user_setting") => 0.9, // Very high for explicit settings
-                _ => 0.5, // Default for unknown sources
+                Some("user_setting") => 0.9,   // Very high for explicit settings
+                _ => 0.5,                      // Default for unknown sources
             }
         };
 
@@ -242,13 +237,10 @@ impl LearningService {
         preference_type: &str,
         context: Option<&str>,
     ) -> Result<Option<Value>, String> {
-        let preference = UserPreferenceRepository::get_by_type_and_context(
-            db,
-            preference_type,
-            context,
-        )
-        .await
-        .map_err(|e| format!("Failed to get preference: {}", e))?;
+        let preference =
+            UserPreferenceRepository::get_by_type_and_context(db, preference_type, context)
+                .await
+                .map_err(|e| format!("Failed to get preference: {}", e))?;
 
         if let Some(pref) = preference {
             let value: Value = serde_json::from_str(&pref.preference_value)
@@ -259,4 +251,3 @@ impl LearningService {
         }
     }
 }
-

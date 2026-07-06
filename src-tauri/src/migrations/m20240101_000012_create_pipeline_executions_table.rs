@@ -18,14 +18,47 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(PipelineExecutions::PipelineId).integer().not_null())
-                    .col(ColumnDef::new(PipelineExecutions::ProjectId).integer().not_null())
-                    .col(ColumnDef::new(PipelineExecutions::Status).string().not_null().default("pending"))
-                    .col(ColumnDef::new(PipelineExecutions::StartedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(PipelineExecutions::FinishedAt).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(PipelineExecutions::TriggeredBy).string().not_null())
-                    .col(ColumnDef::new(PipelineExecutions::StepExecutionsJson).text().not_null())
-                    .col(ColumnDef::new(PipelineExecutions::VariablesJson).text().not_null())
+                    .col(
+                        ColumnDef::new(PipelineExecutions::PipelineId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(PipelineExecutions::ProjectId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(PipelineExecutions::Status)
+                            .string()
+                            .not_null()
+                            .default("pending"),
+                    )
+                    .col(
+                        ColumnDef::new(PipelineExecutions::StartedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(PipelineExecutions::FinishedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(PipelineExecutions::TriggeredBy)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(PipelineExecutions::StepExecutionsJson)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(PipelineExecutions::VariablesJson)
+                            .text()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(PipelineExecutions::Error).text().null())
                     .foreign_key(
                         ForeignKey::create()
@@ -79,4 +112,3 @@ enum Projects {
     Table,
     Id,
 }
-

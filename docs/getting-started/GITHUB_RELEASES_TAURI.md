@@ -47,7 +47,7 @@ name: Build and Release
 on:
   push:
     branches: [main]
-    tags: ['v*.*.*']
+    tags: ["v*.*.*"]
   workflow_dispatch:
 
 jobs:
@@ -61,7 +61,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
       - name: Extract version
         id: version
         run: |
@@ -131,7 +131,7 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -139,7 +139,7 @@ jobs:
           name: Release v${{ needs.prepare.outputs.version }}
           body: |
             ## Portal Desktop ${{ needs.prepare.outputs.version }}
-            
+
             ### Downloads
             - **Linux**: `.deb` and `.AppImage`
             - **Windows**: `.exe` installer
@@ -174,15 +174,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         with:
           tagName: v__VERSION__
-          releaseName: 'Release v__VERSION__'
-          releaseBody: 'See the assets to download this version.'
+          releaseName: "Release v__VERSION__"
+          releaseBody: "See the assets to download this version."
           releaseDraft: true
           prerelease: false
         env:
@@ -200,10 +200,12 @@ jobs:
 **Runner**: `windows-2022` or `windows-latest`
 
 **Artifacts**:
+
 - `src-tauri/target/release/bundle/nsis/*.exe` - NSIS installer
 - `src-tauri/target/release/bundle/msi/*.msi` - Windows Installer
 
 **Code Signing** (Optional but recommended):
+
 ```yaml
 - name: Setup code signing certificate
   run: |
@@ -212,6 +214,7 @@ jobs:
 ```
 
 **Configuration in `tauri.conf.json`**:
+
 ```json
 {
   "bundle": {
@@ -229,10 +232,12 @@ jobs:
 **Runner**: `macos-14` or `macos-latest`
 
 **Artifacts**:
+
 - `src-tauri/target/release/bundle/dmg/*.dmg` - Disk image
 - `src-tauri/target/release/bundle/macos/*.app` - Application bundle
 
 **Universal Binaries** (Intel + Apple Silicon):
+
 ```yaml
 strategy:
   matrix:
@@ -242,6 +247,7 @@ strategy:
 Build both targets and create a universal binary, or release separate builds.
 
 **Code Signing & Notarization** (Required for distribution):
+
 ```yaml
 - name: Setup Apple certificates
   run: |
@@ -254,6 +260,7 @@ Build both targets and create a universal binary, or release separate builds.
 ```
 
 **Configuration in `tauri.conf.json`**:
+
 ```json
 {
   "bundle": {
@@ -268,6 +275,7 @@ Build both targets and create a universal binary, or release separate builds.
 ```
 
 **Required Secrets**:
+
 - `APPLE_ID` - Apple Developer account email
 - `APPLE_PASSWORD` - App-specific password
 - `APPLE_TEAM_ID` - Developer Team ID
@@ -292,6 +300,7 @@ Or use your existing `rename-artifacts.sh` script.
 ### Artifact Upload Strategy
 
 **Option A: Upload per platform** (Recommended)
+
 ```yaml
 - name: Upload artifacts
   uses: actions/upload-artifact@v4
@@ -301,6 +310,7 @@ Or use your existing `rename-artifacts.sh` script.
 ```
 
 **Option B: Upload entire bundle directory**
+
 ```yaml
 - name: Upload artifacts
   uses: actions/upload-artifact@v4
@@ -316,7 +326,7 @@ Or use your existing `rename-artifacts.sh` script.
   uses: actions/download-artifact@v4
   with:
     path: artifacts
-    merge-multiple: true  # Merges all artifacts into one directory
+    merge-multiple: true # Merges all artifacts into one directory
 ```
 
 ## Release Creation
@@ -349,21 +359,21 @@ Or use your existing `rename-artifacts.sh` script.
 ```yaml
 body: |
   ## Portal Desktop ${{ needs.prepare.outputs.version }}
-  
+
   **Release Type:** ${{ needs.prepare.outputs.release_type }}
-  
+
   ### Downloads
-  
+
   - **Linux**: [portal-desktop-${{ needs.prepare.outputs.version }}-linux.deb](link)
   - **Windows**: [portal-desktop-${{ needs.prepare.outputs.version }}-windows.exe](link)
   - **macOS**: [portal-desktop-${{ needs.prepare.outputs.version }}-macos.dmg](link)
-  
+
   ### Installation
-  
+
   See [Installation Guide](https://github.com/${{ github.repository }}/blob/main/docs/getting-started/INSTALLATION.md)
-  
+
   ### Changelog
-  
+
   See [Release Notes](https://github.com/${{ github.repository }}/blob/main/docs/status/RELEASE_NOTES.md)
 ```
 
@@ -390,7 +400,7 @@ create-release:
 Create drafts first, then publish manually:
 
 ```yaml
-draft: true  # Review before publishing
+draft: true # Review before publishing
 ```
 
 ### 4. Prerelease Handling
@@ -404,7 +414,7 @@ prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
 Set appropriate retention periods:
 
 ```yaml
-retention-days: 90  # Keep artifacts for 90 days
+retention-days: 90 # Keep artifacts for 90 days
 ```
 
 ### 6. Error Handling
@@ -414,9 +424,9 @@ Make artifact uploads non-blocking:
 ```yaml
 - name: Upload artifacts
   uses: actions/upload-artifact@v4
-  if: always()  # Upload even if build fails
+  if: always() # Upload even if build fails
   with:
-    if-no-files-found: warn  # Don't fail if no artifacts
+    if-no-files-found: warn # Don't fail if no artifacts
 ```
 
 ## Common Issues & Solutions
@@ -424,6 +434,7 @@ Make artifact uploads non-blocking:
 ### Issue: Artifacts Not Found
 
 **Solution**: Check artifact paths match Tauri output:
+
 ```bash
 # List actual paths
 find src-tauri/target/release/bundle -type f
@@ -432,6 +443,7 @@ find src-tauri/target/release/bundle -type f
 ### Issue: Release Creation Fails
 
 **Solution**: Ensure `contents: write` permission:
+
 ```yaml
 permissions:
   contents: write
@@ -439,7 +451,8 @@ permissions:
 
 ### Issue: macOS Notarization Fails
 
-**Solution**: 
+**Solution**:
+
 - Verify Apple credentials are correct
 - Check certificate is valid
 - Ensure `APPLE_TEAM_ID` matches certificate
@@ -447,6 +460,7 @@ permissions:
 ### Issue: Windows Code Signing Fails
 
 **Solution**:
+
 - Verify certificate is valid
 - Check `certificateThumbprint` in `tauri.conf.json`
 - Ensure certificate is installed in Windows runner
@@ -454,6 +468,7 @@ permissions:
 ## Example: Complete Multi-Platform Workflow
 
 See the reference implementation in your codebase:
+
 - `logs-explorer/.github/workflows/release.yml` - Multi-platform example
 - `waveterm/.github/workflows/build-helper.yml` - Artifact management example
 
@@ -463,4 +478,3 @@ See the reference implementation in your codebase:
 - [GitHub Actions Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts)
 - [Creating Releases](https://docs.github.com/en/rest/releases/releases)
 - [softprops/action-gh-release](https://github.com/softprops/action-gh-release)
-

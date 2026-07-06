@@ -1,6 +1,8 @@
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait, QueryOrder};
-use crate::entities::learning_event::{Entity, Model, ActiveModel};
 use crate::entities::learning_event;
+use crate::entities::learning_event::{ActiveModel, Entity, Model};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 
 pub struct LearningEventRepository;
 
@@ -14,7 +16,10 @@ impl LearningEventRepository {
     }
 
     /// Get event by ID
-    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Model>, sea_orm::DbErr> {
+    pub async fn get_by_id(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
@@ -39,7 +44,7 @@ impl LearningEventRepository {
             .order_by_desc(learning_event::Column::CreatedAt)
             .all(db)
             .await?;
-        
+
         Ok(all.into_iter().take(limit as usize).collect())
     }
 
@@ -94,7 +99,7 @@ impl LearningEventRepository {
         use sea_orm::prelude::*;
         let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
         let cutoff_value: sea_orm::Value = cutoff.into();
-        
+
         let result = Entity::delete_many()
             .filter(learning_event::Column::CreatedAt.lt(cutoff_value))
             .exec(db)
@@ -103,4 +108,3 @@ impl LearningEventRepository {
         Ok(result.rows_affected)
     }
 }
-

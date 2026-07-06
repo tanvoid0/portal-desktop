@@ -3,28 +3,31 @@
 ## Date: 2025-01-XX
 
 ## Summary
+
 This document outlines the security review and production cleanup performed on the Portal Desktop application.
 
 ## Security Improvements
 
 ### 1. Content Security Policy (CSP)
+
 - **Status**: ✅ Fixed
 - **Issue**: CSP was set to `null`, allowing all content
 - **Fix**: Implemented restrictive CSP policy:
   ```
-  default-src 'self'; 
-  script-src 'self' 'unsafe-inline' 'unsafe-eval'; 
-  style-src 'self' 'unsafe-inline'; 
-  img-src 'self' data: https:; 
-  font-src 'self' data:; 
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' 'unsafe-eval';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  font-src 'self' data:;
   connect-src 'self' ws: wss: http: https:;
   ```
 - **Note**: `unsafe-inline` and `unsafe-eval` are required for SvelteKit but should be reviewed for tighter restrictions if possible
 
 ### 2. Logging Configuration
+
 - **Status**: ✅ Fixed
 - **Issue**: Console logs enabled in production, potential information disclosure
-- **Fix**: 
+- **Fix**:
   - Logger service now disables console output in production by default
   - Console.log and console.debug statements are stripped during production builds
   - Error logging remains functional for debugging user issues
@@ -32,11 +35,13 @@ This document outlines the security review and production cleanup performed on t
   - **Optimization**: Removed redundant logging - `toastActions.error()` already logs errors internally, so explicit `log.error()` calls were removed to avoid double-logging
 
 ### 3. Source Maps
+
 - **Status**: ✅ Fixed
 - **Issue**: Source maps enabled in production builds
 - **Fix**: Source maps only generated in development mode
 
 ### 4. Build Configuration
+
 - **Status**: ✅ Fixed
 - **Improvements**:
   - Minification enabled in production
@@ -44,6 +49,7 @@ This document outlines the security review and production cleanup performed on t
   - Console.log/debug stripped in production builds
 
 ### 5. Test Files
+
 - **Status**: ✅ Cleaned
 - **Removed**:
   - `src/demo.spec.ts`
@@ -53,6 +59,7 @@ This document outlines the security review and production cleanup performed on t
   - `appimagelauncher-2.2.0-travis995.0f91801.x86_64.rpm`
 
 ### 6. .gitignore Updates
+
 - **Status**: ✅ Enhanced
 - **Added exclusions for**:
   - Build artifacts (`/dist`, `src-tauri/target/`, `src-tauri/gen/`)
@@ -64,12 +71,13 @@ This document outlines the security review and production cleanup performed on t
 ## Security Review Findings
 
 ### ✅ Secure Practices Found
+
 1. **Input Validation**: Backend (Rust) has proper input validation for:
    - Task creation (title length, status, priority validation)
    - Command execution (shell operator detection)
    - Path validation (path traversal prevention)
 
-2. **No Dangerous Patterns**: 
+2. **No Dangerous Patterns**:
    - No `eval()` usage found
    - No `innerHTML` or `dangerouslySetInnerHTML` found
    - No hardcoded API keys or secrets in code
@@ -84,7 +92,7 @@ This document outlines the security review and production cleanup performed on t
 
 ### ⚠️ Recommendations for Future
 
-1. **CSP Tightening**: 
+1. **CSP Tightening**:
    - Review if `unsafe-inline` and `unsafe-eval` can be removed
    - Consider using nonces for inline scripts if needed
 
@@ -126,4 +134,3 @@ This document outlines the security review and production cleanup performed on t
 - The logger service maintains error logging for end-user debugging but disables debug/info logs in production
 - Console.log statements are stripped at build time, but should be replaced with logger service for better maintainability
 - Terminal domain has many debug logs that are stripped but should be cleaned up in future refactoring
-

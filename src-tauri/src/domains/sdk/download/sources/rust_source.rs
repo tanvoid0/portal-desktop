@@ -2,7 +2,6 @@
  * Rust Source Implementation
  * Fetches versions from official channel manifests
  */
-
 use super::super::VersionInfo;
 use crate::domains::sdk::SDKError;
 use reqwest::Client;
@@ -21,24 +20,26 @@ impl RustSource {
 
     /// Fetch all available Rust versions from official channel manifests
     pub async fn fetch_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
-        let response = self.client
+        let response = self
+            .client
             .get("https://static.rust-lang.org/dist/channel-rust-stable.toml")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Rust versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Rust versions: {}", e))
+            })?;
 
-        let manifest = response
-            .text()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse Rust manifest: {}", e)))?;
+        let manifest = response.text().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse Rust manifest: {}", e))
+        })?;
 
         // Parse TOML manifest to extract version
         let version = self.extract_rust_version(&manifest)?;
-        
+
         let mut download_urls = HashMap::new();
         let (platform, arch) = self.get_platform_info();
         let platform_arch = format!("{}-{}", platform, arch);
-        
+
         // Rust uses different naming conventions
         let rust_platform = match (platform.as_str(), arch.as_str()) {
             ("darwin", "x64") => "x86_64-apple-darwin",
@@ -50,7 +51,10 @@ impl RustSource {
             _ => return Ok(vec![]),
         };
 
-        let base_url = format!("https://static.rust-lang.org/dist/rust-{}-{}.tar.gz", version, rust_platform);
+        let base_url = format!(
+            "https://static.rust-lang.org/dist/rust-{}-{}.tar.gz",
+            version, rust_platform
+        );
         download_urls.insert(platform_arch, base_url);
 
         Ok(vec![VersionInfo {
@@ -74,27 +78,29 @@ impl RustSource {
                 return Ok(version);
             }
         }
-        Err(SDKError::ManagerNotFound("Could not extract Rust version from manifest".to_string()))
+        Err(SDKError::ManagerNotFound(
+            "Could not extract Rust version from manifest".to_string(),
+        ))
     }
 
     /// Get current platform and architecture
     fn get_platform_info(&self) -> (String, String) {
         let os = std::env::consts::OS;
         let arch = std::env::consts::ARCH;
-        
+
         let platform = match os {
             "macos" => "darwin",
             "windows" => "win32",
             "linux" => "linux",
             _ => "unknown",
         };
-        
+
         let architecture = match arch {
             "x86_64" => "x64",
             "aarch64" => "arm64",
             _ => "unknown",
         };
-        
+
         (platform.to_string(), architecture.to_string())
     }
 }

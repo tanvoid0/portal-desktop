@@ -1,13 +1,14 @@
+use super::super::traits::package_manager::{
+    InstalledPackage, Package, PackageDetails, PackageManager, PackageUpdate,
+};
+use super::super::SDKError;
+use crate::command_executor::CommandExecutor;
 /**
  * Scoop Package Manager Implementation
- * 
+ *
  * Scoop (Windows) implementation
  */
-
 use async_trait::async_trait;
-use crate::command_executor::CommandExecutor;
-use super::super::SDKError;
-use super::super::traits::package_manager::{PackageManager, Package, InstalledPackage, PackageDetails, PackageUpdate};
 
 pub struct ScoopManager;
 
@@ -17,30 +18,34 @@ impl ScoopManager {
     }
 
     async fn execute_scoop(&self, args: &[&str]) -> Result<String, SDKError> {
-        let result = CommandExecutor::execute_with_args("scoop", args, None).await
+        let result = CommandExecutor::execute_with_args("scoop", args, None)
+            .await
             .map_err(|e| SDKError::CommandFailed(format!("Scoop command failed: {}", e)))?;
 
         if result.success {
             Ok(result.stdout)
         } else {
-            Err(SDKError::CommandFailed(format!("Scoop error: {}", result.stderr)))
+            Err(SDKError::CommandFailed(format!(
+                "Scoop error: {}",
+                result.stderr
+            )))
         }
     }
 
     fn parse_package_list(&self, output: &str) -> Vec<InstalledPackage> {
         let mut packages = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with("Name") || line.starts_with("---") {
                 continue;
             }
-            
+
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() >= 2 {
                 let name = parts[0].to_string();
                 let version = parts[1].to_string();
-                
+
                 packages.push(InstalledPackage {
                     id: name.clone(),
                     name,
@@ -51,7 +56,7 @@ impl ScoopManager {
                 });
             }
         }
-        
+
         packages
     }
 }
@@ -84,19 +89,19 @@ impl PackageManager for ScoopManager {
 
     async fn search_packages(&self, query: &str) -> Result<Vec<Package>, SDKError> {
         let output = self.execute_scoop(&["search", query]).await?;
-        
+
         let mut packages = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with("Name") || line.starts_with("---") {
                 continue;
             }
-            
+
             let parts: Vec<&str> = line.split_whitespace().collect();
             if !parts.is_empty() {
                 let name = parts[0].to_string();
-                
+
                 packages.push(Package {
                     id: name.clone(),
                     name,
@@ -109,7 +114,7 @@ impl PackageManager for ScoopManager {
                 });
             }
         }
-        
+
         Ok(packages)
     }
 
@@ -120,13 +125,13 @@ impl PackageManager for ScoopManager {
 
     async fn get_package_details(&self, id: &str) -> Result<PackageDetails, SDKError> {
         let output = self.execute_scoop(&["info", id]).await?;
-        
+
         // Parse scoop info output
         let mut name = id.to_string();
         let mut version = None;
         let mut description = None;
         let mut homepage = None;
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.starts_with("Name:") {
@@ -139,7 +144,7 @@ impl PackageManager for ScoopManager {
                 homepage = Some(line.replace("Website:", "").trim().to_string());
             }
         }
-        
+
         Ok(PackageDetails {
             id: id.to_string(),
             name,
@@ -170,9 +175,9 @@ impl PackageManager for ScoopManager {
 
     async fn check_updates(&self) -> Result<Vec<PackageUpdate>, SDKError> {
         let output = self.execute_scoop(&["status"]).await?;
-        
+
         let mut updates = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.contains("WARN") || line.contains("Update available") {
@@ -190,7 +195,7 @@ impl PackageManager for ScoopManager {
                 }
             }
         }
-        
+
         Ok(updates)
     }
 
@@ -206,4 +211,3 @@ impl PackageManager for ScoopManager {
         false
     }
 }
-

@@ -1,22 +1,27 @@
-use tauri::command;
-use crate::domains::projects::services::ProjectService;
-use crate::domains::projects::entities::ProjectAnalysis;
 use crate::database::DatabaseManager;
+use crate::domains::projects::entities::ProjectAnalysis;
+use crate::domains::projects::services::ProjectService;
 use std::sync::Arc;
+use tauri::command;
 
 #[command]
-pub async fn get_all_projects(db_manager: tauri::State<'_, Arc<DatabaseManager>>) -> Result<Vec<crate::database::ProjectModel>, String> {
+pub async fn get_all_projects(
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<crate::domains::projects::entities::ProjectResponse>, String> {
     let service = ProjectService::new(&db_manager);
-    service.get_all_projects().await
+    service
+        .get_all_projects()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[command]
 pub async fn get_project(
     id: i32,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
-) -> Result<Option<crate::database::ProjectModel>, String> {
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
     let service = ProjectService::new(&db_manager);
-    service.get_project(id).await
+    service.get_project(id).await.map_err(|e| e.to_string())
 }
 
 #[command]
@@ -33,23 +38,25 @@ pub async fn create_project(
     output_directory: Option<String>,
     dev_port: Option<i32>,
     prod_port: Option<i32>,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
-) -> Result<crate::database::ProjectModel, String> {
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<crate::domains::projects::entities::ProjectResponse, String> {
     let service = ProjectService::new(&db_manager);
-    service.create_project(
-        name,
-        description,
-        path,
-        framework_ids.unwrap_or_default(),
-        package_manager_ids.unwrap_or_default(),
-        language_ids.unwrap_or_default(),
-        build_command,
-        start_command,
-        test_command,
-        output_directory,
-        dev_port,
-        prod_port,
-    ).await
+    service
+        .create_project(
+            name,
+            description,
+            path,
+            framework_ids.unwrap_or_default(),
+            package_manager_ids.unwrap_or_default(),
+            language_ids.unwrap_or_default(),
+            build_command,
+            start_command,
+            test_command,
+            output_directory,
+            dev_port,
+            prod_port,
+        )
+        .await
 }
 
 #[command]
@@ -68,31 +75,33 @@ pub async fn update_project(
     output_directory: Option<String>,
     dev_port: Option<i32>,
     prod_port: Option<i32>,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
-) -> Result<Option<crate::database::ProjectModel>, String> {
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
     let service = ProjectService::new(&db_manager);
-    service.update_project(
-        id,
-        name,
-        description,
-        path,
-        status,
-        framework_ids,
-        package_manager_ids,
-        language_ids,
-        build_command,
-        start_command,
-        test_command,
-        output_directory,
-        dev_port,
-        prod_port,
-    ).await
+    service
+        .update_project(
+            id,
+            name,
+            description,
+            path,
+            status,
+            framework_ids,
+            package_manager_ids,
+            language_ids,
+            build_command,
+            start_command,
+            test_command,
+            output_directory,
+            dev_port,
+            prod_port,
+        )
+        .await
 }
 
 #[command]
 pub async fn delete_project(
     id: i32,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<bool, String> {
     let service = ProjectService::new(&db_manager);
     service.delete_project(id).await
@@ -101,8 +110,8 @@ pub async fn delete_project(
 #[command]
 pub async fn toggle_project_star(
     id: i32,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
-) -> Result<Option<crate::database::ProjectModel>, String> {
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
     let service = ProjectService::new(&db_manager);
     service.toggle_project_star(id).await
 }
@@ -110,8 +119,8 @@ pub async fn toggle_project_star(
 #[command]
 pub async fn open_project(
     id: i32,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
-) -> Result<Option<crate::database::ProjectModel>, String> {
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
     let service = ProjectService::new(&db_manager);
     service.open_project(id).await
 }
@@ -119,8 +128,8 @@ pub async fn open_project(
 #[command]
 pub async fn refresh_project_metadata(
     id: i32,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
-) -> Result<Option<crate::database::ProjectModel>, String> {
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
     let service = ProjectService::new(&db_manager);
     service.refresh_project_metadata(id).await
 }
@@ -130,21 +139,26 @@ pub async fn get_projects_with_filters(
     status_filter: Option<String>,
     sort_by: String,
     search_query: Option<String>,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
-) -> Result<Vec<crate::database::ProjectModel>, String> {
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<crate::domains::projects::entities::ProjectResponse>, String> {
     let service = ProjectService::new(&db_manager);
-    service.get_projects_with_filters(status_filter, sort_by, search_query).await
+    service
+        .get_projects_with_filters(status_filter, sort_by, search_query)
+        .await
 }
 
-
 #[command]
-pub async fn get_frameworks(db_manager: tauri::State<'_, Arc<DatabaseManager>>) -> Result<Vec<String>, String> {
+pub async fn get_frameworks(
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<String>, String> {
     let service = ProjectService::new(&db_manager);
     service.get_frameworks().await
 }
 
 #[command]
-pub async fn get_project_stats(db_manager: tauri::State<'_, Arc<DatabaseManager>>) -> Result<crate::domains::projects::services::ProjectStats, String> {
+pub async fn get_project_stats(
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<crate::domains::projects::services::ProjectStats, String> {
     let service = ProjectService::new(&db_manager);
     service.get_project_stats().await
 }
@@ -152,16 +166,20 @@ pub async fn get_project_stats(db_manager: tauri::State<'_, Arc<DatabaseManager>
 #[command]
 pub async fn validate_project_path(
     path: String,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<bool, String> {
     let service = ProjectService::new(&db_manager);
-    service.validate_project_path(&path).await.map(|_| true).or_else(|e| Err(e))
+    service
+        .validate_project_path(&path)
+        .await
+        .map(|_| true)
+        .or_else(|e| Err(e))
 }
 
 #[command]
 pub async fn generate_project_name(
     path: String,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<String, String> {
     let service = ProjectService::new(&db_manager);
     service.generate_project_name(&path).await
@@ -170,7 +188,7 @@ pub async fn generate_project_name(
 #[command]
 pub async fn detect_framework(
     path: String,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<String>, String> {
     let service = ProjectService::new(&db_manager);
     service.detect_frameworks(&path).await
@@ -179,7 +197,7 @@ pub async fn detect_framework(
 #[command]
 pub async fn analyze_project_directory(
     path: String,
-    db_manager: tauri::State<'_, Arc<DatabaseManager>>
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<ProjectAnalysis, String> {
     let service = ProjectService::new(&db_manager);
     service.analyze_project_directory(&path).await
@@ -195,7 +213,7 @@ pub async fn open_project_in_explorer(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
@@ -204,7 +222,7 @@ pub async fn open_project_in_explorer(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
-    
+
     #[cfg(target_os = "linux")]
     {
         use std::process::Command;
@@ -213,24 +231,25 @@ pub async fn open_project_in_explorer(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
-    
+
     Ok(())
 }
 
 #[command]
 pub async fn select_directory(app_handle: tauri::AppHandle) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
     use std::sync::mpsc;
-    
+    use tauri_plugin_dialog::DialogExt;
+
     let (tx, rx) = mpsc::channel();
-    
-    app_handle.dialog()
+
+    app_handle
+        .dialog()
         .file()
         .set_title("Select Project Directory")
         .pick_folder(move |path| {
             let _ = tx.send(path);
         });
-    
+
     // Wait for the result
     match rx.recv() {
         Ok(Some(path)) => Ok(Some(path.to_string())),
@@ -243,16 +262,16 @@ pub async fn select_directory(app_handle: tauri::AppHandle) -> Result<Option<Str
 pub async fn execute_command_in_directory(
     command: String,
     args: Vec<String>,
-    working_directory: String
+    working_directory: String,
 ) -> Result<String, String> {
     use std::process::Command;
-    
+
     let output = Command::new(&command)
         .args(&args)
         .current_dir(&working_directory)
         .output()
         .map_err(|e| e.to_string())?;
-    
+
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {

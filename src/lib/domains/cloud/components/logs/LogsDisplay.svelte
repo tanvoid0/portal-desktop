@@ -1,7 +1,7 @@
 <!-- Logs Display Component - Shows formatted log entries -->
 <script lang="ts">
 	import LogEntry from './LogEntry.svelte';
-	import { Button } from '@/lib/components/ui/button';
+	import { Button } from '$lib/components/ui/button';
 	import type { K8sLog } from '../../types/k8s';
 	import { filterLogsBySeverity } from '../../utils/logFilterUtils';
 	

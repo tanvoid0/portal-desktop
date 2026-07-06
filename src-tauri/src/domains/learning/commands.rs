@@ -1,8 +1,8 @@
-use tauri::command;
-use serde_json::{Value, json};
 use crate::database::DatabaseManager;
 use crate::domains::learning::services::{LearningService, MLIntensity, MemoryManager};
+use serde_json::{json, Value};
 use std::sync::Arc;
+use tauri::command;
 
 #[command]
 pub async fn record_learning_event(
@@ -14,7 +14,9 @@ pub async fn record_learning_event(
 ) -> Result<i32, String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    service.record_event(&db, event_type, event_data, outcome, context).await
+    service
+        .record_event(&db, event_type, event_data, outcome, context)
+        .await
 }
 
 #[command]
@@ -26,7 +28,9 @@ pub async fn learn_pattern(
 ) -> Result<i32, String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    service.learn_pattern(&db, pattern_type, pattern_data, context).await
+    service
+        .learn_pattern(&db, pattern_type, pattern_data, context)
+        .await
 }
 
 #[command]
@@ -37,7 +41,9 @@ pub async fn record_pattern_outcome(
 ) -> Result<(), String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    service.record_pattern_outcome(&db, pattern_id, success).await
+    service
+        .record_pattern_outcome(&db, pattern_id, success)
+        .await
 }
 
 #[command]
@@ -48,7 +54,9 @@ pub async fn get_suggestions(
 ) -> Result<Vec<Value>, String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    service.get_suggestions(&db, &pattern_type, context.as_deref()).await
+    service
+        .get_suggestions(&db, &pattern_type, context.as_deref())
+        .await
 }
 
 #[command]
@@ -61,7 +69,15 @@ pub async fn learn_preference(
 ) -> Result<i32, String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    service.learn_preference(&db, preference_type, context, preference_value, learned_from).await
+    service
+        .learn_preference(
+            &db,
+            preference_type,
+            context,
+            preference_value,
+            learned_from,
+        )
+        .await
 }
 
 #[command]
@@ -72,7 +88,9 @@ pub async fn get_preference(
 ) -> Result<Option<Value>, String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    service.get_preference(&db, &preference_type, context.as_deref()).await
+    service
+        .get_preference(&db, &preference_type, context.as_deref())
+        .await
 }
 
 #[command]
@@ -81,9 +99,12 @@ pub async fn get_ml_intensity(
 ) -> Result<String, String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    
+
     // Try to get saved intensity from preferences
-    match service.get_preference(&db, "ml_intensity", Some("global")).await {
+    match service
+        .get_preference(&db, "ml_intensity", Some("global"))
+        .await
+    {
         Ok(Some(value)) => {
             if let Some(intensity_str) = value.get("intensity").and_then(|v| v.as_str()) {
                 return Ok(intensity_str.to_string());
@@ -92,7 +113,7 @@ pub async fn get_ml_intensity(
         Ok(None) => {}
         Err(_) => {} // Log error but continue to default
     }
-    
+
     // Return default
     Ok(MLIntensity::default().to_string().to_string())
 }
@@ -104,20 +125,21 @@ pub async fn set_ml_intensity(
 ) -> Result<(), String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    
+
     let ml_intensity = MLIntensity::from_str(&intensity);
-    
+
     // Save to preferences
-    service.learn_preference(
-        &db,
-        "ml_intensity".to_string(),
-        Some("global".to_string()),
-        serde_json::json!({ "intensity": ml_intensity.to_string() }),
-        Some("user_setting".to_string()),
-    )
-    .await
-    .map_err(|e| format!("Failed to save ML intensity: {}", e))?;
-    
+    service
+        .learn_preference(
+            &db,
+            "ml_intensity".to_string(),
+            Some("global".to_string()),
+            serde_json::json!({ "intensity": ml_intensity.to_string() }),
+            Some("user_setting".to_string()),
+        )
+        .await
+        .map_err(|e| format!("Failed to save ML intensity: {}", e))?;
+
     Ok(())
 }
 
@@ -127,18 +149,19 @@ pub async fn get_ml_enabled(
 ) -> Result<bool, String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    
+
     // Get enabled state from preferences
-    let preference = service.get_preference(&db, "ml_enabled", Some("global"))
+    let preference = service
+        .get_preference(&db, "ml_enabled", Some("global"))
         .await
         .map_err(|e| format!("Failed to get ML enabled state: {}", e))?;
-    
+
     if let Some(value) = preference {
         if let Some(enabled) = value.get("enabled").and_then(|v| v.as_bool()) {
             return Ok(enabled);
         }
     }
-    
+
     // Default to enabled
     Ok(true)
 }
@@ -150,18 +173,19 @@ pub async fn set_ml_enabled(
 ) -> Result<(), String> {
     let db = db_manager.get_connection();
     let service = LearningService::with_default();
-    
+
     // Save enabled state to preferences
-    service.learn_preference(
-        &db,
-        "ml_enabled".to_string(),
-        Some("global".to_string()),
-        serde_json::json!({ "enabled": enabled }),
-        Some("user_setting".to_string()),
-    )
-    .await
-    .map_err(|e| format!("Failed to save ML enabled state: {}", e))?;
-    
+    service
+        .learn_preference(
+            &db,
+            "ml_enabled".to_string(),
+            Some("global".to_string()),
+            serde_json::json!({ "enabled": enabled }),
+            Some("user_setting".to_string()),
+        )
+        .await
+        .map_err(|e| format!("Failed to save ML enabled state: {}", e))?;
+
     Ok(())
 }
 
@@ -171,23 +195,23 @@ pub async fn get_all_patterns(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<Value>, String> {
     use crate::domains::learning::repositories::LearnedPatternRepository;
-    
+
     let db = db_manager.get_connection();
     let patterns = LearnedPatternRepository::get_all(&db)
         .await
         .map_err(|e| format!("Failed to get patterns: {}", e))?;
-    
+
     let patterns = if let Some(lim) = limit {
         patterns.into_iter().take(lim as usize).collect()
     } else {
         patterns
     };
-    
+
     let mut result = Vec::new();
     for pattern in patterns {
-        let pattern_data: Value = serde_json::from_str(&pattern.pattern_data)
-            .unwrap_or_else(|_| json!(null));
-        
+        let pattern_data: Value =
+            serde_json::from_str(&pattern.pattern_data).unwrap_or_else(|_| json!(null));
+
         result.push(json!({
             "id": pattern.id,
             "pattern_type": pattern.pattern_type,
@@ -200,7 +224,7 @@ pub async fn get_all_patterns(
             "created_at": pattern.created_at.map(|d| d.to_string()),
         }));
     }
-    
+
     Ok(result)
 }
 
@@ -210,17 +234,17 @@ pub async fn get_recent_events(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<Value>, String> {
     use crate::domains::learning::repositories::LearningEventRepository;
-    
+
     let db = db_manager.get_connection();
     let events = LearningEventRepository::get_recent(&db, limit)
         .await
         .map_err(|e| format!("Failed to get events: {}", e))?;
-    
+
     let mut result = Vec::new();
     for event in events {
-        let event_data: Value = serde_json::from_str(&event.event_data)
-            .unwrap_or_else(|_| json!(null));
-        
+        let event_data: Value =
+            serde_json::from_str(&event.event_data).unwrap_or_else(|_| json!(null));
+
         result.push(json!({
             "id": event.id,
             "event_type": event.event_type,
@@ -230,7 +254,7 @@ pub async fn get_recent_events(
             "created_at": event.created_at.map(|d| d.to_string()),
         }));
     }
-    
+
     Ok(result)
 }
 
@@ -239,17 +263,17 @@ pub async fn get_all_preferences(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<Value>, String> {
     use crate::domains::learning::repositories::UserPreferenceRepository;
-    
+
     let db = db_manager.get_connection();
     let preferences = UserPreferenceRepository::get_all(&db)
         .await
         .map_err(|e| format!("Failed to get preferences: {}", e))?;
-    
+
     let mut result = Vec::new();
     for pref in preferences {
-        let preference_value: Value = serde_json::from_str(&pref.preference_value)
-            .unwrap_or_else(|_| json!(null));
-        
+        let preference_value: Value =
+            serde_json::from_str(&pref.preference_value).unwrap_or_else(|_| json!(null));
+
         result.push(json!({
             "id": pref.id,
             "preference_type": pref.preference_type,
@@ -262,7 +286,7 @@ pub async fn get_all_preferences(
             "updated_at": pref.updated_at.map(|d| d.to_string()),
         }));
     }
-    
+
     Ok(result)
 }
 
@@ -272,10 +296,12 @@ pub async fn cleanup_learning_data(
 ) -> Result<Value, String> {
     let db = db_manager.get_connection();
     let memory_manager = MemoryManager::new();
-    
-    let stats = memory_manager.cleanup(&db).await
+
+    let stats = memory_manager
+        .cleanup(&db)
+        .await
         .map_err(|e| format!("Failed to cleanup learning data: {}", e))?;
-    
+
     Ok(serde_json::json!({
         "events_deleted": stats.events_deleted,
         "patterns_deleted": stats.patterns_deleted,
@@ -289,10 +315,12 @@ pub async fn get_memory_stats(
 ) -> Result<Value, String> {
     let db = db_manager.get_connection();
     let memory_manager = MemoryManager::new();
-    
-    let stats = memory_manager.get_stats(&db).await
+
+    let stats = memory_manager
+        .get_stats(&db)
+        .await
         .map_err(|e| format!("Failed to get memory stats: {}", e))?;
-    
+
     Ok(serde_json::json!({
         "total_events": stats.total_events,
         "total_patterns": stats.total_patterns,
@@ -310,10 +338,12 @@ pub async fn get_cleanup_preview(
 ) -> Result<Value, String> {
     let db = db_manager.get_connection();
     let memory_manager = MemoryManager::new();
-    
-    let preview = memory_manager.get_cleanup_preview(&db).await
+
+    let preview = memory_manager
+        .get_cleanup_preview(&db)
+        .await
         .map_err(|e| format!("Failed to get cleanup preview: {}", e))?;
-    
+
     Ok(serde_json::json!({
         "events_to_delete": preview.events_to_delete,
         "patterns_to_delete": preview.patterns_to_delete,
@@ -328,12 +358,11 @@ pub async fn mark_pattern_important(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<(), String> {
     use crate::domains::learning::repositories::LearnedPatternRepository;
-    
+
     let db = db_manager.get_connection();
     LearnedPatternRepository::mark_important(&db, pattern_id, is_important)
         .await
         .map_err(|e| format!("Failed to mark pattern as important: {}", e))?;
-    
+
     Ok(())
 }
-

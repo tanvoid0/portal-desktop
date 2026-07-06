@@ -1,9 +1,8 @@
 /**
  * Version Fetcher
- * 
+ *
  * Fetches available versions from official sources for different SDKs
  */
-
 use super::VersionInfo;
 use crate::domains::sdk::SDKError;
 use serde::{Deserialize, Serialize};
@@ -29,20 +28,25 @@ impl VersionFetcher {
             "go" => self.fetch_go_versions().await,
             "php" => self.fetch_php_versions().await,
             "ruby" => self.fetch_ruby_versions().await,
-            _ => Err(SDKError::ManagerNotFound(format!("Unsupported SDK type: {}", self.sdk_type))),
+            _ => Err(SDKError::ManagerNotFound(format!(
+                "Unsupported SDK type: {}",
+                self.sdk_type
+            ))),
         }
     }
 
     /// Fetch Node.js versions from official source
     async fn fetch_nodejs_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
         use reqwest::Client;
-        
+
         let client = Client::new();
         let response = client
             .get("https://nodejs.org/dist/")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Node.js versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Node.js versions: {}", e))
+            })?;
 
         let html = response
             .text()
@@ -51,11 +55,11 @@ impl VersionFetcher {
 
         let mut versions = Vec::new();
         let re = regex::Regex::new(r#"href="v([\d.]+?)/""#).unwrap();
-        
+
         for cap in re.captures_iter(&html) {
             if let Some(version) = cap.get(1) {
                 let version_str = version.as_str().to_string();
-                
+
                 // Skip versions older than 7.x
                 if let Some(version_parts) = version_str.split('.').next() {
                     if let Ok(major) = version_parts.parse::<u32>() {
@@ -66,7 +70,7 @@ impl VersionFetcher {
                 }
 
                 let download_urls = self.get_nodejs_download_urls(&version_str);
-                
+
                 versions.push(VersionInfo {
                     version: version_str.clone(),
                     lts: version_str.contains("LTS"),
@@ -83,7 +87,9 @@ impl VersionFetcher {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)
@@ -93,10 +99,10 @@ impl VersionFetcher {
     fn get_nodejs_download_urls(&self, version: &str) -> HashMap<String, String> {
         let mut urls = HashMap::new();
         let base_url = format!("https://nodejs.org/dist/v{}/", version);
-        
+
         // Determine platform and architecture
         let (platform, arch) = self.get_platform_info();
-        
+
         let filename = match (platform.as_str(), arch.as_str()) {
             ("darwin", "x64") => format!("node-v{}-darwin-x64.tar.gz", version),
             ("darwin", "arm64") => format!("node-v{}-darwin-arm64.tar.gz", version),
@@ -106,22 +112,27 @@ impl VersionFetcher {
             ("win32", "arm64") => format!("node-v{}-win-arm64.zip", version),
             _ => return urls,
         };
-        
-        urls.insert(format!("{}-{}", platform, arch), format!("{}{}", base_url, filename));
+
+        urls.insert(
+            format!("{}-{}", platform, arch),
+            format!("{}{}", base_url, filename),
+        );
         urls
     }
 
     /// Fetch Python versions from GitHub releases
     async fn fetch_python_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
         use reqwest::Client;
-        
+
         let client = Client::new();
         let response = client
             .get("https://api.github.com/repos/python/cpython/releases")
             .header("User-Agent", "Portal-Desktop")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Python versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Python versions: {}", e))
+            })?;
 
         #[derive(Deserialize)]
         struct GitHubRelease {
@@ -136,21 +147,20 @@ impl VersionFetcher {
             browser_download_url: String,
         }
 
-        let releases: Vec<GitHubRelease> = response
-            .json()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse Python releases: {}", e)))?;
+        let releases: Vec<GitHubRelease> = response.json().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse Python releases: {}", e))
+        })?;
 
         let mut versions = Vec::new();
-        
+
         for release in releases {
             let version = release.tag_name.trim_start_matches('v').to_string();
-            
+
             // Skip pre-releases and very old versions
             if version.contains("a") || version.contains("b") || version.contains("rc") {
                 continue;
             }
-            
+
             if let Some(version_parts) = version.split('.').next() {
                 if let Ok(major) = version_parts.parse::<u32>() {
                     if major < 3 {
@@ -181,7 +191,9 @@ impl VersionFetcher {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)
@@ -209,13 +221,15 @@ impl VersionFetcher {
     /// Fetch Java versions from Adoptium API
     async fn fetch_java_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
         use reqwest::Client;
-        
+
         let client = Client::new();
         let response = client
             .get("https://api.adoptium.net/v3/assets/latest/8,11,17,21,22/hotspot")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Java versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Java versions: {}", e))
+            })?;
 
         #[derive(Deserialize)]
         struct AdoptiumRelease {
@@ -248,18 +262,18 @@ impl VersionFetcher {
             checksum: String,
         }
 
-        let releases: Vec<AdoptiumRelease> = response
-            .json()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse Java releases: {}", e)))?;
+        let releases: Vec<AdoptiumRelease> = response.json().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse Java releases: {}", e))
+        })?;
 
         let mut versions = Vec::new();
-        
+
         for release in releases {
-            let version = format!("{}.{}.{}.{}", 
-                release.version.major, 
-                release.version.minor, 
-                release.version.security, 
+            let version = format!(
+                "{}.{}.{}.{}",
+                release.version.major,
+                release.version.minor,
+                release.version.security,
                 release.version.patch
             );
 
@@ -284,7 +298,9 @@ impl VersionFetcher {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)
@@ -293,26 +309,27 @@ impl VersionFetcher {
     /// Fetch Rust versions from official channel manifests
     async fn fetch_rust_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
         use reqwest::Client;
-        
+
         let client = Client::new();
         let response = client
             .get("https://static.rust-lang.org/dist/channel-rust-stable.toml")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Rust versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Rust versions: {}", e))
+            })?;
 
-        let manifest = response
-            .text()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse Rust manifest: {}", e)))?;
+        let manifest = response.text().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse Rust manifest: {}", e))
+        })?;
 
         // Parse TOML manifest to extract version
         let version = self.extract_rust_version(&manifest)?;
-        
+
         let mut download_urls = HashMap::new();
         let (platform, arch) = self.get_platform_info();
         let platform_arch = format!("{}-{}", platform, arch);
-        
+
         // Rust uses different naming conventions
         let rust_platform = match (platform.as_str(), arch.as_str()) {
             ("darwin", "x64") => "x86_64-apple-darwin",
@@ -324,7 +341,10 @@ impl VersionFetcher {
             _ => return Ok(vec![]),
         };
 
-        let base_url = format!("https://static.rust-lang.org/dist/rust-{}-{}.tar.gz", version, rust_platform);
+        let base_url = format!(
+            "https://static.rust-lang.org/dist/rust-{}-{}.tar.gz",
+            version, rust_platform
+        );
         download_urls.insert(platform_arch, base_url);
 
         Ok(vec![VersionInfo {
@@ -348,19 +368,23 @@ impl VersionFetcher {
                 return Ok(version);
             }
         }
-        Err(SDKError::ManagerNotFound("Could not extract Rust version from manifest".to_string()))
+        Err(SDKError::ManagerNotFound(
+            "Could not extract Rust version from manifest".to_string(),
+        ))
     }
 
     /// Fetch Go versions from official API
     async fn fetch_go_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
         use reqwest::Client;
-        
+
         let client = Client::new();
         let response = client
             .get("https://go.dev/dl/?mode=json")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Go versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Go versions: {}", e))
+            })?;
 
         #[derive(Deserialize)]
         struct GoRelease {
@@ -377,16 +401,16 @@ impl VersionFetcher {
             sha256: String,
         }
 
-        let releases: Vec<GoRelease> = response
-            .json()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse Go releases: {}", e)))?;
+        let releases: Vec<GoRelease> = response.json().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse Go releases: {}", e))
+        })?;
 
         let mut versions = Vec::new();
-        
+
         for release in releases {
             // Skip beta/rc versions
-            if !release.stable || release.version.contains("beta") || release.version.contains("rc") {
+            if !release.stable || release.version.contains("beta") || release.version.contains("rc")
+            {
                 continue;
             }
 
@@ -412,7 +436,9 @@ impl VersionFetcher {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)
@@ -421,13 +447,15 @@ impl VersionFetcher {
     /// Fetch PHP versions from official releases API
     async fn fetch_php_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
         use reqwest::Client;
-        
+
         let client = Client::new();
         let response = client
             .get("https://www.php.net/releases/index.php?json")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch PHP versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch PHP versions: {}", e))
+            })?;
 
         #[derive(Deserialize)]
         struct PhpRelease {
@@ -443,13 +471,12 @@ impl VersionFetcher {
             md5: String,
         }
 
-        let releases: Vec<PhpRelease> = response
-            .json()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse PHP releases: {}", e)))?;
+        let releases: Vec<PhpRelease> = response.json().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse PHP releases: {}", e))
+        })?;
 
         let mut versions = Vec::new();
-        
+
         for release in releases {
             // Skip very old versions
             if let Some(version_parts) = release.version.split('.').next() {
@@ -463,7 +490,10 @@ impl VersionFetcher {
             let mut download_urls = HashMap::new();
             for source in &release.source {
                 if source.filename.ends_with(".tar.gz") {
-                    let url = format!("https://www.php.net/get/{}/from/this/mirror", source.filename);
+                    let url = format!(
+                        "https://www.php.net/get/{}/from/this/mirror",
+                        source.filename
+                    );
                     download_urls.insert("source".to_string(), url);
                 }
             }
@@ -483,7 +513,9 @@ impl VersionFetcher {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)
@@ -492,13 +524,15 @@ impl VersionFetcher {
     /// Fetch Ruby versions from official cache
     async fn fetch_ruby_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
         use reqwest::Client;
-        
+
         let client = Client::new();
         let response = client
             .get("https://cache.ruby-lang.org/pub/ruby/")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Ruby versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Ruby versions: {}", e))
+            })?;
 
         let html = response
             .text()
@@ -507,11 +541,11 @@ impl VersionFetcher {
 
         let mut versions = Vec::new();
         let re = regex::Regex::new(r#"href="(\d+\.\d+\.\d+)/""#).unwrap();
-        
+
         for cap in re.captures_iter(&html) {
             if let Some(version) = cap.get(1) {
                 let version_str = version.as_str().to_string();
-                
+
                 // Skip very old versions
                 if let Some(version_parts) = version_str.split('.').next() {
                     if let Ok(major) = version_parts.parse::<u32>() {
@@ -524,9 +558,12 @@ impl VersionFetcher {
                 let mut download_urls = HashMap::new();
                 let (platform, arch) = self.get_platform_info();
                 let platform_arch = format!("{}-{}", platform, arch);
-                
+
                 // Ruby source downloads
-                let source_url = format!("https://cache.ruby-lang.org/pub/ruby/{}/ruby-{}.tar.gz", version_str, version_str);
+                let source_url = format!(
+                    "https://cache.ruby-lang.org/pub/ruby/{}/ruby-{}.tar.gz",
+                    version_str, version_str
+                );
                 download_urls.insert(platform_arch, source_url);
 
                 versions.push(VersionInfo {
@@ -545,7 +582,9 @@ impl VersionFetcher {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)
@@ -555,20 +594,20 @@ impl VersionFetcher {
     fn get_platform_info(&self) -> (String, String) {
         let os = std::env::consts::OS;
         let arch = std::env::consts::ARCH;
-        
+
         let platform = match os {
             "macos" => "darwin",
             "windows" => "win32",
             "linux" => "linux",
             _ => "unknown",
         };
-        
+
         let architecture = match arch {
             "x86_64" => "x64",
             "aarch64" => "arm64",
             _ => "unknown",
         };
-        
+
         (platform.to_string(), architecture.to_string())
     }
 }

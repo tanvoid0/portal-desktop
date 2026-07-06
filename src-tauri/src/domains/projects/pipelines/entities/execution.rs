@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineExecutionModel {
@@ -11,7 +11,7 @@ pub struct PipelineExecutionModel {
     pub finished_at: Option<DateTime<Utc>>,
     pub triggered_by: String,
     pub step_executions_json: String, // JSON array of StepExecution
-    pub variables_json: String, // JSON object
+    pub variables_json: String,       // JSON object
     pub error: Option<String>,
 }
 
@@ -30,4 +30,3 @@ pub struct StepExecutionModel {
     pub retry_count: i32,
     pub logs_json: String, // JSON array of strings
 }
-

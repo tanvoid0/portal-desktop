@@ -25,8 +25,16 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(ProjectPackageManagers::ProjectId).integer().not_null())
-                    .col(ColumnDef::new(ProjectPackageManagers::PackageManagerId).integer().not_null())
+                    .col(
+                        ColumnDef::new(ProjectPackageManagers::ProjectId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectPackageManagers::PackageManagerId)
+                            .integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(ProjectPackageManagers::CreatedAt)
                             .timestamp_with_time_zone()
@@ -36,7 +44,10 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_project_package_managers_project_id")
-                            .from(ProjectPackageManagers::Table, ProjectPackageManagers::ProjectId)
+                            .from(
+                                ProjectPackageManagers::Table,
+                                ProjectPackageManagers::ProjectId,
+                            )
                             .to(Projects::Table, Projects::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
@@ -44,7 +55,10 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_project_package_managers_package_manager_id")
-                            .from(ProjectPackageManagers::Table, ProjectPackageManagers::PackageManagerId)
+                            .from(
+                                ProjectPackageManagers::Table,
+                                ProjectPackageManagers::PackageManagerId,
+                            )
                             .to(PackageManagers::Table, PackageManagers::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
@@ -96,7 +110,11 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(ProjectPackageManagers::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(ProjectPackageManagers::Table)
+                    .to_owned(),
+            )
             .await
     }
 }
@@ -121,4 +139,3 @@ enum PackageManagers {
     Table,
     Id,
 }
-

@@ -1,11 +1,11 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"path": "../../../../external/config/scripts/project"
-		}
-	],
-	"settings": {}
+  "folders": [
+    {
+      "path": ".",
+    },
+    {
+      "path": "../../../../external/config/scripts/project",
+    },
+  ],
+  "settings": {},
 }

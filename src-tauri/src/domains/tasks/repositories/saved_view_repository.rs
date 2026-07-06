@@ -1,6 +1,10 @@
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait, QueryOrder};
+use crate::entities::saved_view::{
+    ActiveModel, Column, Entity as SavedViewEntity, Model as SavedViewModel,
+};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 use serde::{Deserialize, Serialize};
-use crate::entities::saved_view::{Entity as SavedViewEntity, Model as SavedViewModel, ActiveModel, Column};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSavedViewRequest {
@@ -27,7 +31,10 @@ impl SavedViewRepository {
         Self { db }
     }
 
-    pub async fn create(&self, request: CreateSavedViewRequest) -> Result<SavedViewModel, sea_orm::DbErr> {
+    pub async fn create(
+        &self,
+        request: CreateSavedViewRequest,
+    ) -> Result<SavedViewModel, sea_orm::DbErr> {
         // If this is set as default, unset all other defaults
         if request.is_default {
             self.clear_default().await?;
@@ -44,7 +51,11 @@ impl SavedViewRepository {
         active_model.insert(&self.db).await
     }
 
-    pub async fn update(&self, id: i32, request: UpdateSavedViewRequest) -> Result<SavedViewModel, sea_orm::DbErr> {
+    pub async fn update(
+        &self,
+        id: i32,
+        request: UpdateSavedViewRequest,
+    ) -> Result<SavedViewModel, sea_orm::DbErr> {
         let mut active_model: ActiveModel = SavedViewEntity::find_by_id(id)
             .one(&self.db)
             .await?

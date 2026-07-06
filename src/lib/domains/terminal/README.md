@@ -1,101 +1,70 @@
-# Multi-Tab Terminal System
+# Terminal Workspace
 
-This document describes the multi-tab terminal functionality implemented in the portal desktop application.
-
-## Features
-
-### Tab Management
-- **Create New Tab**: Click the `+` button or press `Ctrl+T`
-- **Close Tab**: Click the `×` button on a tab or press `Ctrl+W`
-- **Switch Tabs**: Click on a tab or use keyboard shortcuts
-- **Duplicate Tab**: Press `Ctrl+D` to duplicate the current tab
-
-### Keyboard Shortcuts
-- `Ctrl+T` - Create new tab
-- `Ctrl+W` - Close current tab
-- `Ctrl+D` - Duplicate current tab
-- `Ctrl+Tab` - Switch to next tab
-- `Ctrl+Shift+Tab` - Switch to previous tab
-- `Ctrl+1-9` - Switch to tab by number (1-9)
-
-### Tab Indicators
-- **Status Colors**: Each tab has a colored border indicating its status:
-  - 🟢 Green: Running
-  - 🔴 Red: Error
-  - ✅ Blue: Completed
-  - 💀 Gray: Killed
-  - 💻 Default: Idle
-
-### Tab Information
-- **Tooltips**: Hover over tabs to see detailed information including:
-  - Tab name
-  - Working directory
-  - Status
-  - Process ID (truncated)
+Unified interactive terminal for Portal Desktop — WaveTerm-style widget rail with Warp-style command blocks and AI assistance.
 
 ## Architecture
 
-### Components
-- `MultiTabTerminal.svelte` - Main container managing multiple tabs
-- `TerminalTabBar.svelte` - Tab bar with tab management controls
-- `Terminal.svelte` - Individual terminal instance
-- `ContainerizedTerminal.svelte` - Containerized view option
-
-### State Management
-- `terminalStore.ts` - Centralized state management for tabs and processes
-- `terminalActions` - Actions for tab and process management
-- Reactive stores for active tab, process, and output
-
-### Data Flow
-1. User creates/switches tabs via UI or keyboard shortcuts
-2. `terminalActions` updates the `terminalStore`
-3. Components reactively update based on store changes
-4. Each tab maintains its own terminal process and output
-
-## Usage
-
-### Basic Usage
-```svelte
-<script>
-  import { MultiTabTerminal } from '$lib/domains/terminal';
-  
-  let settings = {
-    theme: 'dark',
-    fontSize: 14,
-    fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-    // ... other settings
-  };
-</script>
-
-<MultiTabTerminal {settings} />
+```
+/terminal
+  └── TerminalWorkspace
+        ├── TabContainer / TabBar (multi-tab sessions)
+        ├── TerminalSession (per tab)
+        │     ├── XtermPane (interactive PTY via xterm.js)
+        │     └── CommandInputBar (optional structured input + /ai)
+        └── Widget rail (collapsible)
+              ├── CommandBlocksPanel (OSC 133 capture)
+              ├── AIAssistantPanel
+              ├── NotesPanel
+              ├── SessionLauncher (projects / containers)
+              └── CommandHistoryPanel
 ```
 
-### With Containerized View
-```svelte
-<script>
-  import { MultiTabTerminal } from '$lib/domains/terminal';
-  
-  let showContainerized = false;
-  let settings = { /* ... */ };
-</script>
+### Shared core
 
-<MultiTabTerminal {showContainerized} {settings} />
+| Module | Purpose |
+|--------|---------|
+| `composables/useXtermSession.ts` | xterm lifecycle, OSC8 links, session persistence |
+| `composables/useTerminalProcess.ts` | PTY create/input/resize/kill |
+| `components/core/XtermPane.svelte` | xterm canvas (interactive or one-shot) |
+| `components/core/TerminalSession.svelte` | xterm + command input + optional widget slot |
+| `stores/commandBlockStore.ts` | Unified command output capture |
+
+### Embedded terminals
+
+- **Project pages:** `ProjectTerminal.svelte` — scoped tabs via `resourceName: "project"`
+- **Script runs:** `EmbeddedTerminal.svelte` — one-shot mode via `XtermPane mode="oneshot"`
+
+## Keyboard shortcuts
+
+- `Ctrl+T` — New tab
+- `Ctrl+W` — Close tab
+- `Ctrl+Tab` / `Ctrl+Shift+Tab` — Switch tabs
+- `Ctrl+1-9` — Switch to tab by number
+- `Ctrl+Space` — Toggle AI mode in command input bar
+- `Ctrl+K` — Command palette
+
+## Deep links
+
+| URL param | Behavior |
+|-----------|----------|
+| `?command=` | Pre-fill and run command in active tab |
+| `?container={id}` | Open Docker exec terminal tab |
+| `?project={id}` | Focus existing project-scoped tab |
+
+## Readonly command capture
+
+For cross-domain readonly execution:
+
+```typescript
+import { TerminalService, commandBlockStore } from "$lib/domains/terminal";
+
+const result = await TerminalService.executeInContext(
+  { tabId, workingDirectory: cwd, environment: {} },
+  "kubectl get pods",
+);
+// Results are automatically captured in commandBlockStore for the tab
 ```
 
-## Integration
+## Backend
 
-The multi-tab terminal integrates with:
-- **Terminal Service**: Backend communication via Tauri
-- **Command History**: Per-tab command tracking
-- **Profile System**: Shell detection and selection
-- **Settings**: Global terminal configuration
-
-## Future Enhancements
-
-Potential improvements:
-- Tab reordering (drag & drop)
-- Tab groups/folders
-- Tab persistence across sessions
-- Custom tab names
-- Tab-specific settings
-- Split panes within tabs
+Tauri PTY (`src-tauri/src/domains/terminal/`), OSC 133 shell integration, SQLite persistence for history/sessions/notes.

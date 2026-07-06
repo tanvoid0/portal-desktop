@@ -33,13 +33,35 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(TaskTemplates::Name).text().not_null())
                     .col(ColumnDef::new(TaskTemplates::Description).text().null())
-                    .col(ColumnDef::new(TaskTemplates::DefaultStatus).text().not_null().default("pending"))
-                    .col(ColumnDef::new(TaskTemplates::DefaultPriority).text().not_null().default("medium"))
+                    .col(
+                        ColumnDef::new(TaskTemplates::DefaultStatus)
+                            .text()
+                            .not_null()
+                            .default("pending"),
+                    )
+                    .col(
+                        ColumnDef::new(TaskTemplates::DefaultPriority)
+                            .text()
+                            .not_null()
+                            .default("medium"),
+                    )
                     .col(ColumnDef::new(TaskTemplates::DefaultType).text().null())
                     .col(ColumnDef::new(TaskTemplates::DefaultTags).text().null())
-                    .col(ColumnDef::new(TaskTemplates::DefaultEstimatedTime).integer().null())
-                    .col(ColumnDef::new(TaskTemplates::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(TaskTemplates::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(TaskTemplates::DefaultEstimatedTime)
+                            .integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(TaskTemplates::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(TaskTemplates::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .to_owned(),
             )
             .await

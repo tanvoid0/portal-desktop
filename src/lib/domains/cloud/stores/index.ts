@@ -1,3 +1,2 @@
 // Cloud stores
-export * from './cloudStore';
-
+export * from "./cloudStore";

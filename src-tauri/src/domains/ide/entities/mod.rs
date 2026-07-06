@@ -35,4 +35,3 @@ pub struct FrameworkGroup {
     pub category: String,
     pub frameworks: Vec<SuggestedFramework>,
 }
-

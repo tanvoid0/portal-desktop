@@ -1,9 +1,9 @@
-use sea_orm::DatabaseConnection;
 use crate::domains::autonomy::services::ApprovalManager;
+use sea_orm::DatabaseConnection;
 // FUTURE: ActionClassifier is imported directly for now, will be re-exported when autonomous actions are fully implemented
 use crate::domains::autonomy::services::action_classifier::ActionClassifier;
-use crate::domains::learning::services::LearningService;
 use crate::domains::learning::repositories::LearnedPatternRepository;
+use crate::domains::learning::services::LearningService;
 use serde::{Deserialize, Serialize};
 
 /// Autonomous action request
@@ -81,16 +81,24 @@ impl AutonomyService {
                 action_id: uuid::Uuid::new_v4().to_string(),
                 executed: false,
                 requires_approval: true,
-                classification: self.classifier.classify(&request.action_type, &request.context, 0.0),
+                classification: self.classifier.classify(
+                    &request.action_type,
+                    &request.context,
+                    0.0,
+                ),
                 message: "Autonomy is disabled".to_string(),
             });
         }
 
         // Get success rate from learned patterns
-        let success_rate = self.get_action_success_rate(db, &request.action_type, &request.context).await?;
+        let success_rate = self
+            .get_action_success_rate(db, &request.action_type, &request.context)
+            .await?;
 
         // Classify the action
-        let classification = self.classifier.classify(&request.action_type, &request.context, success_rate);
+        let classification =
+            self.classifier
+                .classify(&request.action_type, &request.context, success_rate);
 
         // Check if auto-approval is allowed
         let safety_level = classification.safety_level;
@@ -117,7 +125,10 @@ impl AutonomyService {
     }
 
     /// Check if action is allowed by current autonomy level
-    fn is_allowed_by_level(&self, safety_level: crate::domains::autonomy::services::action_classifier::ActionSafetyLevel) -> bool {
+    fn is_allowed_by_level(
+        &self,
+        safety_level: crate::domains::autonomy::services::action_classifier::ActionSafetyLevel,
+    ) -> bool {
         match (self.autonomy_level, safety_level) {
             (AutonomyLevel::Observation, _) => false,
             (AutonomyLevel::Conservative, crate::domains::autonomy::services::action_classifier::ActionSafetyLevel::Safe) => true,
@@ -138,24 +149,24 @@ impl AutonomyService {
         context: &str,
     ) -> Result<f64, String> {
         // Query learned patterns for this action type
-        let patterns = LearnedPatternRepository::get_by_type_and_context(db, action_type, Some(context))
-            .await
-            .map_err(|e| format!("Failed to query patterns: {}", e))?;
+        let patterns =
+            LearnedPatternRepository::get_by_type_and_context(db, action_type, Some(context))
+                .await
+                .map_err(|e| format!("Failed to query patterns: {}", e))?;
 
         if patterns.is_empty() {
             return Ok(0.5); // Default moderate confidence
         }
 
         // Calculate weighted average success rate
-        let total_weight = patterns.iter()
-            .map(|p| p.frequency as f64)
-            .sum::<f64>();
+        let total_weight = patterns.iter().map(|p| p.frequency as f64).sum::<f64>();
 
         if total_weight == 0.0 {
             return Ok(0.5);
         }
 
-        let weighted_sum = patterns.iter()
+        let weighted_sum = patterns
+            .iter()
             .map(|p| p.success_rate * p.frequency as f64)
             .sum::<f64>();
 

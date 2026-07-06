@@ -1,2 +1,1 @@
-export * from './services/autonomyService';
-
+export * from "./services/autonomyService";

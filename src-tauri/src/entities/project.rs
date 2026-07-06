@@ -34,10 +34,10 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::project_framework::Entity")]
     ProjectFrameworks,
-    
+
     #[sea_orm(has_many = "super::project_language::Entity")]
     ProjectLanguages,
-    
+
     #[sea_orm(has_many = "super::project_package_manager::Entity")]
     ProjectPackageManagers,
 }
@@ -46,7 +46,7 @@ impl Related<super::framework::Entity> for Entity {
     fn to() -> RelationDef {
         super::project_framework::Relation::Framework.def()
     }
-    
+
     fn via() -> Option<RelationDef> {
         Some(super::project_framework::Relation::Project.def().rev())
     }
@@ -56,7 +56,7 @@ impl Related<super::language::Entity> for Entity {
     fn to() -> RelationDef {
         super::project_language::Relation::Language.def()
     }
-    
+
     fn via() -> Option<RelationDef> {
         Some(super::project_language::Relation::Project.def().rev())
     }
@@ -66,9 +66,13 @@ impl Related<super::package_manager::Entity> for Entity {
     fn to() -> RelationDef {
         super::project_package_manager::Relation::PackageManager.def()
     }
-    
+
     fn via() -> Option<RelationDef> {
-        Some(super::project_package_manager::Relation::Project.def().rev())
+        Some(
+            super::project_package_manager::Relation::Project
+                .def()
+                .rev(),
+        )
     }
 }
 

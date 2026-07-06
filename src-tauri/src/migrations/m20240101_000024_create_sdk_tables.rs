@@ -30,7 +30,12 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(SdkCustomPaths::SdkType).string().not_null())
                     .col(ColumnDef::new(SdkCustomPaths::Path).string().not_null())
                     .col(ColumnDef::new(SdkCustomPaths::Version).string())
-                    .col(ColumnDef::new(SdkCustomPaths::Enabled).boolean().not_null().default(true))
+                    .col(
+                        ColumnDef::new(SdkCustomPaths::Enabled)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
                     .col(
                         ColumnDef::new(SdkCustomPaths::CreatedAt)
                             .date_time()
@@ -59,7 +64,12 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(SdkEnvironmentConfigs::PathManagedBy).string().not_null().default("none"))
+                    .col(
+                        ColumnDef::new(SdkEnvironmentConfigs::PathManagedBy)
+                            .string()
+                            .not_null()
+                            .default("none"),
+                    )
                     .col(
                         ColumnDef::new(SdkEnvironmentConfigs::LastUpdated)
                             .date_time()
@@ -95,11 +105,33 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(SdkEnvironmentVariables::SdkType).string().not_null())
-                    .col(ColumnDef::new(SdkEnvironmentVariables::Name).string().not_null())
-                    .col(ColumnDef::new(SdkEnvironmentVariables::Value).string().not_null())
-                    .col(ColumnDef::new(SdkEnvironmentVariables::Scope).string().not_null().default("global"))
-                    .col(ColumnDef::new(SdkEnvironmentVariables::IsExported).boolean().not_null().default(true))
+                    .col(
+                        ColumnDef::new(SdkEnvironmentVariables::SdkType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(SdkEnvironmentVariables::Name)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(SdkEnvironmentVariables::Value)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(SdkEnvironmentVariables::Scope)
+                            .string()
+                            .not_null()
+                            .default("global"),
+                    )
+                    .col(
+                        ColumnDef::new(SdkEnvironmentVariables::IsExported)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
                     .col(
                         ColumnDef::new(SdkEnvironmentVariables::CreatedAt)
                             .date_time()
@@ -132,9 +164,24 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(SdkPathEntries::SdkType).string().not_null())
                     .col(ColumnDef::new(SdkPathEntries::Path).string().not_null())
                     .col(ColumnDef::new(SdkPathEntries::Version).string().not_null())
-                    .col(ColumnDef::new(SdkPathEntries::Scope).string().not_null().default("global"))
-                    .col(ColumnDef::new(SdkPathEntries::IsActive).boolean().not_null().default(true))
-                    .col(ColumnDef::new(SdkPathEntries::Priority).integer().not_null().default(0))
+                    .col(
+                        ColumnDef::new(SdkPathEntries::Scope)
+                            .string()
+                            .not_null()
+                            .default("global"),
+                    )
+                    .col(
+                        ColumnDef::new(SdkPathEntries::IsActive)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(SdkPathEntries::Priority)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
                     .col(
                         ColumnDef::new(SdkPathEntries::CreatedAt)
                             .date_time()
@@ -164,8 +211,16 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(SdkVersionAliases::SdkType).string().not_null())
-                    .col(ColumnDef::new(SdkVersionAliases::Version).string().not_null())
+                    .col(
+                        ColumnDef::new(SdkVersionAliases::SdkType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(SdkVersionAliases::Version)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(SdkVersionAliases::Alias).string().not_null())
                     .col(
                         ColumnDef::new(SdkVersionAliases::CreatedAt)
@@ -252,7 +307,11 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(SdkPathEntries::Table).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(SdkEnvironmentVariables::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(SdkEnvironmentVariables::Table)
+                    .to_owned(),
+            )
             .await?;
         manager
             .drop_table(Table::drop().table(SdkEnvironmentConfigs::Table).to_owned())
@@ -323,4 +382,3 @@ enum SdkVersionAliases {
     CreatedAt,
     UpdatedAt,
 }
-

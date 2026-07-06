@@ -30,8 +30,18 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Frameworks::Name).string().not_null())
                     .col(ColumnDef::new(Frameworks::Icon).string().not_null())
-                    .col(ColumnDef::new(Frameworks::IconType).string().not_null().default("devicon"))
-                    .col(ColumnDef::new(Frameworks::Category).string().not_null().default("Custom"))
+                    .col(
+                        ColumnDef::new(Frameworks::IconType)
+                            .string()
+                            .not_null()
+                            .default("devicon"),
+                    )
+                    .col(
+                        ColumnDef::new(Frameworks::Category)
+                            .string()
+                            .not_null()
+                            .default("Custom"),
+                    )
                     .col(
                         ColumnDef::new(Frameworks::CreatedAt)
                             .date_time()
@@ -82,4 +92,3 @@ enum Frameworks {
     CreatedAt,
     UpdatedAt,
 }
-

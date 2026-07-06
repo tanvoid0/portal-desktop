@@ -25,15 +25,46 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(CustomScripts::Name).string().not_null())
                     .col(ColumnDef::new(CustomScripts::Description).text().null())
                     .col(ColumnDef::new(CustomScripts::Command).text().not_null())
-                    .col(ColumnDef::new(CustomScripts::ParametersJson).text().not_null())
+                    .col(
+                        ColumnDef::new(CustomScripts::ParametersJson)
+                            .text()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(CustomScripts::Category).string().null())
                     .col(ColumnDef::new(CustomScripts::Icon).string().null())
-                    .col(ColumnDef::new(CustomScripts::RequiresSudo).boolean().not_null().default(false))
-                    .col(ColumnDef::new(CustomScripts::IsInteractive).boolean().not_null().default(false))
-                    .col(ColumnDef::new(CustomScripts::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(CustomScripts::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(CustomScripts::LastRunAt).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(CustomScripts::RunCount).integer().not_null().default(0))
+                    .col(
+                        ColumnDef::new(CustomScripts::RequiresSudo)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(CustomScripts::IsInteractive)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(CustomScripts::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(CustomScripts::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(CustomScripts::LastRunAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(CustomScripts::RunCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
                     .to_owned(),
             )
             .await
@@ -63,4 +94,3 @@ enum CustomScripts {
     LastRunAt,
     RunCount,
 }
-

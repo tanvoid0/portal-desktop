@@ -12,12 +12,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Blocks::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(Blocks::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(Blocks::Id).string().not_null().primary_key())
                     .col(ColumnDef::new(Blocks::Name).string().not_null())
                     .col(ColumnDef::new(Blocks::Description).text().not_null())
                     .col(ColumnDef::new(Blocks::Category).string().not_null())
@@ -29,8 +24,16 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Blocks::TagsJson).text().not_null())
                     .col(ColumnDef::new(Blocks::Icon).string().null())
                     .col(ColumnDef::new(Blocks::Author).string().null())
-                    .col(ColumnDef::new(Blocks::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Blocks::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(Blocks::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Blocks::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .to_owned(),
             )
             .await
@@ -61,4 +64,3 @@ enum Blocks {
     CreatedAt,
     UpdatedAt,
 }
-

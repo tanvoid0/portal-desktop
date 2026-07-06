@@ -1,67 +1,19 @@
-use tauri::command;
-use std::net::{IpAddr, Ipv4Addr};
-use std::sync::{Arc, OnceLock};
-use tokio::sync::Mutex;
-use chrono::{Utc, Duration};
-use sea_orm::{EntityTrait, Set, ColumnTrait, QueryFilter, QueryOrder};
-use uuid::Uuid;
-use sha2::{Sha256, Digest};
-use base64::{Engine as _, engine::general_purpose};
-use serde::{Deserialize, Serialize};
-use crate::entities::device_approval;
 use crate::database::DatabaseManager;
+use crate::domains::network::services::network_service::get_passcode_store;
+use crate::entities::device_approval;
+use base64::{engine::general_purpose, Engine as _};
+use chrono::{Duration, Utc};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::net::{IpAddr, Ipv4Addr};
+use std::sync::Arc;
+use tauri::command;
+use uuid::Uuid;
 
 // Import logger macros
 #[allow(unused_imports)]
-use crate::{log_info, log_warn, log_error, log_debug};
-
-// In-memory storage for active passcodes (expires after 5 minutes)
-struct PasscodeStore {
-    passcodes: Arc<Mutex<std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>>>,
-}
-
-impl PasscodeStore {
-    fn new() -> Self {
-        Self {
-            passcodes: Arc::new(Mutex::new(std::collections::HashMap::new())),
-        }
-    }
-
-    fn generate_passcode(&self) -> String {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        format!("{:06}", rng.gen_range(0..1000000))
-    }
-
-    async fn store_passcode(&self, device_id: String, passcode: String) {
-        let expires_at = Utc::now() + Duration::minutes(5);
-        let mut store = self.passcodes.lock().await;
-        store.insert(device_id, (passcode, expires_at));
-        // Clean up expired passcodes
-        store.retain(|_, (_, exp)| *exp > Utc::now());
-    }
-
-    async fn verify_passcode(&self, device_id: &str, passcode: &str) -> bool {
-        let store = self.passcodes.lock().await;
-        if let Some((stored_passcode, expires_at)) = store.get(device_id) {
-            if expires_at > &Utc::now() && stored_passcode == passcode {
-                return true;
-            }
-        }
-        false
-    }
-
-    async fn remove_passcode(&self, device_id: &str) {
-        let mut store = self.passcodes.lock().await;
-        store.remove(device_id);
-    }
-}
-
-static PASSCODE_STORE: OnceLock<PasscodeStore> = OnceLock::new();
-
-fn get_passcode_store() -> &'static PasscodeStore {
-    PASSCODE_STORE.get_or_init(|| PasscodeStore::new())
-}
+use crate::{log_debug, log_error, log_info, log_warn};
 
 /// Get the local network IP address (non-loopback, private network preferred)
 /// Returns the first available IPv4 address that is not loopback
@@ -69,17 +21,23 @@ fn get_passcode_store() -> &'static PasscodeStore {
 pub fn get_local_network_ip() -> Result<String, String> {
     // Try to get network interfaces
     let interfaces = get_network_interfaces();
-    
+
     // Prefer private network ranges
     let private_ranges = [
         // 192.168.x.x
-        (Ipv4Addr::new(192, 168, 0, 0), Ipv4Addr::new(192, 168, 255, 255)),
+        (
+            Ipv4Addr::new(192, 168, 0, 0),
+            Ipv4Addr::new(192, 168, 255, 255),
+        ),
         // 10.x.x.x
         (Ipv4Addr::new(10, 0, 0, 0), Ipv4Addr::new(10, 255, 255, 255)),
         // 172.16.x.x - 172.31.x.x
-        (Ipv4Addr::new(172, 16, 0, 0), Ipv4Addr::new(172, 31, 255, 255)),
+        (
+            Ipv4Addr::new(172, 16, 0, 0),
+            Ipv4Addr::new(172, 31, 255, 255),
+        ),
     ];
-    
+
     // First, try to find an IP in private ranges
     for (start, end) in &private_ranges {
         for ip in &interfaces {
@@ -90,7 +48,7 @@ pub fn get_local_network_ip() -> Result<String, String> {
             }
         }
     }
-    
+
     // If no private IP found, return first non-loopback IPv4
     for ip in &interfaces {
         if let IpAddr::V4(ipv4) = ip {
@@ -99,7 +57,7 @@ pub fn get_local_network_ip() -> Result<String, String> {
             }
         }
     }
-    
+
     // Fallback: return localhost
     Ok("127.0.0.1".to_string())
 }
@@ -123,15 +81,21 @@ pub async fn generate_device_passcode(
     request: GeneratePasscodeRequest,
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<GeneratePasscodeResponse, String> {
-    log_info!("device_auth", "Generating passcode for device_id: {}", request.device_id);
-    
+    log_info!(
+        "device_auth",
+        "Generating passcode for device_id: {}",
+        request.device_id
+    );
+
     let store = get_passcode_store();
     let passcode = store.generate_passcode();
-    store.store_passcode(request.device_id.clone(), passcode.clone()).await;
+    store
+        .store_passcode(request.device_id.clone(), passcode.clone())
+        .await;
 
     // Store device approval request in database
     let conn = db.get_connection_clone();
-    
+
     // Check if there's already a pending approval for this device_id
     let now: chrono::DateTime<chrono::FixedOffset> = Utc::now().into();
     let existing = device_approval::Entity::find()
@@ -149,7 +113,7 @@ pub async fn generate_device_passcode(
 
     if let Some(existing_device) = existing {
         log_info!("device_auth", "Found existing pending approval for device_id: {}, updating instead of creating duplicate", request.device_id);
-        
+
         // Update existing pending approval instead of creating a duplicate
         let mut device: device_approval::ActiveModel = existing_device.into();
         device.device_name = Set(request.device_name);
@@ -157,7 +121,7 @@ pub async fn generate_device_passcode(
         device.passcode = Set(hash_passcode(&passcode));
         device.passcode_expires_at = Set((Utc::now() + Duration::minutes(5)).into());
         device.updated_at = Set(Utc::now().into());
-        
+
         device_approval::Entity::update(device)
             .exec(&conn)
             .await
@@ -166,14 +130,22 @@ pub async fn generate_device_passcode(
                 log_error!("device_auth", "{}", err_msg);
                 err_msg
             })?;
-        
-        log_info!("device_auth", "Updated existing approval for device_id: {}", request.device_id);
+
+        log_info!(
+            "device_auth",
+            "Updated existing approval for device_id: {}",
+            request.device_id
+        );
     } else {
-        log_info!("device_auth", "No existing pending approval found, creating new one for device_id: {}", request.device_id);
-        
+        log_info!(
+            "device_auth",
+            "No existing pending approval found, creating new one for device_id: {}",
+            request.device_id
+        );
+
         // Create new approval request
         let approval_id = Uuid::new_v4().to_string();
-        
+
         let approval = device_approval::ActiveModel {
             id: Set(approval_id.clone()),
             device_id: Set(request.device_id.clone()),
@@ -200,12 +172,21 @@ pub async fn generate_device_passcode(
                 log_error!("device_auth", "{}", err_msg);
                 err_msg
             })?;
-        
-        log_info!("device_auth", "Created new approval request id: {} for device_id: {}", approval_id, request.device_id);
+
+        log_info!(
+            "device_auth",
+            "Created new approval request id: {} for device_id: {}",
+            approval_id,
+            request.device_id
+        );
     }
 
-    log_info!("device_auth", "Passcode generated successfully for device_id: {}", request.device_id);
-    
+    log_info!(
+        "device_auth",
+        "Passcode generated successfully for device_id: {}",
+        request.device_id
+    );
+
     Ok(GeneratePasscodeResponse {
         passcode,
         expires_in_seconds: 300, // 5 minutes
@@ -235,7 +216,10 @@ pub async fn verify_device_passcode(
 ) -> Result<VerifyPasscodeResponse, String> {
     // Verify passcode
     let store = get_passcode_store();
-    if !store.verify_passcode(&request.device_id, &request.passcode).await {
+    if !store
+        .verify_passcode(&request.device_id, &request.passcode)
+        .await
+    {
         return Ok(VerifyPasscodeResponse {
             approved: false,
             access_token: None,
@@ -293,10 +277,15 @@ pub async fn approve_device(
     request: ApproveDeviceRequest,
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<ApproveDeviceResponse, String> {
-    log_info!("device_auth", "Approving device_id: {} with type: {}", request.device_id, request.approval_type);
-    
+    log_info!(
+        "device_auth",
+        "Approving device_id: {} with type: {}",
+        request.device_id,
+        request.approval_type
+    );
+
     let conn = db.get_connection_clone();
-    
+
     // Find all pending device approvals for this device_id (handle duplicates)
     let devices = device_approval::Entity::find()
         .filter(device_approval::Column::DeviceId.eq(&request.device_id))
@@ -309,14 +298,22 @@ pub async fn approve_device(
             log_error!("device_auth", "{}", err_msg);
             err_msg
         })?;
-    
+
     if devices.is_empty() {
-        let err_msg = format!("Device approval not found for device_id: {}", request.device_id);
+        let err_msg = format!(
+            "Device approval not found for device_id: {}",
+            request.device_id
+        );
         log_warn!("device_auth", "{}", err_msg);
         return Err(err_msg);
     }
-    
-    log_info!("device_auth", "Found {} pending approval(s) for device_id: {}", devices.len(), request.device_id);
+
+    log_info!(
+        "device_auth",
+        "Found {} pending approval(s) for device_id: {}",
+        devices.len(),
+        request.device_id
+    );
 
     // Calculate expiration (1 month max, or shorter for temporary)
     let expires_at = if request.approval_type == "temporary" {
@@ -349,8 +346,13 @@ pub async fn approve_device(
                 err_msg
             })?;
     }
-    
-    log_info!("device_auth", "Successfully approved {} device approval(s) for device_id: {}", devices.len(), request.device_id);
+
+    log_info!(
+        "device_auth",
+        "Successfully approved {} device approval(s) for device_id: {}",
+        devices.len(),
+        request.device_id
+    );
 
     Ok(ApproveDeviceResponse {
         success: true,
@@ -379,7 +381,7 @@ pub async fn verify_access_token(
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<VerifyTokenResponse, String> {
     let conn = db.get_connection_clone();
-    
+
     // Find device by access token
     let device = device_approval::Entity::find()
         .filter(device_approval::Column::AccessToken.eq(&request.access_token))
@@ -391,7 +393,7 @@ pub async fn verify_access_token(
         // Check if approved and not expired
         let now: chrono::DateTime<chrono::FixedOffset> = Utc::now().into();
         let device_id = device.device_id.clone();
-        if device.approved 
+        if device.approved
             && device.expires_at.map(|e| e > now).unwrap_or(false)
             && device.token_expires_at.map(|e| e > now).unwrap_or(false)
         {
@@ -439,7 +441,7 @@ pub async fn get_device_status(
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<GetDeviceStatusResponse, String> {
     let conn = db.get_connection_clone();
-    
+
     let device = device_approval::Entity::find()
         .filter(device_approval::Column::DeviceId.eq(&request.device_id))
         .one(&conn)
@@ -489,9 +491,9 @@ pub async fn get_pending_device_approvals(
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<serde_json::Value>, String> {
     log_info!("device_auth", "Fetching pending device approvals");
-    
+
     let conn = db.get_connection_clone();
-    
+
     let now: chrono::DateTime<chrono::FixedOffset> = Utc::now().into();
     let devices = device_approval::Entity::find()
         .filter(device_approval::Column::Approved.eq(false))
@@ -505,22 +507,34 @@ pub async fn get_pending_device_approvals(
             err_msg
         })?;
 
-    log_info!("device_auth", "Found {} total pending device approval(s)", devices.len());
+    log_info!(
+        "device_auth",
+        "Found {} total pending device approval(s)",
+        devices.len()
+    );
 
     // Deduplicate by device_id - keep only the most recent one per device_id
     use std::collections::HashMap;
     let mut device_map: HashMap<String, &device_approval::Model> = HashMap::new();
-    
+
     for device in &devices {
         let device_id = &device.device_id;
         // Only keep the first (most recent) one for each device_id
         device_map.entry(device_id.clone()).or_insert(device);
     }
-    
-    log_info!("device_auth", "After deduplication: {} unique device approval(s)", device_map.len());
-    
+
+    log_info!(
+        "device_auth",
+        "After deduplication: {} unique device approval(s)",
+        device_map.len()
+    );
+
     if device_map.len() < devices.len() {
-        log_warn!("device_auth", "Found {} duplicate device approval(s) - they will be cleaned up on next approval", devices.len() - device_map.len());
+        log_warn!(
+            "device_auth",
+            "Found {} duplicate device approval(s) - they will be cleaned up on next approval",
+            devices.len() - device_map.len()
+        );
     }
 
     let result: Vec<serde_json::Value> = device_map
@@ -558,18 +572,18 @@ fn is_in_range(ip: Ipv4Addr, start: Ipv4Addr, end: Ipv4Addr) -> bool {
 
 fn get_network_interfaces() -> Vec<IpAddr> {
     let mut addresses = Vec::new();
-    
+
     // Use platform-specific methods to get network interfaces
     #[cfg(target_os = "linux")]
     {
         use std::fs;
         use std::io::{BufRead, BufReader};
-        
+
         // Read /proc/net/route to find active interfaces
         if let Ok(file) = fs::File::open("/proc/net/route") {
             let reader = BufReader::new(file);
             let mut interfaces = Vec::new();
-            
+
             for line in reader.lines().skip(1) {
                 if let Ok(line) = line {
                     let parts: Vec<&str> = line.split_whitespace().collect();
@@ -578,10 +592,12 @@ fn get_network_interfaces() -> Vec<IpAddr> {
                     }
                 }
             }
-            
+
             // Get IP addresses for each interface
             for interface in interfaces {
-                if let Ok(_addr_file) = fs::File::open(format!("/sys/class/net/{}/address", interface)) {
+                if let Ok(_addr_file) =
+                    fs::File::open(format!("/sys/class/net/{}/address", interface))
+                {
                     // Interface exists, try to get its IP
                     if let Ok(ifconfig_output) = std::process::Command::new("ip")
                         .args(&["addr", "show", &interface])
@@ -604,13 +620,11 @@ fn get_network_interfaces() -> Vec<IpAddr> {
             }
         }
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         // Use ifconfig on macOS
-        if let Ok(output) = std::process::Command::new("ifconfig")
-            .output()
-        {
+        if let Ok(output) = std::process::Command::new("ifconfig").output() {
             let output_str = String::from_utf8_lossy(&output.stdout);
             for line in output_str.lines() {
                 if line.contains("inet ") && !line.contains("127.0.0.1") && !line.contains("::1") {
@@ -627,16 +641,14 @@ fn get_network_interfaces() -> Vec<IpAddr> {
             }
         }
     }
-    
+
     #[cfg(target_os = "windows")]
     {
         // Use ipconfig on Windows
-        if let Ok(output) = std::process::Command::new("ipconfig")
-            .output()
-        {
+        if let Ok(output) = std::process::Command::new("ipconfig").output() {
             let output_str = String::from_utf8_lossy(&output.stdout);
             let mut current_section = String::new();
-            
+
             for line in output_str.lines() {
                 if line.contains("adapter") {
                     current_section = line.to_string();
@@ -654,7 +666,7 @@ fn get_network_interfaces() -> Vec<IpAddr> {
             }
         }
     }
-    
+
     // Fallback: try to use a simple method that works cross-platform
     if addresses.is_empty() {
         // Try to connect to a remote address to determine local IP
@@ -673,6 +685,6 @@ fn get_network_interfaces() -> Vec<IpAddr> {
             }
         }
     }
-    
+
     addresses
 }

@@ -4,110 +4,108 @@
 -->
 
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-	import ProjectForm from '@/lib/components/projects/ProjectForm.svelte';
-	import { projectService } from '@/lib/domains/projects/services/projectService';
-	import { logger } from '@/lib/domains/shared/services/logger';
-	import type { CreateProjectRequest } from '@/lib/domains/projects/types';
-	import { breadcrumbActions } from '@/lib/domains/shared/stores/breadcrumbStore';
+  import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
+  import ProjectForm from "$lib/components/projects/ProjectForm.svelte";
+  import {
+    projectService,
+    createProjectQuery,
+  } from "$lib/domains/projects";
+  import { logger } from "$lib/domains/shared/services/logger";
+  import type { CreateProjectRequest } from "$lib/domains/projects/types";
+  import { breadcrumbActions } from "$lib/domains/shared/stores/breadcrumbStore";
+  import { PageHeader, PageLoading, PageError } from "$lib/components/shell";
 
-	const log = logger.createScoped('ProjectEditPage');
+  const log = logger.createScoped("ProjectEditPage");
 
-	// Get project ID from URL params
-	const projectId = $page.params.id;
+  const projectId = $derived($page.params.id);
+  const projectQuery = createProjectQuery(() => projectId);
 
-	// Form state
-	let isLoading = $state(false);
-	let project = $state<any>(null);
-	let initialData = $state<Partial<CreateProjectRequest>>({});
+  let isLoading = $state(false);
 
-	// Set up breadcrumbs and load project data on mount
-	onMount(async () => {
-		if (!projectId) {
-			log.error('Project ID is required');
-			goto('/projects');
-			return;
-		}
+  const project = $derived(projectQuery.data ?? null);
+  const loading = $derived(projectQuery.isPending);
+  const loadError = $derived(
+    projectQuery.isError
+      ? "Failed to load project"
+      : projectQuery.isSuccess && !projectQuery.data
+        ? "Project not found"
+        : null,
+  );
 
-		try {
-			// Load project data first
-			project = await projectService.getProject(projectId!);
-			
-			if (!project) {
-				log.error('Project not found', { projectId });
-				goto('/projects');
-				return;
-			}
-			
-			// Set breadcrumbs for project editing
-			breadcrumbActions.setProjectEditBreadcrumbs(project.name);
-			
-			// Set initial form data
-			initialData = {
-				name: project.name,
-				description: project.description,
-				path: project.path,
-				framework_ids: project.framework_ids,
-				package_manager_ids: project.package_manager_ids,
-				language_ids: project.language_ids
-			};
-			
-		} catch (err) {
-			log.error('Failed to load project', err);
-			// Redirect to projects page if project not found
-			goto('/projects');
-		}
-	});
+  const initialData = $derived<Partial<CreateProjectRequest>>(
+    project
+      ? {
+          name: project.name,
+          description: project.description,
+          path: project.path,
+          framework_ids: project.framework_ids,
+          package_manager_ids: project.package_manager_ids,
+          language_ids: project.language_ids,
+          build_command: project.build_command,
+          start_command: project.start_command,
+          test_command: project.test_command,
+          output_directory: project.output_directory,
+          dev_port: project.dev_port,
+          prod_port: project.prod_port,
+        }
+      : {},
+  );
 
-	async function handleSubmit(data: CreateProjectRequest) {
-		if (!projectId) {
-			log.error('Project ID is required for update');
-			return;
-		}
+  $effect(() => {
+    if (project) {
+      breadcrumbActions.setProjectEditBreadcrumbs(project.name);
+    }
+  });
 
-		try {
-			isLoading = true;
-			await projectService.updateProject(projectId!, data);
-			
-			// Redirect to projects page after successful update
-			goto('/projects');
-		} catch (err) {
-			log.error('Failed to update project', err);
-			throw err; // Let the form handle the error display
-		} finally {
-			isLoading = false;
-		}
-	}
+  async function handleSubmit(data: CreateProjectRequest) {
+    if (!projectId) {
+      log.error("Project ID is required for update");
+      return;
+    }
 
-	function handleCancel() {
-		goto('/projects');
-	}
+    try {
+      isLoading = true;
+      await projectService.updateProject(projectId, data);
+      goto("/projects");
+    } catch (err) {
+      log.error("Failed to update project", err);
+      throw err;
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  function handleCancel() {
+    goto("/projects");
+  }
+
+  function reloadProject() {
+    void projectQuery.refetch();
+  }
 </script>
 
-<div class="container mx-auto py-8 px-4">
-	<div class="mb-8">
-		<h1 class="text-3xl font-bold text-foreground mb-2">Edit Project</h1>
-		<p class="text-muted-foreground">
-			Update your project details. You can change the path to re-analyze the project structure.
-		</p>
-	</div>
+<div class="container mx-auto space-y-6 px-4 py-8">
+  <PageHeader
+    title="Edit Project"
+    description="Update your project details. You can change the path to re-analyze the project structure."
+  />
 
-	{#if project && projectId}
-		<ProjectForm
-			projectId={parseInt(projectId)}
-			initialData={initialData}
-			onSubmit={handleSubmit}
-			onCancel={handleCancel}
-			{isLoading}
-		/>
-	{:else}
-		<div class="flex items-center justify-center py-12">
-			<div class="text-center">
-				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-				<p class="text-muted-foreground">Loading project...</p>
-			</div>
-		</div>
-	{/if}
+  {#if loading}
+    <PageLoading message="Loading project..." />
+  {:else if loadError}
+    <PageError
+      title="Failed to load project"
+      message={loadError}
+      onRetry={reloadProject}
+    />
+  {:else if project && projectId}
+    <ProjectForm
+      projectId={parseInt(projectId)}
+      {initialData}
+      onSubmit={handleSubmit}
+      onCancel={handleCancel}
+      {isLoading}
+    />
+  {/if}
 </div>

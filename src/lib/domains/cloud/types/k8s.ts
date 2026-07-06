@@ -6,4 +6,3 @@ export interface K8sLog {
   pod: string;
   container: string;
 }
-

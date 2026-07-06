@@ -1,10 +1,10 @@
 <!-- PodsFilters - Search and filter pods -->
 <script lang="ts">
-  import { Input } from '@/lib/components/ui/input';
-  import { Button } from '@/lib/components/ui/button';
-  import Select from '@/lib/components/ui/select.svelte';
-  import { ResourceStatus } from '../../core/types';
-  
+  import { Input } from "$lib/components/ui/input";
+  import { Button } from "$lib/components/ui/button";
+  import Select from "$lib/components/ui/select.svelte";
+  import { ResourceStatus } from "../../core/types";
+
   interface Props {
     searchQuery: string;
     statusFilter: string;
@@ -12,28 +12,28 @@
     onStatusFilterChange: (status: string) => void;
     onClear: () => void;
   }
-  
+
   let {
     searchQuery,
     statusFilter,
     onSearchChange,
     onStatusFilterChange,
-    onClear
+    onClear,
   }: Props = $props();
-  
+
   const statusOptions = [
-    { value: '', label: 'All Statuses' },
-    { value: ResourceStatus.RUNNING, label: 'Running' },
-    { value: ResourceStatus.PENDING, label: 'Pending' },
-    { value: ResourceStatus.FAILED, label: 'Failed' },
-    { value: ResourceStatus.SUCCEEDED, label: 'Succeeded' }
+    { value: "", label: "All Statuses" },
+    { value: ResourceStatus.RUNNING, label: "Running" },
+    { value: ResourceStatus.PENDING, label: "Pending" },
+    { value: ResourceStatus.FAILED, label: "Failed" },
+    { value: ResourceStatus.SUCCEEDED, label: "Succeeded" },
   ];
-  
+
   const hasFilters = $derived(searchQuery || statusFilter);
 </script>
 
-<div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-  <div class="flex-1 min-w-0">
+<div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+  <div class="min-w-0 flex-1">
     <Input
       type="text"
       placeholder="Search pods by name..."
@@ -42,18 +42,15 @@
       class="w-full"
     />
   </div>
-  
+
   <Select
     options={statusOptions}
     bind:value={statusFilter}
     onSelect={onStatusFilterChange}
     placeholder="All Statuses"
   />
-  
+
   {#if hasFilters}
-    <Button variant="outline" size="sm" onclick={onClear}>
-      Clear Filters
-    </Button>
+    <Button variant="outline" size="sm" onclick={onClear}>Clear Filters</Button>
   {/if}
 </div>
-

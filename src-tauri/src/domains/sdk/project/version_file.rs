@@ -1,16 +1,15 @@
 /**
  * Version File Manager
- * 
+ *
  * Manages version files for project-level version isolation
  * Supports multiple version file formats: .portal-version, .nvmrc, .python-version, etc.
  */
-
 use super::ProjectEnvironment;
 use crate::domains::sdk::SDKError;
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
-use tokio::fs;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use tokio::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionFileInfo {
@@ -23,14 +22,14 @@ pub struct VersionFileInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VersionFileFormat {
-    PortalVersion,  // .portal-version (TOML)
-    Nvmrc,          // .nvmrc (plain text)
-    PythonVersion,  // .python-version (plain text)
-    RubyVersion,    // .ruby-version (plain text)
-    JavaVersion,    // .java-version (plain text)
-    RustToolchain,  // rust-toolchain.toml (TOML)
-    PhpVersion,     // .php-version (plain text)
-    GoVersion,      // go.mod (Go module)
+    PortalVersion, // .portal-version (TOML)
+    Nvmrc,         // .nvmrc (plain text)
+    PythonVersion, // .python-version (plain text)
+    RubyVersion,   // .ruby-version (plain text)
+    JavaVersion,   // .java-version (plain text)
+    RustToolchain, // rust-toolchain.toml (TOML)
+    PhpVersion,    // .php-version (plain text)
+    GoVersion,     // go.mod (Go module)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,26 +55,29 @@ impl VersionFileManager {
         version: &str,
     ) -> Result<(), SDKError> {
         let version_file_path = project_path.join(".portal-version");
-        
+
         let mut versions = HashMap::new();
         versions.insert(sdk_type.to_string(), version.to_string());
-        
+
         let version_file = VersionFile {
             versions,
             metadata: VersionMetadata {
                 created_at: chrono::Utc::now().to_rfc3339(),
                 updated_at: chrono::Utc::now().to_rfc3339(),
-                project_name: project_path.file_name()
+                project_name: project_path
+                    .file_name()
                     .and_then(|name| name.to_str())
                     .map(|s| s.to_string()),
             },
         };
 
-        let content = toml::to_string(&version_file)
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to serialize version file: {}", e)))?;
+        let content = toml::to_string(&version_file).map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to serialize version file: {}", e))
+        })?;
 
-        fs::write(&version_file_path, content).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to write version file: {}", e)))?;
+        fs::write(&version_file_path, content).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to write version file: {}", e))
+        })?;
 
         Ok(())
     }
@@ -83,7 +85,7 @@ impl VersionFileManager {
     /// Read version file from a project
     pub async fn read_version_file(project_path: &Path) -> Result<ProjectEnvironment, SDKError> {
         let version_file_path = project_path.join(".portal-version");
-        
+
         if !version_file_path.exists() {
             return Ok(ProjectEnvironment {
                 project_path: project_path.to_path_buf(),
@@ -93,11 +95,13 @@ impl VersionFileManager {
             });
         }
 
-        let content = fs::read_to_string(&version_file_path).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to read version file: {}", e)))?;
+        let content = fs::read_to_string(&version_file_path).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to read version file: {}", e))
+        })?;
 
-        let version_file: VersionFile = toml::from_str(&content)
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse version file: {}", e)))?;
+        let version_file: VersionFile = toml::from_str(&content).map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse version file: {}", e))
+        })?;
 
         Ok(ProjectEnvironment {
             project_path: project_path.to_path_buf(),
@@ -114,34 +118,41 @@ impl VersionFileManager {
         version: &str,
     ) -> Result<(), SDKError> {
         let version_file_path = project_path.join(".portal-version");
-        
+
         let mut version_file = if version_file_path.exists() {
-            let content = fs::read_to_string(&version_file_path).await
-                .map_err(|e| SDKError::ManagerNotFound(format!("Failed to read version file: {}", e)))?;
-            
-            toml::from_str(&content)
-                .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse version file: {}", e)))?
+            let content = fs::read_to_string(&version_file_path).await.map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to read version file: {}", e))
+            })?;
+
+            toml::from_str(&content).map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to parse version file: {}", e))
+            })?
         } else {
             VersionFile {
                 versions: HashMap::new(),
                 metadata: VersionMetadata {
                     created_at: chrono::Utc::now().to_rfc3339(),
                     updated_at: chrono::Utc::now().to_rfc3339(),
-                    project_name: project_path.file_name()
+                    project_name: project_path
+                        .file_name()
                         .and_then(|name| name.to_str())
                         .map(|s| s.to_string()),
                 },
             }
         };
 
-        version_file.versions.insert(sdk_type.to_string(), version.to_string());
+        version_file
+            .versions
+            .insert(sdk_type.to_string(), version.to_string());
         version_file.metadata.updated_at = chrono::Utc::now().to_rfc3339();
 
-        let content = toml::to_string(&version_file)
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to serialize version file: {}", e)))?;
+        let content = toml::to_string(&version_file).map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to serialize version file: {}", e))
+        })?;
 
-        fs::write(&version_file_path, content).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to write version file: {}", e)))?;
+        fs::write(&version_file_path, content).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to write version file: {}", e))
+        })?;
 
         Ok(())
     }
@@ -149,30 +160,35 @@ impl VersionFileManager {
     /// Remove version for a specific SDK from a project
     pub async fn remove_version(project_path: &Path, sdk_type: &str) -> Result<(), SDKError> {
         let version_file_path = project_path.join(".portal-version");
-        
+
         if !version_file_path.exists() {
             return Ok(());
         }
 
-        let content = fs::read_to_string(&version_file_path).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to read version file: {}", e)))?;
+        let content = fs::read_to_string(&version_file_path).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to read version file: {}", e))
+        })?;
 
-        let mut version_file: VersionFile = toml::from_str(&content)
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse version file: {}", e)))?;
+        let mut version_file: VersionFile = toml::from_str(&content).map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse version file: {}", e))
+        })?;
 
         version_file.versions.remove(sdk_type);
         version_file.metadata.updated_at = chrono::Utc::now().to_rfc3339();
 
         if version_file.versions.is_empty() {
             // Remove the file if no versions left
-            fs::remove_file(&version_file_path).await
-                .map_err(|e| SDKError::ManagerNotFound(format!("Failed to remove version file: {}", e)))?;
+            fs::remove_file(&version_file_path).await.map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to remove version file: {}", e))
+            })?;
         } else {
-            let content = toml::to_string(&version_file)
-                .map_err(|e| SDKError::ManagerNotFound(format!("Failed to serialize version file: {}", e)))?;
+            let content = toml::to_string(&version_file).map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to serialize version file: {}", e))
+            })?;
 
-            fs::write(&version_file_path, content).await
-                .map_err(|e| SDKError::ManagerNotFound(format!("Failed to write version file: {}", e)))?;
+            fs::write(&version_file_path, content).await.map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to write version file: {}", e))
+            })?;
         }
 
         Ok(())
@@ -186,7 +202,7 @@ impl VersionFileManager {
     /// Get all projects with version files in a directory
     pub async fn find_projects_with_versions(root_path: &Path) -> Result<Vec<PathBuf>, SDKError> {
         let mut projects = Vec::new();
-        
+
         if let Ok(mut entries) = fs::read_dir(root_path).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 let path = entry.path();
@@ -200,9 +216,11 @@ impl VersionFileManager {
     }
 
     /// Detect all version files in a project directory
-    pub async fn detect_version_files(project_path: &Path) -> Result<Vec<VersionFileInfo>, SDKError> {
+    pub async fn detect_version_files(
+        project_path: &Path,
+    ) -> Result<Vec<VersionFileInfo>, SDKError> {
         let mut version_files = Vec::new();
-        
+
         // Check for .portal-version (our custom format)
         let portal_version_path = project_path.join(".portal-version");
         if portal_version_path.exists() {
@@ -214,10 +232,18 @@ impl VersionFileManager {
         // Check for standard version files
         let standard_files = vec![
             (".nvmrc", "nodejs", VersionFileFormat::Nvmrc),
-            (".python-version", "python", VersionFileFormat::PythonVersion),
+            (
+                ".python-version",
+                "python",
+                VersionFileFormat::PythonVersion,
+            ),
             (".ruby-version", "ruby", VersionFileFormat::RubyVersion),
             (".java-version", "java", VersionFileFormat::JavaVersion),
-            ("rust-toolchain.toml", "rust", VersionFileFormat::RustToolchain),
+            (
+                "rust-toolchain.toml",
+                "rust",
+                VersionFileFormat::RustToolchain,
+            ),
             (".php-version", "php", VersionFileFormat::PhpVersion),
             ("go.mod", "go", VersionFileFormat::GoVersion),
         ];
@@ -225,7 +251,9 @@ impl VersionFileManager {
         for (filename, sdk_type, format) in standard_files {
             let file_path = project_path.join(filename);
             if file_path.exists() {
-                if let Ok(version_info) = Self::parse_standard_version_file(&file_path, sdk_type, format).await {
+                if let Ok(version_info) =
+                    Self::parse_standard_version_file(&file_path, sdk_type, format).await
+                {
                     version_files.push(version_info);
                 }
             }
@@ -236,16 +264,22 @@ impl VersionFileManager {
 
     /// Parse .portal-version file (TOML format)
     async fn parse_portal_version_file(file_path: &Path) -> Result<Vec<VersionFileInfo>, SDKError> {
-        let content = fs::read_to_string(file_path).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to read portal version file: {}", e)))?;
+        let content = fs::read_to_string(file_path).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to read portal version file: {}", e))
+        })?;
 
-        let version_file: VersionFile = toml::from_str(&content)
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse portal version file: {}", e)))?;
+        let version_file: VersionFile = toml::from_str(&content).map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse portal version file: {}", e))
+        })?;
 
-        let metadata = fs::metadata(file_path).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to get file metadata: {}", e)))?;
-        let last_modified = metadata.modified()
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to get modification time: {}", e)))?
+        let metadata = fs::metadata(file_path).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to get file metadata: {}", e))
+        })?;
+        let last_modified = metadata
+            .modified()
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to get modification time: {}", e))
+            })?
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| SDKError::ManagerNotFound(format!("Failed to convert time: {}", e)))?
             .as_secs();
@@ -257,9 +291,12 @@ impl VersionFileManager {
                 sdk_type,
                 version,
                 format: VersionFileFormat::PortalVersion,
-                last_modified: chrono::DateTime::<chrono::Utc>::from_timestamp(last_modified as i64, 0)
-                    .unwrap_or_else(|| chrono::Utc::now())
-                    .to_rfc3339(),
+                last_modified: chrono::DateTime::<chrono::Utc>::from_timestamp(
+                    last_modified as i64,
+                    0,
+                )
+                .unwrap_or_else(|| chrono::Utc::now())
+                .to_rfc3339(),
             });
         }
 
@@ -272,8 +309,9 @@ impl VersionFileManager {
         sdk_type: &str,
         format: VersionFileFormat,
     ) -> Result<VersionFileInfo, SDKError> {
-        let content = fs::read_to_string(file_path).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to read version file: {}", e)))?;
+        let content = fs::read_to_string(file_path).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to read version file: {}", e))
+        })?;
 
         let version = match format {
             VersionFileFormat::RustToolchain => {
@@ -290,10 +328,14 @@ impl VersionFileManager {
             }
         };
 
-        let metadata = fs::metadata(file_path).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to get file metadata: {}", e)))?;
-        let last_modified = metadata.modified()
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to get modification time: {}", e)))?
+        let metadata = fs::metadata(file_path).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to get file metadata: {}", e))
+        })?;
+        let last_modified = metadata
+            .modified()
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to get modification time: {}", e))
+            })?
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| SDKError::ManagerNotFound(format!("Failed to convert time: {}", e)))?
             .as_secs();
@@ -322,8 +364,9 @@ impl VersionFileManager {
             version: Option<String>,
         }
 
-        let toolchain: RustToolchain = toml::from_str(content)
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse rust-toolchain.toml: {}", e)))?;
+        let toolchain: RustToolchain = toml::from_str(content).map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse rust-toolchain.toml: {}", e))
+        })?;
 
         if let Some(toolchain_info) = toolchain.toolchain {
             if let Some(version) = toolchain_info.version {
@@ -342,9 +385,7 @@ impl VersionFileManager {
     fn parse_go_version(content: &str) -> Result<String, SDKError> {
         for line in content.lines() {
             if line.starts_with("go ") {
-                let version = line.strip_prefix("go ")
-                    .unwrap_or("1.21")
-                    .trim();
+                let version = line.strip_prefix("go ").unwrap_or("1.21").trim();
                 return Ok(version.to_string());
             }
         }
@@ -365,21 +406,24 @@ impl VersionFileManager {
             "rust" => ("rust-toolchain.toml", VersionFileFormat::RustToolchain),
             "php" => (".php-version", VersionFileFormat::PhpVersion),
             "go" => ("go.mod", VersionFileFormat::GoVersion),
-            _ => return Err(SDKError::ManagerNotFound(format!("Unsupported SDK type: {}", sdk_type))),
+            _ => {
+                return Err(SDKError::ManagerNotFound(format!(
+                    "Unsupported SDK type: {}",
+                    sdk_type
+                )))
+            }
         };
 
         let file_path = project_path.join(filename);
         let content = match format {
             VersionFileFormat::RustToolchain => {
-                format!(
-                    "[toolchain]\nchannel = \"{}\"\n",
-                    version
-                )
+                format!("[toolchain]\nchannel = \"{}\"\n", version)
             }
             VersionFileFormat::GoVersion => {
                 format!(
                     "module {}\n\ngo {}\n",
-                    project_path.file_name()
+                    project_path
+                        .file_name()
                         .and_then(|name| name.to_str())
                         .unwrap_or("project"),
                     version
@@ -388,8 +432,9 @@ impl VersionFileManager {
             _ => version.to_string(),
         };
 
-        fs::write(&file_path, content).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to write version file: {}", e)))?;
+        fs::write(&file_path, content).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to write version file: {}", e))
+        })?;
 
         Ok(())
     }
@@ -398,13 +443,22 @@ impl VersionFileManager {
     pub fn get_recommended_format(sdk_type: &str) -> (String, VersionFileFormat) {
         match sdk_type {
             "nodejs" => (".nvmrc".to_string(), VersionFileFormat::Nvmrc),
-            "python" => (".python-version".to_string(), VersionFileFormat::PythonVersion),
+            "python" => (
+                ".python-version".to_string(),
+                VersionFileFormat::PythonVersion,
+            ),
             "ruby" => (".ruby-version".to_string(), VersionFileFormat::RubyVersion),
             "java" => (".java-version".to_string(), VersionFileFormat::JavaVersion),
-            "rust" => ("rust-toolchain.toml".to_string(), VersionFileFormat::RustToolchain),
+            "rust" => (
+                "rust-toolchain.toml".to_string(),
+                VersionFileFormat::RustToolchain,
+            ),
             "php" => (".php-version".to_string(), VersionFileFormat::PhpVersion),
             "go" => ("go.mod".to_string(), VersionFileFormat::GoVersion),
-            _ => (".portal-version".to_string(), VersionFileFormat::PortalVersion),
+            _ => (
+                ".portal-version".to_string(),
+                VersionFileFormat::PortalVersion,
+            ),
         }
     }
 }

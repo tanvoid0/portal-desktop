@@ -11,3 +11,6 @@ src-tauri/Cargo.lock
 
 # Miscellaneous
 /static/
+node_modules/
+.svelte-kit/
+src-tauri/gen/

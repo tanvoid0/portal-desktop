@@ -1,12 +1,14 @@
-use tauri::State;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use crate::database::DatabaseManager;
-use crate::domains::tasks::services::task_service::TaskService;
-use crate::domains::tasks::repositories::task_repository::{CreateTaskRequest, UpdateTaskRequest, TaskFilters};
-use crate::domains::tasks::services::ai_task_generator::{AITaskGenerator, GeneratedTaskStructure};
 use crate::domains::ai::providers::ProviderType;
 use crate::domains::ai::services::AIService;
+use crate::domains::tasks::repositories::task_repository::{
+    CreateTaskRequest, TaskFilters, UpdateTaskRequest,
+};
+use crate::domains::tasks::services::ai_task_generator::{AITaskGenerator, GeneratedTaskStructure};
+use crate::domains::tasks::services::task_service::TaskService;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tauri::State;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskResponse {
@@ -33,7 +35,7 @@ pub struct TaskResponse {
     pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
     pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
     pub blocked_by: Option<String>, // JSON array of task IDs
-    pub blocks: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>,     // JSON array of task IDs
 }
 
 impl From<crate::domains::tasks::entities::task::Model> for TaskResponse {
@@ -88,7 +90,7 @@ pub struct CreateTaskCommand {
     pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
     pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
     pub blocked_by: Option<String>, // JSON array of task IDs
-    pub blocks: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>,     // JSON array of task IDs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,7 +114,7 @@ pub struct UpdateTaskCommand {
     pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
     pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
     pub blocked_by: Option<String>, // JSON array of task IDs
-    pub blocks: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>,     // JSON array of task IDs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,40 +136,60 @@ pub async fn create_task(
     if command.title.trim().is_empty() {
         return Err("Task title is required".to_string());
     }
-    
+
     if command.title.len() > 200 {
         return Err("Task title must be less than 200 characters".to_string());
     }
-    
+
     if let Some(ref description) = command.description {
         if description.len() > 1000 {
             return Err("Task description must be less than 1000 characters".to_string());
         }
     }
-    
+
     // Validate status
     let valid_statuses = ["pending", "in-progress", "completed", "cancelled"];
     if !valid_statuses.contains(&command.status.as_str()) {
-        return Err(format!("Invalid status: {}. Must be one of: {}", command.status, valid_statuses.join(", ")));
+        return Err(format!(
+            "Invalid status: {}. Must be one of: {}",
+            command.status,
+            valid_statuses.join(", ")
+        ));
     }
-    
+
     // Validate priority
     let valid_priorities = ["low", "medium", "high"];
     if !valid_priorities.contains(&command.priority.as_str()) {
-        return Err(format!("Invalid priority: {}. Must be one of: {}", command.priority, valid_priorities.join(", ")));
+        return Err(format!(
+            "Invalid priority: {}. Must be one of: {}",
+            command.priority,
+            valid_priorities.join(", ")
+        ));
     }
 
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     let request = CreateTaskRequest {
         title: command.title.trim().to_string(),
-        description: command.description.map(|d| d.trim().to_string()).filter(|d| !d.is_empty()),
+        description: command
+            .description
+            .map(|d| d.trim().to_string())
+            .filter(|d| !d.is_empty()),
         status: command.status,
         priority: command.priority,
-        type_: command.type_.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()),
+        type_: command
+            .type_
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty()),
         parent_id: command.parent_id,
-        resource_id: command.resource_id.map(|r| r.trim().to_string()).filter(|r| !r.is_empty()),
-        resource_type: command.resource_type.map(|r| r.trim().to_string()).filter(|r| !r.is_empty()),
+        resource_id: command
+            .resource_id
+            .map(|r| r.trim().to_string())
+            .filter(|r| !r.is_empty()),
+        resource_type: command
+            .resource_type
+            .map(|r| r.trim().to_string())
+            .filter(|r| !r.is_empty()),
         due_date: command.due_date,
         // New advanced fields
         estimated_time: command.estimated_time,
@@ -203,45 +225,68 @@ pub async fn update_task(
         if title.trim().is_empty() {
             return Err("Task title cannot be empty".to_string());
         }
-        
+
         if title.len() > 200 {
             return Err("Task title must be less than 200 characters".to_string());
         }
     }
-    
+
     if let Some(ref description) = command.description {
         if description.len() > 1000 {
             return Err("Task description must be less than 1000 characters".to_string());
         }
     }
-    
+
     // Validate status if provided
     if let Some(ref status) = command.status {
         let valid_statuses = ["pending", "in-progress", "completed", "cancelled"];
         if !valid_statuses.contains(&status.as_str()) {
-            return Err(format!("Invalid status: {}. Must be one of: {}", status, valid_statuses.join(", ")));
+            return Err(format!(
+                "Invalid status: {}. Must be one of: {}",
+                status,
+                valid_statuses.join(", ")
+            ));
         }
     }
-    
+
     // Validate priority if provided
     if let Some(ref priority) = command.priority {
         let valid_priorities = ["low", "medium", "high"];
         if !valid_priorities.contains(&priority.as_str()) {
-            return Err(format!("Invalid priority: {}. Must be one of: {}", priority, valid_priorities.join(", ")));
+            return Err(format!(
+                "Invalid priority: {}. Must be one of: {}",
+                priority,
+                valid_priorities.join(", ")
+            ));
         }
     }
 
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     let request = UpdateTaskRequest {
-        title: command.title.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()),
-        description: command.description.map(|d| d.trim().to_string()).filter(|d| !d.is_empty()),
+        title: command
+            .title
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty()),
+        description: command
+            .description
+            .map(|d| d.trim().to_string())
+            .filter(|d| !d.is_empty()),
         status: command.status,
         priority: command.priority,
-        type_: command.type_.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()),
+        type_: command
+            .type_
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty()),
         parent_id: command.parent_id,
-        resource_id: command.resource_id.map(|r| r.trim().to_string()).filter(|r| !r.is_empty()),
-        resource_type: command.resource_type.map(|r| r.trim().to_string()).filter(|r| !r.is_empty()),
+        resource_id: command
+            .resource_id
+            .map(|r| r.trim().to_string())
+            .filter(|r| !r.is_empty()),
+        resource_type: command
+            .resource_type
+            .map(|r| r.trim().to_string())
+            .filter(|r| !r.is_empty()),
         due_date: command.due_date,
         // New advanced fields
         estimated_time: command.estimated_time,
@@ -276,18 +321,13 @@ pub async fn delete_task(
     }
 
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     // Check if task exists before deleting
     match task_service.get_task(id).await {
-        Ok(Some(_)) => {
-            task_service
-                .delete_task(id)
-                .await
-                .map_err(|e| {
-                    eprintln!("Failed to delete task: {}", e);
-                    e.to_string()
-                })
-        }
+        Ok(Some(_)) => task_service.delete_task(id).await.map_err(|e| {
+            eprintln!("Failed to delete task: {}", e);
+            e.to_string()
+        }),
         Ok(None) => Err("Task not found".to_string()),
         Err(e) => {
             eprintln!("Failed to check if task exists: {}", e);
@@ -306,7 +346,7 @@ pub async fn get_task(
     }
 
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     task_service
         .get_task(id)
         .await
@@ -323,7 +363,7 @@ pub async fn get_tasks(
     filters: Option<TaskFiltersCommand>,
 ) -> Result<Vec<TaskResponse>, String> {
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     let filters = filters.map(|f| TaskFilters {
         status: f.status,
         priority: f.priority,
@@ -353,7 +393,7 @@ pub async fn get_subtasks(
     }
 
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     task_service
         .get_subtasks(parent_id)
         .await
@@ -369,7 +409,7 @@ pub async fn get_main_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     task_service
         .get_main_tasks()
         .await
@@ -381,18 +421,13 @@ pub async fn get_main_tasks(
 }
 
 #[tauri::command]
-pub async fn get_task_count(
-    db_manager: State<'_, Arc<DatabaseManager>>,
-) -> Result<u64, String> {
+pub async fn get_task_count(db_manager: State<'_, Arc<DatabaseManager>>) -> Result<u64, String> {
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
-    task_service
-        .get_task_count()
-        .await
-        .map_err(|e| {
-            eprintln!("Failed to get task count: {}", e);
-            e.to_string()
-        })
+
+    task_service.get_task_count().await.map_err(|e| {
+        eprintln!("Failed to get task count: {}", e);
+        e.to_string()
+    })
 }
 
 // New advanced commands
@@ -402,7 +437,7 @@ pub async fn get_overdue_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     task_service
         .get_overdue_tasks()
         .await
@@ -418,7 +453,7 @@ pub async fn get_due_today_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     task_service
         .get_due_today_tasks()
         .await
@@ -434,7 +469,7 @@ pub async fn get_unestimated_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
     let task_service = TaskService::new(db_manager.get_connection_clone());
-    
+
     task_service
         .get_unestimated_tasks()
         .await

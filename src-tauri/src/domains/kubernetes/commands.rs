@@ -1,7 +1,10 @@
+use crate::domains::kubernetes::manager::KubernetesManager;
+use crate::domains::kubernetes::types::{
+    ConfigMapInfo, CronJobInfo, DaemonSetInfo, EventInfo, IngressInfo, JobInfo, ResourceMetrics,
+    SecretInfo, StatefulSetInfo, *,
+};
 use tauri::State;
 use tokio::sync::Mutex;
-use crate::domains::kubernetes::manager::KubernetesManager;
-use crate::domains::kubernetes::types::{*, JobInfo, CronJobInfo, ConfigMapInfo, SecretInfo, IngressInfo, ResourceMetrics, StatefulSetInfo, DaemonSetInfo, EventInfo};
 
 #[tauri::command]
 pub async fn k8s_initialize_manager(
@@ -26,12 +29,12 @@ pub async fn k8s_connect_cluster(
     // Do the async connection work first
     let mut temp_mgr = KubernetesManager::new();
     temp_mgr.connect_cluster(&cluster_name).await?;
-    
+
     // Then update the shared state
     let cluster = temp_mgr.current_cluster.clone();
     let mut mgr = manager.lock().await;
     mgr.current_cluster = cluster;
-    
+
     Ok(())
 }
 
@@ -61,7 +64,8 @@ pub async fn k8s_get_pod_logs(
         container.as_deref(),
         follow,
         tail_lines,
-    ).await
+    )
+    .await
 }
 
 #[tauri::command]
@@ -276,7 +280,8 @@ pub async fn k8s_scale_deployment(
     replicas: u32,
 ) -> Result<(), String> {
     let mgr = KubernetesManager::new();
-    mgr.scale_deployment(&namespace, &deployment_name, replicas).await
+    mgr.scale_deployment(&namespace, &deployment_name, replicas)
+        .await
 }
 
 #[tauri::command]
@@ -322,7 +327,8 @@ pub async fn k8s_exec_pod(
     command: Vec<String>,
 ) -> Result<String, String> {
     let mgr = KubernetesManager::new();
-    mgr.exec_pod(&namespace, &pod_name, container.as_deref(), command).await
+    mgr.exec_pod(&namespace, &pod_name, container.as_deref(), command)
+        .await
 }
 
 #[tauri::command]
@@ -334,7 +340,8 @@ pub async fn k8s_start_port_forward(
     remote_port: u16,
 ) -> Result<crate::domains::kubernetes::types::PortForwardInfo, String> {
     let mgr = KubernetesManager::new();
-    mgr.start_port_forward(&namespace, &pod_name, local_port, remote_port).await
+    mgr.start_port_forward(&namespace, &pod_name, local_port, remote_port)
+        .await
 }
 
 #[tauri::command]
@@ -359,6 +366,6 @@ pub async fn k8s_stop_all_watches(
     _manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<(), String> {
     let mgr = KubernetesManager::new();
-    mgr.stop_all_watches();
+    mgr.stop_all_watches().await;
     Ok(())
 }

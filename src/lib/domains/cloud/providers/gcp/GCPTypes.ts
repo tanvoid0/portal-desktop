@@ -5,7 +5,7 @@ export interface KubernetesCluster {
   name: string;
   context: string;
   namespace: string;
-  status: 'Connected' | 'Disconnected' | 'Connecting' | { Error: string };
+  status: "Connected" | "Disconnected" | "Connecting" | { Error: string };
   server?: string;
   version?: string;
   last_connected?: string;
@@ -76,4 +76,3 @@ export interface PortForwardInfo {
   created_at: string;
   url: string;
 }
-

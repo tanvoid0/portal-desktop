@@ -26,4 +26,3 @@ impl Related<super::framework_ide_mapping::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-

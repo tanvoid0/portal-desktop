@@ -1,0 +1,50 @@
+# Cursor retrieval/indexing ignore rules.
+#
+# Goal: prevent embeddings for generated/vendor/log/cache artifacts so usage
+# doesn’t burn embedding large, irrelevant directories.
+
+# Node / build artifacts
+**/node_modules/**
+**/dist/**
+**/build/**
+**/.svelte-kit/**
+**/.vercel/**
+**/.netlify/**
+**/out/**
+**/.output/**
+**/coverage/**
+**/.turbo/**
+**/.next/**
+**/.nuxt/**
+
+# Tauri / Rust build outputs
+**/src-tauri/target/**
+**/src-tauri/gen/**
+**/src-tauri/.tauri/**
+**/.tauri/**
+
+# IDE files
+**/.vscode/**
+**/.idea/**
+
+# Git / metadata
+**/.git/**
+
+# Logs / caches / databases
+**/logs/**
+**/*.log
+**/data/**
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.sqlite
+**/*.sqlite3
+
+# Cursor-specific heavyweight artifacts (plans can be large and noisy)
+**/.cursor/plans/**
+**/.cursor/debug*.log
+**/.cursor/agent-transcripts/**
+
+# Java/Kotlin build caches (helps if they were being indexed previously)
+**/.m2/**
+**/.gradle/**

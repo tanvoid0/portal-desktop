@@ -1,13 +1,12 @@
+use std::fs;
 /**
  * Terminal Integration Service - FlyEnv-style automatic environment switching
  * Automatically sources project-specific environment when opening terminals
  */
-
 use std::path::Path;
-use std::fs;
 // Using println! for logging as per codebase convention
-use crate::domains::sdk::services::SDKService;
 use super::super::SDKError;
+use crate::domains::sdk::services::SDKService;
 
 #[derive(Debug)]
 pub struct TerminalIntegrationService {
@@ -22,30 +21,44 @@ impl TerminalIntegrationService {
 
     /// Setup terminal integration for a project directory
     /// This creates shell hooks that automatically source the project environment
-    pub async fn setup_project_terminal_integration(&self, project_path: &str) -> Result<(), SDKError> {
+    pub async fn setup_project_terminal_integration(
+        &self,
+        project_path: &str,
+    ) -> Result<(), SDKError> {
         let project_path = Path::new(project_path);
-        
+
         // Check if project has environment configuration
         if !self.has_project_environment(project_path).await? {
-            println!("[TerminalIntegration] No project environment found for {}", project_path.display());
+            println!(
+                "[TerminalIntegration] No project environment found for {}",
+                project_path.display()
+            );
             return Ok(());
         }
 
         // Create shell integration scripts
         self.create_shell_integration_scripts(project_path).await?;
-        
+
         // Create project-specific shell profile
         self.create_project_shell_profile(project_path).await?;
 
-        println!("[TerminalIntegration] Terminal integration setup completed for project {}", project_path.display());
+        println!(
+            "[TerminalIntegration] Terminal integration setup completed for project {}",
+            project_path.display()
+        );
         Ok(())
     }
 
     /// Check if project has environment configuration
     async fn has_project_environment(&self, project_path: &Path) -> Result<bool, SDKError> {
         let config_files = vec![
-            ".nvmrc", ".python-version", ".ruby-version", 
-            ".php-version", "rust-toolchain", "go.mod", ".portal_env"
+            ".nvmrc",
+            ".python-version",
+            ".ruby-version",
+            ".php-version",
+            "rust-toolchain",
+            "go.mod",
+            ".portal_env",
         ];
 
         for config_file in config_files {
@@ -61,10 +74,10 @@ impl TerminalIntegrationService {
     async fn create_shell_integration_scripts(&self, project_path: &Path) -> Result<(), SDKError> {
         // Create bash integration
         self.create_bash_integration(project_path).await?;
-        
+
         // Create zsh integration
         self.create_zsh_integration(project_path).await?;
-        
+
         // Create fish integration
         self.create_fish_integration(project_path).await?;
 
@@ -113,8 +126,9 @@ source_project_env
         );
 
         let script_path = project_path.join(".portal_bash_integration");
-        fs::write(&script_path, bash_script)
-            .map_err(|e| SDKError::CommandFailed(format!("Failed to create bash integration: {}", e)))?;
+        fs::write(&script_path, bash_script).map_err(|e| {
+            SDKError::CommandFailed(format!("Failed to create bash integration: {}", e))
+        })?;
 
         // Make it executable (Unix only)
         #[cfg(unix)]
@@ -164,8 +178,9 @@ source_project_env
         );
 
         let script_path = project_path.join(".portal_zsh_integration");
-        fs::write(&script_path, zsh_script)
-            .map_err(|e| SDKError::CommandFailed(format!("Failed to create zsh integration: {}", e)))?;
+        fs::write(&script_path, zsh_script).map_err(|e| {
+            SDKError::CommandFailed(format!("Failed to create zsh integration: {}", e))
+        })?;
 
         // Make it executable (Unix only)
         #[cfg(unix)]
@@ -220,8 +235,9 @@ source_project_env
         );
 
         let script_path = project_path.join(".portal_fish_integration");
-        fs::write(&script_path, fish_script)
-            .map_err(|e| SDKError::CommandFailed(format!("Failed to create fish integration: {}", e)))?;
+        fs::write(&script_path, fish_script).map_err(|e| {
+            SDKError::CommandFailed(format!("Failed to create fish integration: {}", e))
+        })?;
 
         Ok(())
     }
@@ -265,23 +281,45 @@ portal-deactivate() {{
         );
 
         let profile_path = project_path.join(".portal_profile");
-        fs::write(&profile_path, profile_content)
-            .map_err(|e| SDKError::CommandFailed(format!("Failed to create project profile: {}", e)))?;
+        fs::write(&profile_path, profile_content).map_err(|e| {
+            SDKError::CommandFailed(format!("Failed to create project profile: {}", e))
+        })?;
 
-        println!("[TerminalIntegration] Created project shell profile: {}", profile_path.display());
+        println!(
+            "[TerminalIntegration] Created project shell profile: {}",
+            profile_path.display()
+        );
         Ok(())
     }
 
     /// Get terminal integration status for a project
-    pub async fn get_integration_status(&self, project_path: &str) -> Result<HashMap<String, bool>, SDKError> {
+    pub async fn get_integration_status(
+        &self,
+        project_path: &str,
+    ) -> Result<HashMap<String, bool>, SDKError> {
         let project_path = Path::new(project_path);
         let mut status = HashMap::new();
 
-        status.insert("has_environment".to_string(), self.has_project_environment(project_path).await?);
-        status.insert("has_bash_integration".to_string(), project_path.join(".portal_bash_integration").exists());
-        status.insert("has_zsh_integration".to_string(), project_path.join(".portal_zsh_integration").exists());
-        status.insert("has_fish_integration".to_string(), project_path.join(".portal_fish_integration").exists());
-        status.insert("has_profile".to_string(), project_path.join(".portal_profile").exists());
+        status.insert(
+            "has_environment".to_string(),
+            self.has_project_environment(project_path).await?,
+        );
+        status.insert(
+            "has_bash_integration".to_string(),
+            project_path.join(".portal_bash_integration").exists(),
+        );
+        status.insert(
+            "has_zsh_integration".to_string(),
+            project_path.join(".portal_zsh_integration").exists(),
+        );
+        status.insert(
+            "has_fish_integration".to_string(),
+            project_path.join(".portal_fish_integration").exists(),
+        );
+        status.insert(
+            "has_profile".to_string(),
+            project_path.join(".portal_profile").exists(),
+        );
 
         Ok(status)
     }
@@ -291,17 +329,18 @@ portal-deactivate() {{
         let project_path = Path::new(project_path);
         let files_to_remove = vec![
             ".portal_env",
-            ".portal_bash_integration", 
+            ".portal_bash_integration",
             ".portal_zsh_integration",
             ".portal_fish_integration",
-            ".portal_profile"
+            ".portal_profile",
         ];
 
         for file in files_to_remove {
             let file_path = project_path.join(file);
             if file_path.exists() {
-                fs::remove_file(&file_path)
-                    .map_err(|e| SDKError::CommandFailed(format!("Failed to remove {}: {}", file, e)))?;
+                fs::remove_file(&file_path).map_err(|e| {
+                    SDKError::CommandFailed(format!("Failed to remove {}: {}", file, e))
+                })?;
                 println!("[TerminalIntegration] Removed {}", file_path.display());
             }
         }

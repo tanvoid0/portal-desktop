@@ -25,8 +25,16 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(ProjectLanguages::ProjectId).integer().not_null())
-                    .col(ColumnDef::new(ProjectLanguages::LanguageId).integer().not_null())
+                    .col(
+                        ColumnDef::new(ProjectLanguages::ProjectId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectLanguages::LanguageId)
+                            .integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(ProjectLanguages::CreatedAt)
                             .timestamp_with_time_zone()
@@ -121,4 +129,3 @@ enum Languages {
     Table,
     Id,
 }
-

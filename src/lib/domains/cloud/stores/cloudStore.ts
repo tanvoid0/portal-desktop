@@ -1,35 +1,28 @@
 // Cloud store with provider-agnostic state management
 // Uses Svelte stores for reactive state
 
-import { writable, derived, get } from 'svelte/store';
-import { listen } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
-import type {
-  ICluster,
-  ICloudResource
-} from '../core/types';
-import {
-  CloudProviderType,
-  ResourceType,
-  ClusterStatus
-} from '../core/types';
-import { CloudServiceFactory } from '../services/cloudServiceFactory';
-import { toastActions } from '$lib/domains/shared/stores/toastStore';
-import type { PodInfo } from '../providers/gcp/GCPTypes';
-import { GCPProvider } from '../providers/gcp/GCPProvider';
+import { writable, derived, get } from "svelte/store";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import type { ICluster, ICloudResource } from "../core/types";
+import { CloudProviderType, ResourceType, ClusterStatus } from "../core/types";
+import { CloudServiceFactory } from "../services/cloudServiceFactory";
+import { toastActions } from "$lib/utils/toast";
+import type { PodInfo } from "../providers/gcp/GCPTypes";
+import { GCPProvider } from "../providers/gcp/GCPProvider";
 
 // Storage keys
-const STORAGE_KEY_PREFIX = 'portal-cloud-';
+const STORAGE_KEY_PREFIX = "portal-cloud-";
 const STORAGE_KEY_NAMESPACE = `${STORAGE_KEY_PREFIX}selected-namespace`;
 const STORAGE_KEY_CLUSTER_ID = `${STORAGE_KEY_PREFIX}last-cluster-id`;
 const STORAGE_KEY_PROVIDER = `${STORAGE_KEY_PREFIX}last-provider`;
 
 // Persistence helpers
 function saveToStorage(key: string, value: string | null): void {
-  if (typeof window === 'undefined') return;
-  
+  if (typeof window === "undefined") return;
+
   try {
-    if (value === null || value === '') {
+    if (value === null || value === "") {
       localStorage.removeItem(key);
     } else {
       localStorage.setItem(key, value);
@@ -39,9 +32,9 @@ function saveToStorage(key: string, value: string | null): void {
   }
 }
 
-function loadFromStorage(key: string, defaultValue: string = ''): string {
-  if (typeof window === 'undefined') return defaultValue;
-  
+function loadFromStorage(key: string, defaultValue: string = ""): string {
+  if (typeof window === "undefined") return defaultValue;
+
   try {
     return localStorage.getItem(key) || defaultValue;
   } catch (error) {
@@ -55,14 +48,14 @@ export interface CloudState {
   currentProvider: CloudProviderType | null;
   currentCluster: ICluster | null;
   selectedNamespace: string;
-  
+
   // Connection state
   connection: {
     isConnected: boolean;
     isConnecting: boolean;
     error: string | null;
   };
-  
+
   // Resource state
   resources: {
     [ResourceType.POD]: ICloudResource[];
@@ -77,7 +70,7 @@ export interface CloudState {
     [ResourceType.INGRESS]: ICloudResource[];
     [ResourceType.NAMESPACE]: ICloudResource[];
   };
-  
+
   // Loading states
   loading: {
     clusters: boolean;
@@ -86,20 +79,28 @@ export interface CloudState {
 }
 
 // Load persisted state from localStorage
-const persistedNamespace = loadFromStorage(STORAGE_KEY_NAMESPACE, '');
-const persistedClusterId = loadFromStorage(STORAGE_KEY_CLUSTER_ID, '');
-const persistedProvider = loadFromStorage(STORAGE_KEY_PROVIDER, '') as CloudProviderType | '';
+const persistedNamespace = loadFromStorage(STORAGE_KEY_NAMESPACE, "");
+const persistedClusterId = loadFromStorage(STORAGE_KEY_CLUSTER_ID, "");
+const persistedProvider = loadFromStorage(STORAGE_KEY_PROVIDER, "") as
+  | CloudProviderType
+  | "";
 
 const initialState: CloudState = {
-  currentProvider: persistedProvider && Object.values(CloudProviderType).includes(persistedProvider as CloudProviderType)
-    ? (persistedProvider as CloudProviderType)
+  currentProvider:
+    persistedProvider &&
+    Object.values(CloudProviderType).includes(
+      persistedProvider as CloudProviderType,
+    )
+      ? (persistedProvider as CloudProviderType)
+      : null,
+  currentCluster: persistedClusterId
+    ? ({ id: persistedClusterId } as ICluster)
     : null,
-  currentCluster: persistedClusterId ? { id: persistedClusterId } as ICluster : null,
   selectedNamespace: persistedNamespace,
   connection: {
     isConnected: false,
     isConnecting: false,
-    error: null
+    error: null,
   },
   resources: {
     [ResourceType.POD]: [],
@@ -112,7 +113,7 @@ const initialState: CloudState = {
     [ResourceType.CONFIGMAP]: [],
     [ResourceType.SECRET]: [],
     [ResourceType.INGRESS]: [],
-    [ResourceType.NAMESPACE]: []
+    [ResourceType.NAMESPACE]: [],
   },
   loading: {
     clusters: false,
@@ -127,9 +128,9 @@ const initialState: CloudState = {
       [ResourceType.CONFIGMAP]: false,
       [ResourceType.SECRET]: false,
       [ResourceType.INGRESS]: false,
-      [ResourceType.NAMESPACE]: false
-    }
-  }
+      [ResourceType.NAMESPACE]: false,
+    },
+  },
 };
 
 export const cloudStore = writable<CloudState>(initialState);
@@ -138,7 +139,7 @@ export const cloudStore = writable<CloudState>(initialState);
 cloudStore.subscribe((state) => {
   // Persist selected namespace
   saveToStorage(STORAGE_KEY_NAMESPACE, state.selectedNamespace);
-  
+
   // Persist cluster ID and provider when connected
   if (state.currentCluster && state.currentProvider) {
     saveToStorage(STORAGE_KEY_CLUSTER_ID, state.currentCluster.id);
@@ -151,10 +152,22 @@ cloudStore.subscribe((state) => {
 });
 
 // Derived stores for convenience
-export const isConnected = derived(cloudStore, $store => $store.connection.isConnected);
-export const currentCluster = derived(cloudStore, $store => $store.currentCluster);
-export const currentProvider = derived(cloudStore, $store => $store.currentProvider);
-export const selectedNamespace = derived(cloudStore, $store => $store.selectedNamespace);
+export const isConnected = derived(
+  cloudStore,
+  ($store) => $store.connection.isConnected,
+);
+export const currentCluster = derived(
+  cloudStore,
+  ($store) => $store.currentCluster,
+);
+export const currentProvider = derived(
+  cloudStore,
+  ($store) => $store.currentProvider,
+);
+export const selectedNamespace = derived(
+  cloudStore,
+  ($store) => $store.selectedNamespace,
+);
 
 // Store actions
 
@@ -163,72 +176,148 @@ export const selectedNamespace = derived(cloudStore, $store => $store.selectedNa
  */
 export async function connectToCluster(
   providerType: CloudProviderType,
-  clusterId: string
+  clusterId: string,
 ): Promise<void> {
   const state = get(cloudStore);
-  
+
   // Update connecting state
-  cloudStore.update(s => ({
+  cloudStore.update((s) => ({
     ...s,
-    connection: { ...s.connection, isConnecting: true, error: null }
+    connection: { ...s.connection, isConnecting: true, error: null },
   }));
-  
+
   try {
     // #region agent log
-    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:176',message:'connectToCluster start',data:{providerType,clusterId},timestamp:Date.now()})}).catch(()=>{});
+    fetch("http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "7cbddc",
+      },
+      body: JSON.stringify({
+        sessionId: "7cbddc",
+        runId: "pre-fix",
+        hypothesisId: "H5",
+        location: "cloudStore.ts:176",
+        message: "connectToCluster start",
+        data: { providerType, clusterId },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion agent log
     const provider = await CloudServiceFactory.getProvider(providerType);
     await provider.connect(clusterId);
     // #region agent log
-    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:178',message:'after provider.connect',data:{clusterId},timestamp:Date.now()})}).catch(()=>{});
+    fetch("http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "7cbddc",
+      },
+      body: JSON.stringify({
+        sessionId: "7cbddc",
+        runId: "pre-fix",
+        hypothesisId: "H5",
+        location: "cloudStore.ts:178",
+        message: "after provider.connect",
+        data: { clusterId },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion agent log
     const cluster = await provider.getCluster(clusterId);
     // #region agent log
-    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:180',message:'after provider.getCluster',data:{clusterFound:Boolean(cluster)},timestamp:Date.now()})}).catch(()=>{});
+    fetch("http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "7cbddc",
+      },
+      body: JSON.stringify({
+        sessionId: "7cbddc",
+        runId: "pre-fix",
+        hypothesisId: "H5",
+        location: "cloudStore.ts:180",
+        message: "after provider.getCluster",
+        data: { clusterFound: Boolean(cluster) },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion agent log
-    
+
     if (!cluster) {
       throw new Error(`Cluster ${clusterId} not found`);
     }
-    
+
     // Restore persisted namespace if available, otherwise use cluster default
-    const persistedNamespace = loadFromStorage(STORAGE_KEY_NAMESPACE, '');
-    const namespaceToUse = persistedNamespace || cluster.namespace || '';
-    
-    cloudStore.update(s => ({
+    const persistedNamespace = loadFromStorage(STORAGE_KEY_NAMESPACE, "");
+    const namespaceToUse = persistedNamespace || cluster.namespace || "";
+
+    cloudStore.update((s) => ({
       ...s,
       currentProvider: providerType,
       currentCluster: cluster,
       connection: {
         isConnected: true,
         isConnecting: false,
-        error: null
+        error: null,
       },
-      selectedNamespace: namespaceToUse
+      selectedNamespace: namespaceToUse,
     }));
-    
+
     // Start watching for real-time updates
     await startWatchingResources(namespaceToUse || undefined);
     // #region agent log
-    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:202',message:'after startWatchingResources',data:{},timestamp:Date.now()})}).catch(()=>{});
+    fetch("http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "7cbddc",
+      },
+      body: JSON.stringify({
+        sessionId: "7cbddc",
+        runId: "pre-fix",
+        hypothesisId: "H5",
+        location: "cloudStore.ts:202",
+        message: "after startWatchingResources",
+        data: {},
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion agent log
 
     toastActions.success(`Connected to cluster: ${cluster.name}`);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to connect to cluster';
-    
-    cloudStore.update(s => ({
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to connect to cluster";
+
+    cloudStore.update((s) => ({
       ...s,
       connection: {
         isConnected: false,
         isConnecting: false,
-        error: errorMessage
-      }
+        error: errorMessage,
+      },
     }));
-    
+
     toastActions.error(errorMessage);
     // #region agent log
-    fetch('http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7cbddc'},body:JSON.stringify({sessionId:'7cbddc',runId:'pre-fix',hypothesisId:'H5',location:'cloudStore.ts:205',message:'connectToCluster error',data:{error:errorMessage},timestamp:Date.now()})}).catch(()=>{});
+    fetch("http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "7cbddc",
+      },
+      body: JSON.stringify({
+        sessionId: "7cbddc",
+        runId: "pre-fix",
+        hypothesisId: "H5",
+        location: "cloudStore.ts:205",
+        message: "connectToCluster error",
+        data: { error: errorMessage },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion agent log
     throw error;
   }
@@ -239,26 +328,28 @@ export async function connectToCluster(
  */
 export async function disconnectFromCluster(): Promise<void> {
   const state = get(cloudStore);
-  
+
   if (!state.currentProvider || !state.connection.isConnected) {
     return;
   }
-  
+
   try {
     // Stop watching
     await stopWatchingResources();
-    
-    const provider = await CloudServiceFactory.getProvider(state.currentProvider);
+
+    const provider = await CloudServiceFactory.getProvider(
+      state.currentProvider,
+    );
     await provider.disconnect();
-    
-    cloudStore.update(s => ({
+
+    cloudStore.update((s) => ({
       ...s,
       currentProvider: null,
       currentCluster: null,
       connection: {
         isConnected: false,
         isConnecting: false,
-        error: null
+        error: null,
       },
       resources: {
         [ResourceType.POD]: [],
@@ -271,48 +362,50 @@ export async function disconnectFromCluster(): Promise<void> {
         [ResourceType.CONFIGMAP]: [],
         [ResourceType.SECRET]: [],
         [ResourceType.INGRESS]: [],
-        [ResourceType.NAMESPACE]: []
-      }
+        [ResourceType.NAMESPACE]: [],
+      },
     }));
-    
+
     // Clear persisted cluster info
     saveToStorage(STORAGE_KEY_CLUSTER_ID, null);
     saveToStorage(STORAGE_KEY_PROVIDER, null);
-    
-    toastActions.success('Disconnected from cluster');
+
+    toastActions.success("Disconnected from cluster");
   } catch (error) {
-    console.error('Failed to disconnect:', error);
-    toastActions.error('Failed to disconnect from cluster');
+    console.error("Failed to disconnect:", error);
+    toastActions.error("Failed to disconnect from cluster");
   }
 }
 
 /**
  * Load clusters for a provider
  */
-export async function loadClusters(providerType: CloudProviderType): Promise<ICluster[]> {
-  cloudStore.update(s => ({
+export async function loadClusters(
+  providerType: CloudProviderType,
+): Promise<ICluster[]> {
+  cloudStore.update((s) => ({
     ...s,
-    loading: { ...s.loading, clusters: true }
+    loading: { ...s.loading, clusters: true },
   }));
-  
+
   try {
     const provider = await CloudServiceFactory.getProvider(providerType);
     const clusters = await provider.listClusters();
-    
-    cloudStore.update(s => ({
+
+    cloudStore.update((s) => ({
       ...s,
-      loading: { ...s.loading, clusters: false }
+      loading: { ...s.loading, clusters: false },
     }));
-    
+
     return clusters;
   } catch (error) {
-    cloudStore.update(s => ({
+    cloudStore.update((s) => ({
       ...s,
-      loading: { ...s.loading, clusters: false }
+      loading: { ...s.loading, clusters: false },
     }));
-    
-    console.error('Failed to load clusters:', error);
-    toastActions.error('Failed to load clusters');
+
+    console.error("Failed to load clusters:", error);
+    toastActions.error("Failed to load clusters");
     return [];
   }
 }
@@ -322,50 +415,53 @@ export async function loadClusters(providerType: CloudProviderType): Promise<ICl
  */
 export async function loadResources(
   type: ResourceType,
-  namespace?: string
+  namespace?: string,
 ): Promise<void> {
   const state = get(cloudStore);
-  
+
   if (!state.currentProvider || !state.connection.isConnected) {
     return;
   }
-  
-  cloudStore.update(s => ({
+
+  cloudStore.update((s) => ({
     ...s,
     loading: {
       ...s.loading,
-      resources: { ...s.loading.resources, [type]: true }
-    }
+      resources: { ...s.loading.resources, [type]: true },
+    },
   }));
-  
+
   try {
-    const provider = await CloudServiceFactory.getProvider(state.currentProvider);
+    const provider = await CloudServiceFactory.getProvider(
+      state.currentProvider,
+    );
     const resources = await provider.listResources(
       type,
-      namespace || state.selectedNamespace || undefined
+      namespace || state.selectedNamespace || undefined,
     );
-    
-    cloudStore.update(s => ({
+
+    cloudStore.update((s) => ({
       ...s,
       resources: {
         ...s.resources,
-        [type]: resources
+        [type]: resources,
       },
       loading: {
         ...s.loading,
-        resources: { ...s.loading.resources, [type]: false }
-      }
+        resources: { ...s.loading.resources, [type]: false },
+      },
     }));
   } catch (error) {
-    cloudStore.update(s => ({
+    cloudStore.update((s) => ({
       ...s,
       loading: {
         ...s.loading,
-        resources: { ...s.loading.resources, [type]: false }
-      }
+        resources: { ...s.loading.resources, [type]: false },
+      },
     }));
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     console.error(`Failed to load ${type} resources:`, error);
     toastActions.error(`Failed to load ${type} resources: ${errorMessage}`);
   }
@@ -377,17 +473,21 @@ export async function loadResources(
 export async function setSelectedNamespace(namespace: string): Promise<void> {
   const state = get(cloudStore);
   const previousNamespace = state.selectedNamespace;
-  
-  cloudStore.update(s => ({
+
+  cloudStore.update((s) => ({
     ...s,
-    selectedNamespace: namespace
+    selectedNamespace: namespace,
   }));
-  
+
   // Save to storage
   saveToStorage(STORAGE_KEY_NAMESPACE, namespace);
-  
+
   // If watching and namespace changed, restart watch
-  if (isWatching && namespace !== previousNamespace && state.connection.isConnected) {
+  if (
+    isWatching &&
+    namespace !== previousNamespace &&
+    state.connection.isConnected
+  ) {
     await stopWatchingResources();
     await startWatchingResources(namespace || undefined);
   }
@@ -398,11 +498,11 @@ export async function setSelectedNamespace(namespace: string): Promise<void> {
  */
 export async function refreshResources(): Promise<void> {
   const state = get(cloudStore);
-  
+
   if (!state.currentProvider || !state.connection.isConnected) {
     return;
   }
-  
+
   await Promise.all([
     loadResources(ResourceType.POD),
     loadResources(ResourceType.SERVICE),
@@ -414,20 +514,22 @@ export async function refreshResources(): Promise<void> {
     loadResources(ResourceType.CONFIGMAP),
     loadResources(ResourceType.SECRET),
     loadResources(ResourceType.INGRESS),
-    loadResources(ResourceType.NAMESPACE)
+    loadResources(ResourceType.NAMESPACE),
   ]);
 }
 
 /**
  * Initialize provider (call on app startup)
  */
-export async function initializeProvider(providerType: CloudProviderType): Promise<void> {
+export async function initializeProvider(
+  providerType: CloudProviderType,
+): Promise<void> {
   try {
     const provider = await CloudServiceFactory.getProvider(providerType);
     await provider.initialize();
   } catch (error) {
-    console.error('Failed to initialize provider:', error);
-    toastActions.error('Failed to initialize cloud provider');
+    console.error("Failed to initialize provider:", error);
+    toastActions.error("Failed to initialize cloud provider");
   }
 }
 
@@ -439,202 +541,240 @@ let isStoppingWatches = false; // Guard to prevent multiple simultaneous stop ca
 /**
  * Start watching resources for real-time updates
  */
-export async function startWatchingResources(namespace?: string): Promise<void> {
+export async function startWatchingResources(
+  namespace?: string,
+): Promise<void> {
   const state = get(cloudStore);
-  
+
   // If already watching, stop first to restart with new namespace
   if (isWatching) {
     await stopWatchingResources();
   }
-  
-  if (!state.connection.isConnected || state.currentProvider !== CloudProviderType.GCP) {
+
+  if (
+    !state.connection.isConnected ||
+    state.currentProvider !== CloudProviderType.GCP
+  ) {
     return;
   }
-  
+
   try {
     // Use selected namespace if not provided
     const watchNamespace = namespace || state.selectedNamespace || undefined;
-    
+
     // Start backend watches for all resource types
     await Promise.all([
-      invoke('k8s_start_watching_pods', { namespace: watchNamespace }),
-      invoke('k8s_start_watching_services', { namespace: watchNamespace }),
-      invoke('k8s_start_watching_deployments', { namespace: watchNamespace })
+      invoke("k8s_start_watching_pods", { namespace: watchNamespace }),
+      invoke("k8s_start_watching_services", { namespace: watchNamespace }),
+      invoke("k8s_start_watching_deployments", { namespace: watchNamespace }),
     ]);
-    
+
     // Set up event listeners for pods
-    const podUpdatedUnlisten = await listen<PodInfo>('k8s:pod-updated', (event) => {
-      const podInfo = event.payload;
-      const provider = new GCPProvider();
-      const podResource = provider.mapToPod(podInfo);
-      
-      cloudStore.update(s => {
-        const pods = s.resources[ResourceType.POD];
-        const index = pods.findIndex(p => p.id === podResource.id || p.name === podResource.name);
-        
-        if (index >= 0) {
-          // Update existing pod
-          pods[index] = podResource;
-        } else {
-          // Add new pod
-          pods.push(podResource);
-        }
-        
-        return {
-          ...s,
-          resources: {
-            ...s.resources,
-            [ResourceType.POD]: [...pods]
+    const podUpdatedUnlisten = await listen<PodInfo>(
+      "k8s:pod-updated",
+      (event) => {
+        const podInfo = event.payload;
+        const provider = new GCPProvider();
+        const podResource = provider.mapToPod(podInfo);
+
+        cloudStore.update((s) => {
+          const pods = s.resources[ResourceType.POD];
+          const index = pods.findIndex(
+            (p) => p.id === podResource.id || p.name === podResource.name,
+          );
+
+          if (index >= 0) {
+            // Update existing pod
+            pods[index] = podResource;
+          } else {
+            // Add new pod
+            pods.push(podResource);
           }
-        };
-      });
-    });
-    
-    const podDeletedUnlisten = await listen<PodInfo>('k8s:pod-deleted', (event) => {
-      const podInfo = event.payload;
-      
-      cloudStore.update(s => {
-        const pods = s.resources[ResourceType.POD].filter(
-          p => p.id !== podInfo.name && p.name !== podInfo.name
-        );
-        
-        return {
-          ...s,
-          resources: {
-            ...s.resources,
-            [ResourceType.POD]: pods
-          }
-        };
-      });
-    });
-    
+
+          return {
+            ...s,
+            resources: {
+              ...s.resources,
+              [ResourceType.POD]: [...pods],
+            },
+          };
+        });
+      },
+    );
+
+    const podDeletedUnlisten = await listen<PodInfo>(
+      "k8s:pod-deleted",
+      (event) => {
+        const podInfo = event.payload;
+
+        cloudStore.update((s) => {
+          const pods = s.resources[ResourceType.POD].filter(
+            (p) => p.id !== podInfo.name && p.name !== podInfo.name,
+          );
+
+          return {
+            ...s,
+            resources: {
+              ...s.resources,
+              [ResourceType.POD]: pods,
+            },
+          };
+        });
+      },
+    );
+
     // Set up event listeners for services
-    const serviceUpdatedUnlisten = await listen<any>('k8s:service-updated', (event) => {
-      const serviceInfo = event.payload;
-      const provider = new GCPProvider();
-      const serviceResource = provider.mapToService(serviceInfo);
-      
-      cloudStore.update(s => {
-        const services = s.resources[ResourceType.SERVICE];
-        const index = services.findIndex(s => s.id === serviceResource.id || s.name === serviceResource.name);
-        
-        if (index >= 0) {
-          services[index] = serviceResource;
-        } else {
-          services.push(serviceResource);
-        }
-        
-        return {
-          ...s,
-          resources: {
-            ...s.resources,
-            [ResourceType.SERVICE]: [...services]
+    const serviceUpdatedUnlisten = await listen<any>(
+      "k8s:service-updated",
+      (event) => {
+        const serviceInfo = event.payload;
+        const provider = new GCPProvider();
+        const serviceResource = provider.mapToService(serviceInfo);
+
+        cloudStore.update((s) => {
+          const services = s.resources[ResourceType.SERVICE];
+          const index = services.findIndex(
+            (s) =>
+              s.id === serviceResource.id || s.name === serviceResource.name,
+          );
+
+          if (index >= 0) {
+            services[index] = serviceResource;
+          } else {
+            services.push(serviceResource);
           }
-        };
-      });
-    });
-    
-    const serviceDeletedUnlisten = await listen<any>('k8s:service-deleted', (event) => {
-      const serviceInfo = event.payload;
-      
-      cloudStore.update(s => {
-        const services = s.resources[ResourceType.SERVICE].filter(
-          s => s.id !== serviceInfo.name && s.name !== serviceInfo.name
-        );
-        
-        return {
-          ...s,
-          resources: {
-            ...s.resources,
-            [ResourceType.SERVICE]: services
-          }
-        };
-      });
-    });
-    
+
+          return {
+            ...s,
+            resources: {
+              ...s.resources,
+              [ResourceType.SERVICE]: [...services],
+            },
+          };
+        });
+      },
+    );
+
+    const serviceDeletedUnlisten = await listen<any>(
+      "k8s:service-deleted",
+      (event) => {
+        const serviceInfo = event.payload;
+
+        cloudStore.update((s) => {
+          const services = s.resources[ResourceType.SERVICE].filter(
+            (s) => s.id !== serviceInfo.name && s.name !== serviceInfo.name,
+          );
+
+          return {
+            ...s,
+            resources: {
+              ...s.resources,
+              [ResourceType.SERVICE]: services,
+            },
+          };
+        });
+      },
+    );
+
     // Set up event listener for watch errors
     let hasStoppedOnError = false; // Guard to prevent multiple stop calls from error handler
-    const watchErrorUnlisten = await listen<string>('k8s:watch-error', (event) => {
-      const errorMsg = event.payload;
-      console.error('Watch error:', errorMsg);
-      
-      // If it's a connection error, stop watching and let user reconnect
-      if (!hasStoppedOnError && (
-          errorMsg.includes('tcp connect error') 
-          || errorMsg.includes('Cannot assign requested address')
-          || errorMsg.includes('error trying to connect')
-          || errorMsg.includes('connection refused')
-          || errorMsg.includes('connection reset')
-      )) {
-        hasStoppedOnError = true;
-        console.warn('Fatal connection error detected, stopping watches');
-        // Use setTimeout to break the reactive cycle
-        setTimeout(() => {
-          stopWatchingResources().catch(err => {
-            console.error('Failed to stop watches after error:', err);
-            hasStoppedOnError = false; // Reset on error so we can try again
-          });
-        }, 0);
-      }
-    });
-    
-    // Set up event listeners for deployments
-    const deploymentUpdatedUnlisten = await listen<any>('k8s:deployment-updated', (event) => {
-      const deploymentInfo = event.payload;
-      const provider = new GCPProvider();
-      const deploymentResource = provider.mapToDeployment(deploymentInfo);
-      
-      cloudStore.update(s => {
-        const deployments = s.resources[ResourceType.DEPLOYMENT];
-        const index = deployments.findIndex(d => d.id === deploymentResource.id || d.name === deploymentResource.name);
-        
-        if (index >= 0) {
-          deployments[index] = deploymentResource;
-        } else {
-          deployments.push(deploymentResource);
+    const watchErrorUnlisten = await listen<string>(
+      "k8s:watch-error",
+      (event) => {
+        const errorMsg = event.payload;
+        console.error("Watch error:", errorMsg);
+
+        // If it's a connection error, stop watching and let user reconnect
+        if (
+          !hasStoppedOnError &&
+          (errorMsg.includes("tcp connect error") ||
+            errorMsg.includes("Cannot assign requested address") ||
+            errorMsg.includes("error trying to connect") ||
+            errorMsg.includes("connection refused") ||
+            errorMsg.includes("connection reset"))
+        ) {
+          hasStoppedOnError = true;
+          console.warn("Fatal connection error detected, stopping watches");
+          // Use setTimeout to break the reactive cycle
+          setTimeout(() => {
+            stopWatchingResources().catch((err) => {
+              console.error("Failed to stop watches after error:", err);
+              hasStoppedOnError = false; // Reset on error so we can try again
+            });
+          }, 0);
         }
-        
-        return {
-          ...s,
-          resources: {
-            ...s.resources,
-            [ResourceType.DEPLOYMENT]: [...deployments]
+      },
+    );
+
+    // Set up event listeners for deployments
+    const deploymentUpdatedUnlisten = await listen<any>(
+      "k8s:deployment-updated",
+      (event) => {
+        const deploymentInfo = event.payload;
+        const provider = new GCPProvider();
+        const deploymentResource = provider.mapToDeployment(deploymentInfo);
+
+        cloudStore.update((s) => {
+          const deployments = s.resources[ResourceType.DEPLOYMENT];
+          const index = deployments.findIndex(
+            (d) =>
+              d.id === deploymentResource.id ||
+              d.name === deploymentResource.name,
+          );
+
+          if (index >= 0) {
+            deployments[index] = deploymentResource;
+          } else {
+            deployments.push(deploymentResource);
           }
-        };
-      });
-    });
-    
-    const deploymentDeletedUnlisten = await listen<any>('k8s:deployment-deleted', (event) => {
-      const deploymentInfo = event.payload;
-      
-      cloudStore.update(s => {
-        const deployments = s.resources[ResourceType.DEPLOYMENT].filter(
-          d => d.id !== deploymentInfo.name && d.name !== deploymentInfo.name
-        );
-        
-        return {
-          ...s,
-          resources: {
-            ...s.resources,
-            [ResourceType.DEPLOYMENT]: deployments
-          }
-        };
-      });
-    });
-    
+
+          return {
+            ...s,
+            resources: {
+              ...s.resources,
+              [ResourceType.DEPLOYMENT]: [...deployments],
+            },
+          };
+        });
+      },
+    );
+
+    const deploymentDeletedUnlisten = await listen<any>(
+      "k8s:deployment-deleted",
+      (event) => {
+        const deploymentInfo = event.payload;
+
+        cloudStore.update((s) => {
+          const deployments = s.resources[ResourceType.DEPLOYMENT].filter(
+            (d) =>
+              d.id !== deploymentInfo.name && d.name !== deploymentInfo.name,
+          );
+
+          return {
+            ...s,
+            resources: {
+              ...s.resources,
+              [ResourceType.DEPLOYMENT]: deployments,
+            },
+          };
+        });
+      },
+    );
+
     watchListeners.push(
-      podUpdatedUnlisten, 
+      podUpdatedUnlisten,
       podDeletedUnlisten,
       serviceUpdatedUnlisten,
       serviceDeletedUnlisten,
       deploymentUpdatedUnlisten,
       deploymentDeletedUnlisten,
-      watchErrorUnlisten
+      watchErrorUnlisten,
     );
     isWatching = true;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Failed to start watching resources:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error("Failed to start watching resources:", error);
     toastActions.error(`Failed to start watching resources: ${errorMessage}`);
   }
 }
@@ -647,23 +787,22 @@ export async function stopWatchingResources(): Promise<void> {
   if (isStoppingWatches) {
     return;
   }
-  
+
   isStoppingWatches = true;
-  
+
   try {
     // Stop backend watch tasks
     try {
-      await invoke('k8s_stop_all_watches');
+      await invoke("k8s_stop_all_watches");
     } catch (error) {
-      console.error('Failed to stop backend watches:', error);
+      console.error("Failed to stop backend watches:", error);
     }
-    
+
     // Stop frontend listeners
-    watchListeners.forEach(unlisten => unlisten());
+    watchListeners.forEach((unlisten) => unlisten());
     watchListeners = [];
     isWatching = false;
   } finally {
     isStoppingWatches = false;
   }
 }
-

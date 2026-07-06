@@ -25,6 +25,12 @@ pub mod m20240101_000022_create_project_package_managers_table;
 pub mod m20240101_000023_create_device_approvals_table;
 pub mod m20240101_000024_create_sdk_tables;
 pub mod m20240101_000025_create_script_executions_table;
+pub mod m20260325_000026_create_terminal_command_history_table;
+pub mod m20260325_000027_create_terminal_sessions_table;
+pub mod m20260325_000028_create_terminal_notes_table;
+pub mod m20260325_000029_add_preset_key_to_pipelines;
+pub mod m20260330_000030_create_deployments_table;
+pub mod runner;
 
 // Re-export all migrations for easy access
 pub use m20240101_000001_create_frameworks_table::Migration as createFrameworksTable;
@@ -52,6 +58,25 @@ pub use m20240101_000022_create_project_package_managers_table::Migration as cre
 pub use m20240101_000023_create_device_approvals_table::Migration as createDeviceApprovalsTable;
 pub use m20240101_000024_create_sdk_tables::Migration as createSdkTables;
 pub use m20240101_000025_create_script_executions_table::Migration as createScriptExecutionsTable;
+pub use m20260325_000026_create_terminal_command_history_table::Migration
+    as createTerminalCommandHistoryTable;
+pub use m20260325_000027_create_terminal_sessions_table::Migration
+    as createTerminalSessionsTable;
+pub use m20260325_000028_create_terminal_notes_table::Migration
+    as createTerminalNotesTable;
+pub use m20260325_000029_add_preset_key_to_pipelines::Migration
+    as addPresetKeyToPipelines;
+pub use m20260330_000030_create_deployments_table::Migration
+    as createDeploymentsTable;
+
+pub struct Migrator;
+
+#[async_trait::async_trait]
+impl MigratorTrait for Migrator {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        get_migrations()
+    }
+}
 
 // Create a function to get all migrations
 // Organized by logical dependency order:
@@ -71,27 +96,20 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(createPackageManagersTable),
         Box::new(createLanguagesTable),
         Box::new(createIdesTable),
-        
         // 2. Projects (with foreign key columns and constraints)
         Box::new(createProjectsTable),
-        
         // 3. Framework mappings (depends on frameworks and ides)
         Box::new(createFrameworkIdeMappingsTable),
-        
         // 4. Tasks (self-referential)
         Box::new(createTasksTable),
-        
         // 5. Task-related tables (depend on tasks)
         Box::new(createTaskCommentsTable),
         Box::new(createTaskAttachmentsTable),
         Box::new(createTaskTemplatesTable),
-        
         // 6. Pipelines (depends on projects)
         Box::new(createPipelinesTable),
-        
         // 7. Pipeline executions (depends on projects and pipelines)
         Box::new(createPipelineExecutionsTable),
-        
         // 8. Independent tables (no foreign key dependencies)
         Box::new(createSavedViewsTable),
         Box::new(createLearningTables), // Now includes is_important flags
@@ -100,19 +118,22 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(createDocumentsTable),
         Box::new(createAiTables),
         Box::new(createCustomScriptsTable),
-        
         // 9. Junction tables for many-to-many relationships (depends on projects and entity tables)
         Box::new(createProjectFrameworksTable),
         Box::new(createProjectLanguagesTable),
         Box::new(createProjectPackageManagersTable),
-        
         // 10. Device approvals table (for browser authentication)
         Box::new(createDeviceApprovalsTable),
-        
         // 11. SDK management tables
         Box::new(createSdkTables),
-
         // 12. Script executions table (depends on blocks)
         Box::new(createScriptExecutionsTable),
+        // Terminal command history (independent)
+        Box::new(createTerminalCommandHistoryTable),
+        // Terminal sessions + notes (independent)
+        Box::new(createTerminalSessionsTable),
+        Box::new(createTerminalNotesTable),
+        Box::new(addPresetKeyToPipelines),
+        Box::new(createDeploymentsTable),
     ]
 }

@@ -3,11 +3,21 @@
  * High-level API for terminal operations with full Tauri backend integration
  */
 
-import { invokeClient } from '@/lib/utils/invokeClient';
-import { isTauriEnvironment } from '@/lib/utils/tauri';
-import type { TerminalProcess, TerminalOutput, TerminalCommand, TerminalContext, CreateProcessRequest } from '../types';
-import { commandHistoryStore } from '../stores/commandHistoryStore';
-import { patternCollector } from '@/lib/domains/learning';
+import { invokeClient } from "$lib/utils/invokeClient";
+import { isTauriEnvironment } from "$lib/utils/tauri";
+import type {
+  TerminalProcess,
+  TerminalOutput,
+  TerminalCommand,
+  TerminalContext,
+  CreateProcessRequest,
+} from "../types";
+import { commandHistoryStore } from "../stores/commandHistoryStore";
+import { patternCollector } from "$lib/domains/learning";
+import {
+  subscribeTerminalOutput,
+  ensureTerminalOutputListener,
+} from "./terminalOutputBus";
 
 export interface ExecuteCommandRequest {
   command: string;
@@ -16,77 +26,50 @@ export interface ExecuteCommandRequest {
 }
 
 export class TerminalService {
-  private static outputCallbacks = new Map<string, (output: TerminalOutput) => void>();
-  private static currentCommand: { command: string; startTime: number; output: string; exitCode?: number } | null = null;
-  private static globalListenerSetup = false;
-  private static globalListenerUnsubscribe: (() => void) | null = null;
+  private static currentCommand: {
+    command: string;
+    startTime: number;
+    output: string;
+    exitCode?: number;
+  } | null = null;
 
   /**
    * Create a new terminal process with full control
    */
-  static async createProcess(tabId: string, config: Partial<CreateProcessRequest> = {}): Promise<TerminalProcess> {
-    // Create a proper environment for terminal applications
-    const isWindows = navigator.userAgent.includes('Windows');
-    const environment: Record<string, string> = {
-      // Essential terminal capabilities - use a proper terminal type for TUI apps
-      TERM: 'xterm-256color',
-      COLORTERM: 'truecolor',
-      
-      // Shell environment - prefer zsh on Linux
-      SHELL: isWindows ? 'powershell.exe' : '/usr/bin/zsh',
-      
-      // User environment - these will be overridden by backend with actual system values
-      HOME: isWindows ? 'C:\\Users\\user' : '/home/tan',
-      USER: 'tan',
-      USERNAME: 'tan',
-      
-      // Path environment - use system PATH
-      PATH: isWindows 
-        ? 'C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0'
-        : '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/home/tan/.local/bin',
-      
-      // Terminal size
-      COLUMNS: '80',
-      LINES: '24',
-      
-      // Locale
-      LANG: 'en_US.UTF-8',
-      LC_ALL: 'en_US.UTF-8',
-      
-      // Enable color output for TUI applications
-      NO_COLOR: '0',
-      FORCE_COLOR: '1',
-      
-      // Additional environment variables for better shell experience
-      HISTSIZE: '10000',
-      HISTFILESIZE: '10000',
-      EDITOR: 'nano',
-      PAGER: 'less',
-    };
-
+  static async createProcess(
+    tabId: string,
+    config: Partial<CreateProcessRequest> = {},
+  ): Promise<TerminalProcess> {
+    // The Rust backend fills in the real environment (HOME/USER/PATH/TERM/…)
+    // from the actual process. We only forward caller-supplied overrides — no
+    // fake hardcoded values that would clobber the user's real environment.
     const defaultConfig: CreateProcessRequest = {
       tab_id: tabId,
-      shell: navigator.userAgent.includes('Windows') ? 'powershell.exe' : 'zsh',
-      working_directory: navigator.userAgent.includes('Windows') ? 'C:\\' : '/home/tan',
-      environment,
+      shell: navigator.userAgent.includes("Windows") ? "powershell.exe" : "zsh",
+      // Empty → backend falls back to the app's current working directory.
+      working_directory: "",
+      environment: {},
       cols: 80,
       rows: 24,
-      ...config
+      ...config,
     };
 
     try {
-      const process = await invokeClient.request<TerminalProcess>('create_terminal_process', {
-        data: {
-          request: defaultConfig
-        }
-      });
+      const process = await invokeClient.request<TerminalProcess>(
+        "create_terminal_process",
+        {
+          data: {
+            request: defaultConfig,
+          },
+        },
+      );
 
       // Set up output listener for this process
       this.setupOutputListener(process.id);
 
       return process;
     } catch (error) {
-      console.error('Failed to create terminal process:', error);
+      console.error("Failed to create terminal process:", error);
       throw error;
     }
   }
@@ -94,40 +77,54 @@ export class TerminalService {
   /**
    * Send input directly to backend
    */
-  static async sendInput(processId: string, input: string, tabId?: string): Promise<void> {
+  static async sendInput(
+    processId: string,
+    input: string,
+    tabId?: string,
+  ): Promise<void> {
     try {
       // Track command line for history (but don't intercept)
-      if (input === '\r\n' || input === '\n' || input === '\r') {
+      if (input === "\r\n" || input === "\n" || input === "\r") {
         const commandLine = this.lastCommandLine.trim();
-        
+
         if (commandLine) {
           // Start tracking this command for history
           this.currentCommand = {
             command: commandLine,
             startTime: Date.now(),
-            output: ''
+            output: "",
           };
         }
-        
+
         // Clear the command line after execution
-        this.lastCommandLine = '';
-      } else if (input === '\u007f' || input === '\b' || input === '\x7f' || input.charCodeAt(0) === 127 || input.charCodeAt(0) === 8) {
+        this.lastCommandLine = "";
+      } else if (
+        input === "\u007f" ||
+        input === "\b" ||
+        input === "\x7f" ||
+        input.charCodeAt(0) === 127 ||
+        input.charCodeAt(0) === 8
+      ) {
         // Backspace - remove last character
         this.lastCommandLine = this.lastCommandLine.slice(0, -1);
-      } else if (input.length === 1 && input >= ' ' && input.charCodeAt(0) < 127) {
+      } else if (
+        input.length === 1 &&
+        input >= " " &&
+        input.charCodeAt(0) < 127
+      ) {
         // Regular printable character input - append to command line
         this.lastCommandLine += input;
       }
 
       // Send input directly to backend
-      await invokeClient.request('send_terminal_input', {
+      await invokeClient.request("send_terminal_input", {
         data: {
           processId,
-          input
-        }
+          input,
+        },
       });
     } catch (error) {
-      console.error('Failed to send input:', error);
+      console.error("Failed to send input:", error);
       throw error;
     }
   }
@@ -137,9 +134,11 @@ export class TerminalService {
    */
   static async killProcess(processId: string): Promise<void> {
     try {
-      await invokeClient.request('kill_terminal_process', { data: { processId } });
+      await invokeClient.request("kill_terminal_process", {
+        data: { processId },
+      });
     } catch (error) {
-      console.error('Failed to kill process:', error);
+      console.error("Failed to kill process:", error);
       throw error;
     }
   }
@@ -149,9 +148,12 @@ export class TerminalService {
    */
   static async getProcess(processId: string): Promise<TerminalProcess | null> {
     try {
-      return await invokeClient.request<TerminalProcess | null>('get_terminal_process', { data: { processId } });
+      return await invokeClient.request<TerminalProcess | null>(
+        "get_terminal_process",
+        { data: { processId } },
+      );
     } catch (error) {
-      console.error('Failed to get process:', error);
+      console.error("Failed to get process:", error);
       return null;
     }
   }
@@ -161,9 +163,11 @@ export class TerminalService {
    */
   static async getAllProcesses(): Promise<TerminalProcess[]> {
     try {
-      return await invokeClient.request<TerminalProcess[]>('get_terminal_processes');
+      return await invokeClient.request<TerminalProcess[]>(
+        "get_terminal_processes",
+      );
     } catch (error) {
-      console.error('Failed to get processes:', error);
+      console.error("Failed to get processes:", error);
       return [];
     }
   }
@@ -173,37 +177,45 @@ export class TerminalService {
    */
   static async subscribeToOutput(
     processId: string,
-    callback: (output: TerminalOutput) => void
+    callback: (output: TerminalOutput) => void,
   ): Promise<() => void> {
-    // Ensure global listener is set up
-    await this.setupGlobalOutputListener();
-    
-    // Register the callback
-    this.outputCallbacks.set(processId, callback);
-    
-    return () => {
-      this.outputCallbacks.delete(processId);
-    };
+    await ensureTerminalOutputListener();
+
+    return subscribeTerminalOutput(processId, (output) => {
+      if (this.currentCommand) {
+        this.currentCommand.output += output.content;
+      }
+
+      if (output.output_type === "exit") {
+        this.handleProcessExit(processId).catch(console.error);
+      }
+
+      callback(output);
+    });
   }
 
   /**
    * Execute command with interception
    */
-  static async executeCommand(command: string, workingDirectory?: string): Promise<string> {
+  static async executeCommand(
+    command: string,
+    workingDirectory?: string,
+  ): Promise<string> {
     try {
       const request: ExecuteCommandRequest = {
         command,
         workingDirectory,
-        environment: {}
+        environment: {},
       };
 
-      return await invokeClient.request<string>('execute_command', { data: { request } });
+      return await invokeClient.request<string>("execute_command", {
+        data: { request },
+      });
     } catch (error) {
-      console.error('Failed to execute command:', error);
+      console.error("Failed to execute command:", error);
       throw error;
     }
   }
-
 
   /**
    * Get system information with native terminal profiles
@@ -216,15 +228,15 @@ export class TerminalService {
     terminalProfiles: any;
   }> {
     try {
-      return await invokeClient.request('get_system_info');
+      return await invokeClient.request("get_system_info");
     } catch (error) {
-      console.error('Failed to get system info:', error);
+      console.error("Failed to get system info:", error);
       return {
-        platform: 'unknown',
-        shell: 'bash',
-        workingDirectory: '/',
-        availableShells: ['bash'],
-        terminalProfiles: {}
+        platform: "unknown",
+        shell: "bash",
+        workingDirectory: "/",
+        availableShells: ["bash"],
+        terminalProfiles: {},
       };
     }
   }
@@ -232,11 +244,17 @@ export class TerminalService {
   /**
    * Resize terminal
    */
-  static async resizeTerminal(processId: string, cols: number, rows: number): Promise<void> {
+  static async resizeTerminal(
+    processId: string,
+    cols: number,
+    rows: number,
+  ): Promise<void> {
     try {
-      await invokeClient.request('resize_terminal', { data: { processId, cols, rows } });
+      await invokeClient.request("resize_terminal", {
+        data: { processId, cols, rows },
+      });
     } catch (error) {
-      console.error('Failed to resize terminal:', error);
+      console.error("Failed to resize terminal:", error);
       throw error;
     }
   }
@@ -244,77 +262,63 @@ export class TerminalService {
   /**
    * Execute command in context (for cross-domain usage)
    */
-  static async executeInContext(context: TerminalContext, command: string): Promise<TerminalCommand> {
+  static async executeInContext(
+    context: TerminalContext,
+    command: string,
+    options?: { captureBlock?: boolean },
+  ): Promise<TerminalCommand> {
     try {
-      const result = await this.executeCommand(command, context.workingDirectory);
-      
-      return {
+      const result = await this.executeCommand(
+        command,
+        context.workingDirectory,
+      );
+
+      const cmd: TerminalCommand = {
         id: crypto.randomUUID(),
-        processId: 'context-execution',
+        processId: "context-execution",
         command,
         timestamp: new Date(),
-        status: 'completed',
-        output: result
+        status: "completed",
+        output: result,
       };
+
+      if (options?.captureBlock !== false) {
+        const { commandBlockStore } = await import(
+          "../stores/commandBlockStore"
+        );
+        commandBlockStore.captureReadonlyResult(context.tabId, {
+          ...cmd,
+          exitCode: 0,
+        });
+      }
+
+      return cmd;
     } catch (error) {
-      return {
+      const cmd: TerminalCommand = {
         id: crypto.randomUUID(),
-        processId: 'context-execution',
+        processId: "context-execution",
         command,
         timestamp: new Date(),
-        status: 'failed',
-        output: error instanceof Error ? error.message : 'Unknown error'
+        status: "failed",
+        output: error instanceof Error ? error.message : "Unknown error",
       };
+
+      if (options?.captureBlock !== false) {
+        const { commandBlockStore } = await import(
+          "../stores/commandBlockStore"
+        );
+        commandBlockStore.captureReadonlyResult(context.tabId, {
+          ...cmd,
+          exitCode: 1,
+        });
+      }
+
+      return cmd;
     }
   }
 
-  /**
-   * Set up a global listener for terminal output events
-   * This ensures we have a single listener that routes events to all registered callbacks
-   */
-  private static async setupGlobalOutputListener(): Promise<void> {
-    if (this.globalListenerSetup) {
-      return; // Already set up
-    }
-
-    if (!isTauriEnvironment()) {
-      console.warn('Tauri environment not available, skipping terminal output listener setup');
-      return;
-    }
-
-    try {
-      const { listen } = await import('@tauri-apps/api/event');
-      const unsubscribe = await listen<TerminalOutput>('terminal-output', (event) => {
-        const output = event.payload;
-        const processId = output.process_id;
-
-        // Capture output for current command
-        if (this.currentCommand) {
-          this.currentCommand.output += output.content;
-        }
-
-        // Handle exit events - get the actual exit code from the backend
-        if (output.output_type === 'exit') {
-          this.handleProcessExit(processId).catch(console.error);
-        }
-
-        // Call registered callback for this process
-        const callback = this.outputCallbacks.get(processId);
-        if (callback) {
-          callback(output);
-        }
-      });
-
-      this.globalListenerUnsubscribe = unsubscribe;
-      this.globalListenerSetup = true;
-    } catch (error) {
-      console.error('Failed to set up global terminal output listener:', error);
-    }
-  }
-
-  private static setupOutputListener(processId: string): void {
-    // Ensure global listener is set up
-    this.setupGlobalOutputListener().catch(console.error);
+  private static setupOutputListener(_processId: string): void {
+    ensureTerminalOutputListener().catch(console.error);
   }
 
   /**
@@ -325,15 +329,18 @@ export class TerminalService {
       // Get the process to extract tab_id
       const process = await this.getProcess(processId);
       const tabId = process?.tab_id;
-      
+
       // Get the actual exit code from the backend
-      const exitCode = await invokeClient.request<number | null>('get_process_exit_code', { data: { processId } });
+      const exitCode = await invokeClient.request<number | null>(
+        "get_process_exit_code",
+        { data: { processId } },
+      );
       console.log(`Process ${processId} exited with code:`, exitCode);
-      
+
       // Complete the current command with the real exit code
       await this.completeCurrentCommand(exitCode ?? undefined, tabId);
     } catch (error) {
-      console.error('Failed to get process exit code:', error);
+      console.error("Failed to get process exit code:", error);
       // Fallback to output-based detection
       const process = await this.getProcess(processId);
       const tabId = process?.tab_id;
@@ -341,18 +348,17 @@ export class TerminalService {
     }
   }
 
-
-  private static lastCommandLine: string = '';
+  private static lastCommandLine: string = "";
 
   /**
    * Start tracking a command for history (used by quick commands)
    */
   static startCommandTracking(command: string, tabId?: string): void {
-    console.log('Starting command tracking for:', command, 'tabId:', tabId);
+    console.log("Starting command tracking for:", command, "tabId:", tabId);
     this.currentCommand = {
       command: command.trim(),
       startTime: Date.now(),
-      output: ''
+      output: "",
     };
     this.lastCommandLine = command.trim();
   }
@@ -360,16 +366,19 @@ export class TerminalService {
   /**
    * Complete the current command and add it to history
    */
-  static async completeCurrentCommand(exitCode?: number, tabId?: string): Promise<void> {
+  static async completeCurrentCommand(
+    exitCode?: number,
+    tabId?: string,
+  ): Promise<void> {
     // console.log('Completing current command:', this.currentCommand?.command, 'tabId:', tabId);
     if (this.currentCommand) {
       const duration = Date.now() - this.currentCommand.startTime;
-      
-      // Try to detect exit code from output if not provided
-      const detectedExitCode = exitCode ?? this.detectExitCodeFromOutput(this.currentCommand.output);
-      
-      console.log('Adding to history - command:', this.currentCommand.command, 'output length:', this.currentCommand.output.length, 'tabId:', tabId);
-      
+
+      // Exit code comes from the backend (get_process_exit_code / OSC 133).
+      // The old "output contains the word error → exit 1" heuristic was removed:
+      // it produced false failures for any command that merely printed "error".
+      const detectedExitCode = exitCode;
+
       if (tabId) {
         // Use persistence-enabled method
         commandHistoryStore.addEntryWithPersistence(tabId, {
@@ -377,58 +386,41 @@ export class TerminalService {
           output: this.currentCommand.output,
           exitCode: detectedExitCode,
           duration,
-          intercepted: false
+          intercepted: false,
         });
       }
 
       // Learn from command pattern
       try {
-        const success = detectedExitCode === 0 || detectedExitCode === undefined;
+        const success =
+          detectedExitCode === 0 || detectedExitCode === undefined;
         // Extract context from working directory if available
         const context = undefined; // Could be extracted from working directory
         await patternCollector.collectCommandPattern(
           this.currentCommand.command,
           success,
-          context
+          context,
         );
       } catch (error) {
         // Don't fail command completion if learning fails
-        console.warn('Failed to collect command pattern', error);
+        console.warn("Failed to collect command pattern", error);
       }
-      
+
       this.currentCommand = null;
     }
   }
 
   /**
-   * Detect command success/failure from output content
+   * Fetch the real exit code recorded by the backend for a process.
    */
-  private static detectExitCodeFromOutput(output: string): number | undefined {
-    if (!output) return undefined;
-    
-    // Common error patterns
-    const errorPatterns = [
-      /'[^']+' is not recognized as an internal or external command/i,
-      /command not found/i,
-      /permission denied/i,
-      /access denied/i,
-      /file not found/i,
-      /no such file or directory/i,
-      /error:/i,
-      /failed/i,
-      /cannot/i,
-      /unable to/i
-    ];
-    
-    // Check if output contains error patterns
-    for (const pattern of errorPatterns) {
-      if (pattern.test(output)) {
-        return 1; // Non-zero exit code for errors
-      }
+  static async getProcessExitCode(processId: string): Promise<number | null> {
+    try {
+      return await invokeClient.request<number | null>(
+        "get_process_exit_code",
+        { data: { processId } },
+      );
+    } catch {
+      return null;
     }
-    
-    // If no error patterns found, assume success
-    return 0;
   }
-
 }

@@ -1,7 +1,6 @@
 /**
  * SDK Configuration Types
  */
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,7 +75,7 @@ impl SDKCategory {
             SDKCategory::Tool => "tool",
         }
     }
-    
+
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "language" => Some(SDKCategory::Language),
@@ -108,30 +107,29 @@ pub struct SDKConfig {
     pub description: String,
     pub icon: String,
     pub category: SDKCategory,
-    
+
     // Tab configuration
     pub tabs: Vec<SDKTabConfig>,
-    
+
     // Version sources (only for SDKs that support versioning)
     pub supported_sources: Vec<VersionSource>,
     pub default_source: Option<VersionSource>,
-    
+
     // SDK Managers (for language SDKs, this is version managers like nvm, pyenv)
     pub sdk_managers: Vec<SDKManagerConfig>,
-    
+
     // Package Managers (linked package managers for this SDK)
     pub package_managers: Vec<PackageManagerConfig>,
-    
+
     // Detection
     pub detection: DetectionMethod,
-    
+
     // Category-specific features (JSON for flexibility)
     pub category_features: Option<serde_json::Value>,
-    
+
     // Environment variables
     pub environment_variables: Option<serde_json::Value>,
-    
+
     // Service configuration (for SDKs that run as services)
     pub service_config: Option<serde_json::Value>,
 }
-

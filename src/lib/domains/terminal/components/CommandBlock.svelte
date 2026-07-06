@@ -1,9 +1,21 @@
 <script lang="ts">
-  import { Badge } from '@/lib/components/ui/badge';
-  import { Button } from '@/lib/components/ui/button';
-  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/lib/components/ui/collapsible';
-  import { ChevronDown, ChevronRight, Clock, Terminal, CheckCircle, XCircle, AlertCircle } from '@lucide/svelte';
-  
+  import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
+  import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+  } from "$lib/components/ui/collapsible";
+  import {
+    ChevronDown,
+    ChevronRight,
+    Clock,
+    Terminal,
+    CheckCircle,
+    XCircle,
+    AlertCircle,
+  } from "@lucide/svelte";
+
   interface Props {
     block: {
       id: string;
@@ -18,10 +30,7 @@
     onclick?: (() => void) | undefined;
   }
 
-  let {
-    block,
-    onclick = undefined
-  }: Props = $props();
+  let { block, onclick = undefined }: Props = $props();
 
   let isExpanded = $state(block.isExpanded ?? false);
   let isRunning = $derived(block.exitCode === undefined);
@@ -36,65 +45,83 @@
   // Get status icon and color
   function getStatusInfo() {
     if (isRunning) {
-      return { icon: Terminal, color: 'text-blue-500', bgColor: 'bg-blue-50 dark:bg-blue-950' };
+      return {
+        icon: Terminal,
+        color: "text-blue-500",
+        bgColor: "bg-blue-50 dark:bg-blue-950",
+      };
     }
-    
+
     if (block.exitCode === 0) {
-      return { icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-50 dark:bg-green-950' };
+      return {
+        icon: CheckCircle,
+        color: "text-green-500",
+        bgColor: "bg-green-50 dark:bg-green-950",
+      };
     }
-    
+
     if (block.exitCode === undefined) {
-      return { icon: AlertCircle, color: 'text-yellow-500', bgColor: 'bg-yellow-50 dark:bg-yellow-950' };
+      return {
+        icon: AlertCircle,
+        color: "text-yellow-500",
+        bgColor: "bg-yellow-50 dark:bg-yellow-950",
+      };
     }
-    
-    return { icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-50 dark:bg-red-950' };
+
+    return {
+      icon: XCircle,
+      color: "text-red-500",
+      bgColor: "bg-red-50 dark:bg-red-950",
+    };
   }
 
   const statusInfo = getStatusInfo();
   const StatusIcon = statusInfo.icon;
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (onclick && (e.key === 'Enter' || e.key === ' ')) {
+    if (onclick && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
       onclick();
     }
   }
 </script>
 
-<div 
-  class="command-block border border-border rounded-lg bg-card {onclick ? 'cursor-pointer' : ''}" 
+<div
+  class="command-block rounded-lg border border-border bg-card {onclick
+    ? 'cursor-pointer'
+    : ''}"
   onclick={() => onclick && onclick()}
-  role={onclick ? 'button' : undefined}
+  role={onclick ? "button" : undefined}
   tabindex={onclick ? 0 : undefined}
   onkeydown={handleKeyDown}
 >
   <!-- Command Header -->
-  <div class="flex items-center justify-between p-3 border-b border-border">
-    <div class="flex items-center gap-3 flex-1 min-w-0">
+  <div class="flex items-center justify-between border-b border-border p-3">
+    <div class="flex min-w-0 flex-1 items-center gap-3">
       <!-- Status Icon -->
       <div class="flex-shrink-0">
-        <StatusIcon class="w-4 h-4 {statusInfo.color}" />
+        <StatusIcon class="h-4 w-4 {statusInfo.color}" />
       </div>
-      
+
       <!-- Command -->
-      <div class="flex-1 min-w-0">
-        <code class="text-sm font-mono text-foreground break-all">
+      <div class="min-w-0 flex-1">
+        <code class="break-all font-mono text-sm text-foreground">
           {block.command}
         </code>
       </div>
-      
+
       <!-- Metadata -->
-      <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="flex flex-shrink-0 items-center gap-2">
         {#if block.duration !== undefined}
           <Badge variant="outline" class="text-xs">
-            <Clock class="w-3 h-3 mr-1" />
+            <Clock class="mr-1 h-3 w-3" />
             {formatDuration(block.duration)}
           </Badge>
         {/if}
-        
+
         {#if block.exitCode !== undefined}
-          <Badge 
-            variant={block.exitCode === 0 ? 'default' : 'destructive'}
+          <Badge
+            variant={block.exitCode === 0 ? "default" : "destructive"}
             class="text-xs"
           >
             Exit {block.exitCode}
@@ -102,19 +129,15 @@
         {/if}
       </div>
     </div>
-    
+
     <!-- Expand/Collapse Button -->
     <Collapsible bind:open={isExpanded}>
       <CollapsibleTrigger>
-        <Button
-          variant="ghost"
-          size="sm"
-          class="ml-2 h-8 w-8 p-0"
-        >
+        <Button variant="ghost" size="sm" class="ml-2 h-8 w-8 p-0">
           {#if isExpanded}
-            <ChevronDown class="w-4 h-4" />
+            <ChevronDown class="h-4 w-4" />
           {:else}
-            <ChevronRight class="w-4 h-4" />
+            <ChevronRight class="h-4 w-4" />
           {/if}
         </Button>
       </CollapsibleTrigger>
@@ -124,11 +147,12 @@
   <!-- Output Content -->
   <Collapsible bind:open={isExpanded}>
     <CollapsibleContent>
-      <div class="p-3 bg-muted/30">
+      <div class="bg-muted/30 p-3">
         {#if block.output}
-          <pre class="text-sm font-mono text-foreground whitespace-pre-wrap break-words overflow-x-auto">{block.output}</pre>
+          <pre
+            class="overflow-x-auto whitespace-pre-wrap break-words font-mono text-sm text-foreground">{block.output}</pre>
         {:else}
-          <p class="text-sm text-muted-foreground italic">No output</p>
+          <p class="text-sm italic text-muted-foreground">No output</p>
         {/if}
       </div>
     </CollapsibleContent>
@@ -139,7 +163,7 @@
   .command-block {
     transition: all 0.2s ease-in-out;
   }
-  
+
   .command-block:hover {
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }

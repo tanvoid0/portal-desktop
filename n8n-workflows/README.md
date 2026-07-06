@@ -126,7 +126,7 @@ ollama run llama3.2:3b
 ### Performance Tips
 
 - **GPU Acceleration**: Ollama automatically uses GPU if available
-- **Memory Requirements**: 
+- **Memory Requirements**:
   - llama3.2:3b needs ~2GB RAM
   - codellama:7b needs ~4GB RAM
   - mistral:7b needs ~4GB RAM
@@ -137,6 +137,7 @@ ollama run llama3.2:3b
 ### Webhook Configuration
 
 Each workflow exposes a webhook endpoint:
+
 - **Node Setup**: `/webhook/node-setup`
 - **Rust Setup**: `/webhook/rust-setup`
 - **Python Setup**: `/webhook/python-setup`
@@ -242,6 +243,7 @@ npm run n8n:start
 ### Custom Ports
 
 Edit `.env` file:
+
 ```bash
 N8N_PORT=5679
 ```
@@ -249,6 +251,7 @@ N8N_PORT=5679
 ### Authentication
 
 Update `.env`:
+
 ```bash
 N8N_BASIC_AUTH_USER=your_username
 N8N_BASIC_AUTH_PASSWORD=your_password
@@ -257,6 +260,7 @@ N8N_BASIC_AUTH_PASSWORD=your_password
 ### External Integrations
 
 n8n can connect to:
+
 - GitHub (for repository operations)
 - Slack (for notifications)
 - Discord (for team updates)

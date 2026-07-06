@@ -34,17 +34,61 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Credentials::Name).string().not_null())
-                    .col(ColumnDef::new(Credentials::CredentialType).string().not_null())
-                    .col(ColumnDef::new(Credentials::Status).string().not_null().default("active"))
+                    .col(
+                        ColumnDef::new(Credentials::CredentialType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Credentials::Status)
+                            .string()
+                            .not_null()
+                            .default("active"),
+                    )
                     .col(ColumnDef::new(Credentials::Description).string().null())
-                    .col(ColumnDef::new(Credentials::Tags).text().not_null().default("[]"))
-                    .col(ColumnDef::new(Credentials::EncryptedValue).text().not_null())
-                    .col(ColumnDef::new(Credentials::EncryptedFields).text().not_null().default("{}"))
-                    .col(ColumnDef::new(Credentials::Metadata).text().not_null().default("{}"))
-                    .col(ColumnDef::new(Credentials::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Credentials::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Credentials::LastUsed).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(Credentials::ExpiresAt).timestamp_with_time_zone().null())
+                    .col(
+                        ColumnDef::new(Credentials::Tags)
+                            .text()
+                            .not_null()
+                            .default("[]"),
+                    )
+                    .col(
+                        ColumnDef::new(Credentials::EncryptedValue)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Credentials::EncryptedFields)
+                            .text()
+                            .not_null()
+                            .default("{}"),
+                    )
+                    .col(
+                        ColumnDef::new(Credentials::Metadata)
+                            .text()
+                            .not_null()
+                            .default("{}"),
+                    )
+                    .col(
+                        ColumnDef::new(Credentials::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Credentials::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Credentials::LastUsed)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(Credentials::ExpiresAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await
@@ -74,4 +118,3 @@ enum Credentials {
     LastUsed,
     ExpiresAt,
 }
-

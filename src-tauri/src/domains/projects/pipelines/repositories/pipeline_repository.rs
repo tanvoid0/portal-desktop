@@ -1,8 +1,12 @@
 use crate::database::DatabaseManager;
-use crate::entities::pipeline::{Entity as PipelineEntity, ActiveModel as PipelineActiveModel, Model as PipelineModel};
-use sea_orm::{EntityTrait, ActiveModelTrait, Set, ColumnTrait, QueryFilter};
+use crate::entities::pipeline::{
+    ActiveModel as PipelineActiveModel, Column as PipelineColumn, Entity as PipelineEntity,
+    Model as PipelineModel,
+};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct PipelineRepository {
     db_manager: Arc<DatabaseManager>,
 }
@@ -15,7 +19,7 @@ impl PipelineRepository {
     pub async fn get_all_by_project(&self, project_id: i32) -> Result<Vec<PipelineModel>, String> {
         let connection = self.db_manager.get_connection();
         let pipelines = PipelineEntity::find()
-            .filter(crate::entities::pipeline::Column::ProjectId.eq(project_id))
+            .filter(PipelineColumn::ProjectId.eq(project_id))
             .all(connection)
             .await
             .map_err(|e| format!("Failed to fetch pipelines: {}", e))?;
@@ -31,6 +35,21 @@ impl PipelineRepository {
         Ok(pipeline)
     }
 
+    pub async fn get_by_preset_key(
+        &self,
+        project_id: i32,
+        preset_key: &str,
+    ) -> Result<Option<PipelineModel>, String> {
+        let connection = self.db_manager.get_connection();
+        let pipeline = PipelineEntity::find()
+            .filter(PipelineColumn::ProjectId.eq(project_id))
+            .filter(PipelineColumn::PresetKey.eq(preset_key))
+            .one(connection)
+            .await
+            .map_err(|e| format!("Failed to fetch pipeline by preset key: {}", e))?;
+        Ok(pipeline)
+    }
+
     pub async fn create(
         &self,
         name: String,
@@ -41,9 +60,11 @@ impl PipelineRepository {
         secrets_json: String,
         execution_context_json: String,
         enabled: bool,
+        preset_key: Option<String>,
+        category: Option<String>,
     ) -> Result<PipelineModel, String> {
         let connection = self.db_manager.get_connection();
-        
+
         let pipeline = PipelineActiveModel {
             name: Set(name),
             description: Set(description),
@@ -53,13 +74,16 @@ impl PipelineRepository {
             secrets_json: Set(secrets_json),
             execution_context_json: Set(execution_context_json),
             enabled: Set(enabled),
+            preset_key: Set(preset_key),
+            category: Set(category),
             ..Default::default()
         };
-        
-        let result = pipeline.insert(connection)
+
+        let result = pipeline
+            .insert(connection)
             .await
             .map_err(|e| format!("Failed to create pipeline: {}", e))?;
-        
+
         Ok(result)
     }
 
@@ -73,16 +97,18 @@ impl PipelineRepository {
         secrets_json: Option<String>,
         execution_context_json: Option<String>,
         enabled: Option<bool>,
+        preset_key: Option<Option<String>>,
+        category: Option<Option<String>>,
     ) -> Result<PipelineModel, String> {
         let connection = self.db_manager.get_connection();
-        
+
         let mut pipeline: PipelineActiveModel = PipelineEntity::find_by_id(id)
             .one(connection)
             .await
             .map_err(|e| format!("Failed to find pipeline: {}", e))?
             .ok_or_else(|| "Pipeline not found".to_string())?
             .into();
-        
+
         if let Some(name) = name {
             pipeline.name = Set(name);
         }
@@ -104,23 +130,29 @@ impl PipelineRepository {
         if let Some(enabled) = enabled {
             pipeline.enabled = Set(enabled);
         }
-        
-        let result = pipeline.update(connection)
+        if let Some(preset_key) = preset_key {
+            pipeline.preset_key = Set(preset_key);
+        }
+        if let Some(category) = category {
+            pipeline.category = Set(category);
+        }
+
+        let result = pipeline
+            .update(connection)
             .await
             .map_err(|e| format!("Failed to update pipeline: {}", e))?;
-        
+
         Ok(result)
     }
 
     pub async fn delete(&self, id: i32) -> Result<(), String> {
         let connection = self.db_manager.get_connection();
-        
+
         PipelineEntity::delete_by_id(id)
             .exec(connection)
             .await
             .map_err(|e| format!("Failed to delete pipeline: {}", e))?;
-        
+
         Ok(())
     }
 }
-

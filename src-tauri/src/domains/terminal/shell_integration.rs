@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Represents a command block with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,7 +58,7 @@ impl ShellIntegrationParser {
             if let Some(marker_end) = self.find_marker_end(marker_pos) {
                 let marker = self.buffer[marker_pos..marker_end].to_string();
                 events.extend(self.process_marker(&marker));
-                
+
                 // Remove processed content
                 self.buffer = self.buffer[marker_end..].to_string();
             } else {
@@ -88,7 +88,9 @@ impl ShellIntegrationParser {
 
     fn find_marker_end(&self, start: usize) -> Option<usize> {
         // OSC sequences end with \x1b\\
-        self.buffer[start..].find("\x1b\\").map(|pos| start + pos + 2)
+        self.buffer[start..]
+            .find("\x1b\\")
+            .map(|pos| start + pos + 2)
     }
 
     fn process_marker(&mut self, marker: &str) -> Vec<ShellIntegrationEvent> {
@@ -97,6 +99,10 @@ impl ShellIntegrationParser {
         if marker.contains("133;A") {
             // Command start marker
             self.command_counter += 1;
+
+            let working_directory = Self::extract_marker_arg(marker, "133;A;")
+                .unwrap_or_default();
+
             let block = CommandBlock {
                 id: format!("cmd_{}", self.command_counter),
                 command: String::new(), // Will be filled when we detect the actual command
@@ -104,7 +110,7 @@ impl ShellIntegrationParser {
                 end_time: None,
                 duration: None,
                 exit_code: None,
-                working_directory: String::new(),
+                working_directory,
                 output: String::new(),
                 status: CommandStatus::Running,
             };
@@ -114,10 +120,16 @@ impl ShellIntegrationParser {
             // Command end marker
             if let Some(mut block) = self.current_block.take() {
                 block.end_time = Some(Utc::now());
-                block.duration = block.end_time
+                block.duration = block
+                    .end_time
                     .and_then(|end| Some((end - block.start_time).num_milliseconds() as u64));
+
+                let exit_code = Self::extract_marker_arg(marker, "133;B;")
+                    .and_then(|s| s.trim().parse::<i32>().ok());
+                block.exit_code = exit_code;
+
                 block.status = CommandStatus::Completed;
-                
+
                 self.blocks.push(block.clone());
                 events.push(ShellIntegrationEvent::CommandCompleted(block));
             }
@@ -127,6 +139,21 @@ impl ShellIntegrationParser {
         }
 
         events
+    }
+
+    /// Extracts the argument payload for an OSC marker like:
+    /// `ESC ]133;A;<payload> ESC \\`
+    fn extract_marker_arg(marker: &str, prefix: &str) -> Option<String> {
+        let start = marker.find(prefix)?;
+        let rest = &marker[start + prefix.len()..];
+        // Marker terminates with ESC \\ (ESC + backslash). Stop at ESC if present.
+        let before_esc = rest.split('\u{001b}').next().unwrap_or(rest);
+        let cleaned = before_esc.trim_end_matches('\\').to_string();
+        if cleaned.is_empty() {
+            None
+        } else {
+            Some(cleaned)
+        }
     }
 
     fn process_content(&mut self, content: &str) -> Vec<ShellIntegrationEvent> {
@@ -169,4 +196,11 @@ pub enum ShellIntegrationEvent {
     CommandDetected(String),
     PromptDetected,
     OutputContent(String),
+}
+
+/// v2 wrapper so the frontend can scope command blocks per PTY process.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShellIntegrationEventV2 {
+    pub process_id: String,
+    pub event: ShellIntegrationEvent,
 }

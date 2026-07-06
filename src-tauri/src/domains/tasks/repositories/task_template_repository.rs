@@ -1,6 +1,8 @@
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryOrder};
+use crate::entities::task_template::{
+    ActiveModel, Column, Entity as TaskTemplateEntity, Model as TaskTemplateModel,
+};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
-use crate::entities::task_template::{Entity as TaskTemplateEntity, Model as TaskTemplateModel, ActiveModel, Column};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateTaskTemplateRequest {
@@ -33,7 +35,10 @@ impl TaskTemplateRepository {
         Self { db }
     }
 
-    pub async fn create(&self, request: CreateTaskTemplateRequest) -> Result<TaskTemplateModel, sea_orm::DbErr> {
+    pub async fn create(
+        &self,
+        request: CreateTaskTemplateRequest,
+    ) -> Result<TaskTemplateModel, sea_orm::DbErr> {
         let active_model = ActiveModel {
             name: Set(request.name),
             description: Set(request.description),
@@ -48,7 +53,11 @@ impl TaskTemplateRepository {
         active_model.insert(&self.db).await
     }
 
-    pub async fn update(&self, id: i32, request: UpdateTaskTemplateRequest) -> Result<TaskTemplateModel, sea_orm::DbErr> {
+    pub async fn update(
+        &self,
+        id: i32,
+        request: UpdateTaskTemplateRequest,
+    ) -> Result<TaskTemplateModel, sea_orm::DbErr> {
         let mut active_model: ActiveModel = TaskTemplateEntity::find_by_id(id)
             .one(&self.db)
             .await?

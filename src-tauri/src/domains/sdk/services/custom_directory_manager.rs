@@ -1,9 +1,8 @@
 /**
  * Custom Directory Manager
- * 
+ *
  * Manages custom SDK installation directories for user-specified paths
  */
-
 use crate::domains::sdk::SDKError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -56,7 +55,7 @@ impl CustomDirectoryManager {
     ) -> Result<CustomDirectory, SDKError> {
         let id = Uuid::new_v4().to_string();
         let path_buf = PathBuf::from(&path);
-        
+
         // Validate the directory exists
         if !path_buf.exists() && path_buf.is_dir() {
             let mut directory = CustomDirectory {
@@ -79,7 +78,10 @@ impl CustomDirectoryManager {
             self.directories.insert(id.clone(), directory.clone());
             Ok(directory)
         } else {
-            Err(SDKError::ManagerNotFound(format!("Directory {} does not exist or is not a directory", path)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Directory {} does not exist or is not a directory",
+                path
+            )))
         }
     }
 
@@ -89,7 +91,10 @@ impl CustomDirectoryManager {
             self.installations.remove(directory_id);
             Ok(())
         } else {
-            Err(SDKError::ManagerNotFound(format!("Directory {} not found", directory_id)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Directory {} not found",
+                directory_id
+            )))
         }
     }
 
@@ -115,7 +120,9 @@ impl CustomDirectoryManager {
         if let Ok(mut entries) = fs::read_dir(&path_buf).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 if let Some(entry_path) = entry.path().to_str() {
-                    if let Some(installation) = self.detect_sdk_installation(entry_path, sdk_type).await {
+                    if let Some(installation) =
+                        self.detect_sdk_installation(entry_path, sdk_type).await
+                    {
                         installations.push(installation);
                     }
                 }
@@ -128,7 +135,7 @@ impl CustomDirectoryManager {
     /// Detect if a directory contains a valid SDK installation
     async fn detect_sdk_installation(&self, path: &str, sdk_type: &str) -> Option<SDKInstallation> {
         let path_buf = PathBuf::from(path);
-        
+
         if !path_buf.is_dir() {
             return None;
         }
@@ -151,7 +158,10 @@ impl CustomDirectoryManager {
             if binary_path.exists() && binary_path.is_file() {
                 // Check if it's executable
                 if self.is_executable(&binary_path).await {
-                    let version = self.get_sdk_version(&binary_path, sdk_type).await.unwrap_or_else(|| "unknown".to_string());
+                    let version = self
+                        .get_sdk_version(&binary_path, sdk_type)
+                        .await
+                        .unwrap_or_else(|| "unknown".to_string());
                     let metadata = fs::metadata(&path_buf).await.ok();
                     let last_modified = metadata
                         .and_then(|m| m.modified().ok())
@@ -188,7 +198,10 @@ impl CustomDirectoryManager {
         {
             // On Windows, check file extension
             if let Some(extension) = path.extension() {
-                matches!(extension.to_str(), Some("exe") | Some("bat") | Some("cmd") | Some("com"))
+                matches!(
+                    extension.to_str(),
+                    Some("exe") | Some("bat") | Some("cmd") | Some("com")
+                )
             } else {
                 false
             }
@@ -260,28 +273,42 @@ impl CustomDirectoryManager {
     }
 
     /// Rescan a directory for SDK installations
-    pub async fn rescan_directory(&mut self, directory_id: &str) -> Result<Vec<SDKInstallation>, SDKError> {
+    pub async fn rescan_directory(
+        &mut self,
+        directory_id: &str,
+    ) -> Result<Vec<SDKInstallation>, SDKError> {
         if let Some(directory) = self.directories.get(directory_id) {
-            let installations = self.scan_directory_for_sdks(&directory.path, &directory.sdk_type).await;
-            self.installations.insert(directory_id.to_string(), installations.clone());
-            
+            let installations = self
+                .scan_directory_for_sdks(&directory.path, &directory.sdk_type)
+                .await;
+            self.installations
+                .insert(directory_id.to_string(), installations.clone());
+
             // Update last scan time
             if let Some(dir) = self.directories.get_mut(directory_id) {
                 dir.last_scan = Some(chrono::Utc::now().to_rfc3339());
             }
-            
+
             Ok(installations)
         } else {
-            Err(SDKError::ManagerNotFound(format!("Directory {} not found", directory_id)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Directory {} not found",
+                directory_id
+            )))
         }
     }
 
     /// Get installations for a directory
-    pub async fn get_directory_installations(&self, directory_id: &str) -> Result<Vec<SDKInstallation>, SDKError> {
+    pub async fn get_directory_installations(
+        &self,
+        directory_id: &str,
+    ) -> Result<Vec<SDKInstallation>, SDKError> {
         self.installations
             .get(directory_id)
             .cloned()
-            .ok_or_else(|| SDKError::ManagerNotFound(format!("Directory {} not found", directory_id)))
+            .ok_or_else(|| {
+                SDKError::ManagerNotFound(format!("Directory {} not found", directory_id))
+            })
     }
 
     /// Validate a custom directory
@@ -289,17 +316,21 @@ impl CustomDirectoryManager {
         if let Some(directory) = self.directories.get_mut(directory_id) {
             let path_buf = PathBuf::from(&directory.path);
             let is_valid = path_buf.exists() && path_buf.is_dir();
-            
+
             directory.is_valid = is_valid;
             if !is_valid {
-                directory.error_message = Some("Directory does not exist or is not accessible".to_string());
+                directory.error_message =
+                    Some("Directory does not exist or is not accessible".to_string());
             } else {
                 directory.error_message = None;
             }
-            
+
             Ok(is_valid)
         } else {
-            Err(SDKError::ManagerNotFound(format!("Directory {} not found", directory_id)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Directory {} not found",
+                directory_id
+            )))
         }
     }
 }

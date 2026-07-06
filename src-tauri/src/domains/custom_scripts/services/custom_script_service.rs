@@ -1,7 +1,7 @@
+use crate::database::DatabaseManager;
 use crate::domains::custom_scripts::repositories::CustomScriptRepository;
 use crate::entities::custom_script::Model as CustomScriptModel;
 use std::sync::Arc;
-use crate::database::DatabaseManager;
 
 pub struct CustomScriptService {
     repository: CustomScriptRepository,
@@ -33,16 +33,18 @@ impl CustomScriptService {
         requires_sudo: bool,
         is_interactive: bool,
     ) -> Result<CustomScriptModel, String> {
-        self.repository.create(
-            name,
-            description,
-            command,
-            parameters_json,
-            category,
-            icon,
-            requires_sudo,
-            is_interactive,
-        ).await
+        self.repository
+            .create(
+                name,
+                description,
+                command,
+                parameters_json,
+                category,
+                icon,
+                requires_sudo,
+                is_interactive,
+            )
+            .await
     }
 
     pub async fn update_script(
@@ -57,17 +59,19 @@ impl CustomScriptService {
         requires_sudo: Option<bool>,
         is_interactive: Option<bool>,
     ) -> Result<CustomScriptModel, String> {
-        self.repository.update(
-            id,
-            name,
-            description,
-            command,
-            parameters_json,
-            category,
-            icon,
-            requires_sudo,
-            is_interactive,
-        ).await
+        self.repository
+            .update(
+                id,
+                name,
+                description,
+                command,
+                parameters_json,
+                category,
+                icon,
+                requires_sudo,
+                is_interactive,
+            )
+            .await
     }
 
     pub async fn delete_script(&self, id: i32) -> Result<(), String> {
@@ -78,4 +82,3 @@ impl CustomScriptService {
         self.repository.increment_run_count(id).await
     }
 }
-

@@ -18,9 +18,21 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(AiConversations::Title).string().not_null())
-                    .col(ColumnDef::new(AiConversations::Provider).string().not_null())
-                    .col(ColumnDef::new(AiConversations::CreatedAt).string().not_null())
-                    .col(ColumnDef::new(AiConversations::UpdatedAt).string().not_null())
+                    .col(
+                        ColumnDef::new(AiConversations::Provider)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiConversations::CreatedAt)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiConversations::UpdatedAt)
+                            .string()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -63,14 +75,33 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(AiConversationMessages::Role).string().not_null())
-                    .col(ColumnDef::new(AiConversationMessages::Content).text().not_null())
-                    .col(ColumnDef::new(AiConversationMessages::Timestamp).string().not_null())
-                    .col(ColumnDef::new(AiConversationMessages::Sequence).integer().not_null())
+                    .col(
+                        ColumnDef::new(AiConversationMessages::Role)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiConversationMessages::Content)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiConversationMessages::Timestamp)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiConversationMessages::Sequence)
+                            .integer()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_ai_conversation_messages_conversation_id")
-                            .from(AiConversationMessages::Table, AiConversationMessages::ConversationId)
+                            .from(
+                                AiConversationMessages::Table,
+                                AiConversationMessages::ConversationId,
+                            )
                             .to(AiConversations::Table, AiConversations::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -106,12 +137,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(AiLogs::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(AiLogs::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(AiLogs::Id).string().not_null().primary_key())
                     .col(ColumnDef::new(AiLogs::Provider).string().not_null())
                     .col(ColumnDef::new(AiLogs::LogType).string().not_null())
                     .col(ColumnDef::new(AiLogs::RequestData).text().null())
@@ -189,8 +215,16 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(AiTrainingData::Type).string().not_null())
                     .col(ColumnDef::new(AiTrainingData::Content).text().not_null())
                     .col(ColumnDef::new(AiTrainingData::Metadata).text().null())
-                    .col(ColumnDef::new(AiTrainingData::CreatedAt).string().not_null())
-                    .col(ColumnDef::new(AiTrainingData::UpdatedAt).string().not_null())
+                    .col(
+                        ColumnDef::new(AiTrainingData::CreatedAt)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiTrainingData::UpdatedAt)
+                            .string()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -217,7 +251,11 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(AiLogs::Table).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(AiConversationMessages::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(AiConversationMessages::Table)
+                    .to_owned(),
+            )
             .await?;
         manager
             .drop_table(Table::drop().table(AiConversations::Table).to_owned())
@@ -271,4 +309,3 @@ enum AiTrainingData {
     CreatedAt,
     UpdatedAt,
 }
-

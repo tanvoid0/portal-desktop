@@ -1,7 +1,7 @@
 <!-- Log Entry Component - Displays formatted log entries -->
 <script lang="ts">
-	import { Badge } from '@/lib/components/ui/badge';
-	import { Button } from '@/lib/components/ui/button';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import { Copy } from '@lucide/svelte';
 	import { toastActions } from '$lib/domains/shared/stores/toastStore';
 	import type { K8sLog } from '../../types/k8s';

@@ -1,22 +1,20 @@
 /**
  * SDK Manager Domain Module
  */
-
 pub mod commands;
+pub mod configs;
+pub mod download;
 pub mod entities;
+pub mod factory;
+pub mod manager_detector;
+pub mod managers;
+pub mod ollama_manager;
+pub mod package_managers;
+pub mod project;
 pub mod services;
 pub mod traits;
-pub mod managers;
-pub mod factory;
-pub mod package_managers;
-pub mod download;
-pub mod project;
 pub mod version_fetcher;
 pub mod version_installer;
-pub mod manager_detector;
-pub mod ollama_manager;
-pub mod configs;
-
 
 #[derive(Debug, thiserror::Error)]
 pub enum SDKError {
@@ -39,4 +37,3 @@ impl From<SDKError> for String {
         error.to_string()
     }
 }
-

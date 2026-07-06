@@ -1,6 +1,11 @@
-use sea_orm::{DatabaseConnection, EntityTrait, Set, NotSet, ActiveModelTrait, QueryFilter, ColumnTrait, QueryOrder};
+use crate::entities::document::{
+    ActiveModel, Column, Entity as DocumentEntity, Model as DocumentModel,
+};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, NotSet, QueryFilter,
+    QueryOrder, Set,
+};
 use serde::{Deserialize, Serialize};
-use crate::entities::document::{Entity as DocumentEntity, Model as DocumentModel, ActiveModel, Column};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateDocumentRequest {
@@ -27,8 +32,12 @@ impl DocumentRepository {
         Self { db }
     }
 
-    pub async fn create(&self, request: CreateDocumentRequest) -> Result<DocumentModel, sea_orm::DbErr> {
-        let tags_json = request.tags
+    pub async fn create(
+        &self,
+        request: CreateDocumentRequest,
+    ) -> Result<DocumentModel, sea_orm::DbErr> {
+        let tags_json = request
+            .tags
             .map(|tags| serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string()))
             .unwrap_or_else(|| "[]".to_string());
 
@@ -49,7 +58,11 @@ impl DocumentRepository {
         active_model.insert(&self.db).await
     }
 
-    pub async fn update(&self, id: i32, request: UpdateDocumentRequest) -> Result<DocumentModel, sea_orm::DbErr> {
+    pub async fn update(
+        &self,
+        id: i32,
+        request: UpdateDocumentRequest,
+    ) -> Result<DocumentModel, sea_orm::DbErr> {
         let mut active_model: ActiveModel = DocumentEntity::find_by_id(id)
             .one(&self.db)
             .await?
@@ -77,7 +90,11 @@ impl DocumentRepository {
         active_model.update(&self.db).await
     }
 
-    pub async fn update_draft(&self, id: i32, content_draft: String) -> Result<DocumentModel, sea_orm::DbErr> {
+    pub async fn update_draft(
+        &self,
+        id: i32,
+        content_draft: String,
+    ) -> Result<DocumentModel, sea_orm::DbErr> {
         let mut active_model: ActiveModel = DocumentEntity::find_by_id(id)
             .one(&self.db)
             .await?
@@ -92,7 +109,14 @@ impl DocumentRepository {
         active_model.update(&self.db).await
     }
 
-    pub async fn save_document(&self, id: i32, title: Option<String>, content: Option<String>, tags: Option<Vec<String>>, is_archived: Option<bool>) -> Result<DocumentModel, sea_orm::DbErr> {
+    pub async fn save_document(
+        &self,
+        id: i32,
+        title: Option<String>,
+        content: Option<String>,
+        tags: Option<Vec<String>>,
+        is_archived: Option<bool>,
+    ) -> Result<DocumentModel, sea_orm::DbErr> {
         let mut active_model: ActiveModel = DocumentEntity::find_by_id(id)
             .one(&self.db)
             .await?
@@ -147,8 +171,9 @@ impl DocumentRepository {
     pub async fn search(&self, query: &str) -> Result<Vec<DocumentModel>, sea_orm::DbErr> {
         DocumentEntity::find()
             .filter(
-                Column::Title.contains(query)
-                    .or(Column::Content.contains(query))
+                Column::Title
+                    .contains(query)
+                    .or(Column::Content.contains(query)),
             )
             .order_by_desc(Column::CreatedAt)
             .all(&self.db)
@@ -164,4 +189,3 @@ impl DocumentRepository {
             .await
     }
 }
-

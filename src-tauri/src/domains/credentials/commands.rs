@@ -1,11 +1,10 @@
-/**
- * Credentials Tauri Commands
- */
-
-use tauri::State;
 use crate::database::DatabaseManager;
 use crate::domains::credentials::services::CredentialService;
 use std::sync::Arc;
+/**
+ * Credentials Tauri Commands
+ */
+use tauri::State;
 
 /// Create a new credential
 #[tauri::command]
@@ -18,34 +17,35 @@ pub async fn create_credential(
     fields: Option<std::collections::HashMap<String, String>>,
     metadata: Option<std::collections::HashMap<String, serde_json::Value>>,
     expires_at: Option<chrono::DateTime<chrono::Utc>>,
-    db: State<'_, Arc<DatabaseManager>>
+    db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<serde_json::Value, String> {
     let service = CredentialService::new(db.get_connection_clone());
 
-    let request = crate::domains::credentials::services::credential_service::CredentialCreateRequest {
-        name,
-        credential_type,
-        description,
-        tags,
-        value,
-        fields,
-        metadata,
-        expires_at,
-    };
+    let request =
+        crate::domains::credentials::services::credential_service::CredentialCreateRequest {
+            name,
+            credential_type,
+            description,
+            tags,
+            value,
+            fields,
+            metadata,
+            expires_at,
+        };
 
     match service.create_credential(request).await {
         Ok(credential) => Ok(serde_json::to_value(credential).unwrap_or(serde_json::Value::Null)),
-        Err(e) => Err(e.to_string())
+        Err(e) => Err(e.to_string()),
     }
 }
 
 /// Get all credentials
 #[tauri::command]
 pub async fn get_credentials(
-    db: State<'_, Arc<DatabaseManager>>
+    db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<serde_json::Value>, String> {
     let service = CredentialService::new(db.get_connection_clone());
-    
+
     match service.get_credentials().await {
         Ok(credentials) => {
             let result: Vec<serde_json::Value> = credentials
@@ -54,7 +54,7 @@ pub async fn get_credentials(
                 .collect();
             Ok(result)
         }
-        Err(e) => Err(e.to_string())
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -62,13 +62,13 @@ pub async fn get_credentials(
 #[tauri::command]
 pub async fn get_credential(
     id: String,
-    db: State<'_, Arc<DatabaseManager>>
+    db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<serde_json::Value, String> {
     let service = CredentialService::new(db.get_connection_clone());
-    
+
     match service.get_credential(&id).await {
         Ok(credential) => Ok(serde_json::to_value(credential).unwrap_or(serde_json::Value::Null)),
-        Err(e) => Err(e.to_string())
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -84,24 +84,25 @@ pub async fn update_credential(
     metadata: Option<std::collections::HashMap<String, serde_json::Value>>,
     status: Option<String>,
     expires_at: Option<chrono::DateTime<chrono::Utc>>,
-    db: State<'_, Arc<DatabaseManager>>
+    db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<serde_json::Value, String> {
     let service = CredentialService::new(db.get_connection_clone());
-    
-    let request = crate::domains::credentials::services::credential_service::CredentialUpdateRequest {
-        name,
-        description,
-        tags,
-        value,
-        fields,
-        metadata,
-        status,
-        expires_at,
-    };
+
+    let request =
+        crate::domains::credentials::services::credential_service::CredentialUpdateRequest {
+            name,
+            description,
+            tags,
+            value,
+            fields,
+            metadata,
+            status,
+            expires_at,
+        };
 
     match service.update_credential(&id, request).await {
         Ok(credential) => Ok(serde_json::to_value(credential).unwrap_or(serde_json::Value::Null)),
-        Err(e) => Err(e.to_string())
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -109,13 +110,13 @@ pub async fn update_credential(
 #[tauri::command]
 pub async fn delete_credential(
     id: String,
-    db: State<'_, Arc<DatabaseManager>>
+    db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<(), String> {
     let service = CredentialService::new(db.get_connection_clone());
-    
+
     match service.delete_credential(&id).await {
         Ok(_) => Ok(()),
-        Err(e) => Err(e.to_string())
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -123,13 +124,13 @@ pub async fn delete_credential(
 #[tauri::command]
 pub async fn decrypt_credential(
     id: String,
-    db: State<'_, Arc<DatabaseManager>>
+    db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<String, String> {
     let service = CredentialService::new(db.get_connection_clone());
-    
+
     match service.decrypt_credential(&id).await {
         Ok(value) => Ok(value),
-        Err(e) => Err(e.to_string())
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -137,10 +138,10 @@ pub async fn decrypt_credential(
 #[tauri::command]
 pub async fn search_credentials(
     query: String,
-    db: State<'_, Arc<DatabaseManager>>
+    db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<serde_json::Value>, String> {
     let service = CredentialService::new(db.get_connection_clone());
-    
+
     match service.search_credentials(&query).await {
         Ok(credentials) => {
             let result: Vec<serde_json::Value> = credentials
@@ -149,6 +150,6 @@ pub async fn search_credentials(
                 .collect();
             Ok(result)
         }
-        Err(e) => Err(e.to_string())
+        Err(e) => Err(e.to_string()),
     }
 }

@@ -1,6 +1,6 @@
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import type { ChatMessage, ProviderType } from '../types/index.js';
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import type { ChatMessage, ProviderType } from "../types/index.js";
 
 export interface SendMessageOptions {
   provider?: ProviderType;
@@ -23,9 +23,9 @@ export class AIChatService {
   async sendMessage(
     message: string,
     history: ChatMessage[] = [],
-    options: SendMessageOptions = {}
+    options: SendMessageOptions = {},
   ): Promise<string> {
-    return invoke<string>('ai_send_message', {
+    return invoke<string>("ai_send_message", {
       message,
       history: history.map((msg) => ({
         role: msg.role,
@@ -45,19 +45,19 @@ export class AIChatService {
   async streamMessage(
     message: string,
     history: ChatMessage[] = [],
-    options: StreamMessageOptions = {}
+    options: StreamMessageOptions = {},
   ): Promise<string> {
     // Generate unique stream ID
     const streamId = `stream-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-    
+
     // Set up event listeners before invoking the command
     const chunkEventName = `ai-stream-chunk-${streamId}`;
     const completeEventName = `ai-stream-complete-${streamId}`;
-    
-    let fullResponse = '';
+
+    let fullResponse = "";
     let isComplete = false;
     let streamError: Error | null = null;
-    
+
     // Listen for chunks
     const chunkUnlisten = await listen<string>(chunkEventName, (event) => {
       const chunk = event.payload;
@@ -66,20 +66,23 @@ export class AIChatService {
         options.onChunk(chunk);
       }
     });
-    
+
     // Listen for completion
-    const completeUnlisten = await listen<string>(completeEventName, (event) => {
-      isComplete = true;
-      const finalResponse = event.payload;
-      if (options.onComplete) {
-        options.onComplete(finalResponse);
-      }
-    });
-    
+    const completeUnlisten = await listen<string>(
+      completeEventName,
+      (event) => {
+        isComplete = true;
+        const finalResponse = event.payload;
+        if (options.onComplete) {
+          options.onComplete(finalResponse);
+        }
+      },
+    );
+
     try {
       // Invoke the streaming command
       // Note: Tauri v2 expects camelCase parameter names from frontend
-      const result = await invoke<string>('ai_send_message_stream', {
+      const result = await invoke<string>("ai_send_message_stream", {
         message,
         history: history.map((msg) => ({
           role: msg.role,
@@ -92,7 +95,7 @@ export class AIChatService {
         model: options.model || null,
         streamId: streamId,
       });
-      
+
       // Wait for completion event (with timeout)
       let attempts = 0;
       const maxAttempts = 200; // 10 seconds max wait
@@ -100,25 +103,27 @@ export class AIChatService {
         await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
-      
+
       if (!isComplete) {
-        console.warn('Stream completion event not received, using accumulated response');
+        console.warn(
+          "Stream completion event not received, using accumulated response",
+        );
       }
-      
+
       // Clean up listeners
       await chunkUnlisten();
       await completeUnlisten();
-      
+
       if (streamError) {
         throw streamError;
       }
-      
+
       return result || fullResponse;
     } catch (error) {
       // Clean up listeners on error
       await chunkUnlisten();
       await completeUnlisten();
-      
+
       const err = error instanceof Error ? error : new Error(String(error));
       if (options.onError) {
         options.onError(err);
@@ -136,4 +141,3 @@ export class AIChatService {
 }
 
 export const aiChatService = new AIChatService();
-

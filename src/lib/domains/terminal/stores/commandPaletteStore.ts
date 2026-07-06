@@ -3,8 +3,11 @@
  * Manages command palette state and actions
  */
 
-import { writable } from 'svelte/store';
-import { commandHistoryStore, type CommandHistoryEntry } from './commandHistoryStore';
+import { writable } from "svelte/store";
+import {
+  commandHistoryStore,
+  type CommandHistoryEntry,
+} from "./commandHistoryStore";
 
 export interface CommandPaletteAction {
   id: string;
@@ -25,76 +28,86 @@ export interface CommandPaletteState {
 
 const initialState: CommandPaletteState = {
   isOpen: false,
-  query: '',
+  query: "",
   selectedIndex: 0,
   actions: [],
-  filteredActions: []
+  filteredActions: [],
 };
 
 function createCommandPaletteStore() {
-  const { subscribe, set, update } = writable<CommandPaletteState>(initialState);
+  const { subscribe, set, update } =
+    writable<CommandPaletteState>(initialState);
 
   return {
     subscribe,
-    
+
     open: () => {
-      update(state => ({
+      update((state) => ({
         ...state,
         isOpen: true,
-        query: '',
-        selectedIndex: 0
+        query: "",
+        selectedIndex: 0,
       }));
     },
-    
+
     close: () => {
-      update(state => ({
+      update((state) => ({
         ...state,
         isOpen: false,
-        query: '',
-        selectedIndex: 0
+        query: "",
+        selectedIndex: 0,
       }));
     },
-    
+
     setQuery: (query: string) => {
-      update(state => {
-        const filteredActions = state.actions.filter(action => 
-          action.label.toLowerCase().includes(query.toLowerCase()) ||
-          action.description.toLowerCase().includes(query.toLowerCase()) ||
-          action.keywords.some(keyword => keyword.toLowerCase().includes(query.toLowerCase()))
+      update((state) => {
+        const filteredActions = state.actions.filter(
+          (action) =>
+            action.label.toLowerCase().includes(query.toLowerCase()) ||
+            action.description.toLowerCase().includes(query.toLowerCase()) ||
+            action.keywords.some((keyword) =>
+              keyword.toLowerCase().includes(query.toLowerCase()),
+            ),
         );
-        
+
         return {
           ...state,
           query,
           filteredActions,
-          selectedIndex: 0
+          selectedIndex: 0,
         };
       });
     },
-    
+
     setSelectedIndex: (index: number) => {
-      update(state => ({
+      update((state) => ({
         ...state,
-        selectedIndex: Math.max(0, Math.min(index, state.filteredActions.length - 1))
+        selectedIndex: Math.max(
+          0,
+          Math.min(index, state.filteredActions.length - 1),
+        ),
       }));
     },
-    
+
     selectNext: () => {
-      update(state => ({
+      update((state) => ({
         ...state,
-        selectedIndex: Math.min(state.selectedIndex + 1, state.filteredActions.length - 1)
+        selectedIndex: Math.min(
+          state.selectedIndex + 1,
+          state.filteredActions.length - 1,
+        ),
       }));
     },
-    
+
     selectPrevious: () => {
-      update(state => ({
+      update((state) => ({
         ...state,
-        selectedIndex: Math.max(state.selectedIndex - 1, 0)
+        selectedIndex: Math.max(state.selectedIndex - 1, 0),
       }));
     },
-    
+
     executeSelected: async () => {
-      update(state => {
+      update((state) => {
         const selectedAction = state.filteredActions[state.selectedIndex];
         if (selectedAction) {
           selectedAction.action();
@@ -102,35 +115,37 @@ function createCommandPaletteStore() {
         return {
           ...state,
           isOpen: false,
-          query: '',
-          selectedIndex: 0
+          query: "",
+          selectedIndex: 0,
         };
       });
     },
-    
+
     setActions: (actions: CommandPaletteAction[]) => {
-      update(state => ({
+      update((state) => ({
         ...state,
         actions,
-        filteredActions: actions
+        filteredActions: actions,
       }));
     },
-    
+
     addAction: (action: CommandPaletteAction) => {
-      update(state => ({
+      update((state) => ({
         ...state,
         actions: [...state.actions, action],
-        filteredActions: [...state.filteredActions, action]
+        filteredActions: [...state.filteredActions, action],
       }));
     },
-    
+
     removeAction: (actionId: string) => {
-      update(state => ({
+      update((state) => ({
         ...state,
-        actions: state.actions.filter(action => action.id !== actionId),
-        filteredActions: state.filteredActions.filter(action => action.id !== actionId)
+        actions: state.actions.filter((action) => action.id !== actionId),
+        filteredActions: state.filteredActions.filter(
+          (action) => action.id !== actionId,
+        ),
       }));
-    }
+    },
   };
 }
 

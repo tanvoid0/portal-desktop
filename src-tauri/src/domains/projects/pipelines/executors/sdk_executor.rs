@@ -1,6 +1,6 @@
+use crate::domains::projects::pipelines::executors::{ExecutionRequest, ExecutionResult, Executor};
 use std::process::Command;
 use std::time::Instant;
-use crate::domains::projects::pipelines::executors::{Executor, ExecutionRequest, ExecutionResult};
 
 #[allow(dead_code)]
 pub struct SDKExecutor {
@@ -97,7 +97,9 @@ impl Executor for SDKExecutor {
         // Note: std::process::Command doesn't support timeout directly
         // Timeout would need to be handled at a higher level or using a different approach
 
-        let output = cmd.output().map_err(|e| format!("Failed to execute command: {}", e))?;
+        let output = cmd
+            .output()
+            .map_err(|e| format!("Failed to execute command: {}", e))?;
 
         let duration_ms = start_time.elapsed().as_millis() as u64;
         let exit_code = output.status.code();
@@ -124,4 +126,3 @@ impl Executor for SDKExecutor {
         execution_type == "command" || execution_type == "script"
     }
 }
-

@@ -1,7 +1,7 @@
+use chrono;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
-use chrono;
 
 /// Code pattern analyzer for learning best practices and patterns across projects
 pub struct CodePatternAnalyzer;
@@ -10,7 +10,7 @@ impl CodePatternAnalyzer {
     /// Analyze file structure patterns
     pub fn analyze_file_structure(files: &[String]) -> Value {
         let mut patterns = HashMap::new();
-        
+
         // Count file extensions
         let mut extensions: HashMap<String, usize> = HashMap::new();
         for file in files {
@@ -22,7 +22,7 @@ impl CodePatternAnalyzer {
         }
 
         patterns.insert("extensions".to_string(), json!(extensions));
-        
+
         // Detect common directory patterns
         let mut directory_patterns = Vec::new();
         for file in files {
@@ -42,7 +42,7 @@ impl CodePatternAnalyzer {
     /// Analyze import/require patterns
     pub fn analyze_import_patterns(imports: &[String]) -> Value {
         let mut patterns = HashMap::new();
-        
+
         // Group by package/library
         let mut package_counts: HashMap<String, usize> = HashMap::new();
         for import in imports {
@@ -50,7 +50,7 @@ impl CodePatternAnalyzer {
             let package = import.split('/').next().unwrap_or_else(|| import.as_str());
             *package_counts.entry(package.to_string()).or_insert(0) += 1;
         }
-        
+
         patterns.insert("packages".to_string(), json!(package_counts));
         patterns.insert("total_imports".to_string(), json!(imports.len()));
 
@@ -60,7 +60,7 @@ impl CodePatternAnalyzer {
     /// Detect common code patterns
     pub fn detect_common_patterns(code_content: &str) -> Value {
         let mut patterns = HashMap::new();
-        
+
         // Detect async/await patterns
         let async_count = code_content.matches("async").count();
         let await_count = code_content.matches("await").count();
@@ -100,4 +100,3 @@ impl CodePatternAnalyzer {
         })
     }
 }
-

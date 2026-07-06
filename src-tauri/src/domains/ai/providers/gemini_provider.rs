@@ -1,5 +1,6 @@
 use crate::domains::ai::providers::{
-    AIError, AIProvider, ConfigurationStatus, GenerationOptions, GenerationResult, ProviderConfig, ProviderType,
+    AIError, AIProvider, ConfigurationStatus, GenerationOptions, GenerationResult, ProviderConfig,
+    ProviderType,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -27,10 +28,9 @@ impl GeminiProvider {
     }
 
     fn api_key(&self) -> Result<String, AIError> {
-        self.config
-            .api_key
-            .clone()
-            .ok_or_else(|| AIError::AuthenticationError("Gemini API key not configured".to_string()))
+        self.config.api_key.clone().ok_or_else(|| {
+            AIError::AuthenticationError("Gemini API key not configured".to_string())
+        })
     }
 }
 
@@ -185,8 +185,11 @@ impl AIProvider for GeminiProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+
             if status == 401 {
                 return Err(AIError::AuthenticationError("Invalid API key".to_string()));
             } else if status == 429 {
@@ -232,10 +235,7 @@ impl AIProvider for GeminiProvider {
             .map(|p| p.text.clone())
             .ok_or_else(|| AIError::InvalidResponse("No content in response".to_string()))?;
 
-        let tokens_used = result
-            .candidates
-            .first()
-            .and_then(|c| c.token_count);
+        let tokens_used = result.candidates.first().and_then(|c| c.token_count);
 
         let generation_time = start_time.elapsed().as_millis() as u64;
 
@@ -286,9 +286,7 @@ impl AIProvider for GeminiProvider {
 
     fn update_config(&mut self, config: ProviderConfig) -> Result<(), AIError> {
         if config.provider_type != ProviderType::Gemini {
-            return Err(AIError::GenericError(
-                "Provider type mismatch".to_string(),
-            ));
+            return Err(AIError::GenericError("Provider type mismatch".to_string()));
         }
         self.config = config;
         // Recreate client to ensure clean state
@@ -296,4 +294,3 @@ impl AIProvider for GeminiProvider {
         Ok(())
     }
 }
-

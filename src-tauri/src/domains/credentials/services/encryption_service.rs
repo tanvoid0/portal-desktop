@@ -1,13 +1,12 @@
+use super::super::CredentialError;
+use base64::{engine::general_purpose, Engine as _};
 /**
  * Encryption Service - Handles credential encryption/decryption
  */
-
-use ring::aead::{Aad, LessSafeKey, UnboundKey, AES_256_GCM, Nonce};
+use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
 use ring::rand::{SecureRandom, SystemRandom};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use serde::{Serialize, Deserialize};
-use base64::{Engine as _, engine::general_purpose};
-use super::super::CredentialError;
 
 #[derive(Debug, Clone)]
 pub struct EncryptionService {
@@ -22,7 +21,11 @@ impl EncryptionService {
     }
 
     /// Encrypt a plaintext value
-    pub fn encrypt(&self, plaintext: &str, key: &[u8]) -> Result<EncryptionResult, CredentialError> {
+    pub fn encrypt(
+        &self,
+        plaintext: &str,
+        key: &[u8],
+    ) -> Result<EncryptionResult, CredentialError> {
         let unbound_key = UnboundKey::new(&AES_256_GCM, key)
             .map_err(|e| CredentialError::EncryptionFailed(e.to_string()))?;
 
@@ -32,7 +35,8 @@ impl EncryptionService {
 
         let less_safe_key = LessSafeKey::new(unbound_key);
         let mut ciphertext = plaintext.as_bytes().to_vec();
-        let tag = less_safe_key.seal_in_place_separate_tag(nonce, Aad::empty(), &mut ciphertext)
+        let tag = less_safe_key
+            .seal_in_place_separate_tag(nonce, Aad::empty(), &mut ciphertext)
             .map_err(|e| CredentialError::EncryptionFailed(e.to_string()))?;
 
         ciphertext.extend_from_slice(tag.as_ref());
@@ -50,16 +54,19 @@ impl EncryptionService {
         let unbound_key = UnboundKey::new(&AES_256_GCM, request.key.as_bytes())
             .map_err(|e| CredentialError::DecryptionFailed(e.to_string()))?;
 
-        let nonce_bytes = general_purpose::STANDARD.decode(&request.iv)
+        let nonce_bytes = general_purpose::STANDARD
+            .decode(&request.iv)
             .map_err(|e| CredentialError::DecryptionFailed(e.to_string()))?;
         let nonce = Nonce::try_assume_unique_for_key(&nonce_bytes)
             .map_err(|e| CredentialError::DecryptionFailed(e.to_string()))?;
 
         let less_safe_key = LessSafeKey::new(unbound_key);
-        let mut ciphertext = general_purpose::STANDARD.decode(&request.encrypted)
+        let mut ciphertext = general_purpose::STANDARD
+            .decode(&request.encrypted)
             .map_err(|e| CredentialError::DecryptionFailed(e.to_string()))?;
 
-        let plaintext = less_safe_key.open_in_place(nonce, Aad::empty(), &mut ciphertext)
+        let plaintext = less_safe_key
+            .open_in_place(nonce, Aad::empty(), &mut ciphertext)
             .map_err(|e| CredentialError::DecryptionFailed(e.to_string()))?;
 
         String::from_utf8(plaintext.to_vec())
@@ -69,15 +76,20 @@ impl EncryptionService {
     /// Generate a random nonce
     fn generate_nonce(&self) -> Result<[u8; 12], CredentialError> {
         let mut nonce = [0u8; 12];
-        self.rng.fill(&mut nonce)
+        self.rng
+            .fill(&mut nonce)
             .map_err(|e| CredentialError::EncryptionFailed(e.to_string()))?;
         Ok(nonce)
     }
 
     /// Derive key from password using PBKDF2
-    pub fn derive_key(&self, password: &str, salt: &[u8], iterations: u32) -> Result<[u8; 32], CredentialError> {
+    pub fn derive_key(
+        &self,
+        password: &str,
+        salt: &[u8],
+        iterations: u32,
+    ) -> Result<[u8; 32], CredentialError> {
         use ring::pbkdf2;
-        
 
         let mut key = [0u8; 32];
         pbkdf2::derive(
@@ -94,7 +106,8 @@ impl EncryptionService {
     /// Generate a random salt
     pub fn generate_salt(&self) -> Result<[u8; 32], CredentialError> {
         let mut salt = [0u8; 32];
-        self.rng.fill(&mut salt)
+        self.rng
+            .fill(&mut salt)
             .map_err(|e| CredentialError::EncryptionFailed(e.to_string()))?;
         Ok(salt)
     }
@@ -116,4 +129,48 @@ pub struct DecryptionRequest {
     pub tag: String,
     pub algorithm: String,
     pub key: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encrypt_decrypt_round_trip() {
+        let service = EncryptionService::new();
+        let key: [u8; 32] = *b"01234567890123456789012345678901";
+        let key_str = std::str::from_utf8(&key).unwrap().to_string();
+        let plaintext = "portal-desktop-secret";
+
+        let encrypted = service
+            .encrypt(plaintext, &key)
+            .expect("encrypt should succeed");
+
+        let decrypted = service
+            .decrypt(DecryptionRequest {
+                encrypted: encrypted.encrypted,
+                iv: encrypted.iv,
+                tag: encrypted.tag,
+                algorithm: encrypted.algorithm,
+                key: key_str,
+            })
+            .expect("decrypt should succeed");
+
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn derive_key_is_deterministic_for_same_inputs() {
+        let service = EncryptionService::new();
+        let salt = [1u8; 32];
+
+        let key_a = service
+            .derive_key("password", &salt, 10_000)
+            .expect("derive key");
+        let key_b = service
+            .derive_key("password", &salt, 10_000)
+            .expect("derive key");
+
+        assert_eq!(key_a, key_b);
+    }
 }

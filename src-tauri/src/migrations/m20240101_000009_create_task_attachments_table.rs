@@ -32,8 +32,16 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(TaskAttachments::Name).text().not_null())
                     .col(ColumnDef::new(TaskAttachments::Url).text().not_null())
                     .col(ColumnDef::new(TaskAttachments::Type).text().not_null())
-                    .col(ColumnDef::new(TaskAttachments::Size).big_integer().not_null())
-                    .col(ColumnDef::new(TaskAttachments::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(TaskAttachments::Size)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TaskAttachments::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_task_attachments_task_id")

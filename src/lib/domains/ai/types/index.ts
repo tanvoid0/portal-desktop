@@ -1,4 +1,4 @@
-export type ProviderType = 'Ollama' | 'Gemini';
+export type ProviderType = "Ollama" | "Gemini";
 
 export interface ProviderConfig {
   provider_type: ProviderType;
@@ -22,7 +22,7 @@ export interface ConfigurationStatus {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp?: Date;
 }
@@ -39,7 +39,7 @@ export interface Conversation {
 export interface ConversationMessage {
   id: string;
   conversation_id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: string;
   sequence: number;
@@ -58,7 +58,7 @@ export interface TrainingData {
 export interface AILog {
   id: string;
   provider: ProviderType;
-  log_type: 'request' | 'response' | 'error';
+  log_type: "request" | "response" | "error";
   request_data?: string;
   response_data?: string;
   error_message?: string;
@@ -68,9 +68,8 @@ export interface AILog {
 
 export interface LogFilters {
   provider?: ProviderType;
-  log_type?: 'request' | 'response' | 'error';
+  log_type?: "request" | "response" | "error";
   date_from?: string;
   date_to?: string;
   search_query?: string;
 }
-

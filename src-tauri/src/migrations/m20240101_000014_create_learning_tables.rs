@@ -42,7 +42,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(1),
                     )
-                    .col(ColumnDef::new(LearnedPatterns::LastUsed).timestamp_with_time_zone().null())
+                    .col(
+                        ColumnDef::new(LearnedPatterns::LastUsed)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(LearnedPatterns::SuccessRate)
                             .double()
@@ -198,11 +202,7 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
-                    .col(
-                        ColumnDef::new(LearningEvents::EventData)
-                            .text()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(LearningEvents::EventData).text().not_null())
                     .col(ColumnDef::new(LearningEvents::Outcome).string().null())
                     .col(ColumnDef::new(LearningEvents::Context).string().null())
                     .col(
@@ -282,4 +282,3 @@ enum LearningEvents {
     Context,
     CreatedAt,
 }
-

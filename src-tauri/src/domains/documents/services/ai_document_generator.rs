@@ -145,13 +145,16 @@ Guidelines:
             if !inst.trim().is_empty() {
                 full_prompt.push_str("=== GENERATION INSTRUCTIONS ===\n");
                 full_prompt.push_str(&format!("{}\n\n", inst));
-                full_prompt.push_str("Please follow these instructions when generating the document.\n\n");
+                full_prompt
+                    .push_str("Please follow these instructions when generating the document.\n\n");
             }
         }
 
-        full_prompt.push_str("Create a well-structured document based on the following prompt:\n\n");
+        full_prompt
+            .push_str("Create a well-structured document based on the following prompt:\n\n");
         full_prompt.push_str(prompt);
-        full_prompt.push_str("\n\nGenerate a comprehensive document with proper markdown formatting.");
+        full_prompt
+            .push_str("\n\nGenerate a comprehensive document with proper markdown formatting.");
 
         full_prompt
     }
@@ -165,18 +168,28 @@ Guidelines:
         let json_str = Self::extract_json_from_response(response);
 
         // Parse into structure
-        let value: serde_json::Value = serde_json::from_str(&json_str)
-            .map_err(|e| format!("Failed to parse AI response as JSON: {}. Response: {}", e, response))?;
+        let value: serde_json::Value = serde_json::from_str(&json_str).map_err(|e| {
+            format!(
+                "Failed to parse AI response as JSON: {}. Response: {}",
+                e, response
+            )
+        })?;
 
-        let title = value.get("title")
+        let title = value
+            .get("title")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 // Fallback: use first line of prompt as title
-                original_prompt.lines().next().unwrap_or("Untitled Document").to_string()
+                original_prompt
+                    .lines()
+                    .next()
+                    .unwrap_or("Untitled Document")
+                    .to_string()
             });
 
-        let content = value.get("content")
+        let content = value
+            .get("content")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
@@ -184,18 +197,23 @@ Guidelines:
                 response.to_string()
             });
 
-        let suggested_tags = value.get("suggested_tags")
+        let suggested_tags = value
+            .get("suggested_tags")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        let confidence = value.get("confidence")
+        let confidence = value
+            .get("confidence")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.8);
 
-        let model_used = value.get("model_used")
+        let model_used = value
+            .get("model_used")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
             .unwrap_or_else(|| "unknown".to_string());
@@ -239,4 +257,3 @@ Guidelines:
         response.trim().to_string()
     }
 }
-

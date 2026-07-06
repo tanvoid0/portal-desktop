@@ -11,7 +11,7 @@ impl PreferenceEngine {
         let freq_value = (frequency + 1).max(1);
         let frequency_factor = 1.0 + (freq_value as f64).log10() / 10.0;
         let confidence = base_confidence * frequency_factor * success_rate;
-        
+
         confidence.min(1.0)
     }
 
@@ -32,10 +32,7 @@ impl PreferenceEngine {
     }
 
     /// Update confidence based on user feedback
-    pub fn update_confidence_from_feedback(
-        current_confidence: f64,
-        accepted: bool,
-    ) -> f64 {
+    pub fn update_confidence_from_feedback(current_confidence: f64, accepted: bool) -> f64 {
         if accepted {
             // Increase confidence (capped at 1.0)
             (current_confidence + 0.1).min(1.0)
@@ -86,4 +83,3 @@ impl PreferenceEngine {
         values[0].clone()
     }
 }
-

@@ -1,13 +1,14 @@
+use super::super::traits::package_manager::{
+    InstalledPackage, Package, PackageDetails, PackageManager, PackageUpdate,
+};
+use super::super::SDKError;
+use crate::command_executor::CommandExecutor;
 /**
  * Homebrew Package Manager Implementation
- * 
+ *
  * Homebrew (macOS/Linux) implementation
  */
-
 use async_trait::async_trait;
-use crate::command_executor::CommandExecutor;
-use super::super::SDKError;
-use super::super::traits::package_manager::{PackageManager, Package, InstalledPackage, PackageDetails, PackageUpdate};
 
 pub struct HomebrewManager;
 
@@ -17,13 +18,17 @@ impl HomebrewManager {
     }
 
     async fn execute_brew(&self, args: &[&str]) -> Result<String, SDKError> {
-        let result = CommandExecutor::execute_with_args("brew", args, None).await
+        let result = CommandExecutor::execute_with_args("brew", args, None)
+            .await
             .map_err(|e| SDKError::CommandFailed(format!("Homebrew command failed: {}", e)))?;
 
         if result.success {
             Ok(result.stdout)
         } else {
-            Err(SDKError::CommandFailed(format!("Homebrew error: {}", result.stderr)))
+            Err(SDKError::CommandFailed(format!(
+                "Homebrew error: {}",
+                result.stderr
+            )))
         }
     }
 }
@@ -56,15 +61,15 @@ impl PackageManager for HomebrewManager {
 
     async fn search_packages(&self, query: &str) -> Result<Vec<Package>, SDKError> {
         let output = self.execute_brew(&["search", query]).await?;
-        
+
         let mut packages = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with("==>") {
                 continue;
             }
-            
+
             let name = line.to_string();
             packages.push(Package {
                 id: name.clone(),
@@ -77,26 +82,26 @@ impl PackageManager for HomebrewManager {
                 source: "homebrew".to_string(),
             });
         }
-        
+
         Ok(packages)
     }
 
     async fn get_installed_packages(&self) -> Result<Vec<InstalledPackage>, SDKError> {
         let output = self.execute_brew(&["list", "--versions"]).await?;
-        
+
         let mut packages = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            
+
             let parts: Vec<&str> = line.split_whitespace().collect();
             if !parts.is_empty() {
                 let name = parts[0].to_string();
                 let version = parts.get(1).unwrap_or(&"unknown").to_string();
-                
+
                 packages.push(InstalledPackage {
                     id: name.clone(),
                     name,
@@ -107,17 +112,17 @@ impl PackageManager for HomebrewManager {
                 });
             }
         }
-        
+
         Ok(packages)
     }
 
     async fn get_package_details(&self, id: &str) -> Result<PackageDetails, SDKError> {
         let output = self.execute_brew(&["info", id]).await?;
-        
+
         let mut name = id.to_string();
         let mut description = None;
         let mut homepage = None;
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.starts_with(id) && line.contains(':') {
@@ -130,10 +135,10 @@ impl PackageManager for HomebrewManager {
                 homepage = Some(line.to_string());
             }
         }
-        
+
         // Homebrew info doesn't provide version in the standard output format
         let version: Option<String> = None;
-        
+
         Ok(PackageDetails {
             id: id.to_string(),
             name,
@@ -164,15 +169,15 @@ impl PackageManager for HomebrewManager {
 
     async fn check_updates(&self) -> Result<Vec<PackageUpdate>, SDKError> {
         let output = self.execute_brew(&["outdated"]).await?;
-        
+
         let mut updates = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            
+
             let name = line.to_string();
             updates.push(PackageUpdate {
                 id: name.clone(),
@@ -182,7 +187,7 @@ impl PackageManager for HomebrewManager {
                 source: "homebrew".to_string(),
             });
         }
-        
+
         Ok(updates)
     }
 
@@ -198,4 +203,3 @@ impl PackageManager for HomebrewManager {
         false // Homebrew typically doesn't need sudo for user installs
     }
 }
-

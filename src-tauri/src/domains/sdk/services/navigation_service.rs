@@ -1,12 +1,11 @@
+use crate::domains::sdk::factory::SDKManagerFactory;
 /**
  * SDK Navigation Service
- * 
+ *
  * Provides dynamic SDK navigation items with installation status and version information
  * for the SDK management interface. Focuses specifically on SDK-related tools and managers.
  */
-
 use serde::{Deserialize, Serialize};
-use crate::domains::sdk::factory::SDKManagerFactory;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NavigationItem {
@@ -49,7 +48,9 @@ impl NavigationService {
     }
 
     /// Get SDK-specific navigation sections with dynamic status
-    pub async fn get_sdk_navigation_items(&self) -> Result<NavigationResponse, Box<dyn std::error::Error>> {
+    pub async fn get_sdk_navigation_items(
+        &self,
+    ) -> Result<NavigationResponse, Box<dyn std::error::Error>> {
         let mut sections = Vec::new();
 
         // SDK Navigation section
@@ -139,29 +140,28 @@ impl NavigationService {
             items: container_items,
         });
 
-            // AI section
-            let ai_items = self.get_ai_items().await?;
-            sections.push(NavigationSection {
-                title: "AI".to_string(),
-                items: ai_items,
-            });
+        // AI section
+        let ai_items = self.get_ai_items().await?;
+        sections.push(NavigationSection {
+            title: "AI".to_string(),
+            items: ai_items,
+        });
 
-            // SDK Manager Tools section
-            let sdk_tools_items = self.get_sdk_tools_items().await?;
-            sections.push(NavigationSection {
-                title: "SDK Tools".to_string(),
-                items: sdk_tools_items,
-            });
+        // SDK Manager Tools section
+        let sdk_tools_items = self.get_sdk_tools_items().await?;
+        sections.push(NavigationSection {
+            title: "SDK Tools".to_string(),
+            items: sdk_tools_items,
+        });
 
         // Calculate totals
-        let total_installed = sections.iter()
+        let total_installed = sections
+            .iter()
             .flat_map(|s| &s.items)
             .filter(|item| item.installed)
             .count();
-        
-        let total_available = sections.iter()
-            .flat_map(|s| &s.items)
-            .count();
+
+        let total_available = sections.iter().flat_map(|s| &s.items).count();
 
         Ok(NavigationResponse {
             sections,
@@ -358,7 +358,9 @@ impl NavigationService {
         Ok(items)
     }
 
-    async fn get_web_server_items(&self) -> Result<Vec<NavigationItem>, Box<dyn std::error::Error>> {
+    async fn get_web_server_items(
+        &self,
+    ) -> Result<Vec<NavigationItem>, Box<dyn std::error::Error>> {
         let mut items = Vec::new();
 
         // Nginx
@@ -517,88 +519,95 @@ impl NavigationService {
     }
 
     /// Check if an SDK is installed and get its version
-    async fn check_sdk_status(&self, sdk_name: &str) -> Result<(bool, Option<String>), Box<dyn std::error::Error>> {
+    async fn check_sdk_status(
+        &self,
+        sdk_name: &str,
+    ) -> Result<(bool, Option<String>), Box<dyn std::error::Error>> {
         // This would integrate with the actual SDK managers to check installation status
         // For now, we'll simulate some responses based on common installations
-        
+
         match sdk_name {
             "nodejs" => {
                 // Check if Node.js is installed via nvm or system
                 let version = self.check_command_version("node", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "python" => {
                 let version = self.check_command_version("python3", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "java" => {
                 let version = self.check_command_version("java", "-version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "rust" => {
                 let version = self.check_command_version("rustc", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "go" => {
                 let version = self.check_command_version("go", "version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "php" => {
                 let version = self.check_command_version("php", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "ruby" => {
                 let version = self.check_command_version("ruby", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "docker" => {
                 let version = self.check_command_version("docker", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "postgresql" => {
                 let version = self.check_command_version("psql", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "mysql" => {
                 let version = self.check_command_version("mysql", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "mongodb" => {
                 let version = self.check_command_version("mongod", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "redis" => {
-                let version = self.check_command_version("redis-server", "--version").await?;
+                let version = self
+                    .check_command_version("redis-server", "--version")
+                    .await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "nginx" => {
                 let version = self.check_command_version("nginx", "-v").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "apache" => {
                 let version = self.check_command_version("apache2", "-v").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "caddy" => {
                 let version = self.check_command_version("caddy", "version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             "podman" => {
                 let version = self.check_command_version("podman", "--version").await?;
                 Ok((version.is_some(), version))
-            },
+            }
             _ => Ok((false, None)),
         }
     }
 
     /// Check if a command exists and get its version
-    async fn check_command_version(&self, command: &str, version_flag: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    async fn check_command_version(
+        &self,
+        command: &str,
+        version_flag: &str,
+    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
         use std::process::Command;
-        
-        let output = Command::new(command)
-            .arg(version_flag)
-            .output();
-            
+
+        let output = Command::new(command).arg(version_flag).output();
+
         match output {
             Ok(result) => {
                 if result.status.success() {
@@ -607,7 +616,7 @@ impl NavigationService {
                 } else {
                     Ok(None)
                 }
-            },
+            }
             Err(_) => Ok(None),
         }
     }
@@ -643,28 +652,35 @@ impl NavigationService {
     }
 
     /// Check if an AI service is installed
-    async fn check_ai_service_installed(&self, service: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn check_ai_service_installed(
+        &self,
+        service: &str,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         match service {
             "ollama" => {
                 let version = self.check_command_version("ollama", "--version").await?;
                 Ok(version.is_some())
-            },
+            }
             _ => Ok(false),
         }
     }
 
     /// Get AI service version
-    async fn get_ai_service_version(&self, service: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    async fn get_ai_service_version(
+        &self,
+        service: &str,
+    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
         match service {
-            "ollama" => {
-                self.check_command_version("ollama", "--version").await
-            },
+            "ollama" => self.check_command_version("ollama", "--version").await,
             _ => Ok(None),
         }
     }
 
     /// Get detailed information about a specific SDK
-    pub async fn get_sdk_details(&self, sdk_type: &str) -> Result<Option<SdkDetails>, Box<dyn std::error::Error>> {
+    pub async fn get_sdk_details(
+        &self,
+        sdk_type: &str,
+    ) -> Result<Option<SdkDetails>, Box<dyn std::error::Error>> {
         let sdk_details = match sdk_type {
             "nodejs" => SdkDetails {
                 id: "nodejs".to_string(),

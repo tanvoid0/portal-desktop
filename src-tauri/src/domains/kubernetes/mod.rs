@@ -1,7 +1,7 @@
-pub mod manager;
-pub mod types;
 pub mod commands;
+pub mod manager;
 pub mod services;
+pub mod types;
 
 // KubernetesManager is used via State in commands, not directly imported
 // pub use manager::KubernetesManager;

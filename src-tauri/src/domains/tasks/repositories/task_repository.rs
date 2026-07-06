@@ -1,6 +1,11 @@
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait, QueryOrder, PaginatorTrait};
+use crate::domains::tasks::entities::task::{
+    ActiveModel, Column, Entity as TaskEntity, Model as TaskModel,
+};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
+};
 use serde::{Deserialize, Serialize};
-use crate::domains::tasks::entities::task::{Entity as TaskEntity, Model as TaskModel, ActiveModel, Column};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateTaskRequest {
@@ -23,7 +28,7 @@ pub struct CreateTaskRequest {
     pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
     pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
     pub blocked_by: Option<String>, // JSON array of task IDs
-    pub blocks: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>,     // JSON array of task IDs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,7 +52,7 @@ pub struct UpdateTaskRequest {
     pub recurring_end_date: Option<chrono::DateTime<chrono::Utc>>,
     pub recurring_last_generated: Option<chrono::DateTime<chrono::Utc>>,
     pub blocked_by: Option<String>, // JSON array of task IDs
-    pub blocks: Option<String>, // JSON array of task IDs
+    pub blocks: Option<String>,     // JSON array of task IDs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,7 +102,11 @@ impl TaskRepository {
         active_model.insert(&self.db).await
     }
 
-    pub async fn update(&self, id: i32, request: UpdateTaskRequest) -> Result<TaskModel, sea_orm::DbErr> {
+    pub async fn update(
+        &self,
+        id: i32,
+        request: UpdateTaskRequest,
+    ) -> Result<TaskModel, sea_orm::DbErr> {
         let mut active_model: ActiveModel = TaskEntity::find_by_id(id)
             .one(&self.db)
             .await?
@@ -189,7 +198,10 @@ impl TaskRepository {
         TaskEntity::find_by_id(id).one(&self.db).await
     }
 
-    pub async fn find_all(&self, filters: Option<TaskFilters>) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
+    pub async fn find_all(
+        &self,
+        filters: Option<TaskFilters>,
+    ) -> Result<Vec<TaskModel>, sea_orm::DbErr> {
         let mut query = TaskEntity::find();
 
         if let Some(filters) = filters {
@@ -277,7 +289,7 @@ impl TaskRepository {
         let today = chrono::Utc::now().date_naive();
         let start_of_day = today.and_hms_opt(0, 0, 0).unwrap().and_utc();
         let end_of_day = today.and_hms_opt(23, 59, 59).unwrap().and_utc();
-        
+
         TaskEntity::find()
             .filter(Column::DueDate.gte(start_of_day))
             .filter(Column::DueDate.lte(end_of_day))

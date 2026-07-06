@@ -1,12 +1,16 @@
-use tauri::State;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use crate::database::DatabaseManager;
-use crate::domains::documents::services::document_service::DocumentService;
-use crate::domains::documents::services::ai_document_generator::{AIDocumentGenerator, GeneratedDocumentStructure, DocumentContext};
 use crate::domains::ai::providers::ProviderType;
 use crate::domains::ai::services::AIService;
-use crate::domains::documents::repositories::document_repository::{CreateDocumentRequest, UpdateDocumentRequest};
+use crate::domains::documents::repositories::document_repository::{
+    CreateDocumentRequest, UpdateDocumentRequest,
+};
+use crate::domains::documents::services::ai_document_generator::{
+    AIDocumentGenerator, DocumentContext, GeneratedDocumentStructure,
+};
+use crate::domains::documents::services::document_service::DocumentService;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tauri::State;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentResponse {
@@ -77,7 +81,7 @@ pub async fn create_document(
 ) -> Result<DocumentResponse, String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
-    
+
     let request = CreateDocumentRequest {
         title: command.title,
         content: command.content,
@@ -99,7 +103,7 @@ pub async fn get_document(
 ) -> Result<Option<DocumentResponse>, String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
-    
+
     service
         .get_document(id)
         .await
@@ -113,7 +117,7 @@ pub async fn get_documents(
 ) -> Result<Vec<DocumentResponse>, String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
-    
+
     service
         .get_documents()
         .await
@@ -129,7 +133,7 @@ pub async fn update_document(
 ) -> Result<DocumentResponse, String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
-    
+
     let request = UpdateDocumentRequest {
         title: command.title,
         content: command.content,
@@ -152,7 +156,7 @@ pub async fn update_document_draft(
 ) -> Result<DocumentResponse, String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
-    
+
     service
         .update_draft(id, content_draft)
         .await
@@ -171,7 +175,7 @@ pub async fn save_document(
 ) -> Result<DocumentResponse, String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
-    
+
     service
         .save_document(id, title, content, tags, is_archived)
         .await
@@ -186,7 +190,7 @@ pub async fn delete_document(
 ) -> Result<(), String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
-    
+
     service
         .delete_document(id)
         .await
@@ -200,7 +204,7 @@ pub async fn search_documents(
 ) -> Result<Vec<DocumentResponse>, String> {
     let conn = db_manager.get_connection_clone();
     let service = DocumentService::new(conn);
-    
+
     service
         .search_documents(&query)
         .await
@@ -247,4 +251,3 @@ pub async fn generate_document_with_ai(
             format!("Failed to generate document: {}", e)
         })
 }
-

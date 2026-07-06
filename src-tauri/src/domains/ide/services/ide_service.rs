@@ -11,7 +11,7 @@ impl IdeService {
     /// Detect installed IDEs on the system
     pub fn detect_installed_ides(&self) -> Vec<String> {
         let mut detected: Vec<String> = Vec::new();
-        
+
         // Common IDE executables to check
         let common_ides = if cfg!(windows) {
             vec![
@@ -73,7 +73,7 @@ impl IdeService {
             // Get user home directory for AppData paths
             if let Ok(home_dir) = std::env::var("USERPROFILE") {
                 let home = PathBuf::from(&home_dir);
-                
+
                 // JetBrains Toolbox installation path (most common on Windows)
                 // Toolbox creates symlinks in AppData\Local\JetBrains\Toolbox\bin
                 let jetbrains_toolbox_bin = home.join(r"AppData\Local\JetBrains\Toolbox\bin");
@@ -99,7 +99,7 @@ impl IdeService {
                         }
                     }
                 }
-                
+
                 // JetBrains Toolbox apps directory - check actual IDE installations
                 let toolbox_apps = home.join(r"AppData\Local\JetBrains\Toolbox\apps");
                 if toolbox_apps.exists() {
@@ -115,18 +115,40 @@ impl IdeService {
                                             // Look for bin directory with executables
                                             let bin_dir = version_dir.join("bin");
                                             if bin_dir.exists() {
-                                                let launchers = vec!["idea64.exe", "idea.exe", "pycharm64.exe", "pycharm.exe",
-                                                                    "webstorm64.exe", "webstorm.exe", "clion64.exe", "clion.exe",
-                                                                    "goland64.exe", "goland.exe", "phpstorm64.exe", "phpstorm.exe",
-                                                                    "rider64.exe", "rider.exe", "rubymine64.exe", "rubymine.exe",
-                                                                    "studio64.exe", "studio.exe"];
+                                                let launchers = vec![
+                                                    "idea64.exe",
+                                                    "idea.exe",
+                                                    "pycharm64.exe",
+                                                    "pycharm.exe",
+                                                    "webstorm64.exe",
+                                                    "webstorm.exe",
+                                                    "clion64.exe",
+                                                    "clion.exe",
+                                                    "goland64.exe",
+                                                    "goland.exe",
+                                                    "phpstorm64.exe",
+                                                    "phpstorm.exe",
+                                                    "rider64.exe",
+                                                    "rider.exe",
+                                                    "rubymine64.exe",
+                                                    "rubymine.exe",
+                                                    "studio64.exe",
+                                                    "studio.exe",
+                                                ];
                                                 for launcher in launchers {
                                                     let exe_path = bin_dir.join(launcher);
                                                     if exe_path.exists() {
-                                                        if let Ok(canonical) = std::fs::canonicalize(&exe_path) {
-                                                            if let Some(path_str) = canonical.to_str() {
-                                                                if !detected.contains(&path_str.to_string()) {
-                                                                    detected.push(path_str.to_string());
+                                                        if let Ok(canonical) =
+                                                            std::fs::canonicalize(&exe_path)
+                                                        {
+                                                            if let Some(path_str) =
+                                                                canonical.to_str()
+                                                            {
+                                                                if !detected
+                                                                    .contains(&path_str.to_string())
+                                                                {
+                                                                    detected
+                                                                        .push(path_str.to_string());
                                                                 }
                                                             }
                                                         }
@@ -140,7 +162,7 @@ impl IdeService {
                         }
                     }
                 }
-                
+
                 // Check for individual JetBrains IDE installations (non-Toolbox)
                 let jetbrains_apps = home.join(r"AppData\Local\JetBrains");
                 if jetbrains_apps.exists() {
@@ -159,9 +181,12 @@ impl IdeService {
                                         let exe_path = bin_entry.path();
                                         if let Some(ext) = exe_path.extension() {
                                             if ext == "exe" {
-                                                if let Ok(canonical) = std::fs::canonicalize(&exe_path) {
+                                                if let Ok(canonical) =
+                                                    std::fs::canonicalize(&exe_path)
+                                                {
                                                     if let Some(path_str) = canonical.to_str() {
-                                                        if !detected.contains(&path_str.to_string()) {
+                                                        if !detected.contains(&path_str.to_string())
+                                                        {
                                                             detected.push(path_str.to_string());
                                                         }
                                                     }
@@ -174,7 +199,7 @@ impl IdeService {
                         }
                     }
                 }
-                
+
                 // VS Code paths
                 let vs_code_paths = vec![
                     home.join(r"AppData\Local\Programs\Microsoft VS Code\Code.exe"),
@@ -192,7 +217,7 @@ impl IdeService {
                         }
                     }
                 }
-                
+
                 // Check Program Files for JetBrains IDEs
                 let program_files_paths = vec![
                     PathBuf::from(r"C:\Program Files\JetBrains"),
@@ -206,14 +231,29 @@ impl IdeService {
                                 let bin_dir = ide_dir.join("bin");
                                 if bin_dir.exists() {
                                     // Look for launcher exes
-                                    let launchers = vec!["idea64.exe", "idea.exe", "pycharm64.exe", "pycharm.exe",
-                                                        "webstorm64.exe", "webstorm.exe", "clion64.exe", "clion.exe",
-                                                        "goland64.exe", "goland.exe", "phpstorm64.exe", "phpstorm.exe",
-                                                        "rider64.exe", "rider.exe", "rubymine64.exe", "rubymine.exe"];
+                                    let launchers = vec![
+                                        "idea64.exe",
+                                        "idea.exe",
+                                        "pycharm64.exe",
+                                        "pycharm.exe",
+                                        "webstorm64.exe",
+                                        "webstorm.exe",
+                                        "clion64.exe",
+                                        "clion.exe",
+                                        "goland64.exe",
+                                        "goland.exe",
+                                        "phpstorm64.exe",
+                                        "phpstorm.exe",
+                                        "rider64.exe",
+                                        "rider.exe",
+                                        "rubymine64.exe",
+                                        "rubymine.exe",
+                                    ];
                                     for launcher in launchers {
                                         let exe_path = bin_dir.join(launcher);
                                         if exe_path.exists() {
-                                            if let Ok(canonical) = std::fs::canonicalize(&exe_path) {
+                                            if let Ok(canonical) = std::fs::canonicalize(&exe_path)
+                                            {
                                                 if let Some(path_str) = canonical.to_str() {
                                                     if !detected.contains(&path_str.to_string()) {
                                                         detected.push(path_str.to_string());
@@ -235,7 +275,9 @@ impl IdeService {
                 PathBuf::from("/snap/bin/code"),
                 PathBuf::from("/opt/idea/bin/idea.sh"),
                 PathBuf::from("/opt/pycharm/bin/pycharm.sh"),
-                PathBuf::from("/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"),
+                PathBuf::from(
+                    "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+                ),
                 PathBuf::from("/Applications/IntelliJ IDEA.app/Contents/MacOS/idea"),
             ];
             for path in common_paths {
@@ -275,7 +317,7 @@ impl IdeService {
                 .arg(executable)
                 .output()
                 .map_err(|e| e.to_string())?;
-            
+
             if output.status.success() {
                 let path = String::from_utf8_lossy(&output.stdout)
                     .lines()
@@ -292,11 +334,9 @@ impl IdeService {
                 .arg(executable)
                 .output()
                 .map_err(|e| e.to_string())?;
-            
+
             if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout)
-                    .trim()
-                    .to_string();
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 Ok(path)
             } else {
                 Err("Executable not found".to_string())
@@ -304,4 +344,3 @@ impl IdeService {
         }
     }
 }
-

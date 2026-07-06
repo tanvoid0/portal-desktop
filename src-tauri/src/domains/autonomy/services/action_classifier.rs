@@ -46,15 +46,22 @@ impl ActionClassifier {
     }
 
     /// Classify an action based on its type and context
-    pub fn classify(&self, action_type: &str, context: &str, success_rate: f64) -> ActionClassification {
+    pub fn classify(
+        &self,
+        action_type: &str,
+        context: &str,
+        success_rate: f64,
+    ) -> ActionClassification {
         // Determine base safety level from action type
         let base_level = self.get_base_safety_level(action_type);
-        
+
         // Adjust based on success rate and context
         let requires_approval = match base_level {
             ActionSafetyLevel::Safe => false,
             ActionSafetyLevel::LowRisk => success_rate < self.low_risk_threshold,
-            ActionSafetyLevel::MediumRisk => success_rate < self.medium_risk_threshold || success_rate < self.safe_threshold,
+            ActionSafetyLevel::MediumRisk => {
+                success_rate < self.medium_risk_threshold || success_rate < self.safe_threshold
+            }
             ActionSafetyLevel::HighRisk => true,
         };
 
@@ -72,32 +79,35 @@ impl ActionClassifier {
     /// Get base safety level from action type
     fn get_base_safety_level(&self, action_type: &str) -> ActionSafetyLevel {
         let action_lower = action_type.to_lowercase();
-        
+
         // Safe actions
-        if action_lower.contains("read") || 
-           action_lower.contains("list") || 
-           action_lower.contains("get") ||
-           action_lower.contains("suggest") ||
-           action_lower.contains("display") {
+        if action_lower.contains("read")
+            || action_lower.contains("list")
+            || action_lower.contains("get")
+            || action_lower.contains("suggest")
+            || action_lower.contains("display")
+        {
             return ActionSafetyLevel::Safe;
         }
 
         // High risk actions
-        if action_lower.contains("delete") || 
-           action_lower.contains("remove") ||
-           action_lower.contains("uninstall") ||
-           action_lower.contains("destroy") ||
-           action_lower.contains("drop") ||
-           action_lower.contains("format") {
+        if action_lower.contains("delete")
+            || action_lower.contains("remove")
+            || action_lower.contains("uninstall")
+            || action_lower.contains("destroy")
+            || action_lower.contains("drop")
+            || action_lower.contains("format")
+        {
             return ActionSafetyLevel::HighRisk;
         }
 
         // Medium risk actions
-        if action_lower.contains("create") || 
-           action_lower.contains("update") ||
-           action_lower.contains("modify") ||
-           action_lower.contains("configure") ||
-           action_lower.contains("install") {
+        if action_lower.contains("create")
+            || action_lower.contains("update")
+            || action_lower.contains("modify")
+            || action_lower.contains("configure")
+            || action_lower.contains("install")
+        {
             return ActionSafetyLevel::MediumRisk;
         }
 
@@ -106,7 +116,12 @@ impl ActionClassifier {
     }
 
     /// Calculate confidence score
-    fn calculate_confidence(&self, level: ActionSafetyLevel, success_rate: f64, _context: &str) -> f64 {
+    fn calculate_confidence(
+        &self,
+        level: ActionSafetyLevel,
+        success_rate: f64,
+        _context: &str,
+    ) -> f64 {
         let base_confidence = match level {
             ActionSafetyLevel::Safe => 0.95,
             ActionSafetyLevel::LowRisk => 0.80,
@@ -119,7 +134,12 @@ impl ActionClassifier {
     }
 
     /// Generate human-readable reason
-    fn generate_reason(&self, level: ActionSafetyLevel, success_rate: f64, requires_approval: bool) -> String {
+    fn generate_reason(
+        &self,
+        level: ActionSafetyLevel,
+        success_rate: f64,
+        requires_approval: bool,
+    ) -> String {
         match (level, requires_approval) {
             (ActionSafetyLevel::Safe, _) => "Safe read-only operation".to_string(),
             (ActionSafetyLevel::LowRisk, true) => format!(
@@ -138,7 +158,9 @@ impl ActionClassifier {
                 "Medium risk action, but high confidence ({:.0}%)",
                 success_rate * 100.0
             ),
-            (ActionSafetyLevel::HighRisk, _) => "High risk action - always requires approval".to_string(),
+            (ActionSafetyLevel::HighRisk, _) => {
+                "High risk action - always requires approval".to_string()
+            }
         }
     }
 

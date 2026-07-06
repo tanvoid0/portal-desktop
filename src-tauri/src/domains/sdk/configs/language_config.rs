@@ -1,9 +1,9 @@
 /**
  * SDK Configuration Definitions
- * 
+ *
  * All SDK configurations are defined here in the backend, organized by category.
  * Frontend receives processed, formatted data from backend services.
- * 
+ *
  * Categories:
  * - Language: Programming languages (Python, Node.js, Java, etc.)
  * - Database: Database systems (PostgreSQL, MySQL, etc.)
@@ -12,7 +12,6 @@
  * - Container: Container platforms (Docker, Kubernetes, etc.)
  * - Package: Package managers (npm, pip, etc.)
  */
-
 use super::types::*;
 
 /// Get configuration for a specific SDK (by ID)
@@ -285,10 +284,26 @@ fn java_config() -> SDKConfig {
         icon: "devicon-java-plain".to_string(),
         category: SDKCategory::Language,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: true },
-            SDKTabConfig { id: "version".to_string(), label: "Version".to_string(), enabled: true },
-            SDKTabConfig { id: "maven".to_string(), label: "Maven".to_string(), enabled: true },
-            SDKTabConfig { id: "projects".to_string(), label: "Java Projects".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "version".to_string(),
+                label: "Version".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "maven".to_string(),
+                label: "Maven".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "projects".to_string(),
+                label: "Java Projects".to_string(),
+                enabled: true,
+            },
         ],
         supported_sources: vec![
             VersionSource::Static,
@@ -297,19 +312,17 @@ fn java_config() -> SDKConfig {
             VersionSource::Custom,
         ],
         default_source: Some(VersionSource::SdkManager),
-        sdk_managers: vec![
-            SDKManagerConfig {
-                id: "sdkman".to_string(),
-                name: "sdkman".to_string(),
-                display_name: "SDKMAN!".to_string(),
-                binary: "sdk".to_string(),
-                version_command: Some("sdk version".to_string()),
-                supports_installation: true,
-                supports_version_switching: true,
-                install_command: Some("curl -s \"https://get.sdkman.io\" | bash".to_string()),
-                website: Some("https://sdkman.io/".to_string()),
-            },
-        ],
+        sdk_managers: vec![SDKManagerConfig {
+            id: "sdkman".to_string(),
+            name: "sdkman".to_string(),
+            display_name: "SDKMAN!".to_string(),
+            binary: "sdk".to_string(),
+            version_command: Some("sdk version".to_string()),
+            supports_installation: true,
+            supports_version_switching: true,
+            install_command: Some("curl -s \"https://get.sdkman.io\" | bash".to_string()),
+            website: Some("https://sdkman.io/".to_string()),
+        }],
         package_managers: vec![
             PackageManagerConfig {
                 id: "maven".to_string(),
@@ -371,10 +384,26 @@ fn rust_config() -> SDKConfig {
         icon: "devicon-rust-plain".to_string(),
         category: SDKCategory::Language,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: false },
-            SDKTabConfig { id: "version".to_string(), label: "Version".to_string(), enabled: true },
-            SDKTabConfig { id: "package-manager".to_string(), label: "Package Manager".to_string(), enabled: true },
-            SDKTabConfig { id: "projects".to_string(), label: "Projects".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: false,
+            },
+            SDKTabConfig {
+                id: "version".to_string(),
+                label: "Version".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "package-manager".to_string(),
+                label: "Package Manager".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "projects".to_string(),
+                label: "Projects".to_string(),
+                enabled: true,
+            },
         ],
         supported_sources: vec![
             VersionSource::Static,
@@ -383,32 +412,34 @@ fn rust_config() -> SDKConfig {
             VersionSource::Custom,
         ],
         default_source: Some(VersionSource::SdkManager),
-        sdk_managers: vec![
-            SDKManagerConfig {
-                id: "rustup".to_string(),
-                name: "rustup".to_string(),
-                display_name: "Rustup".to_string(),
-                binary: "rustup".to_string(),
-                version_command: Some("rustup --version".to_string()),
-                supports_installation: true,
-                supports_version_switching: true,
-                install_command: Some("curl --proto \"=https\" --tlsv1.2 -sSf https://sh.rustup.rs | sh".to_string()),
-                website: Some("https://rustup.rs/".to_string()),
-            },
-        ],
-        package_managers: vec![
-            PackageManagerConfig {
-                id: "cargo".to_string(),
-                name: "cargo".to_string(),
-                display_name: "Cargo".to_string(),
-                binary: "cargo".to_string(),
-                version_command: Some("cargo --version".to_string()),
-                install_command: None,
-                website: Some("https://doc.rust-lang.org/cargo/".to_string()),
-            },
-        ],
+        sdk_managers: vec![SDKManagerConfig {
+            id: "rustup".to_string(),
+            name: "rustup".to_string(),
+            display_name: "Rustup".to_string(),
+            binary: "rustup".to_string(),
+            version_command: Some("rustup --version".to_string()),
+            supports_installation: true,
+            supports_version_switching: true,
+            install_command: Some(
+                "curl --proto \"=https\" --tlsv1.2 -sSf https://sh.rustup.rs | sh".to_string(),
+            ),
+            website: Some("https://rustup.rs/".to_string()),
+        }],
+        package_managers: vec![PackageManagerConfig {
+            id: "cargo".to_string(),
+            name: "cargo".to_string(),
+            display_name: "Cargo".to_string(),
+            binary: "cargo".to_string(),
+            version_command: Some("cargo --version".to_string()),
+            install_command: None,
+            website: Some("https://doc.rust-lang.org/cargo/".to_string()),
+        }],
         detection: DetectionMethod {
-            binary_names: vec!["rustc".to_string(), "cargo".to_string(), "rustup".to_string()],
+            binary_names: vec![
+                "rustc".to_string(),
+                "cargo".to_string(),
+                "rustup".to_string(),
+            ],
             version_command: Some("rustc --version".to_string()),
             path_patterns: vec![
                 "/usr/bin/rustc".to_string(),
@@ -448,10 +479,26 @@ fn go_config() -> SDKConfig {
         icon: "devicon-go-plain".to_string(),
         category: SDKCategory::Language,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: false },
-            SDKTabConfig { id: "version".to_string(), label: "Version".to_string(), enabled: true },
-            SDKTabConfig { id: "package-manager".to_string(), label: "Package Manager".to_string(), enabled: true },
-            SDKTabConfig { id: "projects".to_string(), label: "Projects".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: false,
+            },
+            SDKTabConfig {
+                id: "version".to_string(),
+                label: "Version".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "package-manager".to_string(),
+                label: "Package Manager".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "projects".to_string(),
+                label: "Projects".to_string(),
+                enabled: true,
+            },
         ],
         supported_sources: vec![
             VersionSource::Static,
@@ -460,17 +507,15 @@ fn go_config() -> SDKConfig {
         ],
         default_source: Some(VersionSource::System),
         sdk_managers: vec![],
-        package_managers: vec![
-            PackageManagerConfig {
-                id: "go".to_string(),
-                name: "go".to_string(),
-                display_name: "go".to_string(),
-                binary: "go".to_string(),
-                version_command: Some("go version".to_string()),
-                install_command: None,
-                website: Some("https://go.dev/".to_string()),
-            },
-        ],
+        package_managers: vec![PackageManagerConfig {
+            id: "go".to_string(),
+            name: "go".to_string(),
+            display_name: "go".to_string(),
+            binary: "go".to_string(),
+            version_command: Some("go version".to_string()),
+            install_command: None,
+            website: Some("https://go.dev/".to_string()),
+        }],
         detection: DetectionMethod {
             binary_names: vec!["go".to_string()],
             version_command: Some("go version".to_string()),
@@ -480,10 +525,7 @@ fn go_config() -> SDKConfig {
                 "/usr/local/go/bin/go".to_string(),
                 "~/go/bin/go".to_string(),
             ],
-            version_file_patterns: vec![
-                "go.mod".to_string(),
-                "go.work".to_string(),
-            ],
+            version_file_patterns: vec!["go.mod".to_string(), "go.work".to_string()],
         },
         category_features: Some(serde_json::json!({
             "packageManagement": true,
@@ -513,21 +555,33 @@ fn postgresql_config() -> SDKConfig {
         icon: "devicon-postgresql-plain".to_string(),
         category: SDKCategory::Database,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: true },
-            SDKTabConfig { id: "version".to_string(), label: "Version".to_string(), enabled: true },
-            SDKTabConfig { id: "configuration".to_string(), label: "Configuration".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "version".to_string(),
+                label: "Version".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "configuration".to_string(),
+                label: "Configuration".to_string(),
+                enabled: true,
+            },
         ],
-        supported_sources: vec![
-            VersionSource::System,
-            VersionSource::Custom,
-        ],
+        supported_sources: vec![VersionSource::System, VersionSource::Custom],
         default_source: Some(VersionSource::System),
         sdk_managers: vec![],
         package_managers: vec![],
         detection: DetectionMethod {
             binary_names: vec!["psql".to_string(), "postgres".to_string()],
             version_command: Some("psql --version".to_string()),
-            path_patterns: vec!["/usr/bin/psql".to_string(), "/usr/local/bin/psql".to_string()],
+            path_patterns: vec![
+                "/usr/bin/psql".to_string(),
+                "/usr/local/bin/psql".to_string(),
+            ],
             version_file_patterns: vec![],
         },
         category_features: Some(serde_json::json!({
@@ -561,21 +615,33 @@ fn mysql_config() -> SDKConfig {
         icon: "devicon-mysql-plain".to_string(),
         category: SDKCategory::Database,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: true },
-            SDKTabConfig { id: "version".to_string(), label: "Version".to_string(), enabled: true },
-            SDKTabConfig { id: "configuration".to_string(), label: "Configuration".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "version".to_string(),
+                label: "Version".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "configuration".to_string(),
+                label: "Configuration".to_string(),
+                enabled: true,
+            },
         ],
-        supported_sources: vec![
-            VersionSource::System,
-            VersionSource::Custom,
-        ],
+        supported_sources: vec![VersionSource::System, VersionSource::Custom],
         default_source: Some(VersionSource::System),
         sdk_managers: vec![],
         package_managers: vec![],
         detection: DetectionMethod {
             binary_names: vec!["mysql".to_string(), "mysqld".to_string()],
             version_command: Some("mysql --version".to_string()),
-            path_patterns: vec!["/usr/bin/mysql".to_string(), "/usr/local/bin/mysql".to_string()],
+            path_patterns: vec![
+                "/usr/bin/mysql".to_string(),
+                "/usr/local/bin/mysql".to_string(),
+            ],
             version_file_patterns: vec![],
         },
         category_features: Some(serde_json::json!({
@@ -608,19 +674,32 @@ fn mongodb_config() -> SDKConfig {
         icon: "devicon-mongodb-plain".to_string(),
         category: SDKCategory::Database,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: true },
-            SDKTabConfig { id: "version".to_string(), label: "Version".to_string(), enabled: true },
-            SDKTabConfig { id: "configuration".to_string(), label: "Configuration".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "version".to_string(),
+                label: "Version".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "configuration".to_string(),
+                label: "Configuration".to_string(),
+                enabled: true,
+            },
         ],
-        supported_sources: vec![
-            VersionSource::System,
-            VersionSource::Custom,
-        ],
+        supported_sources: vec![VersionSource::System, VersionSource::Custom],
         default_source: Some(VersionSource::System),
         sdk_managers: vec![],
         package_managers: vec![],
         detection: DetectionMethod {
-            binary_names: vec!["mongod".to_string(), "mongo".to_string(), "mongosh".to_string()],
+            binary_names: vec![
+                "mongod".to_string(),
+                "mongo".to_string(),
+                "mongosh".to_string(),
+            ],
             version_command: Some("mongod --version".to_string()),
             path_patterns: vec![
                 "/usr/bin/mongod".to_string(),
@@ -663,21 +742,33 @@ fn ollama_config() -> SDKConfig {
         icon: "ollama".to_string(),
         category: SDKCategory::AI,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: true },
-            SDKTabConfig { id: "models".to_string(), label: "Models".to_string(), enabled: true },
-            SDKTabConfig { id: "configuration".to_string(), label: "Configuration".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "models".to_string(),
+                label: "Models".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "configuration".to_string(),
+                label: "Configuration".to_string(),
+                enabled: true,
+            },
         ],
-        supported_sources: vec![
-            VersionSource::Static,
-            VersionSource::System,
-        ],
+        supported_sources: vec![VersionSource::Static, VersionSource::System],
         default_source: Some(VersionSource::System),
         sdk_managers: vec![],
         package_managers: vec![],
         detection: DetectionMethod {
             binary_names: vec!["ollama".to_string()],
             version_command: Some("ollama --version".to_string()),
-            path_patterns: vec!["~/.local/bin/ollama".to_string(), "/usr/local/bin/ollama".to_string()],
+            path_patterns: vec![
+                "~/.local/bin/ollama".to_string(),
+                "/usr/local/bin/ollama".to_string(),
+            ],
             version_file_patterns: vec![],
         },
         category_features: Some(serde_json::json!({
@@ -709,21 +800,33 @@ fn nginx_config() -> SDKConfig {
         icon: "devicon-nginx-plain".to_string(),
         category: SDKCategory::Server,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: true },
-            SDKTabConfig { id: "version".to_string(), label: "Version".to_string(), enabled: true },
-            SDKTabConfig { id: "configuration".to_string(), label: "Configuration".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "version".to_string(),
+                label: "Version".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "configuration".to_string(),
+                label: "Configuration".to_string(),
+                enabled: true,
+            },
         ],
-        supported_sources: vec![
-            VersionSource::System,
-            VersionSource::Custom,
-        ],
+        supported_sources: vec![VersionSource::System, VersionSource::Custom],
         default_source: Some(VersionSource::System),
         sdk_managers: vec![],
         package_managers: vec![],
         detection: DetectionMethod {
             binary_names: vec!["nginx".to_string()],
             version_command: Some("nginx -v".to_string()),
-            path_patterns: vec!["/usr/sbin/nginx".to_string(), "/usr/local/bin/nginx".to_string()],
+            path_patterns: vec![
+                "/usr/sbin/nginx".to_string(),
+                "/usr/local/bin/nginx".to_string(),
+            ],
             version_file_patterns: vec![],
         },
         category_features: Some(serde_json::json!({
@@ -754,20 +857,33 @@ fn docker_config() -> SDKConfig {
         icon: "devicon-docker-plain".to_string(),
         category: SDKCategory::Container,
         tabs: vec![
-            SDKTabConfig { id: "service".to_string(), label: "Service".to_string(), enabled: true },
-            SDKTabConfig { id: "version".to_string(), label: "Version".to_string(), enabled: true },
-            SDKTabConfig { id: "containers".to_string(), label: "Containers".to_string(), enabled: true },
+            SDKTabConfig {
+                id: "service".to_string(),
+                label: "Service".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "version".to_string(),
+                label: "Version".to_string(),
+                enabled: true,
+            },
+            SDKTabConfig {
+                id: "containers".to_string(),
+                label: "Containers".to_string(),
+                enabled: true,
+            },
         ],
-        supported_sources: vec![
-            VersionSource::System,
-        ],
+        supported_sources: vec![VersionSource::System],
         default_source: Some(VersionSource::System),
         sdk_managers: vec![],
         package_managers: vec![],
         detection: DetectionMethod {
             binary_names: vec!["docker".to_string()],
             version_command: Some("docker --version".to_string()),
-            path_patterns: vec!["/usr/bin/docker".to_string(), "/usr/local/bin/docker".to_string()],
+            path_patterns: vec![
+                "/usr/bin/docker".to_string(),
+                "/usr/local/bin/docker".to_string(),
+            ],
             version_file_patterns: vec![],
         },
         category_features: Some(serde_json::json!({

@@ -9,4 +9,3 @@ impl UpdateService {
         env!("CARGO_PKG_VERSION").to_string()
     }
 }
-

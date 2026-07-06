@@ -1,17 +1,18 @@
+use super::super::CredentialError;
+use super::encryption_service::{DecryptionRequest, EncryptionResult, EncryptionService};
+use crate::domains::credentials::entities::Column;
+use crate::domains::credentials::entities::{
+    ActiveModel as CredentialActive, Entity as CredentialEntity, Model as CredentialModel,
+};
+use crate::log_warn;
+use chrono::Utc;
+use dirs;
 /**
  * Credential Service - Business logic for credential management
  */
-
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait};
-use crate::domains::credentials::entities::Column;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde_json;
-use chrono::Utc;
-use crate::domains::credentials::entities::{Entity as CredentialEntity, Model as CredentialModel, ActiveModel as CredentialActive};
-use super::super::CredentialError;
-use super::encryption_service::{EncryptionService, EncryptionResult, DecryptionRequest};
-use sha2::{Sha256, Digest};
-use dirs;
-use crate::log_warn;
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone)]
 pub struct CredentialService {
@@ -28,14 +29,19 @@ impl CredentialService {
     }
 
     /// Create a new credential
-    pub async fn create_credential(&self, request: CredentialCreateRequest) -> Result<CredentialModel, CredentialError> {
+    pub async fn create_credential(
+        &self,
+        request: CredentialCreateRequest,
+    ) -> Result<CredentialModel, CredentialError> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = Utc::now().naive_utc();
 
         // Encrypt the credential value
         let master_key = self.get_master_key()?;
-        let encryption_result = self.encryption.encrypt(&request.value, master_key.as_bytes())?;
-        
+        let encryption_result = self
+            .encryption
+            .encrypt(&request.value, master_key.as_bytes())?;
+
         // Encrypt additional fields
         let mut encrypted_fields = std::collections::HashMap::new();
         if let Some(fields) = request.fields {
@@ -54,7 +60,9 @@ impl CredentialService {
             tags: Set(serde_json::to_string(&request.tags.unwrap_or_default())?),
             encrypted_value: Set(serde_json::to_string(&encryption_result)?),
             encrypted_fields: Set(serde_json::to_string(&encrypted_fields)?),
-            metadata: Set(serde_json::to_string(&request.metadata.unwrap_or_default())?),
+            metadata: Set(serde_json::to_string(
+                &request.metadata.unwrap_or_default(),
+            )?),
             created_at: Set(now),
             updated_at: Set(now),
             last_used: Set(None),
@@ -81,7 +89,11 @@ impl CredentialService {
     }
 
     /// Update credential
-    pub async fn update_credential(&self, id: &str, request: CredentialUpdateRequest) -> Result<CredentialModel, CredentialError> {
+    pub async fn update_credential(
+        &self,
+        id: &str,
+        request: CredentialUpdateRequest,
+    ) -> Result<CredentialModel, CredentialError> {
         let mut credential = self.get_credential(id).await?;
         let now = Utc::now().naive_utc();
 
@@ -158,8 +170,9 @@ impl CredentialService {
     pub async fn decrypt_credential(&self, id: &str) -> Result<String, CredentialError> {
         let credential = self.get_credential(id).await?;
         // Ensure EncryptionResult is deserializable (ensure #[derive(serde::Deserialize)] on EncryptionResult)
-        let encryption_data: EncryptionResult = serde_json::from_str(&credential.encrypted_value)
-            .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
+        let encryption_data: EncryptionResult =
+            serde_json::from_str(&credential.encrypted_value)
+                .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
 
         let request = DecryptionRequest {
             encrypted: encryption_data.encrypted.clone(),
@@ -170,7 +183,7 @@ impl CredentialService {
         };
 
         let decrypted = self.encryption.decrypt(request)?;
-        
+
         // Update last used timestamp
         let now = Utc::now().naive_utc();
         let active_model = CredentialActive {
@@ -194,12 +207,15 @@ impl CredentialService {
     }
 
     /// Search credentials
-    pub async fn search_credentials(&self, query: &str) -> Result<Vec<CredentialModel>, CredentialError> {
+    pub async fn search_credentials(
+        &self,
+        query: &str,
+    ) -> Result<Vec<CredentialModel>, CredentialError> {
         let credentials = CredentialEntity::find()
             .filter(
                 sea_orm::Condition::any()
                     .add(Column::Name.contains(query))
-                    .add(Column::Description.contains(query))
+                    .add(Column::Description.contains(query)),
             )
             .all(&self.db)
             .await?;
@@ -213,31 +229,34 @@ impl CredentialService {
     fn get_master_key(&self) -> Result<String, CredentialError> {
         // Get app data directory (device-specific, persistent)
         let app_data_dir = dirs::data_dir()
-            .ok_or_else(|| CredentialError::EncryptionFailed("Cannot determine app data directory".to_string()))?
+            .ok_or_else(|| {
+                CredentialError::EncryptionFailed("Cannot determine app data directory".to_string())
+            })?
             .join("portal-desktop");
-        
+
         // Create directory if it doesn't exist
-        std::fs::create_dir_all(&app_data_dir)
-            .map_err(|e| CredentialError::EncryptionFailed(format!("Cannot create app data directory: {}", e)))?;
-        
+        std::fs::create_dir_all(&app_data_dir).map_err(|e| {
+            CredentialError::EncryptionFailed(format!("Cannot create app data directory: {}", e))
+        })?;
+
         // Use app data directory path as seed for key derivation
         // This ensures the key is device-specific and persistent
         let seed = format!("{}-portal-credential-master-key-v1", app_data_dir.display());
-        
+
         // Derive a 32-byte key from the seed using SHA-256
         let mut hasher = Sha256::new();
         hasher.update(seed.as_bytes());
         let key_bytes = hasher.finalize();
-        
+
         // Convert to hex string (64 characters for 32 bytes)
         let key_hex = hex::encode(key_bytes);
-        
+
         // Log warning in development mode
         #[cfg(debug_assertions)]
         {
             log_warn!("Credentials", "Using device-specific master key. In production, implement user password-based key derivation.");
         }
-        
+
         Ok(key_hex)
     }
 }

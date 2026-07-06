@@ -1,6 +1,6 @@
+use chrono::Utc;
 use std::fmt;
 use std::sync::Arc;
-use chrono::Utc;
 use tauri::{AppHandle, Emitter};
 
 /// Log levels matching the frontend logger
@@ -66,7 +66,7 @@ impl Logger {
 
     /// Create a logger with custom configuration
     pub fn with_config(config: LoggerConfig) -> Self {
-        Self { 
+        Self {
             config,
             app_handle: None,
         }
@@ -122,7 +122,7 @@ impl Logger {
                 "message": message,
                 "timestamp": timestamp
             });
-            
+
             if let Err(e) = app_handle.emit("backend-log", payload) {
                 eprintln!("Failed to emit backend log event: {}", e);
             }
@@ -150,7 +150,7 @@ impl Logger {
     }
 
     /// Create a scoped logger for a specific context
-    pub fn scoped(&self, context: &'static str) -> ScopedLogger {
+    pub fn scoped(&self, context: &'static str) -> ScopedLogger<'_> {
         ScopedLogger {
             logger: self,
             context,
@@ -164,7 +164,7 @@ impl Logger {
             LogLevel::Debug => "\x1b[36mDEBUG\x1b[0m".to_string(), // Cyan
             LogLevel::Info => "\x1b[32mINFO\x1b[0m".to_string(),   // Green
             LogLevel::Warn => "\x1b[33mWARN\x1b[0m".to_string(),   // Yellow
-            LogLevel::Error => "\x1b[31mERROR\x1b[0m".to_string(),  // Red
+            LogLevel::Error => "\x1b[31mERROR\x1b[0m".to_string(), // Red
         }
     }
 }
@@ -209,7 +209,9 @@ pub fn init_logger(config: Option<LoggerConfig>) {
     } else {
         Logger::new()
     };
-    GLOBAL_LOGGER.set(std::sync::Mutex::new(logger)).expect("Logger already initialized");
+    GLOBAL_LOGGER
+        .set(std::sync::Mutex::new(logger))
+        .expect("Logger already initialized");
 }
 
 /// Set app handle for the global logger
@@ -223,7 +225,10 @@ pub fn set_app_handle(app_handle: AppHandle) {
 
 /// Get the global logger instance
 pub fn logger() -> std::sync::MutexGuard<'static, Logger> {
-    GLOBAL_LOGGER.get_or_init(|| std::sync::Mutex::new(Logger::new())).lock().unwrap()
+    GLOBAL_LOGGER
+        .get_or_init(|| std::sync::Mutex::new(Logger::new()))
+        .lock()
+        .unwrap()
 }
 
 /// Convenience macros for logging
@@ -290,4 +295,3 @@ macro_rules! log_error {
         }
     };
 }
-

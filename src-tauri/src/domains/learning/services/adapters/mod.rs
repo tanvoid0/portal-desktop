@@ -1,9 +1,9 @@
+pub mod ide_learning_adapter;
 pub mod learning_adapter_trait;
 pub mod project_learning_adapter;
 pub mod sdk_learning_adapter;
-pub mod terminal_learning_adapter;
-pub mod ide_learning_adapter;
 pub mod task_learning_adapter;
+pub mod terminal_learning_adapter;
 
 // FUTURE: Learning adapters will be used when implementing advanced learning features
 // pub use learning_adapter_trait::LearningAdapter;

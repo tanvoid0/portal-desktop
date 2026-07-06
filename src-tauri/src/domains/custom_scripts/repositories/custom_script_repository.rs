@@ -1,6 +1,9 @@
 use crate::database::DatabaseManager;
-use crate::entities::custom_script::{Entity as CustomScriptEntity, ActiveModel as CustomScriptActiveModel, Model as CustomScriptModel};
-use sea_orm::{EntityTrait, ActiveModelTrait, Set};
+use crate::entities::custom_script::{
+    ActiveModel as CustomScriptActiveModel, Entity as CustomScriptEntity,
+    Model as CustomScriptModel,
+};
+use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use std::sync::Arc;
 
 pub struct CustomScriptRepository {
@@ -42,7 +45,7 @@ impl CustomScriptRepository {
         is_interactive: bool,
     ) -> Result<CustomScriptModel, String> {
         let connection = self.db_manager.get_connection();
-        
+
         let script = CustomScriptActiveModel {
             name: Set(name),
             description: Set(description),
@@ -58,8 +61,10 @@ impl CustomScriptRepository {
             run_count: Set(0),
             ..Default::default()
         };
-        
-        let result = script.insert(connection).await
+
+        let result = script
+            .insert(connection)
+            .await
             .map_err(|e| format!("Failed to create custom script: {}", e))?;
         Ok(result)
     }
@@ -77,14 +82,14 @@ impl CustomScriptRepository {
         is_interactive: Option<bool>,
     ) -> Result<CustomScriptModel, String> {
         let connection = self.db_manager.get_connection();
-        
+
         let mut script: CustomScriptActiveModel = CustomScriptEntity::find_by_id(id)
             .one(connection)
             .await
             .map_err(|e| format!("Failed to find custom script: {}", e))?
             .ok_or_else(|| "Custom script not found".to_string())?
             .into();
-        
+
         if let Some(name) = name {
             script.name = Set(name);
         }
@@ -110,8 +115,10 @@ impl CustomScriptRepository {
             script.is_interactive = Set(is_interactive);
         }
         script.updated_at = Set(Some(chrono::Utc::now().into()));
-        
-        let result = script.update(connection).await
+
+        let result = script
+            .update(connection)
+            .await
             .map_err(|e| format!("Failed to update custom script: {}", e))?;
         Ok(result)
     }
@@ -127,20 +134,21 @@ impl CustomScriptRepository {
 
     pub async fn increment_run_count(&self, id: i32) -> Result<CustomScriptModel, String> {
         let connection = self.db_manager.get_connection();
-        
+
         let mut script: CustomScriptActiveModel = CustomScriptEntity::find_by_id(id)
             .one(connection)
             .await
             .map_err(|e| format!("Failed to find custom script: {}", e))?
             .ok_or_else(|| "Custom script not found".to_string())?
             .into();
-        
+
         script.run_count = Set(script.run_count.as_ref() + 1);
         script.last_run_at = Set(Some(chrono::Utc::now().into()));
-        
-        let result = script.update(connection).await
+
+        let result = script
+            .update(connection)
+            .await
             .map_err(|e| format!("Failed to update custom script: {}", e))?;
         Ok(result)
     }
 }
-

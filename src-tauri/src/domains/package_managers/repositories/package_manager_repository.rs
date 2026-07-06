@@ -1,5 +1,5 @@
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait};
-use crate::entities::package_manager::{Entity, Model, ActiveModel, Column};
+use crate::entities::package_manager::{ActiveModel, Column, Entity, Model};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 pub struct PackageManagerRepository;
 
@@ -10,16 +10,19 @@ impl PackageManagerRepository {
     }
 
     /// Get package manager by ID
-    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Model>, sea_orm::DbErr> {
+    pub async fn get_by_id(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
     /// Get package manager by name
-    pub async fn get_by_name(db: &DatabaseConnection, name: &str) -> Result<Option<Model>, sea_orm::DbErr> {
-        Entity::find()
-            .filter(Column::Name.eq(name))
-            .one(db)
-            .await
+    pub async fn get_by_name(
+        db: &DatabaseConnection,
+        name: &str,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
+        Entity::find().filter(Column::Name.eq(name)).one(db).await
     }
 
     /// Create a new package manager
@@ -55,7 +58,9 @@ impl PackageManagerRepository {
         let mut active_model: ActiveModel = Entity::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| sea_orm::DbErr::Custom(format!("Package manager with id {} not found", id)))?
+            .ok_or_else(|| {
+                sea_orm::DbErr::Custom(format!("Package manager with id {} not found", id))
+            })?
             .into();
 
         if let Some(name) = name {
@@ -81,4 +86,3 @@ impl PackageManagerRepository {
         Ok(())
     }
 }
-

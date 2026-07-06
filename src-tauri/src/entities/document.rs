@@ -23,4 +23,3 @@ pub enum Relation {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-

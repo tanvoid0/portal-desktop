@@ -321,4 +321,3 @@ pub struct ScaleResourceRequest {
     pub kind: String,
     pub replicas: i32,
 }
-

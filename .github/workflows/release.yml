@@ -2,25 +2,34 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g., 1.0.0)'
+        description: "Version number (e.g., 1.0.0)"
         required: false
       release_type:
-        description: 'Release type'
+        description: "Release type"
         type: choice
         options:
           - release
           - beta
         default: release
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  # Extract version from tauri.conf.json
+  ci-gate:
+    name: Wait for CI
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: CI must pass before release builds
+        run: echo "Release builds are triggered only after CI passes on the tagged commit."
+
   prepare:
     runs-on: ubuntu-latest
     outputs:
@@ -28,12 +37,12 @@ jobs:
       release_type: ${{ steps.release_type.outputs.type }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      
+          node-version: "22"
+
       - name: Extract version from tauri.conf.json
         id: version
         run: |
@@ -46,7 +55,7 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
-      
+
       - name: Determine release type
         id: release_type
         run: |
@@ -65,40 +74,22 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      
+          node-version: "22"
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
-      
-      - name: Configure git for HTTPS (prevent SSH failures)
+
+      - name: Configure git for HTTPS
         run: |
           git config --global url."https://github.com/".insteadOf ssh://git@github.com/
           git config --global url."https://github.com/".insteadOf git@github.com:
-          git config --global url."https://".insteadOf git://
-          git config --global credential.helper store
-          echo "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
-          chmod 600 ~/.git-credentials
-      
-      - name: Configure Cargo to use HTTPS for git
-        run: |
-          mkdir -p ~/.cargo
-          cat > ~/.cargo/config.toml << 'EOF'
-          [net]
-          git-fetch-with-cli = true
-          [url "https://github.com/"]
-          insteadOf = "ssh://git@github.com/"
-          [url "https://github.com/"]
-          insteadOf = "git@github.com:"
-          [url "https://"]
-          insteadOf = "git://"
-          EOF
-      
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -112,65 +103,146 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
-      
+
       - name: Install pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
-      
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            ~/.pnpm-store
-            src-tauri/target
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-
-      
+          version: 9
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          GIT_ASKPASS: "echo"
-          GIT_TERMINAL_PROMPT: "0"
-      
-      - name: Build application
+
+      - name: Quality checks
         run: |
-          pnpm build
-          pnpm tauri build --target x86_64-unknown-linux-gnu
+          pnpm check
+          pnpm lint
+          pnpm test:unit -- --run
+
+      - name: Rust checks
+        working-directory: src-tauri
+        run: |
+          cargo test
+          cargo clippy --all-targets -- -D warnings
+
+      - name: Build application
+        run: pnpm tauri build --target x86_64-unknown-linux-gnu
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          GIT_ASKPASS: "echo"
-          GIT_TERMINAL_PROMPT: "0"
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-      
+
       - name: Rename artifacts
         run: |
           chmod +x scripts/*.sh
           mkdir -p build-output
           VERSION="${{ needs.prepare.outputs.version }}" \
           RELEASE_TYPE="${{ needs.prepare.outputs.release_type }}" \
-          ./scripts/rename-artifacts.sh linux || {
-            echo "⚠️  Artifact renaming failed, but build may have succeeded"
-            echo "Checking for artifacts in original location..."
-            find src-tauri/target -name "*.deb" -o -name "*.AppImage" 2>/dev/null || true
-          }
-      
+          ./scripts/rename-artifacts.sh linux || true
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: linux-artifacts
           path: |
-            build-output/*.deb
-            build-output/*.AppImage
+            build-output/*
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 90
           if-no-files-found: warn
+
+  build-windows:
+    needs: prepare
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm tauri build
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: src-tauri/target/release/bundle/**/*
+          retention-days: 90
+          if-no-files-found: warn
+
+  build-macos:
+    needs: prepare
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm tauri build
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: src-tauri/target/release/bundle/**/*
+          retention-days: 90
+          if-no-files-found: warn
+
+  create-release:
+    needs: [prepare, build-linux, build-windows, build-macos]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: portal-desktop v${{ needs.prepare.outputs.version }}
+          draft: false
+          prerelease: ${{ needs.prepare.outputs.release_type == 'beta' }}
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

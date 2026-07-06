@@ -41,6 +41,7 @@ Microsoft provides official Windows Docker base images:
    - Docker Desktop for Windows installed
 
 2. **Switch Docker to Windows Containers**
+
    ```powershell
    # In Docker Desktop, right-click icon → "Switch to Windows containers"
    # Or via command:
@@ -79,11 +80,11 @@ docker-compose run --rm build-windows
 
 ## Comparison
 
-| Method | Host Requirement | Setup Complexity | Best For |
-|-------|-----------------|------------------|----------|
-| **GitHub Actions** | Any (cloud) | ⭐ Easy | Production builds |
-| **Windows Docker** | Windows only | ⭐⭐ Medium | Local Windows dev |
-| **Linux Cross-compile** | Linux/Mac | ⭐⭐⭐ Hard | Limited use cases |
+| Method                  | Host Requirement | Setup Complexity | Best For          |
+| ----------------------- | ---------------- | ---------------- | ----------------- |
+| **GitHub Actions**      | Any (cloud)      | ⭐ Easy          | Production builds |
+| **Windows Docker**      | Windows only     | ⭐⭐ Medium      | Local Windows dev |
+| **Linux Cross-compile** | Linux/Mac        | ⭐⭐⭐ Hard      | Limited use cases |
 
 ## Troubleshooting
 
@@ -91,7 +92,8 @@ docker-compose run --rm build-windows
 
 **Cause**: Docker is in Linux container mode on a non-Windows host.
 
-**Solution**: 
+**Solution**:
+
 - Use GitHub Actions instead, OR
 - Switch to a Windows host and enable Windows containers
 
@@ -100,6 +102,7 @@ docker-compose run --rm build-windows
 **Cause**: Docker Desktop is in Linux container mode.
 
 **Solution**:
+
 ```powershell
 # Switch to Windows containers
 & $Env:ProgramFiles\Docker\Docker\DockerCli.exe -SwitchDaemon
@@ -108,6 +111,7 @@ docker-compose run --rm build-windows
 ### Build Fails in Windows Container
 
 **Possible causes**:
+
 - Missing Visual Studio Build Tools
 - Chocolatey installation issues
 - Path issues with Windows vs Linux paths
@@ -141,4 +145,3 @@ ls build-output/*.exe
 - ⚠️ But they require a Windows host
 - ✅ GitHub Actions is recommended for most use cases
 - ✅ Windows Docker is great for local Windows development
-

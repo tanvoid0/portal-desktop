@@ -12,4 +12,3 @@ pub struct LanguageGroup {
     pub category: String,
     pub languages: Vec<SuggestedLanguage>,
 }
-

@@ -1,6 +1,7 @@
 # Svelte 5 Patterns Review - Portal Desktop
 
 ## Overview
+
 This document reviews how the project uses Svelte 5 runes for state management, navigation, and lifecycle hooks.
 
 ## State Management Patterns
@@ -8,6 +9,7 @@ This document reviews how the project uses Svelte 5 runes for state management, 
 ### ✅ Current Patterns (Svelte 5 Runes)
 
 #### 1. **Component Props** - Using `$props()`
+
 ```typescript
 // ✅ Correct pattern
 interface Props {
@@ -16,14 +18,11 @@ interface Props {
   emptyMessage?: string;
 }
 
-let {
-  pods = [],
-  onViewPod,
-  emptyMessage = 'No pods found'
-}: Props = $props();
+let { pods = [], onViewPod, emptyMessage = "No pods found" }: Props = $props();
 ```
 
 **Used in:**
+
 - `PodsTable.svelte`
 - `BaseResourceTable.svelte`
 - `PodsFilters.svelte`
@@ -31,35 +30,40 @@ let {
 - Most components in the project
 
 #### 2. **Local State** - Using `$state()`
+
 ```typescript
 // ✅ Correct pattern
-let searchQuery = $state('');
-let statusFilter = $state('');
+let searchQuery = $state("");
+let statusFilter = $state("");
 let isLoading = $state(false);
 let error = $state<string | null>(null);
 ```
 
 **Used in:**
+
 - `+page.svelte` files for local component state
 - Form inputs and filters
 - Loading states and error handling
 
 #### 3. **Derived State** - Using `$derived()`
+
 ```typescript
 // ✅ Correct pattern - Simple derived
 const filteredPods = $derived(
-  $cloudStore.resources[ResourceType.POD].filter(pod => {
-    const matchesSearch = !searchQuery || pod.name.toLowerCase().includes(searchQuery.toLowerCase());
+  $cloudStore.resources[ResourceType.POD].filter((pod) => {
+    const matchesSearch =
+      !searchQuery ||
+      pod.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = !statusFilter || pod.status === statusFilter;
     return matchesSearch && matchesStatus;
-  })
+  }),
 );
 
 // ✅ Correct pattern - Complex derived with .by()
 const defaultColumns = $derived.by(() => {
   if (columns.length > 0) return columns;
   return [
-    { key: 'name', label: 'Name', width: 'w-1/3' },
+    { key: "name", label: "Name", width: "w-1/3" },
     // ...
   ];
 });
@@ -67,17 +71,19 @@ const defaultColumns = $derived.by(() => {
 // ✅ Correct pattern - Object derived
 const stats = $derived({
   total: pods.length,
-  running: pods.filter(p => p.status === ResourceStatus.RUNNING).length,
-  pending: pods.filter(p => p.status === ResourceStatus.PENDING).length
+  running: pods.filter((p) => p.status === ResourceStatus.RUNNING).length,
+  pending: pods.filter((p) => p.status === ResourceStatus.PENDING).length,
 });
 ```
 
 **Used in:**
+
 - Computed values from stores
 - Filtered/transformed data
 - Statistics and aggregations
 
 #### 4. **Effects** - Using `$effect()`
+
 ```typescript
 // ✅ Correct pattern - Side effects
 $effect(() => {
@@ -91,7 +97,7 @@ $effect(() => {
   const timer = setInterval(() => {
     // do something
   }, 1000);
-  
+
   return () => {
     clearInterval(timer);
   };
@@ -99,6 +105,7 @@ $effect(() => {
 ```
 
 **Used in:**
+
 - Reactive side effects
 - Syncing external state
 - Cleanup operations
@@ -106,6 +113,7 @@ $effect(() => {
 ## Navigation Patterns
 
 ### ✅ Using `goto()` from `$app/navigation`
+
 ```typescript
 import { goto } from '$app/navigation';
 
@@ -123,17 +131,19 @@ function handlePodClick(pod: ICloudResource) {
 ```
 
 **Used in:**
+
 - Navigation from button clicks
 - Programmatic navigation after actions
 - Redirects and route changes
 
 ### ✅ Using `$page` store for route data
+
 ```typescript
-import { page } from '$app/stores';
+import { page } from "$app/stores";
 
 // ✅ Correct pattern
-let projectId = $derived(parseInt($page.params.id || '0'));
-let isSdkPage = $derived($page.url.pathname.startsWith('/sdk'));
+let projectId = $derived(parseInt($page.params.id || "0"));
+let isSdkPage = $derived($page.url.pathname.startsWith("/sdk"));
 
 onMount(async () => {
   if (isNaN(projectId)) {
@@ -145,6 +155,7 @@ onMount(async () => {
 ```
 
 **Used in:**
+
 - Getting route parameters
 - Checking current route
 - Conditional logic based on route
@@ -152,8 +163,9 @@ onMount(async () => {
 ## Lifecycle Hooks Patterns
 
 ### ✅ Using `onMount()`
+
 ```typescript
-import { onMount } from 'svelte';
+import { onMount } from "svelte";
 
 // ✅ Correct pattern - Async operations
 onMount(async () => {
@@ -164,10 +176,10 @@ onMount(async () => {
 
 // ✅ Correct pattern - With cleanup
 onMount(() => {
-  const unsubscribe = store.subscribe(value => {
+  const unsubscribe = store.subscribe((value) => {
     // handle changes
   });
-  
+
   return () => {
     unsubscribe();
   };
@@ -175,14 +187,16 @@ onMount(() => {
 ```
 
 **Used in:**
+
 - Loading initial data
 - Setting up subscriptions
 - Initializing components
 - API calls on component mount
 
 ### ✅ Using `onDestroy()`
+
 ```typescript
-import { onDestroy } from 'svelte';
+import { onDestroy } from "svelte";
 
 // ✅ Correct pattern
 onDestroy(() => {
@@ -193,6 +207,7 @@ onDestroy(() => {
 ```
 
 **Used in:**
+
 - Cleaning up timers
 - Unsubscribing from stores
 - Removing event listeners
@@ -201,6 +216,7 @@ onDestroy(() => {
 ## Store Integration Patterns
 
 ### ✅ Using Svelte Stores with Runes
+
 ```typescript
 import { cloudStore } from '$lib/domains/cloud/stores';
 
@@ -223,6 +239,7 @@ onMount(async () => {
 ```
 
 **Used in:**
+
 - Global state management
 - Reactive UI updates
 - Cross-component communication
@@ -230,37 +247,39 @@ onMount(async () => {
 ## Common Patterns Summary
 
 ### ✅ Component Structure
+
 ```typescript
 <script lang="ts">
   // 1. Imports
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  
+
   // 2. Props
   interface Props {
     // ...
   }
   let { ... }: Props = $props();
-  
+
   // 3. Local state
   let isLoading = $state(false);
-  
+
   // 4. Derived state
   const computed = $derived(...);
-  
+
   // 5. Effects (if needed)
   $effect(() => { ... });
-  
+
   // 6. Lifecycle
   onMount(async () => { ... });
-  
+
   // 7. Functions
   function handleClick() { ... }
 </script>
 ```
 
 ### ✅ Event Handlers
+
 ```typescript
 // ✅ Direct function reference
 <Button onclick={handleRefresh}>Refresh</Button>
@@ -275,6 +294,7 @@ onMount(async () => {
 ```
 
 ### ✅ Conditional Rendering
+
 ```typescript
 // ✅ Simple if/else
 {#if !$cloudStore.connection.isConnected}
@@ -292,11 +312,13 @@ onMount(async () => {
 ## TypeScript Configuration
 
 ### Current Setup
+
 - ✅ Using `moduleResolution: "bundler"` (SvelteKit default)
 - ✅ `types: ["svelte"]` in tsconfig.json
 - ✅ Extending `.svelte-kit/tsconfig.json`
 
 ### Potential Issues
+
 - ⚠️ TypeScript may need explicit Svelte module declarations
 - ⚠️ Ensure `skipLibCheck: true` is set (already set)
 
@@ -308,11 +330,15 @@ onMount(async () => {
 4. ✅ **Store integration** - Properly accessing stores with `$` prefix
 5. ✅ **Type safety** - Using TypeScript interfaces for props
 
+## Related Documentation
+
+- [Svelte Maintainability Plan](./SVELTE_MAINTAINABILITY_PLAN.md) — phased migration from legacy stores to TanStack Query + `.svelte.ts` state classes
+
 ## Migration Notes
 
 The project has successfully migrated to Svelte 5 runes:
+
 - ✅ No `export let` statements (all use `$props()`)
 - ✅ No `$:` reactive statements (all use `$derived()`)
 - ✅ No `let` reactive variables (all use `$state()`)
 - ✅ Proper use of `$effect()` for side effects
-

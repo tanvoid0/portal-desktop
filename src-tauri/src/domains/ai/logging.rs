@@ -1,7 +1,7 @@
+use crate::domains::ai::entities::AILogModel;
+use crate::domains::ai::providers::ProviderType;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::domains::ai::providers::ProviderType;
-use crate::domains::ai::entities::AILogModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AILog {
@@ -91,5 +91,3 @@ impl AILog {
         }
     }
 }
-
-

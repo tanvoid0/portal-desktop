@@ -1,6 +1,6 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from "@tauri-apps/api/core";
 
-export type ProviderType = 'Ollama' | 'Gemini' | 'OpenAI' | 'Anthropic';
+export type ProviderType = "Ollama" | "Gemini" | "OpenAI" | "Anthropic";
 
 export interface GeneratedTask {
   title: string;
@@ -35,7 +35,7 @@ export interface GeneratedTaskStructure {
 }
 
 export interface ConversationMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -72,7 +72,12 @@ export interface GenerateTasksFromStoryRequest {
 
 export interface AIErrorInfo {
   message: string;
-  type: 'configuration' | 'network' | 'provider_unavailable' | 'model_not_found' | 'unknown';
+  type:
+    | "configuration"
+    | "network"
+    | "provider_unavailable"
+    | "model_not_found"
+    | "unknown";
   actionable: boolean;
   settingsPath?: string;
 }
@@ -82,102 +87,107 @@ export interface AIErrorInfo {
  * Exported for use in AI dialog components
  */
 export function parseError(error: unknown): AIErrorInfo {
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : typeof error === 'string'
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
         ? error
-        : 'Failed to generate tasks from story';
+        : "Failed to generate tasks from story";
 
-    // Check for configuration issues (including wrapped error messages)
-    if (
-      errorMessage.includes('No default provider') ||
-      errorMessage.includes('No default provider set') ||
-      errorMessage.includes('Configuration incomplete') ||
-      errorMessage.includes('provider configuration') ||
-      errorMessage.includes('Missing fields') ||
-      errorMessage.includes('not configured') ||
-      errorMessage.includes('Provider not found') ||
-      errorMessage.includes('Provider not registered')
-    ) {
-      return {
-        message: 'AI provider is not configured. Please set up an AI provider (Ollama, Gemini, OpenAI, or Anthropic) in Settings.',
-        type: 'configuration',
-        actionable: true,
-        settingsPath: '/settings/learning',
-      };
-    }
-
-    // Check for model not found errors
-    if (
-      errorMessage.includes("model") &&
-      (errorMessage.includes("not found") ||
-        errorMessage.includes("404") ||
-        errorMessage.includes("does not exist"))
-    ) {
-      // Extract model name if possible - handle both JSON and plain text formats
-      // Try multiple patterns to extract the model name
-      let modelMatch = errorMessage.match(/model\s+['"]([^'"]+)['"]/);
-      
-      if (!modelMatch) {
-        // Try pattern: model 'name' (with single quotes)
-        modelMatch = errorMessage.match(/model\s+['"]([^'"]+?)['"]/);
-      }
-      
-      if (!modelMatch) {
-        // Try to extract from JSON error field: {"error":"model 'name' not found"}
-        // Handle both escaped and unescaped JSON
-        modelMatch = errorMessage.match(/"error":\s*"model\s+['"]([^'"]+?)['"]/);
-      }
-      
-      if (!modelMatch) {
-        // Try unescaped JSON format
-        modelMatch = errorMessage.match(/\{"error":\s*"model\s+['"]([^'"]+?)['"]/);
-      }
-      
-      const modelName = modelMatch ? modelMatch[1] : 'the specified model';
-      
-      return {
-        message: `Model "${modelName}" is not installed in Ollama. Please install it using: ollama pull ${modelName}`,
-        type: 'model_not_found',
-        actionable: true,
-        settingsPath: '/settings/learning',
-      };
-    }
-
-    // Check for provider unavailable
-    if (
-      errorMessage.includes('Provider not available') ||
-      errorMessage.includes('service is not running') ||
-      errorMessage.includes('failed to connect')
-    ) {
-      return {
-        message: 'AI provider is not available. Please check that your AI service is running and properly configured.',
-        type: 'provider_unavailable',
-        actionable: true,
-        settingsPath: '/settings/learning',
-      };
-    }
-
-    // Check for network issues
-    if (
-      errorMessage.includes('Network error') ||
-      errorMessage.includes('timeout') ||
-      errorMessage.includes('connection')
-    ) {
-      return {
-        message: 'Network error connecting to AI provider. Please check your connection and try again.',
-        type: 'network',
-        actionable: false,
-      };
-    }
-
-    // Default unknown error
+  // Check for configuration issues (including wrapped error messages)
+  if (
+    errorMessage.includes("No default provider") ||
+    errorMessage.includes("No default provider set") ||
+    errorMessage.includes("Configuration incomplete") ||
+    errorMessage.includes("provider configuration") ||
+    errorMessage.includes("Missing fields") ||
+    errorMessage.includes("not configured") ||
+    errorMessage.includes("Provider not found") ||
+    errorMessage.includes("Provider not registered")
+  ) {
     return {
-      message: errorMessage,
-      type: 'unknown',
+      message:
+        "AI provider is not configured. Please set up an AI provider (Ollama, Gemini, OpenAI, or Anthropic) in Settings.",
+      type: "configuration",
+      actionable: true,
+      settingsPath: "/settings/learning",
+    };
+  }
+
+  // Check for model not found errors
+  if (
+    errorMessage.includes("model") &&
+    (errorMessage.includes("not found") ||
+      errorMessage.includes("404") ||
+      errorMessage.includes("does not exist"))
+  ) {
+    // Extract model name if possible - handle both JSON and plain text formats
+    // Try multiple patterns to extract the model name
+    let modelMatch = errorMessage.match(/model\s+['"]([^'"]+)['"]/);
+
+    if (!modelMatch) {
+      // Try pattern: model 'name' (with single quotes)
+      modelMatch = errorMessage.match(/model\s+['"]([^'"]+?)['"]/);
+    }
+
+    if (!modelMatch) {
+      // Try to extract from JSON error field: {"error":"model 'name' not found"}
+      // Handle both escaped and unescaped JSON
+      modelMatch = errorMessage.match(/"error":\s*"model\s+['"]([^'"]+?)['"]/);
+    }
+
+    if (!modelMatch) {
+      // Try unescaped JSON format
+      modelMatch = errorMessage.match(
+        /\{"error":\s*"model\s+['"]([^'"]+?)['"]/,
+      );
+    }
+
+    const modelName = modelMatch ? modelMatch[1] : "the specified model";
+
+    return {
+      message: `Model "${modelName}" is not installed in Ollama. Please install it using: ollama pull ${modelName}`,
+      type: "model_not_found",
+      actionable: true,
+      settingsPath: "/settings/learning",
+    };
+  }
+
+  // Check for provider unavailable
+  if (
+    errorMessage.includes("Provider not available") ||
+    errorMessage.includes("service is not running") ||
+    errorMessage.includes("failed to connect")
+  ) {
+    return {
+      message:
+        "AI provider is not available. Please check that your AI service is running and properly configured.",
+      type: "provider_unavailable",
+      actionable: true,
+      settingsPath: "/settings/learning",
+    };
+  }
+
+  // Check for network issues
+  if (
+    errorMessage.includes("Network error") ||
+    errorMessage.includes("timeout") ||
+    errorMessage.includes("connection")
+  ) {
+    return {
+      message:
+        "Network error connecting to AI provider. Please check your connection and try again.",
+      type: "network",
       actionable: false,
     };
+  }
+
+  // Default unknown error
+  return {
+    message: errorMessage,
+    type: "unknown",
+    actionable: false,
+  };
 }
 
 export class AITaskService {
@@ -187,7 +197,7 @@ export class AITaskService {
    * @returns Generated task structure with main task, subtasks, and suggestions
    */
   async generateTasksFromStory(
-    request: GenerateTasksFromStoryRequest
+    request: GenerateTasksFromStoryRequest,
   ): Promise<GeneratedTaskStructure> {
     try {
       const command = {
@@ -200,17 +210,19 @@ export class AITaskService {
       };
 
       const response = await invoke<GeneratedTaskStructure>(
-        'generate_tasks_from_story',
-        { command }
+        "generate_tasks_from_story",
+        { command },
       );
 
       return response;
     } catch (error) {
       const errorInfo = parseError(error);
-      console.error('AI task generation error:', error);
-      
+      console.error("AI task generation error:", error);
+
       // Create a custom error with the parsed information
-      const customError = new Error(errorInfo.message) as Error & { errorInfo: AIErrorInfo };
+      const customError = new Error(errorInfo.message) as Error & {
+        errorInfo: AIErrorInfo;
+      };
       customError.errorInfo = errorInfo;
       throw customError;
     }
@@ -218,4 +230,3 @@ export class AITaskService {
 }
 
 export const aiTaskService = new AITaskService();
-

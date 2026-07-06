@@ -2,7 +2,6 @@
  * Java Source Implementation
  * Fetches versions from Adoptium API
  */
-
 use super::super::VersionInfo;
 use crate::domains::sdk::SDKError;
 use reqwest::Client;
@@ -55,24 +54,27 @@ impl JavaSource {
 
     /// Fetch all available Java versions from Adoptium API
     pub async fn fetch_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
-        let response = self.client
+        let response = self
+            .client
             .get("https://api.adoptium.net/v3/assets/latest/8,11,17,21,22/hotspot")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Java versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Java versions: {}", e))
+            })?;
 
-        let releases: Vec<AdoptiumRelease> = response
-            .json()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse Java releases: {}", e)))?;
+        let releases: Vec<AdoptiumRelease> = response.json().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse Java releases: {}", e))
+        })?;
 
         let mut versions = Vec::new();
-        
+
         for release in releases {
-            let version = format!("{}.{}.{}.{}", 
-                release.version.major, 
-                release.version.minor, 
-                release.version.security, 
+            let version = format!(
+                "{}.{}.{}.{}",
+                release.version.major,
+                release.version.minor,
+                release.version.security,
                 release.version.patch
             );
 
@@ -97,7 +99,9 @@ impl JavaSource {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)

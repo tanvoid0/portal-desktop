@@ -3,13 +3,13 @@
  */
 
 // Types
-export * from './types';
+export * from "./types";
 
 // Stores
-export * from './stores/sdkStore';
+export * from "./stores/sdkStore";
 
 // Services
-export { sdkService } from './services/sdkService';
+export { sdkService } from "./services/sdkService";
 
 // Components
-export { default as FlyEnvStyleDashboard } from './components/FlyEnvStyleDashboard.svelte';
+export { default as FlyEnvStyleDashboard } from "./components/FlyEnvStyleDashboard.svelte";

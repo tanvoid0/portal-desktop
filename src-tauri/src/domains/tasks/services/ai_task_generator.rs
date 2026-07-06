@@ -1,7 +1,7 @@
 use crate::domains::ai::providers::{GenerationOptions, ProviderType};
 use crate::domains::ai::services::AIService;
-use crate::domains::tasks::services::story_parser::{StoryParser, ParsedStory};
 use crate::domains::tasks::commands::TaskContext;
+use crate::domains::tasks::services::story_parser::{ParsedStory, StoryParser};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -27,8 +27,8 @@ pub struct GeneratedTaskStructure {
 pub struct GeneratedTask {
     pub title: String,
     pub description: String,
-    pub priority: String, // low, medium, high
-    pub type_: String,    // Story, Bug, Feature, etc.
+    pub priority: String,            // low, medium, high
+    pub type_: String,               // Story, Bug, Feature, etc.
     pub estimated_time: Option<u32>, // minutes
     pub tags: Vec<String>,
 }
@@ -40,7 +40,7 @@ pub struct GeneratedSubtask {
     pub description: String,
     pub estimated_time: Option<u32>, // minutes
     pub dependencies: Vec<usize>,    // indices of other subtasks this depends on
-    pub order: usize,                 // suggested order
+    pub order: usize,                // suggested order
 }
 
 /// Intermediate structure for parsing subtasks with flexible dependencies
@@ -62,7 +62,9 @@ enum DependencyRef {
 }
 
 /// Custom deserializer for dependencies that accepts either strings (task titles) or usize (indices)
-fn deserialize_flexible_dependencies<'de, D>(deserializer: D) -> Result<Vec<DependencyRef>, D::Error>
+fn deserialize_flexible_dependencies<'de, D>(
+    deserializer: D,
+) -> Result<Vec<DependencyRef>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -135,7 +137,8 @@ impl AITaskGenerator {
         let parsed = StoryParser::parse(story_text);
 
         // Build the prompt for AI generation
-        let mut prompt = Self::build_generation_prompt(&parsed, context, developer_note, instruction);
+        let mut prompt =
+            Self::build_generation_prompt(&parsed, context, developer_note, instruction);
 
         // If history is provided, prepend it to the prompt
         if let Some(ref hist) = history {
@@ -255,11 +258,13 @@ Guidelines:
                 }
                 prompt.push_str("\nYou are generating a SUBTASK for this parent task. ");
                 prompt.push_str("The subtask should be a specific, actionable piece of work that contributes to the parent task.\n\n");
-                
+
                 // Include existing siblings for reference
                 if let Some(ref siblings) = ctx.existing_siblings {
                     if !siblings.is_empty() {
-                        prompt.push_str("Existing Sibling Subtasks (for reference, avoid duplication):\n");
+                        prompt.push_str(
+                            "Existing Sibling Subtasks (for reference, avoid duplication):\n",
+                        );
                         for (i, sibling) in siblings.iter().enumerate() {
                             prompt.push_str(&format!("{}. {}", i + 1, sibling.title));
                             if let Some(ref desc) = sibling.description {
@@ -271,7 +276,7 @@ Guidelines:
                     }
                 }
             }
-            
+
             // If creating a parent task, include existing children context
             if let Some(ref children) = ctx.existing_children {
                 if !children.is_empty() {
@@ -362,8 +367,12 @@ Guidelines:
         let json_str = Self::extract_json_from_response(response);
 
         // Parse into intermediate structure first
-        let intermediate: serde_json::Value = serde_json::from_str(&json_str)
-            .map_err(|e| format!("Failed to parse AI response as JSON: {}. Response: {}", e, response))?;
+        let intermediate: serde_json::Value = serde_json::from_str(&json_str).map_err(|e| {
+            format!(
+                "Failed to parse AI response as JSON: {}. Response: {}",
+                e, response
+            )
+        })?;
 
         // Convert intermediate structure to final structure, resolving dependencies
         let parsed = Self::convert_intermediate_to_final(intermediate)?;
@@ -375,9 +384,12 @@ Guidelines:
     }
 
     /// Convert intermediate JSON structure to final GeneratedTaskStructure, resolving string dependencies
-    fn convert_intermediate_to_final(value: serde_json::Value) -> Result<GeneratedTaskStructure, String> {
+    fn convert_intermediate_to_final(
+        value: serde_json::Value,
+    ) -> Result<GeneratedTaskStructure, String> {
         // Extract subtasks first to build title-to-index mapping
-        let subtasks_array = value.get("subtasks")
+        let subtasks_array = value
+            .get("subtasks")
             .and_then(|v| v.as_array())
             .ok_or("Missing or invalid subtasks array")?;
 
@@ -392,8 +404,9 @@ Guidelines:
         // Parse subtasks with flexible dependencies
         let mut resolved_subtasks = Vec::new();
         for subtask_value in subtasks_array {
-            let intermediate: IntermediateSubtask = serde_json::from_value(subtask_value.clone())
-                .map_err(|e| format!("Failed to parse subtask: {}", e))?;
+            let intermediate: IntermediateSubtask =
+                serde_json::from_value(subtask_value.clone())
+                    .map_err(|e| format!("Failed to parse subtask: {}", e))?;
 
             // Resolve dependencies
             let mut resolved_deps = Vec::new();
@@ -429,27 +442,32 @@ Guidelines:
         }
 
         // Parse main task
-        let main_task_value = value.get("main_task")
-            .ok_or("Missing main_task")?;
+        let main_task_value = value.get("main_task").ok_or("Missing main_task")?;
         let main_task: GeneratedTask = serde_json::from_value(main_task_value.clone())
             .map_err(|e| format!("Failed to parse main_task: {}", e))?;
 
         // Parse optional fields
-        let suggested_project = value.get("suggested_project")
+        let suggested_project = value
+            .get("suggested_project")
             .and_then(|v| serde_json::from_value(v.clone()).ok());
-        
-        let suggested_labels = value.get("suggested_labels")
+
+        let suggested_labels = value
+            .get("suggested_labels")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        let confidence = value.get("confidence")
+        let confidence = value
+            .get("confidence")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.8);
 
-        let model_used = value.get("model_used")
+        let model_used = value
+            .get("model_used")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
             .unwrap_or_else(|| "unknown".to_string());
@@ -500,9 +518,7 @@ Guidelines:
         original: &ParsedStory,
     ) -> GeneratedTaskStructure {
         // Use original title if AI didn't generate one or it's too generic
-        if generated.main_task.title.is_empty()
-            || generated.main_task.title.len() > 100
-        {
+        if generated.main_task.title.is_empty() || generated.main_task.title.len() > 100 {
             if let Some(ref title) = original.title {
                 generated.main_task.title = title.clone();
             }
@@ -550,4 +566,3 @@ Guidelines:
         generated
     }
 }
-

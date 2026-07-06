@@ -21,10 +21,12 @@ npm run tauri signer generate -- -w ~/.tauri/portal-desktop.key
 ```
 
 This command will:
+
 - Create a private key at `~/.tauri/portal-desktop.key` (keep this secure and private!)
 - Display the public key in the terminal (you'll need this for the configuration)
 
-**Important:** 
+**Important:**
+
 - Never commit the private key to version control
 - Store the private key securely (consider using a password manager or secure vault)
 - The public key is safe to share and will be included in the configuration
@@ -43,6 +45,7 @@ export TAURI_UPDATER_PUBKEY="YOUR_PUBLIC_KEY_HERE"
 ```
 
 Replace:
+
 - `YOUR_USERNAME` with your GitHub username
 - `YOUR_REPOSITORY` with your repository name
 - `YOUR_PUBLIC_KEY_HERE` with the public key generated in Step 1
@@ -77,11 +80,13 @@ npm run tauri:build
 ```
 
 This will generate:
+
 - Platform-specific installers (`.msi` for Windows, `.AppImage` for Linux, `.dmg` for macOS)
 - Update bundles (`.zip` files)
 - Signature files (`.sig` files)
 
 The update artifacts will be in:
+
 - `src-tauri/target/release/bundle/` (for the installer)
 - `src-tauri/target/release/` (for update bundles and signatures)
 
@@ -135,6 +140,7 @@ Copy the entire output and paste it as the `signature` value in `latest.json`.
 4. Tag the release with the version (e.g., `v0.1.1`)
 
 The `latest.json` file should be accessible at:
+
 ```
 https://github.com/YOUR_USERNAME/YOUR_REPOSITORY/releases/latest/download/latest.json
 ```
@@ -230,4 +236,3 @@ jobs:
 - Update notifications
 - Rollback functionality
 - Delta updates for smaller downloads
-

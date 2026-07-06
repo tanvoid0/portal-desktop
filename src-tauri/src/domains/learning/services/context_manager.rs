@@ -38,7 +38,11 @@ impl ContextManager {
 
         if let Some(additional) = additional {
             for (key, value) in additional {
-                parts.push(format!("{}_{}", key.to_lowercase(), value.to_lowercase().replace(' ', "_")));
+                parts.push(format!(
+                    "{}_{}",
+                    key.to_lowercase(),
+                    value.to_lowercase().replace(' ', "_")
+                ));
             }
         }
 
@@ -88,17 +92,15 @@ impl ContextManager {
     }
 
     /// Get the best matching context from a list
-    pub fn find_best_match(
-        target_context: &str,
-        available_contexts: &[String],
-    ) -> Option<String> {
+    pub fn find_best_match(target_context: &str, available_contexts: &[String]) -> Option<String> {
         let target_hierarchy = Self::get_context_hierarchy(target_context);
 
         // Find most specific match
         for ctx in &target_hierarchy {
-            if let Some(matched) = available_contexts.iter().find(|c| {
-                *c == ctx || Self::contexts_match(ctx, c)
-            }) {
+            if let Some(matched) = available_contexts
+                .iter()
+                .find(|c| *c == ctx || Self::contexts_match(ctx, c))
+            {
                 return Some(matched.clone());
             }
         }
@@ -176,13 +178,7 @@ mod tests {
 
     #[test]
     fn test_build_context() {
-        let ctx = ContextManager::build_context(
-            Some("React"),
-            Some("npm"),
-            None,
-            None,
-            None,
-        );
+        let ctx = ContextManager::build_context(Some("React"), Some("npm"), None, None, None);
         assert_eq!(ctx, "fw_react_pm_npm");
     }
 
@@ -196,8 +192,13 @@ mod tests {
 
     #[test]
     fn test_contexts_match() {
-        assert!(ContextManager::contexts_match("fw_react_pm_npm", "fw_react_pm_npm"));
-        assert!(ContextManager::contexts_match("fw_react", "fw_react_pm_npm"));
+        assert!(ContextManager::contexts_match(
+            "fw_react_pm_npm",
+            "fw_react_pm_npm"
+        ));
+        assert!(ContextManager::contexts_match(
+            "fw_react",
+            "fw_react_pm_npm"
+        ));
     }
 }
-

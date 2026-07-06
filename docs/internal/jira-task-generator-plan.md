@@ -1,12 +1,14 @@
 # Jira Story to Task Generator Enhancement
 
 ## Overview
+
 Add an AI-powered feature to the task manager that takes a Jira story text input and generates structured tasks with subtasks, descriptions, labels, and project links. After user approval, creates developer-friendly tasks with clean formatting while preserving the original Jira text as reference.
 
 **Key Architecture Decision:**
 Use a centralized, abstract AI service that supports multiple providers (Ollama, Gemini, OpenAI, Anthropic) configurable from the UI. This service will be reusable across the entire application.
 
 **DX & UX Focus:**
+
 - Clean, maintainable code with clear separation of concerns
 - Type-safe interfaces with comprehensive TypeScript types
 - Reusable, composable components
@@ -140,39 +142,46 @@ Use a centralized, abstract AI service that supports multiple providers (Ollama,
 ## Implementation Phases
 
 ### Phase 1: Centralized AI Service (Backend)
+
 1. Create AI provider trait and common types
 2. Implement provider backends (Ollama, Gemini, OpenAI, Anthropic)
 3. Create AI service coordinator with provider selection
 4. Add AI configuration to settings backend with Tauri commands
 
 ### Phase 2: Frontend AI Service & Types
+
 1. Create centralized AI service frontend
 2. Create AI settings service and component
 3. Create TypeScript types for AI providers
 4. Create task-specific types
 
 ### Phase 3: Task Generation Backend
+
 1. Create Jira parser service
 2. Create AI task generator using centralized AI service
 3. Add Tauri command for task generation
 
 ### Phase 4: Frontend UI Components
+
 1. Create JiraImportDialog with provider selection
 2. Create TaskGenerationPreview component
 3. Create supporting components (TaskPreviewCard, SubtaskList, etc.)
 4. Enhance TaskForm with Jira import button
 
 ### Phase 5: Task Creation Logic
+
 1. Implement task creation sequence with original text preservation
 2. Format generated content (clean, concise, action-oriented)
 3. Store original Jira text in collapsed section
 
 ### Phase 6: Error Handling & Feedback
+
 1. Comprehensive error handling for all scenarios
 2. User feedback (toasts, loading states, progress indicators)
 3. Error recovery suggestions
 
 ### Phase 7: Testing & Documentation
+
 1. Unit tests for parsing logic
 2. Integration tests for AI generation
 3. E2E tests for full workflow
@@ -241,6 +250,7 @@ src/lib/domains/tasks/
 ## Key Features
 
 ### Developer Experience (DX)
+
 - **Type Safety:** Comprehensive TypeScript types with strict checking
 - **Modular Architecture:** Clear separation of concerns, reusable components
 - **Error Handling:** Typed errors with context and recovery suggestions
@@ -251,6 +261,7 @@ src/lib/domains/tasks/
 - **Provider-Agnostic:** Easy to add new AI providers without changing task generation logic
 
 ### User Experience (UX)
+
 - **Intuitive Interface:** Clear visual hierarchy, familiar patterns
 - **Keyboard Shortcuts:** Power user shortcuts (Cmd/Ctrl+Shift+J, Cmd/Ctrl+Enter)
 - **Smart Defaults:** Auto-detection of format, projects, priorities
@@ -262,6 +273,7 @@ src/lib/domains/tasks/
 - **Provider Selection:** Easy switching between AI providers from UI
 
 ### Core Functionality
+
 - **Provider-Agnostic AI:** Support for Ollama, Gemini, OpenAI, Anthropic (configurable from UI)
 - **Centralized AI Service:** Reusable across entire application
 - **AI-powered parsing of Jira stories** using configured provider
@@ -291,4 +303,3 @@ src/lib/domains/tasks/
 13. **frontend-integration** - Integrate JiraImportDialog into TaskForm.svelte
 14. **task-creation-logic** - Implement task creation sequence with original text preservation
 15. **error-handling** - Add comprehensive error handling and user feedback
-

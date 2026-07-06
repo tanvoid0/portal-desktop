@@ -4,10 +4,10 @@
 -->
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+  import type { Snippet } from "svelte";
 
-	// Get children snippet from props for Svelte 5
-	let { children }: { children: Snippet<[]> } = $props();
+  // Get children snippet from props for Svelte 5
+  let { children }: { children: Snippet<[]> } = $props();
 </script>
 
 <!-- AI Content Area - just render children directly -->

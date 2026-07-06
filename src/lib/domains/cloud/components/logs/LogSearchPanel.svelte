@@ -1,11 +1,11 @@
 <!-- Log Search Panel Component -->
 <script lang="ts">
-	import { Card, CardContent, CardHeader, CardTitle } from '@/lib/components/ui/card';
-	import { Input } from '@/lib/components/ui/input';
-	import { Button } from '@/lib/components/ui/button';
-	import { Label } from '@/lib/components/ui/label';
-	import { Badge } from '@/lib/components/ui/badge';
-	import Select from '@/lib/components/ui/select.svelte';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { Input } from '$lib/components/ui/input';
+	import { Button } from '$lib/components/ui/button';
+	import { Label } from '$lib/components/ui/label';
+	import { Badge } from '$lib/components/ui/badge';
+	import Select from '$lib/components/ui/select.svelte';
 	import { Search, X, Filter } from '@lucide/svelte';
 	
 	interface Props {

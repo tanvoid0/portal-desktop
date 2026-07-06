@@ -69,11 +69,8 @@ impl ContextAnalyzer {
         let parts2: Vec<&str> = context2.split('_').collect();
 
         // Check if they share significant components (at least 50%)
-        let common_parts: usize = parts1
-            .iter()
-            .filter(|&part| parts2.contains(part))
-            .count();
-        
+        let common_parts: usize = parts1.iter().filter(|&part| parts2.contains(part)).count();
+
         let similarity = if parts1.len().max(parts2.len()) > 0 {
             common_parts as f64 / parts1.len().max(parts2.len()) as f64
         } else {
@@ -100,4 +97,3 @@ impl ContextAnalyzer {
         hierarchy
     }
 }
-

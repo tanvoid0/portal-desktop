@@ -1,6 +1,6 @@
+use crate::domains::projects::pipelines::executors::{ExecutionRequest, ExecutionResult, Executor};
 use std::process::Command;
 use std::time::Instant;
-use crate::domains::projects::pipelines::executors::{Executor, ExecutionRequest, ExecutionResult};
 
 #[allow(dead_code)]
 pub struct DockerExecutor {
@@ -25,7 +25,7 @@ impl Executor for DockerExecutor {
 
         // Build Docker command
         let mut cmd = Command::new("docker");
-        
+
         // If we need to build first
         if let Some(dockerfile) = &self.dockerfile {
             cmd.arg("build");
@@ -37,7 +37,8 @@ impl Executor for DockerExecutor {
                 cmd.arg(&request.working_directory);
             }
 
-            let build_output = cmd.output()
+            let build_output = cmd
+                .output()
                 .map_err(|e| format!("Failed to build Docker image: {}", e))?;
 
             if !build_output.status.success() {
@@ -56,22 +57,23 @@ impl Executor for DockerExecutor {
         let mut run_cmd = Command::new("docker");
         run_cmd.arg("run");
         run_cmd.arg("--rm");
-        
+
         // Set working directory
         run_cmd.arg("-w").arg(&request.working_directory);
-        
+
         // Set environment variables
         for (key, value) in &request.environment {
             run_cmd.arg("-e").arg(format!("{}={}", key, value));
         }
-        
+
         // Add the image
         run_cmd.arg(&self.image);
-        
+
         // Add the command
         run_cmd.arg("sh").arg("-c").arg(&request.command);
 
-        let output = run_cmd.output()
+        let output = run_cmd
+            .output()
             .map_err(|e| format!("Failed to execute Docker command: {}", e))?;
 
         let duration_ms = start_time.elapsed().as_millis() as u64;
@@ -99,4 +101,3 @@ impl Executor for DockerExecutor {
         execution_type == "docker"
     }
 }
-

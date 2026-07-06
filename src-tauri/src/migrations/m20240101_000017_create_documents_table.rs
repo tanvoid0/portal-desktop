@@ -1,7 +1,7 @@
 use sea_orm_migration::prelude::*;
 
 /// Migration: Create documents table
-/// 
+///
 /// This migration creates the documents table with the following structure:
 /// - id: Primary key (auto-increment)
 /// - title: Document title
@@ -32,13 +32,35 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Documents::Title).string().not_null())
                     .col(ColumnDef::new(Documents::Content).text().not_null())
-                    .col(ColumnDef::new(Documents::IsArchived).boolean().not_null().default(false))
+                    .col(
+                        ColumnDef::new(Documents::IsArchived)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .col(ColumnDef::new(Documents::ContentDraft).text().null())
-                    .col(ColumnDef::new(Documents::IsDraft).boolean().not_null().default(false))
+                    .col(
+                        ColumnDef::new(Documents::IsDraft)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .col(ColumnDef::new(Documents::Tags).text().null())
-                    .col(ColumnDef::new(Documents::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Documents::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Documents::LastEditedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(Documents::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Documents::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Documents::LastEditedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .to_owned(),
             )
             .await
@@ -65,4 +87,3 @@ enum Documents {
     UpdatedAt,
     LastEditedAt,
 }
-

@@ -1,6 +1,6 @@
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait};
-use crate::entities::ide::{Entity, Model, ActiveModel};
 use crate::entities::ide;
+use crate::entities::ide::{ActiveModel, Entity, Model};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 pub struct IdeRepository;
 
@@ -11,7 +11,10 @@ impl IdeRepository {
     }
 
     /// Get IDE by ID
-    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Model>, sea_orm::DbErr> {
+    pub async fn get_by_id(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
@@ -102,4 +105,3 @@ impl IdeRepository {
         Ok(())
     }
 }
-

@@ -3,15 +3,11 @@
 -->
 
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { CredentialVault } from '$lib/domains/credentials';
-	import { logger } from '$lib/domains/shared';
+  import { CredentialVault } from "$lib/domains/credentials";
 </script>
 
 <svelte:head>
-	<title>Credentials - Portal Desktop</title>
+  <title>Credentials - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto py-6">
-	<CredentialVault />
-</div>
+<CredentialVault />

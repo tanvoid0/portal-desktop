@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineModel {
@@ -7,9 +7,9 @@ pub struct PipelineModel {
     pub name: String,
     pub description: Option<String>,
     pub project_id: i32,
-    pub steps_json: String, // JSON array of PipelineStep
-    pub variables_json: String, // JSON array of PipelineVariable
-    pub secrets_json: String, // JSON array of secret IDs
+    pub steps_json: String,             // JSON array of PipelineStep
+    pub variables_json: String,         // JSON array of PipelineVariable
+    pub secrets_json: String,           // JSON array of secret IDs
     pub execution_context_json: String, // JSON ExecutionContext
     pub enabled: bool,
     pub created_at: Option<DateTime<Utc>>,
@@ -36,4 +36,3 @@ pub struct PipelineVariableModel {
     pub description: Option<String>,
     pub scope: String, // "project" or "pipeline"
 }
-

@@ -19,7 +19,7 @@ pub enum Relation {
         to = "super::project::Column::Id"
     )]
     Project,
-    
+
     #[sea_orm(
         belongs_to = "super::package_manager::Entity",
         from = "Column::PackageManagerId",
@@ -41,4 +41,3 @@ impl Related<super::package_manager::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-

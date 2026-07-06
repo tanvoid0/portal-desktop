@@ -1,14 +1,13 @@
+pub mod archive_handler;
+pub mod binary_downloader;
+pub mod sources;
 /**
  * Download Infrastructure Module
- * 
+ *
  * Provides version fetching and binary download capabilities for SDKs
  * using official sources for long-term sustainability.
  */
-
 pub mod version_fetcher;
-pub mod binary_downloader;
-pub mod archive_handler;
-pub mod sources;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,7 +27,7 @@ pub struct DownloadProgress {
     pub total_bytes: u64,
     pub downloaded_bytes: u64,
     pub percentage: f64,
-    pub speed: u64, // bytes per second
+    pub speed: u64,       // bytes per second
     pub eta: Option<u64>, // seconds
 }
 
@@ -58,4 +57,3 @@ pub struct ServiceConfig {
     pub config_file: Option<String>,
     pub environment: HashMap<String, String>,
 }
-

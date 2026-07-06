@@ -30,4 +30,3 @@ impl Related<super::ide::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-

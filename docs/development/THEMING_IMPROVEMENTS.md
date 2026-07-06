@@ -15,16 +15,19 @@ This document outlines the improvements made to the Svelte shadcn components to 
 ### 1. Tailwind CSS 4 Configuration
 
 **Before:**
+
 ```javascript
-darkMode: 'media'
+darkMode: "media";
 ```
 
 **After:**
+
 ```javascript
-darkMode: 'class'
+darkMode: "class";
 ```
 
 **Benefits:**
+
 - Better control over theme switching
 - More reliable dark mode implementation
 - Better performance with class-based switching
@@ -50,6 +53,7 @@ darkMode: 'class'
 ```
 
 **Benefits:**
+
 - Better organization and maintainability
 - Easier to override styles
 - Better performance with Tailwind's optimization
@@ -57,11 +61,13 @@ darkMode: 'class'
 ### 3. Removed Custom CSS
 
 **Before:**
+
 - Custom scrollbar styles
 - Sidebar positioning with custom CSS
 - Inline styles in chart components
 
 **After:**
+
 - All styles converted to Tailwind classes
 - Better theming inheritance
 - More maintainable code
@@ -69,16 +75,19 @@ darkMode: 'class'
 ### 4. Enhanced Component Theming
 
 **Before:**
+
 ```svelte
 class="bg-primary text-primary-foreground"
 ```
 
 **After:**
+
 ```svelte
 class={cn(buttonVariants({ variant, size }), className)}
 ```
 
 **Benefits:**
+
 - Consistent theming across components
 - Better variant management
 - Easier customization
@@ -96,16 +105,19 @@ Created `/src/lib/utils/theme.ts` with:
 ### 6. Improved Component Examples
 
 #### Button Component
+
 - Better focus states with consistent ring styles
 - Improved transition animations
 - Better variant management
 
 #### Select Component
+
 - Enhanced dropdown styling
 - Better focus management
 - Improved accessibility
 
 #### Breadcrumb Component
+
 - Converted to Svelte 5 runes (`$derived` instead of `$:`)
 - Better theming inheritance
 - Improved TypeScript support
@@ -119,11 +131,11 @@ Created `/src/lib/utils/theme.ts` with:
   /* Base colors */
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
-  
+
   /* Interactive colors */
   --primary: 221.2 83.2% 53.3%;
   --primary-foreground: 210 40% 98%;
-  
+
   /* Sidebar colors */
   --sidebar: 0 0% 98%;
   --sidebar-foreground: 240 5.3% 26.1%;
@@ -139,21 +151,25 @@ Created `/src/lib/utils/theme.ts` with:
 ## 🚀 Benefits
 
 ### 1. **Better Performance**
+
 - Reduced custom CSS
 - Better Tailwind optimization
 - Faster theme switching
 
 ### 2. **Easier Customization**
+
 - Consistent theming system
 - Better component inheritance
 - Easier to override styles
 
 ### 3. **Maintainability**
+
 - Organized CSS architecture
 - Better TypeScript support
 - Consistent patterns
 
 ### 4. **Accessibility**
+
 - Better focus management
 - Consistent interaction patterns
 - Improved screen reader support
@@ -164,21 +180,18 @@ Created `/src/lib/utils/theme.ts` with:
 
 ```svelte
 <script lang="ts">
-  import { createThemedVariant } from '$lib/utils/theme';
-  
-  const myComponentVariants = createThemedVariant(
-    'base-styles-here',
-    {
-      variant: {
-        primary: 'bg-primary text-primary-foreground',
-        secondary: 'bg-secondary text-secondary-foreground'
-      },
-      size: {
-        sm: 'h-8 px-3',
-        default: 'h-9 px-4'
-      }
-    }
-  );
+  import { createThemedVariant } from "$lib/utils/theme";
+
+  const myComponentVariants = createThemedVariant("base-styles-here", {
+    variant: {
+      primary: "bg-primary text-primary-foreground",
+      secondary: "bg-secondary text-secondary-foreground",
+    },
+    size: {
+      sm: "h-8 px-3",
+      default: "h-9 px-4",
+    },
+  });
 </script>
 ```
 
@@ -186,12 +199,12 @@ Created `/src/lib/utils/theme.ts` with:
 
 ```svelte
 <script lang="ts">
-  import { cn, baseComponentStyles, themeColors } from '$lib/utils';
-  
+  import { cn, baseComponentStyles, themeColors } from "$lib/utils";
+
   const classes = cn(
     baseComponentStyles.focus,
     baseComponentStyles.transition,
-    themeColors.primary
+    themeColors.primary,
   );
 </script>
 ```

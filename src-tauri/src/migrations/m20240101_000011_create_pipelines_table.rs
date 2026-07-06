@@ -25,10 +25,27 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Pipelines::StepsJson).text().not_null())
                     .col(ColumnDef::new(Pipelines::VariablesJson).text().not_null())
                     .col(ColumnDef::new(Pipelines::SecretsJson).text().not_null())
-                    .col(ColumnDef::new(Pipelines::ExecutionContextJson).text().not_null())
-                    .col(ColumnDef::new(Pipelines::Enabled).boolean().not_null().default(true))
-                    .col(ColumnDef::new(Pipelines::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Pipelines::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(Pipelines::ExecutionContextJson)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Pipelines::Enabled)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(Pipelines::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Pipelines::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_pipelines_project_id")
@@ -69,4 +86,3 @@ enum Projects {
     Table,
     Id,
 }
-

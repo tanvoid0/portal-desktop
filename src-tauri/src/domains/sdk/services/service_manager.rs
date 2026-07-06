@@ -1,18 +1,17 @@
 /**
  * Service Manager
- * 
+ *
  * Manages service lifecycle for databases and web servers
  */
-
-use super::{ServiceConfig, ServiceInstance, ServiceStatus, ServiceLog};
+use super::{ServiceConfig, ServiceInstance, ServiceLog, ServiceStatus};
 use crate::domains::sdk::SDKError;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
 use tokio::process::Command as AsyncCommand;
 use tokio::sync::mpsc;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceHealth {
@@ -52,7 +51,7 @@ impl ServiceManager {
     ) -> Result<ServiceInstance, SDKError> {
         let service_id = Uuid::new_v4().to_string();
         let service_name = format!("{}-{}", service_type, version);
-        
+
         // Allocate port if needed
         let port = if let Some(requested_port) = config.port {
             self.port_manager.allocate_port(requested_port).await?
@@ -78,7 +77,9 @@ impl ServiceManager {
         self.log_senders.insert(service_id.clone(), log_sender);
 
         // Start the service process
-        let pid = self.start_service_process(service_type, version, &service).await?;
+        let pid = self
+            .start_service_process(service_type, version, &service)
+            .await?;
         service.pid = Some(pid);
         service.status = ServiceStatus::Running;
         service.start_time = Some(chrono::Utc::now().to_rfc3339());
@@ -112,24 +113,24 @@ impl ServiceManager {
     pub async fn stop_service(&mut self, pid: u32) -> Result<(), SDKError> {
         // Find the service by PID
         let service_id = self.process_tracker.get_service_id(pid).await?;
-        
+
         if let Some(service) = self.services.get(&service_id) {
             let port = service.port;
-            
+
             // Stop the process
             self.stop_service_process(pid).await?;
-            
+
             // Release the port
             if let Some(port) = port {
                 self.port_manager.release_port(port).await?;
             }
-            
+
             // Update service status
             if let Some(service) = self.services.get_mut(&service_id) {
                 service.status = ServiceStatus::Stopped;
                 service.pid = None;
             }
-            
+
             // Stop tracking
             self.process_tracker.untrack_process(pid).await?;
         }
@@ -142,7 +143,10 @@ impl ServiceManager {
         if let Some(service) = self.services.values().find(|s| s.pid == Some(pid)) {
             Ok(service.status.clone())
         } else {
-            Err(SDKError::ManagerNotFound(format!("Service with PID {} not found", pid)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Service with PID {} not found",
+                pid
+            )))
         }
     }
 
@@ -154,13 +158,20 @@ impl ServiceManager {
     /// Get service logs
     pub async fn get_service_logs(&self, pid: u32) -> Result<Vec<ServiceLog>, SDKError> {
         if let Some(service) = self.services.values().find(|s| s.pid == Some(pid)) {
-            Ok(service.logs.iter().map(|log| ServiceLog {
-                timestamp: chrono::Utc::now().to_rfc3339(),
-                level: "INFO".to_string(),
-                message: log.clone(),
-            }).collect())
+            Ok(service
+                .logs
+                .iter()
+                .map(|log| ServiceLog {
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    level: "INFO".to_string(),
+                    message: log.clone(),
+                })
+                .collect())
         } else {
-            Err(SDKError::ManagerNotFound(format!("Service with PID {} not found", pid)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Service with PID {} not found",
+                pid
+            )))
         }
     }
 
@@ -177,10 +188,16 @@ impl ServiceManager {
             "redis" => self.create_redis_command(version, service).await?,
             "nginx" => self.create_nginx_command(version, service).await?,
             "apache" => self.create_apache_command(version, service).await?,
-            _ => return Err(SDKError::ManagerNotFound(format!("Unsupported service type: {}", service_type))),
+            _ => {
+                return Err(SDKError::ManagerNotFound(format!(
+                    "Unsupported service type: {}",
+                    service_type
+                )))
+            }
         };
 
-        let child = cmd.spawn()
+        let child = cmd
+            .spawn()
             .map_err(|e| SDKError::ManagerNotFound(format!("Failed to start service: {}", e)))?;
 
         Ok(child.id().unwrap_or(0) as u32)
@@ -208,15 +225,20 @@ impl ServiceManager {
         version: &str,
         service: &ServiceInstance,
     ) -> Result<AsyncCommand, SDKError> {
-        let data_dir = service.config.data_dir.clone()
+        let data_dir = service
+            .config
+            .data_dir
+            .clone()
             .unwrap_or_else(|| format!("~/.portal/data/postgresql-{}", version));
-        
+
         let mut cmd = AsyncCommand::new("postgres");
         cmd.args(&[
-            "-D", &data_dir,
-            "-p", &service.port.unwrap_or(5432).to_string(),
+            "-D",
+            &data_dir,
+            "-p",
+            &service.port.unwrap_or(5432).to_string(),
         ]);
-        
+
         if let Some(host) = &service.config.host {
             cmd.args(&["-h", host]);
         }
@@ -230,13 +252,18 @@ impl ServiceManager {
         version: &str,
         service: &ServiceInstance,
     ) -> Result<AsyncCommand, SDKError> {
-        let data_dir = service.config.data_dir.clone()
+        let data_dir = service
+            .config
+            .data_dir
+            .clone()
             .unwrap_or_else(|| format!("~/.portal/data/mysql-{}", version));
-        
+
         let mut cmd = AsyncCommand::new("mysqld");
         cmd.args(&[
-            "--datadir", &data_dir,
-            "--port", &service.port.unwrap_or(3306).to_string(),
+            "--datadir",
+            &data_dir,
+            "--port",
+            &service.port.unwrap_or(3306).to_string(),
         ]);
 
         Ok(cmd)
@@ -249,9 +276,7 @@ impl ServiceManager {
         service: &ServiceInstance,
     ) -> Result<AsyncCommand, SDKError> {
         let mut cmd = AsyncCommand::new("redis-server");
-        cmd.args(&[
-            "--port", &service.port.unwrap_or(6379).to_string(),
-        ]);
+        cmd.args(&["--port", &service.port.unwrap_or(6379).to_string()]);
 
         if let Some(config_file) = &service.config.config_file {
             cmd.args(&["--config", config_file]);
@@ -268,7 +293,7 @@ impl ServiceManager {
     ) -> Result<AsyncCommand, SDKError> {
         let mut cmd = AsyncCommand::new("nginx");
         cmd.args(&["-g", "daemon off;"]);
-        
+
         if let Some(config_file) = &service.config.config_file {
             cmd.args(&["-c", config_file]);
         }
@@ -284,7 +309,7 @@ impl ServiceManager {
     ) -> Result<AsyncCommand, SDKError> {
         let mut cmd = AsyncCommand::new("httpd");
         cmd.args(&["-D", "FOREGROUND"]);
-        
+
         if let Some(config_file) = &service.config.config_file {
             cmd.args(&["-f", config_file]);
         }
@@ -303,14 +328,15 @@ impl ServiceManager {
             port_open: false,
             error_message: None,
         };
-        
-        self.health_status.insert(service_id.clone(), health.clone());
+
+        self.health_status
+            .insert(service_id.clone(), health.clone());
 
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(30));
             loop {
                 interval.tick().await;
-                
+
                 // Check if process is still running
                 let is_running = Self::is_process_running(pid).await;
                 if !is_running {
@@ -319,10 +345,10 @@ impl ServiceManager {
 
                 // Check port availability
                 let port_open = Self::is_port_open(port).await;
-                
+
                 // Get resource usage
                 let (memory_usage, cpu_usage) = Self::get_process_resources(pid).await;
-                
+
                 // Update health status
                 health.is_healthy = is_running && port_open;
                 health.last_check = chrono::Utc::now().to_rfc3339();
@@ -347,7 +373,9 @@ impl ServiceManager {
                 .args(&["/FI", &format!("PID eq {}", pid)])
                 .output()
                 .ok();
-            output.map_or(false, |o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
+            output.map_or(false, |o| {
+                String::from_utf8_lossy(&o.stdout).contains(&pid.to_string())
+            })
         } else {
             let output = Command::new("ps")
                 .args(&["-p", &pid.to_string()])
@@ -359,9 +387,9 @@ impl ServiceManager {
 
     /// Check if a port is open
     async fn is_port_open(port: u16) -> bool {
-        use std::net::{TcpListener, SocketAddr};
+        use std::net::{SocketAddr, TcpListener};
         use std::str::FromStr;
-        
+
         let addr = format!("127.0.0.1:{}", port);
         if let Ok(socket_addr) = SocketAddr::from_str(&addr) {
             TcpListener::bind(socket_addr).is_ok()
@@ -381,7 +409,7 @@ impl ServiceManager {
                 .args(&["-p", &pid.to_string(), "-o", "rss,pcpu", "--no-headers"])
                 .output()
                 .ok();
-            
+
             if let Some(output) = output {
                 let line = String::from_utf8_lossy(&output.stdout);
                 let parts: Vec<&str> = line.trim().split_whitespace().collect();
@@ -400,19 +428,26 @@ impl ServiceManager {
 
     /// Get service health status
     pub async fn get_service_health(&self, service_id: &str) -> Result<ServiceHealth, SDKError> {
-        self.health_status.get(service_id)
+        self.health_status
+            .get(service_id)
             .cloned()
             .ok_or_else(|| SDKError::ManagerNotFound(format!("Service {} not found", service_id)))
     }
 
     /// Stream service logs
-    pub async fn stream_service_logs(&self, service_id: &str) -> Result<mpsc::UnboundedReceiver<ServiceLog>, SDKError> {
+    pub async fn stream_service_logs(
+        &self,
+        service_id: &str,
+    ) -> Result<mpsc::UnboundedReceiver<ServiceLog>, SDKError> {
         if let Some(_sender) = self.log_senders.get(service_id) {
             let (_tx, rx) = mpsc::unbounded_channel();
             // In a real implementation, you'd connect the sender to the receiver
             Ok(rx)
         } else {
-            Err(SDKError::ManagerNotFound(format!("Service {} not found", service_id)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Service {} not found",
+                service_id
+            )))
         }
     }
 
@@ -420,39 +455,67 @@ impl ServiceManager {
     pub async fn restart_service(&mut self, service_id: &str) -> Result<ServiceInstance, SDKError> {
         // Clone the service data to avoid borrow checker issues
         let service_data = if let Some(service) = self.services.get(service_id) {
-            (service.name.clone(), service.version.clone(), service.config.clone(), service.pid)
+            (
+                service.name.clone(),
+                service.version.clone(),
+                service.config.clone(),
+                service.pid,
+            )
         } else {
-            return Err(SDKError::ManagerNotFound(format!("Service {} not found", service_id)));
+            return Err(SDKError::ManagerNotFound(format!(
+                "Service {} not found",
+                service_id
+            )));
         };
 
         if let Some(pid) = service_data.3 {
             // Stop the service
             self.stop_service(pid).await?;
-            
+
             // Wait a bit for graceful shutdown
             sleep(Duration::from_secs(2)).await;
-            
+
             // Start the service again
-            self.start_service(&service_data.0.split('-').next().unwrap_or("unknown"), &service_data.1, service_data.2).await
+            self.start_service(
+                &service_data.0.split('-').next().unwrap_or("unknown"),
+                &service_data.1,
+                service_data.2,
+            )
+            .await
         } else {
-            Err(SDKError::ManagerNotFound(format!("Service {} has no PID", service_id)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Service {} has no PID",
+                service_id
+            )))
         }
     }
 
     /// Update service configuration
-    pub async fn update_service_config(&mut self, service_id: &str, config: ServiceConfig) -> Result<(), SDKError> {
+    pub async fn update_service_config(
+        &mut self,
+        service_id: &str,
+        config: ServiceConfig,
+    ) -> Result<(), SDKError> {
         if let Some(service) = self.services.get_mut(service_id) {
             service.config = config;
             Ok(())
         } else {
-            Err(SDKError::ManagerNotFound(format!("Service {} not found", service_id)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Service {} not found",
+                service_id
+            )))
         }
     }
 
     /// Get service logs with limit
-    pub async fn get_service_logs_limited(&self, service_id: &str, lines: usize) -> Result<Vec<ServiceLog>, SDKError> {
+    pub async fn get_service_logs_limited(
+        &self,
+        service_id: &str,
+        lines: usize,
+    ) -> Result<Vec<ServiceLog>, SDKError> {
         if let Some(service) = self.services.get(service_id) {
-            let logs: Vec<ServiceLog> = service.logs
+            let logs: Vec<ServiceLog> = service
+                .logs
                 .iter()
                 .rev()
                 .take(lines)
@@ -464,7 +527,10 @@ impl ServiceManager {
                 .collect();
             Ok(logs)
         } else {
-            Err(SDKError::ManagerNotFound(format!("Service {} not found", service_id)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Service {} not found",
+                service_id
+            )))
         }
     }
 }

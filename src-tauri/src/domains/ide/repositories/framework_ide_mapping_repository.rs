@@ -1,6 +1,6 @@
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait};
-use crate::entities::framework_ide_mapping::{Entity, Model, ActiveModel};
 use crate::entities::framework_ide_mapping;
+use crate::entities::framework_ide_mapping::{ActiveModel, Entity, Model};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 pub struct FrameworkIdeMappingRepository;
 
@@ -11,12 +11,18 @@ impl FrameworkIdeMappingRepository {
     }
 
     /// Get mapping by ID
-    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Model>, sea_orm::DbErr> {
+    pub async fn get_by_id(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
     /// Get mapping by framework name
-    pub async fn get_by_framework(db: &DatabaseConnection, framework: &str) -> Result<Option<Model>, sea_orm::DbErr> {
+    pub async fn get_by_framework(
+        db: &DatabaseConnection,
+        framework: &str,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
         Entity::find()
             .filter(framework_ide_mapping::Column::Framework.eq(framework))
             .one(db)
@@ -64,4 +70,3 @@ impl FrameworkIdeMappingRepository {
         Ok(())
     }
 }
-

@@ -29,7 +29,12 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Ides::Name).string().not_null())
                     .col(ColumnDef::new(Ides::Executable).string().not_null())
-                    .col(ColumnDef::new(Ides::IsDefault).boolean().not_null().default(false))
+                    .col(
+                        ColumnDef::new(Ides::IsDefault)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .col(
                         ColumnDef::new(Ides::CreatedAt)
                             .date_time()
@@ -78,4 +83,3 @@ enum Ides {
     CreatedAt,
     UpdatedAt,
 }
-

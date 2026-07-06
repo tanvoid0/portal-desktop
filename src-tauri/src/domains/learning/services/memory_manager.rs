@@ -1,7 +1,7 @@
-use sea_orm::DatabaseConnection;
 use crate::domains::learning::repositories::{
-    LearnedPatternRepository, UserPreferenceRepository, LearningEventRepository,
+    LearnedPatternRepository, LearningEventRepository, UserPreferenceRepository,
 };
+use sea_orm::DatabaseConnection;
 
 // Import logger macros
 use crate::{log_info, log_warn};
@@ -31,10 +31,7 @@ impl MemoryManager {
         }
     }
 
-    pub fn with_custom_retention(
-        event_days: i64,
-        pattern_days: i64,
-    ) -> Self {
+    pub fn with_custom_retention(event_days: i64, pattern_days: i64) -> Self {
         Self {
             event_retention_days: event_days,
             pattern_retention_days: pattern_days,
@@ -45,7 +42,10 @@ impl MemoryManager {
     }
 
     /// Get preview of what would be cleaned (for user authorization)
-    pub async fn get_cleanup_preview(&self, db: &DatabaseConnection) -> Result<CleanupPreview, String> {
+    pub async fn get_cleanup_preview(
+        &self,
+        db: &DatabaseConnection,
+    ) -> Result<CleanupPreview, String> {
         let mut preview = CleanupPreview::default();
 
         // Count old events
@@ -54,7 +54,8 @@ impl MemoryManager {
             .map_err(|e| format!("Failed to get events: {}", e))?;
 
         let cutoff = chrono::Utc::now() - chrono::Duration::days(self.event_retention_days);
-        preview.events_to_delete = events.iter()
+        preview.events_to_delete = events
+            .iter()
             .filter(|e| {
                 if let Some(created_at) = &e.created_at {
                     // Compare timestamps
@@ -70,11 +71,12 @@ impl MemoryManager {
             .await
             .map_err(|e| format!("Failed to get patterns: {}", e))?;
 
-        preview.patterns_to_delete = patterns.iter()
+        preview.patterns_to_delete = patterns
+            .iter()
             .filter(|p| {
-                !p.is_important && 
-                ((p.success_rate < 0.2 && p.frequency < 3) ||
-                 (p.frequency == 1 && p.success_rate < 0.5))
+                !p.is_important
+                    && ((p.success_rate < 0.2 && p.frequency < 3)
+                        || (p.frequency == 1 && p.success_rate < 0.5))
             })
             .count() as u64;
 
@@ -95,7 +97,12 @@ impl MemoryManager {
         match LearningEventRepository::delete_older_than(db, self.event_retention_days).await {
             Ok(count) => {
                 stats.events_deleted = count;
-                log_info!("Learning", "Cleaned {} old events (older than {} days)", count, self.event_retention_days);
+                log_info!(
+                    "Learning",
+                    "Cleaned {} old events (older than {} days)",
+                    count,
+                    self.event_retention_days
+                );
             }
             Err(e) => {
                 log_warn!("Learning", "Failed to clean old events: {}", e);
@@ -135,9 +142,7 @@ impl MemoryManager {
             .await
             .map_err(|e| format!("Failed to get all events: {}", e))?;
 
-        let recent_ids: std::collections::HashSet<i32> = recent.iter()
-            .map(|e| e.id)
-            .collect();
+        let recent_ids: std::collections::HashSet<i32> = recent.iter().map(|e| e.id).collect();
 
         // Delete events not in recent set
         let mut deleted = 0;
@@ -151,7 +156,12 @@ impl MemoryManager {
         }
 
         if deleted > 0 {
-            log_info!("Learning", "Limited events to {} most recent, deleted {} old events", max, deleted);
+            log_info!(
+                "Learning",
+                "Limited events to {} most recent, deleted {} old events",
+                max,
+                deleted
+            );
         }
 
         Ok(())
@@ -205,7 +215,10 @@ impl MemoryManager {
 
         for pattern in &patterns {
             let key = (pattern.pattern_type.clone(), pattern.context.clone());
-            pattern_groups.entry(key).or_insert_with(Vec::new).push(pattern);
+            pattern_groups
+                .entry(key)
+                .or_insert_with(Vec::new)
+                .push(pattern);
         }
 
         let mut consolidated = 0;
@@ -217,7 +230,10 @@ impl MemoryManager {
             // Find patterns with identical pattern_data
             let mut by_data: HashMap<&str, Vec<_>> = HashMap::new();
             for pattern in &group {
-                by_data.entry(&pattern.pattern_data).or_insert_with(Vec::new).push(pattern);
+                by_data
+                    .entry(&pattern.pattern_data)
+                    .or_insert_with(Vec::new)
+                    .push(pattern);
             }
 
             // Merge duplicates (keep the one with highest frequency/success rate)
@@ -227,19 +243,21 @@ impl MemoryManager {
                 }
 
                 // Find the best pattern to keep (prefer important ones)
-                let best = duplicates.iter()
-                    .max_by(|a, b| {
-                        // Important patterns always win
-                        match (a.is_important, b.is_important) {
-                            (true, false) => return std::cmp::Ordering::Greater,
-                            (false, true) => return std::cmp::Ordering::Less,
-                            _ => {}
-                        }
-                        // Compare by frequency, then success rate
-                        a.frequency.cmp(&b.frequency)
-                            .then_with(|| a.success_rate.partial_cmp(&b.success_rate).unwrap_or(std::cmp::Ordering::Equal))
-                    });
-                    
+                let best = duplicates.iter().max_by(|a, b| {
+                    // Important patterns always win
+                    match (a.is_important, b.is_important) {
+                        (true, false) => return std::cmp::Ordering::Greater,
+                        (false, true) => return std::cmp::Ordering::Less,
+                        _ => {}
+                    }
+                    // Compare by frequency, then success rate
+                    a.frequency.cmp(&b.frequency).then_with(|| {
+                        a.success_rate
+                            .partial_cmp(&b.success_rate)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                });
+
                 let best = if let Some(best_pattern) = best {
                     best_pattern
                 } else {
@@ -262,8 +280,9 @@ impl MemoryManager {
                     let total_frequency = best.frequency + pattern.frequency;
                     // Calculate weighted average success rate for merged pattern
                     let _merged_success_rate = if total_frequency > 0 {
-                        ((best.success_rate * best.frequency as f64) + 
-                         (pattern.success_rate * pattern.frequency as f64)) / total_frequency as f64
+                        ((best.success_rate * best.frequency as f64)
+                            + (pattern.success_rate * pattern.frequency as f64))
+                            / total_frequency as f64
                     } else {
                         best.success_rate
                     };
@@ -287,7 +306,11 @@ impl MemoryManager {
         }
 
         if consolidated > 0 {
-            log_info!("Learning", "Consolidated {} duplicate patterns", consolidated);
+            log_info!(
+                "Learning",
+                "Consolidated {} duplicate patterns",
+                consolidated
+            );
         }
 
         Ok(())
@@ -349,4 +372,3 @@ impl Default for MemoryManager {
         Self::new()
     }
 }
-

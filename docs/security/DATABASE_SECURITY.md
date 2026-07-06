@@ -7,11 +7,13 @@ The Portal Desktop application uses SQLite for local data storage with security 
 ## Database Location
 
 **Location**: User's app data directory (OS-specific, user-specific)
+
 - **Linux**: `~/.local/share/portal-desktop/portal_desktop.db`
 - **macOS**: `~/Library/Application Support/portal-desktop/portal_desktop.db`
 - **Windows**: `%APPDATA%\portal-desktop\portal_desktop.db`
 
 **Security Properties**:
+
 - ✅ User-specific (not shared between users)
 - ✅ Outside project directory (never committed to git)
 - ✅ Secure file permissions (0o600 on Unix, owner-only on Windows)
@@ -20,11 +22,13 @@ The Portal Desktop application uses SQLite for local data storage with security 
 ## Security Features
 
 ### 1. File Permissions
+
 - **Database file**: `0o600` (read/write for owner only)
 - **Database directory**: `0o700` (access for owner only)
 - Permissions are set automatically on creation and after migrations
 
 ### 2. Git Exclusion
+
 - Database files are excluded from git via `.gitignore`:
   - `*.db`
   - `*.db-shm` (SQLite shared memory)
@@ -34,11 +38,13 @@ The Portal Desktop application uses SQLite for local data storage with security 
   - `data/` directory
 
 ### 3. Automatic Initialization
+
 - Database is created automatically on first run
 - Migrations run automatically on startup
 - Migrations are idempotent (safe to run multiple times)
 
 ### 4. Data Encryption
+
 - **Credentials**: Encrypted at rest using AES-256-GCM
 - **Database file**: SQLite file itself is not encrypted
 - **Future enhancement**: Consider SQLCipher for full database encryption
@@ -79,4 +85,3 @@ git status | grep -i "\.db"
 3. **Audit Logging**: Track database access
 4. **Connection Pooling**: Limit concurrent connections
 5. **Database Integrity Checks**: Periodic verification
-

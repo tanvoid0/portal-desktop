@@ -1,24 +1,24 @@
-use kube::{Client, Config, Api};
-use kube::config::{Kubeconfig, KubeConfigOptions};
-use kube::api::{ListParams, LogParams, Patch, PatchParams, PostParams};
-use kube::runtime::watcher::{watcher, Config as WatcherConfig, Event};
+use crate::domains::kubernetes::types::*;
+use base64::{engine::general_purpose, Engine as _};
 use futures_util::StreamExt;
+use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
+use k8s_openapi::api::batch::v1::{CronJob, Job};
+use k8s_openapi::api::core::v1::{ConfigMap, Namespace, Pod, Secret, Service};
+use k8s_openapi::api::networking::v1::Ingress;
+use kube::api::{ListParams, LogParams, Patch, PatchParams, PostParams};
+use kube::config::{KubeConfigOptions, Kubeconfig};
+use kube::runtime::watcher::{watcher, Config as WatcherConfig, Event};
+use kube::{Api, Client, Config};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::Mutex;
-use tauri::{Window, Emitter};
-use crate::domains::kubernetes::types::*;
-use k8s_openapi::api::core::v1::{Pod, Service, Namespace, ConfigMap, Secret};
-use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet};
-use k8s_openapi::api::batch::v1::{Job, CronJob};
-use k8s_openapi::api::networking::v1::Ingress;
 use std::sync::OnceLock;
+use tauri::{Emitter, Window};
 use tokio::process::Child;
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
-use base64::{Engine as _, engine::general_purpose};
-use serde_json::Value;
 
 // Static Kubernetes client using OnceLock (thread-safe initialization)
 static K8S_CLIENT: OnceLock<Client> = OnceLock::new();
@@ -47,7 +47,8 @@ impl KubernetesManager {
 
     // Get the static Kubernetes client
     fn get_client() -> Result<Client, String> {
-        K8S_CLIENT.get()
+        K8S_CLIENT
+            .get()
             .cloned()
             .ok_or_else(|| "Kubernetes client not initialized".to_string())
     }
@@ -60,7 +61,8 @@ impl KubernetesManager {
             .and_then(|s| s.split(':').next().map(|p| PathBuf::from(p)))
             .filter(|p| p.exists())
             .or_else(|| {
-                dirs::home_dir().map(|h| h.join(".kube").join("config"))
+                dirs::home_dir()
+                    .map(|h| h.join(".kube").join("config"))
                     .filter(|p| p.exists())
             })
     }
@@ -86,14 +88,16 @@ impl KubernetesManager {
             return Ok(());
         }
         if let Ok(client) = Client::try_default().await {
-            K8S_CLIENT.set(client)
+            K8S_CLIENT
+                .set(client)
                 .map_err(|_| "K8S client already initialized".to_string())?;
             return Ok(());
         }
         let config = Self::load_config().await?;
         let client = Client::try_from(config)
             .map_err(|e| format!("Failed to create Kubernetes client: {}", e))?;
-        K8S_CLIENT.set(client)
+        K8S_CLIENT
+            .set(client)
             .map_err(|_| "K8S client already initialized".to_string())?;
         Ok(())
     }
@@ -129,7 +133,8 @@ impl KubernetesManager {
         let client = Self::get_client()?;
         match client.apiserver_version().await {
             Ok(version) => {
-                let config = Self::load_config().await
+                let config = Self::load_config()
+                    .await
                     .map_err(|e| format!("Failed to load kubeconfig: {}", e))?;
                 self.current_cluster = Some(KubernetesCluster {
                     name: cluster_name.to_string(),
@@ -142,7 +147,7 @@ impl KubernetesManager {
                 });
                 Ok(())
             }
-            Err(e) => Err(format!("Failed to connect to cluster: {}", e))
+            Err(e) => Err(format!("Failed to connect to cluster: {}", e)),
         }
     }
 
@@ -161,7 +166,7 @@ impl KubernetesManager {
                 }
                 Ok(pod_infos)
             }
-            Err(e) => Err(format!("Failed to list pods: {}", e))
+            Err(e) => Err(format!("Failed to list pods: {}", e)),
         }
     }
 
@@ -176,7 +181,7 @@ impl KubernetesManager {
         let client = Self::get_client()?;
 
         let api: Api<Pod> = Api::namespaced(client, namespace);
-        
+
         let mut log_params = LogParams::default();
         if let Some(container_name) = container {
             log_params.container = Some(container_name.to_string());
@@ -188,24 +193,24 @@ impl KubernetesManager {
 
         match api.logs(pod_name, &log_params).await {
             Ok(logs) => Ok(logs),
-            Err(e) => Err(format!("Failed to get pod logs: {}", e))
+            Err(e) => Err(format!("Failed to get pod logs: {}", e)),
         }
     }
 
     pub async fn watch_pods(&self, namespace: &str, window: Window) -> Result<(), String> {
         // Stop existing watch if any
-        self.stop_watch("pods", namespace);
-        
+        self.stop_watch("pods", namespace).await;
+
         let client = Self::get_client()?;
         let api: Api<Pod> = Api::namespaced(client, namespace);
-        
+
         let stream = watcher(api, WatcherConfig::default());
         let mut stream = Box::pin(stream);
-        
+
         // Clone window for use in spawned task
         let window_clone = window.clone();
         let namespace_str = namespace.to_string();
-        
+
         // Spawn a task to watch for events with error recovery
         let handle = tokio::spawn(async move {
             loop {
@@ -227,22 +232,27 @@ impl KubernetesManager {
                     }
                     Some(Err(e)) => {
                         let error_str = format!("{}", e);
-                        let error_msg = format!("Watch error for pods in {}: {}", namespace_str, error_str);
+                        let error_msg =
+                            format!("Watch error for pods in {}: {}", namespace_str, error_str);
                         eprintln!("{}", error_msg);
                         if let Err(emit_err) = window_clone.emit("k8s:watch-error", &error_msg) {
                             eprintln!("Failed to emit watch error: {}", emit_err);
                         }
-                        
+
                         // Check if it's a connection error - these are fatal and we should stop
-                        if error_str.contains("tcp connect error") 
+                        if error_str.contains("tcp connect error")
                             || error_str.contains("Cannot assign requested address")
                             || error_str.contains("error trying to connect")
                             || error_str.contains("connection refused")
-                            || error_str.contains("connection reset") {
-                            eprintln!("Fatal connection error detected, stopping watch for pods in {}", namespace_str);
+                            || error_str.contains("connection reset")
+                        {
+                            eprintln!(
+                                "Fatal connection error detected, stopping watch for pods in {}",
+                                namespace_str
+                            );
                             break;
                         }
-                        
+
                         // For other errors, wait a bit before continuing (stream might recover)
                         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                     }
@@ -253,29 +263,29 @@ impl KubernetesManager {
                 }
             }
         });
-        
+
         // Store the task handle
         let watch_tasks = WATCH_TASKS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
         let task_key = format!("pods:{}", namespace);
         watch_tasks.lock().await.insert(task_key, handle);
-        
+
         Ok(())
     }
 
     pub async fn watch_services(&self, namespace: &str, window: Window) -> Result<(), String> {
         // Stop existing watch if any
-        self.stop_watch("services", namespace);
-        
+        self.stop_watch("services", namespace).await;
+
         let client = Self::get_client()?;
         let api: Api<Service> = Api::namespaced(client, namespace);
-        
+
         let stream = watcher(api, WatcherConfig::default());
         let mut stream = Box::pin(stream);
-        
+
         // Clone window for use in spawned task
         let window_clone = window.clone();
         let namespace_str = namespace.to_string();
-        
+
         // Spawn a task to watch for events with error recovery
         let handle = tokio::spawn(async move {
             loop {
@@ -297,22 +307,26 @@ impl KubernetesManager {
                     }
                     Some(Err(e)) => {
                         let error_str = format!("{}", e);
-                        let error_msg = format!("Watch error for services in {}: {}", namespace_str, error_str);
+                        let error_msg = format!(
+                            "Watch error for services in {}: {}",
+                            namespace_str, error_str
+                        );
                         eprintln!("{}", error_msg);
                         if let Err(emit_err) = window_clone.emit("k8s:watch-error", &error_msg) {
                             eprintln!("Failed to emit watch error: {}", emit_err);
                         }
-                        
+
                         // Check if it's a connection error - these are fatal and we should stop
-                        if error_str.contains("tcp connect error") 
+                        if error_str.contains("tcp connect error")
                             || error_str.contains("Cannot assign requested address")
                             || error_str.contains("error trying to connect")
                             || error_str.contains("connection refused")
-                            || error_str.contains("connection reset") {
+                            || error_str.contains("connection reset")
+                        {
                             eprintln!("Fatal connection error detected, stopping watch for services in {}", namespace_str);
                             break;
                         }
-                        
+
                         // For other errors, wait a bit before continuing (stream might recover)
                         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                     }
@@ -323,42 +337,46 @@ impl KubernetesManager {
                 }
             }
         });
-        
+
         // Store the task handle
         let watch_tasks = WATCH_TASKS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
         let task_key = format!("services:{}", namespace);
         watch_tasks.lock().await.insert(task_key, handle);
-        
+
         Ok(())
     }
 
     pub async fn watch_deployments(&self, namespace: &str, window: Window) -> Result<(), String> {
         // Stop existing watch if any
-        self.stop_watch("deployments", namespace);
-        
+        self.stop_watch("deployments", namespace).await;
+
         let client = Self::get_client()?;
         let api: Api<Deployment> = Api::namespaced(client, namespace);
-        
+
         let stream = watcher(api, WatcherConfig::default());
         let mut stream = Box::pin(stream);
-        
+
         // Clone window for use in spawned task
         let window_clone = window.clone();
         let namespace_str = namespace.to_string();
-        
+
         // Spawn a task to watch for events with error recovery
         let handle = tokio::spawn(async move {
             loop {
                 match stream.next().await {
                     Some(Ok(Event::Applied(deployment))) => {
                         let deployment_info = Self::deployment_to_info_static(&deployment);
-                        if let Err(e) = window_clone.emit("k8s:deployment-updated", &deployment_info) {
+                        if let Err(e) =
+                            window_clone.emit("k8s:deployment-updated", &deployment_info)
+                        {
                             eprintln!("Failed to emit deployment update: {}", e);
                         }
                     }
                     Some(Ok(Event::Deleted(deployment))) => {
                         let deployment_info = Self::deployment_to_info_static(&deployment);
-                        if let Err(e) = window_clone.emit("k8s:deployment-deleted", &deployment_info) {
+                        if let Err(e) =
+                            window_clone.emit("k8s:deployment-deleted", &deployment_info)
+                        {
                             eprintln!("Failed to emit deployment deletion: {}", e);
                         }
                     }
@@ -367,22 +385,26 @@ impl KubernetesManager {
                     }
                     Some(Err(e)) => {
                         let error_str = format!("{}", e);
-                        let error_msg = format!("Watch error for deployments in {}: {}", namespace_str, error_str);
+                        let error_msg = format!(
+                            "Watch error for deployments in {}: {}",
+                            namespace_str, error_str
+                        );
                         eprintln!("{}", error_msg);
                         if let Err(emit_err) = window_clone.emit("k8s:watch-error", &error_msg) {
                             eprintln!("Failed to emit watch error: {}", emit_err);
                         }
-                        
+
                         // Check if it's a connection error - these are fatal and we should stop
-                        if error_str.contains("tcp connect error") 
+                        if error_str.contains("tcp connect error")
                             || error_str.contains("Cannot assign requested address")
                             || error_str.contains("error trying to connect")
                             || error_str.contains("connection refused")
-                            || error_str.contains("connection reset") {
+                            || error_str.contains("connection reset")
+                        {
                             eprintln!("Fatal connection error detected, stopping watch for deployments in {}", namespace_str);
                             break;
                         }
-                        
+
                         // For other errors, wait a bit before continuing (stream might recover)
                         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                     }
@@ -393,12 +415,12 @@ impl KubernetesManager {
                 }
             }
         });
-        
+
         // Store the task handle
         let watch_tasks = WATCH_TASKS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
         let task_key = format!("deployments:{}", namespace);
         watch_tasks.lock().await.insert(task_key, handle);
-        
+
         Ok(())
     }
 
@@ -417,11 +439,14 @@ impl KubernetesManager {
                 }
                 Ok(service_infos)
             }
-            Err(e) => Err(format!("Failed to list services: {}", e))
+            Err(e) => Err(format!("Failed to list services: {}", e)),
         }
     }
 
-    pub async fn list_deployments(&self, namespace: Option<&str>) -> Result<Vec<DeploymentInfo>, String> {
+    pub async fn list_deployments(
+        &self,
+        namespace: Option<&str>,
+    ) -> Result<Vec<DeploymentInfo>, String> {
         let client = Self::get_client()?;
 
         let namespace = namespace.unwrap_or("default");
@@ -436,11 +461,14 @@ impl KubernetesManager {
                 }
                 Ok(deployment_infos)
             }
-            Err(e) => Err(format!("Failed to list deployments: {}", e))
+            Err(e) => Err(format!("Failed to list deployments: {}", e)),
         }
     }
 
-    pub async fn list_statefulsets(&self, namespace: Option<&str>) -> Result<Vec<StatefulSetInfo>, String> {
+    pub async fn list_statefulsets(
+        &self,
+        namespace: Option<&str>,
+    ) -> Result<Vec<StatefulSetInfo>, String> {
         let client = Self::get_client()?;
 
         let namespace = namespace.unwrap_or("default");
@@ -455,11 +483,14 @@ impl KubernetesManager {
                 }
                 Ok(statefulset_infos)
             }
-            Err(e) => Err(format!("Failed to list statefulsets: {}", e))
+            Err(e) => Err(format!("Failed to list statefulsets: {}", e)),
         }
     }
 
-    pub async fn list_daemonsets(&self, namespace: Option<&str>) -> Result<Vec<DaemonSetInfo>, String> {
+    pub async fn list_daemonsets(
+        &self,
+        namespace: Option<&str>,
+    ) -> Result<Vec<DaemonSetInfo>, String> {
         let client = Self::get_client()?;
 
         let namespace = namespace.unwrap_or("default");
@@ -474,7 +505,7 @@ impl KubernetesManager {
                 }
                 Ok(daemonset_infos)
             }
-            Err(e) => Err(format!("Failed to list daemonsets: {}", e))
+            Err(e) => Err(format!("Failed to list daemonsets: {}", e)),
         }
     }
 
@@ -513,7 +544,7 @@ impl KubernetesManager {
                 }
                 Ok(event_infos)
             }
-            Err(e) => Err(format!("Failed to list events: {}", e))
+            Err(e) => Err(format!("Failed to list events: {}", e)),
         }
     }
 
@@ -536,7 +567,10 @@ impl KubernetesManager {
         }
     }
 
-    pub async fn list_ingresses(&self, namespace: Option<&str>) -> Result<Vec<IngressInfo>, String> {
+    pub async fn list_ingresses(
+        &self,
+        namespace: Option<&str>,
+    ) -> Result<Vec<IngressInfo>, String> {
         let client = Self::get_client()?;
 
         let namespace = namespace.unwrap_or("default");
@@ -555,7 +589,10 @@ impl KubernetesManager {
         }
     }
 
-    pub async fn list_configmaps(&self, namespace: Option<&str>) -> Result<Vec<ConfigMapInfo>, String> {
+    pub async fn list_configmaps(
+        &self,
+        namespace: Option<&str>,
+    ) -> Result<Vec<ConfigMapInfo>, String> {
         let client = Self::get_client()?;
 
         let namespace = namespace.unwrap_or("default");
@@ -607,7 +644,7 @@ impl KubernetesManager {
                 }
                 Ok(namespace_infos)
             }
-            Err(e) => Err(format!("Failed to list namespaces: {}", e))
+            Err(e) => Err(format!("Failed to list namespaces: {}", e)),
         }
     }
 
@@ -627,26 +664,33 @@ impl KubernetesManager {
     fn pod_to_info_static(pod: &Pod) -> PodInfo {
         let metadata = &pod.metadata;
         let status = pod.status.as_ref();
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
-        let pod_status = status.and_then(|s| s.phase.clone()).unwrap_or_else(|| "Unknown".to_string());
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
+        let pod_status = status
+            .and_then(|s| s.phase.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
         let pod_ip = status.and_then(|s| s.pod_ip.clone());
         let node = status.and_then(|s| s.host_ip.clone());
-        
+
         let containers: Vec<ContainerInfo> = status
             .and_then(|s| s.container_statuses.as_ref())
             .map(|statuses| {
-                statuses.iter().map(|cs| {
-                    ContainerInfo {
+                statuses
+                    .iter()
+                    .map(|cs| ContainerInfo {
                         name: cs.name.clone(),
                         image: cs.image.clone(),
                         ready: cs.ready,
                         restart_count: cs.restart_count,
                         state: format!("{:?}", cs.state),
-                    }
-                }).collect()
+                    })
+                    .collect()
             })
             .unwrap_or_default();
 
@@ -654,7 +698,8 @@ impl KubernetesManager {
             name,
             namespace,
             status: pod_status,
-            ready: format!("{}/{}", 
+            ready: format!(
+                "{}/{}",
                 containers.iter().filter(|c| c.ready).count(),
                 containers.len()
             ),
@@ -674,9 +719,13 @@ impl KubernetesManager {
         let metadata = &service.metadata;
         let spec = service.spec.as_ref();
         let status = service.status.as_ref();
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
 
         let cluster_ip = spec.and_then(|s| s.cluster_ip.clone());
         let external_ip = status
@@ -688,22 +737,21 @@ impl KubernetesManager {
         let ports = spec
             .and_then(|s| s.ports.as_ref())
             .map(|ports| {
-                ports.iter().map(|p| {
-                    PortInfo {
+                ports
+                    .iter()
+                    .map(|p| PortInfo {
                         name: p.name.clone(),
                         port: p.port,
                         target_port: p.target_port.as_ref().map(|tp| format!("{:?}", tp)),
                         protocol: p.protocol.as_ref().unwrap_or(&"TCP".to_string()).clone(),
-                    }
-                }).collect()
+                    })
+                    .collect()
             })
             .unwrap_or_default();
 
         let selector: HashMap<String, String> = spec
             .and_then(|s| s.selector.as_ref())
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
         ServiceInfo {
@@ -724,33 +772,27 @@ impl KubernetesManager {
     fn deployment_to_info_static(deployment: &Deployment) -> DeploymentInfo {
         let metadata = &deployment.metadata;
         let status = deployment.status.as_ref();
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
         let labels: std::collections::HashMap<String, String> = metadata
             .labels
             .as_ref()
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
-        let desired = status
-            .and_then(|s| s.replicas)
-            .unwrap_or(0);
-        
-        let current = status
-            .and_then(|s| s.replicas)
-            .unwrap_or(0);
-        
-        let up_to_date = status
-            .and_then(|s| s.updated_replicas)
-            .unwrap_or(0);
-        
-        let available = status
-            .and_then(|s| s.available_replicas)
-            .unwrap_or(0);
+        let desired = status.and_then(|s| s.replicas).unwrap_or(0);
+
+        let current = status.and_then(|s| s.replicas).unwrap_or(0);
+
+        let up_to_date = status.and_then(|s| s.updated_replicas).unwrap_or(0);
+
+        let available = status.and_then(|s| s.available_replicas).unwrap_or(0);
 
         DeploymentInfo {
             name,
@@ -771,29 +813,25 @@ impl KubernetesManager {
     fn statefulset_to_info_static(statefulset: &StatefulSet) -> StatefulSetInfo {
         let metadata = &statefulset.metadata;
         let status = statefulset.status.as_ref();
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
         let labels: std::collections::HashMap<String, String> = metadata
             .labels
             .as_ref()
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
-        let desired = status
-            .map(|s| s.replicas)
-            .unwrap_or(0);
-        
-        let current = status
-            .map(|s| s.replicas)
-            .unwrap_or(0);
-        
-        let ready = status
-            .and_then(|s| s.ready_replicas)
-            .unwrap_or(0);
+        let desired = status.map(|s| s.replicas).unwrap_or(0);
+
+        let current = status.map(|s| s.replicas).unwrap_or(0);
+
+        let ready = status.and_then(|s| s.ready_replicas).unwrap_or(0);
 
         StatefulSetInfo {
             name,
@@ -813,37 +851,29 @@ impl KubernetesManager {
     fn daemonset_to_info_static(daemonset: &DaemonSet) -> DaemonSetInfo {
         let metadata = &daemonset.metadata;
         let status = daemonset.status.as_ref();
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
         let labels: std::collections::HashMap<String, String> = metadata
             .labels
             .as_ref()
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
-        let desired = status
-            .map(|s| s.desired_number_scheduled)
-            .unwrap_or(0);
-        
-        let current = status
-            .map(|s| s.current_number_scheduled)
-            .unwrap_or(0);
-        
-        let ready = status
-            .map(|s| s.number_ready)
-            .unwrap_or(0);
-        
-        let up_to_date = status
-            .and_then(|s| s.updated_number_scheduled)
-            .unwrap_or(0);
-        
-        let available = status
-            .and_then(|s| s.number_available)
-            .unwrap_or(0);
+        let desired = status.map(|s| s.desired_number_scheduled).unwrap_or(0);
+
+        let current = status.map(|s| s.current_number_scheduled).unwrap_or(0);
+
+        let ready = status.map(|s| s.number_ready).unwrap_or(0);
+
+        let up_to_date = status.and_then(|s| s.updated_number_scheduled).unwrap_or(0);
+
+        let available = status.and_then(|s| s.number_available).unwrap_or(0);
 
         DaemonSetInfo {
             name,
@@ -862,18 +892,22 @@ impl KubernetesManager {
         let metadata = &job.metadata;
         let status = job.status.as_ref();
         let spec = job.spec.as_ref();
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
         let completions = spec.and_then(|s| s.completions).unwrap_or(1);
         let parallelism = spec.and_then(|s| s.parallelism);
         let backoff_limit = spec.and_then(|s| s.backoff_limit);
-        
+
         let succeeded = status.and_then(|s| s.succeeded).unwrap_or(0);
         let failed = status.and_then(|s| s.failed).unwrap_or(0);
         let active = status.and_then(|s| s.active).unwrap_or(0);
-        
+
         // Determine job status
         let job_status = if succeeded >= completions {
             "succeeded".to_string()
@@ -884,7 +918,7 @@ impl KubernetesManager {
         } else {
             "pending".to_string()
         };
-        
+
         // Extract image from spec
         let image = spec
             .and_then(|s| s.template.spec.as_ref())
@@ -910,19 +944,28 @@ impl KubernetesManager {
         let metadata = &cronjob.metadata;
         let spec = cronjob.spec.as_ref();
         let status = cronjob.status.as_ref();
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
         let schedule = spec.map(|s| s.schedule.clone()).unwrap_or_default();
         let suspend = spec.and_then(|s| s.suspend).unwrap_or(false);
-        
-        let active = status.and_then(|s| s.active.as_ref()).map(|v| v.len() as i32).unwrap_or(0);
-        let last_schedule_time = status.and_then(|s| s.last_schedule_time.as_ref())
+
+        let active = status
+            .and_then(|s| s.active.as_ref())
+            .map(|v| v.len() as i32)
+            .unwrap_or(0);
+        let last_schedule_time = status
+            .and_then(|s| s.last_schedule_time.as_ref())
             .map(|t| t.0.to_rfc3339());
-        let last_successful_time = status.and_then(|s| s.last_successful_time.as_ref())
+        let last_successful_time = status
+            .and_then(|s| s.last_successful_time.as_ref())
             .map(|t| t.0.to_rfc3339());
-        
+
         // Extract image from spec
         let image = spec
             .and_then(|s| s.job_template.spec.as_ref())
@@ -947,38 +990,37 @@ impl KubernetesManager {
         let metadata = &ingress.metadata;
         let spec = ingress.spec.as_ref();
         let status = ingress.status.as_ref();
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
         let class = spec.and_then(|s| s.ingress_class_name.clone());
-        
+
         let addresses: Vec<String> = status
             .and_then(|s| s.load_balancer.as_ref())
             .and_then(|lb| lb.ingress.as_ref())
             .map(|ingresses| {
-                ingresses.iter()
+                ingresses
+                    .iter()
                     .filter_map(|ing| ing.ip.as_ref().or(ing.hostname.as_ref()))
                     .cloned()
                     .collect()
             })
             .unwrap_or_default();
-        
+
         let ports: Vec<String> = spec
             .and_then(|s| s.rules.as_ref())
-            .map(|rules| {
-                rules.iter()
-                    .filter_map(|rule| rule.host.clone())
-                    .collect()
-            })
+            .map(|rules| rules.iter().filter_map(|rule| rule.host.clone()).collect())
             .unwrap_or_default();
-        
+
         let labels: std::collections::HashMap<String, String> = metadata
             .labels
             .as_ref()
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
         IngressInfo {
@@ -994,22 +1036,24 @@ impl KubernetesManager {
 
     fn configmap_to_info(&self, configmap: &ConfigMap) -> ConfigMapInfo {
         let metadata = &configmap.metadata;
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
-        let data: std::collections::HashMap<String, String> = configmap.data.as_ref()
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
+        let data: std::collections::HashMap<String, String> = configmap
+            .data
+            .as_ref()
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
-        
+
         let labels: std::collections::HashMap<String, String> = metadata
             .labels
             .as_ref()
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
         ConfigMapInfo {
@@ -1023,28 +1067,35 @@ impl KubernetesManager {
 
     fn secret_to_info(&self, secret: &Secret) -> SecretInfo {
         let metadata = &secret.metadata;
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
         // Secrets store data as base64-encoded bytes in the API (ByteString type)
-        let data: std::collections::HashMap<String, String> = secret.data.as_ref()
+        let data: std::collections::HashMap<String, String> = secret
+            .data
+            .as_ref()
             .map(|btree| {
-                btree.iter().map(|(k, v)| {
-                    // v.0 is the Vec<u8> that's already base64-encoded in Kubernetes
-                    // We need to decode it first, then re-encode for transmission
-                    let base64_str = general_purpose::STANDARD.encode(&v.0);
-                    (k.clone(), base64_str)
-                }).collect()
+                btree
+                    .iter()
+                    .map(|(k, v)| {
+                        // v.0 is the Vec<u8> that's already base64-encoded in Kubernetes
+                        // We need to decode it first, then re-encode for transmission
+                        let base64_str = general_purpose::STANDARD.encode(&v.0);
+                        (k.clone(), base64_str)
+                    })
+                    .collect()
             })
             .unwrap_or_default();
-        
+
         let labels: std::collections::HashMap<String, String> = metadata
             .labels
             .as_ref()
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
         let secret_type = secret.type_.as_ref().cloned();
@@ -1062,31 +1113,37 @@ impl KubernetesManager {
     fn event_to_info(&self, event: &k8s_openapi::api::core::v1::Event) -> EventInfo {
         let metadata = &event.metadata;
         let involved_object = &event.involved_object;
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let namespace = metadata.namespace.as_ref().cloned().unwrap_or("default".to_string());
-        
+        let namespace = metadata
+            .namespace
+            .as_ref()
+            .cloned()
+            .unwrap_or("default".to_string());
+
         let kind = involved_object.kind.clone().unwrap_or_default();
         let obj_name = involved_object.name.clone().unwrap_or_default();
         let obj_namespace = involved_object.namespace.clone();
         let obj_uid = involved_object.uid.clone();
-        
+
         let reason = event.reason.as_ref().cloned().unwrap_or_default();
         let message = event.message.as_ref().cloned().unwrap_or_default();
         let count = event.count.unwrap_or(1);
-        
-        let first_timestamp = event.first_timestamp.as_ref()
+
+        let first_timestamp = event
+            .first_timestamp
+            .as_ref()
             .map(|t| t.0.format("%Y-%m-%d %H:%M:%S").to_string());
-        let last_timestamp = event.last_timestamp.as_ref()
+        let last_timestamp = event
+            .last_timestamp
+            .as_ref()
             .map(|t| t.0.format("%Y-%m-%d %H:%M:%S").to_string());
-        
-        let source = event.source.as_ref().map(|s| {
-            EventSource {
-                component: s.component.clone(),
-                host: s.host.clone(),
-            }
+
+        let source = event.source.as_ref().map(|s| EventSource {
+            component: s.component.clone(),
+            host: s.host.clone(),
         });
-        
+
         let type_ = event.type_.clone();
 
         EventInfo {
@@ -1111,19 +1168,19 @@ impl KubernetesManager {
 
     fn namespace_to_info(&self, namespace: &Namespace) -> NamespaceInfo {
         let metadata = &namespace.metadata;
-        
+
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
-        let status = namespace.status.as_ref()
+        let status = namespace
+            .status
+            .as_ref()
             .and_then(|s| s.phase.as_ref())
             .cloned()
             .unwrap_or_else(|| "Active".to_string());
-        
+
         let labels: std::collections::HashMap<String, String> = metadata
             .labels
             .as_ref()
-            .map(|btree| {
-                btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-            })
+            .map(|btree| btree.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
         NamespaceInfo {
@@ -1134,16 +1191,21 @@ impl KubernetesManager {
         }
     }
 
-    pub async fn get_resource_yaml(&self, kind: &str, namespace: &str, name: &str) -> Result<String, String> {
+    pub async fn get_resource_yaml(
+        &self,
+        kind: &str,
+        namespace: &str,
+        name: &str,
+    ) -> Result<String, String> {
         let client = Self::get_client()?;
-        
+
         match kind.to_lowercase().as_str() {
             "pod" => {
                 let api: Api<Pod> = Api::namespaced(client, namespace);
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "configmap" => {
@@ -1151,7 +1213,7 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "secret" => {
@@ -1159,7 +1221,7 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "service" => {
@@ -1167,7 +1229,7 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "deployment" => {
@@ -1175,7 +1237,7 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "statefulset" => {
@@ -1183,7 +1245,7 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "daemonset" => {
@@ -1191,7 +1253,7 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "job" => {
@@ -1199,7 +1261,7 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "cronjob" => {
@@ -1207,7 +1269,7 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
             "ingress" => {
@@ -1215,10 +1277,10 @@ impl KubernetesManager {
                 match api.get(name).await {
                     Ok(resource) => serde_json::to_string_pretty(&resource)
                         .map_err(|e| format!("Failed to serialize resource: {}", e)),
-                    Err(e) => Err(format!("Failed to get resource: {}", e))
+                    Err(e) => Err(format!("Failed to get resource: {}", e)),
                 }
             }
-            _ => Err(format!("Unsupported resource kind: {}", kind))
+            _ => Err(format!("Unsupported resource kind: {}", kind)),
         }
     }
 
@@ -1234,47 +1296,61 @@ impl KubernetesManager {
         self.get_resource_yaml("secret", namespace, name).await
     }
 
-    pub async fn apply_resource_yaml(&self, namespace: &str, yaml_content: &str) -> Result<String, String> {
+    pub async fn apply_resource_yaml(
+        &self,
+        namespace: &str,
+        yaml_content: &str,
+    ) -> Result<String, String> {
         let client = Self::get_client()?;
-        
+
         // Parse YAML to JSON
-        let mut json_value: Value = serde_yaml::from_str(yaml_content)
-            .map_err(|e| format!("Invalid YAML: {}", e))?;
-        
+        let mut json_value: Value =
+            serde_yaml::from_str(yaml_content).map_err(|e| format!("Invalid YAML: {}", e))?;
+
         // Extract kind and name before modifying json_value
-        let kind = json_value.get("kind")
+        let kind = json_value
+            .get("kind")
             .and_then(|v| v.as_str())
             .ok_or_else(|| "Missing 'kind' field".to_string())?
             .to_string();
-        
-        let name = json_value.get("metadata")
+
+        let name = json_value
+            .get("metadata")
             .and_then(|m| m.get("name"))
             .and_then(|n| n.as_str())
             .ok_or_else(|| "Missing 'metadata.name' field".to_string())?
             .to_string();
-        
+
         // Validate namespace matches (if specified in YAML)
-        if let Some(yaml_namespace) = json_value.get("metadata")
+        if let Some(yaml_namespace) = json_value
+            .get("metadata")
             .and_then(|m| m.get("namespace"))
-            .and_then(|n| n.as_str()) {
+            .and_then(|n| n.as_str())
+        {
             if yaml_namespace != namespace {
-                return Err(format!("Namespace mismatch: YAML specifies '{}' but request is for '{}'", yaml_namespace, namespace));
+                return Err(format!(
+                    "Namespace mismatch: YAML specifies '{}' but request is for '{}'",
+                    yaml_namespace, namespace
+                ));
             }
         }
-        
+
         // Set namespace in metadata
         if let Some(metadata) = json_value.get_mut("metadata") {
             if let Some(metadata_obj) = metadata.as_object_mut() {
-                metadata_obj.insert("namespace".to_string(), Value::String(namespace.to_string()));
+                metadata_obj.insert(
+                    "namespace".to_string(),
+                    Value::String(namespace.to_string()),
+                );
             }
         }
-        
+
         match kind.to_lowercase().as_str() {
             "configmap" => {
                 let configmap: ConfigMap = serde_json::from_value(json_value)
                     .map_err(|e| format!("Failed to parse ConfigMap: {}", e))?;
                 let api: Api<ConfigMap> = Api::namespaced(client, namespace);
-                
+
                 // Try to get existing resource
                 match api.get(&name).await {
                     Ok(_) => {
@@ -1283,7 +1359,7 @@ impl KubernetesManager {
                         let patch = Patch::Apply(&configmap);
                         match api.patch(&name, &params, &patch).await {
                             Ok(_) => Ok(format!("ConfigMap '{}' updated successfully", name)),
-                            Err(e) => Err(format!("Failed to update ConfigMap: {}", e))
+                            Err(e) => Err(format!("Failed to update ConfigMap: {}", e)),
                         }
                     }
                     Err(_) => {
@@ -1291,7 +1367,7 @@ impl KubernetesManager {
                         let params = PostParams::default();
                         match api.create(&params, &configmap).await {
                             Ok(_) => Ok(format!("ConfigMap '{}' created successfully", name)),
-                            Err(e) => Err(format!("Failed to create ConfigMap: {}", e))
+                            Err(e) => Err(format!("Failed to create ConfigMap: {}", e)),
                         }
                     }
                 }
@@ -1300,7 +1376,7 @@ impl KubernetesManager {
                 let secret: Secret = serde_json::from_value(json_value)
                     .map_err(|e| format!("Failed to parse Secret: {}", e))?;
                 let api: Api<Secret> = Api::namespaced(client, namespace);
-                
+
                 // Try to get existing resource
                 match api.get(&name).await {
                     Ok(_) => {
@@ -1309,7 +1385,7 @@ impl KubernetesManager {
                         let patch = Patch::Apply(&secret);
                         match api.patch(&name, &params, &patch).await {
                             Ok(_) => Ok(format!("Secret '{}' updated successfully", name)),
-                            Err(e) => Err(format!("Failed to update Secret: {}", e))
+                            Err(e) => Err(format!("Failed to update Secret: {}", e)),
                         }
                     }
                     Err(_) => {
@@ -1317,7 +1393,7 @@ impl KubernetesManager {
                         let params = PostParams::default();
                         match api.create(&params, &secret).await {
                             Ok(_) => Ok(format!("Secret '{}' created successfully", name)),
-                            Err(e) => Err(format!("Failed to create Secret: {}", e))
+                            Err(e) => Err(format!("Failed to create Secret: {}", e)),
                         }
                     }
                 }
@@ -1326,7 +1402,7 @@ impl KubernetesManager {
                 let statefulset: StatefulSet = serde_json::from_value(json_value)
                     .map_err(|e| format!("Failed to parse StatefulSet: {}", e))?;
                 let api: Api<StatefulSet> = Api::namespaced(client, namespace);
-                
+
                 // Try to get existing resource
                 match api.get(&name).await {
                     Ok(_) => {
@@ -1335,7 +1411,7 @@ impl KubernetesManager {
                         let patch = Patch::Apply(&statefulset);
                         match api.patch(&name, &params, &patch).await {
                             Ok(_) => Ok(format!("StatefulSet '{}' updated successfully", name)),
-                            Err(e) => Err(format!("Failed to update StatefulSet: {}", e))
+                            Err(e) => Err(format!("Failed to update StatefulSet: {}", e)),
                         }
                     }
                     Err(_) => {
@@ -1343,7 +1419,7 @@ impl KubernetesManager {
                         let params = PostParams::default();
                         match api.create(&params, &statefulset).await {
                             Ok(_) => Ok(format!("StatefulSet '{}' created successfully", name)),
-                            Err(e) => Err(format!("Failed to create StatefulSet: {}", e))
+                            Err(e) => Err(format!("Failed to create StatefulSet: {}", e)),
                         }
                     }
                 }
@@ -1352,7 +1428,7 @@ impl KubernetesManager {
                 let daemonset: DaemonSet = serde_json::from_value(json_value)
                     .map_err(|e| format!("Failed to parse DaemonSet: {}", e))?;
                 let api: Api<DaemonSet> = Api::namespaced(client, namespace);
-                
+
                 // Try to get existing resource
                 match api.get(&name).await {
                     Ok(_) => {
@@ -1361,7 +1437,7 @@ impl KubernetesManager {
                         let patch = Patch::Apply(&daemonset);
                         match api.patch(&name, &params, &patch).await {
                             Ok(_) => Ok(format!("DaemonSet '{}' updated successfully", name)),
-                            Err(e) => Err(format!("Failed to update DaemonSet: {}", e))
+                            Err(e) => Err(format!("Failed to update DaemonSet: {}", e)),
                         }
                     }
                     Err(_) => {
@@ -1369,12 +1445,12 @@ impl KubernetesManager {
                         let params = PostParams::default();
                         match api.create(&params, &daemonset).await {
                             Ok(_) => Ok(format!("DaemonSet '{}' created successfully", name)),
-                            Err(e) => Err(format!("Failed to create DaemonSet: {}", e))
+                            Err(e) => Err(format!("Failed to create DaemonSet: {}", e)),
                         }
                     }
                 }
             }
-            _ => Err(format!("Unsupported resource kind for apply: {}", kind))
+            _ => Err(format!("Unsupported resource kind for apply: {}", kind)),
         }
     }
 
@@ -1383,7 +1459,7 @@ impl KubernetesManager {
         let api: Api<ConfigMap> = Api::namespaced(client, namespace);
         match api.delete(name, &kube::api::DeleteParams::default()).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("Failed to delete ConfigMap: {}", e))
+            Err(e) => Err(format!("Failed to delete ConfigMap: {}", e)),
         }
     }
 
@@ -1392,7 +1468,7 @@ impl KubernetesManager {
         let api: Api<Secret> = Api::namespaced(client, namespace);
         match api.delete(name, &kube::api::DeleteParams::default()).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("Failed to delete Secret: {}", e))
+            Err(e) => Err(format!("Failed to delete Secret: {}", e)),
         }
     }
 
@@ -1400,13 +1476,21 @@ impl KubernetesManager {
         let client = Self::get_client()?;
         let api: Api<Pod> = Api::namespaced(client, namespace);
 
-        match api.delete(pod_name, &kube::api::DeleteParams::default()).await {
+        match api
+            .delete(pod_name, &kube::api::DeleteParams::default())
+            .await
+        {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("Failed to delete pod: {}", e))
+            Err(e) => Err(format!("Failed to delete pod: {}", e)),
         }
     }
 
-    pub async fn scale_deployment(&self, namespace: &str, deployment_name: &str, replicas: u32) -> Result<(), String> {
+    pub async fn scale_deployment(
+        &self,
+        namespace: &str,
+        deployment_name: &str,
+        replicas: u32,
+    ) -> Result<(), String> {
         let client = Self::get_client()?;
         let api: Api<Deployment> = Api::namespaced(client, namespace);
 
@@ -1422,16 +1506,27 @@ impl KubernetesManager {
                     return Err("Deployment spec not found".to_string());
                 }
 
-                match api.replace(deployment_name, &kube::api::PostParams::default(), &deployment).await {
+                match api
+                    .replace(
+                        deployment_name,
+                        &kube::api::PostParams::default(),
+                        &deployment,
+                    )
+                    .await
+                {
                     Ok(_) => Ok(()),
-                    Err(e) => Err(format!("Failed to scale deployment: {}", e))
+                    Err(e) => Err(format!("Failed to scale deployment: {}", e)),
                 }
             }
-            Err(e) => Err(format!("Failed to get deployment: {}", e))
+            Err(e) => Err(format!("Failed to get deployment: {}", e)),
         }
     }
 
-    pub async fn rollback_deployment(&self, namespace: &str, deployment_name: &str) -> Result<String, String> {
+    pub async fn rollback_deployment(
+        &self,
+        namespace: &str,
+        deployment_name: &str,
+    ) -> Result<String, String> {
         // Use kubectl rollout undo for rollback
         use tokio::process::Command;
 
@@ -1442,53 +1537,53 @@ impl KubernetesManager {
             "deployment",
             deployment_name,
             "-n",
-            namespace
+            namespace,
         ]);
 
         match cmd.output().await {
             Ok(output) => {
                 if output.status.success() {
-                    Ok(format!("Deployment '{}' rolled back successfully", deployment_name))
+                    Ok(format!(
+                        "Deployment '{}' rolled back successfully",
+                        deployment_name
+                    ))
                 } else {
                     let error_msg = String::from_utf8_lossy(&output.stderr);
                     Err(format!("Rollback failed: {}", error_msg))
                 }
             }
-            Err(e) => Err(format!("Failed to execute rollback: {}", e))
+            Err(e) => Err(format!("Failed to execute rollback: {}", e)),
         }
     }
 
-    pub async fn get_pod_metrics(&self, namespace: &str, pod_name: &str) -> Result<ResourceMetrics, String> {
+    pub async fn get_pod_metrics(
+        &self,
+        namespace: &str,
+        pod_name: &str,
+    ) -> Result<ResourceMetrics, String> {
         // Use kubectl top to get pod metrics
-        use tokio::process::Command;
         use chrono::Utc;
+        use tokio::process::Command;
 
         let mut cmd = Command::new("kubectl");
-        cmd.args(&[
-            "top",
-            "pod",
-            pod_name,
-            "-n",
-            namespace,
-            "--no-headers"
-        ]);
+        cmd.args(&["top", "pod", pod_name, "-n", namespace, "--no-headers"]);
 
         match cmd.output().await {
             Ok(output) => {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     let parts: Vec<&str> = stdout.trim().split_whitespace().collect();
-                    
+
                     if parts.len() >= 3 {
                         // Format: NAME CPU(cores) MEMORY(bytes)
                         // Parse CPU (can be in m, cores, etc.)
                         let cpu_str = parts[1];
                         let cpu_usage = Self::parse_cpu(cpu_str);
-                        
+
                         // Parse Memory (can be in Ki, Mi, Gi, etc.)
                         let memory_str = parts[2];
                         let memory_usage = Self::parse_memory(memory_str);
-                        
+
                         Ok(ResourceMetrics {
                             cpu_usage: Some(cpu_usage),
                             memory_usage: Some(memory_usage),
@@ -1504,14 +1599,17 @@ impl KubernetesManager {
                     Err(format!("Failed to get metrics: {}", error_msg))
                 }
             }
-            Err(e) => Err(format!("Failed to execute metrics command: {}", e))
+            Err(e) => Err(format!("Failed to execute metrics command: {}", e)),
         }
     }
 
-    pub async fn get_all_pods_metrics(&self, namespace: Option<&str>) -> Result<HashMap<String, ResourceMetrics>, String> {
+    pub async fn get_all_pods_metrics(
+        &self,
+        namespace: Option<&str>,
+    ) -> Result<HashMap<String, ResourceMetrics>, String> {
         // Use kubectl top pods to get all pod metrics
-        use tokio::process::Command;
         use chrono::Utc;
+        use tokio::process::Command;
 
         let mut cmd = Command::new("kubectl");
         cmd.arg("top");
@@ -1528,7 +1626,7 @@ impl KubernetesManager {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     let mut metrics_map = HashMap::new();
-                    
+
                     for line in stdout.lines() {
                         let parts: Vec<&str> = line.trim().split_whitespace().collect();
                         if parts.len() >= 3 {
@@ -1542,69 +1640,86 @@ impl KubernetesManager {
                                     continue;
                                 }
                             };
-                            
-                            let cpu_str = if namespace.is_some() { parts[1] } else { parts[2] };
-                            let memory_str = if namespace.is_some() { parts[2] } else { parts[3] };
-                            
+
+                            let cpu_str = if namespace.is_some() {
+                                parts[1]
+                            } else {
+                                parts[2]
+                            };
+                            let memory_str = if namespace.is_some() {
+                                parts[2]
+                            } else {
+                                parts[3]
+                            };
+
                             let cpu_usage = Self::parse_cpu(cpu_str);
                             let memory_usage = Self::parse_memory(memory_str);
-                            
-                            metrics_map.insert(pod_name, ResourceMetrics {
-                                cpu_usage: Some(cpu_usage),
-                                memory_usage: Some(memory_usage),
-                                cpu_limit: None,
-                                memory_limit: None,
-                                timestamp: Utc::now().to_rfc3339(),
-                            });
+
+                            metrics_map.insert(
+                                pod_name,
+                                ResourceMetrics {
+                                    cpu_usage: Some(cpu_usage),
+                                    memory_usage: Some(memory_usage),
+                                    cpu_limit: None,
+                                    memory_limit: None,
+                                    timestamp: Utc::now().to_rfc3339(),
+                                },
+                            );
                         }
                     }
-                    
+
                     Ok(metrics_map)
                 } else {
                     let error_msg = String::from_utf8_lossy(&output.stderr);
                     Err(format!("Failed to get metrics: {}", error_msg))
                 }
             }
-            Err(e) => Err(format!("Failed to execute metrics command: {}", e))
+            Err(e) => Err(format!("Failed to execute metrics command: {}", e)),
         }
     }
 
     // Helper functions for parsing CPU and memory
     fn parse_cpu(cpu_str: &str) -> f64 {
-    let cpu_str = cpu_str.trim();
-    if cpu_str.ends_with('m') {
-        // Millicores: "100m" = 0.1 cores
-        cpu_str.trim_end_matches('m').parse::<f64>().unwrap_or(0.0) / 1000.0
-    } else {
-        // Cores: "1" = 1 core
-        cpu_str.parse::<f64>().unwrap_or(0.0)
+        let cpu_str = cpu_str.trim();
+        if cpu_str.ends_with('m') {
+            // Millicores: "100m" = 0.1 cores
+            cpu_str.trim_end_matches('m').parse::<f64>().unwrap_or(0.0) / 1000.0
+        } else {
+            // Cores: "1" = 1 core
+            cpu_str.parse::<f64>().unwrap_or(0.0)
+        }
     }
-}
 
-fn parse_memory(memory_str: &str) -> f64 {
-    let memory_str = memory_str.trim();
-    let (value_str, unit) = if memory_str.ends_with("Ki") {
-        (memory_str.trim_end_matches("Ki"), 1024.0)
-    } else if memory_str.ends_with("Mi") {
-        (memory_str.trim_end_matches("Mi"), 1024.0 * 1024.0)
-    } else if memory_str.ends_with("Gi") {
-        (memory_str.trim_end_matches("Gi"), 1024.0 * 1024.0 * 1024.0)
-    } else if memory_str.ends_with("Ti") {
-        (memory_str.trim_end_matches("Ti"), 1024.0 * 1024.0 * 1024.0 * 1024.0)
-    } else if memory_str.ends_with('K') {
-        (memory_str.trim_end_matches('K'), 1000.0)
-    } else if memory_str.ends_with('M') {
-        (memory_str.trim_end_matches('M'), 1000.0 * 1000.0)
-    } else if memory_str.ends_with('G') {
-        (memory_str.trim_end_matches('G'), 1000.0 * 1000.0 * 1000.0)
-    } else if memory_str.ends_with('T') {
-        (memory_str.trim_end_matches('T'), 1000.0 * 1000.0 * 1000.0 * 1000.0)
-    } else {
-        // Assume bytes
-        (memory_str, 1.0)
-    };
-    
-    value_str.parse::<f64>().unwrap_or(0.0) * unit
+    fn parse_memory(memory_str: &str) -> f64 {
+        let memory_str = memory_str.trim();
+        let (value_str, unit) = if memory_str.ends_with("Ki") {
+            (memory_str.trim_end_matches("Ki"), 1024.0)
+        } else if memory_str.ends_with("Mi") {
+            (memory_str.trim_end_matches("Mi"), 1024.0 * 1024.0)
+        } else if memory_str.ends_with("Gi") {
+            (memory_str.trim_end_matches("Gi"), 1024.0 * 1024.0 * 1024.0)
+        } else if memory_str.ends_with("Ti") {
+            (
+                memory_str.trim_end_matches("Ti"),
+                1024.0 * 1024.0 * 1024.0 * 1024.0,
+            )
+        } else if memory_str.ends_with('K') {
+            (memory_str.trim_end_matches('K'), 1000.0)
+        } else if memory_str.ends_with('M') {
+            (memory_str.trim_end_matches('M'), 1000.0 * 1000.0)
+        } else if memory_str.ends_with('G') {
+            (memory_str.trim_end_matches('G'), 1000.0 * 1000.0 * 1000.0)
+        } else if memory_str.ends_with('T') {
+            (
+                memory_str.trim_end_matches('T'),
+                1000.0 * 1000.0 * 1000.0 * 1000.0,
+            )
+        } else {
+            // Assume bytes
+            (memory_str, 1.0)
+        };
+
+        value_str.parse::<f64>().unwrap_or(0.0) * unit
     }
 
     pub async fn exec_pod(
@@ -1619,11 +1734,11 @@ fn parse_memory(memory_str: &str) -> f64 {
 
         let mut cmd = Command::new("kubectl");
         cmd.args(&["exec", "-n", namespace, pod_name]);
-        
+
         if let Some(container_name) = container {
             cmd.args(&["-c", container_name]);
         }
-        
+
         cmd.args(&["--"]);
         cmd.args(&command);
 
@@ -1638,7 +1753,7 @@ fn parse_memory(memory_str: &str) -> f64 {
                     ))
                 }
             }
-            Err(e) => Err(format!("Failed to execute command: {}", e))
+            Err(e) => Err(format!("Failed to execute command: {}", e)),
         }
     }
 
@@ -1650,9 +1765,9 @@ fn parse_memory(memory_str: &str) -> f64 {
         remote_port: u16,
     ) -> Result<PortForwardInfo, String> {
         // Get or create port forward map
-        let port_forwards = PORT_FORWARDS.get_or_init(|| {
-            Arc::new(Mutex::new(HashMap::new()))
-        }).clone();
+        let port_forwards = PORT_FORWARDS
+            .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+            .clone();
 
         // Check if port is already in use
         {
@@ -1665,13 +1780,14 @@ fn parse_memory(memory_str: &str) -> f64 {
         }
 
         // Use kubectl port-forward for simplicity
-        use tokio::process::Command;
         use std::process::Stdio;
+        use tokio::process::Command;
 
         let mut cmd = Command::new("kubectl");
         cmd.args(&[
             "port-forward",
-            "-n", namespace,
+            "-n",
+            namespace,
             &format!("pod/{}", pod_name),
             &format!("{}:{}", local_port, remote_port),
         ]);
@@ -1682,7 +1798,7 @@ fn parse_memory(memory_str: &str) -> f64 {
             Ok(mut child) => {
                 // Give it a moment to start
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                
+
                 // Check if process is still running
                 match child.try_wait() {
                     Ok(Some(status)) => {
@@ -1714,17 +1830,17 @@ fn parse_memory(memory_str: &str) -> f64 {
 
                         Ok(info)
                     }
-                    Err(e) => Err(format!("Failed to check port forward status: {}", e))
+                    Err(e) => Err(format!("Failed to check port forward status: {}", e)),
                 }
             }
-            Err(e) => Err(format!("Failed to start port forward: {}", e))
+            Err(e) => Err(format!("Failed to start port forward: {}", e)),
         }
     }
 
     pub async fn list_port_forwards(&self) -> Result<Vec<PortForwardInfo>, String> {
-        let port_forwards = PORT_FORWARDS.get_or_init(|| {
-            Arc::new(Mutex::new(HashMap::new()))
-        }).clone();
+        let port_forwards = PORT_FORWARDS
+            .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+            .clone();
 
         let mut forwards = port_forwards.lock().await;
         let mut active_forwards = Vec::new();
@@ -1758,16 +1874,16 @@ fn parse_memory(memory_str: &str) -> f64 {
     }
 
     pub async fn stop_port_forward(&self, id: &str) -> Result<(), String> {
-        let port_forwards = PORT_FORWARDS.get_or_init(|| {
-            Arc::new(Mutex::new(HashMap::new()))
-        }).clone();
+        let port_forwards = PORT_FORWARDS
+            .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+            .clone();
 
         // Remove the child from the map first
         let child_option = {
             let mut forwards = port_forwards.lock().await;
             forwards.remove(id).map(|(child, _)| child)
         };
-        
+
         if let Some(mut child) = child_option {
             // Try to kill the process
             if let Err(e) = child.kill().await {
@@ -1778,25 +1894,34 @@ fn parse_memory(memory_str: &str) -> f64 {
             Err(format!("Port forward {} not found", id))
         }
     }
-    
+
     /// Stop a specific watch task
-    fn stop_watch(&self, resource_type: &str, namespace: &str) {
+    async fn stop_watch(&self, resource_type: &str, namespace: &str) {
         let watch_tasks = WATCH_TASKS.get();
         if let Some(tasks) = watch_tasks {
             let task_key = format!("{}:{}", resource_type, namespace);
-            if let Some(handle) = tasks.blocking_lock().remove(&task_key) {
+            // `tokio::sync::Mutex` must be acquired with `.lock().await` when inside
+            // an active Tokio runtime; `blocking_lock()` will panic.
+            if let Some(handle) = tasks.lock().await.remove(&task_key) {
                 handle.abort();
                 eprintln!("Stopped watch for {} in {}", resource_type, namespace);
             }
         }
     }
-    
+
     /// Stop all watch tasks
-    pub fn stop_all_watches(&self) {
+    pub async fn stop_all_watches(&self) {
         let watch_tasks = WATCH_TASKS.get();
         if let Some(tasks) = watch_tasks {
-            let mut tasks_guard = tasks.blocking_lock();
-            for (key, handle) in tasks_guard.drain() {
+            let handles_and_keys: Vec<(String, JoinHandle<()>)> = {
+                let mut tasks_guard = tasks.lock().await;
+                tasks_guard
+                    .drain()
+                    .map(|(key, handle)| (key, handle))
+                    .collect()
+            };
+
+            for (key, handle) in handles_and_keys {
                 handle.abort();
                 eprintln!("Stopped watch task: {}", key);
             }

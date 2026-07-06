@@ -2,7 +2,6 @@
  * Python Source Implementation
  * Fetches versions from GitHub releases API
  */
-
 use super::super::VersionInfo;
 use crate::domains::sdk::SDKError;
 use reqwest::Client;
@@ -39,28 +38,30 @@ impl PythonSource {
 
     /// Fetch all available Python versions from GitHub releases
     pub async fn fetch_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
-        let response = self.client
+        let response = self
+            .client
             .get("https://api.github.com/repos/python/cpython/releases")
             .header("User-Agent", "Portal-Desktop")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Python versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Python versions: {}", e))
+            })?;
 
-        let releases: Vec<GitHubRelease> = response
-            .json()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse Python releases: {}", e)))?;
+        let releases: Vec<GitHubRelease> = response.json().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse Python releases: {}", e))
+        })?;
 
         let mut versions = Vec::new();
-        
+
         for release in releases {
             let version = release.tag_name.trim_start_matches('v').to_string();
-            
+
             // Skip pre-releases and very old versions
             if version.contains("a") || version.contains("b") || version.contains("rc") {
                 continue;
             }
-            
+
             if let Some(version_parts) = version.split('.').next() {
                 if let Ok(major) = version_parts.parse::<u32>() {
                     if major < 3 {
@@ -91,7 +92,9 @@ impl PythonSource {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)

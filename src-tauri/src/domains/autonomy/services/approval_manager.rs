@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Approval decision
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,14 +52,25 @@ impl ApprovalManager {
     }
 
     /// Check if an action should be auto-approved based on learned patterns
-    pub fn should_auto_approve(&self, action_type: &str, context: &str, safety_level: crate::domains::autonomy::services::action_classifier::ActionSafetyLevel) -> bool {
+    pub fn should_auto_approve(
+        &self,
+        action_type: &str,
+        context: &str,
+        safety_level: crate::domains::autonomy::services::action_classifier::ActionSafetyLevel,
+    ) -> bool {
         // High risk actions never auto-approve
-        if matches!(safety_level, crate::domains::autonomy::services::action_classifier::ActionSafetyLevel::HighRisk) {
+        if matches!(
+            safety_level,
+            crate::domains::autonomy::services::action_classifier::ActionSafetyLevel::HighRisk
+        ) {
             return false;
         }
 
         // Safe actions always auto-approve
-        if matches!(safety_level, crate::domains::autonomy::services::action_classifier::ActionSafetyLevel::Safe) {
+        if matches!(
+            safety_level,
+            crate::domains::autonomy::services::action_classifier::ActionSafetyLevel::Safe
+        ) {
             return true;
         }
 
@@ -74,7 +85,14 @@ impl ApprovalManager {
     }
 
     /// Record an approval decision for learning
-    pub fn record_decision(&mut self, action_id: String, action_type: String, context: String, decision: ApprovalDecision, feedback: Option<String>) {
+    pub fn record_decision(
+        &mut self,
+        action_id: String,
+        action_type: String,
+        context: String,
+        decision: ApprovalDecision,
+        feedback: Option<String>,
+    ) {
         let approval = ActionApproval {
             action_id: action_id.clone(),
             action_type: action_type.clone(),
@@ -87,15 +105,20 @@ impl ApprovalManager {
         self.recent_approvals.insert(action_id, approval.clone());
 
         // Update auto-approval rules based on decision
-        self.update_auto_approval_rule(&action_type, &context, decision == ApprovalDecision::Approved);
+        self.update_auto_approval_rule(
+            &action_type,
+            &context,
+            decision == ApprovalDecision::Approved,
+        );
 
         // Limit cache size
         if self.recent_approvals.len() > 1000 {
-            let oldest_key = self.recent_approvals
+            let oldest_key = self
+                .recent_approvals
                 .iter()
                 .min_by_key(|(_, v)| v.timestamp)
                 .map(|(k, _)| k.clone());
-            
+
             if let Some(key) = oldest_key {
                 self.recent_approvals.remove(&key);
             }
@@ -105,7 +128,8 @@ impl ApprovalManager {
     /// Update auto-approval rule based on user decision
     fn update_auto_approval_rule(&mut self, action_type: &str, context: &str, approved: bool) {
         // Find or create rule
-        let rule = self.auto_approval_rules
+        let rule = self
+            .auto_approval_rules
             .iter_mut()
             .find(|r| r.pattern_type == action_type && r.context_pattern == context);
 
@@ -114,10 +138,10 @@ impl ApprovalManager {
             if approved {
                 rule.success_count += 1;
             }
-            
+
             // Auto-approve if success rate > 90% and at least 5 attempts
-            rule.auto_approve = rule.total_count >= 5 && 
-                               (rule.success_count as f64 / rule.total_count as f64) > 0.90;
+            rule.auto_approve = rule.total_count >= 5
+                && (rule.success_count as f64 / rule.total_count as f64) > 0.90;
         } else {
             let new_rule = AutoApprovalRule {
                 pattern_type: action_type.to_string(),
@@ -126,7 +150,7 @@ impl ApprovalManager {
                 total_count: 1,
                 auto_approve: false,
             };
-            
+
             // Don't auto-approve on first attempt
             self.auto_approval_rules.push(new_rule);
         }
@@ -144,17 +168,16 @@ impl ApprovalManager {
     /// Get approval statistics
     pub fn get_approval_stats(&self) -> HashMap<String, (u32, u32)> {
         let mut stats = HashMap::new();
-        
+
         for approval in self.recent_approvals.values() {
-            let entry = stats.entry(approval.action_type.clone())
-                .or_insert((0, 0));
-            
+            let entry = stats.entry(approval.action_type.clone()).or_insert((0, 0));
+
             if approval.decision == ApprovalDecision::Approved {
                 entry.0 += 1;
             }
             entry.1 += 1;
         }
-        
+
         stats
     }
 }

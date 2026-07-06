@@ -17,7 +17,7 @@ pub struct AISettings {
 impl Default for AISettings {
     fn default() -> Self {
         let mut providers = HashMap::new();
-        
+
         // Initialize default configurations for all providers
         providers.insert(
             "Ollama".to_string(),
@@ -44,7 +44,7 @@ impl AISettingsService {
         let mut settings_path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
         settings_path.push("portal-desktop");
         settings_path.push("ai-settings.json");
-        
+
         Self { settings_path }
     }
 
@@ -64,7 +64,9 @@ impl AISettingsService {
         // Filter out unsupported providers (OpenAI, Anthropic) from the providers map
         // We need to check both the key name and the provider_type field inside each config
         let supported_providers = vec!["Ollama", "Gemini"];
-        let keys_to_remove: Vec<String> = if let Some(Value::Object(providers_obj)) = json.get("providers") {
+        let keys_to_remove: Vec<String> = if let Some(Value::Object(providers_obj)) =
+            json.get("providers")
+        {
             providers_obj
                 .iter()
                 .filter(|(key, config_value)| {
@@ -74,7 +76,8 @@ impl AISettingsService {
                     }
                     // Also remove if provider_type field inside config is unsupported
                     if let Some(config_obj) = config_value.as_object() {
-                        if let Some(Value::String(provider_type)) = config_obj.get("provider_type") {
+                        if let Some(Value::String(provider_type)) = config_obj.get("provider_type")
+                        {
                             if !supported_providers.contains(&provider_type.as_str()) {
                                 return true;
                             }
@@ -87,7 +90,7 @@ impl AISettingsService {
         } else {
             Vec::new()
         };
-        
+
         // Now remove the keys from the mutable reference
         if !keys_to_remove.is_empty() {
             if let Some(Value::Object(ref mut providers_obj_mut)) = json.get_mut("providers") {
@@ -149,11 +152,15 @@ impl AISettingsService {
     }
 
     /// Get provider configuration
-    pub fn get_provider_config(&self, provider_type: ProviderType) -> Result<ProviderConfig, String> {
+    pub fn get_provider_config(
+        &self,
+        provider_type: ProviderType,
+    ) -> Result<ProviderConfig, String> {
         let settings = self.load_settings()?;
         let key = format!("{:?}", provider_type);
-        
-        settings.providers
+
+        settings
+            .providers
             .get(&key)
             .cloned()
             .ok_or_else(|| format!("Provider {:?} not found in settings", provider_type))
@@ -163,7 +170,7 @@ impl AISettingsService {
     pub fn save_provider_config(&self, config: ProviderConfig) -> Result<(), String> {
         let mut settings = self.load_settings()?;
         let key = format!("{:?}", config.provider_type);
-        
+
         settings.providers.insert(key, config);
         self.save_settings(&settings)
     }
@@ -195,12 +202,12 @@ impl AISettingsService {
     pub fn set_default_provider(&self, provider_type: ProviderType) -> Result<(), String> {
         let mut settings = self.load_settings()?;
         let key = format!("{:?}", provider_type);
-        
+
         // Verify provider exists
         if !settings.providers.contains_key(&key) {
             return Err(format!("Provider {:?} is not configured", provider_type));
         }
-        
+
         settings.default_provider = Some(key);
         self.save_settings(&settings)
     }
@@ -209,14 +216,13 @@ impl AISettingsService {
     pub fn delete_provider_config(&self, provider_type: ProviderType) -> Result<(), String> {
         let mut settings = self.load_settings()?;
         let key = format!("{:?}", provider_type);
-        
+
         // Don't allow deleting if it's the default provider
         if settings.default_provider.as_ref() == Some(&key) {
             return Err("Cannot delete the default provider".to_string());
         }
-        
+
         settings.providers.remove(&key);
         self.save_settings(&settings)
     }
 }
-

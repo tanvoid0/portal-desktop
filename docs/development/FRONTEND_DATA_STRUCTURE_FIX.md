@@ -1,6 +1,7 @@
 # 🔧 Frontend Data Structure Fix
 
 ## 🐛 **Problem Identified:**
+
 The frontend was throwing a `TypeError: undefined is not an object (evaluating 'manager.type.includes')` error because:
 
 1. **Backend Changes**: The new factory system returns different property names
@@ -10,9 +11,11 @@ The frontend was throwing a `TypeError: undefined is not an object (evaluating '
 ## ✅ **Fixes Applied:**
 
 ### **1. Backend Factory Fix:**
+
 **File**: `src-tauri/src/domains/sdk/factory.rs`
 
 **Before:**
+
 ```rust
 if let Ok(info) = manager.get_info().await {
     installed.push(info);
@@ -20,6 +23,7 @@ if let Ok(info) = manager.get_info().await {
 ```
 
 **After:**
+
 ```rust
 let mut info = HashMap::new();
 info.insert("name".to_string(), manager.name().to_string());
@@ -34,69 +38,80 @@ installed.push(info);
 **Why**: The `get_info()` method was part of `SDKManagerHelpers` trait, not the base `SDKManager` trait.
 
 ### **2. Frontend Property Mapping:**
+
 **File**: `src/lib/domains/sdk/components/FlyEnvStyleDashboard.svelte`
 
 **Before:**
+
 ```javascript
-if (manager.type.includes('node') || manager.type.includes('python')) {
-    category = 'language';
+if (manager.type.includes("node") || manager.type.includes("python")) {
+  category = "language";
 }
 ```
 
 **After:**
-```javascript
-let category = manager.category || 'other';
 
-if (!category || category === 'other') {
-    const sdkType = manager.sdk_type || manager.type || '';
-    if (sdkType.includes('node') || sdkType.includes('python')) {
-        category = 'language';
-    }
+```javascript
+let category = manager.category || "other";
+
+if (!category || category === "other") {
+  const sdkType = manager.sdk_type || manager.type || "";
+  if (sdkType.includes("node") || sdkType.includes("python")) {
+    category = "language";
+  }
 }
 ```
 
 **Why**: The new system uses `sdk_type` and `category` properties instead of just `type`.
 
 ### **3. Display Property Fix:**
+
 **File**: `src/lib/domains/sdk/components/FlyEnvStyleDashboard.svelte`
 
 **Before:**
+
 ```javascript
 <span class="text-xs text-muted-foreground">{manager.type}</span>
 ```
 
 **After:**
+
 ```javascript
-<span class="text-xs text-muted-foreground">{manager.sdk_type || manager.type || manager.name}</span>
+<span class="text-xs text-muted-foreground">
+  {manager.sdk_type || manager.type || manager.name}
+</span>
 ```
 
 **Why**: Fallback chain to handle both old and new data structures.
 
 ### **4. Store Property Fix:**
+
 **File**: `src/lib/domains/sdk/stores/sdkStore.ts`
 
 **Before:**
+
 ```javascript
-$managers.find(manager => manager.type === type)
+$managers.find((manager) => manager.type === type);
 ```
 
 **After:**
+
 ```javascript
-$managers.find(manager => manager.sdk_type === type || manager.type === type)
+$managers.find((manager) => manager.sdk_type === type || manager.type === type);
 ```
 
 **Why**: Support both old and new property names for backward compatibility.
 
 ## 🎯 **Data Structure Mapping:**
 
-| Old Property | New Property | Purpose |
-|-------------|--------------|---------|
-| `manager.type` | `manager.sdk_type` | SDK type (node, python, etc.) |
-| `manager.name` | `manager.name` | Manager name (nvm, pyenv, etc.) |
-| `manager.version` | `manager.version` | Manager version |
-| `manager.installed` | `manager.installed` | Installation status |
-| - | `manager.category` | Category (language, web, etc.) |
-| - | `manager.display_name` | Human-readable name |
+| Old Property        | New Property           | Purpose                         |
+| ------------------- | ---------------------- | ------------------------------- |
+| `manager.type`      | `manager.sdk_type`     | SDK type (node, python, etc.)   |
+| `manager.name`      | `manager.name`         | Manager name (nvm, pyenv, etc.) |
+| `manager.version`   | `manager.version`      | Manager version                 |
+| `manager.installed` | `manager.installed`    | Installation status             |
+| -                   | `manager.category`     | Category (language, web, etc.)  |
+| -                   | `manager.display_name` | Human-readable name             |
 
 ## 🚀 **Benefits:**
 
@@ -109,6 +124,7 @@ $managers.find(manager => manager.sdk_type === type || manager.type === type)
 ## 🔍 **Testing:**
 
 The application should now:
+
 - ✅ Load without frontend errors
 - ✅ Display SDK managers correctly
 - ✅ Categorize managers properly

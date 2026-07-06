@@ -1,14 +1,15 @@
+use super::super::traits::package_manager::{
+    InstalledPackage, Package, PackageDetails, PackageManager, PackageUpdate,
+};
+use super::super::SDKError;
+use crate::command_executor::CommandExecutor;
 /**
  * Pip Package Manager Implementation
- * 
+ *
  * Pip (Python) implementation - cross-platform
  */
-
 use async_trait::async_trait;
 use serde_json::Value;
-use crate::command_executor::CommandExecutor;
-use super::super::SDKError;
-use super::super::traits::package_manager::{PackageManager, Package, InstalledPackage, PackageDetails, PackageUpdate};
 
 pub struct PipManager;
 
@@ -18,13 +19,17 @@ impl PipManager {
     }
 
     async fn execute_pip(&self, args: &[&str]) -> Result<String, SDKError> {
-        let result = CommandExecutor::execute_with_args("pip", args, None).await
+        let result = CommandExecutor::execute_with_args("pip", args, None)
+            .await
             .map_err(|e| SDKError::CommandFailed(format!("Pip command failed: {}", e)))?;
 
         if result.success {
             Ok(result.stdout)
         } else {
-            Err(SDKError::CommandFailed(format!("Pip error: {}", result.stderr)))
+            Err(SDKError::CommandFailed(format!(
+                "Pip error: {}",
+                result.stderr
+            )))
         }
     }
 }
@@ -63,12 +68,12 @@ impl PackageManager for PipManager {
 
     async fn get_installed_packages(&self) -> Result<Vec<InstalledPackage>, SDKError> {
         let output = self.execute_pip(&["list", "--format=json"]).await?;
-        
+
         let json: Value = serde_json::from_str(&output)
             .map_err(|e| SDKError::CommandFailed(format!("Failed to parse pip JSON: {}", e)))?;
 
         let mut packages = Vec::new();
-        
+
         if let Some(array) = json.as_array() {
             for item in array {
                 if let (Some(name), Some(version)) = (
@@ -86,19 +91,19 @@ impl PackageManager for PipManager {
                 }
             }
         }
-        
+
         Ok(packages)
     }
 
     async fn get_package_details(&self, id: &str) -> Result<PackageDetails, SDKError> {
         let output = self.execute_pip(&["show", id]).await?;
-        
+
         let mut name = id.to_string();
         let mut version = None;
         let mut description = None;
         let mut homepage = None;
         let mut license = None;
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.starts_with("Name:") {
@@ -113,7 +118,7 @@ impl PackageManager for PipManager {
                 license = Some(line.replace("License:", "").trim().to_string());
             }
         }
-        
+
         Ok(PackageDetails {
             id: id.to_string(),
             name,
@@ -129,7 +134,8 @@ impl PackageManager for PipManager {
 
     async fn install_package(&self, id: &str, version: Option<&str>) -> Result<(), SDKError> {
         if let Some(ver) = version {
-            self.execute_pip(&["install", &format!("{}=={}", id, ver)]).await?;
+            self.execute_pip(&["install", &format!("{}=={}", id, ver)])
+                .await?;
         } else {
             self.execute_pip(&["install", id]).await?;
         }
@@ -147,13 +153,15 @@ impl PackageManager for PipManager {
     }
 
     async fn check_updates(&self) -> Result<Vec<PackageUpdate>, SDKError> {
-        let output = self.execute_pip(&["list", "--outdated", "--format=json"]).await?;
-        
+        let output = self
+            .execute_pip(&["list", "--outdated", "--format=json"])
+            .await?;
+
         let json: Value = serde_json::from_str(&output)
             .map_err(|e| SDKError::CommandFailed(format!("Failed to parse pip JSON: {}", e)))?;
 
         let mut updates = Vec::new();
-        
+
         if let Some(array) = json.as_array() {
             for item in array {
                 if let (Some(name), Some(current), Some(latest)) = (
@@ -171,7 +179,7 @@ impl PackageManager for PipManager {
                 }
             }
         }
-        
+
         Ok(updates)
     }
 
@@ -187,4 +195,3 @@ impl PackageManager for PipManager {
         false
     }
 }
-

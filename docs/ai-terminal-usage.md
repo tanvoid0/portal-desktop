@@ -3,6 +3,7 @@
 ## Overview
 
 The AI Terminal supports two modes of operation:
+
 1. **Regular Terminal Mode**: Execute shell commands normally
 2. **AI Query Mode**: Ask natural language questions and get AI responses
 
@@ -78,14 +79,17 @@ Make sure you have an AI provider configured:
 ## Troubleshooting
 
 ### "Error: Provider not configured"
+
 - Go to AI > Providers and configure at least one AI provider
 - Make sure the provider is enabled
 
 ### "Error: Connection failed"
+
 - For Ollama: Ensure Ollama is running (`ollama serve`)
 - For Gemini: Check your API key is valid
 
 ### Input is disabled after query
+
 - Wait for the AI response to complete
 - The input is intentionally disabled while processing to prevent multiple concurrent queries
 

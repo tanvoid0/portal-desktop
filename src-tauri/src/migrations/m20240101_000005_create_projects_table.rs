@@ -48,25 +48,71 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Projects::Name).string().not_null())
                     .col(ColumnDef::new(Projects::Description).string().null())
                     .col(ColumnDef::new(Projects::Path).string().not_null())
-                    .col(ColumnDef::new(Projects::Status).string().not_null().default("active"))
+                    .col(
+                        ColumnDef::new(Projects::Status)
+                            .string()
+                            .not_null()
+                            .default("active"),
+                    )
                     .col(ColumnDef::new(Projects::BuildCommand).string().null())
                     .col(ColumnDef::new(Projects::StartCommand).string().null())
                     .col(ColumnDef::new(Projects::TestCommand).string().null())
                     .col(ColumnDef::new(Projects::OutputDirectory).string().null())
                     .col(ColumnDef::new(Projects::DevPort).integer().null())
                     .col(ColumnDef::new(Projects::ProdPort).integer().null())
-                    .col(ColumnDef::new(Projects::Starred).boolean().not_null().default(false))
-                    .col(ColumnDef::new(Projects::OpenCount).integer().not_null().default(0))
-                    .col(ColumnDef::new(Projects::LastOpened).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(Projects::Size).big_integer().not_null().default(0))
-                    .col(ColumnDef::new(Projects::FileCount).integer().not_null().default(0))
+                    .col(
+                        ColumnDef::new(Projects::Starred)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(Projects::OpenCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(Projects::LastOpened)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(Projects::Size)
+                            .big_integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(Projects::FileCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
                     .col(ColumnDef::new(Projects::GitRepository).string().null())
                     .col(ColumnDef::new(Projects::GitBranch).string().null())
                     .col(ColumnDef::new(Projects::GitCommit).string().null())
-                    .col(ColumnDef::new(Projects::HasUncommittedChanges).boolean().not_null().default(false))
-                    .col(ColumnDef::new(Projects::LastCommit).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(Projects::CreatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Projects::UpdatedAt).timestamp_with_time_zone().default(Expr::current_timestamp()))
+                    .col(
+                        ColumnDef::new(Projects::HasUncommittedChanges)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(Projects::LastCommit)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(Projects::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Projects::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Expr::current_timestamp()),
+                    )
                     .to_owned(),
             )
             .await
@@ -106,4 +152,3 @@ enum Projects {
     CreatedAt,
     UpdatedAt,
 }
-

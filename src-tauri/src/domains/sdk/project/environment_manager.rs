@@ -1,10 +1,9 @@
 /**
  * Environment Manager
- * 
+ *
  * Manages environment variables and PATH for SDK installations
  * Supports both app-managed and system-managed environments
  */
-
 use crate::domains::sdk::SDKError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -23,7 +22,7 @@ pub struct EnvironmentVariable {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EnvironmentScope {
-    Global,   // System-wide environment
+    Global,  // System-wide environment
     Session, // Current session only
     Project, // Project-specific
     Service, // Service-specific
@@ -139,7 +138,10 @@ impl EnvironmentManager {
     }
 
     /// Get environment status for an SDK
-    pub async fn get_environment_status(&self, sdk_type: &str) -> Result<EnvironmentStatus, SDKError> {
+    pub async fn get_environment_status(
+        &self,
+        sdk_type: &str,
+    ) -> Result<EnvironmentStatus, SDKError> {
         let current_version = self.get_current_sdk_version(sdk_type).await?;
         let path_managed_by = self.determine_path_management_type(sdk_type).await;
         let binaries_in_path = self.get_sdk_binaries_in_path(sdk_type).await;
@@ -193,7 +195,8 @@ impl EnvironmentManager {
 
         // Update shell configuration if needed
         if let Some(config_path) = &self.shell_config_path {
-            self.update_shell_path_config(config_path, &new_path).await?;
+            self.update_shell_path_config(config_path, &new_path)
+                .await?;
         }
 
         Ok(())
@@ -202,8 +205,9 @@ impl EnvironmentManager {
     /// Update shell configuration file
     async fn update_shell_config(&self, config_path: &Path) -> Result<(), SDKError> {
         let mut config_content = if config_path.exists() {
-            fs::read_to_string(config_path).await
-                .map_err(|e| SDKError::ManagerNotFound(format!("Failed to read shell config: {}", e)))?
+            fs::read_to_string(config_path).await.map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to read shell config: {}", e))
+            })?
         } else {
             String::new()
         };
@@ -218,17 +222,23 @@ impl EnvironmentManager {
             }
         }
 
-        fs::write(config_path, config_content).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to write shell config: {}", e)))?;
+        fs::write(config_path, config_content).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to write shell config: {}", e))
+        })?;
 
         Ok(())
     }
 
     /// Update shell PATH configuration
-    async fn update_shell_path_config(&self, config_path: &Path, new_path: &str) -> Result<(), SDKError> {
+    async fn update_shell_path_config(
+        &self,
+        config_path: &Path,
+        new_path: &str,
+    ) -> Result<(), SDKError> {
         let config_content = if config_path.exists() {
-            fs::read_to_string(config_path).await
-                .map_err(|e| SDKError::ManagerNotFound(format!("Failed to read shell config: {}", e)))?
+            fs::read_to_string(config_path).await.map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to read shell config: {}", e))
+            })?
         } else {
             String::new()
         };
@@ -249,8 +259,9 @@ impl EnvironmentManager {
         // Add new PATH export
         new_config.push_str(&format!("export PATH=\"{}\"\n", new_path));
 
-        fs::write(config_path, new_config).await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to write shell config: {}", e)))?;
+        fs::write(config_path, new_config).await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to write shell config: {}", e))
+        })?;
 
         Ok(())
     }
@@ -258,7 +269,7 @@ impl EnvironmentManager {
     /// Detect shell configuration file path
     fn detect_shell_config_path() -> Option<PathBuf> {
         let home_dir = dirs::home_dir()?;
-        
+
         // Check for different shells
         if std::env::var("SHELL").unwrap_or_default().contains("zsh") {
             Some(home_dir.join(".zshrc"))
@@ -283,14 +294,23 @@ impl EnvironmentManager {
 
     /// Get next priority for path entries
     fn get_next_priority(&self) -> u32 {
-        self.path_entries.iter().map(|entry| entry.priority).max().unwrap_or(0) + 1
+        self.path_entries
+            .iter()
+            .map(|entry| entry.priority)
+            .max()
+            .unwrap_or(0)
+            + 1
     }
 
     /// Get current SDK version from PATH
     async fn get_current_sdk_version(&self, sdk_type: &str) -> Result<Option<String>, SDKError> {
         // This would check the current PATH to determine which version is active
         // For now, return the first active version
-        if let Some(entry) = self.path_entries.iter().find(|entry| entry.sdk_type == sdk_type && entry.is_active) {
+        if let Some(entry) = self
+            .path_entries
+            .iter()
+            .find(|entry| entry.sdk_type == sdk_type && entry.is_active)
+        {
             Ok(Some(entry.version.clone()))
         } else {
             Ok(None)
@@ -299,7 +319,11 @@ impl EnvironmentManager {
 
     /// Determine how PATH is managed for an SDK
     async fn determine_path_management_type(&self, sdk_type: &str) -> PathManagementType {
-        if self.path_entries.iter().any(|entry| entry.sdk_type == sdk_type) {
+        if self
+            .path_entries
+            .iter()
+            .any(|entry| entry.sdk_type == sdk_type)
+        {
             PathManagementType::App
         } else if self.is_sdk_in_system_path(sdk_type).await {
             PathManagementType::System
@@ -319,7 +343,7 @@ impl EnvironmentManager {
     /// Get SDK binaries currently in PATH
     async fn get_sdk_binaries_in_path(&self, sdk_type: &str) -> Vec<String> {
         let mut binaries = Vec::new();
-        
+
         for entry in &self.path_entries {
             if entry.sdk_type == sdk_type && entry.is_active {
                 // This would scan the directory for SDK binaries
@@ -335,7 +359,12 @@ impl EnvironmentManager {
     async fn get_sdk_environment_variables(&self, sdk_type: &str) -> Vec<EnvironmentVariable> {
         self.environment_variables
             .values()
-            .filter(|env_var| env_var.name.to_lowercase().contains(&sdk_type.to_lowercase()))
+            .filter(|env_var| {
+                env_var
+                    .name
+                    .to_lowercase()
+                    .contains(&sdk_type.to_lowercase())
+            })
             .cloned()
             .collect()
     }
@@ -347,7 +376,12 @@ impl EnvironmentManager {
             "zsh" => self.create_zsh_integration().await,
             "fish" => self.create_fish_integration().await,
             "powershell" => self.create_powershell_integration().await,
-            _ => return Err(SDKError::ManagerNotFound(format!("Unsupported shell: {}", shell_type))),
+            _ => {
+                return Err(SDKError::ManagerNotFound(format!(
+                    "Unsupported shell: {}",
+                    shell_type
+                )))
+            }
         };
 
         Ok(script)

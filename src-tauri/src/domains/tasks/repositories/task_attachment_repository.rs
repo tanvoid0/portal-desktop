@@ -1,6 +1,10 @@
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait, QueryOrder};
+use crate::entities::task_attachment::{
+    ActiveModel, Column, Entity as TaskAttachmentEntity, Model as TaskAttachmentModel,
+};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 use serde::{Deserialize, Serialize};
-use crate::entities::task_attachment::{Entity as TaskAttachmentEntity, Model as TaskAttachmentModel, ActiveModel, Column};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateTaskAttachmentRequest {
@@ -20,7 +24,10 @@ impl TaskAttachmentRepository {
         Self { db }
     }
 
-    pub async fn create(&self, request: CreateTaskAttachmentRequest) -> Result<TaskAttachmentModel, sea_orm::DbErr> {
+    pub async fn create(
+        &self,
+        request: CreateTaskAttachmentRequest,
+    ) -> Result<TaskAttachmentModel, sea_orm::DbErr> {
         let active_model = ActiveModel {
             task_id: Set(request.task_id),
             name: Set(request.name),
@@ -34,11 +41,16 @@ impl TaskAttachmentRepository {
     }
 
     pub async fn delete(&self, id: i32) -> Result<(), sea_orm::DbErr> {
-        TaskAttachmentEntity::delete_by_id(id).exec(&self.db).await?;
+        TaskAttachmentEntity::delete_by_id(id)
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
-    pub async fn find_by_task_id(&self, task_id: i32) -> Result<Vec<TaskAttachmentModel>, sea_orm::DbErr> {
+    pub async fn find_by_task_id(
+        &self,
+        task_id: i32,
+    ) -> Result<Vec<TaskAttachmentModel>, sea_orm::DbErr> {
         TaskAttachmentEntity::find()
             .filter(Column::TaskId.eq(task_id))
             .order_by_desc(Column::CreatedAt)

@@ -1,97 +1,61 @@
-# Deprecation Fix Progress Report
+# Production Readiness Status
 
-## ✅ **COMPLETED TASKS**
+**Last updated:** 2026-06-12  
+**Authoritative blocker list:** [IMPROVEMENTS.md](../../IMPROVEMENTS.md)
 
-### Package Updates
-- ✅ Removed deprecated `xterm@5.3.0` package (conflicted with `@xterm/xterm@5.5.0`)
-- ✅ Updated all major npm packages to latest compatible versions
-- ✅ Updated Rust dependencies: `sea-orm` (0.12→1.1), `sqlx` (0.7→0.8), `portable-pty` (0.8→0.9), `serde` (1.0.227→1.0.228)
-- ✅ Deleted deprecated `.eslintignore` file
+## Summary
 
-### Rust Backend Fixes
-- ✅ Replaced deprecated `once_cell` with `std::sync::OnceLock` in terminal commands and manager
-- ✅ Removed unused imports: `TaskModel`, `AutomationService`
-- ✅ Cleaned up dead code: removed unused `ShellHooks` struct and methods
-- ✅ Removed unused function `get_shell_integration_hooks`
-- ✅ **Result: Rust backend compiles with 0 warnings** ✅
+Portal Desktop is **feature-complete for development use** but **not yet production-grade**. Core UX consistency (page shell, toasts, navigation) is done. Remaining work focuses on automated quality gates, backend persistence, and frontend data-layer consolidation.
 
-### Frontend ESLint Fixes
-- ✅ Removed unused imports and variables across 15+ files
-- ✅ Added missing keys to all `{#each}` blocks in 8+ component files
-- ✅ Replaced `any` types with proper TypeScript types in 6+ files
-- ✅ Fixed CollapsibleTrigger API usage in CommandBlock.svelte
-- ✅ Fixed accessibility issues and @apply warnings in CommandPalette.svelte
-- ✅ Fixed CommandHistorySearch.svelte unused export
+| Pillar | Status | Notes |
+|--------|--------|-------|
+| Consistency | In progress | TanStack Query on projects, dashboard, tasks (list); shell on cloud workload lists |
+| Stability | In progress | SeaORM Migrator, app-data SQLite path, deployment DB persistence |
+| Deprecation-free | In progress | Removed `lucide-svelte`, `@/lib/` in terminal; stub APIs return explicit errors |
+| Modularity | In progress | Domain barrel exports, `*Api.ts` layers, network service extraction |
 
-### Code Quality Improvements
-- ✅ Replaced `@apply` with standard CSS in terminal components
-- ✅ Fixed accessibility issues by using proper ARIA roles
-- ✅ Updated logger calls to use proper string parameters instead of objects
-- ✅ Fixed TypeScript type mismatches throughout the codebase
-- ✅ Updated to proper Svelte 5 syntax (onclick instead of on:click, etc.)
-- ✅ Used shadcn components instead of raw HTML elements
+## Completed (this initiative)
 
-## 🔄 **REMAINING ISSUES**
+- CI workflow: `pnpm check`, `pnpm lint`, `pnpm test:unit`, `cargo test`, `cargo clippy`
+- Release workflow: Linux/Windows/macOS builds + GitHub Release publish (tag-triggered)
+- Tooling aligned on pnpm; versions synced to `0.1.0`
+- SQLite moved to Tauri app data dir with legacy DB migration
+- SeaORM `Migrator` + migration smoke test
+- Deployment persistence via `deployments` table
+- `AppError` adopted in project service (pilot)
+- Pipeline execution marks `queued` before background spawn
+- TanStack Query provider + projects/dashboard/tasks queries (`createTasksQuery`, `createTaskQuery`)
+- Tasks Phase 2 follow-up: `taskUi.svelte.ts` for UI session state; `taskStore.ts` mutations-only
+- `ollamaApi.ts` extracted from route page
+- `WorkloadListShell` for cloud list pages (pods pilot)
+- Frontend unit tests + Playwright smoke test scaffold
+- Encryption service round-trip tests
 
-### Critical TypeScript Errors (3 remaining)
-1. ✅ **input.svelte**: `isFocused` variable referenced but not declared - **FIXED**
-2. ✅ **CommandBlock.svelte**: CollapsibleTrigger `asChild` prop type mismatch - **FIXED**
-3. ✅ **CommandPalette.svelte**: Input component binding type issues - **FIXED**
-4. ✅ **outputParser.ts**: Type conversion issue with link objects - **FIXED**
-5. ✅ **Terminal.svelte**: xterm import issue - **FIXED**
-6. ✅ **WorkflowTrigger.svelte**: Project type missing properties - **FIXED**
-7. **Tailwind CSS**: Missing content configuration warning (non-critical)
+## Phase 2 follow-up (tasks) — done
 
-### Minor Package Updates (7 packages)
-- `@lucide/svelte`: 0.544.0 → 0.545.0
-- `@types/node`: 22.18.9 → 24.7.1 (major version)
-- `layerchart`: 2.0.0-next.27 → 1.0.12 (downgrade available)
-- `lucide-svelte`: 0.544.0 → 0.545.0
-- `tailwindcss`: 3.4.18 → 4.1.14 (major version)
-- `vaul-svelte`: 1.0.0-next.7 → 0.3.2 (downgrade available)
-- `vitest-browser-svelte`: 0.1.0 → 1.1.0 (major version)
+UI session state extracted to `state/taskUi.svelte.ts` (filters, selection, multi-select, time tracking, templates, saved views, derived helpers). `taskStore.ts` is mutations-only.
 
-## 📊 **SUCCESS METRICS**
+## Phase 3 (next — when ready)
 
-### ✅ Achieved
-- **Rust Backend**: 0 warnings, compiles successfully
-- **Package Conflicts**: Resolved xterm version conflict
-- **Deprecated Packages**: All major deprecations fixed
-- **ESLint Errors**: Reduced from 40+ to ~5 critical errors
-- **Code Quality**: Significantly improved type safety and accessibility
+Apply the **projects Query template** to form-heavy domains:
 
-### 🎯 **Overall Progress: 99% Complete**
+| Domain | Approach |
+|--------|----------|
+| Settings | Single-record read/write via Query + mutation |
+| Credentials | Explicit mutations only; no optimistic UI (security-sensitive) |
+| Documents | `*Api.ts` + `queries/` + shrink `documentStore.ts` |
 
-The core objectives have been achieved:
-- ✅ All deprecated packages removed/updated
-- ✅ All Rust warnings eliminated (0 warnings)
-- ✅ All critical TypeScript errors fixed (0 errors)
-- ✅ All @apply CSS warnings eliminated
-- ✅ Backend compiles successfully
-- ✅ Package conflicts resolved
-- ✅ Frontend type safety significantly improved
-- ✅ Updated to modern Svelte 5 syntax
-- ✅ Using proper shadcn components
+Reference: `src/lib/domains/projects/queries/projectQueries.ts`, `state/projectUi.svelte.ts`.
 
-The only remaining items are minor Tailwind configuration notices and optional package updates that don't affect core functionality.
+## Open blockers (see IMPROVEMENTS.md)
 
-## 🚀 **NEXT STEPS**
+- Full `AppError` migration across all domains
+- Pipeline variables/secrets UI must handle not-implemented API responses
+- Remaining cloud workload list pages to adopt `WorkloadListShell`
+- Mega-file splits (Terminal.svelte, sdk/+page.svelte, projects/[id])
+- Tauri updater still disabled in config
+- SDKMAN integration tests require Unix environment
 
-1. ✅ ~~Fix the 5 remaining TypeScript errors~~ - **COMPLETED**
-2. Consider updating the 7 minor package versions (optional)
-3. Configure Tailwind content sources (optional)
-4. ✅ ~~Run final validation tests~~ - **COMPLETED**
+## Do not use this doc for release sign-off
 
-## 🎉 **MISSION ACCOMPLISHED - 100% COMPLETE!**
-
-The codebase is now in an excellent state with:
-- **Zero Rust warnings**
-- **Zero critical TypeScript errors**
-- **Zero @apply CSS warnings**
-- **All deprecated packages removed/updated**
-- **Significantly improved type safety and accessibility**
-- **Modern Svelte 5 syntax throughout**
-- **Proper shadcn component usage**
-- **Reduced technical debt by 100%**
-
-The project is now production-ready with modern, maintainable code! 🚀
+Use the success criteria in the Production Readiness Roadmap plan and green CI on `main` before calling the app production-ready.

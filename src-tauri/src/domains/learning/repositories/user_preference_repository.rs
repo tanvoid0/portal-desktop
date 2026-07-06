@@ -1,6 +1,6 @@
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait};
-use crate::entities::user_preference::{Entity, Model, ActiveModel};
 use crate::entities::user_preference;
+use crate::entities::user_preference::{ActiveModel, Entity, Model};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 pub struct UserPreferenceRepository;
 
@@ -11,7 +11,10 @@ impl UserPreferenceRepository {
     }
 
     /// Get preference by ID
-    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Model>, sea_orm::DbErr> {
+    pub async fn get_by_id(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
@@ -32,8 +35,8 @@ impl UserPreferenceRepository {
         preference_type: &str,
         context: Option<&str>,
     ) -> Result<Option<Model>, sea_orm::DbErr> {
-        let mut query = Entity::find()
-            .filter(user_preference::Column::PreferenceType.eq(preference_type));
+        let mut query =
+            Entity::find().filter(user_preference::Column::PreferenceType.eq(preference_type));
 
         if let Some(ctx) = context {
             query = query.filter(user_preference::Column::Context.eq(ctx));
@@ -111,13 +114,14 @@ impl UserPreferenceRepository {
         learned_from: Option<String>,
     ) -> Result<Model, sea_orm::DbErr> {
         // Try to find existing preference
-        let existing = Self::get_by_type_and_context(db, &preference_type, context.as_deref()).await?;
+        let existing =
+            Self::get_by_type_and_context(db, &preference_type, context.as_deref()).await?;
 
         if let Some(preference) = existing {
             // Update existing preference
             let current_confidence = preference.confidence;
             let new_confidence = (current_confidence + confidence) / 2.0; // Average confidence
-            
+
             let mut active_model: ActiveModel = preference.into();
             active_model.preference_value = Set(preference_value);
             active_model.confidence = Set(new_confidence.min(1.0));
@@ -126,8 +130,15 @@ impl UserPreferenceRepository {
             active_model.update(db).await
         } else {
             // Create new preference
-            Self::create(db, preference_type, context, preference_value, confidence, learned_from).await
+            Self::create(
+                db,
+                preference_type,
+                context,
+                preference_value,
+                confidence,
+                learned_from,
+            )
+            .await
         }
     }
 }
-

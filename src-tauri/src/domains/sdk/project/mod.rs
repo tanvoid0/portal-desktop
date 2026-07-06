@@ -1,13 +1,11 @@
+pub mod environment_manager;
+pub mod shell_integration;
 /**
  * Project-Level Version Isolation Module
- * 
+ *
  * Handles .portal-version files and automatic version switching
  */
-
 pub mod version_file;
-pub mod shell_integration;
-pub mod environment_manager;
-
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

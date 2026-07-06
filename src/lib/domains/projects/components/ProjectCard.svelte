@@ -4,165 +4,337 @@
 -->
 
 <script lang="ts">
-	import type { Project } from '@/lib/domains/projects/types';
-	import { formatRelativeTime, formatBytes } from '@/lib/domains/shared/utils';
-	import { Button } from '@/lib/components/ui/button';
-	import { CardInfo } from '@/lib/components/ui/card';
-	import { Edit, Trash2, Folder } from '@lucide/svelte';
+  import { onMount } from "svelte";
+  import type { Project } from "$lib/domains/projects/types";
+  import { formatRelativeTime, formatBytes } from "$lib/domains/shared/utils";
+  import { Button } from "$lib/components/ui/button";
+  import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+  } from "$lib/components/ui/card";
+  import { Badge } from "$lib/components/ui/badge";
+  import TechIcon from "$lib/components/ui/tech-icon.svelte";
+  import {
+    Edit,
+    Trash2,
+    Star,
+    FolderOpen,
+    HardDrive,
+    FileText,
+    Clock,
+    Eye,
+    Calendar,
+    GitBranch,
+    GitCommit,
+    CircleDot,
+    Globe,
+    Archive,
+    CheckCircle2,
+  } from "@lucide/svelte";
+  import {
+    getProjectGitBranch,
+    getProjectGitCommit,
+    getProjectFileCount,
+    getProjectSize,
+    getFrameworkColor,
+    getFrameworkIconBackground,
+    getStatusColor,
+    truncatePath,
+    shortCommitHash,
+  } from "$lib/domains/projects/utils/display";
+  import {
+    projectIconRegistry,
+    type ResolvedTechIcon,
+  } from "$lib/domains/projects/utils/iconRegistry";
 
-	interface Props {
-		project: Project;
-		onClick?: (project: Project) => void;
-		onEdit?: (project: Project) => void;
-		onDelete?: (project: Project) => void;
-		showActions?: boolean;
-	}
+  interface Props {
+    project: Project;
+    onClick?: (project: Project) => void;
+    onEdit?: (project: Project) => void;
+    onDelete?: (project: Project) => void;
+    showActions?: boolean;
+  }
 
-	let { 
-		project, 
-		onClick = () => {}, 
-		onEdit = () => {}, 
-		onDelete = () => {},
-		showActions = true 
-	}: Props = $props();
+  let {
+    project,
+    onClick = () => {},
+    onEdit = () => {},
+    onDelete = () => {},
+    showActions = true,
+  }: Props = $props();
 
-	const handleClick = () => {
-		onClick(project);
-	};
+  let registryReady = $state(false);
 
-	const handleEdit = (e: Event) => {
-		e.stopPropagation();
-		onEdit(project);
-	};
+  onMount(async () => {
+    await projectIconRegistry.ensureLoaded();
+    registryReady = true;
+  });
 
-	const handleDelete = (e: Event) => {
-		e.stopPropagation();
-		onDelete(project);
-	};
+  const primaryFramework = $derived(
+    projectIconRegistry.resolvePrimaryFramework(project),
+  );
+  const frameworks = $derived(projectIconRegistry.resolveFrameworks(project));
+  const packageManagers = $derived(
+    projectIconRegistry.resolvePackageManagers(project),
+  );
+  const languages = $derived(projectIconRegistry.resolveLanguages(project));
+  const showTechStack = $derived(
+    registryReady &&
+      (frameworks.length > 0 ||
+        packageManagers.length > 0 ||
+        languages.length > 0),
+  );
+  const gitBranch = $derived(getProjectGitBranch(project));
+  const gitCommit = $derived(shortCommitHash(getProjectGitCommit(project)));
+  const fileCount = $derived(getProjectFileCount(project));
+  const projectSize = $derived(getProjectSize(project));
+  const hasUncommittedChanges = $derived(
+    project.metadata?.gitInfo?.hasUncommittedChanges ??
+      project.has_uncommitted_changes,
+  );
+  const outdatedCount = $derived(
+    project.metadata?.dependencies?.outdated?.length ?? 0,
+  );
+  const vulnerabilityCount = $derived(
+    project.metadata?.dependencies?.vulnerabilities?.length ?? 0,
+  );
 
-	// Get framework icon class
-	const getFrameworkIconClass = (framework: string | null | undefined): string => {
-		if (!framework) return 'devicon-folder-plain';
-		
-		const icons: Record<string, string> = {
-			'React': 'devicon-react-original',
-			'Vue': 'devicon-vuejs-plain',
-			'Angular': 'devicon-angularjs-plain',
-			'Svelte': 'devicon-svelte-plain',
-			'Next.js': 'devicon-nextjs-plain',
-			'Nuxt': 'devicon-nuxtjs-plain',
-			'Node.js': 'devicon-nodejs-plain',
-			'Express': 'devicon-express-original',
-			'FastAPI': 'devicon-fastapi-plain',
-			'Django': 'devicon-django-plain',
-			'Flask': 'devicon-flask-plain',
-			'Laravel': 'devicon-laravel-plain',
-			'Spring': 'devicon-spring-plain',
-			'ASP.NET': 'devicon-dotnetcore-plain',
-			'Rails': 'devicon-rails-plain',
-			'Flutter': 'devicon-flutter-plain',
-			'React Native': 'devicon-react-original',
-			'Ionic': 'devicon-ionic-original',
-			'Electron': 'devicon-electron-original',
-			'Tauri': 'devicon-rust-plain',
-			'Python': 'devicon-python-plain',
-			'Java': 'devicon-java-plain',
-			'Go': 'devicon-go-plain',
-			'Rust': 'devicon-rust-plain',
-			'PHP': 'devicon-php-plain',
-			'Ruby': 'devicon-ruby-plain',
-			'Swift': 'devicon-swift-plain',
-			'TypeScript': 'devicon-typescript-plain',
-			'JavaScript': 'devicon-javascript-plain'
-		};
-		return icons[framework] || 'devicon-folder-plain';
-	};
+  const handleClick = () => {
+    onClick(project);
+  };
 
-	// Get framework color
-	const getFrameworkColor = (framework: string | null | undefined): string => {
-		if (!framework) return 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200';
-		
-		const colors: Record<string, string> = {
-			'React': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-			'Vue': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-			'Angular': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-			'Svelte': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-			'Next.js': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-			'Node.js': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-			'Express': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-			'FastAPI': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-			'Django': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-			'Flask': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-			'Laravel': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-			'Spring': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-			'ASP.NET': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-			'Rails': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-			'Flutter': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-			'React Native': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-			'Electron': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-			'Tauri': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-		};
-		return colors[framework] || 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200';
-	};
+  const handleEdit = (e: Event) => {
+    e.stopPropagation();
+    onEdit(project);
+  };
 
+  const handleDelete = (e: Event) => {
+    e.stopPropagation();
+    onDelete(project);
+  };
 
+  const statusIcon = $derived(
+    project.status === "active"
+      ? CheckCircle2
+      : project.status === "archived"
+        ? Archive
+        : null,
+  );
+
+  function techBadgeClass(item: ResolvedTechIcon): string {
+    return getFrameworkColor(item.name);
+  }
 </script>
 
-<CardInfo
-	title={project.name}
-	description={project.description}
-	icon={Folder}
-	value={project.metadata?.fileCount?.toString()}
-	onclick={handleClick}
-	class="cursor-pointer group h-full"
-	role="button"
-	tabindex={0}
-	onkeydown={(e) => e.key === 'Enter' && handleClick()}
+<Card
+  class="group h-full cursor-pointer transition-shadow hover:shadow-md"
+  onclick={handleClick}
+  role="button"
+  tabindex={0}
+  onkeydown={(e) => e.key === "Enter" && handleClick()}
 >
-	<div class="space-y-3">
-		<div class="flex items-center gap-2 flex-wrap">
-			{#if project.metadata?.framework}
-				<span class="badge {getFrameworkColor(project.metadata.framework)}">
-					{project.metadata.framework}
-				</span>
-			{/if}
-			{#if project.metadata?.gitInfo?.branch}
-				<span class="badge badge-neutral">
-					{project.metadata.gitInfo.branch}
-				</span>
-			{/if}
-		</div>
+  <CardHeader class="pb-3">
+    <div class="flex w-full items-start justify-between gap-3">
+      <div class="flex min-w-0 flex-1 items-start gap-3">
+        <div
+          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg {getFrameworkIconBackground(
+            primaryFramework?.name,
+          )}"
+        >
+          {#if primaryFramework}
+            <TechIcon
+              icon={primaryFramework.icon}
+              iconType={primaryFramework.icon_type}
+              size="lg"
+              alt={primaryFramework.name}
+            />
+          {:else}
+            <FolderOpen class="h-6 w-6 text-muted-foreground" />
+          {/if}
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5">
+            <CardTitle class="truncate">{project.name}</CardTitle>
+            {#if project.starred}
+              <Star
+                class="h-4 w-4 shrink-0 fill-yellow-400 text-yellow-400"
+                aria-label="Starred project"
+              />
+            {/if}
+          </div>
+          {#if project.description}
+            <CardDescription class="mt-1 line-clamp-2">
+              {project.description}
+            </CardDescription>
+          {/if}
+        </div>
+      </div>
 
-		<div class="flex items-center gap-4 text-xs text-muted-foreground">
-			{#if project.last_opened}
-				<span>Last opened {formatRelativeTime(project.last_opened)}</span>
-			{/if}
-			<span>{formatBytes(project.size ?? 0)}</span>
-		</div>
+      <Badge
+        variant="outline"
+        class="shrink-0 gap-1 capitalize {getStatusColor(project.status)}"
+      >
+        {#if statusIcon}
+          {@const StatusIcon = statusIcon}
+          <StatusIcon class="h-3 w-3" />
+        {/if}
+        {project.status}
+      </Badge>
+    </div>
+  </CardHeader>
 
-		{#if showActions}
-			<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pt-2 border-t">
-				<Button
-					variant="ghost"
-					size="sm"
-					onclick={handleEdit}
-					class="h-8 w-8 p-0"
-					title="Edit project"
-					aria-label="Edit project"
-				>
-					<Edit class="w-4 h-4" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					onclick={handleDelete}
-					class="h-8 w-8 p-0 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-					title="Delete project"
-					aria-label="Delete project"
-				>
-					<Trash2 class="w-4 h-4" />
-				</Button>
-			</div>
-		{/if}
-	</div>
-</CardInfo>
+  <CardContent>
+    <div class="space-y-3">
+      {#if showTechStack}
+        <div class="flex flex-wrap items-center gap-1.5">
+          {#each frameworks as item (item.name)}
+            <Badge variant="outline" class="gap-1.5 {techBadgeClass(item)}">
+              <TechIcon
+                icon={item.icon}
+                iconType={item.icon_type}
+                size="xs"
+                alt={item.name}
+              />
+              {item.name}
+            </Badge>
+          {/each}
+
+          {#each packageManagers as item (item.name)}
+            <Badge variant="outline" class="gap-1.5">
+              <TechIcon
+                icon={item.icon}
+                iconType={item.icon_type}
+                size="xs"
+                alt={item.name}
+              />
+              {item.name}
+            </Badge>
+          {/each}
+
+          {#each languages as item (item.name)}
+            <Badge variant="secondary" class="gap-1.5">
+              <TechIcon
+                icon={item.icon}
+                iconType={item.icon_type}
+                size="xs"
+                alt={item.name}
+              />
+              {item.name}
+            </Badge>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="flex flex-wrap items-center gap-1.5">
+        {#if gitBranch}
+          <Badge variant="outline" class="gap-1">
+            <GitBranch class="h-3 w-3" />
+            {gitBranch}
+          </Badge>
+        {/if}
+
+        {#if gitCommit}
+          <Badge variant="secondary" class="gap-1 font-mono text-xs">
+            <GitCommit class="h-3 w-3" />
+            {gitCommit}
+          </Badge>
+        {/if}
+
+        {#if hasUncommittedChanges}
+          <Badge variant="outline" class="gap-1 text-amber-700 dark:text-amber-300">
+            <CircleDot class="h-3 w-3" />
+            Uncommitted
+          </Badge>
+        {/if}
+      </div>
+
+      <div
+        class="flex items-center gap-1.5 text-xs text-muted-foreground"
+        title={project.path}
+      >
+        <FolderOpen class="h-3.5 w-3.5 shrink-0" />
+        <span class="truncate font-mono">{truncatePath(project.path)}</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+        <div class="flex items-center gap-1.5">
+          <HardDrive class="h-3.5 w-3.5 shrink-0" />
+          <span>{formatBytes(projectSize)}</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <FileText class="h-3.5 w-3.5 shrink-0" />
+          <span>{fileCount} files</span>
+        </div>
+        {#if project.last_opened}
+          <div class="flex items-center gap-1.5">
+            <Clock class="h-3.5 w-3.5 shrink-0" />
+            <span>{formatRelativeTime(project.last_opened)}</span>
+          </div>
+        {/if}
+        {#if project.open_count > 0}
+          <div class="flex items-center gap-1.5">
+            <Eye class="h-3.5 w-3.5 shrink-0" />
+            <span>{project.open_count} opens</span>
+          </div>
+        {/if}
+        {#if project.dev_port}
+          <div class="flex items-center gap-1.5">
+            <Globe class="h-3.5 w-3.5 shrink-0" />
+            <span>:{project.dev_port}</span>
+          </div>
+        {/if}
+        {#if project.created_at}
+          <div class="flex items-center gap-1.5">
+            <Calendar class="h-3.5 w-3.5 shrink-0" />
+            <span>Created {formatRelativeTime(project.created_at)}</span>
+          </div>
+        {/if}
+      </div>
+
+      {#if outdatedCount > 0 || vulnerabilityCount > 0}
+        <div class="flex flex-wrap gap-1.5">
+          {#if outdatedCount > 0}
+            <Badge variant="outline" class="text-xs text-amber-700 dark:text-amber-300">
+              {outdatedCount} outdated
+            </Badge>
+          {/if}
+          {#if vulnerabilityCount > 0}
+            <Badge variant="destructive" class="text-xs">
+              {vulnerabilityCount} vulnerable
+            </Badge>
+          {/if}
+        </div>
+      {/if}
+
+      {#if showActions}
+        <div
+          class="flex items-center gap-1 border-t pt-2 opacity-0 transition-opacity group-hover:opacity-100"
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onclick={handleEdit}
+            class="h-8 w-8 p-0"
+            title="Edit project"
+            aria-label="Edit project"
+          >
+            <Edit class="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onclick={handleDelete}
+            class="h-8 w-8 p-0 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+            title="Delete project"
+            aria-label="Delete project"
+          >
+            <Trash2 class="h-4 w-4" />
+          </Button>
+        </div>
+      {/if}
+    </div>
+  </CardContent>
+</Card>

@@ -1,6 +1,8 @@
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, QueryFilter, ColumnTrait, QueryOrder};
-use crate::entities::learned_pattern::{Entity, Model, ActiveModel};
 use crate::entities::learned_pattern;
+use crate::entities::learned_pattern::{ActiveModel, Entity, Model};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 
 pub struct LearnedPatternRepository;
 
@@ -14,7 +16,10 @@ impl LearnedPatternRepository {
     }
 
     /// Get pattern by ID
-    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<Model>, sea_orm::DbErr> {
+    pub async fn get_by_id(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<Option<Model>, sea_orm::DbErr> {
         Entity::find_by_id(id).one(db).await
     }
 
@@ -36,8 +41,8 @@ impl LearnedPatternRepository {
         pattern_type: &str,
         context: Option<&str>,
     ) -> Result<Vec<Model>, sea_orm::DbErr> {
-        let mut query = Entity::find()
-            .filter(learned_pattern::Column::PatternType.eq(pattern_type));
+        let mut query =
+            Entity::find().filter(learned_pattern::Column::PatternType.eq(pattern_type));
 
         if let Some(ctx) = context {
             query = query.filter(learned_pattern::Column::Context.eq(ctx));
@@ -83,7 +88,7 @@ impl LearnedPatternRepository {
 
         let current_frequency = model.frequency;
         let current_success_rate = model.success_rate;
-        
+
         let mut active_model: ActiveModel = model.into();
 
         // Update frequency
@@ -91,7 +96,8 @@ impl LearnedPatternRepository {
         active_model.last_used = Set(Some(chrono::Utc::now().into()));
 
         // Update success rate (weighted average)
-        let total_successes = (current_success_rate * current_frequency as f64).round() as i32 + if success { 1 } else { 0 };
+        let total_successes = (current_success_rate * current_frequency as f64).round() as i32
+            + if success { 1 } else { 0 };
         let new_success_rate = total_successes as f64 / (current_frequency + 1) as f64;
         active_model.success_rate = Set(new_success_rate);
 
@@ -115,11 +121,11 @@ impl LearnedPatternRepository {
         let mut query = Entity::find()
             .filter(learned_pattern::Column::PatternType.eq(&pattern_type))
             .filter(learned_pattern::Column::PatternData.eq(&pattern_data));
-        
+
         if let Some(ctx) = context.as_ref() {
             query = query.filter(learned_pattern::Column::Context.eq(ctx));
         }
-        
+
         let existing = query.one(db).await?;
 
         if let Some(pattern) = existing {
@@ -145,4 +151,3 @@ impl LearnedPatternRepository {
         active_model.update(db).await
     }
 }
-

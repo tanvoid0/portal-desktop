@@ -1,5 +1,7 @@
 use crate::database::DatabaseManager;
-use crate::domains::scripts::services::{ExecuteScriptRequest, ScriptExecutionInfo, ScriptExecutionService};
+use crate::domains::scripts::services::{
+    ExecuteScriptRequest, ScriptExecutionInfo, ScriptExecutionService,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

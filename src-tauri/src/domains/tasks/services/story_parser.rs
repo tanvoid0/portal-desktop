@@ -68,7 +68,7 @@ impl StoryParser {
         parsed.detected_format = Self::detect_format(story_text);
 
         let lines: Vec<&str> = story_text.lines().collect();
-        
+
         // Try to detect if it's structured format (with labels/fields)
         if Self::is_structured_format(&lines) {
             Self::parse_structured(&lines, &mut parsed);
@@ -82,27 +82,27 @@ impl StoryParser {
     /// Detect the source format (Jira, GitHub, plain text, etc.)
     fn detect_format(text: &str) -> Option<String> {
         let lower = text.to_lowercase();
-        
+
         // Check for Jira patterns
         if lower.contains("jira") || text.contains("PROJ-") || text.contains("[PROJ-") {
             return Some("jira".to_string());
         }
-        
+
         // Check for GitHub issue patterns
         if lower.contains("github") || text.contains("#") && text.contains("issue") {
             return Some("github".to_string());
         }
-        
+
         // Check for markdown format
         if text.contains("```") || text.starts_with("#") {
             return Some("markdown".to_string());
         }
-        
+
         // Check for structured format
         if text.contains(":") && text.lines().any(|l| l.contains(":")) {
             return Some("structured".to_string());
         }
-        
+
         Some("plain".to_string())
     }
 
@@ -110,7 +110,8 @@ impl StoryParser {
     fn is_structured_format(lines: &[&str]) -> bool {
         lines.iter().any(|line| {
             let lower = line.to_lowercase();
-            lower.contains("summary:") || lower.contains("title:")
+            lower.contains("summary:")
+                || lower.contains("title:")
                 || lower.contains("description:")
                 || lower.contains("type:")
                 || lower.contains("priority:")
@@ -133,51 +134,114 @@ impl StoryParser {
             }
 
             let lower = trimmed.to_lowercase();
-            
+
             // Title/Summary
-            if lower.starts_with("summary:") || lower.starts_with("title:") || lower.starts_with("subject:") {
-                parsed.title = Some(trimmed.splitn(2, ':').nth(1).unwrap_or("").trim().to_string());
+            if lower.starts_with("summary:")
+                || lower.starts_with("title:")
+                || lower.starts_with("subject:")
+            {
+                parsed.title = Some(
+                    trimmed
+                        .splitn(2, ':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string(),
+                );
                 current_section = None;
-            } 
+            }
             // Description
-            else if lower.starts_with("description:") || lower.starts_with("body:") || lower.starts_with("details:") {
+            else if lower.starts_with("description:")
+                || lower.starts_with("body:")
+                || lower.starts_with("details:")
+            {
                 current_section = Some("description".to_string());
                 let desc = trimmed.splitn(2, ':').nth(1).unwrap_or("").trim();
                 if !desc.is_empty() {
                     description_lines.push(desc.to_string());
                 }
-            } 
+            }
             // Type
-            else if lower.starts_with("type:") || lower.starts_with("issue type:") || lower.starts_with("kind:") {
-                parsed.story_type = Some(trimmed.splitn(2, ':').nth(1).unwrap_or("").trim().to_string());
+            else if lower.starts_with("type:")
+                || lower.starts_with("issue type:")
+                || lower.starts_with("kind:")
+            {
+                parsed.story_type = Some(
+                    trimmed
+                        .splitn(2, ':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string(),
+                );
                 current_section = None;
-            } 
+            }
             // Priority
             else if lower.starts_with("priority:") || lower.starts_with("severity:") {
-                parsed.priority = Some(trimmed.splitn(2, ':').nth(1).unwrap_or("").trim().to_string());
+                parsed.priority = Some(
+                    trimmed
+                        .splitn(2, ':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string(),
+                );
                 current_section = None;
-            } 
+            }
             // Labels/Tags
-            else if lower.starts_with("labels:") || lower.starts_with("tags:") || lower.starts_with("categories:") {
+            else if lower.starts_with("labels:")
+                || lower.starts_with("tags:")
+                || lower.starts_with("categories:")
+            {
                 let labels_str = trimmed.splitn(2, ':').nth(1).unwrap_or("").trim();
                 parsed.labels = Self::parse_list(labels_str);
                 current_section = None;
-            } 
+            }
             // Project
-            else if lower.starts_with("project:") || lower.starts_with("repo:") || lower.starts_with("repository:") {
-                parsed.project = Some(trimmed.splitn(2, ':').nth(1).unwrap_or("").trim().to_string());
+            else if lower.starts_with("project:")
+                || lower.starts_with("repo:")
+                || lower.starts_with("repository:")
+            {
+                parsed.project = Some(
+                    trimmed
+                        .splitn(2, ':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string(),
+                );
                 current_section = None;
-            } 
+            }
             // Assignee
-            else if lower.starts_with("assignee:") || lower.starts_with("assigned to:") || lower.starts_with("owner:") {
-                parsed.assignee = Some(trimmed.splitn(2, ':').nth(1).unwrap_or("").trim().to_string());
+            else if lower.starts_with("assignee:")
+                || lower.starts_with("assigned to:")
+                || lower.starts_with("owner:")
+            {
+                parsed.assignee = Some(
+                    trimmed
+                        .splitn(2, ':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string(),
+                );
                 current_section = None;
-            } 
+            }
             // Estimate
-            else if lower.starts_with("estimate:") || lower.starts_with("story points:") || lower.starts_with("effort:") {
-                parsed.estimate = Some(trimmed.splitn(2, ':').nth(1).unwrap_or("").trim().to_string());
+            else if lower.starts_with("estimate:")
+                || lower.starts_with("story points:")
+                || lower.starts_with("effort:")
+            {
+                parsed.estimate = Some(
+                    trimmed
+                        .splitn(2, ':')
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string(),
+                );
                 current_section = None;
-            } 
+            }
             // Status
             else if lower.starts_with("status:") || lower.starts_with("state:") {
                 // Skip status, not relevant for task creation
@@ -186,29 +250,55 @@ impl StoryParser {
             // Description continuation
             else if current_section.as_deref() == Some("description") {
                 description_lines.push(trimmed.to_string());
-            } 
+            }
             // Requirements/Acceptance Criteria
-            else if lower.contains("acceptance criteria") || lower.contains("requirements") || lower.contains("acceptance:") || lower.contains("definition of done") {
+            else if lower.contains("acceptance criteria")
+                || lower.contains("requirements")
+                || lower.contains("acceptance:")
+                || lower.contains("definition of done")
+            {
                 current_section = Some("requirements".to_string());
                 let criteria = trimmed.splitn(2, ':').nth(1).unwrap_or("").trim();
                 if !criteria.is_empty() {
                     parsed.requirements.push(criteria.to_string());
                 }
-            } 
+            }
             // Requirements continuation
             else if current_section.as_deref() == Some("requirements") {
                 // Check if it's a list item
-                if trimmed.starts_with('-') || trimmed.starts_with('*') || trimmed.starts_with("•") || trimmed.starts_with("▪") {
-                    parsed.requirements.push(trimmed.trim_start_matches(|c| c == '-' || c == '*' || c == '•' || c == '▪').trim().to_string());
-                } else if trimmed.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                if trimmed.starts_with('-')
+                    || trimmed.starts_with('*')
+                    || trimmed.starts_with("•")
+                    || trimmed.starts_with("▪")
+                {
+                    parsed.requirements.push(
+                        trimmed
+                            .trim_start_matches(|c| c == '-' || c == '*' || c == '•' || c == '▪')
+                            .trim()
+                            .to_string(),
+                    );
+                } else if trimmed
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                {
                     // Numbered list
-                    parsed.requirements.push(trimmed.splitn(2, '.').nth(1).unwrap_or(trimmed).trim().to_string());
-                } else if trimmed.to_lowercase().starts_with("given") 
-                    || trimmed.to_lowercase().starts_with("when") 
-                    || trimmed.to_lowercase().starts_with("then") {
+                    parsed.requirements.push(
+                        trimmed
+                            .splitn(2, '.')
+                            .nth(1)
+                            .unwrap_or(trimmed)
+                            .trim()
+                            .to_string(),
+                    );
+                } else if trimmed.to_lowercase().starts_with("given")
+                    || trimmed.to_lowercase().starts_with("when")
+                    || trimmed.to_lowercase().starts_with("then")
+                {
                     parsed.requirements.push(trimmed.to_string());
                 }
-            } 
+            }
             // First line might be title if no label
             else if parsed.title.is_none() && !lower.contains(":") && trimmed.len() < 200 {
                 parsed.title = Some(trimmed.to_string());
@@ -223,7 +313,7 @@ impl StoryParser {
     /// Parse freeform text (no explicit structure)
     fn parse_freeform(text: &str, parsed: &mut ParsedStory) {
         let lines: Vec<&str> = text.lines().collect();
-        
+
         // First non-empty line is likely the title
         if let Some(first_line) = lines.iter().find(|l| !l.trim().is_empty()) {
             let trimmed = first_line.trim();
@@ -240,19 +330,20 @@ impl StoryParser {
         for (i, line) in lines.iter().enumerate() {
             let lower = line.to_lowercase();
             let trimmed = line.trim();
-            
+
             // Skip empty lines and headers
             if trimmed.is_empty() || trimmed.starts_with('#') {
                 continue;
             }
-            
-            if lower.contains("acceptance criteria") 
-                || lower.contains("requirements") 
+
+            if lower.contains("acceptance criteria")
+                || lower.contains("requirements")
                 || lower.contains("definition of done")
                 || lower.contains("acceptance:")
                 || lower.contains("what needs to be done")
                 || lower.contains("tasks:")
-                || lower.contains("checklist:") {
+                || lower.contains("checklist:")
+            {
                 requirements_start = Some(i);
                 break;
             }
@@ -263,12 +354,14 @@ impl StoryParser {
 
         // Extract description
         let desc_lines: Vec<&str> = if let Some(req_start) = requirements_start {
-            lines[description_start..req_start].iter()
+            lines[description_start..req_start]
+                .iter()
                 .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
                 .copied()
                 .collect()
         } else {
-            lines[description_start..].iter()
+            lines[description_start..]
+                .iter()
                 .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
                 .copied()
                 .collect()
@@ -285,34 +378,60 @@ impl StoryParser {
                 if trimmed.is_empty() {
                     continue;
                 }
-                
+
                 // Skip markdown headers
                 if trimmed.starts_with('#') {
                     continue;
                 }
-                
+
                 // List items
-                if trimmed.starts_with('-') || trimmed.starts_with('*') || trimmed.starts_with("•") || trimmed.starts_with("▪") {
+                if trimmed.starts_with('-')
+                    || trimmed.starts_with('*')
+                    || trimmed.starts_with("•")
+                    || trimmed.starts_with("▪")
+                {
                     parsed.requirements.push(
-                        trimmed.trim_start_matches(|c| c == '-' || c == '*' || c == '•' || c == '▪').trim().to_string()
+                        trimmed
+                            .trim_start_matches(|c| c == '-' || c == '*' || c == '•' || c == '▪')
+                            .trim()
+                            .to_string(),
                     );
-                } 
+                }
                 // Numbered list
-                else if trimmed.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                else if trimmed
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                {
                     parsed.requirements.push(
-                        trimmed.splitn(2, '.').nth(1).unwrap_or(trimmed).trim().to_string()
+                        trimmed
+                            .splitn(2, '.')
+                            .nth(1)
+                            .unwrap_or(trimmed)
+                            .trim()
+                            .to_string(),
                     );
-                } 
+                }
                 // Gherkin-style (Given/When/Then)
-                else if trimmed.to_lowercase().starts_with("given") 
-                    || trimmed.to_lowercase().starts_with("when") 
-                    || trimmed.to_lowercase().starts_with("then") {
+                else if trimmed.to_lowercase().starts_with("given")
+                    || trimmed.to_lowercase().starts_with("when")
+                    || trimmed.to_lowercase().starts_with("then")
+                {
                     parsed.requirements.push(trimmed.to_string());
                 }
                 // Checkbox format
-                else if trimmed.starts_with("[ ]") || trimmed.starts_with("[x]") || trimmed.starts_with("[X]") {
+                else if trimmed.starts_with("[ ]")
+                    || trimmed.starts_with("[x]")
+                    || trimmed.starts_with("[X]")
+                {
                     parsed.requirements.push(
-                        trimmed.trim_start_matches("[ ]").trim_start_matches("[x]").trim_start_matches("[X]").trim().to_string()
+                        trimmed
+                            .trim_start_matches("[ ]")
+                            .trim_start_matches("[x]")
+                            .trim_start_matches("[X]")
+                            .trim()
+                            .to_string(),
                     );
                 }
             }
@@ -328,10 +447,15 @@ impl StoryParser {
 
         // Extract priority
         if parsed.priority.is_none() {
-            for priority in &["critical", "high", "medium", "low", "blocker", "trivial", "minor", "major", "urgent", "normal"] {
+            for priority in &[
+                "critical", "high", "medium", "low", "blocker", "trivial", "minor", "major",
+                "urgent", "normal",
+            ] {
                 if lower.contains(&format!("priority: {}", priority))
                     || lower.contains(&format!("priority {}", priority))
-                    || (lower.contains(priority) && (lower.contains("priority") || lower.contains("severity"))) {
+                    || (lower.contains(priority)
+                        && (lower.contains("priority") || lower.contains("severity")))
+                {
                     parsed.priority = Some(priority.to_string());
                     break;
                 }
@@ -340,7 +464,18 @@ impl StoryParser {
 
         // Extract story type
         if parsed.story_type.is_none() {
-            for story_type in &["story", "bug", "epic", "task", "subtask", "feature", "improvement", "enhancement", "chore", "refactor"] {
+            for story_type in &[
+                "story",
+                "bug",
+                "epic",
+                "task",
+                "subtask",
+                "feature",
+                "improvement",
+                "enhancement",
+                "chore",
+                "refactor",
+            ] {
                 if lower.contains(story_type) {
                     parsed.story_type = Some(story_type.to_string());
                     break;
@@ -351,9 +486,9 @@ impl StoryParser {
         // Extract labels (common patterns)
         // Look for [label], #label, "label", or label: value patterns
         let label_patterns = [
-            (r#"\[([^\]]+)\]"#, 1), // [label]
-            (r"#(\w+)", 1),         // #label
-            (r#""([^"]+)""#, 1),    // "label"
+            (r#"\[([^\]]+)\]"#, 1),      // [label]
+            (r"#(\w+)", 1),              // #label
+            (r#""([^"]+)""#, 1),         // "label"
             (r"labels?:\s*([^\n]+)", 1), // labels: a, b, c
         ];
 
@@ -376,9 +511,12 @@ impl StoryParser {
 
         // Extract project (look for project names, project codes, or repository names)
         let project_patterns = [
-            (r"(?i)(?:project|proj|repo|repository)[\s:]*([A-Z][A-Z0-9-]+)", 1), // PROJECT-123, Project Name
-            (r"(?i)(?:project|proj|repo|repository)[\s:]*([\w\s]+)", 1),        // Project Name
-            (r"([A-Z]{2,}-\d+)", 1), // ISSUE-123 format
+            (
+                r"(?i)(?:project|proj|repo|repository)[\s:]*([A-Z][A-Z0-9-]+)",
+                1,
+            ), // PROJECT-123, Project Name
+            (r"(?i)(?:project|proj|repo|repository)[\s:]*([\w\s]+)", 1), // Project Name
+            (r"([A-Z]{2,}-\d+)", 1),                                     // ISSUE-123 format
         ];
 
         if parsed.project.is_none() {
@@ -398,7 +536,10 @@ impl StoryParser {
 
         // Extract assignee
         if parsed.assignee.is_none() {
-            let assignee_re = regex::Regex::new(r"(?i)(?:assignee|assigned to|owner|author)[\s:]*([A-Za-z][A-Za-z0-9._-]+)").unwrap();
+            let assignee_re = regex::Regex::new(
+                r"(?i)(?:assignee|assigned to|owner|author)[\s:]*([A-Za-z][A-Za-z0-9._-]+)",
+            )
+            .unwrap();
             if let Some(cap) = assignee_re.captures(text) {
                 if let Some(assignee) = cap.get(1) {
                     parsed.assignee = Some(assignee.as_str().trim().to_string());
@@ -408,7 +549,10 @@ impl StoryParser {
 
         // Extract estimate/story points
         if parsed.estimate.is_none() {
-            let estimate_re = regex::Regex::new(r"(?i)(?:estimate|story points?|sp|points?|effort|hours?)[\s:]*(\d+)").unwrap();
+            let estimate_re = regex::Regex::new(
+                r"(?i)(?:estimate|story points?|sp|points?|effort|hours?)[\s:]*(\d+)",
+            )
+            .unwrap();
             if let Some(cap) = estimate_re.captures(text) {
                 if let Some(est) = cap.get(1) {
                     parsed.estimate = Some(est.as_str().to_string());
@@ -417,7 +561,10 @@ impl StoryParser {
         }
 
         // Extract dependencies (linked issues)
-        let dep_re = regex::Regex::new(r"(?i)(?:depends on|blocks?|relates to|linked to|references?)[\s:]*([A-Z]+-\d+|\d+)").unwrap();
+        let dep_re = regex::Regex::new(
+            r"(?i)(?:depends on|blocks?|relates to|linked to|references?)[\s:]*([A-Z]+-\d+|\d+)",
+        )
+        .unwrap();
         for cap in dep_re.captures_iter(text) {
             if let Some(dep) = cap.get(1) {
                 parsed.dependencies.push(dep.as_str().to_string());
@@ -449,9 +596,12 @@ Priority: High
 Labels: backend, security, api
 Project: Portal
         "#;
-        
+
         let parsed = StoryParser::parse(text);
-        assert_eq!(parsed.title, Some("Implement user authentication".to_string()));
+        assert_eq!(
+            parsed.title,
+            Some("Implement user authentication".to_string())
+        );
         assert_eq!(parsed.story_type, Some("Story".to_string()));
         assert_eq!(parsed.priority, Some("High".to_string()));
         assert!(parsed.labels.contains(&"backend".to_string()));
@@ -469,7 +619,7 @@ Acceptance Criteria:
 - User can login with credentials
 - Password is hashed securely
         "#;
-        
+
         let parsed = StoryParser::parse(text);
         assert!(parsed.title.is_some());
         assert!(parsed.description.is_some());
@@ -491,10 +641,9 @@ We need to implement login and registration.
 **Labels:** backend, security
 **Project:** portal-app
         "#;
-        
+
         let parsed = StoryParser::parse(text);
         assert!(parsed.title.is_some());
         assert!(parsed.requirements.len() >= 3);
     }
 }
-

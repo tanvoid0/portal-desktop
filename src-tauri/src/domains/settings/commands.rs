@@ -1,6 +1,6 @@
-use tauri::State;
+use super::services::settings_service::{Settings, SettingsService, SettingsUpdate};
 use std::sync::Arc;
-use super::services::settings_service::{SettingsService, Settings, SettingsUpdate};
+use tauri::State;
 
 #[tauri::command]
 pub async fn get_settings_command(

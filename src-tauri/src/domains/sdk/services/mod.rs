@@ -1,20 +1,19 @@
-/**
- * Service Management Module
- * 
- * Handles service lifecycle management for databases and web servers
- */
-
-pub mod service_manager;
-pub mod process_tracker;
-pub mod port_manager;
-pub mod sdk_service;
-pub mod terminal_integration;
-pub mod navigation_service;
 pub mod custom_directory_manager;
 pub mod language_config_service;
+pub mod navigation_service;
+pub mod port_manager;
+pub mod process_tracker;
+pub mod sdk_service;
+/**
+ * Service Management Module
+ *
+ * Handles service lifecycle management for databases and web servers
+ */
+pub mod service_manager;
+pub mod terminal_integration;
 
-pub use process_tracker::ProcessTracker;
 pub use port_manager::PortManager;
+pub use process_tracker::ProcessTracker;
 pub use sdk_service::SDKService;
 
 use serde::{Deserialize, Serialize};

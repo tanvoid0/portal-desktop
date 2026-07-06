@@ -1,13 +1,15 @@
-use tauri::State;
+use crate::domains::automation::entities::*;
+use crate::domains::automation::services::automation_service::AutomationService;
+use crate::domains::automation::services::workflow_engine::{
+    Workflow, WorkflowContext, WorkflowEngine, WorkflowExecutionResult,
+};
 use serde_json::Value;
-use std::sync::Arc;
-use std::sync::OnceLock;
-use tokio::sync::Mutex;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use crate::domains::automation::services::automation_service::AutomationService;
-use crate::domains::automation::services::workflow_engine::{WorkflowEngine, Workflow, WorkflowContext, WorkflowExecutionResult};
-use crate::domains::automation::entities::*;
+use std::sync::Arc;
+use std::sync::OnceLock;
+use tauri::State;
+use tokio::sync::Mutex;
 
 #[tauri::command]
 pub async fn trigger_n8n_workflow(
@@ -25,18 +27,14 @@ pub async fn get_workflow_status(
     execution_id: String,
     automation_service: State<'_, Arc<AutomationService>>,
 ) -> Result<WorkflowExecution, String> {
-    automation_service
-        .get_workflow_status(&execution_id)
-        .await
+    automation_service.get_workflow_status(&execution_id).await
 }
 
 #[tauri::command]
 pub async fn list_available_workflows(
     automation_service: State<'_, Arc<AutomationService>>,
 ) -> Result<Vec<AvailableWorkflow>, String> {
-    automation_service
-        .list_available_workflows()
-        .await
+    automation_service.list_available_workflows().await
 }
 
 #[tauri::command]
@@ -46,10 +44,7 @@ pub async fn get_suggested_workflows(
     automation_service: State<'_, Arc<AutomationService>>,
 ) -> Result<Vec<AvailableWorkflow>, String> {
     automation_service
-        .get_suggested_workflows(
-            framework.as_deref(),
-            package_manager.as_deref(),
-        )
+        .get_suggested_workflows(framework.as_deref(), package_manager.as_deref())
         .await
 }
 
@@ -57,36 +52,36 @@ pub async fn get_suggested_workflows(
 pub async fn check_n8n_health(
     automation_service: State<'_, Arc<AutomationService>>,
 ) -> Result<bool, String> {
-    automation_service
-        .check_n8n_health()
-        .await
+    automation_service.check_n8n_health().await
 }
 
 // Workflow Engine Commands
 static WORKFLOW_ENGINES: OnceLock<Arc<Mutex<HashMap<String, WorkflowEngine>>>> = OnceLock::new();
 
 fn get_workflow_engines() -> Arc<Mutex<HashMap<String, WorkflowEngine>>> {
-    WORKFLOW_ENGINES.get_or_init(|| Arc::new(Mutex::new(HashMap::new()))).clone()
+    WORKFLOW_ENGINES
+        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+        .clone()
 }
 
 #[tauri::command]
-pub async fn register_embedded_workflow(
-    workflow_json: String,
-) -> Result<String, String> {
+pub async fn register_embedded_workflow(workflow_json: String) -> Result<String, String> {
     // Extract workflow ID from JSON first
     let workflow: Workflow = serde_json::from_str(&workflow_json)
         .map_err(|e| format!("Failed to parse workflow: {}", e))?;
-    
+
     let workflow_id = workflow.id.clone();
-    
+
     let engines = get_workflow_engines();
     let mut engines_guard = engines.lock().await;
-    let engine = engines_guard.entry("default".to_string())
+    let engine = engines_guard
+        .entry("default".to_string())
         .or_insert_with(WorkflowEngine::new);
-    
-    engine.load_from_json(&workflow_json)
+
+    engine
+        .load_from_json(&workflow_json)
         .map_err(|e| format!("Failed to load workflow: {}", e))?;
-    
+
     Ok(workflow_id)
 }
 
@@ -101,12 +96,13 @@ pub async fn execute_embedded_workflow(
         variables: variables.unwrap_or_default(),
         trigger_data: None,
     };
-    
+
     let engines = get_workflow_engines();
     let engines_guard = engines.lock().await;
-    let engine = engines_guard.get("default")
+    let engine = engines_guard
+        .get("default")
         .ok_or("Workflow engine not initialized")?;
-    
+
     engine.execute_workflow(&workflow_id, context).await
 }
 
@@ -114,12 +110,13 @@ pub async fn execute_embedded_workflow(
 pub async fn list_embedded_workflows() -> Result<Vec<Value>, String> {
     let engines = get_workflow_engines();
     let engines_guard = engines.lock().await;
-    let engine = engines_guard.get("default")
+    let engine = engines_guard
+        .get("default")
         .ok_or("Workflow engine not initialized")?;
-    
+
     let workflows: Vec<_> = engine.get_workflows().into_iter().collect();
     let mut result = Vec::new();
-    
+
     for workflow in workflows {
         result.push(serde_json::json!({
             "id": workflow.id,
@@ -130,7 +127,7 @@ pub async fn list_embedded_workflows() -> Result<Vec<Value>, String> {
             "step_count": workflow.steps.len(),
         }));
     }
-    
+
     Ok(result)
 }
 
@@ -141,9 +138,10 @@ pub async fn check_workflow_trigger(
 ) -> Result<bool, String> {
     let engines = get_workflow_engines();
     let engines_guard = engines.lock().await;
-    let engine = engines_guard.get("default")
+    let engine = engines_guard
+        .get("default")
         .ok_or("Workflow engine not initialized")?;
-    
+
     let result = engine.should_trigger(&workflow_id, &trigger_data);
     Ok(result)
 }

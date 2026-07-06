@@ -1,13 +1,14 @@
+use super::super::traits::package_manager::{
+    InstalledPackage, Package, PackageDetails, PackageManager, PackageUpdate,
+};
+use super::super::SDKError;
+use crate::command_executor::CommandExecutor;
 /**
  * Chocolatey Package Manager Implementation
- * 
+ *
  * Chocolatey (Windows) implementation
  */
-
 use async_trait::async_trait;
-use crate::command_executor::CommandExecutor;
-use super::super::SDKError;
-use super::super::traits::package_manager::{PackageManager, Package, InstalledPackage, PackageDetails, PackageUpdate};
 
 pub struct ChocolateyManager;
 
@@ -17,13 +18,17 @@ impl ChocolateyManager {
     }
 
     async fn execute_choco(&self, args: &[&str]) -> Result<String, SDKError> {
-        let result = CommandExecutor::execute_with_args("choco", args, None).await
+        let result = CommandExecutor::execute_with_args("choco", args, None)
+            .await
             .map_err(|e| SDKError::CommandFailed(format!("Chocolatey command failed: {}", e)))?;
 
         if result.success {
             Ok(result.stdout)
         } else {
-            Err(SDKError::CommandFailed(format!("Chocolatey error: {}", result.stderr)))
+            Err(SDKError::CommandFailed(format!(
+                "Chocolatey error: {}",
+                result.stderr
+            )))
         }
     }
 }
@@ -55,22 +60,24 @@ impl PackageManager for ChocolateyManager {
     }
 
     async fn search_packages(&self, query: &str) -> Result<Vec<Package>, SDKError> {
-        let output = self.execute_choco(&["search", query, "--limit-output"]).await?;
-        
+        let output = self
+            .execute_choco(&["search", query, "--limit-output"])
+            .await?;
+
         let mut packages = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            
+
             // Chocolatey limit-output format: package|version
             let parts: Vec<&str> = line.split('|').collect();
             if parts.len() >= 1 {
                 let name = parts[0].to_string();
                 let version = parts.get(1).map(|s| s.to_string());
-                
+
                 packages.push(Package {
                     id: name.clone(),
                     name,
@@ -83,26 +90,28 @@ impl PackageManager for ChocolateyManager {
                 });
             }
         }
-        
+
         Ok(packages)
     }
 
     async fn get_installed_packages(&self) -> Result<Vec<InstalledPackage>, SDKError> {
-        let output = self.execute_choco(&["list", "--local-only", "--limit-output"]).await?;
-        
+        let output = self
+            .execute_choco(&["list", "--local-only", "--limit-output"])
+            .await?;
+
         let mut packages = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            
+
             let parts: Vec<&str> = line.split('|').collect();
             if parts.len() >= 2 {
                 let name = parts[0].to_string();
                 let version = parts[1].to_string();
-                
+
                 packages.push(InstalledPackage {
                     id: name.clone(),
                     name,
@@ -113,17 +122,17 @@ impl PackageManager for ChocolateyManager {
                 });
             }
         }
-        
+
         Ok(packages)
     }
 
     async fn get_package_details(&self, id: &str) -> Result<PackageDetails, SDKError> {
         let output = self.execute_choco(&["info", id]).await?;
-        
+
         let mut name = id.to_string();
         let mut version = None;
         let mut description = None;
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.starts_with(id) && line.contains('|') {
@@ -136,7 +145,7 @@ impl PackageManager for ChocolateyManager {
                 description = Some(line.to_string());
             }
         }
-        
+
         Ok(PackageDetails {
             id: id.to_string(),
             name,
@@ -167,21 +176,21 @@ impl PackageManager for ChocolateyManager {
 
     async fn check_updates(&self) -> Result<Vec<PackageUpdate>, SDKError> {
         let output = self.execute_choco(&["outdated"]).await?;
-        
+
         let mut updates = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with("Chocolatey") || line.starts_with("---") {
                 continue;
             }
-            
+
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() >= 2 {
                 let name = parts[0].to_string();
                 let current = parts.get(1).unwrap_or(&"unknown").to_string();
                 let available = parts.get(2).unwrap_or(&"latest").to_string();
-                
+
                 updates.push(PackageUpdate {
                     id: name.clone(),
                     name,
@@ -191,7 +200,7 @@ impl PackageManager for ChocolateyManager {
                 });
             }
         }
-        
+
         Ok(updates)
     }
 
@@ -207,4 +216,3 @@ impl PackageManager for ChocolateyManager {
         true // Chocolatey typically requires admin
     }
 }
-

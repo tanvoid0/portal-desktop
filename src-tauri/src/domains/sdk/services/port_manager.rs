@@ -1,9 +1,8 @@
 /**
  * Port Manager
- * 
+ *
  * Manages port allocation and conflict detection
  */
-
 use crate::domains::sdk::SDKError;
 use std::collections::HashSet;
 use std::net::TcpListener;
@@ -36,7 +35,10 @@ impl PortManager {
             self.allocated_ports.insert(port);
             Ok(port)
         } else {
-            Err(SDKError::ManagerNotFound(format!("Port {} is not available", port)))
+            Err(SDKError::ManagerNotFound(format!(
+                "Port {} is not available",
+                port
+            )))
         }
     }
 
@@ -49,8 +51,10 @@ impl PortManager {
                 return Ok(port);
             }
         }
-        
-        Err(SDKError::ManagerNotFound("No available ports found".to_string()))
+
+        Err(SDKError::ManagerNotFound(
+            "No available ports found".to_string(),
+        ))
     }
 
     /// Release a port
@@ -98,7 +102,7 @@ impl PortManager {
         // Try to bind to the port to see if it's available
         match TcpListener::bind(format!("127.0.0.1:{}", port)) {
             Ok(_) => false, // Port is available, no conflict
-            Err(_) => true,  // Port is in use, conflict exists
+            Err(_) => true, // Port is in use, conflict exists
         }
     }
 }

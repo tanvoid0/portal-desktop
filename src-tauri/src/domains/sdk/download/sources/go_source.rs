@@ -2,7 +2,6 @@
  * Go Source Implementation
  * Fetches versions from official Go API
  */
-
 use super::super::VersionInfo;
 use crate::domains::sdk::SDKError;
 use reqwest::Client;
@@ -43,22 +42,25 @@ impl GoSource {
 
     /// Fetch all available Go versions from official API
     pub async fn fetch_versions(&self) -> Result<Vec<VersionInfo>, SDKError> {
-        let response = self.client
+        let response = self
+            .client
             .get("https://go.dev/dl/?mode=json")
             .send()
             .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to fetch Go versions: {}", e)))?;
+            .map_err(|e| {
+                SDKError::ManagerNotFound(format!("Failed to fetch Go versions: {}", e))
+            })?;
 
-        let releases: Vec<GoRelease> = response
-            .json()
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to parse Go releases: {}", e)))?;
+        let releases: Vec<GoRelease> = response.json().await.map_err(|e| {
+            SDKError::ManagerNotFound(format!("Failed to parse Go releases: {}", e))
+        })?;
 
         let mut versions = Vec::new();
-        
+
         for release in releases {
             // Skip beta/rc versions
-            if !release.stable || release.version.contains("beta") || release.version.contains("rc") {
+            if !release.stable || release.version.contains("beta") || release.version.contains("rc")
+            {
                 continue;
             }
 
@@ -84,7 +86,9 @@ impl GoSource {
             use version_compare::Version;
             let a_ver = Version::from(&a.version).unwrap_or(Version::from("0.0.0").unwrap());
             let b_ver = Version::from(&b.version).unwrap_or(Version::from("0.0.0").unwrap());
-            b_ver.partial_cmp(&a_ver).unwrap_or(std::cmp::Ordering::Equal)
+            b_ver
+                .partial_cmp(&a_ver)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(versions)

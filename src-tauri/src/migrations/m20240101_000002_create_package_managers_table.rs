@@ -30,8 +30,18 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(PackageManagers::Name).string().not_null())
                     .col(ColumnDef::new(PackageManagers::Icon).string().not_null())
-                    .col(ColumnDef::new(PackageManagers::IconType).string().not_null().default("devicon"))
-                    .col(ColumnDef::new(PackageManagers::Category).string().not_null().default("Custom"))
+                    .col(
+                        ColumnDef::new(PackageManagers::IconType)
+                            .string()
+                            .not_null()
+                            .default("devicon"),
+                    )
+                    .col(
+                        ColumnDef::new(PackageManagers::Category)
+                            .string()
+                            .not_null()
+                            .default("Custom"),
+                    )
                     .col(
                         ColumnDef::new(PackageManagers::CreatedAt)
                             .date_time()
@@ -82,4 +92,3 @@ enum PackageManagers {
     CreatedAt,
     UpdatedAt,
 }
-

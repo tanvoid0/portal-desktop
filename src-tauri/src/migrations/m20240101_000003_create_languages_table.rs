@@ -30,8 +30,18 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Languages::Name).string().not_null())
                     .col(ColumnDef::new(Languages::Icon).string().not_null())
-                    .col(ColumnDef::new(Languages::IconType).string().not_null().default("devicon"))
-                    .col(ColumnDef::new(Languages::Category).string().not_null().default("Custom"))
+                    .col(
+                        ColumnDef::new(Languages::IconType)
+                            .string()
+                            .not_null()
+                            .default("devicon"),
+                    )
+                    .col(
+                        ColumnDef::new(Languages::Category)
+                            .string()
+                            .not_null()
+                            .default("Custom"),
+                    )
                     .col(
                         ColumnDef::new(Languages::CreatedAt)
                             .date_time()
@@ -82,4 +92,3 @@ enum Languages {
     CreatedAt,
     UpdatedAt,
 }
-

@@ -52,13 +52,20 @@ impl ScriptExecutionRepository {
                 let error_str = e.to_string();
                 // If error is RecordNotFound, the insert likely succeeded but SeaORM
                 // couldn't retrieve it (SQLite limitation). Verify it exists.
-                if error_str.contains("RecordNotFound") || error_str.contains("Failed to find inserted item") {
+                if error_str.contains("RecordNotFound")
+                    || error_str.contains("Failed to find inserted item")
+                {
                     // Verify the insert actually succeeded
                     Entity::find_by_id(&id_clone)
                         .one(db)
                         .await
                         .map_err(|e| format!("Failed to verify script execution insert: {}", e))?
-                        .ok_or_else(|| format!("Failed to find inserted script execution with id: {}", id_clone))
+                        .ok_or_else(|| {
+                            format!(
+                                "Failed to find inserted script execution with id: {}",
+                                id_clone
+                            )
+                        })
                 } else {
                     // Real error, return it
                     Err(format!("Failed to create script execution: {}", e))
@@ -76,7 +83,11 @@ impl ScriptExecutionRepository {
             .map_err(|e| format!("Failed to get script execution: {}", e))
     }
 
-    pub async fn get_by_block(&self, block_id: &str, limit: Option<u64>) -> Result<Vec<Model>, String> {
+    pub async fn get_by_block(
+        &self,
+        block_id: &str,
+        limit: Option<u64>,
+    ) -> Result<Vec<Model>, String> {
         let db = self.db_manager.get_connection();
 
         let mut query = Entity::find()

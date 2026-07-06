@@ -4,201 +4,230 @@
  */
 
 export interface CacheEntry<T = any> {
-	value: T;
-	expiresAt: number;
-	createdAt: number;
+  value: T;
+  expiresAt: number;
+  createdAt: number;
 }
 
 export interface CacheConfig {
-	defaultTTL: number; // in milliseconds
-	maxSize: number;
-	cleanupInterval: number; // in milliseconds
+  defaultTTL: number; // in milliseconds
+  maxSize: number;
+  cleanupInterval: number; // in milliseconds
 }
 
 class CacheService {
-	private cache = new Map<string, CacheEntry>();
-	private config: CacheConfig = {
-		defaultTTL: 5 * 60 * 1000, // 5 minutes
-		maxSize: 1000,
-		cleanupInterval: 60 * 1000 // 1 minute
-	};
-	private cleanupTimer?: NodeJS.Timeout;
+  private cache = new Map<string, CacheEntry>();
+  private config: CacheConfig = {
+    defaultTTL: 5 * 60 * 1000, // 5 minutes
+    maxSize: 1000,
+    cleanupInterval: 60 * 1000, // 1 minute
+  };
+  private cleanupTimer?: NodeJS.Timeout;
 
-	constructor() {
-		this.startCleanup();
-	}
+  constructor() {
+    this.startCleanup();
+  }
 
-	/**
-	 * Configure cache settings
-	 */
-	configure(config: Partial<CacheConfig>): void {
-		this.config = { ...this.config, ...config };
-	}
+  /**
+   * Configure cache settings
+   */
+  configure(config: Partial<CacheConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
 
-	/**
-	 * Set a value in the cache
-	 */
-	set<T>(key: string, value: T, ttl?: number): void {
-		const now = Date.now();
-		const expiresAt = now + (ttl || this.config.defaultTTL);
+  /**
+   * Set a value in the cache
+   */
+  set<T>(key: string, value: T, ttl?: number): void {
+    const now = Date.now();
+    const expiresAt = now + (ttl || this.config.defaultTTL);
 
-		// Remove oldest entries if cache is full
-		if (this.cache.size >= this.config.maxSize) {
-			this.evictOldest();
-		}
+    // Remove oldest entries if cache is full
+    if (this.cache.size >= this.config.maxSize) {
+      this.evictOldest();
+    }
 
-		this.cache.set(key, {
-			value,
-			expiresAt,
-			createdAt: now
-		});
-	}
+    this.cache.set(key, {
+      value,
+      expiresAt,
+      createdAt: now,
+    });
+  }
 
-	/**
-	 * Get a value from the cache
-	 */
-	get<T>(key: string): T | null {
-		const entry = this.cache.get(key);
-		
-		if (!entry) {
-			return null;
-		}
+  /**
+   * Get a value from the cache
+   */
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
 
-		// Check if expired
-		if (Date.now() > entry.expiresAt) {
-			this.cache.delete(key);
-			return null;
-		}
+    if (!entry) {
+      return null;
+    }
 
-		return entry.value as T;
-	}
+    // Check if expired
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
 
-	/**
-	 * Check if a key exists and is not expired
-	 */
-	has(key: string): boolean {
-		const entry = this.cache.get(key);
-		
-		if (!entry) {
-			return false;
-		}
+    return entry.value as T;
+  }
 
-		// Check if expired
-		if (Date.now() > entry.expiresAt) {
-			this.cache.delete(key);
-			return false;
-		}
+  /**
+   * Get a cached list. Prefer this over `get()` + `if (cached)` — empty arrays are
+   * truthy and must not be treated as cache misses when storing legitimate empty results.
+   * By default, empty cached lists are ignored so a stale `[]` from a startup race cannot
+   * block fresh backend fetches (see projects loadProjects bug).
+   */
+  getList<T>(key: string, options?: { allowEmpty?: boolean }): T[] | null {
+    const cached = this.get<T[]>(key);
+    if (cached === null) return null;
+    if (!options?.allowEmpty && cached.length === 0) return null;
+    return cached;
+  }
 
-		return true;
-	}
+  /**
+   * Cache a list. By default, empty arrays are not cached (delete key instead).
+   */
+  setList<T>(
+    key: string,
+    value: T[],
+    ttl?: number,
+    options?: { cacheEmpty?: boolean },
+  ): void {
+    if (value.length === 0 && !options?.cacheEmpty) {
+      this.delete(key);
+      return;
+    }
+    this.set(key, value, ttl);
+  }
 
-	/**
-	 * Delete a key from the cache
-	 */
-	delete(key: string): boolean {
-		return this.cache.delete(key);
-	}
+  /**
+   * Check if a key exists and is not expired
+   */
+  has(key: string): boolean {
+    const entry = this.cache.get(key);
 
-	/**
-	 * Clear all cache entries
-	 */
-	clear(): void {
-		this.cache.clear();
-	}
+    if (!entry) {
+      return false;
+    }
 
-	/**
-	 * Get cache statistics
-	 */
-	getStats() {
-		const now = Date.now();
-		let expired = 0;
-		let active = 0;
+    // Check if expired
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return false;
+    }
 
-		for (const entry of this.cache.values()) {
-			if (now > entry.expiresAt) {
-				expired++;
-			} else {
-				active++;
-			}
-		}
+    return true;
+  }
 
-		return {
-			total: this.cache.size,
-			active,
-			expired,
-			maxSize: this.config.maxSize
-		};
-	}
+  /**
+   * Delete a key from the cache
+   */
+  delete(key: string): boolean {
+    return this.cache.delete(key);
+  }
 
-	/**
-	 * Get all active keys
-	 */
-	getKeys(): string[] {
-		const now = Date.now();
-		const keys: string[] = [];
+  /**
+   * Clear all cache entries
+   */
+  clear(): void {
+    this.cache.clear();
+  }
 
-		for (const [key, entry] of this.cache.entries()) {
-			if (now <= entry.expiresAt) {
-				keys.push(key);
-			}
-		}
+  /**
+   * Get cache statistics
+   */
+  getStats() {
+    const now = Date.now();
+    let expired = 0;
+    let active = 0;
 
-		return keys;
-	}
+    for (const entry of this.cache.values()) {
+      if (now > entry.expiresAt) {
+        expired++;
+      } else {
+        active++;
+      }
+    }
 
-	/**
-	 * Remove the oldest entry
-	 */
-	private evictOldest(): void {
-		let oldestKey = '';
-		let oldestTime = Infinity;
+    return {
+      total: this.cache.size,
+      active,
+      expired,
+      maxSize: this.config.maxSize,
+    };
+  }
 
-		for (const [key, entry] of this.cache.entries()) {
-			if (entry.createdAt < oldestTime) {
-				oldestTime = entry.createdAt;
-				oldestKey = key;
-			}
-		}
+  /**
+   * Get all active keys
+   */
+  getKeys(): string[] {
+    const now = Date.now();
+    const keys: string[] = [];
 
-		if (oldestKey) {
-			this.cache.delete(oldestKey);
-		}
-	}
+    for (const [key, entry] of this.cache.entries()) {
+      if (now <= entry.expiresAt) {
+        keys.push(key);
+      }
+    }
 
-	/**
-	 * Start automatic cleanup of expired entries
-	 */
-	private startCleanup(): void {
-		this.cleanupTimer = setInterval(() => {
-			this.cleanup();
-		}, this.config.cleanupInterval);
-	}
+    return keys;
+  }
 
-	/**
-	 * Clean up expired entries
-	 */
-	private cleanup(): void {
-		const now = Date.now();
-		const expiredKeys: string[] = [];
+  /**
+   * Remove the oldest entry
+   */
+  private evictOldest(): void {
+    let oldestKey = "";
+    let oldestTime = Infinity;
 
-		for (const [key, entry] of this.cache.entries()) {
-			if (now > entry.expiresAt) {
-				expiredKeys.push(key);
-			}
-		}
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.createdAt < oldestTime) {
+        oldestTime = entry.createdAt;
+        oldestKey = key;
+      }
+    }
 
-		expiredKeys.forEach(key => this.cache.delete(key));
-	}
+    if (oldestKey) {
+      this.cache.delete(oldestKey);
+    }
+  }
 
-	/**
-	 * Stop cleanup timer
-	 */
-	destroy(): void {
-		if (this.cleanupTimer) {
-			clearInterval(this.cleanupTimer);
-			this.cleanupTimer = undefined;
-		}
-	}
+  /**
+   * Start automatic cleanup of expired entries
+   */
+  private startCleanup(): void {
+    this.cleanupTimer = setInterval(() => {
+      this.cleanup();
+    }, this.config.cleanupInterval);
+  }
+
+  /**
+   * Clean up expired entries
+   */
+  private cleanup(): void {
+    const now = Date.now();
+    const expiredKeys: string[] = [];
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiresAt) {
+        expiredKeys.push(key);
+      }
+    }
+
+    expiredKeys.forEach((key) => this.cache.delete(key));
+  }
+
+  /**
+   * Stop cleanup timer
+   */
+  destroy(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
+  }
 }
 
 // Export singleton instance

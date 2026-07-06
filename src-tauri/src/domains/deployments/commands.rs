@@ -1,7 +1,9 @@
-use tauri::State;
+use super::services::deployment_service::{
+    CreateDeploymentRequest, DeploymentService, UpdateDeploymentRequest,
+};
+use super::services::docker_service::{Deployment, DockerContainer, DockerStatus};
 use std::sync::Arc;
-use super::services::deployment_service::{DeploymentService, CreateDeploymentRequest, UpdateDeploymentRequest};
-use super::services::docker_service::{DockerContainer, Deployment};
+use tauri::State;
 
 #[tauri::command]
 pub async fn create_deployment_command(
@@ -93,6 +95,22 @@ pub async fn list_containers_command(
 }
 
 #[tauri::command]
+pub async fn get_docker_status_command(
+    _app_handle: tauri::AppHandle,
+    _state: State<'_, Arc<DeploymentService>>,
+) -> Result<DockerStatus, String> {
+    _state.docker_service.get_docker_status().await
+}
+
+#[tauri::command]
+pub async fn start_docker_command(
+    _app_handle: tauri::AppHandle,
+    _state: State<'_, Arc<DeploymentService>>,
+) -> Result<String, String> {
+    _state.docker_service.start_docker().await
+}
+
+#[tauri::command]
 pub async fn build_docker_image_command(
     _app_handle: tauri::AppHandle,
     _state: State<'_, Arc<DeploymentService>>,
@@ -100,11 +118,10 @@ pub async fn build_docker_image_command(
     image_name: String,
     dockerfile_path: Option<String>,
 ) -> Result<String, String> {
-    _state.docker_service.build_image(
-        &context_path,
-        &image_name,
-        dockerfile_path.as_deref(),
-    ).await
+    _state
+        .docker_service
+        .build_image(&context_path, &image_name, dockerfile_path.as_deref())
+        .await
 }
 
 #[tauri::command]

@@ -24,24 +24,56 @@ impl MigrationTrait for Migration {
                     // The actual command that was executed (with parameters resolved)
                     .col(ColumnDef::new(ScriptExecutions::Command).text().not_null())
                     // Parameters that were passed (JSON object)
-                    .col(ColumnDef::new(ScriptExecutions::ParametersJson).text().not_null().default("{}"))
+                    .col(
+                        ColumnDef::new(ScriptExecutions::ParametersJson)
+                            .text()
+                            .not_null()
+                            .default("{}"),
+                    )
                     // Working directory for execution
-                    .col(ColumnDef::new(ScriptExecutions::WorkingDirectory).text().null())
+                    .col(
+                        ColumnDef::new(ScriptExecutions::WorkingDirectory)
+                            .text()
+                            .null(),
+                    )
                     // Execution status: pending, running, success, failed, cancelled
-                    .col(ColumnDef::new(ScriptExecutions::Status).string().not_null().default("pending"))
+                    .col(
+                        ColumnDef::new(ScriptExecutions::Status)
+                            .string()
+                            .not_null()
+                            .default("pending"),
+                    )
                     // Exit code from the process
                     .col(ColumnDef::new(ScriptExecutions::ExitCode).integer().null())
                     // Process ID (for tracking running processes)
                     .col(ColumnDef::new(ScriptExecutions::Pid).integer().null())
                     // Combined stdout/stderr output
-                    .col(ColumnDef::new(ScriptExecutions::Output).text().not_null().default(""))
+                    .col(
+                        ColumnDef::new(ScriptExecutions::Output)
+                            .text()
+                            .not_null()
+                            .default(""),
+                    )
                     // Error message if failed
                     .col(ColumnDef::new(ScriptExecutions::Error).text().null())
                     // Timestamps
-                    .col(ColumnDef::new(ScriptExecutions::StartedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(ScriptExecutions::FinishedAt).timestamp_with_time_zone().null())
+                    .col(
+                        ColumnDef::new(ScriptExecutions::StartedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ScriptExecutions::FinishedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     // Who/what triggered this execution
-                    .col(ColumnDef::new(ScriptExecutions::TriggeredBy).string().not_null().default("user"))
+                    .col(
+                        ColumnDef::new(ScriptExecutions::TriggeredBy)
+                            .string()
+                            .not_null()
+                            .default("user"),
+                    )
                     // Foreign key to blocks table (optional - may be a built-in block)
                     .foreign_key(
                         ForeignKey::create()
@@ -61,6 +93,7 @@ impl MigrationTrait for Migration {
                     .name("idx_script_executions_status")
                     .table(ScriptExecutions::Table)
                     .col(ScriptExecutions::Status)
+                    .if_not_exists()
                     .to_owned(),
             )
             .await?;
@@ -72,6 +105,7 @@ impl MigrationTrait for Migration {
                     .name("idx_script_executions_block_id")
                     .table(ScriptExecutions::Table)
                     .col(ScriptExecutions::BlockId)
+                    .if_not_exists()
                     .to_owned(),
             )
             .await?;
@@ -83,6 +117,7 @@ impl MigrationTrait for Migration {
                     .name("idx_script_executions_started_at")
                     .table(ScriptExecutions::Table)
                     .col(ScriptExecutions::StartedAt)
+                    .if_not_exists()
                     .to_owned(),
             )
             .await

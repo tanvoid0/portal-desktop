@@ -121,8 +121,12 @@ impl std::fmt::Display for AIError {
         match self {
             AIError::ProviderNotAvailable(msg) => write!(f, "Provider not available: {}", msg),
             AIError::ConfigurationIncomplete(status) => {
-                write!(f, "Configuration incomplete. Missing: {}", status.missing_fields.join(", "))
-            },
+                write!(
+                    f,
+                    "Configuration incomplete. Missing: {}",
+                    status.missing_fields.join(", ")
+                )
+            }
             AIError::NetworkError(msg) => write!(f, "Network error: {}", msg),
             AIError::TimeoutError(msg) => write!(f, "Timeout: {}", msg),
             AIError::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
@@ -196,4 +200,3 @@ pub trait AIProvider: Send + Sync {
     /// Update configuration dynamically
     fn update_config(&mut self, config: ProviderConfig) -> Result<(), AIError>;
 }
-

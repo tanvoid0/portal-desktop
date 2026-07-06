@@ -1,7 +1,7 @@
+use crate::domains::ai::entities::ConversationMessageModel;
+use crate::domains::ai::entities::ConversationModel;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::domains::ai::entities::ConversationModel;
-use crate::domains::ai::entities::ConversationMessageModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
@@ -65,12 +65,7 @@ impl Conversation {
 }
 
 impl ConversationMessage {
-    pub fn new(
-        conversation_id: String,
-        role: String,
-        content: String,
-        sequence: i32,
-    ) -> Self {
+    pub fn new(conversation_id: String, role: String, content: String, sequence: i32) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             conversation_id,
@@ -87,5 +82,3 @@ pub struct ConversationWithMessages {
     pub conversation: Conversation,
     pub messages: Vec<ConversationMessage>,
 }
-
-

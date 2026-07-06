@@ -1,7 +1,6 @@
 /**
  * Credentials Domain Entities
  */
-
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +18,7 @@ pub struct Model {
     pub tags: String, // JSON array
     pub encrypted_value: String,
     pub encrypted_fields: String, // JSON object
-    pub metadata: String, // JSON object
+    pub metadata: String,         // JSON object
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub last_used: Option<DateTime>,

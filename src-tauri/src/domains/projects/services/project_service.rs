@@ -1,10 +1,12 @@
-use std::path::Path;
-use std::fs;
-use std::process::Command;
 use chrono::Utc;
 use regex::Regex;
+use std::fs;
+use std::path::Path;
+use std::process::Command;
 
-use crate::database::{DatabaseManager, ProjectModel};
+use crate::database::DatabaseManager;
+use crate::domains::projects::entities::ProjectResponse;
+use crate::error::{AppError, AppResult};
 use crate::domains::projects::entities::ProjectAnalysis;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use std::sync::Arc;
@@ -20,12 +22,18 @@ impl ProjectService {
         }
     }
 
-    pub async fn get_all_projects(&self) -> Result<Vec<ProjectModel>, String> {
-        self.repository.get_all().await
+    pub async fn get_all_projects(&self) -> AppResult<Vec<ProjectResponse>> {
+        self.repository
+            .get_all()
+            .await
+            .map_err(AppError::from)
     }
 
-    pub async fn get_project(&self, id: i32) -> Result<Option<ProjectModel>, String> {
-        self.repository.get_by_id(id).await
+    pub async fn get_project(&self, id: i32) -> AppResult<Option<ProjectResponse>> {
+        self.repository
+            .get_by_id(id)
+            .await
+            .map_err(AppError::from)
     }
 
     pub async fn create_project(
@@ -42,24 +50,26 @@ impl ProjectService {
         output_directory: Option<String>,
         dev_port: Option<i32>,
         prod_port: Option<i32>,
-    ) -> Result<ProjectModel, String> {
+    ) -> Result<ProjectResponse, String> {
         // Validate project path
         self.validate_project_path(&path).await?;
 
-        self.repository.create(
-            name,
-            description,
-            path,
-            framework_ids,
-            package_manager_ids,
-            language_ids,
-            build_command,
-            start_command,
-            test_command,
-            output_directory,
-            dev_port,
-            prod_port,
-        ).await
+        self.repository
+            .create(
+                name,
+                description,
+                path,
+                framework_ids,
+                package_manager_ids,
+                language_ids,
+                build_command,
+                start_command,
+                test_command,
+                output_directory,
+                dev_port,
+                prod_port,
+            )
+            .await
     }
 
     pub async fn update_project(
@@ -78,146 +88,157 @@ impl ProjectService {
         output_directory: Option<String>,
         dev_port: Option<i32>,
         prod_port: Option<i32>,
-    ) -> Result<Option<ProjectModel>, String> {
-        self.repository.update(
-            id,
-            name,
-            description,
-            path,
-            status,
-            framework_ids,
-            package_manager_ids,
-            language_ids,
-            build_command,
-            start_command,
-            test_command,
-            output_directory,
-            dev_port,
-            prod_port,
-            None, // starred
-            None, // open_count
-            None, // last_opened
-            None, // size
-            None, // file_count
-            None, // git_repository
-            None, // git_branch
-            None, // git_commit
-            None, // has_uncommitted_changes
-            None, // last_commit
-        ).await
+    ) -> Result<Option<ProjectResponse>, String> {
+        self.repository
+            .update(
+                id,
+                name,
+                description,
+                path,
+                status,
+                framework_ids,
+                package_manager_ids,
+                language_ids,
+                build_command,
+                start_command,
+                test_command,
+                output_directory,
+                dev_port,
+                prod_port,
+                None, // starred
+                None, // open_count
+                None, // last_opened
+                None, // size
+                None, // file_count
+                None, // git_repository
+                None, // git_branch
+                None, // git_commit
+                None, // has_uncommitted_changes
+                None, // last_commit
+            )
+            .await
     }
 
     pub async fn delete_project(&self, id: i32) -> Result<bool, String> {
         self.repository.delete(id).await
     }
 
-    pub async fn toggle_project_star(&self, id: i32) -> Result<Option<ProjectModel>, String> {
+    pub async fn toggle_project_star(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
         // Get current project to check if it exists and get current starred status
         let current_project = self.repository.get_by_id(id).await?;
         if let Some(project) = current_project {
             let new_starred = !project.starred;
-            self.repository.update(
-                id,
-                None, // name
-                None, // description
-                None, // path
-                None, // status
-                None, // framework_ids
-                None, // package_manager_ids
-                None, // language_ids
-                None, // build_command
-                None, // start_command
-                None, // test_command
-                None, // output_directory
-                None, // dev_port
-                None, // prod_port
-                Some(new_starred), // starred
-                None, // open_count
-                None, // last_opened
-                None, // size
-                None, // file_count
-                None, // git_repository
-                None, // git_branch
-                None, // git_commit
-                None, // has_uncommitted_changes
-                None, // last_commit
-            ).await
+            self.repository
+                .update(
+                    id,
+                    None,              // name
+                    None,              // description
+                    None,              // path
+                    None,              // status
+                    None,              // framework_ids
+                    None,              // package_manager_ids
+                    None,              // language_ids
+                    None,              // build_command
+                    None,              // start_command
+                    None,              // test_command
+                    None,              // output_directory
+                    None,              // dev_port
+                    None,              // prod_port
+                    Some(new_starred), // starred
+                    None,              // open_count
+                    None,              // last_opened
+                    None,              // size
+                    None,              // file_count
+                    None,              // git_repository
+                    None,              // git_branch
+                    None,              // git_commit
+                    None,              // has_uncommitted_changes
+                    None,              // last_commit
+                )
+                .await
         } else {
             Ok(None)
         }
     }
 
-    pub async fn open_project(&self, id: i32) -> Result<Option<ProjectModel>, String> {
+    pub async fn open_project(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
         // Get current project to check if it exists and get current open_count
         let current_project = self.repository.get_by_id(id).await?;
         if let Some(project) = current_project {
             let new_open_count = project.open_count + 1;
-            self.repository.update(
-                id,
-                None, // name
-                None, // description
-                None, // path
-                None, // status
-                None, // framework_ids
-                None, // package_manager_ids
-                None, // language_ids
-                None, // build_command
-                None, // start_command
-                None, // test_command
-                None, // output_directory
-                None, // dev_port
-                None, // prod_port
-                None, // starred
-                Some(new_open_count), // open_count
-                Some(Utc::now()), // last_opened
-                None, // size
-                None, // file_count
-                None, // git_repository
-                None, // git_branch
-                None, // git_commit
-                None, // has_uncommitted_changes
-                None, // last_commit
-            ).await
+            self.repository
+                .update(
+                    id,
+                    None,                 // name
+                    None,                 // description
+                    None,                 // path
+                    None,                 // status
+                    None,                 // framework_ids
+                    None,                 // package_manager_ids
+                    None,                 // language_ids
+                    None,                 // build_command
+                    None,                 // start_command
+                    None,                 // test_command
+                    None,                 // output_directory
+                    None,                 // dev_port
+                    None,                 // prod_port
+                    None,                 // starred
+                    Some(new_open_count), // open_count
+                    Some(Utc::now()),     // last_opened
+                    None,                 // size
+                    None,                 // file_count
+                    None,                 // git_repository
+                    None,                 // git_branch
+                    None,                 // git_commit
+                    None,                 // has_uncommitted_changes
+                    None,                 // last_commit
+                )
+                .await
         } else {
             Ok(None)
         }
     }
 
-    pub async fn refresh_project_metadata(&self, id: i32) -> Result<Option<ProjectModel>, String> {
+    pub async fn refresh_project_metadata(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
         // Get current project
         let current_project = self.repository.get_by_id(id).await?;
         if let Some(project) = current_project {
             // Scan project directory
             let (size, file_count) = self.scan_project_directory(&project.path).await?;
             let git_info = self.get_git_info(&project.path).await.ok();
-            
+            let analysis = self.analyze_project_directory(&project.path).await.ok();
+
             // Update metadata using repository
-            self.repository.update(
-                id,
-                None, // name
-                None, // description
-                None, // path
-                None, // status
-                None, // framework_ids
-                None, // package_manager_ids
-                None, // language_ids
-                None, // build_command
-                None, // start_command
-                None, // test_command
-                None, // output_directory
-                None, // dev_port
-                None, // prod_port
-                None, // starred
-                None, // open_count
-                None, // last_opened
-                Some(size), // size
-                Some(file_count), // file_count
-                git_info.as_ref().and_then(|g| g.repository.clone()), // git_repository
-                git_info.as_ref().and_then(|g| g.branch.clone()), // git_branch
-                git_info.as_ref().and_then(|g| g.commit.clone()), // git_commit
-                git_info.as_ref().map(|g| g.has_uncommitted_changes), // has_uncommitted_changes
-                git_info.as_ref().and_then(|g| g.last_commit), // last_commit
-            ).await
+            self.repository
+                .update(
+                    id,
+                    None,                                                 // name
+                    None,                                                 // description
+                    None,                                                 // path
+                    None,                                                 // status
+                    None,                                                 // framework_ids
+                    None,                                                 // package_manager_ids
+                    None,                                                 // language_ids
+                    analysis.as_ref().and_then(|a| a.build_command.clone()), // build_command
+                    analysis.as_ref().and_then(|a| a.start_command.clone()), // start_command
+                    analysis.as_ref().and_then(|a| a.test_command.clone()), // test_command
+                    analysis
+                        .as_ref()
+                        .and_then(|a| a.output_directory.clone()), // output_directory
+                    analysis.as_ref().and_then(|a| a.dev_port), // dev_port
+                    analysis.as_ref().and_then(|a| a.prod_port), // prod_port
+                    None,                                                 // starred
+                    None,                                                 // open_count
+                    None,                                                 // last_opened
+                    Some(size),                                           // size
+                    Some(file_count),                                     // file_count
+                    git_info.as_ref().and_then(|g| g.repository.clone()), // git_repository
+                    git_info.as_ref().and_then(|g| g.branch.clone()),     // git_branch
+                    git_info.as_ref().and_then(|g| g.commit.clone()),     // git_commit
+                    git_info.as_ref().map(|g| g.has_uncommitted_changes), // has_uncommitted_changes
+                    git_info.as_ref().and_then(|g| g.last_commit),        // last_commit
+                )
+                .await
         } else {
             Ok(None)
         }
@@ -228,7 +249,7 @@ impl ProjectService {
         status_filter: Option<String>,
         sort_by: String,
         search_query: Option<String>,
-    ) -> Result<Vec<ProjectModel>, String> {
+    ) -> Result<Vec<ProjectResponse>, String> {
         // Use repository methods instead of direct database access
         let mut projects = self.repository.get_all().await?;
 
@@ -241,28 +262,36 @@ impl ProjectService {
         if let Some(query_str) = search_query {
             let query_lower = query_str.to_lowercase();
             projects.retain(|p| {
-                p.name.to_lowercase().contains(&query_lower) ||
-                p.path.to_lowercase().contains(&query_lower) ||
-                p.description.as_ref().map_or(false, |d| d.to_lowercase().contains(&query_lower))
+                p.name.to_lowercase().contains(&query_lower)
+                    || p.path.to_lowercase().contains(&query_lower)
+                    || p.description
+                        .as_ref()
+                        .map_or(false, |d| d.to_lowercase().contains(&query_lower))
             });
         }
 
         // Apply sorting
-        projects.sort_by(|a, b| {
-            match sort_by.as_str() {
-                "name" => a.name.cmp(&b.name),
-                "name_desc" => b.name.cmp(&a.name),
-                "created_at" => b.created_at.unwrap_or_default().cmp(&a.created_at.unwrap_or_default()),
-                "updated_at" => b.updated_at.unwrap_or_default().cmp(&a.updated_at.unwrap_or_default()),
-                "last_opened" => b.last_opened.unwrap_or_default().cmp(&a.last_opened.unwrap_or_default()),
-                "size" => b.size.cmp(&a.size),
-                _ => a.name.cmp(&b.name),
-            }
+        projects.sort_by(|a, b| match sort_by.as_str() {
+            "name" => a.name.cmp(&b.name),
+            "name_desc" => b.name.cmp(&a.name),
+            "created_at" => b
+                .created_at
+                .unwrap_or_default()
+                .cmp(&a.created_at.unwrap_or_default()),
+            "updated_at" => b
+                .updated_at
+                .unwrap_or_default()
+                .cmp(&a.updated_at.unwrap_or_default()),
+            "last_opened" => b
+                .last_opened
+                .unwrap_or_default()
+                .cmp(&a.last_opened.unwrap_or_default()),
+            "size" => b.size.cmp(&a.size),
+            _ => a.name.cmp(&b.name),
         });
 
         Ok(projects)
     }
-
 
     pub async fn get_frameworks(&self) -> Result<Vec<String>, String> {
         // TODO: Load frameworks from junction tables using find_with_related
@@ -288,14 +317,14 @@ impl ProjectService {
             .and_then(|n| n.to_str())
             .unwrap_or("Unknown Project")
             .to_string();
-        
+
         Ok(name)
     }
 
     pub async fn detect_frameworks(&self, path: &str) -> Result<Vec<String>, String> {
         let path_obj = Path::new(path);
         let mut frameworks = Vec::new();
-        
+
         // Check for common framework indicators (check ALL, not just first)
         let framework_indicators = [
             ("tauri.conf.json", "Tauri"),
@@ -350,7 +379,7 @@ impl ProjectService {
     pub async fn detect_languages(&self, path: &str) -> Result<Vec<String>, String> {
         let path_obj = Path::new(path);
         let mut languages = Vec::new();
-        
+
         // Language detection based on file extensions and config files
         let language_indicators = [
             ("Cargo.toml", "Rust"),
@@ -377,17 +406,34 @@ impl ProjectService {
             let dir_path = path_obj.join(dir);
             if dir_path.is_dir() {
                 if let Ok(entries) = std::fs::read_dir(&dir_path) {
-                    for entry in entries.flatten().take(20) { // Limit to first 20 files for performance
+                    for entry in entries.flatten().take(20) {
+                        // Limit to first 20 files for performance
                         if let Some(ext) = entry.path().extension().and_then(|e| e.to_str()) {
                             match ext {
-                                "rs" if !languages.contains(&"Rust".to_string()) => languages.push("Rust".to_string()),
-                                "go" if !languages.contains(&"Go".to_string()) => languages.push("Go".to_string()),
-                                "js" if !languages.contains(&"JavaScript".to_string()) => languages.push("JavaScript".to_string()),
-                                "ts" | "tsx" if !languages.contains(&"TypeScript".to_string()) => languages.push("TypeScript".to_string()),
-                                "py" if !languages.contains(&"Python".to_string()) => languages.push("Python".to_string()),
-                                "java" if !languages.contains(&"Java".to_string()) => languages.push("Java".to_string()),
-                                "php" if !languages.contains(&"PHP".to_string()) => languages.push("PHP".to_string()),
-                                "rb" if !languages.contains(&"Ruby".to_string()) => languages.push("Ruby".to_string()),
+                                "rs" if !languages.contains(&"Rust".to_string()) => {
+                                    languages.push("Rust".to_string())
+                                }
+                                "go" if !languages.contains(&"Go".to_string()) => {
+                                    languages.push("Go".to_string())
+                                }
+                                "js" if !languages.contains(&"JavaScript".to_string()) => {
+                                    languages.push("JavaScript".to_string())
+                                }
+                                "ts" | "tsx" if !languages.contains(&"TypeScript".to_string()) => {
+                                    languages.push("TypeScript".to_string())
+                                }
+                                "py" if !languages.contains(&"Python".to_string()) => {
+                                    languages.push("Python".to_string())
+                                }
+                                "java" if !languages.contains(&"Java".to_string()) => {
+                                    languages.push("Java".to_string())
+                                }
+                                "php" if !languages.contains(&"PHP".to_string()) => {
+                                    languages.push("PHP".to_string())
+                                }
+                                "rb" if !languages.contains(&"Ruby".to_string()) => {
+                                    languages.push("Ruby".to_string())
+                                }
                                 _ => {}
                             }
                         }
@@ -400,15 +446,15 @@ impl ProjectService {
     }
 
     pub async fn analyze_project_directory(&self, path: &str) -> Result<ProjectAnalysis, String> {
-
         let path_obj = Path::new(path);
-        
+
         // Extract project name from path
-        let name = path_obj.file_name()
+        let name = path_obj
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("Unknown Project")
             .to_string();
-        
+
         // Format name with proper capitalization and spaces
         let formatted_name = self.format_project_name(&name);
 
@@ -426,7 +472,9 @@ impl ProjectService {
         let primary_package_manager = package_managers.first().cloned();
 
         // Detect build/start/test commands
-        let (build_command, start_command, test_command) = self.detect_commands(path, &primary_framework, &primary_package_manager).await;
+        let (build_command, start_command, test_command) = self
+            .detect_commands(path, &primary_framework, &primary_package_manager)
+            .await;
 
         // Detect output directory
         let output_directory = self.detect_output_directory(path, &primary_framework).await;
@@ -456,81 +504,104 @@ impl ProjectService {
             .chars()
             .enumerate()
             .map(|(i, c)| {
-                if i == 0 || (i > 0 && name.chars().nth(i - 1).map_or(false, |prev| prev == ' ' || prev == '-' || prev == '_')) {
+                if i == 0
+                    || (i > 0
+                        && name
+                            .chars()
+                            .nth(i - 1)
+                            .map_or(false, |prev| prev == ' ' || prev == '-' || prev == '_'))
+                {
                     c.to_uppercase().collect::<String>()
                 } else {
                     c.to_lowercase().collect::<String>()
                 }
             })
             .collect::<String>();
-        
-        // Clean up multiple spaces
-        Regex::new(r"\s+").unwrap().replace_all(&formatted, " ").to_string()
-    }
 
+        // Clean up multiple spaces
+        Regex::new(r"\s+")
+            .unwrap()
+            .replace_all(&formatted, " ")
+            .to_string()
+    }
 
     async fn detect_package_managers(&self, path: &str) -> Vec<String> {
         use std::path::Path;
-        
+
         let path_obj = Path::new(path);
         let mut package_managers = Vec::new();
-        
+
         // Check for all package manager indicators (not just first)
         if path_obj.join("package-lock.json").exists() {
             package_managers.push("npm".to_string());
         }
-        
+
         if path_obj.join("yarn.lock").exists() {
             package_managers.push("yarn".to_string());
         }
-        
+
         if path_obj.join("pnpm-lock.yaml").exists() {
             package_managers.push("pnpm".to_string());
         }
-        
+
         if path_obj.join("requirements.txt").exists() {
             package_managers.push("pip".to_string());
         }
-        
+
         if path_obj.join("Cargo.toml").exists() {
             package_managers.push("cargo".to_string());
         }
-        
+
         if path_obj.join("go.mod").exists() {
             package_managers.push("go".to_string());
         }
-        
+
         if path_obj.join("composer.json").exists() {
             package_managers.push("composer".to_string());
         }
-        
+
         if path_obj.join("Gemfile").exists() {
             package_managers.push("bundle".to_string());
         }
-        
+
         package_managers
     }
 
-    async fn detect_commands(&self, path: &str, _framework: &Option<String>, package_manager: &Option<String>) -> (Option<String>, Option<String>, Option<String>) {
-        use std::path::Path;
+    async fn detect_commands(
+        &self,
+        path: &str,
+        _framework: &Option<String>,
+        package_manager: &Option<String>,
+    ) -> (Option<String>, Option<String>, Option<String>) {
         use std::fs;
-        
+        use std::path::Path;
+
         let path_obj = Path::new(path);
         let mut build_command = None;
         let mut start_command = None;
         let mut test_command = None;
-        
+
         // Check package.json for scripts
         if let Ok(contents) = fs::read_to_string(path_obj.join("package.json")) {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
                 if let Some(scripts) = json.get("scripts").and_then(|s| s.as_object()) {
-                    build_command = scripts.get("build").and_then(|v| v.as_str()).map(|s| s.to_string());
-                    start_command = scripts.get("start").or_else(|| scripts.get("dev")).and_then(|v| v.as_str()).map(|s| s.to_string());
-                    test_command = scripts.get("test").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    build_command = scripts
+                        .get("build")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    start_command = scripts
+                        .get("start")
+                        .or_else(|| scripts.get("dev"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    test_command = scripts
+                        .get("test")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
                 }
             }
         }
-        
+
         // Set defaults based on package manager if no scripts found
         if build_command.is_none() {
             if let Some(pm) = package_manager {
@@ -542,7 +613,7 @@ impl ProjectService {
                 }
             }
         }
-        
+
         if start_command.is_none() {
             if let Some(pm) = package_manager {
                 match pm.as_str() {
@@ -553,7 +624,7 @@ impl ProjectService {
                 }
             }
         }
-        
+
         if test_command.is_none() {
             if let Some(pm) = package_manager {
                 match pm.as_str() {
@@ -564,24 +635,28 @@ impl ProjectService {
                 }
             }
         }
-        
+
         (build_command, start_command, test_command)
     }
 
-    async fn detect_output_directory(&self, path: &str, framework: &Option<String>) -> Option<String> {
+    async fn detect_output_directory(
+        &self,
+        path: &str,
+        framework: &Option<String>,
+    ) -> Option<String> {
         use std::path::Path;
-        
+
         let path_obj = Path::new(path);
-        
+
         // Check for common output directories
         let common_dirs = ["dist", "build", "out", "public", "www"];
-        
+
         for dir in &common_dirs {
             if path_obj.join(dir).exists() {
                 return Some(dir.to_string());
             }
         }
-        
+
         // Framework-specific defaults
         if let Some(fw) = framework {
             match fw.as_str() {
@@ -591,22 +666,32 @@ impl ProjectService {
                 _ => {}
             }
         }
-        
+
         None
     }
 
-    async fn detect_ports(&self, path: &str, framework: &Option<String>) -> (Option<i32>, Option<i32>) {
-        use std::path::Path;
-        use std::fs;
+    async fn detect_ports(
+        &self,
+        path: &str,
+        framework: &Option<String>,
+    ) -> (Option<i32>, Option<i32>) {
         use regex::Regex;
-        
+        use std::fs;
+        use std::path::Path;
+
         let path_obj = Path::new(path);
         let mut dev_port = None;
         let prod_port = None;
-        
+
         // Check for port configurations in common files
-        let config_files = ["package.json", "vite.config.js", "next.config.js", "nuxt.config.js", "svelte.config.js"];
-        
+        let config_files = [
+            "package.json",
+            "vite.config.js",
+            "next.config.js",
+            "nuxt.config.js",
+            "svelte.config.js",
+        ];
+
         for file in &config_files {
             if let Ok(contents) = fs::read_to_string(path_obj.join(file)) {
                 // Look for port patterns
@@ -619,7 +704,7 @@ impl ProjectService {
                 }
             }
         }
-        
+
         // Framework-specific defaults
         if dev_port.is_none() {
             if let Some(fw) = framework {
@@ -633,41 +718,44 @@ impl ProjectService {
                 }
             }
         }
-        
+
         // Production port is usually 80 or 443, but we'll leave it as None for now
         (dev_port, prod_port)
     }
 
     pub async fn get_project_stats(&self) -> Result<ProjectStats, String> {
         let projects = self.get_all_projects().await?;
-        
+
         let active_projects = projects.iter().filter(|p| p.status == "active").count() as u32;
         let archived_projects = projects.iter().filter(|p| p.status == "archived").count() as u32;
-        
+
         let total_size: i64 = projects.iter().map(|p| p.size).sum();
-        
+
         // Count frameworks
         // TODO: Load frameworks from junction tables using find_with_related
         // For now, return empty since we're using many-to-many relationships
-        let framework_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-        
-        let most_used_framework = framework_counts.iter()
+        let framework_counts: std::collections::HashMap<String, u32> =
+            std::collections::HashMap::new();
+
+        let most_used_framework = framework_counts
+            .iter()
             .max_by_key(|(_, count)| *count)
             .map(|(framework, _)| framework.clone())
             .unwrap_or_else(|| "Unknown".to_string());
 
         // Get recent projects (last 5 opened)
-        let mut recent_projects: Vec<ProjectModel> = projects.iter()
+        let mut recent_projects: Vec<ProjectResponse> = projects
+            .iter()
             .filter(|p| p.status == "active")
             .cloned()
             .collect();
-        
+
         recent_projects.sort_by(|a, b| {
             let a_time = a.last_opened.map_or(0, |t| t.timestamp());
             let b_time = b.last_opened.map_or(0, |t| t.timestamp());
             b_time.cmp(&a_time)
         });
-        
+
         recent_projects.truncate(5);
 
         Ok(ProjectStats {
@@ -684,16 +772,21 @@ impl ProjectService {
         let mut size = 0i64;
         let mut file_count = 0i32;
 
-        fn scan_dir(dir: &Path, size: &mut i64, file_count: &mut i32) -> Result<(), std::io::Error> {
+        fn scan_dir(
+            dir: &Path,
+            size: &mut i64,
+            file_count: &mut i32,
+        ) -> Result<(), std::io::Error> {
             if dir.is_dir() {
                 for entry in fs::read_dir(dir)? {
                     let entry = entry?;
                     let path = entry.path();
-                    
+
                     if path.is_dir() {
                         // Skip common directories that shouldn't be counted
                         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                            if matches!(name, "node_modules" | ".git" | "target" | "dist" | "build") {
+                            if matches!(name, "node_modules" | ".git" | "target" | "dist" | "build")
+                            {
                                 continue;
                             }
                         }
@@ -730,7 +823,9 @@ impl ProjectService {
 
         let branch = if let Ok(output) = branch_output {
             if output.status.success() {
-                String::from_utf8(output.stdout).ok().map(|s| s.trim().to_string())
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
             } else {
                 None
             }
@@ -746,7 +841,9 @@ impl ProjectService {
 
         let commit = if let Ok(output) = commit_output {
             if output.status.success() {
-                String::from_utf8(output.stdout).ok().map(|s| s.trim().to_string())
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
             } else {
                 None
             }
@@ -783,7 +880,7 @@ pub struct ProjectStats {
     pub archived_projects: u32,
     pub total_size: i64,
     pub most_used_framework: String,
-    pub recent_projects: Vec<ProjectModel>,
+    pub recent_projects: Vec<ProjectResponse>,
 }
 
 #[derive(Debug, Clone)]
