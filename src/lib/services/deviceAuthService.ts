@@ -191,6 +191,7 @@ class DeviceAuthService {
 
     // First verify the passcode
     const verifyResult = await invokeClient.post<{
+      verified: boolean;
       approved: boolean;
       access_token: string | null;
       expires_at: string | null;
@@ -201,11 +202,19 @@ class DeviceAuthService {
         device_id: deviceInfo.device_id,
         passcode,
         approval_type: approvalType,
+        device_name: deviceInfo.device_name,
+        device_info: JSON.stringify(deviceInfo.device_info),
       },
       {
         requireAuth: false,
       },
     );
+
+    // Reject early if the passcode was wrong/expired so the caller can show an
+    // error instead of polling forever.
+    if (!verifyResult.verified) {
+      throw new Error(verifyResult.message || "Invalid or expired passcode");
+    }
 
     // Passcode is verified, now wait for host approval
     // The host will approve via the DeviceApprovalDialog

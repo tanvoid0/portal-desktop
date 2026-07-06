@@ -34,6 +34,7 @@
     RefreshCw,
     Home,
     QrCode,
+    Shield,
   } from "@lucide/svelte";
   import {
     Provider as SidebarProvider,
@@ -502,6 +503,14 @@
                       >
                         <QrCode class="h-4 w-4" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onclick={() => (deviceApprovalDialogOpen = true)}
+                        title="Device approval requests"
+                      >
+                        <Shield class="h-4 w-4" />
+                      </Button>
                     {/if}
                     <Button
                       variant="ghost"
@@ -551,10 +560,7 @@
   <FloatingAvatar />
 
   <!-- QR Code Dialog -->
-  <QRCodeDialog
-    bind:open={qrCodeDialogOpen}
-    onDeviceRequest={() => (deviceApprovalDialogOpen = true)}
-  />
+  <QRCodeDialog bind:open={qrCodeDialogOpen} />
 
   <!-- Device Approval Dialog -->
   {#if showQRButton}

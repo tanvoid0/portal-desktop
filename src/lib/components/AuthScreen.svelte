@@ -27,22 +27,25 @@
   let deviceInfo = $state(DeviceAuthService.getDeviceInfo());
 
   onMount(async () => {
-    // Automatically request passcode when screen loads
-    await requestPasscode();
-  });
-
-  async function requestPasscode() {
-    try {
-      loading = true;
-      error = null;
-      await DeviceAuthService.requestPasscode();
-    } catch (err) {
-      console.error("Failed to request passcode:", err);
-      error = err instanceof Error ? err.message : "Failed to request passcode";
-    } finally {
-      loading = false;
+    // If a passcode was passed via the QR-code URL, auto-fill and verify it
+    // so the user does not have to type anything.
+    const urlPasscode = new URLSearchParams(window.location.search).get(
+      "passcode",
+    );
+    if (urlPasscode && /^\d{6}$/.test(urlPasscode)) {
+      passcode = urlPasscode;
+      // Strip the passcode from the address bar so it isn't left visible or
+      // saved in history after use.
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("passcode");
+      window.history.replaceState({}, "", cleanUrl.toString());
+      await verifyPasscode();
+      return;
     }
-  }
+
+    // Otherwise wait for the user to enter the passcode from the host's QR dialog.
+    // The phone must NOT generate a passcode — that is the host's shared secret.
+  });
 
   async function verifyPasscode() {
     if (!passcode.trim() || passcode.length !== 6) {
@@ -214,11 +217,11 @@
           <div class="flex gap-2">
             <Button
               variant="outline"
-              onclick={requestPasscode}
+              onclick={() => window.location.reload()}
               disabled={loading}
               class="flex-1"
             >
-              Request New Code
+              Reload
             </Button>
             <Button
               onclick={verifyPasscode}

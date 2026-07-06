@@ -10,10 +10,8 @@
 
   let {
     open = $bindable(false),
-    onDeviceRequest = () => {},
   }: {
     open?: boolean;
-    onDeviceRequest?: () => void;
   } = $props();
 
   let qrCodeDataUrl = $state<string | null>(null);
@@ -55,13 +53,13 @@
         throw new Error("Failed to generate passcode");
       }
 
-      // Generate QR code with URL and passcode
-      const qrData = JSON.stringify({
-        url: appUrl,
-        passcode: passcode,
-      });
+      // Encode passcode as a query param so any QR reader opens the link
+      // directly and the target page auto-fills the passcode.
+      const qrUrl = new URL(appUrl);
+      qrUrl.searchParams.set("passcode", passcode);
+      url = qrUrl.toString();
 
-      const dataUrl = await QRCode.toDataURL(qrData, {
+      const dataUrl = await QRCode.toDataURL(url, {
         width: 300,
         margin: 2,
         color: {
@@ -121,9 +119,6 @@
       }
 
       passcode = result.passcode;
-
-      // Notify parent that a device is requesting access
-      onDeviceRequest();
     } catch (err) {
       console.error("Failed to generate passcode:", err);
       throw err;
