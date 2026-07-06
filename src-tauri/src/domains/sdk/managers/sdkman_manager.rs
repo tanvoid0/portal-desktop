@@ -322,6 +322,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires SDKMAN installed locally"]
     async fn test_sdkman_get_version() {
         let manager = SdkmanManager::new();
         let result = manager.get_manager_version().await;
@@ -341,6 +342,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires SDKMAN installed locally"]
     async fn test_sdkman_shell_command_execution() {
         let manager = SdkmanManager::new();
 
@@ -363,6 +365,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires SDKMAN installed locally"]
     async fn test_sdkman_direct_shell_test() {
         // Test the exact command our manager uses
         let command = "source ~/.sdkman/bin/sdkman-init.sh && sdk version";
@@ -396,6 +399,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires SDKMAN installed locally"]
     async fn test_sdkman_file_existence() {
         // Check if SDKMAN files exist
         let sdkman_dir = std::env::var("HOME").unwrap() + "/.sdkman";
