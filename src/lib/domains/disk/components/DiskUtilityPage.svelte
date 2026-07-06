@@ -5,6 +5,8 @@
   import HistoryTab from "./HistoryTab.svelte";
   import ProtectedTab from "./ProtectedTab.svelte";
   import SettingsTab from "./SettingsTab.svelte";
+  import { Tabs, TabsList, TabsTrigger } from "$lib/components/ui/tabs";
+  import { HardDrive } from "@lucide/svelte";
 
   type Tab = "dashboard" | "cleanup" | "projects" | "history" | "protected" | "settings";
   const tabs: Tab[] = ["dashboard", "cleanup", "projects", "history", "protected", "settings"];
@@ -25,31 +27,23 @@
 <div class="mx-auto max-w-5xl px-6 py-8">
   <header class="mb-8">
     <div class="mb-2 flex items-center gap-2.5">
-      <div class="flex h-6 w-6 items-center justify-center rounded-md bg-white">
-        <span class="text-sm font-bold leading-none text-black">◑</span>
+      <div class="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <HardDrive class="size-3.5" />
       </div>
-      <h1 class="text-lg font-semibold tracking-tight">Disk Utility</h1>
+      <h1 class="text-lg font-semibold tracking-tight text-foreground">Disk Utility</h1>
     </div>
-    <p class="max-w-2xl text-sm text-neutral-500">
+    <p class="max-w-2xl text-sm text-muted-foreground">
       Scans propose. You review. Nothing deletes without your tick — items go to the Recycle Bin.
     </p>
   </header>
 
-  <div class="mb-8 flex gap-1 border-b border-neutral-900">
-    {#each tabs as t (t)}
-      <button
-        onclick={() => (tab = t)}
-        class="relative px-3 py-2.5 text-sm capitalize transition-colors {tab === t
-          ? 'text-white'
-          : 'text-neutral-500 hover:text-neutral-300'}"
-      >
-        {t}
-        {#if tab === t}
-          <span class="absolute inset-x-0 -bottom-px h-px bg-white"></span>
-        {/if}
-      </button>
-    {/each}
-  </div>
+  <Tabs value={tab} onValueChange={(v) => (tab = v as Tab)} class="mb-8">
+    <TabsList>
+      {#each tabs as t (t)}
+        <TabsTrigger value={t} class="capitalize">{t}</TabsTrigger>
+      {/each}
+    </TabsList>
+  </Tabs>
 
   <div class={tab === "dashboard" ? "" : "hidden"}>
     <DashboardTab active={tab === "dashboard"} {go} />

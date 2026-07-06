@@ -1,4 +1,5 @@
 use crate::domains::projects::pipelines::executors::{ExecutionRequest, ExecutionResult, Executor};
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 use std::time::Instant;
 
@@ -25,6 +26,7 @@ impl Executor for DockerExecutor {
 
         // Build Docker command
         let mut cmd = Command::new("docker");
+        cmd.no_window();
 
         // If we need to build first
         if let Some(dockerfile) = &self.dockerfile {
@@ -55,6 +57,7 @@ impl Executor for DockerExecutor {
 
         // Run the command in the container
         let mut run_cmd = Command::new("docker");
+        run_cmd.no_window();
         run_cmd.arg("run");
         run_cmd.arg("--rm");
 

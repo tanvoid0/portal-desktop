@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use crate::process_ext::NoWindowExt;
 use tokio::process::Command;
 
 /// Workflow step types
@@ -252,6 +253,7 @@ impl WorkflowEngine {
             .collect();
 
         let mut cmd_builder = Command::new(&cmd);
+        cmd_builder.no_window();
         cmd_builder.args(&cmd_args);
 
         // Set working directory

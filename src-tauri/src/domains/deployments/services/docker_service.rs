@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::process_ext::NoWindowExt;
 use tokio::process::Command;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -89,6 +90,7 @@ impl DockerService {
     /// Get structured Docker daemon status
     pub async fn get_docker_status(&self) -> Result<DockerStatus, String> {
         let version_output = Command::new("docker")
+            .no_window()
             .args(["version", "--format", "{{.Client.Version}}"])
             .output()
             .await;
@@ -112,6 +114,7 @@ impl DockerService {
         };
 
         let info_output = Command::new("docker")
+            .no_window()
             .arg("info")
             .output()
             .await
@@ -175,6 +178,7 @@ impl DockerService {
             for path in candidates {
                 if Path::new(path).exists() {
                     Command::new("cmd")
+                        .no_window()
                         .args(["/C", "start", "", path])
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
@@ -235,6 +239,7 @@ impl DockerService {
     /// List all running containers
     pub async fn list_containers(&self) -> Result<Vec<DockerContainer>, String> {
         let output = Command::new("docker")
+            .no_window()
             .args(&["ps", "-a", "--format", "json"])
             .output()
             .await
@@ -281,6 +286,7 @@ impl DockerService {
         dockerfile_path: Option<&str>,
     ) -> Result<String, String> {
         let mut cmd = Command::new("docker");
+        cmd.no_window();
         cmd.arg("build");
         cmd.arg("--progress=plain"); // Plain progress for easier parsing
         cmd.arg("-t").arg(image_name);
@@ -328,6 +334,7 @@ impl DockerService {
         dockerfile_path: Option<&str>,
     ) -> Result<tokio::process::Child, String> {
         let mut cmd = Command::new("docker");
+        cmd.no_window();
         cmd.arg("build");
         cmd.arg("--progress=plain");
         cmd.arg("-t").arg(image_name);
@@ -354,6 +361,7 @@ impl DockerService {
         environment: &HashMap<String, String>,
     ) -> Result<String, String> {
         let mut cmd = Command::new("docker");
+        cmd.no_window();
         cmd.arg("run");
         cmd.arg("-d"); // detached mode
         cmd.arg("--name").arg(container_name);
@@ -396,6 +404,7 @@ impl DockerService {
     /// Start a container by ID or name
     pub async fn start_container(&self, container_id: &str) -> Result<(), String> {
         let output = Command::new("docker")
+            .no_window()
             .arg("start")
             .arg(container_id)
             .output()
@@ -415,6 +424,7 @@ impl DockerService {
     /// Stop a container
     pub async fn stop_container(&self, container_id: &str) -> Result<(), String> {
         let output = Command::new("docker")
+            .no_window()
             .arg("stop")
             .arg(container_id)
             .output()
@@ -434,6 +444,7 @@ impl DockerService {
     /// Remove a container
     pub async fn remove_container(&self, container_id: &str) -> Result<(), String> {
         let output = Command::new("docker")
+            .no_window()
             .arg("rm")
             .arg("-f") // force removal
             .arg(container_id)
@@ -458,6 +469,7 @@ impl DockerService {
         tail: Option<usize>,
     ) -> Result<Vec<String>, String> {
         let mut cmd = Command::new("docker");
+        cmd.no_window();
         cmd.arg("logs");
 
         if let Some(tail_count) = tail {
@@ -485,6 +497,7 @@ impl DockerService {
     /// Get container status
     pub async fn get_container_status(&self, container_id: &str) -> Result<String, String> {
         let output = Command::new("docker")
+            .no_window()
             .args(&["inspect", "--format", "{{.State.Status}}", container_id])
             .output()
             .await

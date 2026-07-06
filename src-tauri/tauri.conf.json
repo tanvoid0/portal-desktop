@@ -36,12 +36,12 @@
   },
   "plugins": {
     "updater": {
-      "active": false,
+      "active": true,
       "endpoints": [
         "https://github.com/tanvoid0/portal-desktop/releases/latest/download/latest.json"
       ],
       "dialog": false,
-      "pubkey": ""
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI0ODQxMTFGMEJDMjEyRkMKUldUOEVzSUxIeEdFdEdzVVlaNXY2cC9PK3NwNlhxVHFZSXJZUzFnNHFuV0VuWERINFNXN3lEMHoK"
     }
   }
 }

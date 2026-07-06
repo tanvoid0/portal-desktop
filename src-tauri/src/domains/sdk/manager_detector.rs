@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 use which::which;
 
@@ -16,7 +17,7 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     let mut managers = Vec::new();
 
     // Check for Node.js
-    if let Ok(output) = Command::new("node").arg("--version").output() {
+    if let Ok(output) = Command::new("node").no_window().arg("--version").output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let path = which("node")
@@ -33,7 +34,7 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     }
 
     // Check for Python
-    if let Ok(output) = Command::new("python3").arg("--version").output() {
+    if let Ok(output) = Command::new("python3").no_window().arg("--version").output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let path = which("python3")
@@ -50,7 +51,7 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     }
 
     // Check for Rust
-    if let Ok(output) = Command::new("rustc").arg("--version").output() {
+    if let Ok(output) = Command::new("rustc").no_window().arg("--version").output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let path = which("rustc")
@@ -71,7 +72,7 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     }
 
     // Check for Java
-    if let Ok(output) = Command::new("java").arg("-version").output() {
+    if let Ok(output) = Command::new("java").no_window().arg("-version").output() {
         if output.status.success() {
             let version_output = String::from_utf8_lossy(&output.stderr);
             if let Some(version_line) = version_output.lines().next() {
@@ -92,7 +93,7 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     }
 
     // Check for Go
-    if let Ok(output) = Command::new("go").arg("version").output() {
+    if let Ok(output) = Command::new("go").no_window().arg("version").output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let path = which("go")
@@ -113,7 +114,7 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     }
 
     // Check for PHP
-    if let Ok(output) = Command::new("php").arg("--version").output() {
+    if let Ok(output) = Command::new("php").no_window().arg("--version").output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let path = which("php")
@@ -134,7 +135,7 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     }
 
     // Check for Ruby
-    if let Ok(output) = Command::new("ruby").arg("--version").output() {
+    if let Ok(output) = Command::new("ruby").no_window().arg("--version").output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let path = which("ruby")

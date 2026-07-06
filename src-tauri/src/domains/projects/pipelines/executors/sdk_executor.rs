@@ -1,4 +1,5 @@
 use crate::domains::projects::pipelines::executors::{ExecutionRequest, ExecutionResult, Executor};
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 use std::time::Instant;
 
@@ -90,6 +91,7 @@ impl Executor for SDKExecutor {
         };
 
         let mut cmd = Command::new(&program);
+        cmd.no_window();
         cmd.args(&args);
         cmd.current_dir(&request.working_directory);
         cmd.envs(&request.environment);

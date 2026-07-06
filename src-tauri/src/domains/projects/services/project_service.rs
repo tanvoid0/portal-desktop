@@ -2,6 +2,7 @@ use chrono::Utc;
 use regex::Regex;
 use std::fs;
 use std::path::Path;
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 
 use crate::database::DatabaseManager;
@@ -817,6 +818,7 @@ impl ProjectService {
 
         // Get current branch
         let branch_output = Command::new("git")
+            .no_window()
             .args(&["branch", "--show-current"])
             .current_dir(project_path)
             .output();
@@ -835,6 +837,7 @@ impl ProjectService {
 
         // Get last commit
         let commit_output = Command::new("git")
+            .no_window()
             .args(&["log", "-1", "--format=%H"])
             .current_dir(project_path)
             .output();
@@ -853,6 +856,7 @@ impl ProjectService {
 
         // Check for uncommitted changes
         let status_output = Command::new("git")
+            .no_window()
             .args(&["status", "--porcelain"])
             .current_dir(project_path)
             .output();

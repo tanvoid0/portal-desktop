@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
+use crate::process_ext::NoWindowExt;
 use tokio::process::{Child, Command};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +57,7 @@ impl CliService {
 
         // Build command
         let mut cmd = Command::new(program);
+        cmd.no_window();
         cmd.args(args);
 
         // Set working directory

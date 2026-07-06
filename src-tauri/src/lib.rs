@@ -5,6 +5,7 @@ mod entities;
 mod error;
 mod invoke_handler;
 mod migrations;
+mod process_ext;
 mod utils;
 
 // Re-export error types for use throughout the codebase

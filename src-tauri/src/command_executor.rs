@@ -8,6 +8,8 @@ use std::path::Path;
  */
 use std::process::Command;
 
+use crate::process_ext::NoWindowExt;
+
 /// Command execution result
 #[derive(Debug, Clone)]
 pub struct CommandResult {
@@ -53,6 +55,7 @@ impl CommandExecutor {
 
         // Build command
         let mut cmd = Command::new(&shell_cmd);
+        cmd.no_window();
 
         // Add shell arguments
         for arg in shell_args {
@@ -101,6 +104,7 @@ impl CommandExecutor {
         let opts = options.unwrap_or_default();
 
         let mut cmd = Command::new(command);
+        cmd.no_window();
         cmd.args(args);
 
         // Set working directory
@@ -157,6 +161,7 @@ impl CommandExecutor {
         };
 
         let mut cmd = Command::new(shell_cmd);
+        cmd.no_window();
         cmd.args(&shell_args);
 
         // Set working directory
@@ -225,6 +230,7 @@ impl CommandExecutor {
     /// Check if a shell exists
     fn shell_exists(shell: &str) -> bool {
         Command::new(shell)
+            .no_window()
             .arg("--version")
             .output()
             .map(|output| output.status.success())

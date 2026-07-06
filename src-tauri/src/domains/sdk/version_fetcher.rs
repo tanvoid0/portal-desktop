@@ -1,6 +1,7 @@
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -202,7 +203,7 @@ pub async fn fetch_ruby_versions() -> Result<Vec<SDKVersion>, String> {
 // Helper functions to check if versions are installed locally
 async fn check_nodejs_installed(version: &str) -> Result<bool, String> {
     // Check if nvm is available and has the version
-    if let Ok(output) = Command::new("nvm").args(&["list"]).output() {
+    if let Ok(output) = Command::new("nvm").no_window().args(&["list"]).output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         if stdout.contains(version) {
             return Ok(true);
@@ -210,7 +211,7 @@ async fn check_nodejs_installed(version: &str) -> Result<bool, String> {
     }
 
     // Check if fnm is available and has the version
-    if let Ok(output) = Command::new("fnm").args(&["list"]).output() {
+    if let Ok(output) = Command::new("fnm").no_window().args(&["list"]).output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         if stdout.contains(version) {
             return Ok(true);
@@ -222,7 +223,7 @@ async fn check_nodejs_installed(version: &str) -> Result<bool, String> {
 
 async fn check_python_installed(version: &str) -> Result<bool, String> {
     // Check if pyenv is available and has the version
-    if let Ok(output) = Command::new("pyenv").args(&["versions"]).output() {
+    if let Ok(output) = Command::new("pyenv").no_window().args(&["versions"]).output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         if stdout.contains(version) {
             return Ok(true);
@@ -234,7 +235,7 @@ async fn check_python_installed(version: &str) -> Result<bool, String> {
 
 async fn check_java_installed(version: &str) -> Result<bool, String> {
     // Check if sdkman is available and has the version
-    if let Ok(output) = Command::new("sdk").args(&["list", "java"]).output() {
+    if let Ok(output) = Command::new("sdk").no_window().args(&["list", "java"]).output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         if stdout.contains(version) {
             return Ok(true);
@@ -246,7 +247,7 @@ async fn check_java_installed(version: &str) -> Result<bool, String> {
 
 async fn check_rust_installed(version: &str) -> Result<bool, String> {
     // Check if rustup is available and has the version
-    if let Ok(output) = Command::new("rustup").args(&["toolchain", "list"]).output() {
+    if let Ok(output) = Command::new("rustup").no_window().args(&["toolchain", "list"]).output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         if stdout.contains(version) {
             return Ok(true);
@@ -258,7 +259,7 @@ async fn check_rust_installed(version: &str) -> Result<bool, String> {
 
 async fn check_go_installed(version: &str) -> Result<bool, String> {
     // Check if g is available and has the version
-    if let Ok(output) = Command::new("g").args(&["list"]).output() {
+    if let Ok(output) = Command::new("g").no_window().args(&["list"]).output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         if stdout.contains(version) {
             return Ok(true);
@@ -270,7 +271,7 @@ async fn check_go_installed(version: &str) -> Result<bool, String> {
 
 async fn check_php_installed(version: &str) -> Result<bool, String> {
     // Check if phpenv is available and has the version
-    if let Ok(output) = Command::new("phpenv").args(&["versions"]).output() {
+    if let Ok(output) = Command::new("phpenv").no_window().args(&["versions"]).output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         if stdout.contains(version) {
             return Ok(true);
@@ -282,7 +283,7 @@ async fn check_php_installed(version: &str) -> Result<bool, String> {
 
 async fn check_ruby_installed(version: &str) -> Result<bool, String> {
     // Check if rbenv is available and has the version
-    if let Ok(output) = Command::new("rbenv").args(&["versions"]).output() {
+    if let Ok(output) = Command::new("rbenv").no_window().args(&["versions"]).output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         if stdout.contains(version) {
             return Ok(true);

@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use tauri::{Emitter, Window};
+use crate::process_ext::NoWindowExt;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
@@ -1531,6 +1532,7 @@ impl KubernetesManager {
         use tokio::process::Command;
 
         let mut cmd = Command::new("kubectl");
+        cmd.no_window();
         cmd.args(&[
             "rollout",
             "undo",
@@ -1566,6 +1568,7 @@ impl KubernetesManager {
         use tokio::process::Command;
 
         let mut cmd = Command::new("kubectl");
+        cmd.no_window();
         cmd.args(&["top", "pod", pod_name, "-n", namespace, "--no-headers"]);
 
         match cmd.output().await {
@@ -1612,6 +1615,7 @@ impl KubernetesManager {
         use tokio::process::Command;
 
         let mut cmd = Command::new("kubectl");
+        cmd.no_window();
         cmd.arg("top");
         cmd.arg("pods");
         if let Some(ns) = namespace {
@@ -1733,6 +1737,7 @@ impl KubernetesManager {
         use tokio::process::Command;
 
         let mut cmd = Command::new("kubectl");
+        cmd.no_window();
         cmd.args(&["exec", "-n", namespace, pod_name]);
 
         if let Some(container_name) = container {
@@ -1784,6 +1789,7 @@ impl KubernetesManager {
         use tokio::process::Command;
 
         let mut cmd = Command::new("kubectl");
+        cmd.no_window();
         cmd.args(&[
             "port-forward",
             "-n",

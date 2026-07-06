@@ -1,15 +1,16 @@
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 
 pub async fn install_nodejs_version(version: &str) -> Result<String, String> {
     // Try to use nvm first
-    if let Ok(output) = Command::new("nvm").args(&["install", version]).output() {
+    if let Ok(output) = Command::new("nvm").no_window().args(&["install", version]).output() {
         if output.status.success() {
             return Ok(format!("Node.js {} installed via nvm", version));
         }
     }
 
     // Try to use fnm
-    if let Ok(output) = Command::new("fnm").args(&["install", version]).output() {
+    if let Ok(output) = Command::new("fnm").no_window().args(&["install", version]).output() {
         if output.status.success() {
             return Ok(format!("Node.js {} installed via fnm", version));
         }
@@ -24,7 +25,7 @@ pub async fn install_nodejs_version(version: &str) -> Result<String, String> {
 
 pub async fn install_python_version(version: &str) -> Result<String, String> {
     // Try to use pyenv
-    if let Ok(output) = Command::new("pyenv").args(&["install", version]).output() {
+    if let Ok(output) = Command::new("pyenv").no_window().args(&["install", version]).output() {
         if output.status.success() {
             return Ok(format!("Python {} installed via pyenv", version));
         }
