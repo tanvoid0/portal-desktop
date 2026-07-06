@@ -147,6 +147,13 @@ export function buildMainNavSections(
           badge: null,
         },
         {
+          title: "Coder",
+          url: "/coder",
+          icon: "robot",
+          description: "AI coding agent",
+          badge: null,
+        },
+        {
           title: "Settings",
           url: "/settings",
           icon: "settings",

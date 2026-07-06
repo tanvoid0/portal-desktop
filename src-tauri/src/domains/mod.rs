@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod automation;
 pub mod autonomy;
+pub mod coder;
 pub mod credentials;
 pub mod custom_scripts;
 pub mod dashboard;

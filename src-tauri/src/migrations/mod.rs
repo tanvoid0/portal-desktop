@@ -30,6 +30,7 @@ pub mod m20260325_000027_create_terminal_sessions_table;
 pub mod m20260325_000028_create_terminal_notes_table;
 pub mod m20260325_000029_add_preset_key_to_pipelines;
 pub mod m20260330_000030_create_deployments_table;
+pub mod m20260706_000031_create_coder_tables;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -68,6 +69,7 @@ pub use m20260325_000029_add_preset_key_to_pipelines::Migration
     as addPresetKeyToPipelines;
 pub use m20260330_000030_create_deployments_table::Migration
     as createDeploymentsTable;
+pub use m20260706_000031_create_coder_tables::Migration as createCoderTables;
 
 pub struct Migrator;
 
@@ -135,5 +137,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(createTerminalNotesTable),
         Box::new(addPresetKeyToPipelines),
         Box::new(createDeploymentsTable),
+        Box::new(createCoderTables),
     ]
 }

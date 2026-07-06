@@ -137,6 +137,13 @@ pub fn run() {
             .map_err(|e| format!("Failed to initialize deployment service: {}", e))?;
             app.manage(std::sync::Arc::new(deployment_service));
 
+            // Initialize coder agent service (loads threads + rules from DB)
+            let coder_service = tauri::async_runtime::block_on(async {
+                domains::coder::CoderService::new(db_manager_arc.clone()).await
+            });
+            coder_service.init_app_handle(app.handle().clone());
+            app.manage(std::sync::Arc::new(coder_service));
+
             // Initialize pipeline services
             let pipeline_service = PipelineService::new(db_manager_arc.clone());
             let execution_service = ExecutionService::new(db_manager_arc.clone());
@@ -171,6 +178,18 @@ pub fn run() {
         .manage(navigation_service)
         .invoke_handler(tauri::generate_handler![
             greet,
+            // Coder agent commands
+            domains::coder::coder_create_thread,
+            domains::coder::coder_list_threads,
+            domains::coder::coder_get_thread,
+            domains::coder::coder_delete_thread,
+            domains::coder::coder_send,
+            domains::coder::coder_approve,
+            domains::coder::coder_get_mode,
+            domains::coder::coder_set_mode,
+            domains::coder::coder_list_rules,
+            domains::coder::coder_add_rule,
+            domains::coder::coder_remove_rule,
             // Terminal commands
             domains::terminal::create_terminal_process,
             domains::terminal::send_terminal_input,
