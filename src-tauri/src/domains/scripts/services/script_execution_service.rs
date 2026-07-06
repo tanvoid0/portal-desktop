@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
+use crate::process_ext::NoWindowExt;
 use tokio::process::{Child, Command};
 use uuid::Uuid;
 
@@ -108,6 +109,7 @@ impl ScriptExecutionService {
         // Build command - use shell to handle complex commands with pipes, redirects, etc.
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = Command::new("cmd");
+            c.no_window();
             c.args(["/C", &resolved_command]);
             c
         } else {
@@ -435,6 +437,7 @@ impl ScriptExecutionService {
             use std::process::Command as StdCommand;
             // Use tasklist to check if process exists
             StdCommand::new("tasklist")
+                .no_window()
                 .args(["/FI", &format!("PID eq {}", pid)])
                 .output()
                 .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))

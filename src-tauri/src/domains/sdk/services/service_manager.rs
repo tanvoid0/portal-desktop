@@ -7,6 +7,7 @@ use super::{ServiceConfig, ServiceInstance, ServiceLog, ServiceStatus};
 use crate::domains::sdk::SDKError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 use tokio::process::Command as AsyncCommand;
 use tokio::sync::mpsc;
@@ -207,6 +208,7 @@ impl ServiceManager {
     async fn stop_service_process(&self, pid: u32) -> Result<(), SDKError> {
         if cfg!(target_os = "windows") {
             Command::new("taskkill")
+                .no_window()
                 .args(&["/PID", &pid.to_string(), "/F"])
                 .output()
                 .map_err(|e| SDKError::ManagerNotFound(format!("Failed to stop service: {}", e)))?;
@@ -232,6 +234,7 @@ impl ServiceManager {
             .unwrap_or_else(|| format!("~/.portal/data/postgresql-{}", version));
 
         let mut cmd = AsyncCommand::new("postgres");
+        cmd.no_window();
         cmd.args(&[
             "-D",
             &data_dir,
@@ -259,6 +262,7 @@ impl ServiceManager {
             .unwrap_or_else(|| format!("~/.portal/data/mysql-{}", version));
 
         let mut cmd = AsyncCommand::new("mysqld");
+        cmd.no_window();
         cmd.args(&[
             "--datadir",
             &data_dir,
@@ -276,6 +280,7 @@ impl ServiceManager {
         service: &ServiceInstance,
     ) -> Result<AsyncCommand, SDKError> {
         let mut cmd = AsyncCommand::new("redis-server");
+        cmd.no_window();
         cmd.args(&["--port", &service.port.unwrap_or(6379).to_string()]);
 
         if let Some(config_file) = &service.config.config_file {
@@ -292,6 +297,7 @@ impl ServiceManager {
         service: &ServiceInstance,
     ) -> Result<AsyncCommand, SDKError> {
         let mut cmd = AsyncCommand::new("nginx");
+        cmd.no_window();
         cmd.args(&["-g", "daemon off;"]);
 
         if let Some(config_file) = &service.config.config_file {
@@ -308,6 +314,7 @@ impl ServiceManager {
         service: &ServiceInstance,
     ) -> Result<AsyncCommand, SDKError> {
         let mut cmd = AsyncCommand::new("httpd");
+        cmd.no_window();
         cmd.args(&["-D", "FOREGROUND"]);
 
         if let Some(config_file) = &service.config.config_file {
@@ -370,6 +377,7 @@ impl ServiceManager {
     async fn is_process_running(pid: u32) -> bool {
         if cfg!(target_os = "windows") {
             let output = Command::new("tasklist")
+                .no_window()
                 .args(&["/FI", &format!("PID eq {}", pid)])
                 .output()
                 .ok();

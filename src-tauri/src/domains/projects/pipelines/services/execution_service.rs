@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
+use crate::process_ext::NoWindowExt;
 use tokio::process::{Child, Command};
 use tokio::sync::watch;
 use uuid::Uuid;
@@ -453,6 +454,7 @@ impl ExecutionService {
 
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = Command::new("cmd");
+            c.no_window();
             c.args(["/C", &exec_command]);
             c
         } else {

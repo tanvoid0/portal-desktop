@@ -645,7 +645,10 @@ fn get_network_interfaces() -> Vec<IpAddr> {
     #[cfg(target_os = "windows")]
     {
         // Use ipconfig on Windows
-        if let Ok(output) = std::process::Command::new("ipconfig").output() {
+        if let Ok(output) = {
+            use crate::process_ext::NoWindowExt;
+            std::process::Command::new("ipconfig").no_window().output()
+        } {
             let output_str = String::from_utf8_lossy(&output.stdout);
             let mut current_section = String::new();
 

@@ -79,3 +79,5 @@ build-output/*
 !build-output/.gitkeep
 
 raw/
+# Local-only VPN helper (contains internal infra references)
+scripts/vpn.sh

@@ -303,9 +303,11 @@ impl PackageManager for WingetManager {
     async fn install_package(&self, id: &str, _version: Option<&str>) -> Result<(), SDKError> {
         // Use -h for silent mode (--silent is not a valid flag)
         // Note: install commands are long-running, so we spawn and return immediately
+        use crate::process_ext::NoWindowExt;
         use std::process::Command;
 
         let mut cmd = Command::new("winget");
+        cmd.no_window();
         cmd.args(&[
             "install",
             id,
@@ -328,9 +330,11 @@ impl PackageManager for WingetManager {
     async fn upgrade_package(&self, id: &str) -> Result<(), SDKError> {
         // Use -h for silent mode (--silent is not a valid flag)
         // Note: upgrade commands are long-running, so we spawn and return immediately
+        use crate::process_ext::NoWindowExt;
         use std::process::Command;
 
         let mut cmd = Command::new("winget");
+        cmd.no_window();
         cmd.args(&[
             "upgrade",
             id,

@@ -264,9 +264,11 @@ pub async fn execute_command_in_directory(
     args: Vec<String>,
     working_directory: String,
 ) -> Result<String, String> {
+    use crate::process_ext::NoWindowExt;
     use std::process::Command;
 
     let output = Command::new(&command)
+        .no_window()
         .args(&args)
         .current_dir(&working_directory)
         .output()

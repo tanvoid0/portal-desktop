@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 
 pub struct IdeService;
@@ -299,7 +300,7 @@ impl IdeService {
     fn is_executable_in_path(&self, executable: &str) -> bool {
         if cfg!(windows) {
             // On Windows, try "where" command
-            if let Ok(output) = Command::new("where").arg(executable).output() {
+            if let Ok(output) = Command::new("where").no_window().arg(executable).output() {
                 return output.status.success();
             }
         } else {
@@ -314,6 +315,7 @@ impl IdeService {
     fn find_executable_path(&self, executable: &str) -> Result<String, String> {
         if cfg!(windows) {
             let output = Command::new("where")
+                .no_window()
                 .arg(executable)
                 .output()
                 .map_err(|e| e.to_string())?;

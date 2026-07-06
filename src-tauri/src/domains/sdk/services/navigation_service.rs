@@ -604,9 +604,10 @@ impl NavigationService {
         command: &str,
         version_flag: &str,
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        use crate::process_ext::NoWindowExt;
         use std::process::Command;
 
-        let output = Command::new(command).arg(version_flag).output();
+        let output = Command::new(command).no_window().arg(version_flag).output();
 
         match output {
             Ok(result) => {

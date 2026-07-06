@@ -241,9 +241,10 @@ pub async fn get_service_status(sdk_type: String) -> Result<ServiceStatus, Strin
 
 /// Check if Docker is running
 async fn check_docker_running() -> bool {
+    use crate::process_ext::NoWindowExt;
     use std::process::Command;
 
-    let result = Command::new("docker").args(&["info"]).output();
+    let result = Command::new("docker").no_window().args(&["info"]).output();
 
     if let Ok(output) = result {
         output.status.success()
@@ -575,10 +576,11 @@ async fn stop_system_service(service_name: &str) -> Result<String, String> {
 
 /// Start Docker service
 async fn start_docker_service() -> Result<String, String> {
+    use crate::process_ext::NoWindowExt;
     use std::process::Command;
 
     // Check if Docker is already running
-    let check_result = Command::new("docker").args(&["info"]).output();
+    let check_result = Command::new("docker").no_window().args(&["info"]).output();
 
     if let Ok(output) = check_result {
         if output.status.success() {

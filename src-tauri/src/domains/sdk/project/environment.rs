@@ -50,10 +50,14 @@ impl EnvironmentManager {
         }
 
         // Source the environment script
-        let output = std::process::Command::new("bash")
-            .arg("-c")
-            .arg(&format!("source {} && env", env_script_path.display()))
-            .output()
+        let output = {
+            use crate::process_ext::NoWindowExt;
+            std::process::Command::new("bash")
+                .no_window()
+                .arg("-c")
+                .arg(&format!("source {} && env", env_script_path.display()))
+                .output()
+        }
             .map_err(|e| SDKError::ManagerNotFound(format!("Failed to source environment: {}", e)))?;
 
         if !output.status.success() {

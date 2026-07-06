@@ -37,6 +37,7 @@ pub async fn install_python_version(version: &str) -> Result<String, String> {
 pub async fn install_java_version(version: &str) -> Result<String, String> {
     // Try to use sdkman
     if let Ok(output) = Command::new("sdk")
+        .no_window()
         .args(&["install", "java", version])
         .output()
     {
@@ -51,6 +52,7 @@ pub async fn install_java_version(version: &str) -> Result<String, String> {
 pub async fn install_rust_version(version: &str) -> Result<String, String> {
     // Try to use rustup
     if let Ok(output) = Command::new("rustup")
+        .no_window()
         .args(&["toolchain", "install", version])
         .output()
     {
@@ -64,7 +66,7 @@ pub async fn install_rust_version(version: &str) -> Result<String, String> {
 
 pub async fn install_go_version(version: &str) -> Result<String, String> {
     // Try to use g (Go version manager)
-    if let Ok(output) = Command::new("g").args(&["install", version]).output() {
+    if let Ok(output) = Command::new("g").no_window().args(&["install", version]).output() {
         if output.status.success() {
             return Ok(format!("Go {} installed via g", version));
         }
@@ -75,7 +77,7 @@ pub async fn install_go_version(version: &str) -> Result<String, String> {
 
 pub async fn install_php_version(version: &str) -> Result<String, String> {
     // Try to use phpenv
-    if let Ok(output) = Command::new("phpenv").args(&["install", version]).output() {
+    if let Ok(output) = Command::new("phpenv").no_window().args(&["install", version]).output() {
         if output.status.success() {
             return Ok(format!("PHP {} installed via phpenv", version));
         }
@@ -86,7 +88,7 @@ pub async fn install_php_version(version: &str) -> Result<String, String> {
 
 pub async fn install_ruby_version(version: &str) -> Result<String, String> {
     // Try to use rbenv
-    if let Ok(output) = Command::new("rbenv").args(&["install", version]).output() {
+    if let Ok(output) = Command::new("rbenv").no_window().args(&["install", version]).output() {
         if output.status.success() {
             return Ok(format!("Ruby {} installed via rbenv", version));
         }

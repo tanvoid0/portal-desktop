@@ -221,10 +221,14 @@ impl CustomDirectoryManager {
             _ => return None,
         };
 
-        let output = std::process::Command::new(binary_path)
-            .args(&version_args)
-            .output()
-            .ok()?;
+        let output = {
+            use crate::process_ext::NoWindowExt;
+            std::process::Command::new(binary_path)
+                .no_window()
+                .args(&version_args)
+                .output()
+                .ok()?
+        };
 
         if output.status.success() {
             let version_string = String::from_utf8_lossy(&output.stdout);

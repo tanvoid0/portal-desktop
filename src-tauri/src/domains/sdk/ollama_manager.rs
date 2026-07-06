@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
+use crate::process_ext::NoWindowExt;
 use std::process::{Command, Stdio};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -108,6 +109,7 @@ impl OllamaManager {
         if cfg!(target_os = "windows") {
             // On Windows, try to signal the process with 0 signal (doesn't kill, just checks existence)
             Command::new("tasklist")
+                .no_window()
                 .arg("/FI")
                 .arg(format!("PID eq {}", pid))
                 .arg("/NH")
@@ -141,6 +143,7 @@ impl OllamaManager {
         }
 
         let output = Command::new("ollama")
+            .no_window()
             .arg("--version")
             .output()
             .map_err(|e| format!("Failed to get Ollama version: {}", e))?;
@@ -253,7 +256,7 @@ impl OllamaManager {
         // Fallback to CLI if API fails (like FlyEnv does)
         let timeout_duration = std::time::Duration::from_secs(10);
         let output = tokio::time::timeout(timeout_duration, async {
-            Command::new("ollama").arg("list").output()
+            Command::new("ollama").no_window().arg("list").output()
         })
         .await
         .map_err(|_| "Command timed out after 10 seconds")?;
@@ -410,6 +413,7 @@ impl OllamaManager {
 
         // Use spawn to stream output in real-time
         let mut child = TokioCommand::new("ollama")
+            .no_window()
             .arg("pull")
             .arg(model_name)
             .stdout(Stdio::piped())
@@ -553,6 +557,7 @@ impl OllamaManager {
 
         // Use spawn to stream output in real-time
         let mut child = TokioCommand::new("ollama")
+            .no_window()
             .arg("pull")
             .arg(model_name)
             .stdout(Stdio::piped())
@@ -758,7 +763,7 @@ impl OllamaManager {
         // Execute ollama rm with timeout
         let timeout_duration = std::time::Duration::from_secs(30);
         let output = tokio::time::timeout(timeout_duration, async {
-            Command::new("ollama").arg("rm").arg(model_name).output()
+            Command::new("ollama").no_window().arg("rm").arg(model_name).output()
         })
         .await
         .map_err(|_| "Command timed out after 30 seconds")?
@@ -863,6 +868,7 @@ impl OllamaManager {
 
         // Start Ollama service in background
         let child = Command::new("ollama")
+            .no_window()
             .arg("serve")
             .spawn()
             .map_err(|e| format!("Failed to start Ollama service: {}", e))?;
@@ -891,6 +897,7 @@ impl OllamaManager {
                 let output = if cfg!(target_os = "windows") {
                     // Windows: Use taskkill with PID
                     Command::new("taskkill")
+                        .no_window()
                         .arg("/F")
                         .arg("/PID")
                         .arg(pid.to_string())
@@ -917,6 +924,7 @@ impl OllamaManager {
                     if Self::is_pid_running(pid) {
                         let force_output = if cfg!(target_os = "windows") {
                             Command::new("taskkill")
+                                .no_window()
                                 .arg("/F")
                                 .arg("/PID")
                                 .arg(pid.to_string())
@@ -963,6 +971,7 @@ impl OllamaManager {
                 // Windows: Use taskkill to stop ollama.exe processes
                 // Note: This will kill ALL ollama.exe processes
                 Command::new("taskkill")
+                    .no_window()
                     .arg("/F")
                     .arg("/IM")
                     .arg("ollama.exe")

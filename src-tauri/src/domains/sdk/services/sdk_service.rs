@@ -3,6 +3,7 @@ use std::collections::HashMap;
 /**
  * SDK Service - Business logic for SDK management
  */
+use crate::process_ext::NoWindowExt;
 use std::process::{Command, Stdio};
 // use crate::domains::sdk::entities::ActiveModel as SDKInstallationActive; // TODO: Use when entities are needed
 use super::super::factory::SDKManagerFactory;
@@ -575,6 +576,7 @@ impl SDKService {
     /// Execute a shell command
     async fn execute_command(&self, command: &str, args: &[&str]) -> Result<String, SDKError> {
         let output = Command::new(command)
+            .no_window()
             .args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

@@ -9,6 +9,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 use std::collections::HashMap;
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 use std::sync::Arc;
 use tauri::{command, State, Window};
@@ -156,7 +157,7 @@ async fn get_available_shells() -> Vec<String> {
         ];
 
         for shell in terminal_shells {
-            if let Ok(_) = Command::new("where").arg(shell).output() {
+            if let Ok(_) = Command::new("where").no_window().arg(shell).output() {
                 if !shells.contains(&shell.to_string()) {
                     shells.push(shell.to_string());
                     println!("Found terminal shell: {}", shell);

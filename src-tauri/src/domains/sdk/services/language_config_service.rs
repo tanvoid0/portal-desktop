@@ -294,6 +294,7 @@ impl SDKConfigService {
     /// For known SDK managers (nvm, sdkman, etc.), use their specific detection methods
     /// For others, fall back to simple binary check
     async fn check_manager_status(binary: &str) -> (bool, Option<String>) {
+        use crate::process_ext::NoWindowExt;
         use std::process::Command;
 
         // Map of known manager binaries to their factory names
@@ -328,7 +329,7 @@ impl SDKConfigService {
         }
 
         // Fallback: Try to run version command
-        if let Ok(output) = Command::new(binary).arg("--version").output() {
+        if let Ok(output) = Command::new(binary).no_window().arg("--version").output() {
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 // Also check stderr (some commands output version there)
@@ -363,7 +364,7 @@ impl SDKConfigService {
                 for path in &conda_paths {
                     if std::path::Path::new(path).exists() {
                         // Try to get version
-                        if let Ok(output) = Command::new(path).arg("--version").output() {
+                        if let Ok(output) = Command::new(path).no_window().arg("--version").output() {
                             if output.status.success() {
                                 let version =
                                     String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -383,6 +384,7 @@ impl SDKConfigService {
     async fn check_sdk_installation(
         detection: &crate::domains::sdk::configs::types::DetectionMethod,
     ) -> (bool, Option<String>) {
+        use crate::process_ext::NoWindowExt;
         use std::process::Command;
 
         // First, try the version command if available
@@ -393,7 +395,7 @@ impl SDKConfigService {
                 let binary = parts[0];
                 let args: Vec<&str> = parts[1..].to_vec();
 
-                if let Ok(output) = Command::new(binary).args(&args).output() {
+                if let Ok(output) = Command::new(binary).no_window().args(&args).output() {
                     if output.status.success() {
                         // Some commands (like docker --version) output to stderr instead of stdout
                         let raw_output = if !output.stdout.is_empty() {
@@ -417,7 +419,7 @@ impl SDKConfigService {
             if let Ok(output) = Command::new("which").arg(binary_name).output() {
                 if output.status.success() {
                     // Try to get version
-                    if let Ok(version_output) = Command::new(binary_name).arg("--version").output()
+                    if let Ok(version_output) = Command::new(binary_name).no_window().arg("--version").output()
                     {
                         if version_output.status.success() {
                             // Some commands output to stderr instead of stdout

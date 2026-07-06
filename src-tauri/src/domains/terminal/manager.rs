@@ -4,6 +4,7 @@ use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySyste
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use crate::process_ext::NoWindowExt;
 use std::process::Command;
 use std::sync::Arc;
 use tauri::{Emitter, Window};
@@ -454,7 +455,7 @@ PROMPT_COMMAND='__portal_osc133_precmd'
         }
 
         let output = if cfg!(target_os = "windows") {
-            Command::new("cmd").args(["/C", &request.command]).output()
+            Command::new("cmd").no_window().args(["/C", &request.command]).output()
         } else {
             Command::new("sh").arg("-c").arg(&request.command).output()
         }
