@@ -18,13 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # pnpm must be installed before setup-node so its packageManager-based
+      # cache detection can find pnpm on PATH.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v5
 
       - name: Get pnpm store directory
         shell: bash
