@@ -1090,6 +1090,7 @@ async fn kill_process_tree(child: &mut Child) {
         if cfg!(target_os = "windows") {
             // cmd /C npm run dev spawns node as a child — taskkill /T terminates the tree
             let _ = Command::new("taskkill")
+                .no_window()
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
