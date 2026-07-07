@@ -1,6 +1,5 @@
 use crate::database::DatabaseManager;
 use crate::domains::projects::entities::ProjectResponse;
-use crate::process_ext::NoWindowExt;
 use crate::domains::projects::pipelines::repositories::{ExecutionRepository, PipelineRepository};
 use crate::domains::projects::pipelines::utils::dependency_resolver::resolve_execution_order;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
