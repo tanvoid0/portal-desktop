@@ -1,11 +1,11 @@
+use crate::domains::ai::message::ChatMessage;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
 /// AI provider types supported by the system
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ProviderType {
-    Ollama,
-    Gemini,
+    AgentPlatform,
 }
 
 /// Configuration options for AI generation
@@ -62,24 +62,14 @@ pub struct ProviderConfig {
 impl ProviderConfig {
     /// Create a default configuration for a provider type
     pub fn default_for_type(provider_type: ProviderType) -> Self {
-        let (base_url, model) = match provider_type {
-            ProviderType::Ollama => (
-                Some("http://localhost:11434".to_string()),
-                "llama3.2:3b".to_string(),
-            ),
-            ProviderType::Gemini => (
-                Some("https://generativelanguage.googleapis.com/v1beta".to_string()),
-                "gemini-pro".to_string(),
-            ),
-        };
-
+        let _ = provider_type;
         Self {
-            provider_type,
-            base_url,
+            provider_type: ProviderType::AgentPlatform,
+            base_url: Some("http://127.0.0.1:18410".to_string()),
             api_key: None,
-            model,
+            model: "llama3".to_string(),
             default_options: GenerationOptions::default(),
-            enabled: false,
+            enabled: true,
         }
     }
 }
@@ -186,6 +176,33 @@ pub trait AIProvider: Send + Sync {
         // Default implementation combines system and user messages
         let combined_prompt = format!("System: {}\n\nUser: {}", system_message, user_message);
         self.generate(&combined_prompt, options).await
+    }
+
+    /// Multi-turn chat using OpenAI-style message roles.
+    async fn generate_chat(
+        &self,
+        messages: &[ChatMessage],
+        options: &GenerationOptions,
+    ) -> Result<GenerationResult, AIError> {
+        let mut prompt = String::new();
+        for msg in messages {
+            prompt.push_str(&format!("{}: {}\n", msg.role, msg.content));
+        }
+        self.generate(&prompt, options).await
+    }
+
+    /// Streaming multi-turn chat.
+    async fn generate_chat_stream(
+        &self,
+        messages: &[ChatMessage],
+        options: &GenerationOptions,
+        on_chunk: Box<dyn FnMut(String) -> Result<(), AIError> + Send>,
+    ) -> Result<GenerationResult, AIError> {
+        let mut prompt = String::new();
+        for msg in messages {
+            prompt.push_str(&format!("{}: {}\n", msg.role, msg.content));
+        }
+        self.generate_stream(&prompt, options, on_chunk).await
     }
 
     /// Get available models for this provider

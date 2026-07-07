@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use tauri::State;
 
-use super::service::CoderService;
-use super::types::{CoderRunResult, CoderThread, FileChange, PermissionMode, PermissionRule};
+use super::service::{AgentTurn, CoderService};
+use super::types::{CoderThread, FileChange, PermissionMode, PermissionRule};
 
 #[tauri::command]
 pub async fn coder_create_thread(
@@ -40,12 +40,33 @@ pub async fn coder_delete_thread(
 }
 
 #[tauri::command]
+pub async fn coder_update_thread_model(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+    model: Option<String>,
+) -> Result<(), String> {
+    service.update_thread_model(&thread_id, model).await
+}
+
+#[tauri::command]
 pub async fn coder_send(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
     message: String,
-) -> Result<CoderRunResult, String> {
-    service.send(&thread_id, message).await
+) -> Result<(), String> {
+    service.prepare_send(&thread_id, message).await?;
+    CoderService::spawn_run(service.inner().clone(), thread_id, AgentTurn::Send);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn coder_retry(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+) -> Result<(), String> {
+    service.prepare_retry(&thread_id).await?;
+    CoderService::spawn_run(service.inner().clone(), thread_id, AgentTurn::Retry);
+    Ok(())
 }
 
 #[tauri::command]
@@ -56,10 +77,49 @@ pub async fn coder_approve(
     approve: bool,
     remember: Option<bool>,
     edited_pattern: Option<String>,
-) -> Result<CoderRunResult, String> {
+) -> Result<(), String> {
     service
-        .approve(&thread_id, &call_id, approve, remember.unwrap_or(false), edited_pattern)
-        .await
+        .prepare_approve(
+            &thread_id,
+            &call_id,
+            approve,
+            remember.unwrap_or(false),
+            edited_pattern.clone(),
+        )
+        .await?;
+    CoderService::spawn_run(
+        service.inner().clone(),
+        thread_id,
+        AgentTurn::Approve {
+            call_id,
+            approve,
+            edited_command: edited_pattern,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn coder_stop(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+) -> Result<bool, String> {
+    Ok(service.stop(&thread_id).await)
+}
+
+#[tauri::command]
+pub async fn coder_get_context_usage(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+) -> Result<Option<crate::domains::ai::context_usage::ContextUsage>, String> {
+    service.get_context_usage(&thread_id).await
+}
+
+#[tauri::command]
+pub async fn coder_list_running(
+    service: State<'_, Arc<CoderService>>,
+) -> Result<Vec<String>, String> {
+    Ok(service.list_running().await)
 }
 
 #[tauri::command]
@@ -147,4 +207,9 @@ pub async fn coder_modify_change(
     content: String,
 ) -> Result<(), String> {
     service.modify_change(&change_id, content).await
+}
+
+#[tauri::command]
+pub fn coder_get_git_diff_stats(workspace_root: String) -> super::git_status::GitDiffStats {
+    super::git_status::git_diff_stats(&workspace_root)
 }

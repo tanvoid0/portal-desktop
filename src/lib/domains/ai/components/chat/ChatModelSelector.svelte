@@ -2,53 +2,68 @@
   import Select from "$lib/components/ui/select.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Loader } from "@lucide/svelte";
-  import type { ProviderType } from "../../types/index.js";
+  import type { ProviderType, CatalogModel } from "../../types/index.js";
   import { aiProviderService } from "../../services/aiProviderService.js";
-  import { onMount } from "svelte";
+  import {
+    formatModelLabel,
+    flattenCatalogModels,
+  } from "../../utils/catalog.js";
 
   interface Props {
     selectedProvider?: ProviderType | null;
     selectedModel?: string | null;
     onModelChange?: (model: string) => void;
+    disabled?: boolean;
+    selectClass?: string;
   }
 
   let {
     selectedProvider = $bindable<ProviderType | null>(null),
     selectedModel = $bindable<string | null>(null),
     onModelChange,
+    disabled = false,
+    selectClass = "w-[280px]",
   }: Props = $props();
 
-  let availableModels = $state<string[]>([]);
+  let catalogModels = $state<CatalogModel[]>([]);
   let isLoading = $state(false);
   let defaultModel = $state<string | null>(null);
+  let resolvedDefaultModel = $state<string | null>(null);
 
   async function loadModels() {
-    if (!selectedProvider) {
-      availableModels = [];
+    if (!selectedProvider || selectedProvider !== "AgentPlatform") {
+      catalogModels = [];
       return;
     }
 
     isLoading = true;
     try {
-      // Get available models for the provider
-      availableModels =
-        await aiProviderService.getAvailableModels(selectedProvider);
+      const catalog = await aiProviderService.getCatalogAliases();
+      catalogModels = flattenCatalogModels(catalog.providers);
+      resolvedDefaultModel = catalog.resolved_defaults?.model ?? null;
 
-      // Get the default model from provider config
       const config =
         await aiProviderService.getProviderConfig(selectedProvider);
-      defaultModel = config.model;
+      defaultModel = config.model || resolvedDefaultModel;
 
-      // Set selected model to default if not set
       if (!selectedModel && defaultModel) {
         selectedModel = defaultModel;
-        if (onModelChange) {
-          onModelChange(defaultModel);
-        }
+        onModelChange?.(defaultModel);
       }
     } catch (error) {
-      console.error("Failed to load models:", error);
-      availableModels = [];
+      console.error("Failed to load catalog:", error);
+      try {
+        const fallbackIds = await aiProviderService.getAvailableModels(
+          selectedProvider,
+        );
+        catalogModels = fallbackIds.map((id) => ({
+          id,
+          provider: "unknown",
+          source: "alias",
+        }));
+      } catch {
+        catalogModels = [];
+      }
     } finally {
       isLoading = false;
     }
@@ -58,20 +73,21 @@
     if (selectedProvider) {
       loadModels();
     } else {
-      availableModels = [];
+      catalogModels = [];
       selectedModel = null;
     }
   });
 
   function handleModelChange(value: string) {
     selectedModel = value;
-    if (onModelChange) {
-      onModelChange(value);
-    }
+    onModelChange?.(value);
   }
 
   const modelOptions = $derived(
-    availableModels.map((model) => ({ value: model, label: model })),
+    catalogModels.map((model) => ({
+      value: model.id,
+      label: formatModelLabel(model),
+    })),
   );
 </script>
 
@@ -81,10 +97,10 @@
     value={selectedModel || undefined}
     onSelect={handleModelChange}
     placeholder={isLoading ? "Loading..." : "Select model"}
-    disabled={isLoading || !selectedProvider || availableModels.length === 0}
-    class="w-[200px]"
+    disabled={disabled || isLoading || !selectedProvider || catalogModels.length === 0}
+    class={selectClass}
   />
-  {#if selectedModel === defaultModel}
+  {#if selectedModel && (selectedModel === defaultModel || selectedModel === resolvedDefaultModel)}
     <Badge variant="secondary" class="text-xs">Default</Badge>
   {/if}
   {#if isLoading}

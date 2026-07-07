@@ -2,6 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ChatMessage, ProviderType } from "../types/index.js";
 
+export interface ConversationTitleEvent {
+  conversation_id: string;
+  title: string;
+}
+
+export interface StreamCompletePayload {
+  content: string;
+  title?: string;
+}
+
 export interface SendMessageOptions {
   provider?: ProviderType;
   conversation_id?: string;
@@ -12,7 +22,8 @@ export interface SendMessageOptions {
 
 export interface StreamMessageOptions extends SendMessageOptions {
   onChunk?: (chunk: string) => void;
-  onComplete?: (fullMessage: string) => void;
+  onComplete?: (fullMessage: string, payload?: StreamCompletePayload) => void;
+  onTitleUpdated?: (event: ConversationTitleEvent) => void;
   onError?: (error: Error) => void;
 }
 
@@ -47,41 +58,46 @@ export class AIChatService {
     history: ChatMessage[] = [],
     options: StreamMessageOptions = {},
   ): Promise<string> {
-    // Generate unique stream ID
     const streamId = `stream-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
-    // Set up event listeners before invoking the command
     const chunkEventName = `ai-stream-chunk-${streamId}`;
     const completeEventName = `ai-stream-complete-${streamId}`;
+    const titleEventName = `ai-stream-title-${streamId}`;
 
     let fullResponse = "";
     let isComplete = false;
+    let completePayload: StreamCompletePayload | undefined;
     let streamError: Error | null = null;
 
-    // Listen for chunks
     const chunkUnlisten = await listen<string>(chunkEventName, (event) => {
       const chunk = event.payload;
       fullResponse += chunk;
-      if (options.onChunk) {
-        options.onChunk(chunk);
-      }
+      options.onChunk?.(chunk);
     });
 
-    // Listen for completion
-    const completeUnlisten = await listen<string>(
+    const titleUnlisten = await listen<ConversationTitleEvent>(
+      titleEventName,
+      (event) => {
+        options.onTitleUpdated?.(event.payload);
+      },
+    );
+
+    const completeUnlisten = await listen<StreamCompletePayload | string>(
       completeEventName,
       (event) => {
         isComplete = true;
-        const finalResponse = event.payload;
-        if (options.onComplete) {
-          options.onComplete(finalResponse);
+        const payload = event.payload;
+        if (typeof payload === "string") {
+          completePayload = { content: payload };
+          options.onComplete?.(payload);
+        } else {
+          completePayload = payload;
+          options.onComplete?.(payload.content, payload);
         }
       },
     );
 
     try {
-      // Invoke the streaming command
-      // Note: Tauri v2 expects camelCase parameter names from frontend
       const result = await invoke<string>("ai_send_message_stream", {
         message,
         history: history.map((msg) => ({
@@ -96,9 +112,8 @@ export class AIChatService {
         streamId: streamId,
       });
 
-      // Wait for completion event (with timeout)
       let attempts = 0;
-      const maxAttempts = 200; // 10 seconds max wait
+      const maxAttempts = 200;
       while (!isComplete && attempts < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
@@ -110,33 +125,28 @@ export class AIChatService {
         );
       }
 
-      // Clean up listeners
       await chunkUnlisten();
+      await titleUnlisten();
       await completeUnlisten();
 
       if (streamError) {
         throw streamError;
       }
 
-      return result || fullResponse;
+      return completePayload?.content || result || fullResponse;
     } catch (error) {
-      // Clean up listeners on error
       await chunkUnlisten();
+      await titleUnlisten();
       await completeUnlisten();
 
       const err = error instanceof Error ? error : new Error(String(error));
-      if (options.onError) {
-        options.onError(err);
-      }
+      options.onError?.(err);
       throw err;
     }
   }
 
-  /**
-   * Clear chat history (client-side only)
-   */
   clearChat(): void {
-    // This is a client-side operation, no backend call needed
+    // client-side only
   }
 }
 

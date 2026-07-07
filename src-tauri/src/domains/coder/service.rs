@@ -7,8 +7,10 @@
 //! and it picks up exactly where it left off (a tool_call with no matching
 //! `tool` response yet).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::sync::OnceLock;
 
@@ -22,14 +24,20 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 
 use crate::database::DatabaseManager;
+use crate::domains::ai::chat_title::{
+    fallback_title_from_message, is_placeholder_title, should_apply_generated_title,
+    PLACEHOLDER_SESSION,
+};
+use crate::domains::ai::platform_config::{PlatformConfig, DESKTOP_CLIENT_ID};
+use crate::domains::ai::services::AISettingsService;
 
 use super::diff;
 use super::entities::{coder_file_change, coder_setting, coder_thread};
-use super::permissions::{self, Decision};
+use super::platform_stream::{self, PlatformDone};
 use super::tools;
 use super::types::{
     ChangeStatus, ChatMessage, CoderRunResult, CoderThread, FileChange, PendingApproval,
-    PermissionMode, PermissionRule, ToolCall,
+    PermissionMode, PermissionRule,
 };
 
 /// Persisted permission config (mode + rules) stored as one JSON row.
@@ -49,7 +57,21 @@ const SYSTEM_PROMPT: &str = concat!(
     "- When done, give a short summary of what you changed and why."
 );
 
-const MAX_ITERATIONS: usize = 25;
+struct RunHandle {
+    cancel: Arc<AtomicBool>,
+}
+
+/// What the background agent task should run against agent-platform.
+#[derive(Debug, Clone)]
+pub enum AgentTurn {
+    Send,
+    Approve {
+        call_id: String,
+        approve: bool,
+        edited_command: Option<String>,
+    },
+    Retry,
+}
 
 pub struct CoderService {
     db: Arc<DatabaseManager>,
@@ -61,21 +83,18 @@ pub struct CoderService {
     /// Agent file edits awaiting or completed review (Cursor-style).
     changes: Mutex<Vec<FileChange>>,
     client: reqwest::Client,
-    base_url: String,
-    master_key: Option<String>,
-    default_model: Option<String>,
+    settings: AISettingsService,
     /// When set, the `delegate_task` tool is offered, targeting this team
     /// template on the platform. Configured via `CODER_TEAM_TEMPLATE_ID`.
     delegation_team_template_id: Option<i64>,
+    /// In-flight agent loops keyed by thread id (for cancel + status).
+    active_runs: Mutex<HashMap<String, RunHandle>>,
 }
 
 impl CoderService {
     /// Build the service and hydrate threads + settings from the database.
     pub async fn new(db: Arc<DatabaseManager>) -> Self {
-        let base_url = std::env::var("CODER_PLATFORM_BASE_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:18410".to_string());
-        let master_key = std::env::var("AGENT_PLATFORM_MASTER_KEY").ok().filter(|k| !k.is_empty());
-        let default_model = std::env::var("CODER_MODEL").ok().filter(|m| !m.is_empty());
+        let settings = AISettingsService::new();
         let delegation_team_template_id = std::env::var("CODER_TEAM_TEMPLATE_ID")
             .ok()
             .and_then(|v| v.trim().parse::<i64>().ok());
@@ -87,13 +106,16 @@ impl CoderService {
             mode: Mutex::new(PermissionMode::default()),
             changes: Mutex::new(Vec::new()),
             client: reqwest::Client::new(),
-            base_url,
-            master_key,
-            default_model,
+            settings,
             delegation_team_template_id,
+            active_runs: Mutex::new(HashMap::new()),
         };
         svc.load_from_db().await;
         svc
+    }
+
+    fn platform_config(&self) -> PlatformConfig {
+        PlatformConfig::resolve(&self.settings)
     }
 
     /// Tool specs offered to the model, including platform delegation when
@@ -119,12 +141,18 @@ impl CoderService {
                     .and_then(Value::as_str)
                     .ok_or("missing arg: goal")?;
 
-                let base = self.base_url.trim_end_matches('/');
+                let cfg = self.platform_config();
+                let base = cfg.base_url.trim_end_matches('/');
                 // Start the process.
                 let start = self
                     .platform_post(
                         &format!("{base}/api/v1/processes"),
-                        json!({ "goal": goal, "auto_approve": true, "team_template_id": team_id }),
+                        json!({
+                            "goal": goal,
+                            "auto_approve": true,
+                            "team_template_id": team_id,
+                            "client_id": "portal-coder",
+                        }),
                     )
                     .await?;
                 let process_id = start
@@ -160,8 +188,13 @@ impl CoderService {
     }
 
     async fn platform_post(&self, url: &str, body: Value) -> Result<Value, String> {
-        let mut req = self.client.post(url).json(&body);
-        if let Some(key) = &self.master_key {
+        let cfg = self.platform_config();
+        let mut req = self
+            .client
+            .post(url)
+            .header("X-Agent-Platform-Client", DESKTOP_CLIENT_ID)
+            .json(&body);
+        if let Some(key) = &cfg.api_token {
             req = req.bearer_auth(key);
         }
         let resp = req.send().await.map_err(|e| format!("platform POST failed: {e}"))?;
@@ -174,8 +207,12 @@ impl CoderService {
     }
 
     async fn platform_get(&self, url: &str) -> Result<Value, String> {
-        let mut req = self.client.get(url);
-        if let Some(key) = &self.master_key {
+        let cfg = self.platform_config();
+        let mut req = self
+            .client
+            .get(url)
+            .header("X-Agent-Platform-Client", DESKTOP_CLIENT_ID);
+        if let Some(key) = &cfg.api_token {
             req = req.bearer_auth(key);
         }
         let resp = req.send().await.map_err(|e| format!("platform GET failed: {e}"))?;
@@ -185,6 +222,44 @@ impl CoderService {
             return Err(format!("platform {status}: {text}"));
         }
         serde_json::from_str(&text).map_err(|e| format!("bad platform JSON: {e}"))
+    }
+
+    async fn execute_delegated_tool(
+        &self,
+        local_thread_id: &str,
+        platform_thread_id: i64,
+        workspace_root: &str,
+        call_id: &str,
+        tool: &str,
+        args: &Value,
+    ) -> Result<(), String> {
+        let mutated = tools::mutated_path(tool, args);
+        let before = mutated
+            .as_ref()
+            .and_then(|path| tools::read_raw(workspace_root, path));
+
+        let result = match tools::execute(workspace_root, tool, args) {
+            Ok(output) => output,
+            Err(e) => format!("Error: {e}"),
+        };
+
+        if !result.starts_with("Error: ") {
+            if let Some(path) = mutated {
+                self.record_change(local_thread_id, tool, workspace_root, path, before)
+                    .await;
+            }
+        }
+
+        let cfg = self.platform_config();
+        let base = cfg.base_url.trim_end_matches('/');
+        let body = json!({
+            "thread_id": platform_thread_id,
+            "call_id": call_id,
+            "result": result,
+        });
+        self.platform_post(&format!("{base}/api/v1/coder/chat/tool-result"), body)
+            .await?;
+        Ok(())
     }
 
     /// Wire the Tauri handle so loop steps can be streamed to the UI.
@@ -214,6 +289,7 @@ impl CoderService {
                             title: row.title,
                             workspace_root: row.workspace_root,
                             model: row.model,
+                            platform_thread_id: row.platform_thread_id,
                             messages,
                             created_at: row.created_at,
                             updated_at: row.updated_at,
@@ -417,6 +493,7 @@ impl CoderService {
             title: Set(thread.title),
             workspace_root: Set(thread.workspace_root),
             model: Set(thread.model),
+            platform_thread_id: Set(thread.platform_thread_id),
             messages_json: Set(messages_json),
             created_at: Set(thread.created_at),
             updated_at: Set(thread.updated_at),
@@ -428,6 +505,7 @@ impl CoderService {
                         coder_thread::Column::Title,
                         coder_thread::Column::WorkspaceRoot,
                         coder_thread::Column::Model,
+                        coder_thread::Column::PlatformThreadId,
                         coder_thread::Column::MessagesJson,
                         coder_thread::Column::UpdatedAt,
                     ])
@@ -469,9 +547,10 @@ impl CoderService {
         let now = now_iso();
         let thread = CoderThread {
             id: uuid::Uuid::new_v4().to_string(),
-            title: "New session".into(),
+            title: PLACEHOLDER_SESSION.into(),
             workspace_root,
-            model: model.or_else(|| self.default_model.clone()),
+            model: model.or_else(|| self.platform_config().default_model.clone()),
+            platform_thread_id: None,
             messages: vec![ChatMessage::system(SYSTEM_PROMPT)],
             created_at: now.clone(),
             updated_at: now,
@@ -499,6 +578,18 @@ impl CoderService {
                 .await;
         }
         removed
+    }
+
+    /// Change the model for an existing thread (mid-session switching).
+    pub async fn update_thread_model(&self, id: &str, model: Option<String>) -> Result<(), String> {
+        {
+            let mut threads = self.threads.lock().await;
+            let thread = threads.get_mut(id).ok_or("thread not found")?;
+            thread.model = model;
+            thread.updated_at = now_iso();
+        }
+        self.persist_thread(id).await;
+        Ok(())
     }
 
     // ---- permission config --------------------------------------------
@@ -530,24 +621,165 @@ impl CoderService {
 
     // ---- run / resume --------------------------------------------------
 
-    /// Append a user message and drive the loop until it pauses or finishes.
-    pub async fn send(&self, thread_id: &str, message: String) -> Result<CoderRunResult, String> {
+    /// Spawn the agent loop in the background. Returns immediately; progress
+    /// streams via `coder://*` events.
+    pub fn spawn_run(self: Arc<Self>, thread_id: String, turn: AgentTurn) {
+        let cancel = Arc::new(AtomicBool::new(false));
+        let handle = RunHandle {
+            cancel: cancel.clone(),
+        };
+        let svc = Arc::clone(&self);
+        let tid = thread_id.clone();
+
+        tauri::async_runtime::spawn(async move {
+            {
+                let mut runs = svc.active_runs.lock().await;
+                if let Some(old) = runs.insert(tid.clone(), handle) {
+                    old.cancel.store(true, Ordering::SeqCst);
+                }
+            }
+            svc.emit(
+                "coder://running",
+                json!({ "thread_id": tid, "running": true }),
+            );
+
+            let result = svc.advance_platform(&tid, turn, Some(cancel)).await;
+
+            {
+                let mut runs = svc.active_runs.lock().await;
+                runs.remove(&tid);
+            }
+            svc.emit(
+                "coder://running",
+                json!({ "thread_id": tid, "running": false }),
+            );
+
+            if let Err(e) = result {
+                svc.emit(
+                    "coder://error",
+                    json!({ "thread_id": tid, "error": e }),
+                );
+            }
+        });
+    }
+
+    /// Cancel an in-flight run for a thread, if any.
+    pub async fn stop(&self, thread_id: &str) -> bool {
+        let handle = self.active_runs.lock().await.get(thread_id).map(|h| RunHandle {
+            cancel: Arc::clone(&h.cancel),
+        });
+        if let Some(h) = handle {
+            h.cancel.store(true, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub async fn list_running(&self) -> Vec<String> {
+        self.active_runs.lock().await.keys().cloned().collect()
+    }
+
+    /// Fetch estimated context usage for a thread from agent-platform.
+    pub async fn get_context_usage(
+        &self,
+        thread_id: &str,
+    ) -> Result<Option<crate::domains::ai::context_usage::ContextUsage>, String> {
+        use crate::domains::ai::context_usage::parse_context_usage;
+
+        let platform_id = self
+            .get_thread(thread_id)
+            .await
+            .and_then(|t| t.platform_thread_id)
+            .ok_or_else(|| "Thread has no platform id yet".to_string())?;
+
+        let cfg = self.platform_config();
+        let base = cfg.base_url.trim_end_matches('/');
+        let url = format!("{base}/api/v1/coder/chat/context-usage?thread_id={platform_id}");
+        let value = self.platform_get(&url).await?;
+        Ok(parse_context_usage(&value))
+    }
+
+    /// Resume the agent loop from the current thread state (e.g. after a failed
+    /// LLM request). Truncates any partial assistant/tool tail after the last user
+    /// message so the platform retry does not duplicate the user turn.
+    pub async fn prepare_retry(&self, thread_id: &str) -> Result<(), String> {
         {
             let mut threads = self.threads.lock().await;
             let thread = threads.get_mut(thread_id).ok_or("thread not found")?;
-            if thread.messages.iter().filter(|m| m.role == "user").count() == 0 {
-                thread.title = auto_title(&message);
-            }
-            thread.messages.push(ChatMessage::user(message));
+            let last_user = thread.messages.iter().rposition(|m| {
+                m.role == "user" && m.content.as_deref().unwrap_or("").trim().len() > 0
+            });
+            let Some(idx) = last_user else {
+                return Err("no user message to retry".into());
+            };
+            thread.messages.truncate(idx + 1);
+            thread.updated_at = now_iso();
         }
         self.persist_thread(thread_id).await;
-        self.advance(thread_id, None).await
+        Ok(())
+    }
+
+    /// Append a user message and drive the loop until it pauses or finishes.
+    pub async fn prepare_send(self: &Arc<Self>, thread_id: &str, message: String) -> Result<(), String> {
+        let fallback_title = {
+            let mut threads = self.threads.lock().await;
+            let thread = threads.get_mut(thread_id).ok_or("thread not found")?;
+            let is_first = thread.messages.iter().filter(|m| m.role == "user").count() == 0;
+            let mut fallback = None;
+            if is_first && is_placeholder_title(&thread.title) {
+                let fb = fallback_title_from_message(&message, PLACEHOLDER_SESSION);
+                thread.title = fb.clone();
+                fallback = Some(fb);
+            }
+            let user_msg = ChatMessage::user(message.clone());
+            thread.messages.push(user_msg.clone());
+            self.emit(
+                "coder://message",
+                json!({ "thread_id": thread_id, "message": user_msg }),
+            );
+            fallback
+        };
+        self.persist_thread(thread_id).await;
+        if let Some(fb) = fallback_title {
+            self.emit(
+                "coder://title",
+                json!({ "thread_id": thread_id, "title": fb }),
+            );
+        }
+        Ok(())
     }
 
     /// Resolve a pending approval, then continue the loop.
-    ///
-    /// `approve=false` records a rejection tool result so the model can adapt.
-    /// `remember`/`edited_pattern` optionally persist an allow rule.
+    pub async fn prepare_approve(
+        &self,
+        thread_id: &str,
+        call_id: &str,
+        approve: bool,
+        remember: bool,
+        edited_pattern: Option<String>,
+    ) -> Result<(), String> {
+        if remember && approve {
+            if let Some((tool, args)) = self.find_open_call(thread_id, call_id).await {
+                let pattern = edited_pattern.unwrap_or_else(|| tools::suggested_rule(&tool, &args));
+                self.add_rule(PermissionRule {
+                    tool,
+                    pattern,
+                    allow: true,
+                })
+                .await;
+            }
+        }
+        let _ = (thread_id, call_id, approve);
+        Ok(())
+    }
+
+    /// Legacy synchronous entry points — kept for compatibility, now spawn.
+    pub async fn retry(&self, thread_id: &str) -> Result<(), String> {
+        self.prepare_retry(thread_id).await?;
+        Ok(())
+    }
+
     pub async fn approve(
         &self,
         thread_id: &str,
@@ -555,151 +787,436 @@ impl CoderService {
         approve: bool,
         remember: bool,
         edited_pattern: Option<String>,
-    ) -> Result<CoderRunResult, String> {
-        if !approve {
-            let mut threads = self.threads.lock().await;
-            let thread = threads.get_mut(thread_id).ok_or("thread not found")?;
-            thread
-                .messages
-                .push(ChatMessage::tool_result(call_id, "user rejected this action"));
-            drop(threads);
-            self.persist_thread(thread_id).await;
-            return self.advance(thread_id, None).await;
-        }
-
-        if remember {
-            // Look up the pending call to derive tool + pattern.
-            if let Some((tool, args)) = self.find_open_call(thread_id, call_id).await {
-                let pattern = edited_pattern.unwrap_or_else(|| tools::suggested_rule(&tool, &args));
-                self.add_rule(PermissionRule { tool, pattern, allow: true }).await;
-            }
-        }
-        self.advance(thread_id, Some(call_id.to_string())).await
+    ) -> Result<(), String> {
+        self.prepare_approve(thread_id, call_id, approve, remember, edited_pattern)
+            .await
     }
 
-    /// Core loop. `granted` is a one-shot approval for a specific call id.
-    async fn advance(
+    /// Run one turn via agent-platform `POST /api/v1/coder/chat/stream`, `/retry`, or `/approve`.
+    async fn advance_platform(
         &self,
         thread_id: &str,
-        mut granted: Option<String>,
+        turn: AgentTurn,
+        cancel: Option<Arc<AtomicBool>>,
     ) -> Result<CoderRunResult, String> {
-        let mode = self.get_mode().await;
-        let rules = self.list_rules().await;
-        let mut llm_calls = 0usize;
+        let is_cancelled = || {
+            cancel
+                .as_ref()
+                .map(|c| c.load(Ordering::SeqCst))
+                .unwrap_or(false)
+        };
 
-        loop {
-            // Snapshot current state.
-            let (messages, model, root) = {
-                let threads = self.threads.lock().await;
-                let t = threads.get(thread_id).ok_or("thread not found")?;
-                (t.messages.clone(), t.model.clone(), t.workspace_root.clone())
+        if is_cancelled() {
+            return Ok(self.finish(thread_id, None, false, true).await);
+        }
+
+        let platform_thread_id = self.ensure_platform_thread(thread_id).await?;
+        let (model, workspace_root, send_message, fallback_title) = {
+            let threads = self.threads.lock().await;
+            let t = threads.get(thread_id).ok_or("thread not found")?;
+            let send_message = match &turn {
+                AgentTurn::Send => t
+                    .messages
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "user")
+                    .and_then(|m| m.content.clone())
+                    .ok_or("no user message to send")?,
+                AgentTurn::Approve { .. } => String::new(),
+                AgentTurn::Retry => String::new(),
             };
+            let fallback = t
+                .messages
+                .iter()
+                .rev()
+                .find(|m| m.role == "user")
+                .and_then(|m| m.content.as_deref())
+                .map(|m| fallback_title_from_message(m, PLACEHOLDER_SESSION))
+                .unwrap_or_else(|| PLACEHOLDER_SESSION.to_string());
+            (
+                t.model.clone(),
+                t.workspace_root.clone(),
+                send_message,
+                fallback,
+            )
+        };
 
-            match open_calls(&messages) {
-                // No unanswered tool calls: either finished or need the model.
-                None => {
-                    if let Some(last) = messages.last() {
-                        if last.role == "assistant" && last.tool_calls.is_none() {
-                            return Ok(self.finish(thread_id, last.content.clone(), false).await);
-                        }
-                    }
-                    if llm_calls >= MAX_ITERATIONS {
-                        return Ok(self.finish(thread_id, None, true).await);
-                    }
-                    llm_calls += 1;
-                    let assistant = self.call_llm(thread_id, &messages, model.as_deref()).await?;
-                    self.push_message(thread_id, assistant).await;
+        validate_workspace_root(&workspace_root)?;
+
+        let (allow_commands, auto_approve) = self.permission_flags().await;
+        let cfg = self.platform_config();
+        let base = cfg.base_url.trim_end_matches('/');
+
+        let mut req = match turn {
+            AgentTurn::Send => {
+                let url = format!("{base}/api/v1/coder/chat/stream");
+                let mut body = json!({
+                    "message": send_message,
+                    "thread_id": platform_thread_id,
+                    "workspace_root": workspace_root,
+                    "allow_commands": allow_commands,
+                    "auto_approve_commands": auto_approve,
+                    "delegate_tools": true,
+                });
+                if let Some(m) = &model {
+                    body["model"] = json!(m);
                 }
-                // There are tool calls awaiting execution.
-                Some(calls) => {
-                    for call in calls {
-                        let args = tools::parse_args(&call).unwrap_or_else(|_| json!({}));
-                        let one_shot = granted.as_deref() == Some(call.id.as_str());
-                        let decision = if one_shot {
-                            granted = None;
-                            Decision::Allow
-                        } else {
-                            permissions::decide(mode, &rules, &call.function.name, &args)
-                        };
+                let mut r = self
+                    .client
+                    .post(&url)
+                    .header("X-Agent-Platform-Client", DESKTOP_CLIENT_ID)
+                    .json(&body);
+                if let Some(key) = &cfg.api_token {
+                    r = r.bearer_auth(key);
+                }
+                r
+            }
+            AgentTurn::Approve {
+                call_id,
+                approve,
+                edited_command,
+            } => {
+                let url = format!("{base}/api/v1/coder/chat/approve");
+                let mut body = json!({
+                    "thread_id": platform_thread_id,
+                    "call_id": call_id,
+                    "approve": approve,
+                    "allow_commands": allow_commands,
+                    "auto_approve_commands": auto_approve,
+                    "delegate_tools": true,
+                });
+                if let Some(m) = &model {
+                    body["model"] = json!(m);
+                }
+                if let Some(cmd) = edited_command {
+                    body["edited_command"] = json!(cmd);
+                }
+                let mut r = self
+                    .client
+                    .post(&url)
+                    .header("X-Agent-Platform-Client", DESKTOP_CLIENT_ID)
+                    .json(&body);
+                if let Some(key) = &cfg.api_token {
+                    r = r.bearer_auth(key);
+                }
+                r
+            }
+            AgentTurn::Retry => {
+                let url = format!("{base}/api/v1/coder/chat/retry");
+                let mut body = json!({
+                    "thread_id": platform_thread_id,
+                    "workspace_root": workspace_root,
+                    "allow_commands": allow_commands,
+                    "auto_approve_commands": auto_approve,
+                    "delegate_tools": true,
+                });
+                if let Some(m) = &model {
+                    body["model"] = json!(m);
+                }
+                let mut r = self
+                    .client
+                    .post(&url)
+                    .header("X-Agent-Platform-Client", DESKTOP_CLIENT_ID)
+                    .json(&body);
+                if let Some(key) = &cfg.api_token {
+                    r = r.bearer_auth(key);
+                }
+                r
+            }
+        };
 
-                        match decision {
-                            Decision::Allow => {
-                                let name = call.function.name.clone();
-                                // Snapshot before-content for change review.
-                                let mutated = tools::mutated_path(&name, &args);
-                                let before = mutated.as_ref().map(|p| tools::read_raw(&root, p));
-                                let result = if tools::is_platform_tool(&name) {
-                                    self.execute_platform_tool(&name, &args)
-                                        .await
-                                        .unwrap_or_else(|e| format!("tool error: {e}"))
-                                } else {
-                                    tools::execute(&root, &name, &args)
-                                        .unwrap_or_else(|e| format!("tool error: {e}"))
-                                };
-                                self.push_message(thread_id, ChatMessage::tool_result(&call.id, result))
-                                    .await;
-                                if let Some(path) = mutated {
-                                    self.record_change(thread_id, &name, &root, path, before.flatten())
-                                        .await;
-                                }
-                            }
-                            Decision::Deny(reason) => {
-                                self.push_message(
-                                    thread_id,
-                                    ChatMessage::tool_result(&call.id, format!("denied: {reason}")),
-                                )
-                                .await;
-                            }
-                            Decision::Prompt => {
-                                let messages = self.get_thread(thread_id).await.map(|t| t.messages).unwrap_or_default();
-                                let pending = PendingApproval {
-                                    call_id: call.id.clone(),
-                                    tool: call.function.name.clone(),
-                                    arguments: args.clone(),
-                                    suggested_rule: tools::suggested_rule(&call.function.name, &args),
-                                    summary: tools::summarize(&call.function.name, &args),
-                                };
+        let resp = req.send().await.map_err(|e| {
+            if e.is_connect() || e.is_timeout() {
+                format!(
+                    "Can't reach agent-platform at {}. Is it running? Configure under AI → Providers.",
+                    cfg.base_url
+                )
+            } else {
+                format!("platform coder request failed: {e}")
+            }
+        })?;
+
+        let thread_id_for_stream = thread_id.to_string();
+        let fallback_for_title = fallback_title.clone();
+        let mut done: Option<PlatformDone> = None;
+        let mut stream_error: Option<String> = None;
+        let platform_thread_id_for_tools = platform_thread_id;
+        let workspace_root_for_tools = workspace_root.clone();
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("platform stream {status}: {text}"));
+        }
+
+        let mut buf: Vec<u8> = Vec::new();
+        let mut stream = resp.bytes_stream();
+        'stream: loop {
+            if is_cancelled() {
+                break;
+            }
+            let chunk = tokio::select! {
+                biased;
+                _ = async {
+                    while !is_cancelled() {
+                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    }
+                } => break,
+                c = stream.next() => c,
+            };
+            let Some(chunk) = chunk else { break };
+            if is_cancelled() {
+                break;
+            }
+            let bytes = chunk.map_err(|e| format!("platform stream read error: {e}"))?;
+            buf.extend_from_slice(&bytes);
+
+            for (event, data) in platform_stream::drain_sse_events(&mut buf) {
+                if is_cancelled() {
+                    break 'stream;
+                }
+                match event.as_str() {
+                    "title" => {
+                        if let Some(title) = data.get("title").and_then(Value::as_str) {
+                            self.apply_generated_title(
+                                &thread_id_for_stream,
+                                title,
+                                &fallback_for_title,
+                            )
+                            .await;
+                        }
+                    }
+                    "assistant" => {
+                        if let Some(content) = data.get("content").and_then(Value::as_str) {
+                            if !content.is_empty() {
                                 self.emit(
-                                    "coder://pending",
-                                    json!({ "thread_id": thread_id, "pending": pending }),
+                                    "coder://token",
+                                    json!({ "thread_id": thread_id_for_stream, "delta": content }),
                                 );
-                                return Ok(CoderRunResult {
-                                    thread_id: thread_id.to_string(),
-                                    messages,
-                                    pending: Some(pending),
-                                    final_text: None,
-                                    exhausted: false,
-                                });
                             }
                         }
                     }
+                    "tool_call" => {
+                        if is_cancelled() {
+                            break 'stream;
+                        }
+                        let call_id = data
+                            .get("call_id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("");
+                        let name = data.get("name").and_then(Value::as_str).unwrap_or("");
+                        let args = data
+                            .get("arguments")
+                            .cloned()
+                            .unwrap_or_else(|| json!({}));
+                        if call_id.is_empty() {
+                            stream_error =
+                                Some("platform tool_call missing call_id".to_string());
+                        } else if let Err(e) = self
+                            .execute_delegated_tool(
+                                &thread_id_for_stream,
+                                platform_thread_id_for_tools,
+                                &workspace_root_for_tools,
+                                call_id,
+                                name,
+                                &args,
+                            )
+                            .await
+                        {
+                            stream_error = Some(e);
+                        }
+                    }
+                    "error" => {
+                        let detail = data
+                            .get("detail")
+                            .and_then(Value::as_str)
+                            .unwrap_or("unknown platform error")
+                            .to_string();
+                        stream_error = Some(detail);
+                    }
+                    "done" => {
+                        let parsed = platform_stream::done_from_event(&data);
+                        if let Some(ctx) = &parsed.context_usage {
+                            self.emit(
+                                "coder://context-usage",
+                                json!({
+                                    "thread_id": thread_id_for_stream,
+                                    "context_usage": ctx,
+                                    "llm_usage": parsed.llm_usage,
+                                }),
+                            );
+                        }
+                        done = Some(parsed);
+                    }
+                    _ => {}
                 }
             }
         }
+
+        if is_cancelled() {
+            return Ok(self.finish(thread_id, None, false, true).await);
+        }
+
+        let done = if let Some(done) = done {
+            done
+        } else if let Some(err) = stream_error {
+            return Err(err);
+        } else {
+            return Err("platform stream ended without done event".into());
+        };
+
+        self.sync_thread_from_platform(thread_id, platform_thread_id, &done, &fallback_title)
+            .await;
+
+        if let Some(pending) = done.pending.clone() {
+            self.emit(
+                "coder://pending",
+                json!({ "thread_id": thread_id, "pending": pending }),
+            );
+            let messages = self
+                .get_thread(thread_id)
+                .await
+                .map(|t| t.messages)
+                .unwrap_or_default();
+            return Ok(CoderRunResult {
+                thread_id: thread_id.to_string(),
+                messages,
+                pending: Some(pending),
+                final_text: None,
+                exhausted: false,
+            });
+        }
+
+        Ok(self.finish(thread_id, done.final_text, false, false).await)
     }
 
-    // ---- helpers -------------------------------------------------------
+    async fn permission_flags(&self) -> (bool, bool) {
+        match self.get_mode().await {
+            PermissionMode::AutoAcceptAll => (true, true),
+            PermissionMode::Review => (true, false),
+            PermissionMode::Plan => (false, false),
+        }
+    }
 
-    async fn push_message(&self, thread_id: &str, msg: ChatMessage) {
-        self.emit(
-            "coder://message",
-            json!({ "thread_id": thread_id, "message": msg }),
-        );
+    async fn ensure_platform_thread(&self, local_id: &str) -> Result<i64, String> {
+        if let Some(id) = self
+            .get_thread(local_id)
+            .await
+            .and_then(|t| t.platform_thread_id)
+        {
+            return Ok(id);
+        }
+
+        let (title, workspace_root) = {
+            let threads = self.threads.lock().await;
+            let t = threads.get(local_id).ok_or("thread not found")?;
+            (t.title.clone(), t.workspace_root.clone())
+        };
+
+        let cfg = self.platform_config();
+        let base = cfg.base_url.trim_end_matches('/');
+        let body = json!({
+            "title": title,
+            "workspace_root": workspace_root,
+        });
+        let created = self
+            .platform_post(&format!("{base}/api/v1/coder/chat/threads"), body)
+            .await?;
+        let platform_id = created
+            .get("thread_id")
+            .and_then(Value::as_i64)
+            .ok_or_else(|| format!("platform thread create missing thread_id: {created}"))?;
+
         {
             let mut threads = self.threads.lock().await;
-            if let Some(t) = threads.get_mut(thread_id) {
-                t.messages.push(msg);
+            if let Some(t) = threads.get_mut(local_id) {
+                t.platform_thread_id = Some(platform_id);
                 t.updated_at = now_iso();
             }
         }
-        self.persist_thread(thread_id).await;
+        self.persist_thread(local_id).await;
+        Ok(platform_id)
     }
 
-    async fn finish(&self, thread_id: &str, final_text: Option<String>, exhausted: bool) -> CoderRunResult {
-        let messages = self.get_thread(thread_id).await.map(|t| t.messages).unwrap_or_default();
+    async fn sync_from_platform(&self, local_id: &str) -> Result<(), String> {
+        let platform_id = self
+            .get_thread(local_id)
+            .await
+            .and_then(|t| t.platform_thread_id)
+            .ok_or("thread not linked to platform")?;
+        let cfg = self.platform_config();
+        let base = cfg.base_url.trim_end_matches('/');
+        let data = self
+            .platform_get(&format!(
+                "{base}/api/v1/coder/chat/thread?thread_id={platform_id}"
+            ))
+            .await?;
+        let messages: Vec<ChatMessage> = data
+            .get("messages")
+            .and_then(Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|m| serde_json::from_value(m.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let title = data
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or(PLACEHOLDER_SESSION)
+            .to_string();
+        {
+            let mut threads = self.threads.lock().await;
+            if let Some(t) = threads.get_mut(local_id) {
+                t.messages = messages;
+                t.title = title;
+                t.updated_at = now_iso();
+            }
+        }
+        self.persist_thread(local_id).await;
+        Ok(())
+    }
+
+    async fn sync_thread_from_platform(
+        &self,
+        local_id: &str,
+        platform_id: i64,
+        done: &platform_stream::PlatformDone,
+        fallback_title: &str,
+    ) {
+        {
+            let mut threads = self.threads.lock().await;
+            if let Some(t) = threads.get_mut(local_id) {
+                t.platform_thread_id = Some(platform_id);
+                t.messages = done.messages.clone();
+                if should_apply_generated_title(&t.title, fallback_title) {
+                    t.title = done.title.clone();
+                }
+                t.updated_at = now_iso();
+            }
+        }
+        self.persist_thread(local_id).await;
+    }
+
+    async fn finish(
+        &self,
+        thread_id: &str,
+        final_text: Option<String>,
+        exhausted: bool,
+        cancelled: bool,
+    ) -> CoderRunResult {
+        let (messages, title) = match self.get_thread(thread_id).await {
+            Some(t) => (t.messages, t.title),
+            None => (Vec::new(), PLACEHOLDER_SESSION.to_string()),
+        };
         self.emit(
             "coder://done",
-            json!({ "thread_id": thread_id, "final_text": final_text, "exhausted": exhausted }),
+            json!({
+                "thread_id": thread_id,
+                "final_text": final_text,
+                "exhausted": exhausted,
+                "cancelled": cancelled,
+                "title": title,
+            }),
         );
         CoderRunResult {
             thread_id: thread_id.to_string(),
@@ -707,6 +1224,30 @@ impl CoderService {
             pending: None,
             final_text,
             exhausted,
+        }
+    }
+
+    async fn apply_generated_title(&self, thread_id: &str, title: &str, fallback: &str) {
+        let should_emit = {
+            let mut threads = self.threads.lock().await;
+            let Some(thread) = threads.get_mut(thread_id) else {
+                return;
+            };
+            if !should_apply_generated_title(&thread.title, fallback) {
+                return;
+            }
+            if thread.title == title {
+                return;
+            }
+            thread.title = title.to_string();
+            true
+        };
+        if should_emit {
+            self.persist_thread(thread_id).await;
+            self.emit(
+                "coder://title",
+                json!({ "thread_id": thread_id, "title": title }),
+            );
         }
     }
 
@@ -722,156 +1263,24 @@ impl CoderService {
         }
         None
     }
-
-    /// One request to the platform's OpenAI-compatible `/v1/chat/completions`.
-    async fn call_llm(
-        &self,
-        thread_id: &str,
-        messages: &[ChatMessage],
-        model: Option<&str>,
-    ) -> Result<ChatMessage, String> {
-        let url = format!("{}/v1/chat/completions", self.base_url.trim_end_matches('/'));
-        let mut body = json!({
-            "messages": messages,
-            "tools": self.tool_specs_for_request(),
-            "tool_choice": "auto",
-            "stream": true,
-        });
-        if let Some(m) = model {
-            body["model"] = json!(m);
-        }
-
-        let mut req = self.client.post(&url).json(&body);
-        if let Some(key) = &self.master_key {
-            req = req.bearer_auth(key);
-        }
-
-        let resp = req.send().await.map_err(|e| format!("platform request failed: {e}"))?;
-        let status = resp.status();
-        if !status.is_success() {
-            let text = resp.text().await.unwrap_or_default();
-            return Err(format!("platform returned {status}: {text}"));
-        }
-
-        // Consume the SSE stream, accumulating content + tool-call deltas.
-        let mut content = String::new();
-        // Tool calls accumulate by index; id/name arrive first, arguments stream.
-        let mut calls: Vec<PartialCall> = Vec::new();
-        let mut buf: Vec<u8> = Vec::new();
-        let mut stream = resp.bytes_stream();
-
-        while let Some(chunk) = stream.next().await {
-            let bytes = chunk.map_err(|e| format!("stream error: {e}"))?;
-            buf.extend_from_slice(&bytes);
-
-            while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
-                let line: Vec<u8> = buf.drain(..=pos).collect();
-                let line = String::from_utf8_lossy(&line);
-                let line = line.trim();
-                let payload = match line.strip_prefix("data:") {
-                    Some(p) => p.trim(),
-                    None => continue,
-                };
-                if payload == "[DONE]" {
-                    continue;
-                }
-                let Ok(value) = serde_json::from_str::<Value>(payload) else { continue };
-                let Some(delta) = value
-                    .get("choices")
-                    .and_then(|c| c.get(0))
-                    .and_then(|c| c.get("delta"))
-                else {
-                    continue;
-                };
-
-                if let Some(text) = delta.get("content").and_then(Value::as_str) {
-                    if !text.is_empty() {
-                        content.push_str(text);
-                        self.emit(
-                            "coder://token",
-                            json!({ "thread_id": thread_id, "delta": text }),
-                        );
-                    }
-                }
-
-                if let Some(tcs) = delta.get("tool_calls").and_then(Value::as_array) {
-                    for tc in tcs {
-                        let idx = tc.get("index").and_then(Value::as_u64).unwrap_or(0) as usize;
-                        while calls.len() <= idx {
-                            calls.push(PartialCall::default());
-                        }
-                        let slot = &mut calls[idx];
-                        if let Some(id) = tc.get("id").and_then(Value::as_str) {
-                            if !id.is_empty() {
-                                slot.id = id.to_string();
-                            }
-                        }
-                        if let Some(func) = tc.get("function") {
-                            if let Some(name) = func.get("name").and_then(Value::as_str) {
-                                if !name.is_empty() {
-                                    slot.name = name.to_string();
-                                }
-                            }
-                            if let Some(args) = func.get("arguments").and_then(Value::as_str) {
-                                slot.arguments.push_str(args);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let tool_calls: Vec<ToolCall> = calls
-            .into_iter()
-            .filter(|c| !c.name.is_empty())
-            .enumerate()
-            .map(|(i, c)| ToolCall {
-                id: if c.id.is_empty() { format!("call_{i}") } else { c.id },
-                r#type: "function".into(),
-                function: super::types::FunctionCall { name: c.name, arguments: c.arguments },
-            })
-            .collect();
-
-        Ok(ChatMessage {
-            role: "assistant".into(),
-            content: if content.is_empty() { None } else { Some(content) },
-            tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
-            tool_call_id: None,
-        })
-    }
-}
-
-/// Accumulator for a streamed tool call (fields arrive across SSE chunks).
-#[derive(Default)]
-struct PartialCall {
-    id: String,
-    name: String,
-    arguments: String,
-}
-
-/// Return tool calls in the last assistant turn that have no `tool` response
-/// yet, or `None` if there are none pending.
-fn open_calls(messages: &[ChatMessage]) -> Option<Vec<ToolCall>> {
-    let answered: HashSet<&str> = messages
-        .iter()
-        .filter_map(|m| m.tool_call_id.as_deref())
-        .collect();
-    // Only the most recent assistant-with-tool_calls matters.
-    for m in messages.iter().rev() {
-        if m.role == "assistant" {
-            if let Some(calls) = &m.tool_calls {
-                let open: Vec<ToolCall> =
-                    calls.iter().filter(|c| !answered.contains(c.id.as_str())).cloned().collect();
-                return if open.is_empty() { None } else { Some(open) };
-            }
-            return None;
-        }
-    }
-    None
 }
 
 fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
+}
+
+fn validate_workspace_root(root: &str) -> Result<(), String> {
+    let trimmed = root.trim();
+    if trimmed.is_empty() {
+        return Err("Set a workspace folder first.".into());
+    }
+    let path = Path::new(trimmed);
+    if !path.is_dir() {
+        return Err(format!(
+            "Workspace folder does not exist or is not a directory: {trimmed}"
+        ));
+    }
+    Ok(())
 }
 
 /// Cap a tool result so a huge platform payload can't blow the context budget.
@@ -884,13 +1293,4 @@ fn truncate(text: &str, max: usize) -> String {
         end -= 1;
     }
     format!("{}… [truncated {} bytes]", &text[..end], text.len() - end)
-}
-
-fn auto_title(message: &str) -> String {
-    let text: String = message.split_whitespace().collect::<Vec<_>>().join(" ");
-    if text.len() <= 48 {
-        text
-    } else {
-        format!("{}...", &text[..45])
-    }
 }

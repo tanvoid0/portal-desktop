@@ -2,7 +2,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import { cloudStore, loadResources } from "$lib/domains/cloud/stores";
   import {
     ResourceType,
@@ -149,9 +149,9 @@
 
   function handleTabChange(tab: string) {
     activeTab = tab;
-    const url = new URL(window.location.href);
+    const url = new URL($page.url);
     url.searchParams.set("tab", tab);
-    window.history.replaceState({}, "", url.toString());
+    replaceState(url, {});
   }
 
   function handleScale() {

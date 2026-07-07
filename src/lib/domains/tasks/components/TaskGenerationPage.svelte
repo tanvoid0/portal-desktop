@@ -194,7 +194,7 @@
     try {
       const result = await aiTaskService.generateTasksFromStory({
         story_text: storyText,
-        provider_type: "Ollama",
+        provider_type: "AgentPlatform",
         instruction: customInstruction.trim() || undefined,
         context: taskContext,
       });
@@ -278,7 +278,7 @@
     try {
       const result = await aiTaskService.generateTasksFromStory({
         story_text: storyText,
-        provider_type: "Ollama",
+        provider_type: "AgentPlatform",
         history: conversationHistory,
         instruction: customInstruction.trim() || undefined,
         context: taskContext,

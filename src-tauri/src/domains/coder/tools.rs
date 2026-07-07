@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::utils::pnpm_workspace::{prepare_shell_command, warn_if_broken_pnpm_workspace};
 use serde_json::{json, Value};
 
 use super::types::ToolCall;
@@ -327,20 +328,39 @@ fn walk(dir: &Path, f: &mut dyn FnMut(&Path) -> bool) -> bool {
 }
 
 fn run_command(root: &str, command: &str) -> Result<String, String> {
+    let exec_command = prepare_shell_command(command, root);
+    let warning = warn_if_broken_pnpm_workspace(root);
+
     let output = if cfg!(target_os = "windows") {
-        Command::new("cmd").args(["/C", command]).current_dir(root).output()
+        Command::new("cmd")
+            .args(["/C", &exec_command])
+            .current_dir(root)
+            .output()
     } else {
-        Command::new("sh").arg("-c").arg(command).current_dir(root).output()
+        Command::new("sh")
+            .arg("-c")
+            .arg(&exec_command)
+            .current_dir(root)
+            .output()
     }
     .map_err(|e| format!("spawn: {e}"))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    if output.status.success() {
-        Ok(if stdout.is_empty() { "(no output)".into() } else { stdout.to_string() })
+    let body = if output.status.success() {
+        if stdout.is_empty() {
+            "(no output)".to_string()
+        } else {
+            stdout.to_string()
+        }
     } else {
-        Ok(format!("exit {}\n{stdout}{stderr}", output.status.code().unwrap_or(-1)))
-    }
+        format!("exit {}\n{stdout}{stderr}", output.status.code().unwrap_or(-1))
+    };
+
+    Ok(match warning {
+        Some(w) => format!("{w}\n{body}"),
+        None => body,
+    })
 }
 
 #[cfg(test)]

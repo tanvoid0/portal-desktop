@@ -54,7 +54,7 @@ export interface ConversationMessage {
 
 export interface GenerateDocumentRequest {
   prompt: string;
-  providerType?: "Ollama" | "Gemini" | "OpenAI" | "Anthropic";
+  providerType?: "AgentPlatform";
   history?: ConversationMessage[];
   context?: DocumentContext;
   instruction?: string;

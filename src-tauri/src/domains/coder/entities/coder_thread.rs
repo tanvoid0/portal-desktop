@@ -9,6 +9,8 @@ pub struct Model {
     pub title: String,
     pub workspace_root: String,
     pub model: Option<String>,
+    /// Agent-platform `coder_chat_threads.id` when using `/api/v1/coder/chat/stream`.
+    pub platform_thread_id: Option<i64>,
     /// The full transcript (`Vec<ChatMessage>`) serialized as JSON.
     pub messages_json: String,
     pub created_at: String,

@@ -1,3 +1,5 @@
+pub use crate::domains::ai::message::ChatMessage;
+use crate::domains::ai::message::ChatMessage as ChatTurn;
 use crate::domains::ai::providers::ProviderType;
 use crate::domains::ai::services::AIService;
 use serde::{Deserialize, Serialize};
@@ -5,15 +7,9 @@ use std::sync::Arc;
 use tauri::State;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChatMessage {
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct SendMessageRequest {
     pub message: String,
-    pub history: Vec<ChatMessage>,
+    pub history: Vec<ChatTurn>,
     pub provider: Option<ProviderType>,
     pub conversation_id: Option<String>,
     pub temperature: Option<f64>,
@@ -35,15 +31,14 @@ pub async fn send_message(
         extra_options: None,
     };
 
-    // Convert history to prompt format
-    let mut prompt = String::new();
-    for msg in &request.history {
-        prompt.push_str(&format!("{}: {}\n", msg.role, msg.content));
-    }
-    prompt.push_str(&format!("user: {}\nassistant:", request.message));
+    let mut messages = request.history;
+    messages.push(ChatTurn {
+        role: "user".to_string(),
+        content: request.message,
+    });
 
     let result = ai_service
-        .generate(&prompt, Some(options), provider)
+        .generate_chat(&messages, Some(options), provider)
         .await
         .map_err(|e| format!("AI generation error: {}", e))?;
 

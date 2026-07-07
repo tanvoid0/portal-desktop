@@ -1,4 +1,4 @@
-export type ProviderType = "Ollama" | "Gemini";
+export type ProviderType = "AgentPlatform";
 
 export interface ProviderConfig {
   provider_type: ProviderType;
@@ -31,6 +31,7 @@ export interface Conversation {
   id: string;
   title: string;
   provider: ProviderType;
+  model?: string | null;
   created_at: string;
   updated_at: string;
   message_count?: number;
@@ -72,4 +73,61 @@ export interface LogFilters {
   date_from?: string;
   date_to?: string;
   search_query?: string;
+}
+
+/** Resolved defaults from agent-platform `GET /v1/catalog`. */
+export interface CatalogResolvedDefaults {
+  provider: string;
+  model: string;
+}
+
+/** A model entry from agent-platform catalog. */
+export interface CatalogModel {
+  id: string;
+  provider: string;
+  source: "alias" | "live" | string;
+  backend_id?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+/** A provider entry from agent-platform catalog. */
+export interface CatalogProvider {
+  id: string;
+  label: string;
+  configured: boolean;
+  reachable: boolean | null;
+  default_model?: string | null;
+  models: CatalogModel[];
+}
+
+/** Full catalog response from agent-platform `GET /v1/catalog`. */
+export interface PlatformCatalog {
+  object: string;
+  resolved_defaults: CatalogResolvedDefaults;
+  providers: CatalogProvider[];
+}
+
+export interface CatalogQuery {
+  /** `["all"]` for all providers; omit for effective default only. */
+  providers?: string[] | null;
+  /** `false` = YAML aliases only (no upstream fetches). */
+  live?: boolean | null;
+}
+
+/** Estimated input context breakdown from agent-platform chat APIs. */
+export interface ContextUsage {
+  context_window: number;
+  total_estimated: number;
+  percent_used: number;
+  prompt_budget: number;
+  reserved_output: number;
+  categories: Record<string, number>;
+}
+
+/** Aggregated LLM token usage for one or more completion steps. */
+export interface LlmUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
 }

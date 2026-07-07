@@ -1,13 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { ContextUsage, LlmUsage } from "$lib/domains/ai/types/index.js";
 import type {
   ChatMessage,
-  CoderRunResult,
+  CoderDoneEvent,
   CoderThread,
   FileChange,
+  GitDiffStats,
   PendingApproval,
   PermissionMode,
   PermissionRule,
+  ThreadTitleEvent,
 } from "../types.js";
 
 /**
@@ -34,9 +37,18 @@ export class CoderService {
     return invoke<boolean>("coder_delete_thread", { threadId });
   }
 
-  /** Send a user message and run until the loop pauses or finishes. */
-  send(threadId: string, message: string): Promise<CoderRunResult> {
-    return invoke<CoderRunResult>("coder_send", { threadId, message });
+  updateThreadModel(threadId: string, model: string | null): Promise<void> {
+    return invoke<void>("coder_update_thread_model", { threadId, model });
+  }
+
+  /** Send a user message and start a background run. */
+  send(threadId: string, message: string): Promise<void> {
+    return invoke<void>("coder_send", { threadId, message });
+  }
+
+  /** Resume a failed run from the current thread state. */
+  retry(threadId: string): Promise<void> {
+    return invoke<void>("coder_retry", { threadId });
   }
 
   /** Resolve a pending approval and continue the run. */
@@ -46,14 +58,24 @@ export class CoderService {
     approve: boolean,
     remember = false,
     editedPattern?: string,
-  ): Promise<CoderRunResult> {
-    return invoke<CoderRunResult>("coder_approve", {
+  ): Promise<void> {
+    return invoke<void>("coder_approve", {
       threadId,
       callId,
       approve,
       remember,
       editedPattern: editedPattern ?? null,
     });
+  }
+
+  /** Cancel an in-flight run for a thread. */
+  stop(threadId: string): Promise<boolean> {
+    return invoke<boolean>("coder_stop", { threadId });
+  }
+
+  /** Thread ids with active agent loops. */
+  listRunning(): Promise<string[]> {
+    return invoke<string[]>("coder_list_running");
   }
 
   getMode(): Promise<PermissionMode> {
@@ -139,19 +161,65 @@ export class CoderService {
     );
   }
 
-  /** The run finished. */
-  onDone(
+  /** Thread title updated (fallback or smart). */
+  onTitle(
+    cb: (p: ThreadTitleEvent) => void,
+  ): Promise<UnlistenFn> {
+    return listen<ThreadTitleEvent>("coder://title", (e) => cb(e.payload));
+  }
+
+  /** Context window usage updated for a thread. */
+  onContextUsage(
     cb: (p: {
       thread_id: string;
-      final_text: string | null;
-      exhausted: boolean;
+      context_usage: ContextUsage;
+      llm_usage?: LlmUsage | null;
     }) => void,
   ): Promise<UnlistenFn> {
     return listen<{
       thread_id: string;
-      final_text: string | null;
-      exhausted: boolean;
-    }>("coder://done", (e) => cb(e.payload));
+      context_usage: ContextUsage;
+      llm_usage?: LlmUsage | null;
+    }>("coder://context-usage", (e) => cb(e.payload));
+  }
+
+  /** Fetch current context usage from agent-platform for a thread. */
+  getContextUsage(threadId: string): Promise<ContextUsage | null> {
+    return invoke<ContextUsage | null>("coder_get_context_usage", { threadId });
+  }
+
+  /** Git branch / working-tree diff stats for a workspace path. */
+  getGitDiffStats(workspaceRoot: string): Promise<GitDiffStats> {
+    return invoke<GitDiffStats>("coder_get_git_diff_stats", {
+      workspaceRoot,
+    });
+  }
+
+  /** The run finished. */
+  onDone(
+    cb: (p: CoderDoneEvent) => void,
+  ): Promise<UnlistenFn> {
+    return listen<CoderDoneEvent>("coder://done", (e) => cb(e.payload));
+  }
+
+  /** Run started or stopped for a thread. */
+  onRunning(
+    cb: (p: { thread_id: string; running: boolean }) => void,
+  ): Promise<UnlistenFn> {
+    return listen<{ thread_id: string; running: boolean }>(
+      "coder://running",
+      (e) => cb(e.payload),
+    );
+  }
+
+  /** Run failed with an error. */
+  onError(
+    cb: (p: { thread_id: string; error: string }) => void,
+  ): Promise<UnlistenFn> {
+    return listen<{ thread_id: string; error: string }>(
+      "coder://error",
+      (e) => cb(e.payload),
+    );
   }
 }
 

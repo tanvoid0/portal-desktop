@@ -61,6 +61,45 @@ export interface ProjectScan {
   projects: Project[];
 }
 
+export interface DevCleanerItem {
+  id: string;
+  cleanerId: string;
+  path: string;
+  kind: string;
+  reason: string;
+  sizeBytes: number;
+  fileCount: number;
+  risk: Risk;
+  groupLabel?: string;
+}
+
+export interface DevCleanerGroup {
+  cleanerId: string;
+  label: string;
+  available: boolean;
+  unavailableReason?: string;
+  totalBytes: number;
+  items: DevCleanerItem[];
+}
+
+export interface DevCleanerScan {
+  totalBytes: number;
+  itemCount: number;
+  groups: DevCleanerGroup[];
+}
+
+export interface DevCleanerCleanProgress {
+  done: number;
+  total: number;
+  currentPath: string;
+}
+
+export interface DevCleanerCleanResult {
+  cleaned: { path: string; kind: string; sizeBytes: number }[];
+  failed: { path: string; kind: string; error: string }[];
+  reclaimedBytes: number;
+}
+
 export interface CachedScan {
   ts: number;
   status: "complete" | "partial";
@@ -104,19 +143,6 @@ export interface AuditEntry {
   sizeBytes: number;
   kind: string;
   status: string;
-}
-
-export interface AiConfig {
-  baseUrl?: string;
-  apiToken?: string;
-  teamTemplateId?: number;
-}
-
-export interface TeamOption {
-  id: number;
-  name: string;
-  description: string;
-  isAppTeam: boolean;
 }
 
 export interface AgentNote {

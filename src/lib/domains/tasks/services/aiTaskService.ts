@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import { AI_PROVIDER_SETTINGS_PATH } from "$lib/config/ai-nav";
 
-export type ProviderType = "Ollama" | "Gemini" | "OpenAI" | "Anthropic";
+export type ProviderType = "AgentPlatform";
 
 export interface GeneratedTask {
   title: string;
@@ -107,10 +108,10 @@ export function parseError(error: unknown): AIErrorInfo {
   ) {
     return {
       message:
-        "AI provider is not configured. Please set up an AI provider (Ollama, Gemini, OpenAI, or Anthropic) in Settings.",
+        "AI provider is not configured. Please set up Agent Platform in AI → Providers.",
       type: "configuration",
       actionable: true,
-      settingsPath: "/settings/learning",
+      settingsPath: AI_PROVIDER_SETTINGS_PATH,
     };
   }
 
@@ -146,10 +147,10 @@ export function parseError(error: unknown): AIErrorInfo {
     const modelName = modelMatch ? modelMatch[1] : "the specified model";
 
     return {
-      message: `Model "${modelName}" is not installed in Ollama. Please install it using: ollama pull ${modelName}`,
+      message: `Model "${modelName}" is not available on agent-platform. Check the model alias in AI → Providers or configure it at /config on the platform.`,
       type: "model_not_found",
       actionable: true,
-      settingsPath: "/settings/learning",
+      settingsPath: AI_PROVIDER_SETTINGS_PATH,
     };
   }
 
@@ -164,7 +165,7 @@ export function parseError(error: unknown): AIErrorInfo {
         "AI provider is not available. Please check that your AI service is running and properly configured.",
       type: "provider_unavailable",
       actionable: true,
-      settingsPath: "/settings/learning",
+      settingsPath: AI_PROVIDER_SETTINGS_PATH,
     };
   }
 

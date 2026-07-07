@@ -1,4 +1,5 @@
 use crate::database::DatabaseManager;
+use crate::utils::pnpm_workspace::{prepare_shell_command, warn_if_broken_pnpm_workspace};
 use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::pipelines::repositories::{ExecutionRepository, PipelineRepository};
 use crate::domains::projects::pipelines::utils::dependency_resolver::resolve_execution_order;
@@ -1031,44 +1032,6 @@ fn normalize_node_script_command(
     }
 
     normalize_package_manager_command(trimmed, detected_pm)
-}
-
-fn warn_if_broken_pnpm_workspace(project_path: &str) -> Option<String> {
-    if !has_broken_pnpm_workspace(project_path) {
-        return None;
-    }
-
-    Some(
-        "warning: pnpm-workspace.yaml is missing a packages field — using --ignore-workspace for this run".to_string(),
-    )
-}
-
-fn has_broken_pnpm_workspace(project_path: &str) -> bool {
-    let workspace_file = Path::new(project_path).join("pnpm-workspace.yaml");
-    if !workspace_file.exists() {
-        return false;
-    }
-
-    let contents = match std::fs::read_to_string(workspace_file) {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-
-    !contents
-        .lines()
-        .any(|line| line.trim_start().starts_with("packages:"))
-}
-
-fn prepare_shell_command(command: &str, working_directory: &str) -> String {
-    let trimmed = command.trim();
-    if !trimmed.starts_with("pnpm") {
-        return trimmed.to_string();
-    }
-    if trimmed.contains("--ignore-workspace") || !has_broken_pnpm_workspace(working_directory) {
-        return trimmed.to_string();
-    }
-
-    trimmed.replacen("pnpm", "pnpm --ignore-workspace", 1)
 }
 
 fn resolve_package_manager(project: &ProjectResponse) -> String {

@@ -8,6 +8,8 @@ pub struct Conversation {
     pub id: String,
     pub title: String,
     pub provider: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,6 +32,7 @@ impl From<ConversationModel> for Conversation {
             id: model.id,
             title: model.title,
             provider: model.provider,
+            model: model.model,
             created_at: model.created_at,
             updated_at: model.updated_at,
             message_count: None,
@@ -51,12 +54,13 @@ impl From<ConversationMessageModel> for ConversationMessage {
 }
 
 impl Conversation {
-    pub fn new(title: String, provider: String) -> Self {
+    pub fn new(title: String, provider: String, model: Option<String>) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
             id: Uuid::new_v4().to_string(),
             title,
             provider,
+            model,
             created_at: now.clone(),
             updated_at: now,
             message_count: None,

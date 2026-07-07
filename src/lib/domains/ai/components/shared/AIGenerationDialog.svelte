@@ -5,6 +5,7 @@
   import { Label } from "$lib/components/ui/label";
   import { toastActions } from "$lib/utils/toast";
   import { goto } from "$app/navigation";
+  import { AI_PROVIDER_SETTINGS_PATH } from "$lib/config/ai-nav";
   import Icon from "@iconify/svelte";
 
   export interface AIErrorInfo {
@@ -41,7 +42,7 @@
     ) => Promise<TOutput>;
     /** Function to serialize result for display in regenerate dialog */
     serializeResult?: (result: TOutput) => string;
-    /** Optional provider type to use (defaults to Ollama) */
+    /** Optional provider type to use (defaults to AgentPlatform) */
     providerType?: string;
     /** Optional info box content */
     infoContent?: string | { title: string; items: string[] };
@@ -97,10 +98,10 @@
     ) {
       return {
         message:
-          "AI provider is not configured. Please set up an AI provider (Ollama or Gemini) in Settings.",
+          "AI provider is not configured. Please set up Agent Platform in Settings → AI Providers.",
         type: "configuration",
         actionable: true,
-        settingsPath: "/ai/providers",
+        settingsPath: AI_PROVIDER_SETTINGS_PATH,
       };
     }
 
@@ -130,10 +131,10 @@
       const modelName = modelMatch ? modelMatch[1] : "the specified model";
 
       return {
-        message: `Model "${modelName}" is not installed in Ollama. Please install it using: ollama pull ${modelName}`,
+        message: `Model "${modelName}" is not available on agent-platform. Check the model alias in Settings → AI Providers.`,
         type: "model_not_found",
         actionable: true,
-        settingsPath: "/ai/providers",
+        settingsPath: AI_PROVIDER_SETTINGS_PATH,
       };
     }
 
@@ -148,7 +149,7 @@
           "AI provider is not available. Please check that your AI service is running and properly configured.",
         type: "provider_unavailable",
         actionable: true,
-        settingsPath: "/ai/providers",
+        settingsPath: AI_PROVIDER_SETTINGS_PATH,
       };
     }
 
@@ -307,7 +308,7 @@
   }
 
   function handleOpenSettings() {
-    goto("/ai/providers");
+    goto(AI_PROVIDER_SETTINGS_PATH);
     onOpenChange(false);
   }
 
@@ -433,8 +434,7 @@
                 AI Provider Not Configured
               </p>
               <p class="text-amber-800 dark:text-amber-200">
-                To use AI features, you need to configure an AI provider. You
-                can use Ollama (local) or Gemini.
+                To use AI features, configure Agent Platform under Settings → AI Providers.
               </p>
               <Button
                 variant="outline"

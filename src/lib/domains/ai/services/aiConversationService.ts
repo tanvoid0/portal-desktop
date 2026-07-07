@@ -12,8 +12,13 @@ export class AIConversationService {
   async createConversation(
     title: string,
     provider: ProviderType,
+    model?: string | null,
   ): Promise<Conversation> {
-    return invoke<Conversation>("ai_create_conversation", { title, provider });
+    return invoke<Conversation>("ai_create_conversation", {
+      title,
+      provider,
+      model: model ?? null,
+    });
   }
 
   /**
@@ -57,6 +62,13 @@ export class AIConversationService {
    */
   async updateConversationTitle(id: string, title: string): Promise<void> {
     return invoke("ai_update_conversation_title", { id, title });
+  }
+
+  async updateConversationModel(
+    id: string,
+    model: string | null,
+  ): Promise<void> {
+    return invoke("ai_update_conversation_model", { id, model });
   }
 }
 

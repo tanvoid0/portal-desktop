@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import { Card } from "$lib/components/ui/card";
   import { Bot, User } from "@lucide/svelte";
   import { marked } from "marked";
@@ -7,9 +8,10 @@
   interface Props {
     message: ChatMessageType;
     showLoader?: boolean;
+    children?: Snippet;
   }
 
-  let { message, showLoader = false }: Props = $props();
+  let { message, showLoader = false, children }: Props = $props();
 
   // Configure marked options
   marked.setOptions({
@@ -31,7 +33,7 @@
   <Card
     class="max-w-[85%] px-4 py-2 {message.role === 'user'
       ? 'bg-primary text-primary-foreground'
-      : 'bg-muted'}"
+      : 'bg-muted'} {!(message.content || showLoader) ? 'hidden' : ''}"
   >
     <div class="flex items-start gap-2">
       {#if message.role === "assistant"}
@@ -52,7 +54,7 @@
             style="animation-delay: 0.4s"
           ></span>
         </div>
-      {:else}
+      {:else if message.content}
         <div
           class="prose prose-sm dark:prose-invert max-w-none flex-1 text-sm {message.role ===
           'user'
@@ -67,6 +69,11 @@
       {/if}
     </div>
   </Card>
+  {#if children}
+    <div class="mt-2 w-full max-w-[85%] space-y-2">
+      {@render children()}
+    </div>
+  {/if}
   {#if message.timestamp}
     <span class="mt-1 px-1 text-xs text-muted-foreground">
       {new Date(message.timestamp).toLocaleTimeString()}

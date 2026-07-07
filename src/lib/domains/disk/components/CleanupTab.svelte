@@ -7,7 +7,6 @@
     CachedScan,
     ItemVerdict,
     Location,
-    Proposal,
     QuarantineProgress,
     QuarantineResult,
     ScanProgress,
@@ -24,12 +23,26 @@
     fmtDuration,
     fmtAgo,
     leafIds,
-    loadAiConfig,
     RISK_BADGE,
     VERDICT_BADGE,
     verdictMap,
     type TreeNode,
   } from "../utils";
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Checkbox } from "$lib/components/ui/checkbox";
+  import { Progress } from "$lib/components/ui/progress";
+  import { Alert, AlertDescription } from "$lib/components/ui/alert";
+  import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+  } from "$lib/components/ui/table";
 
   let { pending }: { pending: { tab: string; path?: string; seq: number } | null } = $props();
 
@@ -47,17 +60,6 @@
   let verifyProgress = $state<VerifyProgress | null>(null);
   let verification = $state<VerificationResult | null>(null);
   let verifyErr = $state("");
-
-  const btnPrimary =
-    "inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-white text-black text-sm font-medium transition-colors hover:bg-neutral-200 disabled:opacity-40 disabled:pointer-events-none";
-  const btnSecondary =
-    "inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-neutral-900 text-neutral-200 text-sm font-medium border border-neutral-800 transition-colors hover:bg-neutral-800 hover:border-neutral-700 disabled:opacity-40 disabled:pointer-events-none";
-  const btnDanger =
-    "inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-red-600 text-white text-sm font-medium transition-colors hover:bg-red-500 disabled:opacity-40 disabled:pointer-events-none";
-  const btnGhostSm =
-    "inline-flex items-center justify-center h-7 px-2.5 rounded-md text-xs font-medium text-neutral-300 border border-neutral-800 bg-neutral-950 transition-colors hover:bg-neutral-900 hover:text-white disabled:opacity-40 disabled:pointer-events-none";
-  const inputCls =
-    "h-9 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-sm text-neutral-100 placeholder:text-neutral-600 transition-colors focus:outline-none focus:border-neutral-600";
 
   onMount(() => {
     invoke<Location[]>("list_locations").then((l) => (locations = l)).catch(() => (locations = []));
@@ -96,7 +98,6 @@
   const tree = $derived(summary ? buildTree(summary.proposals, summary.root) : []);
   const rows = $derived(flattenTree(tree, expanded));
 
-  // Expand everything whenever a fresh tree arrives.
   let lastTreeRef: TreeNode[] | null = null;
   $effect(() => {
     if (tree !== lastTreeRef) {
@@ -105,7 +106,6 @@
     }
   });
 
-  // Restore card: surface any cached scan for the chosen root.
   $effect(() => {
     const dir = root;
     if (!dir) {
@@ -121,7 +121,6 @@
     };
   });
 
-  // Deep-link auto-scan from the dashboard.
   let jumpSeen = 0;
   $effect(() => {
     if (pending && pending.tab === "cleanup" && pending.path && pending.seq !== jumpSeen) {
@@ -230,7 +229,6 @@
       verification = await invoke<VerificationResult>("verify_proposals", {
         root: summary.root,
         proposals: toVerify,
-        config: loadAiConfig(),
       });
     } catch (e) {
       const msg = String(e);
@@ -303,28 +301,23 @@
 </script>
 
 <div class="mb-4 flex items-center gap-2">
-  <button onclick={pickFolder} class={btnSecondary}>Choose folder</button>
-  <input bind:value={root} placeholder="C:\Users\you\Downloads" class="flex-1 {inputCls}" />
-  <button onclick={() => scan()} disabled={busy || !root} class={btnPrimary}>{busy ? "Working…" : "Scan"}</button>
+  <Button variant="outline" onclick={pickFolder}>Choose folder</Button>
+  <Input bind:value={root} placeholder="C:\Users\you\Downloads" class="flex-1" />
+  <Button onclick={() => scan()} disabled={busy || !root}>{busy ? "Working…" : "Scan"}</Button>
   {#if busy}
-    <button onclick={cancelScan} class={btnDanger}>Stop</button>
+    <Button variant="destructive" onclick={cancelScan}>Stop</Button>
   {/if}
 </div>
 
 {#if !summary && locations.length > 0}
   <div class="mb-6">
-    <div class="mb-2 text-xs uppercase tracking-wide text-neutral-600">Suggested — drives &amp; common folders</div>
+    <div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Suggested — drives &amp; common folders</div>
     <div class="flex flex-wrap gap-2">
       {#each locations as loc (loc.path)}
-        <button
-          onclick={() => scan(loc.path)}
-          disabled={busy}
-          title={loc.path}
-          class="inline-flex h-9 items-center gap-2 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-neutral-200 transition-colors hover:border-neutral-700 hover:bg-neutral-900 disabled:pointer-events-none disabled:opacity-40"
-        >
-          <span class="text-neutral-500">{loc.kind === "drive" ? "▮" : "▸"}</span>
+        <Button variant="outline" onclick={() => scan(loc.path)} disabled={busy} title={loc.path}>
+          <span class="text-muted-foreground">{loc.kind === "drive" ? "▮" : "▸"}</span>
           {loc.label}
-        </button>
+        </Button>
       {/each}
     </div>
   </div>
@@ -332,251 +325,272 @@
 
 {#if cached && !summary && !busy}
   {@const partial = cached.status === "partial"}
-  <div class="mb-4 overflow-hidden rounded-xl border bg-neutral-950/60 {partial ? 'border-amber-500/30' : 'border-neutral-800'}">
-    <div class="flex items-start gap-3 px-4 py-3.5">
-      <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm {partial ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}">
+  <Card class="mb-4 gap-0 {partial ? 'border-status-warning/30' : ''}">
+    <CardContent class="flex items-start gap-3 px-4 py-3.5">
+      <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm {partial ? 'bg-status-warning-bg text-status-warning' : 'bg-status-success-bg text-status-success'}">
         {partial ? "◴" : "↻"}
       </div>
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-neutral-100">{partial ? "Interrupted scan can be restored" : "Saved scan available"}</span>
-          <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium {partial ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'}">
+          <span class="text-sm font-medium text-foreground">{partial ? "Interrupted scan can be restored" : "Saved scan available"}</span>
+          <Badge
+            variant="outline"
+            class={partial
+              ? "bg-status-warning-bg text-status-warning border-status-warning/30"
+              : "bg-status-success-bg text-status-success border-status-success/30"}
+          >
             {partial ? `stopped at ${restorePct}%` : "complete"}
-          </span>
+          </Badge>
         </div>
-        <div class="mt-1 text-xs text-neutral-500">
+        <div class="mt-1 text-xs text-muted-foreground">
           {fmtAgo(cached.ts)} · {fmtDate(cached.ts)} · {cached.scannedFiles.toLocaleString()}{partial && cached.totalFiles > 0 ? ` / ${cached.totalFiles.toLocaleString()}` : ""} files · {fmtBytes(restoreReclaimable)} reclaimable
         </div>
         {#if partial}
-          <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-900">
-            <div class="h-full rounded-full bg-amber-500" style="width: {restorePct}%"></div>
-          </div>
+          <Progress value={restorePct} class="mt-2 h-1.5 [&>[data-slot=progress-indicator]]:bg-status-warning" />
         {/if}
         <div class="mt-3 flex flex-wrap items-center gap-2">
           {#if partial}
-            <button onclick={() => scan()} class="{btnPrimary} h-8 text-xs">Resume — full scan</button>
-            <button onclick={loadCached} class={btnGhostSm}>Load partial results</button>
+            <Button size="sm" onclick={() => scan()}>Resume — full scan</Button>
+            <Button variant="outline" size="sm" onclick={loadCached}>Load partial results</Button>
           {:else}
-            <button onclick={loadCached} class="{btnPrimary} h-8 text-xs">Load saved scan</button>
-            <button onclick={() => scan()} class={btnGhostSm}>Rescan fresh</button>
+            <Button size="sm" onclick={loadCached}>Load saved scan</Button>
+            <Button variant="outline" size="sm" onclick={() => scan()}>Rescan fresh</Button>
           {/if}
-          <button onclick={discardCached} class="{btnGhostSm} hover:!border-red-600 hover:!bg-red-600 hover:!text-white">Discard</button>
+          <Button variant="outline" size="sm" onclick={discardCached} class="text-destructive hover:text-destructive">Discard</Button>
         </div>
       </div>
-    </div>
-  </div>
+    </CardContent>
+  </Card>
 {/if}
 
 {#if busy && progress}
   {@const counting = progress.phase === "counting"}
-  <div class="mb-4 rounded-xl border border-neutral-800 bg-neutral-950/60 px-4 py-3.5">
-    <div class="mb-2 flex items-center justify-between text-sm">
-      <span class="text-neutral-300">
-        {counting ? "Counting files…" : "Scanning"}
-        {#if !counting}
-          <span class="text-neutral-500"> · {progress.scannedFiles.toLocaleString()} / {progress.totalFiles.toLocaleString()} · {fmtBytes(progress.totalBytes)}</span>
-        {:else}
-          <span class="text-neutral-500"> · {progress.scannedFiles.toLocaleString()} found</span>
-        {/if}
-      </span>
-      <span class="tabular-nums text-neutral-400">
-        {counting ? fmtDuration(progress.elapsedMs) : `${scanPct.toFixed(0)}% · ETA ${fmtDuration(progress.etaMs)}`}
-      </span>
-    </div>
-    <div class="h-2 w-full overflow-hidden rounded-full bg-neutral-900">
+  <Card class="mb-4 gap-0 py-4">
+    <CardContent class="px-4">
+      <div class="mb-2 flex items-center justify-between text-sm">
+        <span class="text-foreground">
+          {counting ? "Counting files…" : "Scanning"}
+          {#if !counting}
+            <span class="text-muted-foreground"> · {progress.scannedFiles.toLocaleString()} / {progress.totalFiles.toLocaleString()} · {fmtBytes(progress.totalBytes)}</span>
+          {:else}
+            <span class="text-muted-foreground"> · {progress.scannedFiles.toLocaleString()} found</span>
+          {/if}
+        </span>
+        <span class="tabular-nums text-muted-foreground">
+          {counting ? fmtDuration(progress.elapsedMs) : `${scanPct.toFixed(0)}% · ETA ${fmtDuration(progress.etaMs)}`}
+        </span>
+      </div>
       {#if counting}
-        <div class="h-full w-1/3 animate-pulse rounded-full bg-white/60"></div>
+        <Progress value={33} class="h-2 animate-pulse" />
       {:else}
-        <div class="h-full rounded-full bg-white transition-[width] duration-150 ease-linear" style="width: {scanPct}%"></div>
+        <Progress value={scanPct} class="h-2" />
       {/if}
-    </div>
-    <div class="mt-1.5 truncate font-mono text-xs text-neutral-600" title={progress.currentPath}>{progress.currentPath}</div>
-  </div>
+      <div class="mt-1.5 truncate font-mono text-xs text-muted-foreground" title={progress.currentPath}>{progress.currentPath}</div>
+    </CardContent>
+  </Card>
 {/if}
 
 {#if qProgress}
   {@const qpct = qProgress.total > 0 ? Math.min(100, (qProgress.done / qProgress.total) * 100) : 0}
-  <div class="mb-4 rounded-xl border border-neutral-800 bg-neutral-950/60 px-4 py-3.5">
-    <div class="mb-2 flex items-center justify-between text-sm">
-      <span class="text-neutral-300">Moving to Recycle Bin<span class="text-neutral-500"> · {qProgress.done} / {qProgress.total}</span></span>
-      <span class="tabular-nums text-neutral-400">{qpct.toFixed(0)}%</span>
-    </div>
-    <div class="h-2 w-full overflow-hidden rounded-full bg-neutral-900">
-      <div class="h-full rounded-full bg-white transition-[width] duration-150 ease-linear" style="width: {qpct}%"></div>
-    </div>
-    <div class="mt-1.5 truncate font-mono text-xs text-neutral-600" title={qProgress.currentPath}>{qProgress.currentPath}</div>
-  </div>
+  <Card class="mb-4 gap-0 py-4">
+    <CardContent class="px-4">
+      <div class="mb-2 flex items-center justify-between text-sm">
+        <span class="text-foreground">Moving to Recycle Bin<span class="text-muted-foreground"> · {qProgress.done} / {qProgress.total}</span></span>
+        <span class="tabular-nums text-muted-foreground">{qpct.toFixed(0)}%</span>
+      </div>
+      <Progress value={qpct} class="h-2" />
+      <div class="mt-1.5 truncate font-mono text-xs text-muted-foreground" title={qProgress.currentPath}>{qProgress.currentPath}</div>
+    </CardContent>
+  </Card>
 {/if}
 
 {#if status && !(busy && progress) && !qProgress}
-  <div class="mb-4 text-sm text-neutral-500">{status}</div>
+  <div class="mb-4 text-sm text-muted-foreground">{status}</div>
 {/if}
 
 {#if summary && stats}
   <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-    {#each [["Reclaimable", stats.total, `${stats.count} proposal${stats.count === 1 ? "" : "s"}`, "text-white"], ["Safe", stats.byRisk.Safe.b, `${stats.byRisk.Safe.n} items`, "text-emerald-400"], ["Review", stats.byRisk.Review.b, `${stats.byRisk.Review.n} items`, "text-amber-400"], ["Danger", stats.byRisk.Danger.b, `${stats.byRisk.Danger.n} items`, "text-red-400"]] as [label, bytes, sub, accent]}
-      <div class="rounded-xl border border-neutral-800 bg-neutral-950/60 px-4 py-3.5">
-        <div class="mb-1.5 text-xs uppercase tracking-wide text-neutral-500">{label}</div>
-        <div class="text-2xl font-semibold tabular-nums tracking-tight {accent}">{fmtBytes(bytes as number)}</div>
-        <div class="mt-1 text-xs text-neutral-600">{sub}</div>
-      </div>
+    {#each [["Reclaimable", stats.total, `${stats.count} proposal${stats.count === 1 ? "" : "s"}`, "text-foreground"], ["Safe", stats.byRisk.Safe.b, `${stats.byRisk.Safe.n} items`, "text-status-success"], ["Review", stats.byRisk.Review.b, `${stats.byRisk.Review.n} items`, "text-status-warning"], ["Danger", stats.byRisk.Danger.b, `${stats.byRisk.Danger.n} items`, "text-status-error"]] as [label, bytes, sub, accent]}
+      <Card class="gap-0 py-4">
+        <CardContent class="px-4">
+          <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div class="text-2xl font-semibold tabular-nums tracking-tight {accent}">{fmtBytes(bytes as number)}</div>
+          <div class="mt-1 text-xs text-muted-foreground">{sub}</div>
+        </CardContent>
+      </Card>
     {/each}
   </div>
 
   {#if stats.total > 0}
-    <div class="mb-6 flex h-2 w-full overflow-hidden rounded-full bg-neutral-900">
-      {#each [["Safe", stats.byRisk.Safe.b, "bg-emerald-500"], ["Review", stats.byRisk.Review.b, "bg-amber-500"], ["Danger", stats.byRisk.Danger.b, "bg-red-500"]] as [risk, bytes, color]}
+    <div class="mb-6 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+      {#each [["Safe", stats.byRisk.Safe.b, "bg-status-success"], ["Review", stats.byRisk.Review.b, "bg-status-warning"], ["Danger", stats.byRisk.Danger.b, "bg-status-error"]] as [risk, bytes, color]}
         {#if (bytes as number) > 0}
-          <div class={color as string} style="width: {((bytes as number) / stats.total) * 100}%" title="{risk}"></div>
+          <div class={color as string} style="width: {((bytes as number) / stats.total) * 100}%" title={String(risk)}></div>
         {/if}
       {/each}
     </div>
   {/if}
 
   <div class="mb-3 flex items-center gap-2">
-    <button onclick={selectSafe} class={btnGhostSm}>Select all Safe</button>
-    <button onclick={() => (selected = new Set())} class={btnGhostSm}>Clear</button>
-    <button onclick={() => (expanded = new Set(folderPaths(tree)))} class={btnGhostSm}>Expand all</button>
-    <button onclick={() => (expanded = new Set())} class={btnGhostSm}>Collapse all</button>
-    <button onclick={verifyWithAi} disabled={verifying} class={btnGhostSm}>
+    <Button variant="outline" size="sm" onclick={selectSafe}>Select all Safe</Button>
+    <Button variant="outline" size="sm" onclick={() => (selected = new Set())}>Clear</Button>
+    <Button variant="outline" size="sm" onclick={() => (expanded = new Set(folderPaths(tree)))}>Expand all</Button>
+    <Button variant="outline" size="sm" onclick={() => (expanded = new Set())}>Collapse all</Button>
+    <Button variant="outline" size="sm" onclick={verifyWithAi} disabled={verifying}>
       {verifying ? "Verifying…" : selected.size > 0 ? `Verify ${selected.size} selected with AI` : "Verify with AI"}
-    </button>
+    </Button>
     {#if verifying}
-      <button onclick={cancelVerify} class={btnGhostSm}>Stop</button>
+      <Button variant="outline" size="sm" onclick={cancelVerify}>Stop</Button>
     {/if}
-    <div class="ml-auto text-sm text-neutral-400">
-      {selected.size} selected · <span class="font-semibold text-white">{fmtBytes(selectedBytes)}</span>
+    <div class="ml-auto text-sm text-muted-foreground">
+      {selected.size} selected · <span class="font-semibold text-foreground">{fmtBytes(selectedBytes)}</span>
     </div>
-    <button onclick={quarantine} disabled={busy || selected.size === 0} class="h-7 px-3 {btnDanger} text-xs">Move to Recycle Bin</button>
+    <Button variant="destructive" size="sm" onclick={quarantine} disabled={busy || selected.size === 0}>Move to Recycle Bin</Button>
   </div>
 
   {#if verifying && verifyProgress}
-    <div class="mb-4 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/60">
-      <div class="flex items-center gap-2 border-b border-neutral-900 bg-neutral-900/40 px-4 py-2.5">
-        <span class="text-sm font-medium text-neutral-200">AI verification</span>
-        <span class="text-xs text-neutral-500">process #{verifyProgress.processId} · {verifyProgress.status.replace(/_/g, " ")}</span>
-        <button onclick={cancelVerify} class="ml-auto {btnGhostSm}">Stop</button>
-      </div>
-      <div class="px-4 py-3">
+    <Card class="mb-4 gap-0 overflow-hidden py-0">
+      <CardHeader class="border-b bg-muted/40 px-4 py-2.5 [.border-b]:pb-2.5">
+        <div class="flex items-center gap-2">
+          <CardTitle class="text-sm font-medium">AI verification</CardTitle>
+          <span class="text-xs text-muted-foreground">process #{verifyProgress.processId} · {verifyProgress.status.replace(/_/g, " ")}</span>
+          <Button variant="outline" size="sm" onclick={cancelVerify} class="ml-auto">Stop</Button>
+        </div>
+      </CardHeader>
+      <CardContent class="px-4 py-3">
         {#if verifyProgress.tasks.length === 0}
-          <div class="flex items-center gap-2 text-sm text-neutral-500"><span class="h-1.5 w-1.5 animate-pulse rounded-full bg-white"></span>Planning the review…</div>
+          <div class="flex items-center gap-2 text-sm text-muted-foreground"><span class="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"></span>Planning the review…</div>
         {:else}
           <ul class="space-y-1.5">
             {#each verifyProgress.tasks as t, i (i)}
-              <li class="flex items-center gap-2 text-sm text-neutral-300">
-                <span class="h-1.5 w-1.5 rounded-full {t.status === 'completed' ? 'bg-emerald-400' : t.status === 'failed' ? 'bg-red-400' : t.status.includes('progress') || t.status === 'running' ? 'bg-white animate-pulse' : 'bg-neutral-600'}"></span>
+              <li class="flex items-center gap-2 text-sm text-foreground">
+                <span class="h-1.5 w-1.5 rounded-full {t.status === 'completed' ? 'bg-status-success' : t.status === 'failed' ? 'bg-status-error' : t.status.includes('progress') || t.status === 'running' ? 'bg-primary animate-pulse' : 'bg-muted-foreground'}"></span>
                 <span>{t.role}</span>
-                <span class="text-xs text-neutral-600">{t.status.replace(/_/g, " ")}</span>
+                <span class="text-xs text-muted-foreground">{t.status.replace(/_/g, " ")}</span>
               </li>
             {/each}
           </ul>
         {/if}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   {/if}
 
   {#if verifyErr || verification}
-    <div class="mb-4 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/60">
-      <div class="flex items-center gap-2 border-b border-neutral-900 bg-neutral-900/40 px-4 py-2.5">
-        <span class="text-sm font-medium text-neutral-200">AI verification</span>
-        {#if verification}
-          <span class="text-xs text-neutral-500">process #{verification.processId} · {verification.status}</span>
-        {/if}
-        {#if verification?.gated}
-          <span class="inline-flex items-center rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">paused at a review gate</span>
-        {/if}
-        <button onclick={() => { verification = null; verifyErr = ""; }} class="ml-auto {btnGhostSm}">Dismiss</button>
-      </div>
-      <div class="px-4 py-3">
-        <p class="mb-3 text-xs text-neutral-500">Advisory only — the agents review deletion candidates but never delete or change risk. You still tick every item.</p>
+    <Card class="mb-4 gap-0 overflow-hidden py-0">
+      <CardHeader class="border-b bg-muted/40 px-4 py-2.5 [.border-b]:pb-2.5">
+        <div class="flex items-center gap-2">
+          <CardTitle class="text-sm font-medium">AI verification</CardTitle>
+          {#if verification}
+            <span class="text-xs text-muted-foreground">process #{verification.processId} · {verification.status}</span>
+          {/if}
+          {#if verification?.gated}
+            <Badge variant="outline" class="bg-status-warning-bg text-status-warning border-status-warning/30">paused at a review gate</Badge>
+          {/if}
+          <Button variant="outline" size="sm" onclick={() => { verification = null; verifyErr = ""; }} class="ml-auto">Dismiss</Button>
+        </div>
+      </CardHeader>
+      <CardContent class="px-4 py-3">
+        <p class="mb-3 text-xs text-muted-foreground">Advisory only — the agents review deletion candidates but never delete or change risk. You still tick every item.</p>
         {#if verification && verification.verdicts.length > 0}
           <div class="mb-3 flex flex-wrap items-center gap-3">
-            <span class="text-sm text-neutral-300">
-              <span class="text-emerald-400">{verifyCounts.safe} safe</span> · <span class="text-amber-400">{verifyCounts.review} review</span> · <span class="text-red-400">{verifyCounts.dangerous} dangerous</span>
+            <span class="text-sm text-foreground">
+              <span class="text-status-success">{verifyCounts.safe} safe</span> · <span class="text-status-warning">{verifyCounts.review} review</span> · <span class="text-status-error">{verifyCounts.dangerous} dangerous</span>
             </span>
             {#if verifyCounts.review + verifyCounts.dangerous > 0}
-              <button onclick={deselectFlagged} class={btnGhostSm}>Deselect {verifyCounts.review + verifyCounts.dangerous} flagged</button>
+              <Button variant="outline" size="sm" onclick={deselectFlagged}>Deselect {verifyCounts.review + verifyCounts.dangerous} flagged</Button>
             {/if}
           </div>
         {/if}
         {#if verifyErr}
-          <div class="whitespace-pre-wrap text-sm text-red-400">{verifyErr}</div>
+          <Alert variant="destructive" class="mb-3">
+            <AlertDescription class="whitespace-pre-wrap">{verifyErr}</AlertDescription>
+          </Alert>
         {/if}
         {#if verification}
           {#if verification.notes.length === 0}
-            <div class="text-sm text-neutral-500">No agent notes returned{verification.gated ? " before the gate." : "."}</div>
+            <div class="text-sm text-muted-foreground">No agent notes returned{verification.gated ? " before the gate." : "."}</div>
           {:else}
             <div class="space-y-3">
               {#each verification.notes as n (n.taskId)}
-                <div class="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3">
-                  <div class="mb-1.5 flex items-center gap-2">
-                    <span class="text-xs font-medium text-neutral-300">{n.role}</span>
-                    <span class="text-xs text-neutral-600">#{n.taskId} · {n.status}</span>
-                  </div>
-                  <div class="whitespace-pre-wrap break-words text-sm text-neutral-400">{n.output}</div>
-                </div>
+                <Card class="gap-0 py-3">
+                  <CardContent class="px-3">
+                    <div class="mb-1.5 flex items-center gap-2">
+                      <span class="text-xs font-medium text-foreground">{n.role}</span>
+                      <span class="text-xs text-muted-foreground">#{n.taskId} · {n.status}</span>
+                    </div>
+                    <div class="whitespace-pre-wrap break-words text-sm text-muted-foreground">{n.output}</div>
+                  </CardContent>
+                </Card>
               {/each}
             </div>
           {/if}
         {/if}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   {/if}
 
-  <div class="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/60">
-    <table class="w-full text-sm">
-      <thead class="bg-neutral-900/50 text-left text-xs uppercase tracking-wide text-neutral-500">
-        <tr>
-          <th class="w-8 px-3 py-2.5"></th>
-          <th class="px-3 py-2.5 font-medium">Path</th>
-          <th class="px-3 py-2.5 font-medium">Kind</th>
-          <th class="px-3 py-2.5 font-medium">Reason</th>
-          <th class="px-3 py-2.5 text-right font-medium">Size</th>
-          <th class="px-3 py-2.5 font-medium">Risk</th>
-          {#if verdictByPath.size > 0}<th class="px-3 py-2.5 font-medium">AI</th>{/if}
-        </tr>
-      </thead>
-      <tbody>
+  <Card class="gap-0 overflow-hidden py-0">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead class="w-8"></TableHead>
+          <TableHead>Path</TableHead>
+          <TableHead>Kind</TableHead>
+          <TableHead>Reason</TableHead>
+          <TableHead class="text-right">Size</TableHead>
+          <TableHead>Risk</TableHead>
+          {#if verdictByPath.size > 0}<TableHead>AI</TableHead>{/if}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {#each rows as { node, depth, isFolder } (node.fullPath + (node.proposal?.id ?? ""))}
           {@const sel = rowSel(node)}
           {@const p = node.proposal}
-          <tr class="border-t border-neutral-900 transition-colors hover:bg-neutral-900/40">
-            <td class="px-3 py-2 align-top">
-              <input type="checkbox" class="accent-white" checked={sel.all} indeterminate={sel.some} onchange={() => toggleSel(sel.ids, !sel.all)} />
-            </td>
-            <td class="break-all px-3 py-2 font-mono text-xs text-neutral-300">
+          <TableRow>
+            <TableCell class="align-top">
+              <Checkbox
+                checked={sel.all}
+                indeterminate={sel.some}
+                onCheckedChange={() => toggleSel(sel.ids, !sel.all)}
+              />
+            </TableCell>
+            <TableCell class="break-all align-top font-mono text-xs">
               <div class="flex items-start" style="padding-left: {depth * 16}px">
                 {#if isFolder}
-                  <button onclick={() => toggleExp(node.fullPath)} class="mr-1.5 mt-px w-4 shrink-0 text-neutral-500 hover:text-white">{expanded.has(node.fullPath) ? "▾" : "▸"}</button>
+                  <button onclick={() => toggleExp(node.fullPath)} class="mr-1.5 mt-px w-4 shrink-0 text-muted-foreground hover:text-foreground">{expanded.has(node.fullPath) ? "▾" : "▸"}</button>
                 {:else}
-                  <span class="mr-1.5 w-4 shrink-0 text-neutral-700">·</span>
+                  <span class="mr-1.5 w-4 shrink-0 text-muted-foreground/50">·</span>
                 {/if}
-                <span class={isFolder ? "text-neutral-200" : ""}>
+                <span class={isFolder ? "text-foreground" : ""}>
                   {node.name}
-                  {#if isFolder}<span class="ml-2 text-neutral-600">{node.count} item{node.count === 1 ? "" : "s"}</span>{/if}
+                  {#if isFolder}<span class="ml-2 text-muted-foreground">{node.count} item{node.count === 1 ? "" : "s"}</span>{/if}
                 </span>
               </div>
-            </td>
-            <td class="px-3 py-2 align-top text-neutral-400">{p ? p.kind : ""}</td>
-            <td class="px-3 py-2 align-top text-neutral-500">{p ? p.reason : ""}</td>
-            <td class="whitespace-nowrap px-3 py-2 text-right align-top text-neutral-300">{fmtBytes(node.sizeBytes)}</td>
-            <td class="px-3 py-2 align-top">
-              {#if p}<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium {RISK_BADGE[p.risk]}">{p.risk}</span>{/if}
-            </td>
+            </TableCell>
+            <TableCell class="align-top text-muted-foreground">{p ? p.kind : ""}</TableCell>
+            <TableCell class="align-top text-muted-foreground">{p ? p.reason : ""}</TableCell>
+            <TableCell class="whitespace-nowrap text-right align-top">{fmtBytes(node.sizeBytes)}</TableCell>
+            <TableCell class="align-top">
+              {#if p}<Badge variant="outline" class={RISK_BADGE[p.risk]}>{p.risk}</Badge>{/if}
+            </TableCell>
             {#if verdictByPath.size > 0}
-              <td class="px-3 py-2 align-top">
+              <TableCell class="align-top">
                 {#if p && verdictByPath.has(p.path)}
                   {@const v = verdictByPath.get(p.path)!}
-                  <span title={v.reason} class="inline-flex cursor-help items-center rounded-full border px-2 py-0.5 text-xs font-medium {VERDICT_BADGE[v.verdict]}">{v.verdict}</span>
+                  <Badge variant="outline" class={VERDICT_BADGE[v.verdict]} title={v.reason}>{v.verdict}</Badge>
                 {/if}
-              </td>
+              </TableCell>
             {/if}
-          </tr>
+          </TableRow>
         {/each}
         {#if summary.proposals.length === 0}
-          <tr><td colspan={verdictByPath.size > 0 ? 7 : 6} class="px-3 py-10 text-center text-neutral-600">No cleanup proposals. Disk looks tidy.</td></tr>
+          <TableRow>
+            <TableCell colspan={verdictByPath.size > 0 ? 7 : 6} class="py-10 text-center text-muted-foreground">
+              No cleanup proposals. Disk looks tidy.
+            </TableCell>
+          </TableRow>
         {/if}
-      </tbody>
-    </table>
-  </div>
+      </TableBody>
+    </Table>
+  </Card>
 {/if}

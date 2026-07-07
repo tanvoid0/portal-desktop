@@ -5,10 +5,12 @@
   import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
   import { Button } from "$lib/components/ui/button";
   import { Progress } from "$lib/components/ui/progress";
-  import { HardDrive, Usb, RefreshCw, Download, Recycle, Boxes, Trash2 } from "@lucide/svelte";
+  import { HardDrive, Usb, RefreshCw, Download, Recycle, Boxes, Trash2, Container } from "@lucide/svelte";
 
-  let { active, go }: { active: boolean; go: (tab: "cleanup" | "projects", path?: string) => void } =
-    $props();
+  let { active, go }: {
+    active: boolean;
+    go: (tab: "cleanup" | "projects" | "devtools", path?: string) => void;
+  } = $props();
 
   const PALETTE = ["#34d399", "#60a5fa", "#f59e0b", "#a78bfa", "#f472b6", "#22d3ee", "#fb7185", "#a3e635"];
 
@@ -148,6 +150,9 @@
   {/if}
   <Button variant="secondary" onclick={() => go("projects", quick.home?.path)}>
     <Boxes class="size-4" /> Find project junk
+  </Button>
+  <Button variant="secondary" onclick={() => go("devtools")}>
+    <Container class="size-4" /> Docker / Podman
   </Button>
   <Button variant="secondary" onclick={() => void invoke("open_recycle_bin").catch(() => {})}>
     <Trash2 class="size-4" /> Open Recycle Bin

@@ -1,19 +1,17 @@
 //! Coding agent domain.
 //!
-//! Architecture (Option B — "portal drives, platform is the brain"):
-//! - The agent loop runs here in Rust. It owns tool execution, the permission
-//!   system, and thread state.
-//! - The agent-platform (`http://127.0.0.1:18410`) is used only as an
-//!   OpenAI-compatible LLM via `/v1/chat/completions` (tool-calling format),
-//!   plus optional delegated capability tools over `/api/v1`.
-//! - Tools execute against the user's native desktop through existing domains
-//!   (filesystem, terminal, ...), so the agent can do far more than the
-//!   platform's sandboxed Python executor.
+//! Agent turns run through agent-platform `POST /api/v1/coder/chat/stream` when
+//! configured (AI → Providers). Workspace tools execute on the desktop host and
+//! results are posted back to the platform (`portal-desktop` client id).
+//! Thread state is mirrored locally for the sidebar; `platform_thread_id` links
+//! the SQLite row to `coder_chat_threads` on the platform.
 
 pub mod commands;
 pub mod diff;
 pub mod entities;
+pub mod git_status;
 pub mod permissions;
+pub mod platform_stream;
 pub mod service;
 pub mod tools;
 pub mod types;

@@ -2,14 +2,22 @@
   import { invoke } from "@tauri-apps/api/core";
   import type { AuditEntry } from "../types";
   import { fmtBytes, fmtDate } from "../utils";
+  import { Card, CardContent } from "$lib/components/ui/card";
+  import { Button } from "$lib/components/ui/button";
+  import { Badge } from "$lib/components/ui/badge";
+  import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+  } from "$lib/components/ui/table";
 
   let { active }: { active: boolean } = $props();
 
   let entries = $state<AuditEntry[]>([]);
   let status = $state("Loading…");
-
-  const btnGhostSm =
-    "inline-flex items-center justify-center h-7 px-2.5 rounded-md text-xs font-medium text-neutral-300 border border-neutral-800 bg-neutral-950 transition-colors hover:bg-neutral-900 hover:text-white disabled:opacity-40 disabled:pointer-events-none";
 
   async function load() {
     status = "Loading…";
@@ -47,53 +55,70 @@
 </script>
 
 <div class="mb-4 grid grid-cols-3 gap-3">
-  <div class="rounded-xl border border-neutral-800 bg-neutral-950/60 px-4 py-3.5">
-    <div class="mb-1.5 text-xs uppercase tracking-wide text-neutral-500">Total reclaimed</div>
-    <div class="text-2xl font-semibold tabular-nums tracking-tight text-emerald-400">{fmtBytes(hstats.reclaimed)}</div>
-  </div>
-  <div class="rounded-xl border border-neutral-800 bg-neutral-950/60 px-4 py-3.5">
-    <div class="mb-1.5 text-xs uppercase tracking-wide text-neutral-500">Moved</div>
-    <div class="text-2xl font-semibold tabular-nums tracking-tight text-white">{hstats.movedN}</div>
-    <div class="mt-1 text-xs text-neutral-600">to Recycle Bin</div>
-  </div>
-  <div class="rounded-xl border border-neutral-800 bg-neutral-950/60 px-4 py-3.5">
-    <div class="mb-1.5 text-xs uppercase tracking-wide text-neutral-500">Failed</div>
-    <div class="text-2xl font-semibold tabular-nums tracking-tight {hstats.failedN ? 'text-red-400' : 'text-white'}">{hstats.failedN}</div>
-  </div>
+  <Card class="gap-0 py-4">
+    <CardContent class="px-4">
+      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Total reclaimed</div>
+      <div class="text-2xl font-semibold tabular-nums tracking-tight text-status-success">{fmtBytes(hstats.reclaimed)}</div>
+    </CardContent>
+  </Card>
+  <Card class="gap-0 py-4">
+    <CardContent class="px-4">
+      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Moved</div>
+      <div class="text-2xl font-semibold tabular-nums tracking-tight text-foreground">{hstats.movedN}</div>
+      <div class="mt-1 text-xs text-muted-foreground">to Recycle Bin</div>
+    </CardContent>
+  </Card>
+  <Card class="gap-0 py-4">
+    <CardContent class="px-4">
+      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Failed</div>
+      <div class="text-2xl font-semibold tabular-nums tracking-tight {hstats.failedN ? 'text-status-error' : 'text-foreground'}">{hstats.failedN}</div>
+    </CardContent>
+  </Card>
 </div>
 
 <div class="mb-4 flex items-center gap-3">
-  <div class="text-sm text-neutral-500">{status}</div>
-  <button onclick={load} class="ml-auto {btnGhostSm}">Refresh</button>
-  <button onclick={openBin} class={btnGhostSm}>Open Recycle Bin to undo</button>
+  <div class="text-sm text-muted-foreground">{status}</div>
+  <Button variant="outline" size="sm" onclick={load} class="ml-auto">Refresh</Button>
+  <Button variant="outline" size="sm" onclick={openBin}>Open Recycle Bin to undo</Button>
 </div>
 
-<div class="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/60">
-  <table class="w-full text-sm">
-    <thead class="bg-neutral-900/50 text-left text-xs uppercase tracking-wide text-neutral-500">
-      <tr>
-        <th class="px-3 py-2.5 font-medium">When</th>
-        <th class="px-3 py-2.5 font-medium">Path</th>
-        <th class="px-3 py-2.5 font-medium">Kind</th>
-        <th class="px-3 py-2.5 text-right font-medium">Size</th>
-        <th class="px-3 py-2.5 font-medium">Status</th>
-      </tr>
-    </thead>
-    <tbody>
+<Card class="gap-0 overflow-hidden py-0">
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead>When</TableHead>
+        <TableHead>Path</TableHead>
+        <TableHead>Kind</TableHead>
+        <TableHead class="text-right">Size</TableHead>
+        <TableHead>Status</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
       {#each entries as e (e.id)}
-        <tr class="border-t border-neutral-900 transition-colors hover:bg-neutral-900/40">
-          <td class="whitespace-nowrap px-3 py-2.5 text-neutral-500">{fmtDate(e.ts)}</td>
-          <td class="break-all px-3 py-2.5 font-mono text-xs text-neutral-300">{e.path}</td>
-          <td class="px-3 py-2.5 text-neutral-400">{e.kind}</td>
-          <td class="whitespace-nowrap px-3 py-2.5 text-right text-neutral-300">{fmtBytes(e.sizeBytes)}</td>
-          <td class="px-3 py-2.5">
-            <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium {e.status === 'moved' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' : 'border-red-500/20 bg-red-500/10 text-red-400'}">{e.status}</span>
-          </td>
-        </tr>
+        <TableRow>
+          <TableCell class="whitespace-nowrap text-muted-foreground">{fmtDate(e.ts)}</TableCell>
+          <TableCell class="break-all font-mono text-xs">{e.path}</TableCell>
+          <TableCell class="text-muted-foreground">{e.kind}</TableCell>
+          <TableCell class="whitespace-nowrap text-right">{fmtBytes(e.sizeBytes)}</TableCell>
+          <TableCell>
+            <Badge
+              variant="outline"
+              class={e.status === "moved"
+                ? "bg-status-success-bg text-status-success border-status-success/30"
+                : "bg-status-error-bg text-status-error border-status-error/30"}
+            >
+              {e.status}
+            </Badge>
+          </TableCell>
+        </TableRow>
       {/each}
       {#if entries.length === 0}
-        <tr><td colspan="5" class="px-3 py-10 text-center text-neutral-600">Nothing here yet. Quarantined items will be logged.</td></tr>
+        <TableRow>
+          <TableCell colspan={5} class="py-10 text-center text-muted-foreground">
+            Nothing here yet. Quarantined items will be logged.
+          </TableCell>
+        </TableRow>
       {/if}
-    </tbody>
-  </table>
-</div>
+    </TableBody>
+  </Table>
+</Card>

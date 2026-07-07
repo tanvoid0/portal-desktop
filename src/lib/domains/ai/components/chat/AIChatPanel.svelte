@@ -29,6 +29,9 @@
     title?: string;
     class?: string;
     conversationId?: string;
+    showSelectors?: boolean;
+    selectedProvider?: ProviderType | null;
+    selectedModel?: string | null;
   }
 
   let {
@@ -40,13 +43,14 @@
     title = "Chat",
     class: className = "",
     conversationId,
+    showSelectors = true,
+    selectedProvider = $bindable<ProviderType | null>(null),
+    selectedModel = $bindable<string | null>(null),
   }: Props = $props();
 
   let messageInput = $state("");
   let messagesContainer: HTMLElement | null = $state(null);
   let scrollViewport: HTMLElement | null = $state(null);
-  let selectedProvider = $state<ProviderType | null>(null);
-  let selectedModel = $state<string | null>(null);
 
   async function handleSend() {
     if (!messageInput.trim() || isLoading) return;
@@ -120,20 +124,22 @@
 </script>
 
 <Card class="flex h-full flex-col {className}">
-  <CardHeader class="pb-3">
-    <div class="flex items-center justify-between">
-      <CardTitle class="flex items-center gap-2 text-lg">
-        <MessageSquare class="h-5 w-5" />
-        {title}
-      </CardTitle>
-      <div class="flex items-center gap-2">
-        <ChatProviderSelector bind:selectedProvider />
-        {#if selectedProvider}
-          <ChatModelSelector bind:selectedProvider bind:selectedModel />
-        {/if}
+  {#if showSelectors}
+    <CardHeader class="pb-3">
+      <div class="flex items-center justify-between">
+        <CardTitle class="flex items-center gap-2 text-lg">
+          <MessageSquare class="h-5 w-5" />
+          {title}
+        </CardTitle>
+        <div class="flex items-center gap-2">
+          <ChatProviderSelector bind:selectedProvider />
+          {#if selectedProvider}
+            <ChatModelSelector bind:selectedProvider bind:selectedModel />
+          {/if}
+        </div>
       </div>
-    </div>
-  </CardHeader>
+    </CardHeader>
+  {/if}
   <CardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
     <ScrollArea class="min-h-0 flex-1" bind:viewportRef={scrollViewport}>
       <div class="space-y-4 px-4 py-4" bind:this={messagesContainer}>

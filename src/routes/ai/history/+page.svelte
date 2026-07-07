@@ -22,14 +22,13 @@
   let selectedProvider = $state<ProviderType | null>(null);
 
   const providerOptions = [
-    { value: "Ollama", label: "Ollama" },
-    { value: "Gemini", label: "Gemini" },
+    { value: "AgentPlatform" as const, label: "Agent Platform" },
   ];
 
   onMount(async () => {
     await loadConversations();
     const defaultProvider = await aiProviderService.getDefaultProvider();
-    selectedProvider = defaultProvider || "Ollama";
+    selectedProvider = defaultProvider || "AgentPlatform";
   });
 
   async function loadConversations() {

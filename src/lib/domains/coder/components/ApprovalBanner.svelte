@@ -2,6 +2,7 @@
   import { Button } from "$lib/components/ui/button";
   import { ShieldQuestion } from "@lucide/svelte";
   import type { PendingApproval } from "../types.js";
+  import { getToolCallDisplay } from "../utils/toolCallDisplay.js";
 
   interface Props {
     pending: PendingApproval;
@@ -22,6 +23,8 @@
   $effect(() => {
     rule = pending.suggested_rule;
   });
+
+  const display = $derived(getToolCallDisplay(pending.tool, pending.arguments));
 </script>
 
 <div class="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
@@ -31,13 +34,10 @@
   </div>
 
   <div class="mb-3 space-y-1 text-sm">
-    <div>
-      <span class="text-muted-foreground">tool</span>
-      <span class="ml-2 font-mono text-xs">{pending.tool}</span>
-    </div>
-    <pre class="overflow-auto rounded bg-background p-2 text-xs"><code
-        >{pending.summary}</code
-      ></pre>
+    <div class="font-medium">{display.label}</div>
+    {#if display.detail}
+      <div class="font-mono text-xs text-muted-foreground">{display.detail}</div>
+    {/if}
   </div>
 
   <div class="mb-3 flex items-center gap-2">

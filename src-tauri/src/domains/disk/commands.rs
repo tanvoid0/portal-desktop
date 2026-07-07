@@ -11,13 +11,17 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::domains::disk::classify::{self, Proposal};
+use crate::domains::disk::dev_cleaners::{
+    self, DevCleaner, DevCleanerCleanItem, DevCleanerCleanResult, DevCleanerScan,
+    DevCleanerScanContext, DevCleanerWalkHooks,
+};
 use crate::domains::disk::db::{AuditEntry, Db};
 use crate::domains::disk::disk::{self, DiskUsage};
 use crate::domains::disk::locations::{self, Location};
-use crate::domains::disk::projects::{self, ProjectScan};
+use crate::domains::disk::projects::{to_project_scan, ProjectScan};
 use crate::domains::disk::quarantine::{self, QuarantineItem, QuarantineResult};
 use crate::domains::disk::scan;
-use crate::domains::disk::verify::{self, AiConfig, TeamOption, VerificationResult, VerifyProgress, VerifyTask};
+use crate::domains::disk::verify::{VerificationResult, VerifyProgress, VerifyTask};
 use crate::domains::disk::verify_ai;
 use crate::domains::ai::services::AIService;
 
@@ -145,10 +149,8 @@ pub async fn scan_directory(
     Ok(out)
 }
 
-/// Read-only project-aware scan: detects project roots by their marker files
-/// (package.json, pom.xml, Cargo.toml, …) and groups each project's regenerable
-/// temp dirs (node_modules, target, build, .venv, …). Deletes nothing; reuses
-/// the same walk + progress event as `scan_directory`.
+/// Read-only project-aware scan via the unified `DevCleaner` pipeline. Walks the
+/// chosen root, detects project markers, groups regenerable temp dirs.
 #[tauri::command]
 pub async fn scan_projects(
     root: String,
@@ -159,25 +161,26 @@ pub async fn scan_projects(
     let extra_protected = db.list_protected()?;
     let cancel = control.cancel.clone();
     cancel.store(false, Ordering::Relaxed);
+    let root_for_out = root.clone();
+
     let scan = tauri::async_runtime::spawn_blocking(move || {
-        let raw = scan::walk(
-            &root,
-            &cancel,
-            |p| {
+        let ctx = DevCleanerScanContext {
+            roots: vec![root],
+            extra_protected,
+        };
+        let hooks = DevCleanerWalkHooks {
+            cancel: &cancel,
+            on_progress: &|p| {
                 let _ = app.emit("scan://progress", p);
             },
-            // Projects tab has no restore flow — nothing to checkpoint.
-            |_files, _total, _bytes, _elapsed| {},
-        );
-        if raw.cancelled {
-            return None;
-        }
-        Some(projects::detect(&root, &raw.files, &extra_protected))
+        };
+        let cleaner = dev_cleaners::projects::ProjectDevCleaner;
+        cleaner.scan(&ctx, Some(&hooks))
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())??;
 
-    scan.ok_or_else(|| "cancelled".to_string())
+    Ok(to_project_scan(&root_for_out, &scan))
 }
 
 /// Requests cancellation of the in-flight scan. The walker stops at its next
@@ -275,20 +278,15 @@ pub fn disk_usage() -> Vec<DiskUsage> {
 /// Advisory: asks the configured AI provider (via the desktop `ai` domain) for a
 /// second opinion on the current proposals. Deletes nothing and never changes a
 /// proposal's risk — the returned notes/verdicts inform the user's own review.
-///
-/// `_config` is accepted for wire-compatibility with the old Agent-Platform path
-/// (the frontend still sends it) but is unused here — the provider is whatever the
-/// user configured under AI settings. See DISK_UTILITY_MIGRATION.md.
+/// Provider is configured under Settings → AI Providers.
 #[tauri::command]
 pub async fn verify_proposals(
     root: String,
     proposals: Vec<Proposal>,
-    #[allow(non_snake_case)] config: AiConfig,
     app: AppHandle,
     ai: State<'_, Arc<AIService>>,
     control: State<'_, VerifyControl>,
 ) -> Result<VerificationResult, String> {
-    let _config = config;
     // Fresh flag for this run — clears any leftover request from a prior verify.
     let cancel = control.cancel.clone();
     cancel.store(false, Ordering::Relaxed);
@@ -322,22 +320,65 @@ pub fn cancel_verify(control: State<'_, VerifyControl>) {
     control.cancel.store(true, Ordering::Relaxed);
 }
 
-/// Lists the platform's team templates for the Settings picker. Each carries an
-/// `isAppTeam` flag so the UI can preselect our own roster or warn if it's absent.
+/// Read-only scan of all registered dev cleaners. Pass `roots` to include the
+/// project cleaner (filesystem walk on drives/folders); omit for CLI-only cleaners.
 #[tauri::command]
-pub async fn list_ai_teams(config: AiConfig) -> Result<Vec<TeamOption>, String> {
-    tauri::async_runtime::spawn_blocking(move || verify::list_teams(config))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn scan_dev_cleaners(
+    roots: Option<Vec<String>>,
+    app: AppHandle,
+    db: State<'_, Arc<Db>>,
+    control: State<'_, ScanControl>,
+) -> Result<DevCleanerScan, String> {
+    let extra_protected = db.list_protected()?;
+    let cancel = control.cancel.clone();
+    cancel.store(false, Ordering::Relaxed);
+    let ctx = DevCleanerScanContext {
+        roots: roots.unwrap_or_default(),
+        extra_protected,
+    };
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let hooks = DevCleanerWalkHooks {
+            cancel: &cancel,
+            on_progress: &|p| {
+                let _ = app.emit("scan://progress", p);
+            },
+        };
+        let walk = if ctx.roots.is_empty() {
+            None
+        } else {
+            Some(&hooks)
+        };
+        dev_cleaners::scan_all(ctx, walk)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
-/// Creates this app's dedicated "Deletion Verifier" team on the platform on demand
-/// (Settings button). Idempotent — returns the existing one if already provisioned.
+/// Removes user-confirmed dev-cleaner items. Unlike `quarantine_paths`, container
+/// resources are removed via the runtime CLI (not the Recycle Bin). Every outcome
+/// is recorded in the audit log.
 #[tauri::command]
-pub async fn provision_ai_team(config: AiConfig) -> Result<TeamOption, String> {
-    tauri::async_runtime::spawn_blocking(move || verify::provision_team(config))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn clean_dev_items(
+    items: Vec<DevCleanerCleanItem>,
+    app: AppHandle,
+    db: State<'_, Arc<Db>>,
+) -> Result<DevCleanerCleanResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        dev_cleaners::clean_items(items, |p| {
+            let _ = app.emit("dev-clean://progress", p);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    for c in &result.cleaned {
+        let _ = db.log_action("dev-clean", &c.path, c.size_bytes, &c.kind, "moved");
+    }
+    for f in &result.failed {
+        let _ = db.log_action("dev-clean", &f.path, 0, &f.kind, "failed");
+    }
+    Ok(result)
 }
 
 /// Opens the OS Recycle Bin so the user can restore anything moved. This is the

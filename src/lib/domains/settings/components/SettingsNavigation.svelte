@@ -29,6 +29,7 @@
     FileCode,
     ChevronDown,
     Languages,
+    Sparkles,
   } from "@lucide/svelte";
 
   type SettingsSectionType =
@@ -42,6 +43,7 @@
     | "package-managers"
     | "languages"
     | "learning"
+    | "ai"
     | "autonomy"
     | "updates";
 
@@ -147,6 +149,13 @@
       path: "/settings/learning",
     },
     {
+      id: "ai" as const,
+      label: "AI Providers",
+      description: "Agent platform & model connections",
+      icon: Sparkles,
+      path: "/settings/ai",
+    },
+    {
       id: "autonomy" as const,
       label: "Autonomy",
       description: "Autonomous action settings",
@@ -188,6 +197,7 @@
         "package-managers",
         "languages",
         "learning",
+        "ai",
         "autonomy",
         "updates",
       ].includes(normalizedSection)

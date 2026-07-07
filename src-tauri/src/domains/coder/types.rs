@@ -1,6 +1,6 @@
 //! Wire + persistence types for the coder agent.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 use super::diff::Hunk;
 
@@ -12,8 +12,8 @@ pub struct ChatMessage {
     /// `system` | `user` | `assistant` | `tool`.
     pub role: String,
     /// Text content. May be empty for an assistant turn that only issues tool
-    /// calls.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// calls. Serialized as `""` when absent — agent-platform rejects null.
+    #[serde(default, serialize_with = "serialize_content")]
     pub content: Option<String>,
     /// Present on assistant turns that call tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -21,6 +21,13 @@ pub struct ChatMessage {
     /// Present on `tool` messages — the id of the call this result answers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+}
+
+fn serialize_content<S>(content: &Option<String>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(content.as_deref().unwrap_or(""))
 }
 
 impl ChatMessage {
@@ -69,6 +76,8 @@ pub struct CoderThread {
     /// Absolute path the agent's relative tool paths resolve against.
     pub workspace_root: String,
     pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform_thread_id: Option<i64>,
     pub messages: Vec<ChatMessage>,
     #[serde(default)]
     pub created_at: String,

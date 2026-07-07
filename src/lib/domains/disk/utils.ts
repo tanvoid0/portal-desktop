@@ -163,44 +163,41 @@ export function flattenTree(nodes: TreeNode[], expanded: Set<string>): FlatRow[]
 }
 
 export const RISK_BADGE: Record<string, string> = {
-  Safe: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  Review: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  Danger: "bg-red-500/10 text-red-400 border-red-500/20",
+  Safe: "bg-status-success-bg text-status-success border-status-success/30",
+  Review: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  Danger: "bg-status-error-bg text-status-error border-status-error/30",
 };
 
 export const VERDICT_BADGE: Record<string, string> = {
-  safe: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  review: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  dangerous: "bg-red-500/10 text-red-400 border-red-500/20",
+  safe: "bg-status-success-bg text-status-success border-status-success/30",
+  review: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  dangerous: "bg-status-error-bg text-status-error border-status-error/30",
 };
 
 export const KIND_BADGE: Record<string, string> = {
-  node: "bg-green-500/10 text-green-400 border-green-500/20",
-  rust: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  maven: "bg-red-500/10 text-red-400 border-red-500/20",
-  gradle: "bg-teal-500/10 text-teal-400 border-teal-500/20",
-  python: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  dotnet: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  go: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-  php: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+  node: "bg-status-success-bg text-status-success border-status-success/30",
+  rust: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  maven: "bg-status-error-bg text-status-error border-status-error/30",
+  gradle: "bg-status-info-bg text-status-info border-status-info/30",
+  python: "bg-status-info-bg text-status-info border-status-info/30",
+  dotnet: "bg-secondary text-secondary-foreground border-border",
+  go: "bg-status-info-bg text-status-info border-status-info/30",
+  php: "bg-secondary text-secondary-foreground border-border",
+  "stopped-container": "bg-status-warning-bg text-status-warning border-status-warning/30",
+  "created-container": "bg-status-warning-bg text-status-warning border-status-warning/30",
+  "dead-container": "bg-status-error-bg text-status-error border-status-error/30",
+  "dangling-image": "bg-status-success-bg text-status-success border-status-success/30",
+  "unused-image": "bg-status-info-bg text-status-info border-status-info/30",
+  "dangling-volume": "bg-status-warning-bg text-status-warning border-status-warning/30",
+  "dangling-network": "bg-secondary text-secondary-foreground border-border",
+  "build-cache": "bg-status-success-bg text-status-success border-status-success/30",
+  projects: "bg-status-success-bg text-status-success border-status-success/30",
+  docker: "bg-status-info-bg text-status-info border-status-info/30",
+  podman: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
 export function verdictMap(verdicts: ItemVerdict[]): Map<string, ItemVerdict> {
   const m = new Map<string, ItemVerdict>();
   for (const v of verdicts) m.set(v.path, v);
   return m;
-}
-
-const AI_CONFIG_KEY = "portal.disk.aiConfig";
-
-export function loadAiConfig(): import("./types").AiConfig {
-  try {
-    return JSON.parse(localStorage.getItem(AI_CONFIG_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-export function saveAiConfig(cfg: import("./types").AiConfig) {
-  localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(cfg));
 }

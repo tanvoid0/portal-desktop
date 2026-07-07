@@ -60,7 +60,7 @@
     try {
       const result = await aiDocumentService.generateDocumentFromPrompt({
         prompt,
-        providerType: "Ollama",
+        providerType: "AgentPlatform",
         instruction: customInstruction.trim() || undefined,
         context: documentContext,
       });
@@ -113,7 +113,7 @@
     try {
       const result = await aiDocumentService.generateDocumentFromPrompt({
         prompt,
-        providerType: "Ollama",
+        providerType: "AgentPlatform",
         history: conversationHistory,
         instruction: customInstruction.trim() || undefined,
         context: documentContext,

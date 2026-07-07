@@ -26,6 +26,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import type { ProviderType, Conversation } from "$lib/domains/ai/types";
   import { PageHeader, PageLoading, PageError } from "$lib/components/shell";
+  import { AI_PROVIDER_SETTINGS_PATH } from "$lib/config/ai-nav";
 
   let defaultProvider = $state<ProviderType | null>(null);
   let recentConversations = $state<Conversation[]>([]);
@@ -42,9 +43,9 @@
     },
     {
       title: "Configure Providers",
-      description: "Set up Ollama, OpenAI, and other AI providers",
+      description: "Connect to agent-platform for chat, tasks, and documents",
       icon: Settings,
-      url: "/ai/providers",
+      url: AI_PROVIDER_SETTINGS_PATH,
       color: "text-primary",
     },
     {
@@ -102,6 +103,10 @@
       description="Manage AI providers, conversations, and training data"
     >
       {#snippet actions()}
+        <Button variant="outline" onclick={() => goto(AI_PROVIDER_SETTINGS_PATH)}>
+          <Settings class="mr-2 h-4 w-4" />
+          Providers
+        </Button>
         <Button onclick={() => goto("/ai/chat")}>
           <MessageSquare class="mr-2 h-4 w-4" />
           New Chat
@@ -135,7 +140,7 @@
               {#if defaultProvider}
                 Configured and ready
               {:else}
-                <a href="/ai/providers" class="text-primary hover:underline"
+                <a href={AI_PROVIDER_SETTINGS_PATH} class="text-primary hover:underline"
                   >Set up a provider</a
                 >
               {/if}

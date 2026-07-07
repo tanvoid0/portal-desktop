@@ -107,6 +107,57 @@ function normalizeSettings(raw: Settings): Settings {
   };
 }
 
+function serializeThemeSettings(theme: ThemeSettings): Record<string, unknown> {
+  return {
+    primary_color: theme.primaryColor,
+    secondary_color: theme.secondaryColor,
+    accent_color: theme.accentColor,
+    background_color: theme.backgroundColor,
+    surface_color: theme.surfaceColor,
+    text_color: theme.textColor,
+    border_radius: theme.borderRadius,
+    shadow_intensity: theme.shadowIntensity,
+    animation_speed: theme.animationSpeed,
+    custom_themes: theme.customThemes.map((customTheme) => ({
+      id: customTheme.id,
+      name: customTheme.name,
+      description: customTheme.description,
+      colors: customTheme.colors,
+      created_at:
+        customTheme.createdAt instanceof Date
+          ? customTheme.createdAt.toISOString()
+          : customTheme.createdAt,
+      updated_at:
+        customTheme.updatedAt instanceof Date
+          ? customTheme.updatedAt.toISOString()
+          : customTheme.updatedAt,
+    })),
+    active_theme: theme.activeTheme,
+  };
+}
+
+function serializeSettingsForRust(
+  settings: Settings & Record<string, unknown>,
+): Record<string, unknown> {
+  const now = new Date().toISOString();
+  return {
+    ...settings,
+    theme: serializeThemeSettings(settings.theme),
+    created_at: settings.created_at ?? settings.createdAt ?? now,
+    updated_at: settings.updated_at ?? settings.updatedAt ?? now,
+  };
+}
+
+function serializeSettingsUpdateForRust(
+  updates: SettingsUpdate,
+): Record<string, unknown> {
+  const serialized: Record<string, unknown> = { ...updates };
+  if (updates.theme) {
+    serialized.theme = serializeThemeSettings(updates.theme);
+  }
+  return serialized;
+}
+
 export class SettingsService {
   private static instance: SettingsService;
 
@@ -151,7 +202,11 @@ export class SettingsService {
         data: { settingsId: settings.id },
       });
 
-      await invoke("save_settings_command", { settings });
+      await invoke("save_settings_command", {
+        settings: serializeSettingsForRust(
+          settings as Settings & Record<string, unknown>,
+        ),
+      });
 
       logger.info("Settings saved successfully", {
         context: "SettingsService",
@@ -183,8 +238,10 @@ export class SettingsService {
       const updatedSettings = await invoke<Settings>(
         "update_settings_command",
         {
-          settings: currentSettings,
-          updates,
+          settings: serializeSettingsForRust(
+            currentSettings as Settings & Record<string, unknown>,
+          ),
+          updates: serializeSettingsUpdateForRust(updates),
         },
       );
 
@@ -239,7 +296,9 @@ export class SettingsService {
       });
 
       const exportedSettings = await invoke<string>("export_settings_command", {
-        settings,
+        settings: serializeSettingsForRust(
+          settings as Settings & Record<string, unknown>,
+        ),
       });
 
       logger.info("Settings exported successfully", {

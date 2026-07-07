@@ -3,6 +3,8 @@ import type {
   ProviderType,
   ProviderConfig,
   ConfigurationStatus,
+  PlatformCatalog,
+  CatalogQuery,
 } from "../types/index.js";
 
 export class AIProviderService {
@@ -60,7 +62,7 @@ export class AIProviderService {
   }
 
   /**
-   * Get available models for a provider
+   * Get available models for a provider (model ids only).
    */
   async getAvailableModels(providerType?: ProviderType): Promise<string[]> {
     return invoke<string[]>("get_ai_provider_models", {
@@ -69,15 +71,23 @@ export class AIProviderService {
   }
 
   /**
-   * Get available Ollama models (downloadable models organized by family)
-   * This returns models available to download, which changes over time
+   * Fetch agent-platform provider/model catalog (`GET /v1/catalog`).
    */
-  async getAvailableOllamaModels(): Promise<
-    Record<string, Array<{ name: string; size?: string }>>
-  > {
-    return invoke<Record<string, Array<{ name: string; size?: string }>>>(
-      "get_ai_available_ollama_models",
-    );
+  async getCatalog(query: CatalogQuery = {}): Promise<PlatformCatalog> {
+    return invoke<PlatformCatalog>("get_ai_platform_catalog", {
+      providers: query.providers ?? null,
+      live: query.live ?? null,
+    });
+  }
+
+  /** Fast catalog load: all providers, YAML aliases only. */
+  async getCatalogAliases(): Promise<PlatformCatalog> {
+    return this.getCatalog({ providers: ["all"], live: false });
+  }
+
+  /** Full catalog with live upstream model lists. */
+  async getCatalogLive(): Promise<PlatformCatalog> {
+    return this.getCatalog({ providers: ["all"] });
   }
 }
 

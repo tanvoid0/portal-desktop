@@ -1,90 +1,71 @@
+use crate::domains::ai::message::ChatMessage;
 use crate::domains::ai::providers::{
-    AIError, AIProvider, ConfigurationStatus, GeminiProvider, GenerationOptions, GenerationResult,
-    OllamaProvider, ProviderConfig, ProviderType,
+    AIError, AIProvider, AgentPlatformProvider, ConfigurationStatus, GenerationOptions,
+    GenerationResult, ProviderConfig, ProviderType,
 };
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// Centralized AI service that manages multiple providers
+/// Centralized AI service — all inference goes through agent-platform.
 pub struct AIService {
-    providers: Arc<RwLock<HashMap<ProviderType, Arc<dyn AIProvider>>>>,
-    default_provider: Arc<RwLock<Option<ProviderType>>>,
+    provider: Arc<RwLock<Option<Arc<dyn AIProvider>>>>,
 }
 
 impl AIService {
     pub fn new() -> Self {
         Self {
-            providers: Arc::new(RwLock::new(HashMap::new())),
-            default_provider: Arc::new(RwLock::new(None)),
+            provider: Arc::new(RwLock::new(None)),
         }
     }
 
-    /// Register a provider with the service
     pub async fn register_provider(&self, provider: Arc<dyn AIProvider>) {
-        let provider_type = provider.provider_type();
-        let mut providers = self.providers.write().await;
-        providers.insert(provider_type, provider);
+        *self.provider.write().await = Some(provider);
     }
 
-    /// Register a provider from configuration
     pub async fn register_provider_from_config(&self, config: ProviderConfig) {
-        let provider: Arc<dyn AIProvider> = match config.provider_type {
-            ProviderType::Ollama => Arc::new(OllamaProvider::new(config)),
-            ProviderType::Gemini => Arc::new(GeminiProvider::new(config)),
-        };
-        self.register_provider(provider).await;
+        if config.provider_type != ProviderType::AgentPlatform {
+            return;
+        }
+        self.register_provider(Arc::new(AgentPlatformProvider::new(config)))
+            .await;
     }
 
-    /// Set the default provider
-    pub async fn set_default_provider(&self, provider_type: ProviderType) -> Result<(), AIError> {
-        let providers = self.providers.read().await;
-        if !providers.contains_key(&provider_type) {
-            return Err(AIError::ProviderNotAvailable(format!(
-                "Provider {:?} is not registered",
-                provider_type
-            )));
-        }
-        drop(providers);
-
-        let mut default = self.default_provider.write().await;
-        *default = Some(provider_type);
+    pub async fn set_default_provider(&self, _provider_type: ProviderType) -> Result<(), AIError> {
+        self.get_provider().await?;
         Ok(())
     }
 
-    /// Get the default provider
     pub async fn get_default_provider_type(&self) -> Option<ProviderType> {
-        self.default_provider.read().await.clone()
+        Some(ProviderType::AgentPlatform)
     }
 
-    /// Get a provider by type
-    pub async fn get_provider(
+    pub async fn get_provider(&self) -> Result<Arc<dyn AIProvider>, AIError> {
+        let guard = self.provider.read().await;
+        guard
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| {
+                AIError::ProviderNotAvailable(
+                    "Agent Platform is not registered. Configure it under Settings → AI."
+                        .to_string(),
+                )
+            })
+    }
+
+    /// Legacy optional type — always resolves to the registered agent-platform provider.
+    pub async fn get_provider_typed(
         &self,
-        provider_type: Option<ProviderType>,
+        _provider_type: Option<ProviderType>,
     ) -> Result<Arc<dyn AIProvider>, AIError> {
-        let provider_type = match provider_type {
-            Some(pt) => pt,
-            None => self.default_provider.read().await.clone().ok_or_else(|| {
-                AIError::ProviderNotAvailable("No default provider set".to_string())
-            })?,
-        };
-
-        let providers = self.providers.read().await;
-        let provider = providers.get(&provider_type).ok_or_else(|| {
-            AIError::ProviderNotAvailable(format!("Provider {:?} not found", provider_type))
-        })?;
-
-        Ok(Arc::clone(provider))
+        self.get_provider().await
     }
 
-    /// Generate text using the specified provider (or default)
     pub async fn generate(
         &self,
         prompt: &str,
         options: Option<GenerationOptions>,
         provider_type: Option<ProviderType>,
     ) -> Result<GenerationResult, AIError> {
-        // Validate configuration first
         let config_status = self
             .check_provider_configuration(provider_type.clone())
             .await?;
@@ -93,9 +74,8 @@ impl AIService {
         }
 
         let options = options.unwrap_or_default();
-        let provider = self.get_provider(provider_type).await?;
+        let provider = self.get_provider_typed(provider_type).await?;
 
-        // Retry logic with exponential backoff
         let max_retries = 3;
         let mut last_error = None;
 
@@ -103,7 +83,6 @@ impl AIService {
             match provider.generate(prompt, &options).await {
                 Ok(result) => return Ok(result),
                 Err(e) => {
-                    // Don't retry configuration errors
                     if matches!(&e, AIError::ConfigurationIncomplete(_)) {
                         return Err(e);
                     }
@@ -121,7 +100,6 @@ impl AIService {
         }))
     }
 
-    /// Generate text with system message
     pub async fn generate_with_system(
         &self,
         system_message: &str,
@@ -130,117 +108,98 @@ impl AIService {
         provider_type: Option<ProviderType>,
     ) -> Result<GenerationResult, AIError> {
         let options = options.unwrap_or_default();
-        let provider = self.get_provider(provider_type).await?;
-
+        let provider = self.get_provider_typed(provider_type).await?;
         provider
             .generate_with_system(system_message, user_message, &options)
             .await
     }
 
-    /// Get all registered provider types
     pub async fn get_registered_providers(&self) -> Vec<ProviderType> {
-        let providers = self.providers.read().await;
-        providers.keys().cloned().collect()
+        if self.provider.read().await.is_some() {
+            vec![ProviderType::AgentPlatform]
+        } else {
+            vec![]
+        }
     }
 
-    /// Test connection to a provider
-    pub async fn test_provider(&self, provider_type: ProviderType) -> Result<(), AIError> {
-        let provider = self.get_provider(Some(provider_type)).await?;
+    pub async fn test_provider(&self, _provider_type: ProviderType) -> Result<(), AIError> {
+        let provider = self.get_provider().await?;
         provider.test_connection().await
     }
 
-    /// Get available models for a provider
     pub async fn get_available_models(
         &self,
         provider_type: Option<ProviderType>,
     ) -> Result<Vec<String>, AIError> {
-        let provider = self.get_provider(provider_type).await?;
+        let provider = self.get_provider_typed(provider_type).await?;
         provider.get_available_models().await
     }
 
-    /// Check configuration status for a provider
     pub async fn check_provider_configuration(
         &self,
-        provider_type: Option<ProviderType>,
+        _provider_type: Option<ProviderType>,
     ) -> Result<ConfigurationStatus, AIError> {
-        let provider = self.get_provider(provider_type).await?;
+        let provider = self.get_provider().await?;
         Ok(provider.check_configuration())
     }
 
-    /// Update provider configuration dynamically
     pub async fn update_provider_config(&self, config: ProviderConfig) -> Result<(), AIError> {
-        let provider_type = config.provider_type.clone();
-
-        // Create new provider with updated config
-        let new_provider: Arc<dyn AIProvider> = match provider_type {
-            ProviderType::Ollama => Arc::new(OllamaProvider::new(config)),
-            ProviderType::Gemini => Arc::new(GeminiProvider::new(config)),
-        };
-
-        // Replace existing provider with new one
-        let mut providers = self.providers.write().await;
-        providers.insert(provider_type, new_provider);
+        if config.provider_type != ProviderType::AgentPlatform {
+            return Err(AIError::GenericError(
+                "Only AgentPlatform is supported".to_string(),
+            ));
+        }
+        self.register_provider(Arc::new(AgentPlatformProvider::new(config)))
+            .await;
         Ok(())
     }
 
-    /// Validate configuration before attempting generation
     pub async fn validate_before_generate(
         &self,
         provider_type: Option<ProviderType>,
     ) -> Result<(), AIError> {
         let status = self.check_provider_configuration(provider_type).await?;
-
         if !status.is_configured {
             return Err(AIError::ConfigurationIncomplete(status));
         }
-
         Ok(())
     }
 
-    /// Get available Ollama models (downloadable models from library)
-    /// This is different from get_available_models which returns installed models
-    pub async fn get_available_ollama_models(
+    pub async fn generate_chat(
         &self,
-    ) -> Result<
-        std::collections::HashMap<String, Vec<std::collections::HashMap<String, String>>>,
-        AIError,
-    > {
-        use crate::domains::sdk::ollama_manager::OllamaManager;
+        messages: &[ChatMessage],
+        options: Option<GenerationOptions>,
+        provider_type: Option<ProviderType>,
+    ) -> Result<GenerationResult, AIError> {
+        let config_status = self
+            .check_provider_configuration(provider_type.clone())
+            .await?;
+        if !config_status.is_configured {
+            return Err(AIError::ConfigurationIncomplete(config_status));
+        }
+        let options = options.unwrap_or_default();
+        let provider = self.get_provider_typed(provider_type).await?;
+        provider.generate_chat(messages, &options).await
+    }
 
-        let models = OllamaManager::get_available_models().await.map_err(|e| {
-            AIError::GenericError(format!("Failed to get available Ollama models: {}", e))
-        })?;
-
-        // Convert from HashMap<String, Vec<serde_json::Value>> to HashMap<String, Vec<HashMap<String, String>>>
-        let converted: std::collections::HashMap<
-            String,
-            Vec<std::collections::HashMap<String, String>>,
-        > = models
-            .into_iter()
-            .map(|(family, models)| {
-                let converted_models: Vec<std::collections::HashMap<String, String>> = models
-                    .into_iter()
-                    .filter_map(|v| {
-                        if let serde_json::Value::Object(obj) = v {
-                            let mut map = std::collections::HashMap::new();
-                            for (k, v) in obj {
-                                if let Some(s) = v.as_str() {
-                                    map.insert(k, s.to_string());
-                                } else {
-                                    map.insert(k, v.to_string());
-                                }
-                            }
-                            Some(map)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                (family, converted_models)
-            })
-            .collect();
-
-        Ok(converted)
+    pub async fn generate_chat_stream(
+        &self,
+        messages: &[ChatMessage],
+        options: Option<GenerationOptions>,
+        provider_type: Option<ProviderType>,
+        on_chunk: Box<dyn FnMut(String) -> Result<(), AIError> + Send>,
+    ) -> Result<GenerationResult, AIError> {
+        let config_status = self
+            .check_provider_configuration(provider_type.clone())
+            .await?;
+        if !config_status.is_configured {
+            return Err(AIError::ConfigurationIncomplete(config_status));
+        }
+        let options = options.unwrap_or_default();
+        let provider = self.get_provider_typed(provider_type).await?;
+        provider
+            .generate_chat_stream(messages, &options, on_chunk)
+            .await
     }
 }
 

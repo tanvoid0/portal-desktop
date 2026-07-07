@@ -332,7 +332,7 @@
       </CardDescription>
     </CardHeader>
     <CardContent>
-      <Button onclick={() => goto("/ai/providers")}>
+      <Button onclick={() => goto("/settings/ai")}>
         <Sparkles class="mr-2 h-4 w-4" />
         Go to AI Providers
       </Button>

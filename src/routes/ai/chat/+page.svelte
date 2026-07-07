@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { replaceState } from "$app/navigation";
   import { page } from "$app/stores";
   import AIChatPanel from "$lib/domains/ai/components/chat/AIChatPanel.svelte";
   import ConversationList from "$lib/domains/ai/components/conversations/ConversationList.svelte";
+  import ProviderModelSelector from "$lib/domains/ai/components/ProviderModelSelector.svelte";
   import { toastActions } from "$lib/utils/toast";
   import { confirmAction } from "$lib/utils/confirm";
   import {
@@ -16,6 +18,11 @@
     ConversationMessage,
     ProviderType,
   } from "$lib/domains/ai/types/index.js";
+  import {
+    fallbackTitleFromMessage,
+    isPlaceholderTitle,
+    reconcileThreadTitle,
+  } from "$lib/domains/chat/title.js";
   import { MessageSquare } from "@lucide/svelte";
 
   let messages = $state<ChatMessage[]>([]);
@@ -23,12 +30,31 @@
   let conversations = $state<Conversation[]>([]);
   let selectedConversation = $state<Conversation | null>(null);
   let selectedProvider = $state<ProviderType | null>(null);
+  let selectedModel = $state<string | null>(null);
   let isSending = $state(false);
   let conversationId = $state<string | undefined>(undefined);
+  /** Conversation ids with user-edited titles — ignore smart title events. */
+  let userRenamedConversationIds = $state<Set<string>>(new Set());
+
+  function patchConversationTitle(id: string, title: string) {
+    if (userRenamedConversationIds.has(id)) return;
+
+    const idx = conversations.findIndex((c) => c.id === id);
+    const current = idx >= 0 ? conversations[idx].title : selectedConversation?.title;
+    const next = reconcileThreadTitle(current, title);
+
+    if (idx >= 0) {
+      conversations[idx] = { ...conversations[idx], title: next };
+      conversations = [...conversations];
+    }
+    if (selectedConversation?.id === id) {
+      selectedConversation = { ...selectedConversation, title: next };
+    }
+  }
 
   onMount(async () => {
     const defaultProvider = await aiProviderService.getDefaultProvider();
-    selectedProvider = defaultProvider || "Ollama";
+    selectedProvider = defaultProvider || "AgentPlatform";
 
     // Load conversations first
     await loadConversations();
@@ -46,7 +72,7 @@
         try {
           const result =
             await aiConversationService.loadConversation(urlConversationId);
-          selectedConversation = result.conversation;
+          applyConversationSelection(result.conversation);
           messages = result.messages.map((msg: ConversationMessage) => ({
             role: msg.role,
             content: msg.content,
@@ -69,6 +95,12 @@
     }
   }
 
+  function applyConversationSelection(conversation: Conversation) {
+    selectedConversation = conversation;
+    selectedProvider = conversation.provider;
+    selectedModel = conversation.model ?? null;
+  }
+
   async function handleConversationClick(conversation: Conversation) {
     if (selectedConversation?.id === conversation.id) return;
 
@@ -77,7 +109,7 @@
       const result = await aiConversationService.loadConversation(
         conversation.id,
       );
-      selectedConversation = result.conversation;
+      applyConversationSelection(result.conversation);
       messages = result.messages.map((msg: ConversationMessage) => ({
         role: msg.role,
         content: msg.content,
@@ -86,9 +118,9 @@
       conversationId = conversation.id;
 
       // Update URL without navigation
-      const url = new URL(window.location.href);
+      const url = new URL($page.url);
       url.searchParams.set("id", conversation.id);
-      window.history.replaceState({}, "", url.toString());
+      replaceState(url, {});
     } catch (error) {
       toastActions.error("Failed to load conversation", error);
     } finally {
@@ -148,9 +180,22 @@
     conversationId = undefined;
 
     // Clear URL parameter
-    const url = new URL(window.location.href);
+    const url = new URL($page.url);
     url.searchParams.delete("id");
-    window.history.replaceState({}, "", url.toString());
+    replaceState(url, {});
+  }
+
+  async function handleModelChange(model: string) {
+    if (!selectedConversation) return;
+    try {
+      await aiConversationService.updateConversationModel(
+        selectedConversation.id,
+        model,
+      );
+      selectedConversation = { ...selectedConversation, model };
+    } catch (error) {
+      toastActions.error("Failed to update model", error);
+    }
   }
 
   async function handleSendMessage(message: string, history: ChatMessage[]) {
@@ -177,34 +222,68 @@
     ];
 
     try {
-      // If no conversation is selected, create a new one with auto-generated title from first message
+      if (
+        selectedConversation &&
+        selectedModel &&
+        selectedModel !== selectedConversation.model
+      ) {
+        await aiConversationService.updateConversationModel(
+          selectedConversation.id,
+          selectedModel,
+        );
+        selectedConversation = { ...selectedConversation, model: selectedModel };
+      }
+
+      // First message on new thread: create with placeholder, optimistic fallback in sidebar
       if (!selectedConversation && selectedProvider) {
-        // Auto-generate title from first message (truncate to 50 chars)
-        const title = message.trim().slice(0, 50) || "New Conversation";
         const conversation = await aiConversationService.createConversation(
-          title,
+          "New chat",
           selectedProvider,
+          selectedModel,
         );
         selectedConversation = conversation;
         conversationId = conversation.id;
-        await loadConversations();
+        conversations = [conversation, ...conversations];
+
+        const fb = fallbackTitleFromMessage(message.trim(), "New chat");
+        patchConversationTitle(conversation.id, fb);
+      } else if (
+        selectedConversation &&
+        isPlaceholderTitle(selectedConversation.title) &&
+        history.filter((m) => m.role === "user").length === 0
+      ) {
+        const fb = fallbackTitleFromMessage(message.trim(), "New chat");
+        patchConversationTitle(selectedConversation.id, fb);
       }
+
+      const streamFallback = fallbackTitleFromMessage(message.trim(), "New chat");
 
       // Use streaming API
       const fullResponse = await aiChatService.streamMessage(message, history, {
         provider:
           selectedConversation?.provider || selectedProvider || undefined,
         conversation_id: conversationId,
-        model: undefined,
+        model: selectedModel || undefined,
+        onTitleUpdated: ({ conversation_id, title }) => {
+          patchConversationTitle(conversation_id, title);
+        },
         onChunk: (chunk: string) => {
-          // Update the assistant message content incrementally
           messages[assistantMessageIndex].content += chunk;
-          // Trigger reactivity by creating a new array reference
           messages = [...messages];
         },
-        onComplete: (fullMessage: string) => {
+        onComplete: (fullMessage: string, payload) => {
           messages[assistantMessageIndex].content = fullMessage;
           messages = [...messages];
+          if (payload?.title && conversationId) {
+            patchConversationTitle(
+              conversationId,
+              reconcileThreadTitle(
+                selectedConversation?.title,
+                payload.title,
+                streamFallback,
+              ),
+            );
+          }
         },
       });
 
@@ -228,9 +307,9 @@
 
         // Update URL if not already set
         if (!conversationId) {
-          const url = new URL(window.location.href);
+          const url = new URL($page.url);
           url.searchParams.set("id", selectedConversation.id);
-          window.history.replaceState({}, "", url.toString());
+          replaceState(url, {});
         }
       }
     } catch (error) {
@@ -266,6 +345,19 @@
 
   <!-- Main Chat Area -->
   <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <div
+      class="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2.5"
+    >
+      <h2 class="truncate text-sm font-semibold">
+        {selectedConversation?.title || "AI Chat"}
+      </h2>
+      <ProviderModelSelector
+        bind:selectedProvider
+        bind:selectedModel
+        onModelChange={handleModelChange}
+        modelSelectClass="w-[220px]"
+      />
+    </div>
     <div class="flex h-full min-h-0 w-full flex-col p-6">
       <AIChatPanel
         bind:messages
@@ -274,6 +366,7 @@
         placeholder="Ask me anything..."
         class="flex h-full flex-col border-0 shadow-none"
         {conversationId}
+        showSelectors={false}
         onSendMessageWithHistory={handleSendMessage}
       />
     </div>

@@ -36,7 +36,7 @@
           "Paste your story, issue description, or requirements here...",
         inputRows: 12,
         maxLength: 10000,
-        providerType: "Ollama",
+        providerType: "AgentPlatform",
         infoContent: {
           title: "How it works:",
           items: [
@@ -55,7 +55,7 @@
         ) => {
           return await aiTaskService.generateTasksFromStory({
             story_text: storyText,
-            provider_type: "Ollama", // Explicitly use Ollama since it's the only supported provider
+            provider_type: "AgentPlatform",
             history: history,
             context: context,
             developer_note: developerNote,

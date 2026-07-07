@@ -1,5 +1,7 @@
 import type { NavSection } from "$lib/components/shell/nav-types";
 
+export const AI_PROVIDER_SETTINGS_PATH = "/settings/ai";
+
 export function buildAiNavSections(): NavSection[] {
   return [
     {
@@ -10,12 +12,6 @@ export function buildAiNavSections(): NavSection[] {
           url: "/ai/chat",
           icon: "message-square",
           description: "Chat with AI",
-        },
-        {
-          title: "Providers",
-          url: "/ai/providers",
-          icon: "settings",
-          description: "Configure AI providers",
         },
         {
           title: "Training Data",

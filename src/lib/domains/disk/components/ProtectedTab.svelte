@@ -1,19 +1,23 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import { Card } from "$lib/components/ui/card";
+  import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+  } from "$lib/components/ui/table";
 
   let { active }: { active: boolean } = $props();
 
   let paths = $state<string[]>([]);
   let input = $state("");
   let status = $state("");
-
-  const btnPrimary =
-    "inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-white text-black text-sm font-medium transition-colors hover:bg-neutral-200 disabled:opacity-40 disabled:pointer-events-none";
-  const btnSecondary =
-    "inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-neutral-900 text-neutral-200 text-sm font-medium border border-neutral-800 transition-colors hover:bg-neutral-800 hover:border-neutral-700 disabled:opacity-40 disabled:pointer-events-none";
-  const inputCls =
-    "h-9 px-3 rounded-md bg-neutral-950 border border-neutral-800 text-sm text-neutral-100 placeholder:text-neutral-600 transition-colors focus:outline-none focus:border-neutral-600";
 
   async function load() {
     try {
@@ -58,36 +62,50 @@
   }
 </script>
 
-<p class="mb-4 max-w-2xl text-sm text-neutral-500">
+<p class="mb-4 max-w-2xl text-sm text-muted-foreground">
   Paths listed here are never proposed for cleanup — anything under them is skipped during scans. OS
   and program folders are already protected by default.
 </p>
 
 <div class="mb-4 flex items-center gap-2">
-  <button onclick={pickFolder} class={btnSecondary}>Add folder…</button>
-  <input bind:value={input} onkeydown={(e) => e.key === "Enter" && add(input)} placeholder="C:\Users\you\Projects" class="flex-1 {inputCls}" />
-  <button onclick={() => add(input)} disabled={!input.trim()} class={btnPrimary}>Protect</button>
+  <Button variant="outline" onclick={pickFolder}>Add folder…</Button>
+  <Input
+    bind:value={input}
+    onkeydown={(e) => e.key === "Enter" && add(input)}
+    placeholder="C:\Users\you\Projects"
+    class="flex-1"
+  />
+  <Button onclick={() => add(input)} disabled={!input.trim()}>Protect</Button>
 </div>
 
-{#if status}<div class="mb-4 text-sm text-neutral-500">{status}</div>{/if}
+{#if status}<div class="mb-4 text-sm text-muted-foreground">{status}</div>{/if}
 
-<div class="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/60">
-  <table class="w-full text-sm">
-    <thead class="bg-neutral-900/50 text-left text-xs uppercase tracking-wide text-neutral-500">
-      <tr><th class="px-3 py-2.5 font-medium">Protected path</th><th class="w-24 px-3 py-2.5"></th></tr>
-    </thead>
-    <tbody>
+<Card class="gap-0 overflow-hidden py-0">
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead>Protected path</TableHead>
+        <TableHead class="w-24"></TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
       {#each paths as p (p)}
-        <tr class="border-t border-neutral-900 transition-colors hover:bg-neutral-900/40">
-          <td class="break-all px-3 py-2.5 font-mono text-xs text-neutral-300">{p}</td>
-          <td class="px-3 py-2.5 text-right">
-            <button onclick={() => remove(p)} class="inline-flex h-7 items-center rounded-md border border-neutral-800 bg-neutral-950 px-2.5 text-xs font-medium text-neutral-400 transition-colors hover:border-red-600 hover:bg-red-600 hover:text-white">Remove</button>
-          </td>
-        </tr>
+        <TableRow>
+          <TableCell class="break-all font-mono text-xs">{p}</TableCell>
+          <TableCell class="text-right">
+            <Button variant="outline" size="sm" onclick={() => remove(p)} class="text-destructive hover:text-destructive">
+              Remove
+            </Button>
+          </TableCell>
+        </TableRow>
       {/each}
       {#if paths.length === 0}
-        <tr><td colspan="2" class="px-3 py-10 text-center text-neutral-600">No custom protected paths. Add folders you never want touched.</td></tr>
+        <TableRow>
+          <TableCell colspan={2} class="py-10 text-center text-muted-foreground">
+            No custom protected paths. Add folders you never want touched.
+          </TableCell>
+        </TableRow>
       {/if}
-    </tbody>
-  </table>
-</div>
+    </TableBody>
+  </Table>
+</Card>

@@ -13,7 +13,7 @@
   let {
     sidebar,
     children,
-    contentClass = "min-h-0 w-full flex-1 overflow-hidden",
+    contentClass = "flex h-full min-h-0 w-full flex-1 overflow-hidden",
     sidebarClass = "flex h-full min-h-0 flex-col overflow-hidden",
     mainClass = "min-h-0 min-w-0 flex-1 overflow-y-auto",
   }: Props = $props();

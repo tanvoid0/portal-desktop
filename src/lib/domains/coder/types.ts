@@ -18,6 +18,7 @@ export interface CoderThread {
   title: string;
   workspace_root: string;
   model?: string | null;
+  platform_thread_id?: number | null;
   messages: ChatMessage[];
   created_at: string;
   updated_at: string;
@@ -29,6 +30,19 @@ export interface PendingApproval {
   arguments: Record<string, unknown>;
   suggested_rule: string;
   summary: string;
+}
+
+export interface ThreadTitleEvent {
+  thread_id: string;
+  title: string;
+}
+
+export interface CoderDoneEvent {
+  thread_id: string;
+  final_text: string | null;
+  exhausted: boolean;
+  cancelled?: boolean;
+  title?: string;
 }
 
 export interface CoderRunResult {
@@ -68,4 +82,13 @@ export interface PermissionRule {
   tool: string;
   pattern: string;
   allow: boolean;
+}
+
+export interface GitDiffStats {
+  isRepo: boolean;
+  branch?: string | null;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  hasChanges: boolean;
 }

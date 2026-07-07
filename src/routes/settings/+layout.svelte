@@ -52,6 +52,7 @@
       | "terminal"
       | "theme"
       | "ides"
+      | "ai"
       | "updates";
   });
 
@@ -227,7 +228,10 @@
     {/if}
   </div>
 
-  <ShellSidebarLayout>
+  <ShellSidebarLayout
+    contentClass="flex h-full min-h-0 w-full overflow-hidden"
+    mainClass="min-h-0 min-w-0 flex-1 overflow-y-auto"
+  >
     {#snippet sidebar()}
       <div class="min-h-0 flex-1 overflow-y-auto p-4">
         <Card class="p-3">

@@ -1,8 +1,7 @@
 //! AI-domain-backed verification of cleanup proposals.
 //!
 //! Replaces the standalone Agent Platform round-trip (`verify.rs`) with a single
-//! call through the desktop's own `ai` domain — whichever provider the user has
-//! configured (Ollama / Gemini / …). Same contract as before: advisory only,
+//! call through the desktop's agent-platform provider. Same contract as before:
 //! reasons from metadata, never deletes or lowers risk. The prompt + verdict
 //! parsing are reused verbatim from `verify.rs` so the UI is unchanged.
 

@@ -1,17 +1,26 @@
 use crate::database::DatabaseManager;
-use crate::domains::ai::chat;
+use crate::domains::ai::chat_title::{
+    fallback_title_from_message, generate_smart_title, is_placeholder_title,
+    should_apply_generated_title, smart_titles_enabled, PLACEHOLDER_CHAT,
+};
+use crate::domains::ai::catalog::{CatalogQuery, PlatformCatalog};
+use crate::domains::ai::message::ChatMessage;
 use crate::domains::ai::conversation::{
     Conversation, ConversationMessage, ConversationWithMessages,
 };
 use crate::domains::ai::logging::{AILog, LogFilters};
 use crate::domains::ai::providers::{
-    AIError, ConfigurationStatus, GenerationOptions, GenerationResult, ProviderConfig, ProviderType,
+    AIError, AgentPlatformProvider, ConfigurationStatus, GenerationOptions, GenerationResult,
+    ProviderConfig, ProviderType,
 };
 use crate::domains::ai::services::{AIService, AISettingsService};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Set,
 };
+use crate::domains::ai::chat;
+use crate::domains::ai::platform_config::PlatformConfig;
+use reqwest::Client;
 use std::sync::Arc;
 use tauri::{Emitter, State};
 // Use the centralized logger from utils
@@ -120,15 +129,20 @@ pub async fn get_ai_provider_models(
         .map_err(|e| e.to_string())
 }
 
-/// Get available Ollama models (downloadable models from library)
-/// This returns models available to download, which changes over time
+/// Fetch agent-platform provider/model catalog (`GET /v1/catalog`).
 #[tauri::command]
-pub async fn get_ai_available_ollama_models(
-    ai_service: State<'_, Arc<AIService>>,
-) -> Result<std::collections::HashMap<String, Vec<std::collections::HashMap<String, String>>>, String>
-{
-    ai_service
-        .get_available_ollama_models()
+pub async fn get_ai_platform_catalog(
+    providers: Option<Vec<String>>,
+    live: Option<bool>,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<PlatformCatalog, String> {
+    let config = settings_service
+        .get_provider_config(ProviderType::AgentPlatform)
+        .map_err(|e| e.to_string())?;
+    let platform = AgentPlatformProvider::new(config);
+    let query = CatalogQuery { providers, live };
+    platform
+        .fetch_catalog(query)
         .await
         .map_err(|e| e.to_string())
 }
@@ -184,7 +198,7 @@ pub async fn generate_ai_text_with_system(
 #[tauri::command]
 pub async fn ai_send_message(
     message: String,
-    history: Vec<chat::ChatMessage>,
+    history: Vec<ChatMessage>,
     provider: Option<ProviderType>,
     conversation_id: Option<String>,
     temperature: Option<f64>,
@@ -208,16 +222,78 @@ pub async fn ai_send_message(
 #[tauri::command]
 pub async fn ai_send_message_stream(
     message: String,
-    history: Vec<chat::ChatMessage>,
+    history: Vec<ChatMessage>,
     provider: Option<ProviderType>,
-    #[allow(unused_variables)] conversation_id: Option<String>,
+    conversation_id: Option<String>,
     temperature: Option<f64>,
     max_tokens: Option<u32>,
     model: Option<String>,
     stream_id: String, // Unique ID for this stream
     app_handle: tauri::AppHandle,
     ai_service: State<'_, Arc<AIService>>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
+    settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<String, String> {
+    let is_first_user = history.iter().filter(|m| m.role == "user").count() == 0;
+    let fallback_title = if is_first_user {
+        Some(fallback_title_from_message(&message, PLACEHOLDER_CHAT))
+    } else {
+        None
+    };
+
+    if let (Some(conv_id), Some(fb)) = (&conversation_id, &fallback_title) {
+        let db = db_manager.get_connection();
+        if let Ok(Some(conv_model)) = ConversationEntity::find_by_id(conv_id).one(db).await {
+            if is_placeholder_title(&conv_model.title) {
+                let mut conversation: ConversationActiveModel = conv_model.into();
+                conversation.title = Set(fb.clone());
+                conversation.updated_at = Set(chrono::Utc::now().to_rfc3339());
+                let _ = conversation.update(db).await;
+                let _ = app_handle.emit(
+                    &format!("ai-stream-title-{stream_id}"),
+                    serde_json::json!({ "conversation_id": conv_id, "title": fb }),
+                );
+
+                if smart_titles_enabled() {
+                    let app = app_handle.clone();
+                    let sid = stream_id.clone();
+                    let cid = conv_id.clone();
+                    let fb_clone = fb.clone();
+                    let msg = message.clone();
+                    let cfg = PlatformConfig::resolve(settings_service.inner());
+                    let db_arc = db_manager.inner().clone();
+                    tauri::async_runtime::spawn(async move {
+                        let client = Client::new();
+                        let Ok(smart) = generate_smart_title(&client, &cfg, &msg).await else {
+                            return;
+                        };
+                        if smart == fb_clone {
+                            return;
+                        }
+                        let db = db_arc.get_connection();
+                        let Ok(Some(conv_model)) =
+                            ConversationEntity::find_by_id(&cid).one(db).await
+                        else {
+                            return;
+                        };
+                        if !should_apply_generated_title(&conv_model.title, &fb_clone) {
+                            return;
+                        }
+                        let mut conversation: ConversationActiveModel = conv_model.into();
+                        conversation.title = Set(smart.clone());
+                        conversation.updated_at = Set(chrono::Utc::now().to_rfc3339());
+                        if conversation.update(db).await.is_ok() {
+                            let _ = app.emit(
+                                &format!("ai-stream-title-{sid}"),
+                                serde_json::json!({ "conversation_id": cid, "title": smart }),
+                            );
+                        }
+                    });
+                }
+            }
+        }
+    }
+
     let options = GenerationOptions {
         temperature,
         max_tokens,
@@ -226,36 +302,24 @@ pub async fn ai_send_message_stream(
         extra_options: None,
     };
 
-    // Convert history to prompt format
-    let mut prompt = String::new();
-    for msg in &history {
-        prompt.push_str(&format!("{}: {}\n", msg.role, msg.content));
-    }
-    prompt.push_str(&format!("user: {}\nassistant:", message));
-
-    // Get the provider
-    let provider_type = provider.or_else(|| {
-        // Try to get default provider synchronously
-        None // Will be handled in the service
+    let mut messages = history;
+    messages.push(ChatMessage {
+        role: "user".to_string(),
+        content: message,
     });
 
-    let provider_result = ai_service.get_provider(provider_type).await;
-    let provider = match provider_result {
-        Ok(p) => p,
-        Err(e) => return Err(format!("Failed to get provider: {}", e)),
-    };
+    let provider_type = provider;
 
-    // Use streaming method from trait
     let mut full_response = String::new();
     let app_handle_clone = app_handle.clone();
     let stream_id_clone = stream_id.clone();
-    let result = provider
-        .generate_stream(
-            &prompt,
-            &options,
+    let result = ai_service
+        .generate_chat_stream(
+            &messages,
+            Some(options),
+            provider_type,
             Box::new(move |chunk: String| {
                 full_response.push_str(&chunk);
-                // Emit event for each chunk
                 app_handle_clone
                     .emit(&format!("ai-stream-chunk-{}", stream_id_clone), &chunk)
                     .map_err(|e| AIError::GenericError(format!("Failed to emit event: {}", e)))?;
@@ -264,13 +328,29 @@ pub async fn ai_send_message_stream(
         )
         .await;
 
+    let final_title = if let Some(conv_id) = &conversation_id {
+        let db = db_manager.get_connection();
+        ConversationEntity::find_by_id(conv_id)
+            .one(db)
+            .await
+            .ok()
+            .flatten()
+            .map(|m| m.title)
+    } else {
+        None
+    };
+
     match result {
         Ok(gen_result) => {
-            // Emit completion event
+            let complete_payload = if let Some(title) = final_title {
+                serde_json::json!({ "content": gen_result.content, "title": title })
+            } else {
+                serde_json::json!({ "content": gen_result.content })
+            };
             app_handle
                 .emit(
                     &format!("ai-stream-complete-{}", stream_id),
-                    &gen_result.content,
+                    &complete_payload,
                 )
                 .map_err(|e| format!("Failed to emit completion event: {}", e))?;
             Ok(gen_result.content)
@@ -284,6 +364,7 @@ pub async fn ai_send_message_stream(
 pub async fn ai_create_conversation(
     title: String,
     provider: ProviderType,
+    model: Option<String>,
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Conversation, String> {
     log_info!(
@@ -293,7 +374,7 @@ pub async fn ai_create_conversation(
         provider
     );
 
-    let conversation = Conversation::new(title.clone(), format!("{:?}", provider));
+    let conversation = Conversation::new(title.clone(), format!("{:?}", provider), model);
     log_debug!("AI", "Generated conversation ID: {}", conversation.id);
 
     let db = db_manager.get_connection();
@@ -302,6 +383,7 @@ pub async fn ai_create_conversation(
         id: Set(conversation.id.clone()),
         title: Set(conversation.title.clone()),
         provider: Set(conversation.provider.clone()),
+        model: Set(conversation.model.clone()),
         created_at: Set(conversation.created_at.clone()),
         updated_at: Set(conversation.updated_at.clone()),
     };
@@ -545,6 +627,33 @@ pub async fn ai_update_conversation_title(
         .update(db)
         .await
         .map_err(|e| format!("Failed to update conversation title: {}", e))?;
+
+    Ok(())
+}
+
+/// Update the model used for a conversation (allows mid-thread switching).
+#[tauri::command]
+pub async fn ai_update_conversation_model(
+    id: String,
+    model: Option<String>,
+    db_manager: State<'_, Arc<DatabaseManager>>,
+) -> Result<(), String> {
+    let db = db_manager.get_connection();
+
+    let mut conversation: ConversationActiveModel = ConversationEntity::find_by_id(&id)
+        .one(db)
+        .await
+        .map_err(|e| format!("Failed to find conversation: {}", e))?
+        .ok_or_else(|| "Conversation not found".to_string())?
+        .into();
+
+    conversation.model = Set(model);
+    conversation.updated_at = Set(chrono::Utc::now().to_rfc3339());
+
+    conversation
+        .update(db)
+        .await
+        .map_err(|e| format!("Failed to update conversation model: {}", e))?;
 
     Ok(())
 }

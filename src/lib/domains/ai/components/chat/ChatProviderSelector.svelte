@@ -1,7 +1,5 @@
 <script lang="ts">
-  import Select from "$lib/components/ui/select.svelte";
   import { Badge } from "$lib/components/ui/badge";
-  import Icon from "@iconify/svelte";
   import type { ProviderType } from "../../types/index.js";
   import { aiProviderService } from "../../services/aiProviderService.js";
 
@@ -15,10 +13,6 @@
     onProviderChange,
   }: Props = $props();
 
-  let providers = $state<Array<{ value: ProviderType; label: string }>>([
-    { value: "Ollama", label: "Ollama" },
-    { value: "Gemini", label: "Gemini" },
-  ]);
   let defaultProvider = $state<ProviderType | null>(null);
   let isLoading = $state(false);
 
@@ -26,11 +20,12 @@
     isLoading = true;
     try {
       defaultProvider = await aiProviderService.getDefaultProvider();
-      if (!selectedProvider && defaultProvider) {
-        selectedProvider = defaultProvider;
+      if (!selectedProvider) {
+        selectedProvider = defaultProvider ?? "AgentPlatform";
       }
-    } catch (error) {
-      console.error("Failed to load default provider:", error);
+      onProviderChange?.(selectedProvider ?? "AgentPlatform");
+    } catch {
+      selectedProvider = "AgentPlatform";
     } finally {
       isLoading = false;
     }
@@ -39,26 +34,15 @@
   $effect(() => {
     loadDefaultProvider();
   });
-
-  function handleProviderChange(value: string) {
-    const provider = value as ProviderType;
-    selectedProvider = provider;
-    if (onProviderChange) {
-      onProviderChange(provider);
-    }
-  }
 </script>
 
-<div class="flex items-center gap-2">
-  <Select
-    options={providers}
-    value={selectedProvider || undefined}
-    onSelect={handleProviderChange}
-    placeholder="Select provider"
-    disabled={isLoading}
-    class="w-[180px]"
-  />
-  {#if selectedProvider === defaultProvider}
-    <Badge variant="secondary" class="text-xs">Default</Badge>
+<div class="flex items-center gap-2 text-sm text-muted-foreground">
+  {#if isLoading}
+    <span>Loading provider…</span>
+  {:else}
+    <span>Agent Platform</span>
+    {#if selectedProvider === defaultProvider || selectedProvider === "AgentPlatform"}
+      <Badge variant="secondary" class="text-xs">Default</Badge>
+    {/if}
   {/if}
 </div>

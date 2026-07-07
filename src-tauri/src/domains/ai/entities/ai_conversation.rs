@@ -8,6 +8,7 @@ pub struct Model {
     pub id: String,
     pub title: String,
     pub provider: String,
+    pub model: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

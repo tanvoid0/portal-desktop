@@ -183,7 +183,9 @@ pub fn run() {
             domains::coder::coder_list_threads,
             domains::coder::coder_get_thread,
             domains::coder::coder_delete_thread,
+            domains::coder::coder_update_thread_model,
             domains::coder::coder_send,
+            domains::coder::coder_retry,
             domains::coder::coder_approve,
             domains::coder::coder_get_mode,
             domains::coder::coder_set_mode,
@@ -195,6 +197,10 @@ pub fn run() {
             domains::coder::coder_reject_change,
             domains::coder::coder_set_hunk,
             domains::coder::coder_modify_change,
+            domains::coder::coder_stop,
+            domains::coder::coder_list_running,
+            domains::coder::coder_get_context_usage,
+            domains::coder::coder_get_git_diff_stats,
             // Terminal commands
             domains::terminal::create_terminal_process,
             domains::terminal::send_terminal_input,
@@ -520,7 +526,7 @@ pub fn run() {
             domains::ai::commands::get_ai_provider_config,
             domains::ai::commands::test_ai_provider,
             domains::ai::commands::get_ai_provider_models,
-            domains::ai::commands::get_ai_available_ollama_models,
+            domains::ai::commands::get_ai_platform_catalog,
             domains::ai::commands::generate_ai_text,
             domains::ai::commands::generate_ai_text_with_system,
             // AI Chat commands
@@ -533,6 +539,7 @@ pub fn run() {
             domains::ai::commands::ai_list_conversations,
             domains::ai::commands::ai_delete_conversation,
             domains::ai::commands::ai_update_conversation_title,
+            domains::ai::commands::ai_update_conversation_model,
             // AI Log commands
             domains::ai::commands::ai_get_logs,
             domains::ai::commands::ai_search_logs,
@@ -571,6 +578,8 @@ pub fn run() {
             // Disk-cleanup commands (ported from portal_disk_utility)
             domains::disk::commands::scan_directory,
             domains::disk::commands::scan_projects,
+            domains::disk::commands::scan_dev_cleaners,
+            domains::disk::commands::clean_dev_items,
             domains::disk::commands::cancel_scan,
             domains::disk::commands::get_cached_scan,
             domains::disk::commands::remove_cached_scan,
@@ -583,8 +592,6 @@ pub fn run() {
             domains::disk::commands::disk_usage,
             domains::disk::commands::verify_proposals,
             domains::disk::commands::cancel_verify,
-            domains::disk::commands::list_ai_teams,
-            domains::disk::commands::provision_ai_team,
             domains::disk::commands::open_recycle_bin,
         ])
         .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build

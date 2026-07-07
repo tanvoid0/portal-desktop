@@ -32,6 +32,8 @@ pub mod m20260325_000029_add_preset_key_to_pipelines;
 pub mod m20260330_000030_create_deployments_table;
 pub mod m20260706_000031_create_coder_tables;
 pub mod m20260706_000032_create_coder_file_changes_table;
+pub mod m20260707_000033_add_model_to_ai_conversations;
+pub mod m20260707_000034_add_platform_thread_id_to_coder_threads;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -73,6 +75,10 @@ pub use m20260330_000030_create_deployments_table::Migration
 pub use m20260706_000031_create_coder_tables::Migration as createCoderTables;
 pub use m20260706_000032_create_coder_file_changes_table::Migration
     as createCoderFileChangesTable;
+pub use m20260707_000033_add_model_to_ai_conversations::Migration
+    as addModelToAiConversations;
+pub use m20260707_000034_add_platform_thread_id_to_coder_threads::Migration
+    as addPlatformThreadIdToCoderThreads;
 
 pub struct Migrator;
 
@@ -142,5 +148,7 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(createDeploymentsTable),
         Box::new(createCoderTables),
         Box::new(createCoderFileChangesTable),
+        Box::new(addModelToAiConversations),
+        Box::new(addPlatformThreadIdToCoderThreads),
     ]
 }
