@@ -272,7 +272,7 @@
         isLoading={isSending || isLoading}
         title={selectedConversation?.title || "AI Chat"}
         placeholder="Ask me anything..."
-        class="flex h-full flex-col"
+        class="flex h-full flex-col border-0 shadow-none"
         {conversationId}
         onSendMessageWithHistory={handleSendMessage}
       />
