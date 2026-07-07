@@ -3,12 +3,13 @@
   import { Button } from "$lib/components/ui/button";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
-  import { Bot, Send, User, Settings2, Trash2, Plus, MessageSquare } from "@lucide/svelte";
+  import { Bot, Send, User, Settings2, Trash2, Plus, MessageSquare, GitCompare } from "@lucide/svelte";
   import { coderService } from "../services/coderService.js";
   import type {
     ChatMessage,
     CoderRunResult,
     CoderThread,
+    FileChange,
     PendingApproval,
     PermissionMode,
     PermissionRule,
@@ -16,6 +17,7 @@
   } from "../types.js";
   import ToolCallCard from "./ToolCallCard.svelte";
   import ApprovalBanner from "./ApprovalBanner.svelte";
+  import ChangesPanel from "./ChangesPanel.svelte";
 
   let workspaceRoot = $state("");
   let thread = $state<CoderThread | null>(null);
@@ -31,6 +33,11 @@
   let mode = $state<PermissionMode>("review");
   let rules = $state<PermissionRule[]>([]);
   let showSettings = $state(false);
+  let changes = $state<FileChange[]>([]);
+  let showChanges = $state(false);
+  const pendingChangeCount = $derived(
+    changes.filter((c) => c.status === "pending").length,
+  );
 
   const MODES: { value: PermissionMode; label: string; hint: string }[] = [
     { value: "review", label: "Review", hint: "prompt on each mutating action" },
@@ -66,6 +73,12 @@
             streamingText = "";
             if (exhausted) error = "Agent hit the max iteration limit.";
           }
+        }),
+        await coderService.onChange(({ change }) => {
+          if (thread && change.thread_id !== thread.id) return;
+          const i = changes.findIndex((c) => c.id === change.id);
+          if (i >= 0) changes[i] = change;
+          else changes = [...changes, change];
         }),
       );
     })();
@@ -164,6 +177,10 @@
     threads = await coderService.listThreads();
   }
 
+  async function refreshChanges() {
+    changes = await coderService.listChanges(thread?.id);
+  }
+
   async function selectThread(id: string) {
     if (busy || running) return;
     const t = await coderService.getThread(id);
@@ -173,6 +190,7 @@
     workspaceRoot = t.workspace_root;
     pending = null;
     error = null;
+    await refreshChanges();
   }
 
   function newSession() {
@@ -182,6 +200,7 @@
     pending = null;
     error = null;
     workspaceRoot = "";
+    changes = [];
   }
 
   async function removeThread(id: string, e: MouseEvent) {
@@ -286,6 +305,25 @@
     </div>
 
     <Button
+      size="sm"
+      variant={showChanges ? "secondary" : "ghost"}
+      class="gap-1"
+      title="Review file changes"
+      onclick={() => {
+        showChanges = !showChanges;
+        if (showChanges) refreshChanges();
+      }}
+    >
+      <GitCompare class="h-4 w-4" />
+      Changes
+      {#if pendingChangeCount > 0}
+        <span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">
+          {pendingChangeCount}
+        </span>
+      {/if}
+    </Button>
+
+    <Button
       size="icon"
       variant="ghost"
       title="Permission rules"
@@ -294,6 +332,12 @@
       <Settings2 class="h-4 w-4" />
     </Button>
   </div>
+
+  {#if showChanges}
+    <div class="max-h-72 overflow-auto border-b border-border bg-muted/30 p-3">
+      <ChangesPanel {changes} onRefresh={refreshChanges} />
+    </div>
+  {/if}
 
   {#if showSettings}
     <div class="border-b border-border bg-muted/30 p-3 text-sm">

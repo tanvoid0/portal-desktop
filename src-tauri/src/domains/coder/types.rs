@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::diff::Hunk;
+
 /// A single chat message in a thread transcript. This mirrors the OpenAI
 /// chat-completions message shape so it can be sent to the platform `/v1`
 /// proxy verbatim.
@@ -119,6 +121,41 @@ impl Default for PermissionMode {
     fn default() -> Self {
         PermissionMode::Review
     }
+}
+
+/// Review status of a file change produced by the agent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ChangeStatus {
+    /// Applied to disk, awaiting the user's accept/reject decision.
+    Pending,
+    /// User kept the change.
+    Accepted,
+    /// User reverted the change (disk restored to `before`).
+    Rejected,
+}
+
+/// A single file edit made by the agent, tracked for Cursor-style review.
+/// The edit is already on disk; `before` + `hunks` let the user accept/reject
+/// the whole change or individual hunks (which rewrites the file on disk).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileChange {
+    pub id: String,
+    pub thread_id: String,
+    /// Path relative to the workspace root.
+    pub path: String,
+    /// The tool that produced it (`write_file` | `edit_file`).
+    pub tool: String,
+    /// Snapshot of the file before the edit (empty string if newly created).
+    pub before: String,
+    /// The full content originally written by the agent.
+    pub original_after: String,
+    /// Per-block decisions; disk content = rebuild(before, hunks).
+    pub hunks: Vec<Hunk>,
+    /// True when the file did not exist before this change.
+    pub created: bool,
+    pub status: ChangeStatus,
+    pub created_at: String,
 }
 
 /// A persisted allow/deny rule for a tool.

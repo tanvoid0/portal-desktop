@@ -11,6 +11,7 @@
 //!   platform's sandboxed Python executor.
 
 pub mod commands;
+pub mod diff;
 pub mod entities;
 pub mod permissions;
 pub mod service;

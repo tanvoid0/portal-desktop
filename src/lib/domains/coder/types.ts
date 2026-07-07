@@ -39,6 +39,29 @@ export interface CoderRunResult {
   exhausted: boolean;
 }
 
+export interface Hunk {
+  index: number;
+  before_start: number;
+  before_lines: string[];
+  after_lines: string[];
+  accepted: boolean;
+}
+
+export type ChangeStatus = "pending" | "accepted" | "rejected";
+
+export interface FileChange {
+  id: string;
+  thread_id: string;
+  path: string;
+  tool: string;
+  before: string;
+  original_after: string;
+  hunks: Hunk[];
+  created: boolean;
+  status: ChangeStatus;
+  created_at: string;
+}
+
 export type PermissionMode = "auto-accept-all" | "review" | "plan";
 
 export interface PermissionRule {

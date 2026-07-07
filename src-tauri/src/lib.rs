@@ -190,6 +190,11 @@ pub fn run() {
             domains::coder::coder_list_rules,
             domains::coder::coder_add_rule,
             domains::coder::coder_remove_rule,
+            domains::coder::coder_list_changes,
+            domains::coder::coder_accept_change,
+            domains::coder::coder_reject_change,
+            domains::coder::coder_set_hunk,
+            domains::coder::coder_modify_change,
             // Terminal commands
             domains::terminal::create_terminal_process,
             domains::terminal::send_terminal_input,

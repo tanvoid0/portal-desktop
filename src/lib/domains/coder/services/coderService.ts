@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   CoderRunResult,
   CoderThread,
+  FileChange,
   PendingApproval,
   PermissionMode,
   PermissionRule,
@@ -73,6 +74,37 @@ export class CoderService {
 
   removeRule(tool: string, pattern: string): Promise<void> {
     return invoke<void>("coder_remove_rule", { tool, pattern });
+  }
+
+  // ---- change review (Cursor-style) ---------------------------------
+
+  listChanges(threadId?: string): Promise<FileChange[]> {
+    return invoke<FileChange[]>("coder_list_changes", {
+      threadId: threadId ?? null,
+    });
+  }
+
+  acceptChange(changeId: string): Promise<void> {
+    return invoke<void>("coder_accept_change", { changeId });
+  }
+
+  rejectChange(changeId: string): Promise<void> {
+    return invoke<void>("coder_reject_change", { changeId });
+  }
+
+  /** Accept or reject a single hunk; rewrites the file on disk. */
+  setHunk(changeId: string, hunkIndex: number, accepted: boolean): Promise<void> {
+    return invoke<void>("coder_set_hunk", { changeId, hunkIndex, accepted });
+  }
+
+  /** Overwrite the file with manually edited content. */
+  modifyChange(changeId: string, content: string): Promise<void> {
+    return invoke<void>("coder_modify_change", { changeId, content });
+  }
+
+  /** A change was created or updated. */
+  onChange(cb: (p: { change: FileChange }) => void): Promise<UnlistenFn> {
+    return listen<{ change: FileChange }>("coder://change", (e) => cb(e.payload));
   }
 
   // ---- live streaming events (emitted during a run) ------------------

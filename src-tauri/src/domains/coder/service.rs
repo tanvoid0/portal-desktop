@@ -23,12 +23,13 @@ use tokio::sync::Mutex;
 
 use crate::database::DatabaseManager;
 
-use super::entities::{coder_setting, coder_thread};
+use super::diff;
+use super::entities::{coder_file_change, coder_setting, coder_thread};
 use super::permissions::{self, Decision};
 use super::tools;
 use super::types::{
-    ChatMessage, CoderRunResult, CoderThread, PendingApproval, PermissionMode, PermissionRule,
-    ToolCall,
+    ChangeStatus, ChatMessage, CoderRunResult, CoderThread, FileChange, PendingApproval,
+    PermissionMode, PermissionRule, ToolCall,
 };
 
 /// Persisted permission config (mode + rules) stored as one JSON row.
@@ -57,6 +58,8 @@ pub struct CoderService {
     threads: Mutex<HashMap<String, CoderThread>>,
     rules: Mutex<Vec<PermissionRule>>,
     mode: Mutex<PermissionMode>,
+    /// Agent file edits awaiting or completed review (Cursor-style).
+    changes: Mutex<Vec<FileChange>>,
     client: reqwest::Client,
     base_url: String,
     master_key: Option<String>,
@@ -82,6 +85,7 @@ impl CoderService {
             threads: Mutex::new(HashMap::new()),
             rules: Mutex::new(Vec::new()),
             mode: Mutex::new(PermissionMode::default()),
+            changes: Mutex::new(Vec::new()),
             client: reqwest::Client::new(),
             base_url,
             master_key,
@@ -226,6 +230,180 @@ impl CoderService {
                 *self.rules.lock().await = blob.rules;
             }
         }
+
+        if let Ok(rows) = coder_file_change::Entity::find().all(conn).await {
+            let mut changes = self.changes.lock().await;
+            for row in rows {
+                if let Ok(fc) = serde_json::from_str::<FileChange>(&row.data_json) {
+                    changes.push(fc);
+                }
+            }
+        }
+    }
+
+    async fn persist_change(&self, change: &FileChange) {
+        let data_json = serde_json::to_string(change).unwrap_or_else(|_| "{}".into());
+        let status = serde_json::to_value(change.status)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_else(|| "pending".into());
+        let am = coder_file_change::ActiveModel {
+            id: Set(change.id.clone()),
+            thread_id: Set(change.thread_id.clone()),
+            path: Set(change.path.clone()),
+            status: Set(status),
+            data_json: Set(data_json),
+            created_at: Set(change.created_at.clone()),
+        };
+        let res = coder_file_change::Entity::insert(am)
+            .on_conflict(
+                OnConflict::column(coder_file_change::Column::Id)
+                    .update_columns([
+                        coder_file_change::Column::Status,
+                        coder_file_change::Column::DataJson,
+                    ])
+                    .to_owned(),
+            )
+            .exec(self.db.get_connection())
+            .await;
+        if let Err(e) = res {
+            eprintln!("coder: persist change failed: {e}");
+        }
+    }
+
+    /// Record a file edit for review. The edit is already on disk; we snapshot
+    /// `before`, read the resulting content, and compute reviewable hunks.
+    async fn record_change(
+        &self,
+        thread_id: &str,
+        tool: &str,
+        root: &str,
+        path: String,
+        before: Option<String>,
+    ) {
+        let after = tools::read_raw(root, &path).unwrap_or_default();
+        let before_str = before.clone().unwrap_or_default();
+        if after == before_str {
+            return; // tool failed or no-op; nothing to review
+        }
+        let change = FileChange {
+            id: uuid::Uuid::new_v4().to_string(),
+            thread_id: thread_id.to_string(),
+            path,
+            tool: tool.to_string(),
+            hunks: diff::compute_hunks(&before_str, &after),
+            before: before_str,
+            original_after: after,
+            created: before.is_none(),
+            status: ChangeStatus::Pending,
+            created_at: now_iso(),
+        };
+        self.changes.lock().await.push(change.clone());
+        self.persist_change(&change).await;
+        self.emit("coder://change", json!({ "change": change }));
+    }
+
+    // ---- change review (public) ---------------------------------------
+
+    pub async fn list_changes(&self, thread_id: Option<&str>) -> Vec<FileChange> {
+        let changes = self.changes.lock().await;
+        changes
+            .iter()
+            .filter(|c| thread_id.map(|t| c.thread_id == t).unwrap_or(true))
+            .cloned()
+            .collect()
+    }
+
+    /// Rewrite the file on disk from `before` + the current hunk decisions and
+    /// persist the change.
+    async fn rewrite_from_hunks(&self, change: &FileChange, root: &str) -> Result<(), String> {
+        let content = diff::rebuild(&change.before, &change.hunks);
+        tools::write_raw(root, &change.path, &content)
+    }
+
+    async fn workspace_root_for(&self, thread_id: &str) -> Option<String> {
+        self.get_thread(thread_id).await.map(|t| t.workspace_root)
+    }
+
+    /// Accept the whole change: all hunks kept, disk = original_after.
+    pub async fn accept_change(&self, change_id: &str) -> Result<(), String> {
+        self.update_change(change_id, |c| {
+            for h in &mut c.hunks {
+                h.accepted = true;
+            }
+            c.status = ChangeStatus::Accepted;
+        })
+        .await
+    }
+
+    /// Reject the whole change: disk restored to `before`.
+    pub async fn reject_change(&self, change_id: &str) -> Result<(), String> {
+        self.update_change(change_id, |c| {
+            for h in &mut c.hunks {
+                h.accepted = false;
+            }
+            c.status = ChangeStatus::Rejected;
+        })
+        .await
+    }
+
+    /// Toggle a single hunk and rewrite the file.
+    pub async fn set_hunk(&self, change_id: &str, hunk_index: usize, accepted: bool) -> Result<(), String> {
+        self.update_change(change_id, |c| {
+            if let Some(h) = c.hunks.iter_mut().find(|h| h.index == hunk_index) {
+                h.accepted = accepted;
+            }
+            // Any per-hunk touch means it's under active review, not final.
+            c.status = ChangeStatus::Pending;
+        })
+        .await
+    }
+
+    /// Replace the file content wholesale (user's manual edit) and recompute
+    /// the change against the original `before`.
+    pub async fn modify_change(&self, change_id: &str, new_content: String) -> Result<(), String> {
+        let (thread_id, path, before) = {
+            let changes = self.changes.lock().await;
+            let c = changes.iter().find(|c| c.id == change_id).ok_or("change not found")?;
+            (c.thread_id.clone(), c.path.clone(), c.before.clone())
+        };
+        let root = self.workspace_root_for(&thread_id).await.ok_or("thread not found")?;
+        tools::write_raw(&root, &path, &new_content)?;
+        let mut changes = self.changes.lock().await;
+        if let Some(c) = changes.iter_mut().find(|c| c.id == change_id) {
+            c.hunks = diff::compute_hunks(&before, &new_content);
+            c.original_after = new_content;
+            c.status = ChangeStatus::Pending;
+            let snapshot = c.clone();
+            drop(changes);
+            self.persist_change(&snapshot).await;
+            self.emit("coder://change", json!({ "change": snapshot }));
+        }
+        Ok(())
+    }
+
+    /// Shared helper: mutate a change in memory, rewrite disk, persist, emit.
+    async fn update_change(
+        &self,
+        change_id: &str,
+        mutate: impl FnOnce(&mut FileChange),
+    ) -> Result<(), String> {
+        let (snapshot, root) = {
+            let mut changes = self.changes.lock().await;
+            let c = changes.iter_mut().find(|c| c.id == change_id).ok_or("change not found")?;
+            mutate(c);
+            let snapshot = c.clone();
+            drop(changes);
+            let root = self
+                .workspace_root_for(&snapshot.thread_id)
+                .await
+                .ok_or("thread not found")?;
+            (snapshot, root)
+        };
+        self.rewrite_from_hunks(&snapshot, &root).await?;
+        self.persist_change(&snapshot).await;
+        self.emit("coder://change", json!({ "change": snapshot }));
+        Ok(())
     }
 
     async fn persist_thread(&self, thread_id: &str) {
@@ -446,16 +624,24 @@ impl CoderService {
 
                         match decision {
                             Decision::Allow => {
-                                let result = if tools::is_platform_tool(&call.function.name) {
-                                    self.execute_platform_tool(&call.function.name, &args)
+                                let name = call.function.name.clone();
+                                // Snapshot before-content for change review.
+                                let mutated = tools::mutated_path(&name, &args);
+                                let before = mutated.as_ref().map(|p| tools::read_raw(&root, p));
+                                let result = if tools::is_platform_tool(&name) {
+                                    self.execute_platform_tool(&name, &args)
                                         .await
                                         .unwrap_or_else(|e| format!("tool error: {e}"))
                                 } else {
-                                    tools::execute(&root, &call.function.name, &args)
+                                    tools::execute(&root, &name, &args)
                                         .unwrap_or_else(|e| format!("tool error: {e}"))
                                 };
                                 self.push_message(thread_id, ChatMessage::tool_result(&call.id, result))
                                     .await;
+                                if let Some(path) = mutated {
+                                    self.record_change(thread_id, &name, &root, path, before.flatten())
+                                        .await;
+                                }
                             }
                             Decision::Deny(reason) => {
                                 self.push_message(

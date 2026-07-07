@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use super::service::CoderService;
-use super::types::{CoderRunResult, CoderThread, PermissionMode, PermissionRule};
+use super::types::{CoderRunResult, CoderThread, FileChange, PermissionMode, PermissionRule};
 
 #[tauri::command]
 pub async fn coder_create_thread(
@@ -102,4 +102,49 @@ pub async fn coder_remove_rule(
 ) -> Result<(), String> {
     service.remove_rule(&tool, &pattern).await;
     Ok(())
+}
+
+// ---- change review ----------------------------------------------------
+
+#[tauri::command]
+pub async fn coder_list_changes(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: Option<String>,
+) -> Result<Vec<FileChange>, String> {
+    Ok(service.list_changes(thread_id.as_deref()).await)
+}
+
+#[tauri::command]
+pub async fn coder_accept_change(
+    service: State<'_, Arc<CoderService>>,
+    change_id: String,
+) -> Result<(), String> {
+    service.accept_change(&change_id).await
+}
+
+#[tauri::command]
+pub async fn coder_reject_change(
+    service: State<'_, Arc<CoderService>>,
+    change_id: String,
+) -> Result<(), String> {
+    service.reject_change(&change_id).await
+}
+
+#[tauri::command]
+pub async fn coder_set_hunk(
+    service: State<'_, Arc<CoderService>>,
+    change_id: String,
+    hunk_index: usize,
+    accepted: bool,
+) -> Result<(), String> {
+    service.set_hunk(&change_id, hunk_index, accepted).await
+}
+
+#[tauri::command]
+pub async fn coder_modify_change(
+    service: State<'_, Arc<CoderService>>,
+    change_id: String,
+    content: String,
+) -> Result<(), String> {
+    service.modify_change(&change_id, content).await
 }

@@ -112,6 +112,33 @@ pub fn is_platform_tool(tool: &str) -> bool {
     matches!(tool, "delegate_task")
 }
 
+/// The relative path a file-mutating tool targets, for change tracking.
+pub fn mutated_path(tool: &str, args: &Value) -> Option<String> {
+    match tool {
+        "write_file" | "edit_file" => {
+            args.get("path").and_then(Value::as_str).map(str::to_string)
+        }
+        _ => None,
+    }
+}
+
+/// Read a file under `root`, returning `None` if it does not exist. Used to
+/// snapshot `before` content for change review.
+pub fn read_raw(root: &str, rel: &str) -> Option<String> {
+    let path = resolve(root, rel).ok()?;
+    std::fs::read_to_string(path).ok()
+}
+
+/// Write raw content to a file under `root` (used when accepting/rejecting a
+/// reviewed change rewrites the file). Creates parent dirs.
+pub fn write_raw(root: &str, rel: &str, content: &str) -> Result<(), String> {
+    let path = resolve(root, rel)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {e}"))?;
+    }
+    std::fs::write(&path, content).map_err(|e| format!("write {rel}: {e}"))
+}
+
 /// A tool that does not change disk or run processes — never needs approval.
 /// Platform delegation is *not* read-only (it spends compute / runs agents).
 pub fn is_read_only(tool: &str) -> bool {
