@@ -327,7 +327,7 @@
 
   // Switch to terminal tab
   function switchToTerminal() {
-    activeTab = "terminal";
+    setActiveTab("terminal");
     const projectId = getValidProjectId(projectIdParam);
     log.info("Switched to terminal tab for project", { projectId });
   }
@@ -620,7 +620,7 @@
     }
 
     if (kind === "start") {
-      activeTab = "terminal";
+      setActiveTab("terminal");
       toast.info(`No dev pipeline found. Run in terminal: ${command}`);
       return;
     }
@@ -678,7 +678,7 @@
       tabParam &&
       ["overview", "dependencies", "pipelines", "terminal"].includes(tabParam)
     ) {
-      activeTab = tabParam;
+      setActiveTab(tabParam as ProjectTab);
     }
     loadPipelines();
   });

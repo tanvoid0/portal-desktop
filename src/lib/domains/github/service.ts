@@ -1,4 +1,5 @@
 import { invokeClient } from "$lib/utils/invokeClient";
+import { openExternalUrl } from "$lib/utils/tauri";
 import { logger } from "$lib/domains/shared/services/logger";
 import { normalizeProject } from "$lib/domains/projects/utils/normalizeProject";
 import { queryClient } from "$lib/domains/shared/query";
@@ -8,6 +9,7 @@ import type {
   GitHubCloneRepositoryRequest,
   GitHubConnectionStatus,
   GitHubCreateIssueRequest,
+  GitHubDeviceFlowCallbacks,
   GitHubDeviceFlowPollResult,
   GitHubDeviceFlowStart,
   GitHubIssue,
@@ -22,6 +24,47 @@ import type {
 } from "./types";
 
 const log = logger.createScoped("GitHubService");
+
+const DEVICE_FLOW_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+        timeoutMs,
+      );
+    }),
+  ]);
+}
+
+function isPollResult(value: unknown): value is GitHubDeviceFlowPollResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "status" in value &&
+    typeof (value as GitHubDeviceFlowPollResult).status === "string"
+  );
+}
+
+function formatDeviceFlowError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    message.includes("Failed to fetch") ||
+    message.includes("CONNECTION_REFUSED") ||
+    message.includes("Tauri environment required")
+  ) {
+    return new Error(
+      "Lost connection to the desktop app backend. Restart Portal Desktop and try again.",
+    );
+  }
+  return new Error(`GitHub authorization check failed: ${message}`);
+}
 
 class GitHubService {
   async getConnectionStatus(): Promise<GitHubConnectionStatus> {
@@ -40,14 +83,44 @@ class GitHubService {
     });
   }
 
-  async connectWithDeviceFlow(scope?: string): Promise<GitHubConnectionStatus> {
-    const started = await this.startDeviceFlow(scope);
+  async connectWithDeviceFlow(
+    scope?: string,
+    callbacks?: GitHubDeviceFlowCallbacks,
+  ): Promise<GitHubConnectionStatus> {
+    const started = await withTimeout(
+      this.startDeviceFlow(scope),
+      DEVICE_FLOW_TIMEOUT_MS,
+      "GitHub device flow start",
+    );
+
+    await callbacks?.onStarted?.(started);
+
     const target = started.verificationUriComplete || started.verificationUri;
-    window.open(target, "_blank", "noopener,noreferrer");
+    try {
+      await openExternalUrl(target);
+    } catch (error) {
+      log.warn("Failed to open GitHub authorization URL automatically", error);
+    }
 
     const startedAt = Date.now();
     while (Date.now() - startedAt < started.expiresIn * 1000) {
-      const polled = await this.pollDeviceFlow(started.deviceCode);
+      await callbacks?.onPolling?.();
+
+      let polled: GitHubDeviceFlowPollResult;
+      try {
+        polled = await withTimeout(
+          this.pollDeviceFlow(started.deviceCode),
+          DEVICE_FLOW_TIMEOUT_MS,
+          "GitHub authorization check",
+        );
+      } catch (error) {
+        throw formatDeviceFlowError(error);
+      }
+
+      if (!isPollResult(polled)) {
+        throw new Error("Invalid response while checking GitHub authorization");
+      }
+
       if (polled.status === "connected") {
         await this.invalidateGitHubCaches();
         return this.getConnectionStatus();
@@ -58,7 +131,14 @@ class GitHubService {
       if (polled.status === "error") {
         throw new Error(polled.message || "GitHub login failed");
       }
-      const delayMs = (polled.retryAfterSeconds || started.interval || 5) * 1000;
+      if (polled.status !== "pending") {
+        throw new Error(
+          polled.message || `Unexpected GitHub login status: ${polled.status}`,
+        );
+      }
+
+      const delayMs =
+        (polled.retryAfterSeconds || started.interval || 5) * 1000;
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 

@@ -30,6 +30,18 @@ pub struct DockerStatus {
     pub message: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ContainerResourceStats {
+    pub cpu_percent: f64,
+    pub memory_bytes: u64,
+    pub memory_limit_bytes: u64,
+    pub memory_percent: f64,
+    pub network_rx_bytes: u64,
+    pub network_tx_bytes: u64,
+    pub block_read_bytes: u64,
+    pub block_write_bytes: u64,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DockerContainer {
     pub id: String,
@@ -38,6 +50,47 @@ pub struct DockerContainer {
     pub status: String,
     pub ports: Vec<String>,
     pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_stats: Option<ContainerResourceStats>,
+}
+
+fn parse_percent(value: &str) -> f64 {
+    value.trim().trim_end_matches('%').parse().unwrap_or(0.0)
+}
+
+fn parse_docker_bytes(value: &str) -> u64 {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed == "0" || trimmed == "0B" {
+        return 0;
+    }
+
+    let num_end = trimmed
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .count();
+    let num_str = &trimmed[..num_end];
+    let unit = trimmed[num_end..].trim();
+
+    let num: f64 = num_str.parse().unwrap_or(0.0);
+    let multiplier: f64 = match unit.to_uppercase().as_str() {
+        "B" => 1.0,
+        "KB" | "KIB" => 1024.0,
+        "MB" | "MIB" => 1024.0 * 1024.0,
+        "GB" | "GIB" => 1024.0 * 1024.0 * 1024.0,
+        "TB" | "TIB" => 1024.0 * 1024.0 * 1024.0 * 1024.0,
+        _ => 1.0,
+    };
+
+    (num * multiplier) as u64
+}
+
+fn parse_io_pair(value: &str) -> (u64, u64) {
+    let parts: Vec<&str> = value.split('/').map(str::trim).collect();
+    if parts.len() == 2 {
+        (parse_docker_bytes(parts[0]), parse_docker_bytes(parts[1]))
+    } else {
+        (0, 0)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -266,12 +319,87 @@ impl DockerService {
                         .filter(|s| !s.is_empty())
                         .collect(),
                     created_at: container["CreatedAt"].as_str().unwrap_or("").to_string(),
+                    resource_stats: None,
                 };
                 containers.push(container);
             }
         }
 
+        // Attach live resource stats for running containers
+        if let Ok(stats_map) = self.list_container_stats().await {
+            for container in &mut containers {
+                if let Some(stats) = stats_map.get(&container.id) {
+                    container.resource_stats = Some(stats.clone());
+                } else if let Some(stats) = stats_map.get(&container.name) {
+                    container.resource_stats = Some(stats.clone());
+                }
+            }
+        }
+
         Ok(containers)
+    }
+
+    /// Fetch live resource usage for all running containers via `docker stats`
+    pub async fn list_container_stats(
+        &self,
+    ) -> Result<std::collections::HashMap<String, ContainerResourceStats>, String> {
+        let output = Command::new("docker")
+            .no_window()
+            .args(["stats", "--no-stream", "--format", "{{json .}}"])
+            .output()
+            .await
+            .map_err(|e| format!("Failed to get container stats: {}", e))?;
+
+        if !output.status.success() {
+            // No running containers or stats unavailable — return empty map
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stderr.contains("No such container") || stderr.is_empty() {
+                return Ok(std::collections::HashMap::new());
+            }
+            return Err(format!("Docker stats failed: {}", stderr));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut stats_map = std::collections::HashMap::new();
+
+        for line in stdout.lines().filter(|l| !l.trim().is_empty()) {
+            if let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) {
+                let id = entry["ID"].as_str().unwrap_or("").to_string();
+                let name = entry["Name"]
+                    .as_str()
+                    .unwrap_or("")
+                    .trim_start_matches('/')
+                    .to_string();
+
+                let (mem_used, mem_limit) = parse_io_pair(
+                    entry["MemUsage"].as_str().unwrap_or("0B / 0B"),
+                );
+                let (net_rx, net_tx) =
+                    parse_io_pair(entry["NetIO"].as_str().unwrap_or("0B / 0B"));
+                let (block_read, block_write) =
+                    parse_io_pair(entry["BlockIO"].as_str().unwrap_or("0B / 0B"));
+
+                let stats = ContainerResourceStats {
+                    cpu_percent: parse_percent(entry["CPUPerc"].as_str().unwrap_or("0%")),
+                    memory_bytes: mem_used,
+                    memory_limit_bytes: mem_limit,
+                    memory_percent: parse_percent(entry["MemPerc"].as_str().unwrap_or("0%")),
+                    network_rx_bytes: net_rx,
+                    network_tx_bytes: net_tx,
+                    block_read_bytes: block_read,
+                    block_write_bytes: block_write,
+                };
+
+                if !id.is_empty() {
+                    stats_map.insert(id.clone(), stats.clone());
+                }
+                if !name.is_empty() {
+                    stats_map.insert(name, stats);
+                }
+            }
+        }
+
+        Ok(stats_map)
     }
 
     /// Build a Docker image with progress tracking

@@ -20,6 +20,7 @@
   import { confirmAction } from "$lib/utils/confirm";
   import DeploymentCard from "./DeploymentCard.svelte";
   import ContainerCard from "./ContainerCard.svelte";
+  import ContainerOverview from "./ContainerOverview.svelte";
   import DockerStatusBanner from "./DockerStatusBanner.svelte";
   import { Button } from "$lib/components/ui/button";
   import {
@@ -46,7 +47,6 @@
   import {
     Plus,
     Search,
-    Filter,
     Rocket,
     Container as ContainerIcon,
     Play,
@@ -56,11 +56,12 @@
     RefreshCw,
     Box,
   } from "@lucide/svelte";
-  import type { DeploymentStatus } from "../types";
+  import type { DeploymentStatus, DockerContainer } from "../types";
+  import { containerStatusGroup } from "../utils/format";
 
   type TabValue = "deployments" | "containers";
 
-  let activeTab = $state<TabValue>("deployments");
+  let activeTab = $state<TabValue>("containers");
   let searchQuery = $state("");
   let selectedStatus = $state<DeploymentStatus | null>(null);
   let containerSearchQuery = $state("");
@@ -131,7 +132,10 @@
   }
 
   async function handleRefresh() {
-    if (activeTab === "deployments") {
+    if (activeTab === "containers") {
+      await loadContainers();
+      toast.success("Containers refreshed");
+    } else {
       try {
         await deploymentActions.refreshDeploymentStatuses();
         toast.success("Deployment statuses refreshed");
@@ -142,8 +146,6 @@
         });
         toast.error("Failed to refresh deployment statuses");
       }
-    } else {
-      await loadContainers();
     }
   }
 
@@ -200,18 +202,40 @@
     }
   }
 
-  function getContainerStats() {
-    const containersList = containerList;
-    const running = containersList.filter((c: any) => {
-      const status = c.status?.toLowerCase() || "";
-      return status.includes("running") || status.includes("up");
-    }).length;
-    return {
-      total: containersList.length,
-      running,
-      stopped: containersList.length - running,
-    };
+  function filterContainers(list: DockerContainer[]): DockerContainer[] {
+    if (!containerSearchQuery) return list;
+    const query = containerSearchQuery.toLowerCase();
+    return list.filter(
+      (c) =>
+        c.name?.toLowerCase().includes(query) ||
+        c.image?.toLowerCase().includes(query) ||
+        c.id?.toLowerCase().includes(query),
+    );
   }
+
+  function groupContainers(list: DockerContainer[]) {
+    const filtered = filterContainers(list);
+    const groups: { key: string; label: string; items: DockerContainer[] }[] =
+      [
+        { key: "running", label: "Running", items: [] },
+        { key: "stopped", label: "Stopped", items: [] },
+        { key: "other", label: "Other", items: [] },
+      ];
+
+    for (const c of filtered) {
+      const group = containerStatusGroup(c.status);
+      const target = groups.find((g) => g.key === group);
+      target?.items.push(c);
+    }
+
+    for (const g of groups) {
+      g.items.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return groups.filter((g) => g.items.length > 0);
+  }
+
+  let groupedContainers = $derived(groupContainers(containerList));
 
   function getStatusColor(status: DeploymentStatus): string {
     return deploymentService.getStatusColor(status);
@@ -228,10 +252,10 @@
     <div>
       <h1 class="flex items-center gap-2 text-3xl font-bold tracking-tight">
         <ContainerIcon class="h-8 w-8" />
-        Deployments & Containers
+        Local Docker
       </h1>
       <p class="text-muted-foreground">
-        Local Docker containers
+        Containers, resource usage, and Portal-managed deployments
       </p>
     </div>
     <div class="flex gap-2">
@@ -272,15 +296,111 @@
   <!-- Tabs -->
   <Tabs bind:value={activeTab} class="w-full">
     <TabsList class="grid w-full grid-cols-2">
-      <TabsTrigger value="deployments">
-        <Rocket class="mr-2 h-4 w-4" />
-        Deployments
-      </TabsTrigger>
       <TabsTrigger value="containers">
         <Box class="mr-2 h-4 w-4" />
         Containers
       </TabsTrigger>
+      <TabsTrigger value="deployments">
+        <Rocket class="mr-2 h-4 w-4" />
+        Deployments
+      </TabsTrigger>
     </TabsList>
+
+    <!-- Containers Tab -->
+    <TabsContent value="containers" class="mt-6 space-y-6">
+      <ContainerOverview containers={containerList} />
+
+      <!-- Container Search -->
+      <div class="flex flex-col gap-4 sm:flex-row">
+        <div class="flex-1">
+          <div class="relative">
+            <Search
+              class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+            />
+            <Input
+              placeholder="Search containers by name, image, or ID..."
+              bind:value={containerSearchQuery}
+              class="pl-10"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      {#if isLoadingContainers}
+        <div class="grid gap-4 md:grid-cols-2">
+          {#each Array(4) as _}
+            <Card>
+              <CardHeader>
+                <div class="h-4 animate-pulse rounded bg-muted"></div>
+                <div class="h-3 w-2/3 animate-pulse rounded bg-muted"></div>
+              </CardHeader>
+              <CardContent>
+                <div class="space-y-2">
+                  <div class="h-3 animate-pulse rounded bg-muted"></div>
+                  <div class="h-3 w-1/2 animate-pulse rounded bg-muted"></div>
+                </div>
+              </CardContent>
+            </Card>
+          {/each}
+        </div>
+      {/if}
+
+      <!-- Grouped Containers -->
+      {#if !isLoadingContainers && groupedContainers.length > 0}
+        {#each groupedContainers as group (group.key)}
+          <section class="space-y-3">
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                {group.label}
+              </h2>
+              <Badge variant="outline" class="tabular-nums">
+                {group.items.length}
+              </Badge>
+            </div>
+            <div class="grid gap-4 md:grid-cols-2">
+              {#each group.items as container (container.id)}
+                <ContainerCard
+                  {container}
+                  onStart={handleContainerStart}
+                  onStop={handleContainerStop}
+                  onRemove={handleContainerRemove}
+                />
+              {/each}
+            </div>
+          </section>
+        {/each}
+      {/if}
+
+      <!-- Empty State -->
+      {#if !isLoadingContainers && containerList.length === 0}
+        <Card>
+          <CardContent class="flex flex-col items-center justify-center py-12">
+            <ContainerIcon class="mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 class="mb-2 text-lg font-semibold">
+              {dockerOffline ? "Docker Is Offline" : "No Containers Found"}
+            </h3>
+            <p class="mb-4 text-center text-muted-foreground">
+              {#if dockerOffline}
+                Start Docker Desktop using the banner above, then retry.
+              {:else if containerSearchQuery}
+                Try adjusting your search
+              {:else}
+                No Docker containers are running or stopped
+              {/if}
+            </p>
+          </CardContent>
+        </Card>
+      {:else if !isLoadingContainers && groupedContainers.length === 0 && containerSearchQuery}
+        <Card>
+          <CardContent class="flex flex-col items-center justify-center py-8">
+            <p class="text-muted-foreground">
+              No containers match "{containerSearchQuery}"
+            </p>
+          </CardContent>
+        </Card>
+      {/if}
+    </TabsContent>
 
     <!-- Deployments Tab -->
     <TabsContent value="deployments" class="mt-6 space-y-6">
@@ -424,134 +544,6 @@
                 New Deployment
               </Button>
             {/if}
-          </CardContent>
-        </Card>
-      {/if}
-    </TabsContent>
-
-    <!-- Containers Tab -->
-    <TabsContent value="containers" class="mt-6 space-y-6">
-      <!-- Container Stats -->
-      {@const containerStats = getContainerStats()}
-      <div class="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader
-            class="flex flex-row items-center justify-between space-y-0 pb-2"
-          >
-            <CardTitle class="text-sm font-medium">Total Containers</CardTitle>
-            <ContainerIcon class="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold">{containerStats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader
-            class="flex flex-row items-center justify-between space-y-0 pb-2"
-          >
-            <CardTitle class="text-sm font-medium">Running</CardTitle>
-            <Badge variant="default" class="bg-green-100 text-green-800">
-              <Play class="mr-1 h-3 w-3" />
-              {containerStats.running}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold text-green-600">
-              {containerStats.running}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader
-            class="flex flex-row items-center justify-between space-y-0 pb-2"
-          >
-            <CardTitle class="text-sm font-medium">Stopped</CardTitle>
-            <Badge variant="outline">
-              <Square class="mr-1 h-3 w-3" />
-              {containerStats.stopped}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold text-gray-600">
-              {containerStats.stopped}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <!-- Container Search -->
-      <div class="flex flex-col gap-4 sm:flex-row">
-        <div class="flex-1">
-          <div class="relative">
-            <Search
-              class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
-            />
-            <Input
-              placeholder="Search containers..."
-              bind:value={containerSearchQuery}
-              class="pl-10"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Loading State -->
-      {#if isLoadingContainers}
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {#each Array(6) as _}
-            <Card>
-              <CardHeader>
-                <div class="h-4 animate-pulse rounded bg-muted"></div>
-                <div class="h-3 w-2/3 animate-pulse rounded bg-muted"></div>
-              </CardHeader>
-              <CardContent>
-                <div class="space-y-2">
-                  <div class="h-3 animate-pulse rounded bg-muted"></div>
-                  <div class="h-3 w-1/2 animate-pulse rounded bg-muted"></div>
-                </div>
-              </CardContent>
-            </Card>
-          {/each}
-        </div>
-      {/if}
-
-      <!-- Containers Grid -->
-      {#if !isLoadingContainers && containerList.length > 0}
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {#each containerList.filter((c) => {
-            if (!containerSearchQuery) return true;
-            const query = containerSearchQuery.toLowerCase();
-            return c.name?.toLowerCase().includes(query) || c.image
-                ?.toLowerCase()
-                .includes(query) || c.id?.toLowerCase().includes(query);
-          }) as container}
-            <ContainerCard
-              {container}
-              onStart={handleContainerStart}
-              onStop={handleContainerStop}
-              onRemove={handleContainerRemove}
-            />
-          {/each}
-        </div>
-      {/if}
-
-      <!-- Empty State -->
-      {#if !isLoadingContainers && containerList.length === 0}
-        <Card>
-          <CardContent class="flex flex-col items-center justify-center py-12">
-            <ContainerIcon class="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 class="mb-2 text-lg font-semibold">
-              {dockerOffline ? "Docker Is Offline" : "No Containers Found"}
-            </h3>
-            <p class="mb-4 text-center text-muted-foreground">
-              {#if dockerOffline}
-                Start Docker Desktop using the banner above, then retry.
-              {:else if containerSearchQuery}
-                Try adjusting your search
-              {:else}
-                No Docker containers are running or stopped
-              {/if}
-            </p>
           </CardContent>
         </Card>
       {/if}

@@ -3,6 +3,7 @@ export type {
   GitHubCloneRepositoryRequest,
   GitHubConnectionStatus,
   GitHubCreateIssueRequest,
+  GitHubDeviceFlowCallbacks,
   GitHubDeviceFlowPollResult,
   GitHubDeviceFlowStart,
   GitHubIssue,

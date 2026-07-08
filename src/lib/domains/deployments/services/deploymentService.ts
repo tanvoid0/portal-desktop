@@ -357,9 +357,24 @@ export class DeploymentService {
    * Convert backend container to frontend format
    */
   private convertBackendContainer(backendContainer: any): DockerContainer {
+    const resourceStats = backendContainer.resource_stats
+      ? {
+          cpuPercent: backendContainer.resource_stats.cpu_percent ?? 0,
+          memoryBytes: backendContainer.resource_stats.memory_bytes ?? 0,
+          memoryLimitBytes:
+            backendContainer.resource_stats.memory_limit_bytes ?? 0,
+          memoryPercent: backendContainer.resource_stats.memory_percent ?? 0,
+          networkRxBytes: backendContainer.resource_stats.network_rx_bytes ?? 0,
+          networkTxBytes: backendContainer.resource_stats.network_tx_bytes ?? 0,
+          blockReadBytes: backendContainer.resource_stats.block_read_bytes ?? 0,
+          blockWriteBytes:
+            backendContainer.resource_stats.block_write_bytes ?? 0,
+        }
+      : undefined;
+
     return {
       ...backendContainer,
-      status: backendContainer.status as any,
+      status: backendContainer.status,
       ports: Array.isArray(backendContainer.ports)
         ? backendContainer.ports
         : backendContainer.ports
@@ -373,21 +388,19 @@ export class DeploymentService {
           return new Date();
         }
         const dateStr = backendContainer.created_at.trim();
-        // Try parsing as Unix timestamp (seconds) first
         const unixTimestamp = parseInt(dateStr, 10);
         if (!isNaN(unixTimestamp) && unixTimestamp > 0) {
-          // If it's a Unix timestamp in seconds, convert to milliseconds
           const date = new Date(unixTimestamp * 1000);
           if (!isNaN(date.getTime())) {
             return date;
           }
         }
-        // Try parsing as ISO string or other date format
         const date = new Date(dateStr);
         return isNaN(date.getTime()) ? new Date() : date;
       })(),
       volumes: backendContainer.volumes || [],
       environment: backendContainer.environment || {},
+      resourceStats,
     } as DockerContainer;
   }
 

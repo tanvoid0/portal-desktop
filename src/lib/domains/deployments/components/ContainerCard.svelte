@@ -2,8 +2,10 @@
   import { Card, CardContent } from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import { Progress } from "$lib/components/ui/progress";
   import type { DockerContainer } from "../types";
-  import { Play, Square, Trash2, ExternalLink } from "@lucide/svelte";
+  import { fmtBytes, fmtPercent, isContainerRunning } from "../utils/format";
+  import { Play, Square, Trash2, Cpu, MemoryStick } from "@lucide/svelte";
 
   interface Props {
     container: DockerContainer;
@@ -14,22 +16,32 @@
 
   let { container, onStart, onStop, onRemove }: Props = $props();
 
-  function isRunning(): boolean {
-    const status = container.status?.toLowerCase() || "";
-    return status.includes("running") || status.includes("up");
-  }
+  const running = $derived(isContainerRunning(container.status));
+  const stats = $derived(container.resourceStats);
 
   function getStatusColor(): string {
-    if (isRunning()) {
-      return "bg-green-100 text-green-800 border-green-200";
+    if (running) {
+      return "bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300";
     }
-    return "bg-gray-100 text-gray-800 border-gray-200";
+    const s = container.status?.toLowerCase() || "";
+    if (s.includes("paused")) {
+      return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    }
+    return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300";
+  }
+
+  function getStatusLabel(): string {
+    if (running) return "Running";
+    const s = container.status?.toLowerCase() || "";
+    if (s.includes("exited")) return "Exited";
+    if (s.includes("paused")) return "Paused";
+    if (s.includes("created")) return "Created";
+    return "Stopped";
   }
 
   function formatPorts(): string {
     if (Array.isArray(container.ports)) {
-      if (container.ports.length === 0) return "No ports";
-      // Handle string array or object array
+      if (container.ports.length === 0) return "—";
       return container.ports
         .map((p: any) => {
           if (typeof p === "string") return p;
@@ -38,9 +50,9 @@
         .join(", ");
     }
     if (typeof container.ports === "string") {
-      return container.ports || "No ports";
+      return container.ports || "—";
     }
-    return "No ports";
+    return "—";
   }
 </script>
 
@@ -49,57 +61,97 @@
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0 flex-1">
         <div class="mb-2 flex items-center gap-2">
-          <h3 class="truncate text-lg font-semibold" title={container.name}>
+          <h3 class="truncate text-base font-semibold" title={container.name}>
             {container.name}
           </h3>
           <Badge class={getStatusColor()}>
-            {isRunning() ? "Running" : "Stopped"}
+            {getStatusLabel()}
           </Badge>
         </div>
 
-        <div class="space-y-1 text-sm text-muted-foreground">
-          <div class="flex items-center gap-2">
-            <span class="font-medium">Image:</span>
+        <div class="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <div class="col-span-2 flex items-center gap-2">
+            <span class="shrink-0 font-medium text-foreground/70">Image</span>
             <span class="truncate font-mono text-xs" title={container.image}>
               {container.image}
             </span>
           </div>
-
-          {#if container.ports && (Array.isArray(container.ports) ? container.ports.length > 0 : container.ports)}
-            <div class="flex items-center gap-2">
-              <span class="font-medium">Ports:</span>
-              <span class="font-mono text-xs">{formatPorts()}</span>
-            </div>
-          {/if}
-
+          <div class="flex items-center gap-2">
+            <span class="shrink-0 font-medium text-foreground/70">Ports</span>
+            <span class="truncate font-mono text-xs">{formatPorts()}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="shrink-0 font-medium text-foreground/70">ID</span>
+            <span class="truncate font-mono text-xs" title={container.id}>
+              {container.id.substring(0, 12)}
+            </span>
+          </div>
           {#if container.createdAt}
             {@const createdDate =
               container.createdAt instanceof Date
                 ? container.createdAt
                 : new Date(container.createdAt)}
-            {@const isValidDate = !isNaN(createdDate.getTime())}
-            {#if isValidDate}
-              <div class="flex items-center gap-2">
-                <span class="font-medium">Created:</span>
+            {#if !isNaN(createdDate.getTime())}
+              <div class="col-span-2 flex items-center gap-2">
+                <span class="shrink-0 font-medium text-foreground/70"
+                  >Created</span
+                >
                 <span class="text-xs">
                   {createdDate.toLocaleDateString()}
-                  {createdDate.toLocaleTimeString()}
+                  {createdDate.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
             {/if}
           {/if}
-
-          <div class="flex items-center gap-2">
-            <span class="font-medium">ID:</span>
-            <span class="truncate font-mono text-xs" title={container.id}>
-              {container.id.substring(0, 12)}...
-            </span>
-          </div>
         </div>
+
+        {#if running && stats}
+          <div class="space-y-2 rounded-md border bg-muted/30 p-2.5">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="flex items-center gap-1 text-muted-foreground">
+                  <Cpu class="h-3 w-3" /> CPU
+                </span>
+                <span class="tabular-nums font-medium"
+                  >{fmtPercent(stats.cpuPercent)}</span
+                >
+              </div>
+              <Progress
+                value={Math.min(stats.cpuPercent, 100)}
+                class="h-1 [&>[data-slot=progress-indicator]]:bg-emerald-500"
+              />
+            </div>
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="flex items-center gap-1 text-muted-foreground">
+                  <MemoryStick class="h-3 w-3" /> Memory
+                </span>
+                <span class="tabular-nums font-medium">
+                  {fmtBytes(stats.memoryBytes)}
+                  {#if stats.memoryLimitBytes}
+                    / {fmtBytes(stats.memoryLimitBytes)}
+                  {/if}
+                  · {fmtPercent(stats.memoryPercent)}
+                </span>
+              </div>
+              <Progress
+                value={Math.min(stats.memoryPercent, 100)}
+                class="h-1 [&>[data-slot=progress-indicator]]:bg-blue-500"
+              />
+            </div>
+          </div>
+        {:else if running}
+          <p class="text-xs text-muted-foreground italic">
+            Resource stats unavailable
+          </p>
+        {/if}
       </div>
 
-      <div class="flex flex-col gap-2">
-        {#if isRunning()}
+      <div class="flex shrink-0 flex-col gap-2">
+        {#if running}
           <Button
             variant="outline"
             size="sm"

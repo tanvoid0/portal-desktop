@@ -31,6 +31,11 @@ export interface GitHubDeviceFlowPollResult {
   account?: GitHubAccount | null;
 }
 
+export interface GitHubDeviceFlowCallbacks {
+  onStarted?: (start: GitHubDeviceFlowStart) => void | Promise<void>;
+  onPolling?: () => void | Promise<void>;
+}
+
 export interface GitHubRepoOwner {
   login: string;
   avatarUrl?: string;

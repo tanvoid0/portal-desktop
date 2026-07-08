@@ -49,15 +49,15 @@ export interface DockerContainer {
   id: string;
   name: string;
   image: string;
-  status: ContainerStatus;
-  ports: PortMapping[];
-  volumes: VolumeMapping[];
-  environment: Record<string, string>;
+  status: string;
+  ports: PortMapping[] | string[];
+  volumes?: VolumeMapping[];
+  environment?: Record<string, string>;
   createdAt: Date;
   startedAt?: Date;
   stoppedAt?: Date;
-  restartCount: number;
-  resourceUsage: ResourceUsage;
+  restartCount?: number;
+  resourceStats?: ResourceUsage;
 }
 
 export interface PortMapping {
@@ -75,6 +75,7 @@ export interface VolumeMapping {
 export interface ResourceUsage {
   cpuPercent: number;
   memoryBytes: number;
+  memoryLimitBytes?: number;
   memoryPercent: number;
   networkRxBytes: number;
   networkTxBytes: number;

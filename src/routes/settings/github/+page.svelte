@@ -4,6 +4,8 @@
   import { settings, settingsActions } from "$lib/domains/settings/stores/settingsStore";
   import type { AppSettings } from "$lib/domains/settings/types";
   import { createGitHubStatusQuery, githubService } from "$lib/domains/github";
+  import type { GitHubDeviceFlowStart } from "$lib/domains/github";
+  import { openExternalUrl } from "$lib/utils/tauri";
   import { toast } from "$lib/utils/toast";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
@@ -26,6 +28,8 @@
   let saving = $state(false);
   let connecting = $state(false);
   let disconnecting = $state(false);
+  let deviceFlow = $state<GitHubDeviceFlowStart | null>(null);
+  let flowMessage = $state<string | null>(null);
 
   $effect(() => {
     clientId = settingsData?.app.integrations?.github?.clientId ?? "";
@@ -79,7 +83,18 @@
         return;
       }
       connecting = true;
-      await githubService.connectWithDeviceFlow();
+      deviceFlow = null;
+      flowMessage = null;
+      await githubService.connectWithDeviceFlow(undefined, {
+        onStarted: (start) => {
+          deviceFlow = start;
+          flowMessage =
+            "Authorize GitHub in your browser. If nothing opened, use the code below.";
+        },
+        onPolling: () => {
+          flowMessage = "Waiting for you to authorize on GitHub...";
+        },
+      });
       await statusQuery.refetch();
       toast.success("GitHub connected");
     } catch (error) {
@@ -88,6 +103,23 @@
       );
     } finally {
       connecting = false;
+      deviceFlow = null;
+      flowMessage = null;
+    }
+  }
+
+  async function handleOpenGitHub() {
+    if (!deviceFlow) return;
+    const target =
+      deviceFlow.verificationUriComplete || deviceFlow.verificationUri;
+    try {
+      await openExternalUrl(target);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to open GitHub authorization page",
+      );
     }
   }
 
@@ -230,6 +262,22 @@
               <Unplug class="mr-2 h-4 w-4" />
               {disconnecting ? "Disconnecting..." : "Disconnect GitHub"}
             </Button>
+          {:else if deviceFlow}
+            <div class="w-full space-y-4 rounded-lg border bg-muted/30 p-4">
+              <p class="text-sm text-muted-foreground">{flowMessage}</p>
+              <div class="rounded-lg border bg-background px-4 py-3 text-center">
+                <div class="text-xs uppercase tracking-wide text-muted-foreground">
+                  Your code
+                </div>
+                <div class="mt-1 font-mono text-2xl font-semibold tracking-widest">
+                  {deviceFlow.userCode}
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <Button onclick={handleOpenGitHub}>Open GitHub</Button>
+                <Button variant="outline" disabled>Connecting...</Button>
+              </div>
+            </div>
           {:else}
             <Button
               onclick={handleConnect}

@@ -5,6 +5,8 @@
   import { Badge } from "$lib/components/ui/badge";
   import { PageHeader, PageLoading, PageError } from "$lib/components/shell";
   import { createGitHubStatusQuery, githubService } from "$lib/domains/github";
+  import type { GitHubDeviceFlowStart } from "$lib/domains/github";
+  import { openExternalUrl } from "$lib/utils/tauri";
   import { toast } from "$lib/utils/toast";
   import { FolderGit2, Bug, Unplug } from "@lucide/svelte";
 
@@ -13,6 +15,8 @@
 
   let connecting = $state(false);
   let disconnecting = $state(false);
+  let deviceFlow = $state<GitHubDeviceFlowStart | null>(null);
+  let flowMessage = $state<string | null>(null);
 
   async function handleConnect() {
     try {
@@ -21,7 +25,18 @@
         return;
       }
       connecting = true;
-      await githubService.connectWithDeviceFlow();
+      deviceFlow = null;
+      flowMessage = null;
+      await githubService.connectWithDeviceFlow(undefined, {
+        onStarted: (start) => {
+          deviceFlow = start;
+          flowMessage =
+            "Authorize GitHub in your browser. If nothing opened, use the code below.";
+        },
+        onPolling: () => {
+          flowMessage = "Waiting for you to authorize on GitHub...";
+        },
+      });
       toast.success("GitHub connected");
       await statusQuery.refetch();
     } catch (error) {
@@ -30,6 +45,23 @@
       toast.error(message);
     } finally {
       connecting = false;
+      deviceFlow = null;
+      flowMessage = null;
+    }
+  }
+
+  async function handleOpenGitHub() {
+    if (!deviceFlow) return;
+    const target =
+      deviceFlow.verificationUriComplete || deviceFlow.verificationUri;
+    try {
+      await openExternalUrl(target);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to open GitHub authorization page",
+      );
     }
   }
 
