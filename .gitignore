@@ -61,12 +61,11 @@ data/
 portal_desktop.db
 logs-explorer.db
 
-# Test files
-*.test.js
-*.test.ts
-*.spec.js
-*.spec.ts
-!vitest-setup-client.ts
+# Ad-hoc root-level test scripts (vitest tests under src/ and e2e/ are tracked)
+/*.test.js
+/*.test.ts
+/*.spec.js
+/*.spec.ts
 
 # Development files
 test-*.js

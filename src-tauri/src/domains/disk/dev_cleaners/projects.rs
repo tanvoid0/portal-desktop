@@ -412,20 +412,20 @@ mod tests {
 
     #[test]
     fn detect_items_finds_node_modules() {
-        let root = r"C:\code\myapp";
+        let root = PathBuf::from("code").join("myapp");
         let files = vec![
             FileEntry {
-                path: PathBuf::from(r"C:\code\myapp\package.json"),
+                path: root.join("package.json"),
                 size: 100,
                 modified_secs: 0,
             },
             FileEntry {
-                path: PathBuf::from(r"C:\code\myapp\node_modules\lodash\index.js"),
+                path: root.join("node_modules").join("lodash").join("index.js"),
                 size: 5000,
                 modified_secs: 0,
             },
         ];
-        let items = detect_items(root, &files, &[]);
+        let items = detect_items(&root.to_string_lossy(), &files, &[]);
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].kind, "node_modules");
         assert_eq!(items[0].size_bytes, 5000);
