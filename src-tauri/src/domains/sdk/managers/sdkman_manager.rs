@@ -101,7 +101,8 @@ impl SdkmanManager {
             }
 
             // Skip header rows.
-            if version.eq_ignore_ascii_case("version") || version.eq_ignore_ascii_case("identifier") {
+            if version.eq_ignore_ascii_case("version") || version.eq_ignore_ascii_case("identifier")
+            {
                 continue;
             }
 
@@ -150,7 +151,8 @@ impl SdkmanManager {
             if lower.contains(self.sdkman_sdk_name()) && lower.contains("using") {
                 for token in line.split_whitespace() {
                     let token_lower = token.to_lowercase();
-                    if token_lower.contains('.') && token_lower.chars().any(|c| c.is_ascii_digit()) {
+                    if token_lower.contains('.') && token_lower.chars().any(|c| c.is_ascii_digit())
+                    {
                         return Some(token.to_string());
                     }
                 }

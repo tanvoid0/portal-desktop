@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use crate::process_ext::NoWindowExt;
+use std::path::PathBuf;
 use std::process::Command;
 
 pub struct IdeService;

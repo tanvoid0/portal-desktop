@@ -65,7 +65,12 @@ const ECOSYSTEMS: &[Ecosystem] = &[
     },
     Ecosystem {
         kind: "python",
-        markers: &["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt"],
+        markers: &[
+            "pyproject.toml",
+            "setup.py",
+            "setup.cfg",
+            "requirements.txt",
+        ],
         marker_exts: &[],
         temp_dirs: &[
             "__pycache__",
@@ -350,14 +355,19 @@ pub fn to_project_scan(primary_root: &str, group: &DevCleanerGroup) -> ProjectSc
     let mut by_root: HashMap<String, (String, Vec<ProjectTemp>)> = HashMap::new();
 
     for item in &group.items {
-        let project_root = item.group_label.clone().unwrap_or_else(|| primary_root.to_string());
+        let project_root = item
+            .group_label
+            .clone()
+            .unwrap_or_else(|| primary_root.to_string());
         let eco = item
             .reason
             .strip_prefix("regenerable ")
             .and_then(|r| r.split(' ').next())
             .unwrap_or("project")
             .to_string();
-        let entry = by_root.entry(project_root.clone()).or_insert((eco, Vec::new()));
+        let entry = by_root
+            .entry(project_root.clone())
+            .or_insert((eco, Vec::new()));
         entry.1.push(ProjectTemp {
             id: item.id.clone(),
             path: item.path.clone(),

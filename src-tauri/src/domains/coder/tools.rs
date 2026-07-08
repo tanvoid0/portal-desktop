@@ -73,11 +73,27 @@ pub fn tool_specs() -> Vec<Value> {
         ),
         spec(
             "run_command",
-            "Run a shell command in the workspace root and return combined stdout/stderr.",
+            "Run a shell command in the workspace root. Commands run in a fast background \
+             shell by default. Pass terminal_id from list_terminals only when you need to run \
+             inside a specific interactive session tab.",
             json!({
                 "type": "object",
-                "properties": { "command": { "type": "string" } },
+                "properties": {
+                    "command": { "type": "string" },
+                    "terminal_id": {
+                        "type": "string",
+                        "description": "Optional: run inside a specific interactive terminal tab from list_terminals."
+                    }
+                },
                 "required": ["command"]
+            }),
+        ),
+        spec(
+            "list_terminals",
+            "List interactive terminals attached to this coder session (id + label).",
+            json!({
+                "type": "object",
+                "properties": {},
             }),
         ),
     ]
@@ -108,6 +124,39 @@ pub fn platform_tool_specs() -> Vec<Value> {
     )]
 }
 
+pub fn multitask_tool_specs() -> Vec<Value> {
+    vec![spec(
+        "spawn_parallel_tasks",
+        "Split independent work into parallel git worktree-backed sub-agents. Use this only in coordinator threads when the tasks are independent enough to run separately.",
+        json!({
+            "type": "object",
+            "properties": {
+                "base_ref": {
+                    "type": "string",
+                    "description": "Optional git base ref to branch worktrees from. Defaults to HEAD."
+                },
+                "issue_urls": {
+                    "type": "array",
+                    "description": "Optional GitHub issue URLs to fan out directly.",
+                    "items": { "type": "string" }
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": { "type": "string" },
+                            "prompt": { "type": "string" },
+                            "github_issue_url": { "type": "string" }
+                        },
+                        "required": ["title"]
+                    }
+                }
+            }
+        }),
+    )]
+}
+
 /// A tool routed to the platform over HTTP rather than executed locally.
 pub fn is_platform_tool(tool: &str) -> bool {
     matches!(tool, "delegate_task")
@@ -116,9 +165,7 @@ pub fn is_platform_tool(tool: &str) -> bool {
 /// The relative path a file-mutating tool targets, for change tracking.
 pub fn mutated_path(tool: &str, args: &Value) -> Option<String> {
     match tool {
-        "write_file" | "edit_file" => {
-            args.get("path").and_then(Value::as_str).map(str::to_string)
-        }
+        "write_file" | "edit_file" => args.get("path").and_then(Value::as_str).map(str::to_string),
         _ => None,
     }
 }
@@ -143,7 +190,10 @@ pub fn write_raw(root: &str, rel: &str, content: &str) -> Result<(), String> {
 /// A tool that does not change disk or run processes — never needs approval.
 /// Platform delegation is *not* read-only (it spends compute / runs agents).
 pub fn is_read_only(tool: &str) -> bool {
-    matches!(tool, "read_file" | "list_dir" | "search_files")
+    matches!(
+        tool,
+        "read_file" | "list_dir" | "search_files" | "list_terminals"
+    )
 }
 
 /// Parse a tool call's JSON argument string.
@@ -158,9 +208,18 @@ pub fn parse_args(call: &ToolCall) -> Result<Value, String> {
 /// Short human summary for the approval UI.
 pub fn summarize(tool: &str, args: &Value) -> String {
     match tool {
-        "run_command" => format!("$ {}", args.get("command").and_then(Value::as_str).unwrap_or("")),
-        "write_file" => format!("write {}", args.get("path").and_then(Value::as_str).unwrap_or("")),
-        "edit_file" => format!("edit {}", args.get("path").and_then(Value::as_str).unwrap_or("")),
+        "run_command" => format!(
+            "$ {}",
+            args.get("command").and_then(Value::as_str).unwrap_or("")
+        ),
+        "write_file" => format!(
+            "write {}",
+            args.get("path").and_then(Value::as_str).unwrap_or("")
+        ),
+        "edit_file" => format!(
+            "edit {}",
+            args.get("path").and_then(Value::as_str).unwrap_or("")
+        ),
         _ => tool.to_string(),
     }
 }
@@ -178,7 +237,11 @@ pub fn suggested_rule(tool: &str, args: &Value) -> String {
             .to_string(),
         "write_file" | "edit_file" => {
             let p = args.get("path").and_then(Value::as_str).unwrap_or("");
-            match Path::new(p).parent().and_then(|d| d.to_str()).filter(|s| !s.is_empty()) {
+            match Path::new(p)
+                .parent()
+                .and_then(|d| d.to_str())
+                .filter(|s| !s.is_empty())
+            {
                 Some(dir) => format!("{dir}/*"),
                 None => "*".to_string(),
             }
@@ -198,19 +261,25 @@ pub fn execute(root: &str, tool: &str, args: &Value) -> Result<String, String> {
             arg_str(args, "old_string")?,
             arg_str(args, "new_string")?,
         ),
-        "list_dir" => list_dir(root, args.get("path").and_then(Value::as_str).unwrap_or(".")),
+        "list_dir" => list_dir(
+            root,
+            args.get("path").and_then(Value::as_str).unwrap_or("."),
+        ),
         "search_files" => search_files(
             root,
             arg_str(args, "query")?,
             args.get("path").and_then(Value::as_str).unwrap_or("."),
         ),
         "run_command" => run_command(root, arg_str(args, "command")?),
+        "list_terminals" => Ok("[]".into()),
         other => Err(format!("unknown tool: {other}")),
     }
 }
 
 fn arg_str<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
-    args.get(key).and_then(Value::as_str).ok_or_else(|| format!("missing arg: {key}"))
+    args.get(key)
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("missing arg: {key}"))
 }
 
 /// Resolve `rel` under `root`, rejecting escapes outside the workspace.
@@ -262,7 +331,9 @@ fn edit_file(root: &str, rel: &str, old: &str, new: &str) -> Result<String, Stri
         return Err(format!("old_string not found in {rel}"));
     }
     if count > 1 {
-        return Err(format!("old_string occurs {count} times in {rel}; make it unique"));
+        return Err(format!(
+            "old_string occurs {count} times in {rel}; make it unique"
+        ));
     }
     let updated = content.replacen(old, new, 1);
     std::fs::write(&path, updated).map_err(|e| format!("write {rel}: {e}"))?;
@@ -270,16 +341,48 @@ fn edit_file(root: &str, rel: &str, old: &str, new: &str) -> Result<String, Stri
 }
 
 fn list_dir(root: &str, rel: &str) -> Result<String, String> {
+    let entries = list_dir_entries(root, rel)?;
+    Ok(entries
+        .iter()
+        .map(|e| {
+            if e.is_dir {
+                format!("{}/", e.name)
+            } else {
+                e.name.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+/// Structured directory listing for the workspace file explorer.
+pub fn list_dir_entries(
+    root: &str,
+    rel: &str,
+) -> Result<Vec<crate::domains::coder::types::WorkspaceDirEntry>, String> {
+    use crate::domains::coder::types::WorkspaceDirEntry;
     let path = resolve(root, rel)?;
     let mut out = Vec::new();
     for entry in std::fs::read_dir(&path).map_err(|e| format!("list {rel}: {e}"))? {
         let entry = entry.map_err(|e| e.to_string())?;
         let name = entry.file_name().to_string_lossy().to_string();
-        let suffix = if entry.path().is_dir() { "/" } else { "" };
-        out.push(format!("{name}{suffix}"));
+        if name == ".git" || name == "node_modules" || name == "target" {
+            continue;
+        }
+        let is_dir = entry.path().is_dir();
+        let child_rel = if rel == "." {
+            name.clone()
+        } else {
+            format!("{rel}/{name}")
+        };
+        out.push(WorkspaceDirEntry {
+            name,
+            path: child_rel,
+            is_dir,
+        });
     }
-    out.sort();
-    Ok(out.join("\n"))
+    out.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
+    Ok(out)
 }
 
 fn search_files(root: &str, query: &str, rel: &str) -> Result<String, String> {
@@ -309,7 +412,9 @@ fn search_files(root: &str, query: &str, rel: &str) -> Result<String, String> {
 /// Depth-first file walk; `f` returns false to stop early. Skips common heavy
 /// dirs to keep searches responsive.
 fn walk(dir: &Path, f: &mut dyn FnMut(&Path) -> bool) -> bool {
-    let Ok(entries) = std::fs::read_dir(dir) else { return true };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return true;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -354,7 +459,10 @@ fn run_command(root: &str, command: &str) -> Result<String, String> {
             stdout.to_string()
         }
     } else {
-        format!("exit {}\n{stdout}{stderr}", output.status.code().unwrap_or(-1))
+        format!(
+            "exit {}\n{stdout}{stderr}",
+            output.status.code().unwrap_or(-1)
+        )
     };
 
     Ok(match warning {

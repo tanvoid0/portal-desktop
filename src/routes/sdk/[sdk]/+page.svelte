@@ -68,7 +68,7 @@
   }
 </script>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   {#if loading}
     <PageLoading message="Loading SDK..." />
   {:else if error}

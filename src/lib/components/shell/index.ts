@@ -6,6 +6,8 @@ export { default as PageLoading } from "./page-loading.svelte";
 export { default as PageError } from "./page-error.svelte";
 export { default as PageEmpty } from "./page-empty.svelte";
 export { default as ShellSidebarLayout } from "./shell-sidebar-layout.svelte";
+export { default as ResponsivePanel } from "./responsive-panel.svelte";
+export { default as PageContainer } from "./page-container.svelte";
 export { default as NavSectionList } from "./nav-section-list.svelte";
 export { default as NavIcon } from "./nav-icon.svelte";
 export type { NavItem, NavSection } from "./nav-types";

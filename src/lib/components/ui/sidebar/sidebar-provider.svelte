@@ -5,8 +5,6 @@
   import {
     SIDEBAR_COOKIE_MAX_AGE,
     SIDEBAR_COOKIE_NAME,
-    SIDEBAR_WIDTH,
-    SIDEBAR_WIDTH_ICON,
   } from "./constants.js";
   import { setSidebar } from "./context.svelte.js";
 
@@ -14,6 +12,8 @@
     ref = $bindable(null),
     open = $bindable(true),
     onOpenChange = () => {},
+    cookieName = SIDEBAR_COOKIE_NAME,
+    enableShortcut = true,
     class: className,
     style,
     children,
@@ -21,6 +21,8 @@
   }: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    cookieName?: string;
+    enableShortcut?: boolean;
   } = $props();
 
   const sidebar = setSidebar({
@@ -29,18 +31,19 @@
       open = value;
       onOpenChange(value);
 
-      // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${open}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+      document.cookie = `${cookieName}=${open}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
   });
 </script>
 
-<svelte:window onkeydown={sidebar.handleShortcutKeydown} />
+<svelte:window
+  onkeydown={(e) => enableShortcut && sidebar.handleShortcutKeydown(e)}
+/>
 
 <Tooltip.Provider delayDuration={0}>
   <div
     data-slot="sidebar-wrapper"
-    style="--sidebar-width: {SIDEBAR_WIDTH}; --sidebar-width-icon: {SIDEBAR_WIDTH_ICON}; {style}"
+    style={style}
     class={cn(
       "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
       className,

@@ -7,6 +7,7 @@ import { logger } from "$lib/domains/shared";
 import type {
   AppSettings,
   EditorSettings,
+  GitHubIntegrationSettings,
   TerminalSettings,
   ThemeSettings,
 } from "../types";
@@ -41,7 +42,167 @@ const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   activeTheme: "default",
 };
 
+const DEFAULT_GITHUB_INTEGRATION_SETTINGS: GitHubIntegrationSettings = {
+  clientId: "",
+};
+
+const DEFAULT_APP_SETTINGS: AppSettings = {
+  theme: "system",
+  language: "en",
+  timezone: "UTC",
+  dateFormat: "%Y-%m-%d",
+  timeFormat: "24h",
+  windowState: {
+    width: 1200,
+    height: 800,
+    maximized: false,
+    rememberPosition: true,
+  },
+  startupBehavior: {
+    openLastSession: true,
+    restoreWindows: true,
+    showWelcomeScreen: false,
+    minimizeToTray: false,
+    startMinimized: false,
+  },
+  notifications: {
+    enabled: true,
+    desktopNotifications: true,
+    soundEnabled: true,
+    showInTaskbar: true,
+    types: {
+      success: true,
+      info: true,
+      warning: true,
+      error: true,
+      updates: true,
+      security: true,
+    },
+  },
+  privacy: {
+    analytics: false,
+    crashReports: true,
+    telemetry: false,
+    usageData: false,
+    marketing: false,
+  },
+  updates: {
+    autoCheck: true,
+    autoDownload: false,
+    autoInstall: false,
+    checkInterval: 24,
+    channel: "stable",
+    notifyOnUpdate: true,
+  },
+  integrations: {
+    github: DEFAULT_GITHUB_INTEGRATION_SETTINGS,
+  },
+};
+
 type RawThemeSettings = Partial<ThemeSettings> & Record<string, unknown>;
+type RawAppSettings = Partial<AppSettings> & Record<string, unknown>;
+
+function normalizeAppSettings(
+  raw: RawAppSettings | null | undefined,
+): AppSettings {
+  const app = raw ?? {};
+
+  return {
+    theme:
+      (app.theme as AppSettings["theme"] | undefined) ??
+      DEFAULT_APP_SETTINGS.theme,
+    language:
+      (app.language as string | undefined) ?? DEFAULT_APP_SETTINGS.language,
+    timezone:
+      (app.timezone as string | undefined) ?? DEFAULT_APP_SETTINGS.timezone,
+    dateFormat:
+      (app.dateFormat as string | undefined) ??
+      (app.date_format as string | undefined) ??
+      DEFAULT_APP_SETTINGS.dateFormat,
+    timeFormat:
+      (app.timeFormat as AppSettings["timeFormat"] | undefined) ??
+      (app.time_format as AppSettings["timeFormat"] | undefined) ??
+      DEFAULT_APP_SETTINGS.timeFormat,
+    windowState: {
+      ...DEFAULT_APP_SETTINGS.windowState,
+      ...((app.windowState as Record<string, unknown> | undefined) ?? {}),
+      ...((app.window_state as Record<string, unknown> | undefined) ?? {}),
+      rememberPosition: Boolean(
+        (app.windowState as Record<string, unknown> | undefined)
+          ?.rememberPosition ??
+          (app.window_state as Record<string, unknown> | undefined)
+            ?.remember_position ??
+          DEFAULT_APP_SETTINGS.windowState.rememberPosition,
+      ),
+    },
+    startupBehavior: {
+      ...DEFAULT_APP_SETTINGS.startupBehavior,
+      ...((app.startupBehavior as Record<string, unknown> | undefined) ?? {}),
+      ...((app.startup_behavior as Record<string, unknown> | undefined) ?? {}),
+      openLastSession: Boolean(
+        (app.startupBehavior as Record<string, unknown> | undefined)
+          ?.openLastSession ??
+          (app.startup_behavior as Record<string, unknown> | undefined)
+            ?.open_last_session ??
+          DEFAULT_APP_SETTINGS.startupBehavior.openLastSession,
+      ),
+      restoreWindows: Boolean(
+        (app.startupBehavior as Record<string, unknown> | undefined)
+          ?.restoreWindows ??
+          (app.startup_behavior as Record<string, unknown> | undefined)
+            ?.restore_windows ??
+          DEFAULT_APP_SETTINGS.startupBehavior.restoreWindows,
+      ),
+      showWelcomeScreen: Boolean(
+        (app.startupBehavior as Record<string, unknown> | undefined)
+          ?.showWelcomeScreen ??
+          (app.startup_behavior as Record<string, unknown> | undefined)
+            ?.show_welcome_screen ??
+          DEFAULT_APP_SETTINGS.startupBehavior.showWelcomeScreen,
+      ),
+      minimizeToTray: Boolean(
+        (app.startupBehavior as Record<string, unknown> | undefined)
+          ?.minimizeToTray ??
+          (app.startup_behavior as Record<string, unknown> | undefined)
+            ?.minimize_to_tray ??
+          DEFAULT_APP_SETTINGS.startupBehavior.minimizeToTray,
+      ),
+      startMinimized: Boolean(
+        (app.startupBehavior as Record<string, unknown> | undefined)
+          ?.startMinimized ??
+          (app.startup_behavior as Record<string, unknown> | undefined)
+            ?.start_minimized ??
+          DEFAULT_APP_SETTINGS.startupBehavior.startMinimized,
+      ),
+    },
+    notifications:
+      (app.notifications as AppSettings["notifications"] | undefined) ??
+      DEFAULT_APP_SETTINGS.notifications,
+    privacy:
+      (app.privacy as AppSettings["privacy"] | undefined) ??
+      DEFAULT_APP_SETTINGS.privacy,
+    updates:
+      (app.updates as AppSettings["updates"] | undefined) ??
+      DEFAULT_APP_SETTINGS.updates,
+    avatarEnabled:
+      (app.avatarEnabled as boolean | undefined) ??
+      (app.avatar_enabled as boolean | undefined),
+    integrations: {
+      github: {
+        clientId:
+          ((app.integrations as Record<string, unknown> | undefined)?.github as
+            | Record<string, unknown>
+            | undefined)?.clientId?.toString?.() ??
+          ((app.integrations as Record<string, unknown> | undefined)?.github as
+            | Record<string, unknown>
+            | undefined)?.client_id?.toString?.() ??
+          ((app.integrations as Record<string, unknown> | undefined)
+            ?.github_client_id as string | undefined) ??
+          DEFAULT_GITHUB_INTEGRATION_SETTINGS.clientId,
+      },
+    },
+  };
+}
 
 function normalizeThemeSettings(
   raw: RawThemeSettings | null | undefined,
@@ -103,7 +264,42 @@ function normalizeThemeSettings(
 function normalizeSettings(raw: Settings): Settings {
   return {
     ...raw,
+    app: normalizeAppSettings(raw.app as RawAppSettings),
     theme: normalizeThemeSettings(raw.theme as RawThemeSettings),
+  };
+}
+
+function serializeAppSettings(app: AppSettings): Record<string, unknown> {
+  return {
+    theme: app.theme,
+    language: app.language,
+    timezone: app.timezone,
+    date_format: app.dateFormat,
+    time_format: app.timeFormat,
+    window_state: {
+      width: app.windowState.width,
+      height: app.windowState.height,
+      x: app.windowState.x,
+      y: app.windowState.y,
+      maximized: app.windowState.maximized,
+      remember_position: app.windowState.rememberPosition,
+    },
+    startup_behavior: {
+      open_last_session: app.startupBehavior.openLastSession,
+      restore_windows: app.startupBehavior.restoreWindows,
+      show_welcome_screen: app.startupBehavior.showWelcomeScreen,
+      minimize_to_tray: app.startupBehavior.minimizeToTray,
+      start_minimized: app.startupBehavior.startMinimized,
+    },
+    notifications: app.notifications,
+    privacy: app.privacy,
+    updates: app.updates,
+    avatar_enabled: app.avatarEnabled,
+    integrations: {
+      github: {
+        client_id: app.integrations?.github?.clientId ?? "",
+      },
+    },
   };
 }
 
@@ -142,6 +338,7 @@ function serializeSettingsForRust(
   const now = new Date().toISOString();
   return {
     ...settings,
+    app: serializeAppSettings(settings.app),
     theme: serializeThemeSettings(settings.theme),
     created_at: settings.created_at ?? settings.createdAt ?? now,
     updated_at: settings.updated_at ?? settings.updatedAt ?? now,

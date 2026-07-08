@@ -58,6 +58,23 @@
   import { toast } from "$lib/utils/toast";
   import { confirmAction } from "$lib/utils/confirm";
   import { PageLoading, PageError } from "$lib/components/shell";
+  import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
+  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
+
+  const INSTALLER_TABS = ["browse", "installed", "updates"] as const;
+  type InstallerTab = (typeof INSTALLER_TABS)[number];
+
+  const activeTab = $derived(
+    resolveUrlTab($page.url.searchParams, INSTALLER_TABS, "browse"),
+  );
+
+  function setActiveTab(tab: InstallerTab) {
+    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+      replaceState: true,
+      noScroll: true,
+    });
+  }
 
   // State
   let loading = $state(true);
@@ -88,9 +105,6 @@
   let installingPackage = $state<string | null>(null);
   let upgradingPackage = $state<string | null>(null);
   let uninstallingPackage = $state<string | null>(null);
-
-  // Active tab
-  let activeTab = $state<"browse" | "installed" | "updates">("browse");
 
   // Debounce timer for search
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -346,7 +360,7 @@
   <title>Software Installer - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   {#if loading && availableManagers.length === 0}
     <PageLoading message="Loading package managers..." />
   {:else}
@@ -475,7 +489,10 @@
     </Card>
   {:else}
     <!-- Tabs -->
-    <Tabs bind:value={activeTab}>
+    <Tabs
+      value={activeTab}
+      onValueChange={(v) => setActiveTab(v as InstallerTab)}
+    >
       <TabsList>
         <TabsTrigger value="browse">
           Browse ({searchResults.length})

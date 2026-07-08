@@ -35,11 +35,7 @@ impl DatabaseManager {
         let db_path = data_dir.join("portal_desktop.db");
         let database_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
-        log_info!(
-            "DatabaseManager",
-            "Database path: {}",
-            db_path.display()
-        );
+        log_info!("DatabaseManager", "Database path: {}", db_path.display());
 
         log_info!("DatabaseManager", "Connecting to database...");
         let conn = Database::connect(&database_url).await.map_err(|e| {

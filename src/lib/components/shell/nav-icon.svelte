@@ -9,6 +9,7 @@
     FileCode,
     FileText,
     Folder,
+    FolderGit2,
     Globe,
     HardDrive,
     History,
@@ -54,6 +55,8 @@
   <Cloud class={className} />
 {:else if icon === "globe"}
   <Globe class={className} />
+{:else if icon === "github"}
+  <FolderGit2 class={className} />
 {:else if icon === "robot"}
   <Bot class={className} />
 {:else if icon === "wrench"}

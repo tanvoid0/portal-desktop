@@ -71,8 +71,8 @@ impl ExecutionRepository {
 
     pub async fn get_all(&self, limit: Option<u64>) -> Result<Vec<ExecutionModel>, String> {
         let connection = self.db_manager.get_connection();
-        let mut query =
-            ExecutionEntity::find().order_by_desc(crate::entities::pipeline_execution::Column::StartedAt);
+        let mut query = ExecutionEntity::find()
+            .order_by_desc(crate::entities::pipeline_execution::Column::StartedAt);
 
         if let Some(limit) = limit {
             query = query.limit(limit);

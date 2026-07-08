@@ -37,6 +37,21 @@
   import ModelList from "$lib/components/ModelList.svelte";
   import ModelTreeList from "$lib/components/ModelTreeList.svelte";
   import { PageLoading, PageError } from "$lib/components/shell";
+  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
+
+  const MODEL_TABS = ["local", "library"] as const;
+  type ModelTab = (typeof MODEL_TABS)[number];
+
+  const modelTab = $derived(
+    resolveUrlTab($page.url.searchParams, MODEL_TABS, "local"),
+  );
+
+  function setModelTab(tab: ModelTab) {
+    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+      replaceState: true,
+      noScroll: true,
+    });
+  }
 
   // SDK ID from URL
   const sdkId = $page.params.sdk as string;
@@ -55,7 +70,6 @@
   } | null>(null);
 
   // Models
-  let modelTab = $state<"local" | "library">("local");
   let modelsLoading = $state(false);
   let modelsError = $state<string | null>(null);
   let models = $state<any[]>([]);
@@ -232,7 +246,7 @@
   }
 </script>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   {#if serviceLoading}
     <PageLoading message="Loading models..." />
   {:else if serviceError}
@@ -294,12 +308,17 @@
         </Card>
       {/if}
 
-      <Tabs bind:value={modelTab} class="w-full">
+      <Tabs
+        value={modelTab}
+        onValueChange={(v) => {
+          setModelTab(v as ModelTab);
+          if (v === "library") void loadAvailableModels();
+        }}
+        class="w-full"
+      >
         <TabsList>
           <TabsTrigger value="local">Installed</TabsTrigger>
-          <TabsTrigger value="library" onclick={loadAvailableModels}>
-            Library
-          </TabsTrigger>
+          <TabsTrigger value="library">Library</TabsTrigger>
         </TabsList>
 
         <TabsContent value="local" class="mt-6">
@@ -323,7 +342,7 @@
                 onRemove={removeModel}
                 onRetry={loadModelsIfAllowed}
                 onBrowseAvailable={() => {
-                  modelTab = "library";
+                  setModelTab("library");
                   loadAvailableModels();
                 }}
               />

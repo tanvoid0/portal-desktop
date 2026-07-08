@@ -215,7 +215,7 @@
   }
 </script>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   {#if !$cloudStore.connection.isConnected || !$cloudStore.currentCluster}
     <Card>
       <CardHeader>

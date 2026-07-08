@@ -44,6 +44,9 @@ export type {
 export {
   generateId,
   formatBytes,
+  formatCount,
+  formatSessionDateTime,
+  formatSessionDateTimeFull,
   formatRelativeTime,
   debounce,
   throttle,

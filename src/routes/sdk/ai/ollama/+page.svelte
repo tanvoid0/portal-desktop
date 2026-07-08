@@ -28,10 +28,22 @@
   import ModelList from "$lib/components/ModelList.svelte";
   import ModelTreeList from "$lib/components/ModelTreeList.svelte";
   import ProgressIndicator from "$lib/components/ProgressIndicator.svelte";
+  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
+
+  const OLLAMA_TABS = [
+    "service",
+    "version",
+    "models",
+    "configuration",
+    "log",
+  ] as const;
+  type OllamaTab = (typeof OLLAMA_TABS)[number];
+
+  const activeTab = $derived(
+    resolveUrlTab($page.url.searchParams, OLLAMA_TABS, "service"),
+  );
 
   const log = logger.createScoped("OllamaService");
-
-  // Service information
   let serviceInfo = $state<any>(null);
   let serviceLoading = $state(true);
   let serviceError = $state<string | null>(null);
@@ -65,23 +77,12 @@
   let logsError = $state<string | null>(null);
   let logPath = $state<string>("");
 
-  // Tab management
-  let activeTab = $state("service");
-
-  // Get tab from URL parameter
-  $effect(() => {
-    const urlParams = new URLSearchParams($page.url.search);
-    const tab = urlParams.get("tab");
-    if (
-      tab &&
-      ["service", "version", "models", "configuration", "log"].includes(tab)
-    ) {
-      activeTab = tab;
-    }
-  });
-
   onMount(async () => {
     await loadServiceInfo();
+  });
+
+  $effect(() => {
+    loadTabData(activeTab);
   });
 
   async function loadServiceInfo() {
@@ -89,7 +90,6 @@
       serviceLoading = true;
       serviceError = null;
 
-      // Get real service information from backend
       const info = (await ollamaApi.getServiceStatus()) as any;
       serviceInfo = info;
 
@@ -101,6 +101,22 @@
       log.error("Failed to load Ollama service info", { error: errorMessage });
     } finally {
       serviceLoading = false;
+    }
+  }
+
+  function loadTabData(tab: OllamaTab) {
+    if (tab === "version") {
+      if (versions.length === 0) void loadVersions();
+    } else if (tab === "models") {
+      if (modelTab === "local") {
+        if (serviceInfo?.running) void loadModels();
+      } else {
+        void loadAvailableModels();
+      }
+    } else if (tab === "configuration") {
+      if (!configContent) void loadConfiguration();
+    } else if (tab === "log") {
+      void loadLogs();
     }
   }
 
@@ -677,33 +693,11 @@
     }
   }
 
-  function setActiveTab(tab: string) {
-    activeTab = tab;
-    // Update URL using SvelteKit navigation
-    goto(`?tab=${tab}`, { replaceState: true });
-
-    // Load data when switching to specific tabs
-    if (tab === "version") {
-      if (versions.length === 0) {
-        loadVersions();
-      }
-    } else if (tab === "models") {
-      // Always refresh when switching to models tab to ensure current data
-      if (modelTab === "local") {
-        if (serviceInfo?.running) {
-          loadModels();
-        }
-      } else {
-        // Library tab doesn't need service running
-        loadAvailableModels();
-      }
-    } else if (tab === "configuration") {
-      if (!configContent) {
-        loadConfiguration();
-      }
-    } else if (tab === "log") {
-      loadLogs();
-    }
+  function setActiveTab(tab: OllamaTab) {
+    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+      replaceState: true,
+      noScroll: true,
+    });
   }
 </script>
 
@@ -779,7 +773,7 @@
 
 <!-- Main Content -->
 <div class="flex-1 p-6">
-  <Tabs value={activeTab} onValueChange={setActiveTab} class="w-full">
+  <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as OllamaTab)} class="w-full">
     <TabsList class="grid w-full grid-cols-5">
       <TabsTrigger value="service">Service</TabsTrigger>
       <TabsTrigger value="version">Version</TabsTrigger>

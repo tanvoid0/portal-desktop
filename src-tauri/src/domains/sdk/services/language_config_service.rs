@@ -364,7 +364,8 @@ impl SDKConfigService {
                 for path in &conda_paths {
                     if std::path::Path::new(path).exists() {
                         // Try to get version
-                        if let Ok(output) = Command::new(path).no_window().arg("--version").output() {
+                        if let Ok(output) = Command::new(path).no_window().arg("--version").output()
+                        {
                             if output.status.success() {
                                 let version =
                                     String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -419,7 +420,10 @@ impl SDKConfigService {
             if let Ok(output) = Command::new("which").arg(binary_name).output() {
                 if output.status.success() {
                     // Try to get version
-                    if let Ok(version_output) = Command::new(binary_name).no_window().arg("--version").output()
+                    if let Ok(version_output) = Command::new(binary_name)
+                        .no_window()
+                        .arg("--version")
+                        .output()
                     {
                         if version_output.status.success() {
                             // Some commands output to stderr instead of stdout

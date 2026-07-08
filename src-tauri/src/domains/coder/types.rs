@@ -32,10 +32,20 @@ where
 
 impl ChatMessage {
     pub fn system(text: impl Into<String>) -> Self {
-        Self { role: "system".into(), content: Some(text.into()), tool_calls: None, tool_call_id: None }
+        Self {
+            role: "system".into(),
+            content: Some(text.into()),
+            tool_calls: None,
+            tool_call_id: None,
+        }
     }
     pub fn user(text: impl Into<String>) -> Self {
-        Self { role: "user".into(), content: Some(text.into()), tool_calls: None, tool_call_id: None }
+        Self {
+            role: "user".into(),
+            content: Some(text.into()),
+            tool_calls: None,
+            tool_call_id: None,
+        }
     }
     pub fn tool_result(call_id: impl Into<String>, text: impl Into<String>) -> Self {
         Self {
@@ -78,11 +88,45 @@ pub struct CoderThread {
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platform_thread_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub llm_provider: Option<String>,
     pub messages: Vec<ChatMessage>,
+    #[serde(default)]
+    pub thread_kind: CoderThreadKind,
     #[serde(default)]
     pub created_at: String,
     #[serde(default)]
     pub updated_at: String,
+}
+
+/// Lightweight thread row for the sessions sidebar (no message payload).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoderThreadSummary {
+    pub id: String,
+    pub title: String,
+    pub workspace_root: String,
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform_thread_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub llm_provider: Option<String>,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+    #[serde(default)]
+    pub thread_kind: CoderThreadKind,
+    pub message_count: usize,
+    pub is_running: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum CoderThreadKind {
+    #[default]
+    Session,
+    Coordinator,
+    SubAgent,
 }
 
 /// A tool call awaiting a human decision because the current permission mode +
@@ -175,4 +219,98 @@ pub struct PermissionRule {
     pub pattern: String,
     /// true = allow, false = deny.
     pub allow: bool,
+}
+
+/// Workspace file explorer entry (relative path under thread root).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceDirEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CoderSubAgentStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHubIssueRef {
+    pub owner: String,
+    pub repo: String,
+    pub number: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpawnSubAgentTask {
+    pub title: String,
+    #[serde(default)]
+    pub prompt: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_issue: Option<GitHubIssueRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_issue_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultitaskSpawnRequest {
+    pub coordinator_thread_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref: Option<String>,
+    #[serde(default)]
+    pub tasks: Vec<SpawnSubAgentTask>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issue_urls: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultitaskCleanupRequest {
+    pub coordinator_thread_id: String,
+    #[serde(default)]
+    pub sub_agent_ids: Vec<String>,
+    #[serde(default)]
+    pub force: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultitaskCancelRequest {
+    pub coordinator_thread_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_agent_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoderSubAgent {
+    pub id: String,
+    pub coordinator_thread_id: String,
+    pub child_thread_id: String,
+    pub title: String,
+    pub workspace_root: String,
+    pub branch: String,
+    pub status: CoderSubAgentStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_owner: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_repo: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_issue_number: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_issue_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
 }

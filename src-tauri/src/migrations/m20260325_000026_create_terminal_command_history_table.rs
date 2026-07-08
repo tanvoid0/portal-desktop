@@ -88,7 +88,11 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(TerminalCommandHistory::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(TerminalCommandHistory::Table)
+                    .to_owned(),
+            )
             .await
     }
 }
@@ -105,4 +109,3 @@ enum TerminalCommandHistory {
     DurationMs,
     Intercepted,
 }
-

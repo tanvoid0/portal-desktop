@@ -3,7 +3,19 @@ export default {
   content: ["./src/**/*.{html,js,svelte,ts}"],
   darkMode: "class",
   theme: {
+    screens: {
+      sm: "640px",
+      md: "768px",
+      lg: "1024px",
+      xl: "1280px",
+      "2xl": "1536px",
+      "3xl": "1920px",
+    },
     extend: {
+      maxWidth: {
+        readable: "var(--content-max-width-readable)",
+        chat: "var(--content-max-width-chat)",
+      },
       colors: {
         // shadcn/ui theme colors
         border: "hsl(var(--border))",
@@ -221,6 +233,8 @@ export default {
         "pulse-glow": "pulseGlow 2s ease-in-out infinite",
         float: "float 3s ease-in-out infinite",
         "gradient-shift": "gradientShift 3s ease infinite",
+        "typing-bounce": "typingBounce 1.4s ease-in-out infinite",
+        "cursor-blink": "cursorBlink 1.05s step-end infinite",
       },
       keyframes: {
         fadeIn: {
@@ -254,6 +268,14 @@ export default {
         gradientShift: {
           "0%, 100%": { backgroundPosition: "0% 50%" },
           "50%": { backgroundPosition: "100% 50%" },
+        },
+        typingBounce: {
+          "0%, 60%, 100%": { transform: "translateY(0)", opacity: "0.35" },
+          "30%": { transform: "translateY(-5px)", opacity: "1" },
+        },
+        cursorBlink: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0" },
         },
       },
     },

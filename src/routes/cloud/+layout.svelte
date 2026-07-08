@@ -17,6 +17,7 @@
   import { ResourceType } from "$lib/domains/cloud/core/types";
   import type { Command } from "$lib/domains/k8s-navigation";
   import ShellSidebarLayout from "$lib/components/shell/shell-sidebar-layout.svelte";
+  import PageContainer from "$lib/components/shell/page-container.svelte";
 
   let { children }: { children: Snippet<[]> } = $props();
 
@@ -122,19 +123,25 @@
   });
 </script>
 
-<CloudConnectionGuard>
+{#if $cloudStore.connection.isConnected}
   <ShellSidebarLayout>
     {#snippet sidebar()}
-      <div class="min-h-0 flex-1 overflow-y-auto p-4">
+      <div class="p-4">
         <Card class="p-3">
           <CloudNavigation />
         </Card>
       </div>
     {/snippet}
-    {@render children()}
+    <div class="min-h-0 flex-1 overflow-y-auto">
+      <PageContainer variant="full" class="py-4 md:py-6">
+        {@render children()}
+      </PageContainer>
+    </div>
   </ShellSidebarLayout>
 
   <!-- Navigation Enhancement Components (Additive) -->
   <CommandPalette commands={allCommands} />
   <ShortcutsHelp bind:open={showShortcutsHelp} context="table" />
-</CloudConnectionGuard>
+{:else}
+  <CloudConnectionGuard />
+{/if}

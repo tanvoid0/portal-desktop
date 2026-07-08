@@ -4,13 +4,23 @@ import type { ContextUsage, LlmUsage } from "$lib/domains/ai/types/index.js";
 import type {
   ChatMessage,
   CoderDoneEvent,
+  CoderSubAgent,
   CoderThread,
+  CoderThreadKind,
+  CoderThreadSummary,
   FileChange,
   GitDiffStats,
+  GitFileChange,
+  GitCommitDraft,
+  MultitaskCancelRequest,
+  MultitaskCleanupRequest,
+  MultitaskSpawnRequest,
   PendingApproval,
   PermissionMode,
   PermissionRule,
   ThreadTitleEvent,
+  RunCommandEvent,
+  ListTerminalsEvent,
 } from "../types.js";
 
 /**
@@ -18,15 +28,26 @@ import type {
  * execution, and permission gating all live in Rust; this only marshals calls.
  */
 export class CoderService {
-  createThread(workspaceRoot: string, model?: string): Promise<CoderThread> {
+  createThread(
+    workspaceRoot: string,
+    model?: string,
+    llmProvider?: string,
+    threadKind?: CoderThreadKind | null,
+  ): Promise<CoderThread> {
     return invoke<CoderThread>("coder_create_thread", {
       workspaceRoot,
       model: model ?? null,
+      llmProvider: llmProvider ?? null,
+      threadKind: threadKind ?? null,
     });
   }
 
   listThreads(): Promise<CoderThread[]> {
     return invoke<CoderThread[]>("coder_list_threads");
+  }
+
+  listThreadSummaries(): Promise<CoderThreadSummary[]> {
+    return invoke<CoderThreadSummary[]>("coder_list_thread_summaries");
   }
 
   getThread(threadId: string): Promise<CoderThread | null> {
@@ -37,8 +58,20 @@ export class CoderService {
     return invoke<boolean>("coder_delete_thread", { threadId });
   }
 
-  updateThreadModel(threadId: string, model: string | null): Promise<void> {
-    return invoke<void>("coder_update_thread_model", { threadId, model });
+  updateThreadModel(
+    threadId: string,
+    model: string | null,
+    llmProvider?: string | null,
+  ): Promise<void> {
+    return invoke<void>("coder_update_thread_model", {
+      threadId,
+      model,
+      llmProvider: llmProvider ?? null,
+    });
+  }
+
+  setThreadKind(threadId: string, threadKind: CoderThreadKind): Promise<void> {
+    return invoke<void>("coder_set_thread_kind", { threadId, threadKind });
   }
 
   /** Send a user message and start a background run. */
@@ -58,6 +91,8 @@ export class CoderService {
     approve: boolean,
     remember = false,
     editedPattern?: string,
+    rememberTool?: string,
+    rememberArgs?: Record<string, unknown>,
   ): Promise<void> {
     return invoke<void>("coder_approve", {
       threadId,
@@ -65,6 +100,8 @@ export class CoderService {
       approve,
       remember,
       editedPattern: editedPattern ?? null,
+      rememberTool: rememberTool ?? null,
+      rememberArgs: rememberArgs ?? null,
     });
   }
 
@@ -195,6 +232,37 @@ export class CoderService {
     });
   }
 
+  /** Per-file git working-tree diffs for a workspace path. */
+  listGitChanges(workspaceRoot: string): Promise<GitFileChange[]> {
+    return invoke<GitFileChange[]>("coder_list_git_changes", {
+      workspaceRoot,
+    });
+  }
+
+  /** Review working tree and suggest a commit message (optional AI). */
+  prepareGitCommit(
+    workspaceRoot: string,
+    useAi = true,
+  ): Promise<GitCommitDraft> {
+    return invoke<GitCommitDraft>("coder_prepare_git_commit", {
+      workspaceRoot,
+      useAi,
+    });
+  }
+
+  /** Stage all changes and commit with the given title and summary. */
+  gitCommit(
+    workspaceRoot: string,
+    title: string,
+    summary?: string | null,
+  ): Promise<string> {
+    return invoke<string>("coder_git_commit", {
+      workspaceRoot,
+      title,
+      summary: summary ?? null,
+    });
+  }
+
   /** The run finished. */
   onDone(
     cb: (p: CoderDoneEvent) => void,
@@ -218,6 +286,96 @@ export class CoderService {
   ): Promise<UnlistenFn> {
     return listen<{ thread_id: string; error: string }>(
       "coder://error",
+      (e) => cb(e.payload),
+    );
+  }
+
+  /** Backend requests frontend terminal execution for run_command. */
+  onRunCommand(cb: (p: RunCommandEvent) => void): Promise<UnlistenFn> {
+    return listen<RunCommandEvent>("coder://run_command", (e) =>
+      cb(e.payload),
+    );
+  }
+
+  /** Backend requests the list of session terminals. */
+  onListTerminals(cb: (p: ListTerminalsEvent) => void): Promise<UnlistenFn> {
+    return listen<ListTerminalsEvent>("coder://list_terminals", (e) =>
+      cb(e.payload),
+    );
+  }
+
+  submitCommandResult(
+    threadId: string,
+    callId: string,
+    result: string,
+  ): Promise<void> {
+    return invoke<void>("coder_submit_command_result", {
+      threadId,
+      callId,
+      result,
+    });
+  }
+
+  submitTerminalList(
+    threadId: string,
+    callId: string,
+    listJson: string,
+  ): Promise<void> {
+    return invoke<void>("coder_submit_terminal_list", {
+      threadId,
+      callId,
+      listJson: listJson,
+    });
+  }
+
+  multitaskSpawn(request: MultitaskSpawnRequest): Promise<CoderSubAgent[]> {
+    return invoke<CoderSubAgent[]>("coder_multitask_spawn", { request });
+  }
+
+  listSubAgents(coordinatorThreadId: string): Promise<CoderSubAgent[]> {
+    return invoke<CoderSubAgent[]>("coder_multitask_list", { coordinatorThreadId });
+  }
+
+  multitaskCancel(request: MultitaskCancelRequest): Promise<CoderSubAgent[]> {
+    return invoke<CoderSubAgent[]>("coder_multitask_cancel", { request });
+  }
+
+  multitaskCleanup(request: MultitaskCleanupRequest): Promise<CoderSubAgent[]> {
+    return invoke<CoderSubAgent[]>("coder_multitask_cleanup", { request });
+  }
+
+  onSubAgentStarted(
+    cb: (p: { coordinator_id: string; subagent: CoderSubAgent }) => void,
+  ): Promise<UnlistenFn> {
+    return listen<{ coordinator_id: string; subagent: CoderSubAgent }>(
+      "coder://subagent-started",
+      (e) => cb(e.payload),
+    );
+  }
+
+  onSubAgentProgress(
+    cb: (p: { coordinator_id: string; subagent: CoderSubAgent }) => void,
+  ): Promise<UnlistenFn> {
+    return listen<{ coordinator_id: string; subagent: CoderSubAgent }>(
+      "coder://subagent-progress",
+      (e) => cb(e.payload),
+    );
+  }
+
+  onSubAgentFinished(
+    cb: (p: { coordinator_id: string; subagent: CoderSubAgent | null }) => void,
+  ): Promise<UnlistenFn> {
+    return listen<{ coordinator_id: string; subagent: CoderSubAgent | null }>(
+      "coder://subagent-finished",
+      (e) => cb(e.payload),
+    );
+  }
+
+  onMultitaskComplete(
+    cb: (p: { coordinator_id: string; subagents: CoderSubAgent[] }) => void,
+  ): Promise<UnlistenFn> {
+    return listen<{ coordinator_id: string; subagents: CoderSubAgent[] }>(
+      "coder://multitask-complete",
       (e) => cb(e.payload),
     );
   }

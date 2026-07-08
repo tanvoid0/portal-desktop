@@ -1,4 +1,6 @@
+use crate::command_executor::{CommandExecutor, CommandOptions};
 use crate::domains::kubernetes::types::*;
+use crate::process_ext::NoWindowExt;
 use base64::{engine::general_purpose, Engine as _};
 use futures_util::StreamExt;
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
@@ -15,11 +17,60 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use tauri::{Emitter, Window};
-use crate::process_ext::NoWindowExt;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KubeSetupToolStatus {
+    pub installed: bool,
+    pub command: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KubeSetupTools {
+    pub kubectl: KubeSetupToolStatus,
+    pub gcloud: KubeSetupToolStatus,
+    pub aws: KubeSetupToolStatus,
+    pub az: KubeSetupToolStatus,
+    pub minikube: KubeSetupToolStatus,
+    pub kind: KubeSetupToolStatus,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KubeSetupTarget {
+    pub id: String,
+    pub label: String,
+    pub provider: String,
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KubeSetupDetectionResult {
+    pub tools: KubeSetupTools,
+    pub targets: Vec<KubeSetupTarget>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GenerateKubeconfigRequest {
+    pub provider: String,
+    pub cluster_name: Option<String>,
+    pub region: Option<String>,
+    pub zone: Option<String>,
+    pub project: Option<String>,
+    pub resource_group: Option<String>,
+    pub profile: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GenerateKubeconfigResult {
+    pub success: bool,
+    pub command: String,
+    pub stdout: String,
+    pub stderr: String,
+}
 
 // Static Kubernetes client using OnceLock (thread-safe initialization)
 static K8S_CLIENT: OnceLock<Client> = OnceLock::new();
@@ -39,6 +90,78 @@ pub struct KubernetesManager {
 }
 
 impl KubernetesManager {
+    pub async fn detect_setup_tools(&self) -> KubeSetupDetectionResult {
+        let kubectl = Self::tool_status("kubectl").await;
+        let gcloud = Self::tool_status("gcloud").await;
+        let aws = Self::tool_status("aws").await;
+        let az = Self::tool_status("az").await;
+        let minikube = Self::tool_status("minikube").await;
+        let kind = Self::tool_status("kind").await;
+
+        let tools = KubeSetupTools {
+            kubectl,
+            gcloud,
+            aws,
+            az,
+            minikube,
+            kind,
+        };
+
+        let mut targets = Vec::new();
+        let mut errors = Vec::new();
+
+        if tools.kind.installed {
+            match self.detect_kind_targets().await {
+                Ok(found) => targets.extend(found),
+                Err(error) => errors.push(error),
+            }
+        }
+
+        if tools.minikube.installed {
+            match self.detect_minikube_targets().await {
+                Ok(found) => targets.extend(found),
+                Err(error) => errors.push(error),
+            }
+        }
+
+        if tools.gcloud.installed {
+            match self.detect_gcloud_targets().await {
+                Ok(found) => targets.extend(found),
+                Err(error) => errors.push(error),
+            }
+        }
+
+        if tools.az.installed {
+            match self.detect_az_targets().await {
+                Ok(found) => targets.extend(found),
+                Err(error) => errors.push(error),
+            }
+        }
+
+        KubeSetupDetectionResult {
+            tools,
+            targets,
+            errors,
+        }
+    }
+
+    pub async fn generate_kubeconfig(
+        &self,
+        request: GenerateKubeconfigRequest,
+    ) -> Result<GenerateKubeconfigResult, String> {
+        match request.provider.as_str() {
+            "kind" => self.generate_kind_kubeconfig(&request).await,
+            "minikube" => self.generate_minikube_kubeconfig(&request).await,
+            "gcloud" => self.generate_gcloud_kubeconfig(&request).await,
+            "az" => self.generate_az_kubeconfig(&request).await,
+            "aws" => self.generate_aws_kubeconfig(&request).await,
+            _ => Err(format!(
+                "Unsupported kubeconfig provider '{}'",
+                request.provider
+            )),
+        }
+    }
+
     pub fn new() -> Self {
         Self {
             current_cluster: None,
@@ -655,6 +778,313 @@ impl KubernetesManager {
 
     pub fn is_connected(&self) -> bool {
         K8S_CLIENT.get().is_some()
+    }
+
+    async fn tool_status(command: &str) -> KubeSetupToolStatus {
+        KubeSetupToolStatus {
+            installed: CommandExecutor::command_exists(command).await,
+            command: command.to_string(),
+        }
+    }
+
+    async fn detect_kind_targets(&self) -> Result<Vec<KubeSetupTarget>, String> {
+        let result = CommandExecutor::execute_with_args("kind", &["get", "clusters"], None).await?;
+        if !result.success {
+            return Err(format!("kind cluster detection failed: {}", result.stderr));
+        }
+
+        let targets = result
+            .stdout
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(|name| KubeSetupTarget {
+                id: format!("kind:{name}"),
+                label: format!("kind: {name}"),
+                provider: "kind".to_string(),
+                metadata: HashMap::from([("cluster_name".to_string(), name.to_string())]),
+            })
+            .collect();
+
+        Ok(targets)
+    }
+
+    async fn detect_minikube_targets(&self) -> Result<Vec<KubeSetupTarget>, String> {
+        let result = CommandExecutor::execute_with_args(
+            "minikube",
+            &["profile", "list", "-o", "json"],
+            None,
+        )
+        .await?;
+        if !result.success {
+            return Err(format!(
+                "minikube profile detection failed: {}",
+                result.stderr
+            ));
+        }
+
+        let parsed: Value = serde_json::from_str(&result.stdout)
+            .map_err(|e| format!("Failed to parse minikube profiles: {}", e))?;
+        let valid = parsed
+            .get("valid")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        let mut targets = Vec::new();
+        for item in valid {
+            let Some(name) = item.get("Name").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            targets.push(KubeSetupTarget {
+                id: format!("minikube:{name}"),
+                label: format!("minikube: {name}"),
+                provider: "minikube".to_string(),
+                metadata: HashMap::from([("profile".to_string(), name.to_string())]),
+            });
+        }
+
+        Ok(targets)
+    }
+
+    async fn detect_gcloud_targets(&self) -> Result<Vec<KubeSetupTarget>, String> {
+        let result = CommandExecutor::execute_with_args(
+            "gcloud",
+            &["container", "clusters", "list", "--format=json"],
+            None,
+        )
+        .await?;
+        if !result.success {
+            return Err(format!(
+                "gcloud cluster detection failed: {}",
+                result.stderr
+            ));
+        }
+
+        let parsed: Value = serde_json::from_str(&result.stdout)
+            .map_err(|e| format!("Failed to parse gcloud clusters: {}", e))?;
+        let Some(items) = parsed.as_array() else {
+            return Ok(Vec::new());
+        };
+
+        let mut targets = Vec::new();
+        for item in items {
+            let Some(name) = item.get("name").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let location = item
+                .get("location")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let project = item
+                .get("location")
+                .and_then(|_| item.get("selfLink"))
+                .and_then(|v| v.as_str())
+                .and_then(|self_link| self_link.split("/projects/").nth(1))
+                .and_then(|rest| rest.split('/').next())
+                .unwrap_or_default()
+                .to_string();
+
+            let mut metadata = HashMap::from([
+                ("cluster_name".to_string(), name.to_string()),
+                ("location".to_string(), location.to_string()),
+            ]);
+
+            if !project.is_empty() {
+                metadata.insert("project".to_string(), project.clone());
+            }
+
+            targets.push(KubeSetupTarget {
+                id: format!("gcloud:{name}:{location}"),
+                label: if project.is_empty() {
+                    format!("gke: {name} ({location})")
+                } else {
+                    format!("gke: {name} ({location}, {project})")
+                },
+                provider: "gcloud".to_string(),
+                metadata,
+            });
+        }
+
+        Ok(targets)
+    }
+
+    async fn detect_az_targets(&self) -> Result<Vec<KubeSetupTarget>, String> {
+        let result =
+            CommandExecutor::execute_with_args("az", &["aks", "list", "--output", "json"], None)
+                .await?;
+        if !result.success {
+            return Err(format!("az aks detection failed: {}", result.stderr));
+        }
+
+        let parsed: Value = serde_json::from_str(&result.stdout)
+            .map_err(|e| format!("Failed to parse az aks list: {}", e))?;
+        let Some(items) = parsed.as_array() else {
+            return Ok(Vec::new());
+        };
+
+        let mut targets = Vec::new();
+        for item in items {
+            let Some(name) = item.get("name").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let Some(resource_group) = item.get("resourceGroup").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            targets.push(KubeSetupTarget {
+                id: format!("az:{resource_group}:{name}"),
+                label: format!("aks: {name} ({resource_group})"),
+                provider: "az".to_string(),
+                metadata: HashMap::from([
+                    ("cluster_name".to_string(), name.to_string()),
+                    ("resource_group".to_string(), resource_group.to_string()),
+                ]),
+            });
+        }
+
+        Ok(targets)
+    }
+
+    async fn generate_kind_kubeconfig(
+        &self,
+        request: &GenerateKubeconfigRequest,
+    ) -> Result<GenerateKubeconfigResult, String> {
+        let cluster_name = request
+            .cluster_name
+            .as_deref()
+            .ok_or_else(|| "kind cluster name is required".to_string())?;
+        let args = ["export", "kubeconfig", "--name", cluster_name];
+        Self::run_kubeconfig_command("kind", &args).await
+    }
+
+    async fn generate_minikube_kubeconfig(
+        &self,
+        request: &GenerateKubeconfigRequest,
+    ) -> Result<GenerateKubeconfigResult, String> {
+        let profile = request
+            .profile
+            .as_deref()
+            .or(request.cluster_name.as_deref())
+            .ok_or_else(|| "minikube profile is required".to_string())?;
+        let args = ["update-context", "-p", profile];
+        Self::run_kubeconfig_command("minikube", &args).await
+    }
+
+    async fn generate_gcloud_kubeconfig(
+        &self,
+        request: &GenerateKubeconfigRequest,
+    ) -> Result<GenerateKubeconfigResult, String> {
+        let cluster_name = request
+            .cluster_name
+            .as_deref()
+            .ok_or_else(|| "GKE cluster name is required".to_string())?;
+        let location = request
+            .zone
+            .as_deref()
+            .or(request.region.as_deref())
+            .ok_or_else(|| "GKE zone or region is required".to_string())?;
+
+        let mut args = vec![
+            "container".to_string(),
+            "clusters".to_string(),
+            "get-credentials".to_string(),
+            cluster_name.to_string(),
+        ];
+
+        if let Some(zone) = request.zone.as_deref() {
+            args.push("--zone".to_string());
+            args.push(zone.to_string());
+        } else {
+            args.push("--region".to_string());
+            args.push(location.to_string());
+        }
+
+        if let Some(project) = request.project.as_deref() {
+            args.push("--project".to_string());
+            args.push(project.to_string());
+        }
+
+        let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        Self::run_kubeconfig_command("gcloud", &arg_refs).await
+    }
+
+    async fn generate_az_kubeconfig(
+        &self,
+        request: &GenerateKubeconfigRequest,
+    ) -> Result<GenerateKubeconfigResult, String> {
+        let cluster_name = request
+            .cluster_name
+            .as_deref()
+            .ok_or_else(|| "AKS cluster name is required".to_string())?;
+        let resource_group = request
+            .resource_group
+            .as_deref()
+            .ok_or_else(|| "AKS resource group is required".to_string())?;
+        let args = [
+            "aks",
+            "get-credentials",
+            "--name",
+            cluster_name,
+            "--resource-group",
+            resource_group,
+            "--overwrite-existing",
+        ];
+        Self::run_kubeconfig_command("az", &args).await
+    }
+
+    async fn generate_aws_kubeconfig(
+        &self,
+        request: &GenerateKubeconfigRequest,
+    ) -> Result<GenerateKubeconfigResult, String> {
+        let cluster_name = request
+            .cluster_name
+            .as_deref()
+            .ok_or_else(|| "EKS cluster name is required".to_string())?;
+        let region = request
+            .region
+            .as_deref()
+            .ok_or_else(|| "AWS region is required".to_string())?;
+        let args = [
+            "eks",
+            "update-kubeconfig",
+            "--name",
+            cluster_name,
+            "--region",
+            region,
+        ];
+        Self::run_kubeconfig_command("aws", &args).await
+    }
+
+    async fn run_kubeconfig_command(
+        command: &str,
+        args: &[&str],
+    ) -> Result<GenerateKubeconfigResult, String> {
+        let result = CommandExecutor::execute_with_args(
+            command,
+            args,
+            Some(CommandOptions {
+                timeout_seconds: Some(120),
+                ..Default::default()
+            }),
+        )
+        .await?;
+
+        let command_string = format!("{} {}", command, args.join(" "));
+
+        if !result.success {
+            return Err(if result.stderr.trim().is_empty() {
+                format!("Command failed: {}", command_string)
+            } else {
+                result.stderr.clone()
+            });
+        }
+
+        Ok(GenerateKubeconfigResult {
+            success: true,
+            command: command_string,
+            stdout: result.stdout,
+            stderr: result.stderr,
+        })
     }
 
     // Helper methods to convert K8s resources to our types

@@ -9,6 +9,7 @@
   Modes:
     - "interactive" (default): long-lived shell.
     - "oneshot": runs `command` once via the backend and exits with its real code.
+    - "display": read-only xterm buffer (no PTY).
 -->
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
@@ -32,6 +33,8 @@
     mode?: XtermSessionMode;
     /** Oneshot command (required when mode="oneshot"). */
     command?: string;
+    /** Static buffer for mode="display". */
+    displayContent?: string;
     /** Extra environment overrides forwarded to the PTY. */
     env?: Record<string, string>;
     /** Per-instance xterm theme override merged over the resolved app theme. */
@@ -52,6 +55,7 @@
     tabId,
     mode = "interactive",
     command,
+    displayContent,
     env,
     themeOverride,
     autoStart = true,
@@ -74,6 +78,7 @@
       settings,
       mode,
       oneshotCommand: command,
+      displayContent,
       env,
       themeOverride,
       killOnDestroy,
@@ -134,7 +139,7 @@
   }
 
   onMount(() => {
-    if (autoStart && isTauriEnvironment()) {
+    if (autoStart && (isTauriEnvironment() || mode === "display")) {
       void start();
     }
   });

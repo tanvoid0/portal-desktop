@@ -30,6 +30,7 @@
     ChevronDown,
     Languages,
     Sparkles,
+    FolderGit2,
   } from "@lucide/svelte";
 
   type SettingsSectionType =
@@ -44,6 +45,7 @@
     | "languages"
     | "learning"
     | "ai"
+    | "github"
     | "autonomy"
     | "updates";
 
@@ -135,6 +137,13 @@
       ],
     },
     {
+      id: "github" as const,
+      label: "GitHub",
+      description: "OAuth app and account connection",
+      icon: FolderGit2,
+      path: "/settings/github",
+    },
+    {
       id: "theme" as const,
       label: "Theme",
       description: "Appearance & colors",
@@ -198,6 +207,7 @@
         "languages",
         "learning",
         "ai",
+        "github",
         "autonomy",
         "updates",
       ].includes(normalizedSection)

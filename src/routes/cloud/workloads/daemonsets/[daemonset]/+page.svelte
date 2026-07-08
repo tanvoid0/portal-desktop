@@ -134,7 +134,7 @@
   }
 </script>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <div class="flex items-center gap-4">
     <Button
       variant="ghost"

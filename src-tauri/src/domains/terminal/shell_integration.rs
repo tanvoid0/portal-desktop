@@ -100,8 +100,7 @@ impl ShellIntegrationParser {
             // Command start marker
             self.command_counter += 1;
 
-            let working_directory = Self::extract_marker_arg(marker, "133;A;")
-                .unwrap_or_default();
+            let working_directory = Self::extract_marker_arg(marker, "133;A;").unwrap_or_default();
 
             let block = CommandBlock {
                 id: format!("cmd_{}", self.command_counter),

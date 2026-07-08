@@ -15,6 +15,7 @@ pub struct SendMessageRequest {
     pub temperature: Option<f64>,
     pub max_tokens: Option<u32>,
     pub model: Option<String>,
+    pub llm_provider: Option<String>,
 }
 
 /// Send a message to the AI provider
@@ -28,6 +29,7 @@ pub async fn send_message(
         max_tokens: request.max_tokens,
         timeout_ms: None,
         model: request.model,
+        llm_provider: request.llm_provider,
         extra_options: None,
     };
 

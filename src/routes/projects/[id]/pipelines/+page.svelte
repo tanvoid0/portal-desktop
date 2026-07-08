@@ -225,7 +225,7 @@
   >
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <Button variant="ghost" size="sm" onclick={handleBack} class="w-fit gap-2">
     <ArrowLeft class="h-4 w-4" />
     Back to Project

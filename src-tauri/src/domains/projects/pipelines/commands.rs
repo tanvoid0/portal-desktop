@@ -1,4 +1,6 @@
-use crate::domains::projects::pipelines::services::{ExecutionRequestData, ExecutionService, PipelineService};
+use crate::domains::projects::pipelines::services::{
+    ExecutionRequestData, ExecutionService, PipelineService,
+};
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::State;

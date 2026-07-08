@@ -13,12 +13,13 @@
     AlertDialogTrigger,
   } from "$lib/components/ui/alert-dialog";
   import Icon from "@iconify/svelte";
-  import ChatModelSelector from "../chat/ChatModelSelector.svelte";
+  import ProviderModelSelector from "../ProviderModelSelector.svelte";
   import type { Conversation } from "../../types/index.js";
 
   interface Props {
     conversation: Conversation;
     selectedModel?: string | null;
+    selectedBackendProvider?: string | null;
     onTitleChange?: (title: string) => void;
     onDelete?: () => void;
     onBack?: () => void;
@@ -28,6 +29,7 @@
   let {
     conversation,
     selectedModel = $bindable<string | null>(null),
+    selectedBackendProvider = $bindable<string | null>(null),
     onTitleChange,
     onDelete,
     onBack,
@@ -92,10 +94,12 @@
     {/if}
   </div>
   <div class="flex items-center gap-2">
-    <ChatModelSelector
+    <ProviderModelSelector
       bind:selectedProvider
+      bind:selectedBackendProvider
       bind:selectedModel
       {onModelChange}
+      modelSelectClass="w-[220px]"
     />
   </div>
   {#if onDelete}

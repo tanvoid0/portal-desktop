@@ -164,7 +164,7 @@
   <title>Create Pipeline - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <Button
     variant="ghost"
     size="sm"

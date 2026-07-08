@@ -72,7 +72,11 @@ mod tests {
     fn accepts_valid_workspace_file() {
         let root = tmp_root();
         let root_s = root.to_str().unwrap();
-        fs::write(root.join("pnpm-workspace.yaml"), "packages:\n  - packages/*\n").unwrap();
+        fs::write(
+            root.join("pnpm-workspace.yaml"),
+            "packages:\n  - packages/*\n",
+        )
+        .unwrap();
         assert!(!has_broken_pnpm_workspace(root_s));
         fs::remove_dir_all(&root).ok();
     }
@@ -81,8 +85,11 @@ mod tests {
     fn injects_ignore_workspace_for_broken_file() {
         let root = tmp_root();
         let root_s = root.to_str().unwrap();
-        fs::write(root.join("pnpm-workspace.yaml"), "onlyBuiltDependencies:\n  - esbuild\n")
-            .unwrap();
+        fs::write(
+            root.join("pnpm-workspace.yaml"),
+            "onlyBuiltDependencies:\n  - esbuild\n",
+        )
+        .unwrap();
         let prepared = prepare_shell_command("pnpm run dev", root_s);
         assert_eq!(prepared, "pnpm --ignore-workspace run dev");
         fs::remove_dir_all(&root).ok();

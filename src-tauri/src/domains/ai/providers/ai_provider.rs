@@ -19,6 +19,8 @@ pub struct GenerationOptions {
     pub timeout_ms: Option<u64>,
     /// Model to use (provider-specific)
     pub model: Option<String>,
+    /// agent-platform backend id (ollama, lm_studio, gemini, …)
+    pub llm_provider: Option<String>,
     /// Additional provider-specific options
     pub extra_options: Option<serde_json::Value>,
 }
@@ -30,6 +32,7 @@ impl Default for GenerationOptions {
             max_tokens: Some(2048),
             timeout_ms: Some(60000),
             model: None,
+            llm_provider: None,
             extra_options: None,
         }
     }

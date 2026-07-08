@@ -98,7 +98,11 @@ pub fn classify(root: &str, files: &[FileEntry], extra_protected: &[String]) -> 
             continue;
         }
         if let Some((dir, kind)) = cache_ancestor(&f.path, &root_path) {
-            let g = groups.entry(dir).or_insert(Group { kind, size: 0, count: 0 });
+            let g = groups.entry(dir).or_insert(Group {
+                kind,
+                size: 0,
+                count: 0,
+            });
             g.size += f.size;
             g.count += 1;
         } else if f.size >= LARGE_FILE_BYTES && now.saturating_sub(f.modified_secs) >= OLD_SECS {

@@ -96,8 +96,7 @@
   <title>AI Hub - Portal Desktop</title>
 </svelte:head>
 
-<div class="h-full w-full overflow-y-auto p-6">
-  <div class="mx-auto max-w-7xl space-y-6">
+<div class="space-y-6">
     <PageHeader
       title="AI Hub"
       description="Manage AI providers, conversations, and training data"
@@ -250,5 +249,4 @@
         </div>
       {/if}
     {/if}
-  </div>
 </div>

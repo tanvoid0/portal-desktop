@@ -1,9 +1,10 @@
 use crate::database::DatabaseManager;
-use crate::utils::pnpm_workspace::{prepare_shell_command, warn_if_broken_pnpm_workspace};
 use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::pipelines::repositories::{ExecutionRepository, PipelineRepository};
 use crate::domains::projects::pipelines::utils::dependency_resolver::resolve_execution_order;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
+use crate::process_ext::NoWindowExt;
+use crate::utils::pnpm_workspace::{prepare_shell_command, warn_if_broken_pnpm_workspace};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -12,7 +13,6 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
-use crate::process_ext::NoWindowExt;
 use tokio::process::{Child, Command};
 use tokio::sync::watch;
 use uuid::Uuid;
@@ -95,19 +95,18 @@ impl ExecutionService {
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
 
-        let steps: Vec<Value> =
-            serde_json::from_str(&pipeline.steps_json).unwrap_or_default();
+        let steps: Vec<Value> = serde_json::from_str(&pipeline.steps_json).unwrap_or_default();
 
         let mut variables: HashMap<String, String> = request.variables.unwrap_or_default();
-        if let Ok(pipeline_vars) =
-            serde_json::from_str::<Vec<Value>>(&pipeline.variables_json)
-        {
+        if let Ok(pipeline_vars) = serde_json::from_str::<Vec<Value>>(&pipeline.variables_json) {
             for var in pipeline_vars {
                 if let (Some(name), Some(value)) = (
                     var.get("name").and_then(|v| v.as_str()),
                     var.get("value").and_then(|v| v.as_str()),
                 ) {
-                    variables.entry(name.to_string()).or_insert(value.to_string());
+                    variables
+                        .entry(name.to_string())
+                        .or_insert(value.to_string());
                 }
             }
         }
@@ -262,11 +261,9 @@ impl ExecutionService {
                         .as_deref()
                         .filter(|s| !s.trim().is_empty())
                         .unwrap_or(&command);
-                    command =
-                        normalize_node_script_command(source, &detected_pm, Some("build"));
+                    command = normalize_node_script_command(source, &detected_pm, Some("build"));
                 } else if is_dev_step(&command_template, &step_name) {
-                    command =
-                        normalize_node_script_command(&command, &detected_pm, Some("dev"));
+                    command = normalize_node_script_command(&command, &detected_pm, Some("dev"));
                 } else {
                     command = normalize_package_manager_command(&command, &detected_pm);
                     command = normalize_node_script_command(&command, &detected_pm, None);
@@ -354,14 +351,8 @@ impl ExecutionService {
                         }
                     }
                     Err(e) if e == "Execution cancelled" => {
-                        self.finalize_step(
-                            &execution_id,
-                            &step_id,
-                            "cancelled",
-                            None,
-                            None,
-                        )
-                        .await?;
+                        self.finalize_step(&execution_id, &step_id, "cancelled", None, None)
+                            .await?;
                         self.mark_cancelled(&execution_id, &app).await;
                         return Ok(());
                     }
@@ -720,7 +711,11 @@ impl ExecutionService {
             .unwrap_or_default())
     }
 
-    pub async fn cancel_execution(&self, execution_id: &str, app: Option<AppHandle>) -> Result<(), String> {
+    pub async fn cancel_execution(
+        &self,
+        execution_id: &str,
+        app: Option<AppHandle>,
+    ) -> Result<(), String> {
         let runtime_snapshot = {
             let guard = self.running.lock().unwrap();
             guard
@@ -733,7 +728,8 @@ impl ExecutionService {
             kill_children_async(&children).await;
         }
 
-        self.finalize_running_steps(execution_id, "cancelled").await?;
+        self.finalize_running_steps(execution_id, "cancelled")
+            .await?;
 
         self.execution_repo
             .update_status(execution_id, "cancelled".to_string(), None)
@@ -748,11 +744,7 @@ impl ExecutionService {
         Ok(())
     }
 
-    async fn finalize_running_steps(
-        &self,
-        execution_id: &str,
-        status: &str,
-    ) -> Result<(), String> {
+    async fn finalize_running_steps(&self, execution_id: &str, status: &str) -> Result<(), String> {
         let execution = self
             .execution_repo
             .get_by_id(execution_id)
@@ -964,9 +956,7 @@ fn is_install_step(command_template: &str) -> bool {
 fn is_build_step(command_template: &str, step_name: &str) -> bool {
     let lower = command_template.to_lowercase();
     let name_lower = step_name.to_lowercase();
-    lower.contains("run build")
-        || lower.ends_with(" build")
-        || name_lower.contains("build")
+    lower.contains("run build") || lower.ends_with(" build") || name_lower.contains("build")
 }
 
 fn is_dev_step(command_template: &str, step_name: &str) -> bool {
@@ -977,11 +967,7 @@ fn is_dev_step(command_template: &str, step_name: &str) -> bool {
 }
 
 /// Normalize package-manager script commands, respecting pnpm/yarn shorthand.
-fn normalize_node_script_command(
-    command: &str,
-    detected_pm: &str,
-    script: Option<&str>,
-) -> String {
+fn normalize_node_script_command(command: &str, detected_pm: &str, script: Option<&str>) -> String {
     let trimmed = command.trim();
     if trimmed.is_empty() {
         return if let Some(script) = script {
@@ -1014,8 +1000,7 @@ fn normalize_node_script_command(
         if !matches!(parts[0], "npm" | "yarn" | "pnpm") {
             return format_package_script_command(detected_pm, script);
         }
-    } else if parts.len() >= 3 && matches!(parts[0], "npm" | "yarn" | "pnpm") && parts[1] == "run"
-    {
+    } else if parts.len() >= 3 && matches!(parts[0], "npm" | "yarn" | "pnpm") && parts[1] == "run" {
         parts[0] = detected_pm;
         return parts.join(" ");
     } else if parts.len() >= 2 && matches!(parts[0], "npm" | "yarn" | "pnpm") {
@@ -1077,9 +1062,5 @@ async fn kill_process_tree(child: &mut Child) {
         let _ = child.start_kill();
     }
 
-    let _ = tokio::time::timeout(
-        tokio::time::Duration::from_secs(5),
-        child.wait(),
-    )
-    .await;
+    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(5), child.wait()).await;
 }

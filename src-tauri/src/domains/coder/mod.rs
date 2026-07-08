@@ -9,12 +9,15 @@
 pub mod commands;
 pub mod diff;
 pub mod entities;
+pub mod git_commit;
 pub mod git_status;
+pub mod multitask;
 pub mod permissions;
 pub mod platform_stream;
 pub mod service;
 pub mod tools;
 pub mod types;
+pub mod worktree;
 
 pub use commands::*;
 pub use service::CoderService;

@@ -420,10 +420,7 @@ pub async fn get_runtime_models(sdk_type: String) -> Result<Vec<OllamaModel>, St
 }
 
 #[tauri::command]
-pub async fn remove_runtime_model(
-    sdk_type: String,
-    model_name: String,
-) -> Result<String, String> {
+pub async fn remove_runtime_model(sdk_type: String, model_name: String) -> Result<String, String> {
     match sdk_type.as_str() {
         "ollama" => remove_ollama_model(model_name).await,
         _ => Err(format!("Unknown runtime sdk type: {}", sdk_type)),

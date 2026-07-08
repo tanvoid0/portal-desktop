@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
   import ChatMessage from "../chat/ChatMessage.svelte";
+  import TypingIndicator from "$lib/components/ui/typing-indicator.svelte";
   import ChatInput from "../chat/ChatInput.svelte";
   import ConversationHeader from "./ConversationHeader.svelte";
   import type {
@@ -76,21 +77,8 @@
         {/each}
       {/if}
       {#if isLoading}
-        <div class="flex items-start">
-          <div class="rounded-lg bg-muted px-4 py-2">
-            <div class="flex gap-1">
-              <span class="h-2 w-2 animate-pulse rounded-full bg-foreground/50"
-              ></span>
-              <span
-                class="h-2 w-2 animate-pulse rounded-full bg-foreground/50"
-                style="animation-delay: 0.2s"
-              ></span>
-              <span
-                class="h-2 w-2 animate-pulse rounded-full bg-foreground/50"
-                style="animation-delay: 0.4s"
-              ></span>
-            </div>
-          </div>
+        <div class="flex items-start gap-2.5">
+          <TypingIndicator />
         </div>
       {/if}
     </div>

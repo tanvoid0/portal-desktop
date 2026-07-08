@@ -9,6 +9,7 @@
   import type { Snippet } from "svelte";
   import SettingsNavigation from "$lib/domains/settings/components/SettingsNavigation.svelte";
   import ShellSidebarLayout from "$lib/components/shell/shell-sidebar-layout.svelte";
+  import PageContainer from "$lib/components/shell/page-container.svelte";
   import {
     settingsActions,
     settings,
@@ -53,6 +54,7 @@
       | "theme"
       | "ides"
       | "ai"
+      | "github"
       | "updates";
   });
 
@@ -166,8 +168,8 @@
   <div
     class="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
-    <div class="flex items-center justify-between px-6 py-4">
-      <div>
+    <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 3xl:px-8">
+      <div class="min-w-0">
         <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Settings class="h-6 w-6" />
           Settings
@@ -176,7 +178,7 @@
           Configure your application preferences and behavior
         </p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <Button
           variant="outline"
           onclick={handleExport}
@@ -228,19 +230,17 @@
     {/if}
   </div>
 
-  <ShellSidebarLayout
-    contentClass="flex h-full min-h-0 w-full overflow-hidden"
-    mainClass="min-h-0 min-w-0 flex-1 overflow-y-auto"
-  >
+  <ShellSidebarLayout mobileTriggerLabel="Settings menu">
     {#snippet sidebar()}
-      <div class="min-h-0 flex-1 overflow-y-auto p-4">
+      <div class="p-4">
         <Card class="p-3">
           <SettingsNavigation currentSection={currentSection()} />
         </Card>
       </div>
     {/snippet}
 
-    <div class="max-w-5xl p-6">
+    <div class="min-h-0 flex-1 overflow-y-auto">
+      <PageContainer variant="readable" class="py-6">
       {#if $isLoadingSettings}
         <PageLoading message="Loading settings..." />
       {:else if $settingsError}
@@ -252,6 +252,7 @@
       {:else}
         {@render children()}
       {/if}
+      </PageContainer>
     </div>
   </ShellSidebarLayout>
 </div>

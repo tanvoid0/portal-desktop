@@ -25,6 +25,16 @@ export interface AppSettings {
 
   // AI Avatar
   avatarEnabled?: boolean;
+
+  integrations?: AppIntegrationSettings;
+}
+
+export interface AppIntegrationSettings {
+  github: GitHubIntegrationSettings;
+}
+
+export interface GitHubIntegrationSettings {
+  clientId: string;
 }
 
 export interface WindowState {

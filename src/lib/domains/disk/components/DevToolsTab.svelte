@@ -328,7 +328,6 @@
         {#if !collapsed.has(g.cleanerId) && g.available}
           {#if g.items.length === 0}
             <CardContent class="py-6 text-center text-sm text-muted-foreground">Nothing to reclaim.</CardContent>
-          {:else}
           {:else if g.cleanerId === "projects"}
             {#each projectSubgroups(g.items) as sub (sub.label)}
               {@const sel = groupSel(sub.items)}
@@ -404,7 +403,6 @@
                 {/each}
               </TableBody>
             </Table>
-          {/if}
           {/if}
         {/if}
       </Card>

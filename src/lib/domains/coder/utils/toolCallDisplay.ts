@@ -32,6 +32,8 @@ export function getToolCallDisplay(
       };
     case "run_command":
       return { label: "Running command", detail: str(args, "command") };
+    case "list_terminals":
+      return { label: "Listing terminals", detail: "" };
     case "delegate_task":
       return { label: "Delegating task", detail: str(args, "goal") };
     default:

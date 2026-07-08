@@ -52,7 +52,27 @@
     sdkActions,
   } from "$lib/domains/sdk/stores/sdkStore";
   import { goto } from "$app/navigation";
+  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
   import type { SDKManagerInfo } from "$lib/domains/sdk/types";
+
+  const SDK_OVERVIEW_TABS = [
+    "overview",
+    "managers",
+    "services",
+    "versions",
+  ] as const;
+  type SdkOverviewTab = (typeof SDK_OVERVIEW_TABS)[number];
+
+  const activeTab = $derived(
+    resolveUrlTab($page.url.searchParams, SDK_OVERVIEW_TABS, "overview"),
+  );
+
+  function setActiveTab(tab: SdkOverviewTab) {
+    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+      replaceState: true,
+      noScroll: true,
+    });
+  }
 
   // State
   let loading = $state(false);
@@ -60,7 +80,6 @@
   let services = $state<any[]>([]);
   let versions = $state<any[]>([]);
   let availableVersions = $state<any[]>([]);
-  let activeTab = $state("overview");
 
   // Service state
   let serviceRunning = $state(false);
@@ -102,15 +121,6 @@
       description: m.description || "",
       sdk_type: m.sdk_type || m.type || m.name || "",
     }));
-  });
-
-  // Handle URL parameters
-  $effect(() => {
-    const urlParams = new URLSearchParams($page.url.search);
-    const tab = urlParams.get("tab");
-    if (tab && ["overview", "managers", "services", "versions"].includes(tab)) {
-      activeTab = tab;
-    }
   });
 
   // Initialize data
@@ -613,7 +623,7 @@
   }
 </script>
 
-<div class="p-6">
+<div class="space-y-6">
   <!-- Header -->
   <div class="flex items-center justify-between">
     <div>
@@ -723,7 +733,11 @@
   </div>
 
   <!-- Main Content Tabs -->
-  <Tabs bind:value={activeTab} class="w-full">
+  <Tabs
+    value={activeTab}
+    onValueChange={(v) => setActiveTab(v as SdkOverviewTab)}
+    class="w-full"
+  >
     <TabsList class="grid w-full grid-cols-4">
       <TabsTrigger value="overview">Overview</TabsTrigger>
       <TabsTrigger value="managers">SDK Managers</TabsTrigger>
@@ -757,7 +771,7 @@
           </CardHeader>
           <CardContent>
             <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-              <Button variant="outline" onclick={() => (activeTab = "managers")}>
+              <Button variant="outline" onclick={() => setActiveTab("managers")}>
                 <Settings class="mr-2 h-4 w-4" />
                 SDK Managers
               </Button>
@@ -1113,13 +1127,13 @@
                 a service.
               </p>
               <div class="flex gap-2">
-                <Button onclick={() => (activeTab = "versions")}>
+                <Button onclick={() => setActiveTab("versions")}>
                   <Download class="mr-2 h-4 w-4" />
                   Install SDK
                 </Button>
                 <Button
                   variant="outline"
-                  onclick={() => (activeTab = "services")}
+                  onclick={() => setActiveTab("services")}
                 >
                   <Play class="mr-2 h-4 w-4" />
                   Start Service
@@ -1186,7 +1200,7 @@
               <Button
                 variant="outline"
                 class="flex h-20 flex-col gap-2"
-                onclick={() => (activeTab = "services")}
+                onclick={() => setActiveTab("services")}
               >
                 <Play class="h-6 w-6" />
                 <span>Start All</span>
@@ -1194,7 +1208,7 @@
               <Button
                 variant="outline"
                 class="flex h-20 flex-col gap-2"
-                onclick={() => (activeTab = "services")}
+                onclick={() => setActiveTab("services")}
               >
                 <Square class="h-6 w-6" />
                 <span>Stop All</span>
@@ -1202,7 +1216,7 @@
               <Button
                 variant="outline"
                 class="flex h-20 flex-col gap-2"
-                onclick={() => (activeTab = "versions")}
+                onclick={() => setActiveTab("versions")}
               >
                 <Download class="h-6 w-6" />
                 <span>Install Latest</span>
@@ -1210,7 +1224,7 @@
               <Button
                 variant="outline"
                 class="flex h-20 flex-col gap-2"
-                onclick={() => (activeTab = "versions")}
+                onclick={() => setActiveTab("versions")}
               >
                 <Settings class="h-6 w-6" />
                 <span>Configure</span>

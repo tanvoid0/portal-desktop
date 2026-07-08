@@ -8,34 +8,52 @@
     Bot,
     Settings2,
     Trash2,
-    GitCompare,
+    GitBranch,
+    GitCommitHorizontal,
     Sparkles,
     RotateCcw,
     FolderOpen,
     Square,
     Copy,
     Check,
+    Terminal as TerminalIcon,
+    PanelRightOpen,
+    PanelLeftOpen,
   } from '@lucide/svelte';
   import { toast } from '$lib/utils/toast';
   import { goto, replaceState } from '$app/navigation';
   import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
   import { coderSession } from '../state/coderSession.svelte.js';
-  import type { ChatMessage, PermissionMode, PermissionRule, ToolCall } from '../types.js';
+  import { coderService } from '../services/coderService.js';
+  import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
+  import type { ChatMessage, PermissionMode, PermissionRule, ToolCall, GitDiffStats } from '../types.js';
   import ToolCallCard from './ToolCallCard.svelte';
   import ApprovalBanner from './ApprovalBanner.svelte';
-  import ChangesPanel from './ChangesPanel.svelte';
   import CoderProjectSelector from './CoderProjectSelector.svelte';
   import CoderSessionList from './CoderSessionList.svelte';
+  import CoderMultitaskBar from './CoderMultitaskBar.svelte';
   import ProviderModelSelector from '$lib/domains/ai/components/ProviderModelSelector.svelte';
   import CoderComposer from './CoderComposer.svelte';
   import ChatMessageComponent from '$lib/domains/ai/components/chat/ChatMessage.svelte';
+  import CoderWorkspaceSidebar from './CoderWorkspaceSidebar.svelte';
+  import CoderWorkspacePanel from './CoderWorkspacePanel.svelte';
+  import GitCommitDialog from './GitCommitDialog.svelte';
+  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
   import type { ChatMessage as AIChatMessage } from '$lib/domains/ai/types/index.js';
+  import ResponsivePanel from '$lib/components/shell/responsive-panel.svelte';
+  import PageContainer from '$lib/components/shell/page-container.svelte';
 
+  const showChanges = $derived(coderWorkspaceStore.activePanel === 'changes');
+  const showGitChanges = $derived(coderWorkspaceStore.activePanel === 'git-changes');
   let showSettings = $state(false);
-  let showChanges = $state(false);
   let scrollViewport = $state<HTMLElement | null>(null);
   let input = $state('');
   let copied = $state(false);
+  let gitStats = $state<GitDiffStats | null>(null);
+  let showCommitDialog = $state(false);
+
+  const showWorkspace = $derived(coderWorkspaceStore.activePanel !== 'chat');
+  let sessionsPanelOpen = $state(false);
 
   const MODES: { value: PermissionMode; label: string; hint: string }[] = [
     { value: 'review', label: 'Review', hint: 'prompt on each mutating action' },
@@ -52,7 +70,10 @@
   const running = $derived(rt.running);
   const streamingText = $derived(rt.streamingText);
   const error = $derived(rt.error);
-  const canRetry = $derived(rt.canRetry);
+  const showRetry = $derived.by(() => {
+    coderSession.runtimeRevision;
+    return coderSession.shouldShowRetry();
+  });
   const thread = $derived(coderSession.thread);
   const pendingChangeCount = $derived(
     coderSession.changes.filter((c) => c.status === 'pending').length,
@@ -71,13 +92,76 @@
   const contextUsage = $derived(rt.contextUsage);
   const llmUsage = $derived(rt.llmUsage);
   const queuedMessages = $derived(rt.messageQueue);
-  const runningCount = $derived(coderSession.runningThreadIds.size);
+  const subAgents = $derived(rt.subAgents);
+  const multitaskMode = $derived.by(() => {
+    coderSession.runtimeRevision;
+    return coderSession.multitaskMode || thread?.thread_kind === 'coordinator';
+  });
+  const sessionThreads = $derived.by(() => {
+    coderSession.threadsRevision;
+    return coderSession.threads;
+  });
+  const sessionsLoading = $derived(coderSession.threadsLoading);
+  const activeThreadId = $derived.by(() => {
+    coderSession.threadsRevision;
+    return coderSession.activeThreadId;
+  });
+  const runningThreadIds = $derived.by(() => {
+    coderSession.threadsRevision;
+    coderSession.runtimeRevision;
+    return coderSession.runningThreadIds;
+  });
+  const runningCount = $derived(runningThreadIds.size);
   const changesRevision = $derived(
     coderSession.changes.map((c) => `${c.id}:${c.status}`).join('|'),
   );
+  const terminalOpen = $derived.by(() => {
+    coderSession.runtimeRevision;
+    return coderSession.terminalOpen;
+  });
+  const activeTerminalThread = $derived(
+    sessionThreads.find((t) => t.id === activeThreadId) ?? thread,
+  );
+
+  async function refreshGitStats() {
+    const root = thread?.workspace_root ?? coderSession.workspaceRoot;
+    if (!root.trim()) {
+      gitStats = null;
+      return;
+    }
+    try {
+      gitStats = await coderService.getGitDiffStats(root);
+    } catch {
+      gitStats = null;
+    }
+  }
+
+  $effect(() => {
+    const root = thread?.workspace_root ?? coderSession.workspaceRoot;
+    if (root) void refreshGitStats();
+  });
+
+  $effect(() => {
+    if (!terminalOpen || !activeThreadId || !activeTerminalThread) return;
+    const tab = coderTerminalStore.ensureDefault(
+      activeThreadId,
+      activeTerminalThread.workspace_root,
+    );
+    const wsActive = coderWorkspaceStore.activeTerminalId();
+    if (
+      coderWorkspaceStore.activePanel !== 'terminal' ||
+      wsActive !== tab.id
+    ) {
+      coderWorkspaceStore.openTerminal(activeThreadId, tab.id, tab.label);
+    }
+  });
 
   onMount(async () => {
-    await coderSession.ensureInit();
+    try {
+      await coderSession.ensureInit();
+    } catch (e) {
+      console.error("coder: ensureInit failed", e);
+    }
 
     const urlId = $page.url.searchParams.get('id');
     if (urlId) {
@@ -91,6 +175,9 @@
           /* ignore */
         }
       }
+    } else if (!coderSession.activeThreadId) {
+      const attached = await coderSession.attachToRunningThread();
+      if (attached) syncUrl(attached);
     }
   });
 
@@ -116,6 +203,10 @@
   async function send() {
     const text = input.trim();
     if (!text || composerDisabled) return;
+    if (!coderSession.workspaceRoot.trim()) {
+      toast.error('Set a workspace folder first.');
+      return;
+    }
     input = '';
     await coderSession.send(text);
     if (coderSession.activeThreadId) syncUrl(coderSession.activeThreadId);
@@ -242,40 +333,59 @@
 </script>
 
 <div class="flex h-full w-full overflow-hidden">
-  <aside class="flex w-64 flex-shrink-0 flex-col overflow-hidden border-r bg-background">
-    <div class="border-b p-2.5">
-      <h2 class="flex items-center gap-1.5 text-sm font-semibold">
-        <Bot class="h-4 w-4" />
-        Sessions
-        {#if runningCount > 0}
-          <span
-            class="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary"
-            title="{runningCount} session(s) running"
-          >
-            {runningCount} active
-          </span>
-        {/if}
-      </h2>
-    </div>
+  <ResponsivePanel
+    bind:open={sessionsPanelOpen}
+    side="left"
+    desktopClass="w-80 bg-muted/20"
+  >
+    {#snippet header()}
+      <div class="border-b bg-background px-3 py-2.5">
+        <h2 class="flex items-center gap-2 text-sm font-semibold tracking-tight">
+          <Bot class="h-4 w-4 text-primary" />
+          Sessions
+          {#if runningCount > 0}
+            <span
+              class="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary"
+              title="{runningCount} session(s) running"
+            >
+              {runningCount} running
+            </span>
+          {/if}
+        </h2>
+      </div>
+    {/snippet}
     <CoderSessionList
-      threads={coderSession.threads}
-      onThreadClick={(t) => selectThread(t.id)}
+      threads={sessionThreads}
+      loading={sessionsLoading}
+      selectedThreadId={activeThreadId}
+      runningThreadIds={runningThreadIds}
+      onThreadClick={(t) => {
+        selectThread(t.id);
+        sessionsPanelOpen = false;
+      }}
       onCreateNew={newSession}
       onDeleteThread={(t) => coderSession.removeThread(t)}
-      selectedThreadId={coderSession.activeThreadId}
-      runningThreadIds={coderSession.runningThreadIds}
       queuedCountFor={(id) => {
         coderSession.runtimeRevision;
         return coderSession.queuedCountFor(id);
       }}
     />
-  </aside>
+  </ResponsivePanel>
 
-  <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <div
-      class="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2.5"
+      class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2.5"
     >
       <div class="flex min-w-0 items-center gap-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          class="h-8 w-8 shrink-0 md:hidden"
+          title="Sessions"
+          onclick={() => (sessionsPanelOpen = true)}
+        >
+          <PanelLeftOpen class="h-4 w-4" />
+        </Button>
         <h2 class="truncate text-sm font-semibold">
           {thread?.title || 'New session'}
         </h2>
@@ -305,36 +415,65 @@
         />
         <ProviderModelSelector
           bind:selectedProvider={coderSession.selectedProvider}
+          bind:selectedBackendProvider={coderSession.selectedBackendProvider}
           bind:selectedModel={coderSession.selectedModel}
           onModelChange={(m) => coderSession.handleModelChange(m)}
+          onBackendProviderChange={(p) =>
+            coderSession.handleBackendProviderChange(p)}
           modelSelectClass="w-[180px]"
         />
-        <div class="flex items-center rounded-md border border-border p-0.5">
-          {#each MODES as m}
-            <button
-              type="button"
-              title={m.hint}
-              onclick={() => coderSession.changeMode(m.value)}
-              class="rounded px-2 py-0.5 text-xs transition-colors {coderSession.mode ===
-              m.value
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted'}"
-            >
-              {m.label}
-            </button>
-          {/each}
-        </div>
         {#if running}
           <Button
             size="sm"
             variant="destructive"
             class="h-8 gap-1"
-            onclick={() => coderSession.stop()}
+            onclick={() => void coderSession.stop()}
           >
             <Square class="h-3 w-3 fill-current" />
             Stop
           </Button>
+        {:else if showRetry && thread}
+          <Button
+            size="sm"
+            variant="outline"
+            class="h-8 gap-1"
+            title="Retry the last message"
+            onclick={() => coderSession.retry()}
+          >
+            <RotateCcw class="h-3.5 w-3.5" />
+            Retry
+          </Button>
         {/if}
+        <Button
+          size="sm"
+          variant={coderWorkspaceStore.sidebarOpen ? 'secondary' : 'ghost'}
+          class="h-8 gap-1"
+          title="Workspace sidebar"
+          onclick={() => {
+            coderWorkspaceStore.sidebarOpen = !coderWorkspaceStore.sidebarOpen;
+          }}
+        >
+          <PanelRightOpen class="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant={terminalOpen ? 'secondary' : 'ghost'}
+          class="h-8 gap-1"
+          title="Session terminal"
+          disabled={!activeThreadId}
+          onclick={() => {
+            if (!activeThreadId || !activeTerminalThread) return;
+            const tab = coderTerminalStore.ensureDefault(
+              activeThreadId,
+              activeTerminalThread.workspace_root,
+            );
+            coderWorkspaceStore.openTerminal(activeThreadId, tab.id, tab.label);
+            coderSession.terminalOpen = true;
+          }}
+        >
+          <TerminalIcon class="h-3.5 w-3.5" />
+          Terminal
+        </Button>
         <Button
           size="icon"
           variant="ghost"
@@ -353,18 +492,44 @@
           size="sm"
           variant={showChanges ? 'secondary' : 'ghost'}
           class="h-8 gap-1"
-          title="Review file changes"
+          title="Review agent file changes"
           onclick={() => {
-            showChanges = !showChanges;
-            if (showChanges) coderSession.refreshChanges(thread?.id);
+            coderWorkspaceStore.openChanges();
+            coderSession.refreshChanges(thread?.id);
           }}
         >
-          <GitCompare class="h-3.5 w-3.5" />
+          <Bot class="h-3.5 w-3.5" />
           {#if pendingChangeCount > 0}
             <span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">
               {pendingChangeCount}
             </span>
           {/if}
+        </Button>
+        <Button
+          size="sm"
+          variant={showGitChanges ? 'secondary' : 'ghost'}
+          class="h-8 gap-1"
+          title="View git working tree changes"
+          onclick={() => coderWorkspaceStore.openGitChanges()}
+        >
+          <GitBranch class="h-3.5 w-3.5" />
+          {#if gitStats?.hasChanges}
+            <span class="font-mono text-[10px] text-green-600 dark:text-green-400">
+              {#if gitStats.additions > 0}+{gitStats.additions}{/if}
+              {#if gitStats.deletions > 0}-{gitStats.deletions}{/if}
+            </span>
+          {/if}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          class="h-8 gap-1"
+          title="Review and commit git changes"
+          disabled={!gitStats?.hasChanges}
+          onclick={() => (showCommitDialog = true)}
+        >
+          <GitCommitHorizontal class="h-3.5 w-3.5" />
+          Commit
         </Button>
         <Button
           size="icon"
@@ -387,17 +552,17 @@
       </div>
     </div>
 
-    {#if showChanges}
-      <div class="max-h-72 overflow-auto border-b border-border bg-muted/30 p-3">
-        <ChangesPanel
-          changes={coderSession.changes}
-          onRefresh={() => coderSession.refreshChanges(thread?.id)}
-        />
-      </div>
+    {#if thread?.thread_kind === 'coordinator'}
+      <CoderMultitaskBar
+        {subAgents}
+        onCancel={(id) => void coderSession.cancelSubAgent(id)}
+        onCleanupOne={(id) => void coderSession.cleanupSubAgents([id], true)}
+        onCleanupAll={() => void coderSession.cleanupSubAgents([], true)}
+      />
     {/if}
 
     {#if showSettings}
-      <div class="border-b border-border bg-muted/30 p-3 text-sm">
+      <div class="shrink-0 border-b border-border bg-muted/30 p-3 text-sm">
         <div class="mb-2 font-medium">Allow / deny rules</div>
         {#if coderSession.rules.length === 0}
           <div class="text-xs text-muted-foreground">
@@ -426,6 +591,9 @@
       </div>
     {/if}
 
+    <div class="flex min-h-0 flex-1 overflow-hidden">
+      <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+
     {#if isEmpty}
       <div class="flex flex-1 flex-col items-center justify-center px-4 pb-8">
         <div class="mb-6 text-center">
@@ -440,7 +608,8 @@
             permission mode.
           </p>
         </div>
-        <div class="w-full max-w-3xl">
+        <div class="w-full">
+          <PageContainer variant="chat" class="px-0">
           <CoderComposer
             bind:value={input}
             onSend={send}
@@ -454,15 +623,20 @@
             onModeChange={(m) => coderSession.changeMode(m)}
             workspaceRoot={coderSession.workspaceRoot}
             onToggleChanges={() => {
-              showChanges = !showChanges;
-              if (showChanges) coderSession.refreshChanges(thread?.id);
+              coderWorkspaceStore.openChanges();
+              coderSession.refreshChanges(thread?.id);
             }}
+            onToggleGitChanges={() => coderWorkspaceStore.openGitChanges()}
             {showChanges}
-            {changesRevision}
+            {showGitChanges}
+            {pendingChangeCount}
             {contextUsage}
             {llmUsage}
+            {multitaskMode}
+            onToggleMultitask={(enabled) => void coderSession.setMultitaskMode(enabled)}
             class="px-0 pb-0"
           />
+          </PageContainer>
         </div>
         {#if error}
           <div
@@ -474,7 +648,7 @@
       </div>
     {:else}
       <ScrollArea class="min-h-0 flex-1" bind:viewportRef={scrollViewport}>
-        <div class="mx-auto max-w-3xl space-y-4 px-4 py-6">
+        <PageContainer variant="chat" class="space-y-4 py-6">
           {#each visibleMessages as m}
             {#if callsOf(m).length > 0}
               <ChatMessageComponent message={toDisplayMessage(m)}>
@@ -484,6 +658,7 @@
                       {call}
                       result={resultsById.get(call.id) ?? null}
                       workspaceRoot={thread?.workspace_root ?? coderSession.workspaceRoot}
+                      threadId={activeThreadId ?? undefined}
                     />
                   {/each}
                 {/snippet}
@@ -493,7 +668,10 @@
             {/if}
           {/each}
           {#if streamingText}
-            <ChatMessageComponent message={{ role: 'assistant', content: streamingText }} />
+            <ChatMessageComponent
+              message={{ role: 'assistant', content: streamingText }}
+              isStreaming={true}
+            />
           {/if}
           {#if running && !pending && !streamingText}
             <ChatMessageComponent message={{ role: 'assistant', content: '' }} showLoader={true} />
@@ -505,31 +683,54 @@
               onDecision={(a, r, p) => coderSession.decide(a, r, p)}
             />
           {/if}
-          {#if error}
-            <div
-              class="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive"
-            >
-              <span class="flex-1">{error}</span>
-              {#if canRetry && thread}
+          {#if showRetry && thread && !running}
+            {#if error}
+              <div
+                class="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive"
+              >
+                <span class="flex-1">{error}</span>
                 <Button
                   size="sm"
                   variant="outline"
                   class="h-7 shrink-0 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
                   onclick={() => coderSession.retry()}
-                  disabled={running}
                 >
                   <RotateCcw class="h-3.5 w-3.5" />
                   Retry
                 </Button>
-              {/if}
+              </div>
+            {:else}
+              <div
+                class="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-5 text-center"
+              >
+                <p class="text-xs text-muted-foreground">
+                  The agent didn't reply. Retry to run the turn again.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  class="h-8 gap-1"
+                  onclick={() => coderSession.retry()}
+                >
+                  <RotateCcw class="h-3.5 w-3.5" />
+                  Retry
+                </Button>
+              </div>
+            {/if}
+          {:else if error}
+            <div
+              class="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive"
+            >
+              <span class="flex-1">{error}</span>
             </div>
           {/if}
-        </div>
+        </PageContainer>
       </ScrollArea>
       <div class="shrink-0 bg-gradient-to-t from-background via-background to-transparent pt-2">
         <CoderComposer
           bind:value={input}
           onSend={send}
+          onStop={() => void coderSession.stop()}
           disabled={composerDisabled}
           {running}
           {queuedMessages}
@@ -538,16 +739,56 @@
           onModeChange={(m) => coderSession.changeMode(m)}
           workspaceRoot={coderSession.workspaceRoot}
           onToggleChanges={() => {
-            showChanges = !showChanges;
-            if (showChanges) coderSession.refreshChanges(thread?.id);
+            coderWorkspaceStore.openChanges();
+            coderSession.refreshChanges(thread?.id);
           }}
+          onToggleGitChanges={() => coderWorkspaceStore.openGitChanges()}
           {showChanges}
+          {showGitChanges}
+          {pendingChangeCount}
           {changesRevision}
           {contextUsage}
           {llmUsage}
+          {multitaskMode}
+          onToggleMultitask={(enabled) => void coderSession.setMultitaskMode(enabled)}
           class="pt-0"
         />
       </div>
     {/if}
-  </main>
+      </main>
+
+      {#if showWorkspace}
+        <CoderWorkspacePanel
+          threadId={activeThreadId}
+          workspaceRoot={activeTerminalThread?.workspace_root ?? coderSession.workspaceRoot}
+          changes={coderSession.changes}
+          onRefreshChanges={() => coderSession.refreshChanges(thread?.id)}
+          onCommit={() => (showCommitDialog = true)}
+        />
+      {/if}
+
+      {#if coderWorkspaceStore.sidebarOpen}
+        <ResponsivePanel
+          bind:open={coderWorkspaceStore.sidebarOpen}
+          side="right"
+          desktopClass="w-56 border-l border-border bg-muted/20"
+          borderClass=""
+        >
+          <CoderWorkspaceSidebar
+            threadId={activeThreadId}
+            workspaceRoot={activeTerminalThread?.workspace_root ?? coderSession.workspaceRoot}
+            workspaceName={workspaceName}
+            {gitStats}
+            {pendingChangeCount}
+          />
+        </ResponsivePanel>
+      {/if}
+    </div>
+  </div>
 </div>
+
+<GitCommitDialog
+  bind:open={showCommitDialog}
+  workspaceRoot={thread?.workspace_root ?? coderSession.workspaceRoot}
+  onCommitted={() => void refreshGitStats()}
+/>

@@ -4,8 +4,8 @@ use crate::domains::deployments::services::docker_service::{
 use crate::entities::deployment::{
     ActiveModel as DeploymentActiveModel, Column, Entity as DeploymentEntity, Model,
 };
-use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, Set};
 use sea_orm::sea_query::OnConflict;
+use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, Set};
 use std::sync::Arc;
 
 pub struct DeploymentRepository {
@@ -86,8 +86,7 @@ impl DeploymentRepository {
 }
 
 fn model_to_deployment(model: Model) -> Result<Deployment, String> {
-    serde_json::from_str(&model.data_json)
-        .map_err(|e| format!("Failed to parse deployment: {}", e))
+    serde_json::from_str(&model.data_json).map_err(|e| format!("Failed to parse deployment: {}", e))
 }
 
 fn deployment_type_to_str(deployment_type: &DeploymentType) -> String {

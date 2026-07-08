@@ -20,6 +20,9 @@
     getToolResultStatus,
     resultLines,
   } from "../utils/toolCallDisplay.js";
+  import CoderCommandOutput from "./CoderCommandOutput.svelte";
+  import MarkdownFileContent from "$lib/components/ui/chat-markdown/MarkdownFileContent.svelte";
+  import { isMarkdownPath } from "$lib/utils/markdownFile.js";
 
   interface Props {
     call: ToolCall;
@@ -27,9 +30,11 @@
     result?: string | null;
     /** Workspace root where local tools execute. */
     workspaceRoot?: string;
+    /** Coder thread id — scopes terminal output. */
+    threadId?: string;
   }
 
-  let { call, result = null, workspaceRoot = "" }: Props = $props();
+  let { call, result = null, workspaceRoot = "", threadId }: Props = $props();
 
   let open = $state(false);
 
@@ -54,6 +59,9 @@
   const isSearch = $derived(tool === "search_files");
   const searchHits = $derived(isSearch && result ? resultLines(result) : []);
   const isRead = $derived(tool === "read_file");
+  const readPath = $derived(isRead ? String(args.path ?? "") : "");
+  const isMarkdownRead = $derived(isRead && isMarkdownPath(readPath));
+  const isMarkdownWrite = $derived(isWrite && isMarkdownPath(String(args.path ?? "")));
   const status = $derived(getToolResultStatus(tool, result));
   const failed = $derived(status === "failed");
   const failureSummary = $derived(
@@ -136,11 +144,15 @@
   {#if open}
     <div class="space-y-2 border-t border-border px-3 py-2">
       {#if isWrite}
-        <div>
-          <pre class="max-h-64 overflow-auto rounded bg-background p-2 text-xs"><code
-              >{writeContent}</code
-            ></pre>
-        </div>
+        {#if isMarkdownWrite}
+          <MarkdownFileContent content={writeContent} />
+        {:else}
+          <div>
+            <pre class="max-h-64 overflow-auto rounded bg-background p-2 text-xs"><code
+                >{writeContent}</code
+              ></pre>
+          </div>
+        {/if}
       {:else if isEdit}
         <div class="space-y-1">
           <pre class="max-h-40 overflow-auto rounded bg-red-500/10 p-2 text-xs"><code
@@ -152,28 +164,39 @@
         </div>
       {:else if isCommand}
         <div class="space-y-2">
-          {#if workspaceRoot}
-            <div
-              class="truncate font-mono text-[11px] text-muted-foreground"
-              title={workspaceRoot}
-            >
+          {#if result !== null && threadId}
+            <CoderCommandOutput
+              {threadId}
+              callId={call.id}
+              {command}
+              output={failed ? failedOutput : result}
+              {failed}
               {workspaceRoot}
-            </div>
-          {/if}
-          <div
-            class="rounded px-2.5 py-1.5 font-mono text-xs {failed
-              ? 'bg-destructive/10 text-destructive'
-              : 'bg-zinc-900 text-zinc-100 dark:bg-zinc-950'}"
-          >
-            <span class={failed ? 'text-destructive/70' : 'text-zinc-500'}>$</span>
-            {command}
-          </div>
-          {#if result !== null}
-            <pre
-              class="max-h-64 overflow-auto rounded p-2 text-xs {failed
+            />
+          {:else}
+            {#if workspaceRoot}
+              <div
+                class="truncate font-mono text-[11px] text-muted-foreground"
+                title={workspaceRoot}
+              >
+                {workspaceRoot}
+              </div>
+            {/if}
+            <div
+              class="rounded px-2.5 py-1.5 font-mono text-xs {failed
                 ? 'bg-destructive/10 text-destructive'
-                : 'bg-background'}"><code>{failed ? failedOutput : result}</code></pre
+                : 'bg-zinc-900 text-zinc-100 dark:bg-zinc-950'}"
             >
+              <span class={failed ? 'text-destructive/70' : 'text-zinc-500'}>$</span>
+              {command}
+            </div>
+            {#if result !== null}
+              <pre
+                class="max-h-64 overflow-auto rounded p-2 text-xs {failed
+                  ? 'bg-destructive/10 text-destructive'
+                  : 'bg-background'}"><code>{failed ? failedOutput : result}</code></pre
+              >
+            {/if}
           {/if}
         </div>
       {:else if isListDir && result !== null && !failed}
@@ -193,11 +216,15 @@
           ><code>{failedOutput}</code></pre
         >
       {:else if isRead && result !== null}
-        <pre
-          class="max-h-64 overflow-auto rounded p-2 text-xs {failed
-            ? 'bg-destructive/10 text-destructive'
-            : 'bg-background'}"><code>{failed ? failedOutput : result}</code></pre
-        >
+        {#if isMarkdownRead && !failed}
+          <MarkdownFileContent content={result} />
+        {:else}
+          <pre
+            class="max-h-64 overflow-auto rounded p-2 text-xs {failed
+              ? 'bg-destructive/10 text-destructive'
+              : 'bg-background'}"><code>{failed ? failedOutput : result}</code></pre
+          >
+        {/if}
       {:else if tool === "delegate_task"}
         <p class="text-xs text-muted-foreground">{String(args.goal ?? "")}</p>
         {#if result !== null}

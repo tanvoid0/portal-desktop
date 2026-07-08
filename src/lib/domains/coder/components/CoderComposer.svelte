@@ -5,12 +5,14 @@
   import {
     Plus,
     ArrowUp,
+    Bot,
     GitBranch,
+    GitBranchPlus,
     Monitor,
     ChevronDown,
-    GitCompare,
     X,
     ListOrdered,
+    Square,
   } from "@lucide/svelte";
   import { cn } from "$lib/utils.js";
   import AIContextBar from "$lib/domains/ai/components/AIContextBar.svelte";
@@ -21,6 +23,7 @@
   interface Props {
     value: string;
     onSend: () => void;
+    onStop?: () => void;
     placeholder?: string;
     disabled?: boolean;
     running?: boolean;
@@ -29,6 +32,9 @@
     workspaceRoot: string;
     onToggleChanges?: () => void;
     showChanges?: boolean;
+    onToggleGitChanges?: () => void;
+    showGitChanges?: boolean;
+    pendingChangeCount?: number;
     /** Bumps when agent file changes are refreshed (accept/reject). */
     changesRevision?: string;
     contextUsage?: ContextUsage | null;
@@ -36,12 +42,15 @@
     rows?: number;
     queuedMessages?: string[];
     onRemoveQueued?: (index: number) => void;
+    multitaskMode?: boolean;
+    onToggleMultitask?: (enabled: boolean) => void;
     class?: string;
   }
 
   let {
     value = $bindable(""),
     onSend,
+    onStop,
     placeholder = "Send follow-up…",
     disabled = false,
     running = false,
@@ -50,12 +59,17 @@
     workspaceRoot,
     onToggleChanges,
     showChanges = false,
+    onToggleGitChanges,
+    showGitChanges = false,
+    pendingChangeCount = 0,
     changesRevision = "",
     contextUsage = null,
     llmUsage = null,
     rows = 2,
     queuedMessages = [],
     onRemoveQueued,
+    multitaskMode = false,
+    onToggleMultitask,
     class: className = "",
   }: Props = $props();
 
@@ -75,12 +89,15 @@
   );
   const gitBranch = $derived(gitStats?.branch ?? null);
   const hasGitChanges = $derived(!!gitStats?.hasChanges);
+  const hasAgentChanges = $derived(pendingChangeCount > 0);
   const followUpPlaceholder = $derived(
     running
       ? queuedMessages.length > 0
         ? `Queue follow-up (${queuedMessages.length} queued)…`
         : "Queue follow-up while agent runs…"
-      : placeholder,
+      : multitaskMode
+        ? "Paste 2+ GitHub issue URLs to spawn parallel worktrees…"
+        : placeholder,
   );
   const queueCount = $derived(queuedMessages.length);
 
@@ -139,36 +156,76 @@
 </script>
 
 <div class={cn("px-4 pb-3 pt-2", className)}>
-  {#if hasGitChanges && onToggleChanges}
-    <div class="mx-auto mb-2 flex w-full max-w-3xl gap-2">
+  {#if (hasAgentChanges && onToggleChanges) || (hasGitChanges && onToggleGitChanges)}
+    <div class="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-2 lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
+      {#if hasAgentChanges && onToggleChanges}
+        <button
+          type="button"
+          onclick={onToggleChanges}
+          class={cn(
+            "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            showChanges
+              ? "border-primary/40 bg-primary/10 text-foreground"
+              : "border-border bg-background text-foreground hover:bg-muted/60",
+          )}
+          title="Review agent file changes"
+        >
+          <Bot class="h-3.5 w-3.5 text-muted-foreground" />
+          <span>Agent changes</span>
+          <span class="rounded-full bg-amber-500 px-1.5 font-mono text-[10px] text-white">
+            {pendingChangeCount}
+          </span>
+        </button>
+      {/if}
+      {#if hasGitChanges && onToggleGitChanges}
+        <button
+          type="button"
+          onclick={onToggleGitChanges}
+          class={cn(
+            "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            showGitChanges
+              ? "border-primary/40 bg-primary/10 text-foreground"
+              : "border-border bg-background text-foreground hover:bg-muted/60",
+          )}
+          title="Git changes in {gitBranch ?? 'workspace'}"
+        >
+          <GitBranch class="h-3.5 w-3.5 text-muted-foreground" />
+          <span>Git changes</span>
+          {#if gitStats && gitStats.additions > 0}
+            <span class="font-mono text-emerald-600 dark:text-emerald-400">
+              +{gitStats.additions}
+            </span>
+          {/if}
+          {#if gitStats && gitStats.deletions > 0}
+            <span class="font-mono text-red-600 dark:text-red-400">
+              -{gitStats.deletions}
+            </span>
+          {/if}
+        </button>
+      {/if}
+    </div>
+  {/if}
+
+  {#if onToggleMultitask}
+    <div class="mx-auto mb-2 flex w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
       <button
         type="button"
-        onclick={onToggleChanges}
+        onclick={() => onToggleMultitask(!multitaskMode)}
         class={cn(
           "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-          showChanges
+          multitaskMode
             ? "border-primary/40 bg-primary/10 text-foreground"
             : "border-border bg-background text-foreground hover:bg-muted/60",
         )}
-        title="Git changes in {gitBranch ?? 'workspace'}"
+        title="Use a coordinator thread that can fan out parallel worktree agents"
       >
-        <GitCompare class="h-3.5 w-3.5 text-muted-foreground" />
-        <span>Changes</span>
-        {#if gitStats && gitStats.additions > 0}
-          <span class="font-mono text-emerald-600 dark:text-emerald-400">
-            +{gitStats.additions}
-          </span>
-        {/if}
-        {#if gitStats && gitStats.deletions > 0}
-          <span class="font-mono text-red-600 dark:text-red-400">
-            -{gitStats.deletions}
-          </span>
-        {/if}
+        <GitBranchPlus class="h-3.5 w-3.5 text-muted-foreground" />
+        <span>{multitaskMode ? "Multitask on" : "Multitask off"}</span>
       </button>
     </div>
   {/if}
 
-  <div class="mx-auto w-full max-w-3xl">
+  <div class="mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
     {#if queueCount > 0}
       <div class="mb-2 space-y-1">
         <div class="flex items-center gap-1.5 px-1 text-[11px] font-medium text-muted-foreground">
@@ -242,20 +299,33 @@
           </DropdownMenu.Content>
         </DropdownMenu.Root>
 
-        <Button
-          type="button"
-          onclick={onSend}
-          disabled={!value.trim() || disabled}
-          size="icon"
-          class="h-8 w-8 rounded-full"
-          title={running ? "Queue message (Ctrl/Cmd+Enter)" : "Send (Ctrl/Cmd+Enter)"}
-        >
-          {#if running && value.trim()}
-            <ListOrdered class="h-4 w-4" />
-          {:else}
-            <ArrowUp class="h-4 w-4" />
-          {/if}
-        </Button>
+        {#if running && !value.trim() && onStop}
+          <Button
+            type="button"
+            onclick={onStop}
+            size="icon"
+            variant="destructive"
+            class="h-8 w-8 rounded-full"
+            title="Stop agent"
+          >
+            <Square class="h-3.5 w-3.5 fill-current" />
+          </Button>
+        {:else}
+          <Button
+            type="button"
+            onclick={onSend}
+            disabled={!value.trim() || disabled}
+            size="icon"
+            class="h-8 w-8 rounded-full"
+            title={running ? "Queue message (Ctrl/Cmd+Enter)" : "Send (Ctrl/Cmd+Enter)"}
+          >
+            {#if running && value.trim()}
+              <ListOrdered class="h-4 w-4" />
+            {:else}
+              <ArrowUp class="h-4 w-4" />
+            {/if}
+          </Button>
+        {/if}
       </div>
     </div>
 

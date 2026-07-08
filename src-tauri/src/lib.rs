@@ -66,10 +66,9 @@ pub fn run() {
                 .app_data_dir()
                 .map_err(|e| format!("Failed to resolve app data directory: {}", e))?;
 
-            let db_manager = tauri::async_runtime::block_on(async {
-                DatabaseManager::new(app_data_dir).await
-            })
-            .map_err(|e| format!("Failed to initialize database manager: {}", e))?;
+            let db_manager =
+                tauri::async_runtime::block_on(async { DatabaseManager::new(app_data_dir).await })
+                    .map_err(|e| format!("Failed to initialize database manager: {}", e))?;
 
             log_info!("Tauri", "Database manager initialized, managing state...");
 
@@ -181,9 +180,11 @@ pub fn run() {
             // Coder agent commands
             domains::coder::coder_create_thread,
             domains::coder::coder_list_threads,
+            domains::coder::coder_list_thread_summaries,
             domains::coder::coder_get_thread,
             domains::coder::coder_delete_thread,
             domains::coder::coder_update_thread_model,
+            domains::coder::coder_set_thread_kind,
             domains::coder::coder_send,
             domains::coder::coder_retry,
             domains::coder::coder_approve,
@@ -201,6 +202,17 @@ pub fn run() {
             domains::coder::coder_list_running,
             domains::coder::coder_get_context_usage,
             domains::coder::coder_get_git_diff_stats,
+            domains::coder::coder_list_git_changes,
+            domains::coder::coder_prepare_git_commit,
+            domains::coder::coder_git_commit,
+            domains::coder::coder_list_dir,
+            domains::coder::coder_open_in_explorer,
+            domains::coder::coder_submit_command_result,
+            domains::coder::coder_submit_terminal_list,
+            domains::coder::coder_multitask_spawn,
+            domains::coder::coder_multitask_list,
+            domains::coder::coder_multitask_cancel,
+            domains::coder::coder_multitask_cleanup,
             // Terminal commands
             domains::terminal::create_terminal_process,
             domains::terminal::send_terminal_input,
@@ -298,6 +310,21 @@ pub fn run() {
             domains::documents::commands::delete_document,
             domains::documents::commands::search_documents,
             domains::documents::commands::generate_document_with_ai,
+            // GitHub commands
+            domains::github::commands::github_get_connection_status,
+            domains::github::commands::github_start_device_flow,
+            domains::github::commands::github_poll_device_flow,
+            domains::github::commands::github_disconnect,
+            domains::github::commands::github_list_repositories,
+            domains::github::commands::github_get_repository,
+            domains::github::commands::github_list_issues,
+            domains::github::commands::github_get_issue,
+            domains::github::commands::github_create_issue,
+            domains::github::commands::github_update_issue,
+            domains::github::commands::github_clone_repository,
+            domains::github::commands::github_link_existing_repository,
+            domains::github::commands::github_get_project_link,
+            domains::github::commands::github_detect_local_repository,
             // Credential commands
             domains::credentials::commands::create_credential,
             domains::credentials::commands::get_credentials,
@@ -516,6 +543,8 @@ pub fn run() {
             domains::kubernetes::commands::k8s_list_namespaces,
             domains::kubernetes::commands::k8s_get_current_cluster,
             domains::kubernetes::commands::k8s_is_connected,
+            domains::kubernetes::commands::k8s_detect_setup_tools,
+            domains::kubernetes::commands::k8s_generate_kubeconfig,
             // AI commands
             // AI Provider commands
             domains::ai::commands::get_ai_provider_config_status,

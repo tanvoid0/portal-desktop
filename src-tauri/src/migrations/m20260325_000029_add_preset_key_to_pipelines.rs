@@ -8,37 +8,23 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // SQLite only supports one ALTER TABLE change per statement
-        if !manager
-            .has_column("pipelines", "preset_key")
-            .await?
-        {
+        if !manager.has_column("pipelines", "preset_key").await? {
             manager
                 .alter_table(
                     Table::alter()
                         .table(Pipelines::Table)
-                        .add_column(
-                            ColumnDef::new(Pipelines::PresetKey)
-                                .string()
-                                .null(),
-                        )
+                        .add_column(ColumnDef::new(Pipelines::PresetKey).string().null())
                         .to_owned(),
                 )
                 .await?;
         }
 
-        if !manager
-            .has_column("pipelines", "category")
-            .await?
-        {
+        if !manager.has_column("pipelines", "category").await? {
             manager
                 .alter_table(
                     Table::alter()
                         .table(Pipelines::Table)
-                        .add_column(
-                            ColumnDef::new(Pipelines::Category)
-                                .string()
-                                .null(),
-                        )
+                        .add_column(ColumnDef::new(Pipelines::Category).string().null())
                         .to_owned(),
                 )
                 .await?;

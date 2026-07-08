@@ -17,13 +17,15 @@ import {
 } from "./useTerminalProcess";
 import { commandBlockStore } from "../stores/commandBlockStore";
 
-export type XtermSessionMode = "interactive" | "oneshot";
+export type XtermSessionMode = "interactive" | "oneshot" | "display";
 
 export interface XtermSessionOptions {
   tabId: string;
   settings: TerminalConfig;
   mode?: XtermSessionMode;
   oneshotCommand?: string;
+  /** Static buffer rendered in display mode (no PTY). */
+  displayContent?: string;
   /** Per-instance xterm theme override merged over the resolved app theme. */
   themeOverride?: Partial<ITheme>;
   /** Extra environment overrides forwarded to the PTY. */
@@ -63,6 +65,7 @@ export class XtermSession {
     this.mounted = true;
     this.disposed = false;
 
+    const isDisplay = this.opts.mode === "display";
     const t = new XTerminal({
       theme: resolveXtermTheme(this.opts.settings, this.opts.themeOverride),
       fontSize: this.opts.settings.fontSize,
@@ -70,6 +73,8 @@ export class XtermSession {
       cursorStyle: this.opts.settings.cursorStyle,
       scrollback: this.opts.settings.scrollbackLines,
       allowTransparency: false,
+      disableStdin: isDisplay,
+      cursorBlink: !isDisplay,
     });
 
     const f = new FitAddon();
@@ -100,7 +105,9 @@ export class XtermSession {
       }
     });
 
-    if (this.opts.mode === "oneshot" && this.opts.oneshotCommand) {
+    if (this.opts.mode === "display") {
+      await this.startDisplay();
+    } else if (this.opts.mode === "oneshot" && this.opts.oneshotCommand) {
       await this.startOneshot(this.opts.oneshotCommand);
     } else {
       await this.startInteractive();
@@ -133,6 +140,15 @@ export class XtermSession {
     }
     const [x, y] = session.cursor_position;
     this.terminal.write("\x1b[" + y + ";" + x + "H");
+  }
+
+  private async startDisplay(): Promise<void> {
+    if (!this.terminal) return;
+    const content = this.opts.displayContent ?? "";
+    if (content) {
+      this.outputBuffer = content;
+      this.terminal.write(content.replace(/\n/g, "\r\n"));
+    }
   }
 
   private async startInteractive(): Promise<void> {
@@ -318,7 +334,8 @@ export class XtermSession {
 
     this.outputUnsubscribe?.();
 
-    const shouldKill = this.opts.killOnDestroy ?? this.opts.mode !== "oneshot";
+    const shouldKill =
+      this.opts.killOnDestroy ?? this.opts.mode === "interactive";
     if (this.currentProcess && shouldKill) {
       await killTerminalProcess(this.currentProcess.id).catch(() => {});
     }

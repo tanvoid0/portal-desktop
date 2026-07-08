@@ -27,11 +27,11 @@
   );
 </script>
 
-<div class="border-b bg-background px-6 pt-4">
+<div class="border-b bg-background px-[var(--content-gutter)] pt-4">
   <Tabs value={activeTab}>
-    <TabsList>
+    <TabsList class="h-auto w-full justify-start overflow-x-auto">
       {#each tabs as tab}
-        <TabsTrigger value={tab.id} onclick={() => goto(tab.url)}>
+        <TabsTrigger value={tab.id} class="shrink-0" onclick={() => goto(tab.url)}>
           {tab.label}
         </TabsTrigger>
       {/each}

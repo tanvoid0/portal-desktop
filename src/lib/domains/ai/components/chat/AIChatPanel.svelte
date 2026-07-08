@@ -9,8 +9,7 @@
   import { MessageSquare, MessageCircle } from "@lucide/svelte";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
-  import ChatProviderSelector from "./ChatProviderSelector.svelte";
-  import ChatModelSelector from "./ChatModelSelector.svelte";
+  import ChatCatalogSelectors from "./ChatCatalogSelectors.svelte";
   import type {
     ChatMessage as ChatMessageType,
     ProviderType,
@@ -31,6 +30,7 @@
     conversationId?: string;
     showSelectors?: boolean;
     selectedProvider?: ProviderType | null;
+    selectedBackendProvider?: string | null;
     selectedModel?: string | null;
   }
 
@@ -45,6 +45,7 @@
     conversationId,
     showSelectors = true,
     selectedProvider = $bindable<ProviderType | null>(null),
+    selectedBackendProvider = $bindable<string | null>(null),
     selectedModel = $bindable<string | null>(null),
   }: Props = $props();
 
@@ -90,6 +91,7 @@
           messages,
           {
             provider: selectedProvider || undefined,
+            llm_provider: selectedBackendProvider || undefined,
             conversation_id: conversationId,
             model: selectedModel || undefined,
           },
@@ -132,10 +134,11 @@
           {title}
         </CardTitle>
         <div class="flex items-center gap-2">
-          <ChatProviderSelector bind:selectedProvider />
-          {#if selectedProvider}
-            <ChatModelSelector bind:selectedProvider bind:selectedModel />
-          {/if}
+          <ChatCatalogSelectors
+            bind:selectedProvider
+            bind:selectedBackendProvider
+            bind:selectedModel
+          />
         </div>
       </div>
     </CardHeader>
@@ -156,7 +159,16 @@
               isLastMessage &&
               message.role === "assistant" &&
               !message.content}
-            <ChatMessage {message} showLoader={shouldShowLoader} />
+            {@const isStreamingMessage =
+              isLoading &&
+              isLastMessage &&
+              message.role === "assistant" &&
+              !!message.content}
+            <ChatMessage
+              {message}
+              showLoader={shouldShowLoader}
+              isStreaming={isStreamingMessage}
+            />
           {/each}
         {/if}
       </div>

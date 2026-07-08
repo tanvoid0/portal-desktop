@@ -73,6 +73,7 @@ impl AIDocumentGenerator {
             max_tokens: Some(8000), // Documents can be longer than tasks
             timeout_ms: Some(120000),
             model: None,
+            llm_provider: None,
             extra_options: None,
         };
 

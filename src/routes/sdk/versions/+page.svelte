@@ -135,7 +135,7 @@
   <title>SDK Versions - Portal Desktop</title>
 </svelte:head>
 
-<div class="w-full max-w-none space-y-6 p-6">
+<div class="space-y-6">
   <!-- Header -->
   <div class="flex items-center gap-4">
     <div class="flex-1">

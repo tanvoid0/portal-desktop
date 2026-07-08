@@ -167,7 +167,12 @@ where
 
         if last_checkpoint.elapsed().as_millis() >= CHECKPOINT_EVERY_MS {
             last_checkpoint = Instant::now();
-            on_checkpoint(&files, total_files, total_bytes, scan_started.elapsed().as_millis());
+            on_checkpoint(
+                &files,
+                total_files,
+                total_bytes,
+                scan_started.elapsed().as_millis(),
+            );
         }
     }
 

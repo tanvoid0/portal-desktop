@@ -17,6 +17,21 @@ const STORAGE_KEY_NAMESPACE = `${STORAGE_KEY_PREFIX}selected-namespace`;
 const STORAGE_KEY_CLUSTER_ID = `${STORAGE_KEY_PREFIX}last-cluster-id`;
 const STORAGE_KEY_PROVIDER = `${STORAGE_KEY_PREFIX}last-provider`;
 
+function isExpectedClusterSetupState(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : String(error ?? "").toString();
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes("no kubeconfig found") ||
+    normalized.includes("failed to load kubeconfig") ||
+    normalized.includes("kubeconfig") ||
+    normalized.includes("kubernetes client not initialized") ||
+    normalized.includes("kubectl") ||
+    normalized.includes("no clusters found")
+  );
+}
+
 // Persistence helpers
 function saveToStorage(key: string, value: string | null): void {
   if (typeof window === "undefined") return;
@@ -405,7 +420,9 @@ export async function loadClusters(
     }));
 
     console.error("Failed to load clusters:", error);
-    toastActions.error("Failed to load clusters");
+    if (!isExpectedClusterSetupState(error)) {
+      toastActions.error("Failed to load clusters");
+    }
     return [];
   }
 }
@@ -529,7 +546,9 @@ export async function initializeProvider(
     await provider.initialize();
   } catch (error) {
     console.error("Failed to initialize provider:", error);
-    toastActions.error("Failed to initialize cloud provider");
+    if (!isExpectedClusterSetupState(error)) {
+      toastActions.error("Failed to initialize cloud provider");
+    }
   }
 }
 

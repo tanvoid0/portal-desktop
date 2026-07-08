@@ -1,11 +1,10 @@
 <script lang="ts">
-  import Select from "$lib/components/ui/select.svelte";
+  import CatalogModelSelect from "./CatalogModelSelect.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Loader } from "@lucide/svelte";
   import type { ProviderType, CatalogModel } from "../../types/index.js";
   import { aiProviderService } from "../../services/aiProviderService.js";
   import {
-    formatModelLabel,
     flattenCatalogModels,
   } from "../../utils/catalog.js";
 
@@ -30,6 +29,21 @@
   let defaultModel = $state<string | null>(null);
   let resolvedDefaultModel = $state<string | null>(null);
 
+  async function loadFallbackModels() {
+    try {
+      const fallbackIds = await aiProviderService.getAvailableModels(
+        selectedProvider ?? undefined,
+      );
+      catalogModels = fallbackIds.map((id) => ({
+        id,
+        provider: "unknown",
+        source: "alias",
+      }));
+    } catch {
+      catalogModels = [];
+    }
+  }
+
   async function loadModels() {
     if (!selectedProvider || selectedProvider !== "AgentPlatform") {
       catalogModels = [];
@@ -40,6 +54,9 @@
     try {
       const catalog = await aiProviderService.getCatalogAliases();
       catalogModels = flattenCatalogModels(catalog.providers);
+      if (catalogModels.length === 0) {
+        await loadFallbackModels();
+      }
       resolvedDefaultModel = catalog.resolved_defaults?.model ?? null;
 
       const config =
@@ -52,18 +69,7 @@
       }
     } catch (error) {
       console.error("Failed to load catalog:", error);
-      try {
-        const fallbackIds = await aiProviderService.getAvailableModels(
-          selectedProvider,
-        );
-        catalogModels = fallbackIds.map((id) => ({
-          id,
-          provider: "unknown",
-          source: "alias",
-        }));
-      } catch {
-        catalogModels = [];
-      }
+      await loadFallbackModels();
     } finally {
       isLoading = false;
     }
@@ -83,21 +89,27 @@
     onModelChange?.(value);
   }
 
-  const modelOptions = $derived(
-    catalogModels.map((model) => ({
-      value: model.id,
-      label: formatModelLabel(model),
-    })),
-  );
+  const catalogModelList = $derived.by((): CatalogModel[] => {
+    if (
+      selectedModel &&
+      !catalogModels.some((entry) => entry.id === selectedModel)
+    ) {
+      return [
+        { id: selectedModel, provider: "unknown", source: "alias" },
+        ...catalogModels,
+      ];
+    }
+    return catalogModels;
+  });
 </script>
 
 <div class="flex items-center gap-2">
-  <Select
-    options={modelOptions}
-    value={selectedModel || undefined}
+  <CatalogModelSelect
+    models={catalogModelList}
+    bind:value={selectedModel}
     onSelect={handleModelChange}
     placeholder={isLoading ? "Loading..." : "Select model"}
-    disabled={disabled || isLoading || !selectedProvider || catalogModels.length === 0}
+    disabled={disabled || isLoading || !selectedProvider}
     class={selectClass}
   />
   {#if selectedModel && (selectedModel === defaultModel || selectedModel === resolvedDefaultModel)}

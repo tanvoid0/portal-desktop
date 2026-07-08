@@ -1,10 +1,12 @@
-use crate::domains::terminal::shell_integration::{ShellIntegrationEventV2, ShellIntegrationParser};
+use crate::domains::terminal::shell_integration::{
+    ShellIntegrationEventV2, ShellIntegrationParser,
+};
 use crate::domains::terminal::types::*;
+use crate::process_ext::NoWindowExt;
 use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use crate::process_ext::NoWindowExt;
 use std::process::Command;
 use std::sync::Arc;
 use tauri::{Emitter, Window};
@@ -196,8 +198,10 @@ impl TerminalManager {
             let shell_lower = request.shell.to_lowercase();
 
             if shell_cmd == "zsh" && shell_lower.contains("zsh") {
-                let zsh_dir = std::env::temp_dir()
-                    .join(format!("portal_osc133_zsh_{}", process_id.replace('-', "_")));
+                let zsh_dir = std::env::temp_dir().join(format!(
+                    "portal_osc133_zsh_{}",
+                    process_id.replace('-', "_")
+                ));
                 std::fs::create_dir_all(&zsh_dir).map_err(|e| {
                     format!("Failed to create temporary ZDOTDIR for OSC133 injection: {e}")
                 })?;
@@ -222,8 +226,10 @@ precmd() {
                 environment.insert("ZDOTDIR".to_string(), zsh_dir.to_string_lossy().to_string());
                 temp_rc_path = Some(zsh_dir);
             } else if shell_cmd == "bash" && shell_lower.contains("bash") {
-                let bash_rc_path = std::env::temp_dir()
-                    .join(format!("portal_osc133_bashrc_{}", process_id.replace('-', "_")));
+                let bash_rc_path = std::env::temp_dir().join(format!(
+                    "portal_osc133_bashrc_{}",
+                    process_id.replace('-', "_")
+                ));
 
                 let bashrc = r#"
 __portal_osc133_suppress=0
@@ -317,7 +323,11 @@ PROMPT_COMMAND='__portal_osc133_precmd'
         // Inform the frontend the PTY is ready.
         let initial_output = TerminalOutput {
             process_id: process_id.clone(),
-            content: format!("PTY shell ready: {} {}\r\n", shell_cmd, shell_args.join(" ")),
+            content: format!(
+                "PTY shell ready: {} {}\r\n",
+                shell_cmd,
+                shell_args.join(" ")
+            ),
             output_type: "info".to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
@@ -455,7 +465,10 @@ PROMPT_COMMAND='__portal_osc133_precmd'
         }
 
         let output = if cfg!(target_os = "windows") {
-            Command::new("cmd").no_window().args(["/C", &request.command]).output()
+            Command::new("cmd")
+                .no_window()
+                .args(["/C", &request.command])
+                .output()
         } else {
             Command::new("sh").arg("-c").arg(&request.command).output()
         }

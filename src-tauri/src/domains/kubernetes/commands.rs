@@ -1,4 +1,7 @@
 use crate::domains::kubernetes::manager::KubernetesManager;
+use crate::domains::kubernetes::manager::{
+    GenerateKubeconfigRequest, GenerateKubeconfigResult, KubeSetupDetectionResult,
+};
 use crate::domains::kubernetes::types::{
     ConfigMapInfo, CronJobInfo, DaemonSetInfo, EventInfo, IngressInfo, JobInfo, ResourceMetrics,
     SecretInfo, StatefulSetInfo, *,
@@ -250,6 +253,23 @@ pub async fn k8s_is_connected(
 ) -> Result<bool, String> {
     let mgr = manager.lock().await;
     Ok(mgr.is_connected())
+}
+
+#[tauri::command]
+pub async fn k8s_detect_setup_tools(
+    _manager: State<'_, Mutex<KubernetesManager>>,
+) -> Result<KubeSetupDetectionResult, String> {
+    let mgr = KubernetesManager::new();
+    Ok(mgr.detect_setup_tools().await)
+}
+
+#[tauri::command]
+pub async fn k8s_generate_kubeconfig(
+    _manager: State<'_, Mutex<KubernetesManager>>,
+    request: GenerateKubeconfigRequest,
+) -> Result<GenerateKubeconfigResult, String> {
+    let mgr = KubernetesManager::new();
+    mgr.generate_kubeconfig(request).await
 }
 
 #[tauri::command]

@@ -27,6 +27,60 @@ export function formatBytes(bytes: number, decimals = 2): string {
 }
 
 /**
+ * Format a count with correct singular/plural label.
+ */
+export function formatCount(
+  count: number,
+  singular: string,
+  plural?: string,
+): string {
+  const label = count === 1 ? singular : (plural ?? `${singular}s`);
+  return `${count.toLocaleString()} ${label}`;
+}
+
+/**
+ * Readable session timestamp: "Today, 3:42 PM", "Yesterday, 9:15 AM", "Jul 5, 2:30 PM".
+ */
+export function formatSessionDateTime(iso: string | Date): string {
+  const date = iso instanceof Date ? iso : new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const now = new Date();
+  const time = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  if (date.toDateString() === now.toDateString()) {
+    return `Today, ${time}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `Yesterday, ${time}`;
+  }
+
+  const sameYear = date.getFullYear() === now.getFullYear();
+  const datePart = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+  return `${datePart}, ${time}`;
+}
+
+/** Full locale datetime for tooltips. */
+export function formatSessionDateTimeFull(iso: string | Date): string {
+  const date = iso instanceof Date ? iso : new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, {
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+}
+
+/**
  * Format date to relative time
  */
 export function formatRelativeTime(date: Date): string {

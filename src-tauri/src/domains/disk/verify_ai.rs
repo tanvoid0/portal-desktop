@@ -8,9 +8,7 @@
 use crate::domains::ai::providers::GenerationOptions;
 use crate::domains::ai::services::AIService;
 use crate::domains::disk::classify::Proposal;
-use crate::domains::disk::verify::{
-    build_goal, parse_verdicts, AgentNote, VerificationResult,
-};
+use crate::domains::disk::verify::{build_goal, parse_verdicts, AgentNote, VerificationResult};
 
 /// System persona that mirrors the old multi-agent roster's stance in one voice.
 const SYSTEM: &str = "You are a cautious disk-cleanup reviewer. You judge whether deletion \

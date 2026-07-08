@@ -35,4 +35,3 @@ pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}
 
 // JSON decoding helpers live in `commands.rs` where the DB rows are mapped.
-

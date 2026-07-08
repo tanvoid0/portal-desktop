@@ -55,10 +55,8 @@ impl FrontendPipelineRequest {
             project_id,
             steps_json: serde_json::to_string(&self.steps)
                 .map_err(|e| format!("Failed to serialize steps: {}", e))?,
-            variables_json: serde_json::to_string(
-                &self.variables.unwrap_or(json!([])),
-            )
-            .map_err(|e| format!("Failed to serialize variables: {}", e))?,
+            variables_json: serde_json::to_string(&self.variables.unwrap_or(json!([])))
+                .map_err(|e| format!("Failed to serialize variables: {}", e))?,
             secrets_json: serde_json::to_string(&self.secrets.unwrap_or(json!([])))
                 .map_err(|e| format!("Failed to serialize secrets: {}", e))?,
             execution_context_json: serde_json::to_string(&execution_context)
@@ -130,10 +128,7 @@ impl PipelineService {
         })
     }
 
-    pub async fn get_pipeline(
-        &self,
-        pipeline_id: i32,
-    ) -> Result<Option<Value>, String> {
+    pub async fn get_pipeline(&self, pipeline_id: i32) -> Result<Option<Value>, String> {
         let pipeline = self.pipeline_repo.get_by_id(pipeline_id).await?;
         Ok(pipeline.map(Self::pipeline_to_json))
     }
@@ -218,10 +213,9 @@ impl PipelineService {
             .and_then(|v| v.as_str())
             .unwrap_or("command");
 
-        let parameters_json = serde_json::to_string(
-            &request.get("parameters").unwrap_or(&json!([])),
-        )
-        .map_err(|e| format!("Failed to serialize parameters: {}", e))?;
+        let parameters_json =
+            serde_json::to_string(&request.get("parameters").unwrap_or(&json!([])))
+                .map_err(|e| format!("Failed to serialize parameters: {}", e))?;
         let default_config_json = serde_json::to_string(
             &request
                 .get("defaultConfig")
@@ -246,8 +240,14 @@ impl PipelineService {
                 execution_type.to_string(),
                 default_config_json,
                 tags_json,
-                request.get("icon").and_then(|v| v.as_str()).map(str::to_string),
-                request.get("author").and_then(|v| v.as_str()).map(str::to_string),
+                request
+                    .get("icon")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                request
+                    .get("author")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
             )
             .await?;
 
@@ -257,27 +257,47 @@ impl PipelineService {
     pub async fn update_block(&self, block_id: &str, request: Value) -> Result<Value, String> {
         let parameters_json = request
             .get("parameters")
-            .map(|v| serde_json::to_string(v).map_err(|e| format!("Failed to serialize parameters: {}", e)))
+            .map(|v| {
+                serde_json::to_string(v)
+                    .map_err(|e| format!("Failed to serialize parameters: {}", e))
+            })
             .transpose()?;
         let default_config_json = request
             .get("defaultConfig")
             .or_else(|| request.get("default_config"))
-            .map(|v| serde_json::to_string(v).map_err(|e| format!("Failed to serialize default config: {}", e)))
+            .map(|v| {
+                serde_json::to_string(v)
+                    .map_err(|e| format!("Failed to serialize default config: {}", e))
+            })
             .transpose()?;
         let tags_json = request
             .get("tags")
-            .map(|v| serde_json::to_string(v).map_err(|e| format!("Failed to serialize tags: {}", e)))
+            .map(|v| {
+                serde_json::to_string(v).map_err(|e| format!("Failed to serialize tags: {}", e))
+            })
             .transpose()?;
 
         let block = self
             .block_repo
             .update(
                 block_id,
-                request.get("name").and_then(|v| v.as_str()).map(str::to_string),
-                request.get("description").and_then(|v| v.as_str()).map(str::to_string),
-                request.get("category").and_then(|v| v.as_str()).map(str::to_string),
+                request
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                request
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                request
+                    .get("category")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
                 parameters_json,
-                request.get("command").and_then(|v| v.as_str()).map(str::to_string),
+                request
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
                 request
                     .get("executionType")
                     .or_else(|| request.get("execution_type"))
@@ -285,8 +305,14 @@ impl PipelineService {
                     .map(str::to_string),
                 default_config_json,
                 tags_json,
-                request.get("icon").and_then(|v| v.as_str()).map(str::to_string),
-                request.get("author").and_then(|v| v.as_str()).map(str::to_string),
+                request
+                    .get("icon")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                request
+                    .get("author")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
             )
             .await?;
 

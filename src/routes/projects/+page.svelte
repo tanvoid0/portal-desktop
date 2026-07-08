@@ -207,7 +207,7 @@
   <title>Projects - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <!-- Header -->
   <PageHeader title="Projects" description="Manage your development projects">
     {#snippet actions()}

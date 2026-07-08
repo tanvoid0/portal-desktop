@@ -44,7 +44,9 @@
   import { SIDEBAR_COOKIE_NAME } from "$lib/components/ui/sidebar/constants";
   import type { NavSection } from "$lib/components/shell/nav-types";
   import NavSectionList from "$lib/components/shell/nav-section-list.svelte";
+  import PageContainer from "$lib/components/shell/page-container.svelte";
   import { buildMainNavSections } from "$lib/config/main-nav";
+  import { isViewportFillRoute, isShellSidebarRoute, isMainSidebarHidden as shouldHideMainSidebar } from "$lib/config/layout-breakpoints";
 
   const log = logger.createScoped("AppLayout");
 
@@ -71,16 +73,9 @@
 
   const dashboardOverview = $derived(dashboardQuery.data ?? null);
 
-  let isMainSidebarHidden = $derived(() => {
-    const path = $page.url.pathname;
-    // Nested route groups manage their own sidebars.
-    return (
-      path.startsWith("/ai") ||
-      path.startsWith("/cloud") ||
-      path.startsWith("/settings") ||
-      path.startsWith("/sdk")
-    );
-  });
+  let hideMainSidebar = $derived(shouldHideMainSidebar($page.url.pathname));
+  let isFillViewport = $derived(isViewportFillRoute($page.url.pathname));
+  let isDomainLayout = $derived(isShellSidebarRoute($page.url.pathname));
   let sidebarOpen = $state(true);
   let qrCodeDialogOpen = $state(false);
   let deviceApprovalDialogOpen = $state(false);
@@ -230,12 +225,15 @@
 
 <DeviceAuthGuard>
   <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-    <div class="flex h-screen min-h-0 w-full flex-col overflow-hidden">
+    <div
+      class="flex h-screen min-h-0 w-full flex-col overflow-hidden"
+      style="--header-height: 3.5rem"
+    >
       <!-- Top Bar -->
       <header
         class="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
       >
-        <div class="flex h-14 items-center gap-2 px-4">
+        <div class="flex h-14 items-center gap-2 px-3 md:px-4 3xl:px-6">
           <SidebarTrigger />
           <!-- Navigation Buttons -->
           <div class="mr-2 flex items-center gap-1 border-r pr-2">
@@ -295,7 +293,7 @@
       <!-- Main Content Area -->
       <div class="flex h-full min-h-0 w-full flex-1 overflow-hidden">
         <!-- Sidebar Navigation (nested route groups manage their own sidebars) -->
-        {#if !isMainSidebarHidden()}
+        {#if !hideMainSidebar}
           <SidebarRoot collapsible="icon">
             <div class="flex h-full min-h-0 min-w-0 flex-col">
               <!-- Sidebar Header -->
@@ -440,8 +438,20 @@
         {/if}
 
         <!-- Page Content -->
-        <main class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
-          {@render children()}
+        <main class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          {#if isFillViewport}
+            {@render children()}
+          {:else if isDomainLayout}
+            <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+              {@render children()}
+            </div>
+          {:else}
+            <div class="h-full min-h-0 flex-1 overflow-y-auto">
+              <PageContainer variant="full" class="py-4 md:py-6">
+                {@render children()}
+              </PageContainer>
+            </div>
+          {/if}
         </main>
       </div>
     </div>

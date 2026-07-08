@@ -41,15 +41,11 @@ impl AIService {
 
     pub async fn get_provider(&self) -> Result<Arc<dyn AIProvider>, AIError> {
         let guard = self.provider.read().await;
-        guard
-            .as_ref()
-            .cloned()
-            .ok_or_else(|| {
-                AIError::ProviderNotAvailable(
-                    "Agent Platform is not registered. Configure it under Settings → AI."
-                        .to_string(),
-                )
-            })
+        guard.as_ref().cloned().ok_or_else(|| {
+            AIError::ProviderNotAvailable(
+                "Agent Platform is not registered. Configure it under Settings → AI.".to_string(),
+            )
+        })
     }
 
     /// Legacy optional type — always resolves to the registered agent-platform provider.

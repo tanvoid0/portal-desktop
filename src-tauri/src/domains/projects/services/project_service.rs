@@ -1,15 +1,15 @@
+use crate::process_ext::NoWindowExt;
 use chrono::Utc;
 use regex::Regex;
 use std::fs;
 use std::path::Path;
-use crate::process_ext::NoWindowExt;
 use std::process::Command;
 
 use crate::database::DatabaseManager;
-use crate::domains::projects::entities::ProjectResponse;
-use crate::error::{AppError, AppResult};
 use crate::domains::projects::entities::ProjectAnalysis;
+use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
+use crate::error::{AppError, AppResult};
 use std::sync::Arc;
 
 pub struct ProjectService {
@@ -24,17 +24,11 @@ impl ProjectService {
     }
 
     pub async fn get_all_projects(&self) -> AppResult<Vec<ProjectResponse>> {
-        self.repository
-            .get_all()
-            .await
-            .map_err(AppError::from)
+        self.repository.get_all().await.map_err(AppError::from)
     }
 
     pub async fn get_project(&self, id: i32) -> AppResult<Option<ProjectResponse>> {
-        self.repository
-            .get_by_id(id)
-            .await
-            .map_err(AppError::from)
+        self.repository.get_by_id(id).await.map_err(AppError::from)
     }
 
     pub async fn create_project(
@@ -200,7 +194,10 @@ impl ProjectService {
         }
     }
 
-    pub async fn refresh_project_metadata(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
+    pub async fn refresh_project_metadata(
+        &self,
+        id: i32,
+    ) -> Result<Option<ProjectResponse>, String> {
         // Get current project
         let current_project = self.repository.get_by_id(id).await?;
         if let Some(project) = current_project {
@@ -213,31 +210,29 @@ impl ProjectService {
             self.repository
                 .update(
                     id,
-                    None,                                                 // name
-                    None,                                                 // description
-                    None,                                                 // path
-                    None,                                                 // status
-                    None,                                                 // framework_ids
-                    None,                                                 // package_manager_ids
-                    None,                                                 // language_ids
+                    None,                                                       // name
+                    None,                                                       // description
+                    None,                                                       // path
+                    None,                                                       // status
+                    None,                                                       // framework_ids
+                    None, // package_manager_ids
+                    None, // language_ids
                     analysis.as_ref().and_then(|a| a.build_command.clone()), // build_command
                     analysis.as_ref().and_then(|a| a.start_command.clone()), // start_command
                     analysis.as_ref().and_then(|a| a.test_command.clone()), // test_command
-                    analysis
-                        .as_ref()
-                        .and_then(|a| a.output_directory.clone()), // output_directory
+                    analysis.as_ref().and_then(|a| a.output_directory.clone()), // output_directory
                     analysis.as_ref().and_then(|a| a.dev_port), // dev_port
                     analysis.as_ref().and_then(|a| a.prod_port), // prod_port
-                    None,                                                 // starred
-                    None,                                                 // open_count
-                    None,                                                 // last_opened
-                    Some(size),                                           // size
-                    Some(file_count),                                     // file_count
+                    None, // starred
+                    None, // open_count
+                    None, // last_opened
+                    Some(size), // size
+                    Some(file_count), // file_count
                     git_info.as_ref().and_then(|g| g.repository.clone()), // git_repository
-                    git_info.as_ref().and_then(|g| g.branch.clone()),     // git_branch
-                    git_info.as_ref().and_then(|g| g.commit.clone()),     // git_commit
+                    git_info.as_ref().and_then(|g| g.branch.clone()), // git_branch
+                    git_info.as_ref().and_then(|g| g.commit.clone()), // git_commit
                     git_info.as_ref().map(|g| g.has_uncommitted_changes), // has_uncommitted_changes
-                    git_info.as_ref().and_then(|g| g.last_commit),        // last_commit
+                    git_info.as_ref().and_then(|g| g.last_commit), // last_commit
                 )
                 .await
         } else {

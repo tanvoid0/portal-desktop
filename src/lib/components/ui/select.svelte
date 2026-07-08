@@ -117,7 +117,7 @@
       </span>
     </SelectPrimitive.Trigger>
     <SelectPrimitive.Content
-      class="w-full min-w-[var(--bits-select-anchor-width)]"
+      class="max-h-60 w-full min-w-[var(--bits-select-anchor-width)]"
     >
       {#each normalizedOptions as option (option.value)}
         <SelectPrimitive.Item

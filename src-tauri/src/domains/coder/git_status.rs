@@ -9,6 +9,16 @@ use crate::process_ext::NoWindowExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GitFileChange {
+    pub path: String,
+    pub status: String,
+    pub additions: u32,
+    pub deletions: u32,
+    pub diff: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GitDiffStats {
     pub is_repo: bool,
     pub branch: Option<String>,
@@ -49,7 +59,13 @@ pub fn git_diff_stats(workspace: &str) -> GitDiffStats {
 
     if let Some(default) = default_branch(workspace) {
         if branch.as_deref() == Some(default.as_str()) {
-            accumulate_numstat(workspace, &["diff", "HEAD", "--numstat"], &mut additions, &mut deletions, &mut changed_files);
+            accumulate_numstat(
+                workspace,
+                &["diff", "HEAD", "--numstat"],
+                &mut additions,
+                &mut deletions,
+                &mut changed_files,
+            );
         } else if has_commits {
             let range = format!("{default}...HEAD");
             accumulate_numstat(
@@ -68,9 +84,21 @@ pub fn git_diff_stats(workspace: &str) -> GitDiffStats {
             );
         }
     } else if has_commits {
-        accumulate_numstat(workspace, &["diff", "HEAD", "--numstat"], &mut additions, &mut deletions, &mut changed_files);
+        accumulate_numstat(
+            workspace,
+            &["diff", "HEAD", "--numstat"],
+            &mut additions,
+            &mut deletions,
+            &mut changed_files,
+        );
     } else {
-        accumulate_numstat(workspace, &["diff", "--numstat"], &mut additions, &mut deletions, &mut changed_files);
+        accumulate_numstat(
+            workspace,
+            &["diff", "--numstat"],
+            &mut additions,
+            &mut deletions,
+            &mut changed_files,
+        );
     }
 
     accumulate_untracked(root, workspace, &mut additions, &mut changed_files);
@@ -132,7 +160,12 @@ fn accumulate_numstat(
     }
 }
 
-fn accumulate_untracked(root: &Path, workspace: &str, additions: &mut u32, changed_files: &mut u32) {
+fn accumulate_untracked(
+    root: &Path,
+    workspace: &str,
+    additions: &mut u32,
+    changed_files: &mut u32,
+) {
     let Ok(output) = git_output(workspace, &["ls-files", "--others", "--exclude-standard"]) else {
         return;
     };
@@ -150,6 +183,111 @@ fn accumulate_untracked(root: &Path, workspace: &str, additions: &mut u32, chang
             }
         }
     }
+}
+
+pub fn git_list_changes(workspace: &str) -> Vec<GitFileChange> {
+    let root = Path::new(workspace);
+    if workspace.is_empty() || !root.join(".git").exists() {
+        return Vec::new();
+    }
+
+    let has_commits = git_output(workspace, &["rev-parse", "--verify", "HEAD"]).is_ok();
+    let name_status_args: &[&str] = if has_commits {
+        &["diff", "HEAD", "--name-status"]
+    } else {
+        &["diff", "--name-status"]
+    };
+
+    let mut changes = Vec::new();
+
+    if let Ok(output) = git_output(workspace, name_status_args) {
+        for line in output.lines().filter(|l| !l.is_empty()) {
+            let Some((status, path)) = parse_name_status(line) else {
+                continue;
+            };
+            let diff_args: Vec<&str> = if has_commits {
+                vec!["diff", "HEAD", "--no-color", "--", &path]
+            } else {
+                vec!["diff", "--no-color", "--", &path]
+            };
+            let diff = git_output(workspace, &diff_args).unwrap_or_default();
+            let (additions, deletions) = count_diff_lines(&diff);
+            changes.push(GitFileChange {
+                path,
+                status,
+                additions,
+                deletions,
+                diff,
+            });
+        }
+    }
+
+    if let Ok(output) = git_output(workspace, &["ls-files", "--others", "--exclude-standard"]) {
+        for rel in output.lines().filter(|l| !l.is_empty()) {
+            let full = root.join(rel);
+            if !full.is_file() {
+                continue;
+            }
+            let content = std::fs::read_to_string(&full).unwrap_or_default();
+            let lines: Vec<&str> = content.lines().collect();
+            let additions = lines.len() as u32;
+            let diff = if lines.is_empty() {
+                String::new()
+            } else {
+                lines
+                    .iter()
+                    .map(|line| format!("+{line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            changes.push(GitFileChange {
+                path: rel.to_string(),
+                status: "untracked".into(),
+                additions,
+                deletions: 0,
+                diff,
+            });
+        }
+    }
+
+    changes.sort_by(|a, b| a.path.cmp(&b.path));
+    changes
+}
+
+fn parse_name_status(line: &str) -> Option<(String, String)> {
+    let mut parts = line.split('\t');
+    let code = parts.next()?;
+    let status = match code.chars().next()? {
+        'M' => "modified",
+        'A' => "added",
+        'D' => "deleted",
+        'R' => "renamed",
+        'C' => "copied",
+        'T' => "type changed",
+        _ => "changed",
+    }
+    .to_string();
+
+    let first_path = parts.next()?.to_string();
+    let path = parts.next().unwrap_or(&first_path).to_string();
+    Some((status, path))
+}
+
+fn count_diff_lines(diff: &str) -> (u32, u32) {
+    let mut additions = 0u32;
+    let mut deletions = 0u32;
+    for line in diff.lines() {
+        if let Some(rest) = line.strip_prefix('+') {
+            if !rest.starts_with("+++") {
+                additions += 1;
+            }
+        } else if let Some(rest) = line.strip_prefix('-') {
+            if !rest.starts_with("---") {
+                deletions += 1;
+            }
+        }
+    }
+    (additions, deletions)
 }
 
 fn parse_numstat_line(line: &str) -> Option<(u32, u32)> {

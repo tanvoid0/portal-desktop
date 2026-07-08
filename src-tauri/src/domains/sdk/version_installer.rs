@@ -3,14 +3,22 @@ use std::process::Command;
 
 pub async fn install_nodejs_version(version: &str) -> Result<String, String> {
     // Try to use nvm first
-    if let Ok(output) = Command::new("nvm").no_window().args(&["install", version]).output() {
+    if let Ok(output) = Command::new("nvm")
+        .no_window()
+        .args(&["install", version])
+        .output()
+    {
         if output.status.success() {
             return Ok(format!("Node.js {} installed via nvm", version));
         }
     }
 
     // Try to use fnm
-    if let Ok(output) = Command::new("fnm").no_window().args(&["install", version]).output() {
+    if let Ok(output) = Command::new("fnm")
+        .no_window()
+        .args(&["install", version])
+        .output()
+    {
         if output.status.success() {
             return Ok(format!("Node.js {} installed via fnm", version));
         }
@@ -25,7 +33,11 @@ pub async fn install_nodejs_version(version: &str) -> Result<String, String> {
 
 pub async fn install_python_version(version: &str) -> Result<String, String> {
     // Try to use pyenv
-    if let Ok(output) = Command::new("pyenv").no_window().args(&["install", version]).output() {
+    if let Ok(output) = Command::new("pyenv")
+        .no_window()
+        .args(&["install", version])
+        .output()
+    {
         if output.status.success() {
             return Ok(format!("Python {} installed via pyenv", version));
         }
@@ -66,7 +78,11 @@ pub async fn install_rust_version(version: &str) -> Result<String, String> {
 
 pub async fn install_go_version(version: &str) -> Result<String, String> {
     // Try to use g (Go version manager)
-    if let Ok(output) = Command::new("g").no_window().args(&["install", version]).output() {
+    if let Ok(output) = Command::new("g")
+        .no_window()
+        .args(&["install", version])
+        .output()
+    {
         if output.status.success() {
             return Ok(format!("Go {} installed via g", version));
         }
@@ -77,7 +93,11 @@ pub async fn install_go_version(version: &str) -> Result<String, String> {
 
 pub async fn install_php_version(version: &str) -> Result<String, String> {
     // Try to use phpenv
-    if let Ok(output) = Command::new("phpenv").no_window().args(&["install", version]).output() {
+    if let Ok(output) = Command::new("phpenv")
+        .no_window()
+        .args(&["install", version])
+        .output()
+    {
         if output.status.success() {
             return Ok(format!("PHP {} installed via phpenv", version));
         }
@@ -88,7 +108,11 @@ pub async fn install_php_version(version: &str) -> Result<String, String> {
 
 pub async fn install_ruby_version(version: &str) -> Result<String, String> {
     // Try to use rbenv
-    if let Ok(output) = Command::new("rbenv").no_window().args(&["install", version]).output() {
+    if let Ok(output) = Command::new("rbenv")
+        .no_window()
+        .args(&["install", version])
+        .output()
+    {
         if output.status.success() {
             return Ok(format!("Ruby {} installed via rbenv", version));
         }

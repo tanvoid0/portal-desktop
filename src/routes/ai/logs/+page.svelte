@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
 
@@ -12,5 +12,5 @@
 </svelte:head>
 
 <div class="flex items-center justify-center p-12 text-muted-foreground">
-  Redirecting to conversation history…
+  Redirecting to conversation history�
 </div>

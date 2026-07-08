@@ -9,6 +9,7 @@
   import { Button } from "./button";
   import { cn } from "$lib/utils";
   import type { BreadcrumbItem } from "$lib/domains/shared";
+  import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
 
   interface Props {
     items: BreadcrumbItem[];
@@ -39,6 +40,13 @@
   // Combine home item with provided items
   let allItems = $derived(showHome ? [effectiveHomeItem, ...items] : items);
 
+  const isMobile = new IsMobile();
+  let visibleItems = $derived(
+    isMobile.current && allItems.length > 1
+      ? [allItems[allItems.length - 1]]
+      : allItems,
+  );
+
   function handleClick(item: BreadcrumbItem) {
     if (item.href && !item.disabled) {
       goto(item.href);
@@ -54,14 +62,14 @@
   class={cn("flex items-center space-x-1 text-sm", className)}
   aria-label="Breadcrumb"
 >
-  <ol class="flex items-center space-x-1">
-    {#each allItems as item, index (index)}
+  <ol class="flex min-w-0 items-center space-x-1 overflow-hidden">
+    {#each visibleItems as item, index (index)}
       <li class="flex items-center">
         {#if index > 0}
           <ChevronRight class="mx-1 h-4 w-4 text-muted-foreground" />
         {/if}
 
-        {#if item.href && !item.disabled && !isLastItem(index)}
+        {#if item.href && !item.disabled && !isLastItem(allItems.indexOf(item))}
           <Button
             variant="ghost"
             size="sm"

@@ -31,12 +31,40 @@ pub struct CatalogProvider {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogModel {
     pub id: String,
-    pub provider: String,
+    /// Parent provider id when present; agent-platform v1 catalog omits this on model rows.
+    #[serde(default)]
+    pub provider: Option<String>,
     pub source: String,
     #[serde(default)]
     pub backend_id: Option<String>,
     #[serde(default)]
     pub metadata: Value,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PlatformCatalog;
+
+    #[test]
+    fn deserializes_v1_catalog_without_model_provider_field() {
+        let json = r#"{
+            "object": "catalog",
+            "resolved_defaults": { "provider": "ollama", "model": "llama3" },
+            "providers": [{
+                "id": "ollama",
+                "label": "Ollama",
+                "configured": true,
+                "reachable": false,
+                "default_model": "llama3",
+                "models": [{ "id": "llama3", "source": "alias" }]
+            }]
+        }"#;
+
+        let catalog: PlatformCatalog = serde_json::from_str(json).expect("catalog json");
+        assert_eq!(catalog.object, "catalog");
+        assert_eq!(catalog.providers[0].models[0].id, "llama3");
+        assert!(catalog.providers[0].models[0].provider.is_none());
+    }
 }
 
 /// Query parameters for `GET /v1/catalog`.

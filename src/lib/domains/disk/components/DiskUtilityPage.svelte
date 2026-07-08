@@ -35,18 +35,19 @@
   }
 </script>
 
-<div class="mx-auto max-w-5xl px-6 py-8">
-  <header class="mb-8">
-    <div class="mb-2 flex items-center gap-2.5">
-      <div class="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-        <HardDrive class="size-3.5" />
+<div class="h-full min-h-0 overflow-y-auto">
+  <div class="mx-auto max-w-5xl px-6 py-8">
+    <header class="mb-8">
+      <div class="mb-2 flex items-center gap-2.5">
+        <div class="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <HardDrive class="size-3.5" />
+        </div>
+        <h1 class="text-lg font-semibold tracking-tight text-foreground">Disk Utility</h1>
       </div>
-      <h1 class="text-lg font-semibold tracking-tight text-foreground">Disk Utility</h1>
-    </div>
-    <p class="max-w-2xl text-sm text-muted-foreground">
-      Scans propose. You review. Nothing deletes without your tick — files go to the Recycle Bin; dev tools use their own remove commands.
-    </p>
-  </header>
+      <p class="max-w-2xl text-sm text-muted-foreground">
+        Scans propose. You review. Nothing deletes without your tick — files go to the Recycle Bin; dev tools use their own remove commands.
+      </p>
+    </header>
 
   <Tabs value={tab} onValueChange={(v) => (tab = v as Tab)} class="mb-8">
     <TabsList>
@@ -76,5 +77,6 @@
   </div>
   <div class={tab === "settings" ? "" : "hidden"}>
     <SettingsTab />
+  </div>
   </div>
 </div>

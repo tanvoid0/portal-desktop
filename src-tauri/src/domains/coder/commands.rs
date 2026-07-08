@@ -1,19 +1,32 @@
 //! Tauri command surface for the coder agent.
 
 use std::sync::Arc;
+use std::path::PathBuf;
 
+use reqwest::Client;
 use tauri::State;
 
+use crate::domains::ai::platform_config::PlatformConfig;
+use crate::domains::ai::services::AISettingsService;
+
 use super::service::{AgentTurn, CoderService};
-use super::types::{CoderThread, FileChange, PermissionMode, PermissionRule};
+use super::types::{
+    CoderSubAgent, CoderThread, CoderThreadKind, CoderThreadSummary, FileChange,
+    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PermissionMode,
+    PermissionRule,
+};
 
 #[tauri::command]
 pub async fn coder_create_thread(
     service: State<'_, Arc<CoderService>>,
     workspace_root: String,
     model: Option<String>,
+    llm_provider: Option<String>,
+    thread_kind: Option<CoderThreadKind>,
 ) -> Result<CoderThread, String> {
-    Ok(service.create_thread(workspace_root, model).await)
+    Ok(service
+        .create_thread(workspace_root, model, llm_provider, thread_kind)
+        .await)
 }
 
 #[tauri::command]
@@ -21,6 +34,13 @@ pub async fn coder_list_threads(
     service: State<'_, Arc<CoderService>>,
 ) -> Result<Vec<CoderThread>, String> {
     Ok(service.list_threads().await)
+}
+
+#[tauri::command]
+pub async fn coder_list_thread_summaries(
+    service: State<'_, Arc<CoderService>>,
+) -> Result<Vec<CoderThreadSummary>, String> {
+    Ok(service.list_thread_summaries().await)
 }
 
 #[tauri::command]
@@ -44,8 +64,20 @@ pub async fn coder_update_thread_model(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
     model: Option<String>,
+    llm_provider: Option<String>,
 ) -> Result<(), String> {
-    service.update_thread_model(&thread_id, model).await
+    service
+        .update_thread_model(&thread_id, model, llm_provider)
+        .await
+}
+
+#[tauri::command]
+pub async fn coder_set_thread_kind(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+    thread_kind: CoderThreadKind,
+) -> Result<(), String> {
+    service.set_thread_kind(&thread_id, thread_kind).await
 }
 
 #[tauri::command]
@@ -77,6 +109,8 @@ pub async fn coder_approve(
     approve: bool,
     remember: Option<bool>,
     edited_pattern: Option<String>,
+    remember_tool: Option<String>,
+    remember_args: Option<serde_json::Value>,
 ) -> Result<(), String> {
     service
         .prepare_approve(
@@ -85,6 +119,8 @@ pub async fn coder_approve(
             approve,
             remember.unwrap_or(false),
             edited_pattern.clone(),
+            remember_tool,
+            remember_args,
         )
         .await?;
     CoderService::spawn_run(
@@ -93,7 +129,7 @@ pub async fn coder_approve(
         AgentTurn::Approve {
             call_id,
             approve,
-            edited_command: edited_pattern,
+            edited_command: None,
         },
     );
     Ok(())
@@ -210,6 +246,161 @@ pub async fn coder_modify_change(
 }
 
 #[tauri::command]
+pub fn coder_list_dir(
+    workspace_root: String,
+    path: Option<String>,
+) -> Result<Vec<super::types::WorkspaceDirEntry>, String> {
+    let rel = path.unwrap_or_else(|| ".".to_string());
+    super::tools::list_dir_entries(&workspace_root, &rel)
+}
+
+#[tauri::command]
+pub fn coder_open_in_explorer(workspace_root: String, path: String) -> Result<(), String> {
+    let root = PathBuf::from(&workspace_root);
+    let joined = root.join(path);
+
+    // Normalize without requiring the path to already exist.
+    let mut normalized = PathBuf::new();
+    for comp in joined.components() {
+        use std::path::Component::*;
+        match comp {
+            ParentDir => {
+                if !normalized.pop() {
+                    return Err("path escapes workspace root".into());
+                }
+            }
+            CurDir => {}
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    if !normalized.starts_with(&root) {
+        return Err("path escapes workspace root".into());
+    }
+    if !normalized.exists() {
+        return Err("path does not exist".into());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(normalized)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(normalized)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(normalized)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 pub fn coder_get_git_diff_stats(workspace_root: String) -> super::git_status::GitDiffStats {
     super::git_status::git_diff_stats(&workspace_root)
+}
+
+#[tauri::command]
+pub fn coder_list_git_changes(
+    workspace_root: String,
+) -> Vec<super::git_status::GitFileChange> {
+    super::git_status::git_list_changes(&workspace_root)
+}
+
+#[tauri::command]
+pub async fn coder_prepare_git_commit(
+    workspace_root: String,
+    use_ai: Option<bool>,
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<super::git_commit::GitCommitDraft, String> {
+    let mut draft = super::git_commit::prepare_commit(&workspace_root)?;
+    if use_ai.unwrap_or(true) {
+        let cfg = PlatformConfig::resolve(&settings_service);
+        let client = Client::new();
+        if let Ok((title, summary)) =
+            super::git_commit::suggest_commit_message(&client, &cfg, &draft.changes).await
+        {
+            draft.title = title;
+            draft.summary = summary;
+            draft.ai_generated = true;
+        }
+    }
+    Ok(draft)
+}
+
+#[tauri::command]
+pub fn coder_git_commit(
+    workspace_root: String,
+    title: String,
+    summary: Option<String>,
+) -> Result<String, String> {
+    super::git_commit::git_commit(&workspace_root, &title, summary.as_deref())
+}
+
+#[tauri::command]
+pub async fn coder_submit_command_result(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+    call_id: String,
+    result: String,
+) -> Result<(), String> {
+    service
+        .submit_command_result(thread_id, call_id, result)
+        .await
+}
+
+#[tauri::command]
+pub async fn coder_submit_terminal_list(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+    call_id: String,
+    list_json: String,
+) -> Result<(), String> {
+    service
+        .submit_terminal_list(thread_id, call_id, list_json)
+        .await
+}
+
+#[tauri::command]
+pub async fn coder_multitask_spawn(
+    service: State<'_, Arc<CoderService>>,
+    request: MultitaskSpawnRequest,
+) -> Result<Vec<CoderSubAgent>, String> {
+    service.inner().multitask_spawn(request).await
+}
+
+#[tauri::command]
+pub async fn coder_multitask_list(
+    service: State<'_, Arc<CoderService>>,
+    coordinator_thread_id: String,
+) -> Result<Vec<CoderSubAgent>, String> {
+    Ok(service.list_sub_agents(&coordinator_thread_id).await)
+}
+
+#[tauri::command]
+pub async fn coder_multitask_cancel(
+    service: State<'_, Arc<CoderService>>,
+    request: MultitaskCancelRequest,
+) -> Result<Vec<CoderSubAgent>, String> {
+    service.multitask_cancel(request).await
+}
+
+#[tauri::command]
+pub async fn coder_multitask_cleanup(
+    service: State<'_, Arc<CoderService>>,
+    request: MultitaskCleanupRequest,
+) -> Result<Vec<CoderSubAgent>, String> {
+    service.multitask_cleanup(request).await
 }

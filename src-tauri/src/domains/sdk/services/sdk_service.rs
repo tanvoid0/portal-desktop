@@ -1,9 +1,9 @@
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait};
-use std::collections::HashMap;
 /**
  * SDK Service - Business logic for SDK management
  */
 use crate::process_ext::NoWindowExt;
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait};
+use std::collections::HashMap;
 use std::process::{Command, Stdio};
 // use crate::domains::sdk::entities::ActiveModel as SDKInstallationActive; // TODO: Use when entities are needed
 use super::super::factory::SDKManagerFactory;

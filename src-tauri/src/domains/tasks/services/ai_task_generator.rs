@@ -164,6 +164,7 @@ impl AITaskGenerator {
             max_tokens: Some(4000),
             timeout_ms: Some(120000),
             model: None,
+            llm_provider: None,
             extra_options: None,
         };
 

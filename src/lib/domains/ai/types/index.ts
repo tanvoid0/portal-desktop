@@ -84,7 +84,8 @@ export interface CatalogResolvedDefaults {
 /** A model entry from agent-platform catalog. */
 export interface CatalogModel {
   id: string;
-  provider: string;
+  /** Parent provider id when present; v1 catalog omits this on model rows. */
+  provider?: string | null;
   source: "alias" | "live" | string;
   backend_id?: string | null;
   metadata?: Record<string, unknown>;

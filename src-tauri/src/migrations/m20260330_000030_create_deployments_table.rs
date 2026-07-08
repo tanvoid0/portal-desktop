@@ -17,11 +17,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(Deployments::ProjectId)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Deployments::ProjectId).string().not_null())
                     .col(ColumnDef::new(Deployments::Name).string().not_null())
                     .col(
                         ColumnDef::new(Deployments::DeploymentType)
@@ -29,21 +25,9 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(Deployments::Status).string().not_null())
-                    .col(
-                        ColumnDef::new(Deployments::DataJson)
-                            .text()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(Deployments::CreatedAt)
-                            .string()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(Deployments::UpdatedAt)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Deployments::DataJson).text().not_null())
+                    .col(ColumnDef::new(Deployments::CreatedAt).string().not_null())
+                    .col(ColumnDef::new(Deployments::UpdatedAt).string().not_null())
                     .to_owned(),
             )
             .await?;

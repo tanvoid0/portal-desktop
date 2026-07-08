@@ -8,8 +8,8 @@
 
 pub mod classify;
 pub mod commands;
-pub mod dev_cleaners;
 pub mod db;
+pub mod dev_cleaners;
 pub mod disk;
 pub mod locations;
 pub mod projects;

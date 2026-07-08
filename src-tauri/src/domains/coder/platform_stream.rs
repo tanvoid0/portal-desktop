@@ -1,10 +1,12 @@
 //! Consumer for agent-platform `POST /api/v1/coder/chat/stream` SSE.
 
-use crate::domains::ai::context_usage::{parse_context_usage, parse_llm_usage, ContextUsage, LlmUsage};
+use crate::domains::ai::context_usage::{
+    parse_context_usage, parse_llm_usage, ContextUsage, LlmUsage,
+};
 use serde_json::Value;
 
-use super::types::{ChatMessage, PendingApproval};
 use super::tools;
+use super::types::{ChatMessage, PendingApproval};
 
 #[derive(Debug, Clone)]
 pub struct PlatformDone {

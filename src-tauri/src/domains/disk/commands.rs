@@ -10,12 +10,13 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::domains::ai::services::AIService;
 use crate::domains::disk::classify::{self, Proposal};
+use crate::domains::disk::db::{AuditEntry, Db};
 use crate::domains::disk::dev_cleaners::{
     self, DevCleaner, DevCleanerCleanItem, DevCleanerCleanResult, DevCleanerScan,
     DevCleanerScanContext, DevCleanerWalkHooks,
 };
-use crate::domains::disk::db::{AuditEntry, Db};
 use crate::domains::disk::disk::{self, DiskUsage};
 use crate::domains::disk::locations::{self, Location};
 use crate::domains::disk::projects::{to_project_scan, ProjectScan};
@@ -23,7 +24,6 @@ use crate::domains::disk::quarantine::{self, QuarantineItem, QuarantineResult};
 use crate::domains::disk::scan;
 use crate::domains::disk::verify::{VerificationResult, VerifyProgress, VerifyTask};
 use crate::domains::disk::verify_ai;
-use crate::domains::ai::services::AIService;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -299,14 +299,21 @@ pub async fn verify_proposals(
     }
     let _ = app.emit(
         "verify://progress",
-        VerifyProgress { process_id: 0, status: "planning".to_string(), tasks: vec![] },
+        VerifyProgress {
+            process_id: 0,
+            status: "planning".to_string(),
+            tasks: vec![],
+        },
     );
     let _ = app.emit(
         "verify://progress",
         VerifyProgress {
             process_id: 0,
             status: "running".to_string(),
-            tasks: vec![VerifyTask { role: "AI Reviewer".to_string(), status: "in_progress".to_string() }],
+            tasks: vec![VerifyTask {
+                role: "AI Reviewer".to_string(),
+                status: "in_progress".to_string(),
+            }],
         },
     );
 

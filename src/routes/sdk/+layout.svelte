@@ -7,31 +7,28 @@
   import type { Snippet } from "svelte";
   import SDKSidebar from "$lib/domains/sdk/components/SDKSidebar.svelte";
   import ShellSidebarLayout from "$lib/components/shell/shell-sidebar-layout.svelte";
+  import PageContainer from "$lib/components/shell/page-container.svelte";
   import { page } from "$app/stores";
 
-  // Get children snippet from props for Svelte 5
   let { children }: { children: Snippet<[]> } = $props();
 
-  // Get current path for sidebar selection
   let currentPath = $derived($page.url.pathname);
-
-  // Keep the sidebar reusable: pass the global navigation config.
-  // For the SDK section we only show a single entry in the navigation list.
   const navigationItemIds = ["/sdk"];
 </script>
 
 <ShellSidebarLayout
-  contentClass="flex h-full min-h-0 w-full overflow-hidden"
   sidebarClass="flex h-full min-h-0 flex-col"
-  mainClass="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background"
+  mobileTriggerLabel="SDK menu"
 >
   {#snippet sidebar()}
-    <div class="flex h-full min-h-0 flex-col">
-      <SDKSidebar
-        selectedSDK={currentPath.split("/").pop() || undefined}
-        navigationItemIds={navigationItemIds}
-      />
-    </div>
+    <SDKSidebar
+      selectedSDK={currentPath.split("/").pop() || undefined}
+      {navigationItemIds}
+    />
   {/snippet}
-  {@render children()}
+  <div class="min-h-0 flex-1 overflow-y-auto bg-background">
+    <PageContainer variant="full" class="py-4 md:py-6">
+      {@render children()}
+    </PageContainer>
+  </div>
 </ShellSidebarLayout>

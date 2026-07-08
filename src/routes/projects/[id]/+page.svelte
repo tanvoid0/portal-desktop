@@ -7,6 +7,7 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
+  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
   import { Button } from "$lib/components/ui/button";
   import {
     Card,
@@ -123,12 +124,30 @@
     return null;
   });
 
+  const PROJECT_TABS = [
+    "overview",
+    "dependencies",
+    "pipelines",
+    "terminal",
+  ] as const;
+  type ProjectTab = (typeof PROJECT_TABS)[number];
+
+  const activeTab = $derived(
+    resolveUrlTab($page.url.searchParams, PROJECT_TABS, "overview"),
+  );
+
+  function setActiveTab(tab: ProjectTab) {
+    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+      replaceState: true,
+      noScroll: true,
+    });
+  }
+
   const projectQuery = createProjectQuery(() => resolvedProjectId);
 
   // State
   let project = $state<Project | null>(null);
   let error = $state("");
-  let activeTab = $state("overview");
   let refreshing = $state(false);
 
   const loading = $derived(
@@ -269,6 +288,18 @@
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  }
+
+  function toGitHubUrl(remote?: string): string | null {
+    if (!remote) return null;
+    const trimmed = remote.trim().replace(/\.git$/, "");
+    if (trimmed.startsWith("https://github.com/")) {
+      return trimmed;
+    }
+    if (trimmed.startsWith("git@github.com:")) {
+      return `https://github.com/${trimmed.slice("git@github.com:".length)}`;
+    }
+    return null;
   }
 
   // Navigate to edit page
@@ -660,7 +691,7 @@
   >
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <Button
     variant="ghost"
     size="sm"
@@ -681,6 +712,7 @@
     />
   {:else if project}
     {@const currentProject = project}
+    {@const githubUrl = toGitHubUrl(currentProject.git_repository)}
     <PageHeader
       title={currentProject.name}
       description={currentProject.description}
@@ -714,6 +746,14 @@
           <ExternalLink class="h-4 w-4" />
           Explorer
         </Button>
+        {#if githubUrl}
+          <a href={githubUrl} target="_blank" rel="noreferrer">
+            <Button variant="outline" class="gap-2">
+              <ExternalLink class="h-4 w-4" />
+              GitHub
+            </Button>
+          </a>
+        {/if}
         <Button variant="outline" onclick={switchToTerminal} class="gap-2">
           <Terminal class="h-4 w-4" />
           Terminal
@@ -734,7 +774,11 @@
 
     <PageStats stats={detailStats} columns={4} />
 
-    <Tabs bind:value={activeTab} class="w-full">
+    <Tabs
+      value={activeTab}
+      onValueChange={(v) => setActiveTab(v as ProjectTab)}
+      class="w-full"
+    >
       <TabsList class="grid w-full grid-cols-4">
         <TabsTrigger value="overview" class="gap-2">
           <FolderOpen class="h-4 w-4" />
@@ -1273,6 +1317,17 @@
                     >
                       {project.git_repository}
                     </p>
+                    {#if toGitHubUrl(project.git_repository)}
+                      <a
+                        href={toGitHubUrl(project.git_repository) ?? "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="mt-2 inline-flex items-center text-sm text-primary"
+                      >
+                        Open repository
+                        <ExternalLink class="ml-1 h-3 w-3" />
+                      </a>
+                    {/if}
                   </div>
                 {/if}
 

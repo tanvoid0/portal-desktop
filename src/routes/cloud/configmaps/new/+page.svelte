@@ -127,7 +127,7 @@ ${dataSection}
   );
 </script>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <PageHeader
     title="Create ConfigMap"
     description="Create a new Kubernetes ConfigMap"

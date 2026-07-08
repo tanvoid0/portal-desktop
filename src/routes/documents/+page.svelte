@@ -54,7 +54,7 @@
   <title>Documents - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <PageHeader
     title="Documents"
     description="Workspace documentation, notes, and knowledge base"

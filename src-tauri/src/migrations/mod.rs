@@ -34,6 +34,9 @@ pub mod m20260706_000031_create_coder_tables;
 pub mod m20260706_000032_create_coder_file_changes_table;
 pub mod m20260707_000033_add_model_to_ai_conversations;
 pub mod m20260707_000034_add_platform_thread_id_to_coder_threads;
+pub mod m20260707_000035_add_llm_provider_to_coder_threads;
+pub mod m20260708_000036_create_github_tables;
+pub mod m20260708_000037_add_coder_multitask_tables;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -62,23 +65,18 @@ pub use m20240101_000022_create_project_package_managers_table::Migration as cre
 pub use m20240101_000023_create_device_approvals_table::Migration as createDeviceApprovalsTable;
 pub use m20240101_000024_create_sdk_tables::Migration as createSdkTables;
 pub use m20240101_000025_create_script_executions_table::Migration as createScriptExecutionsTable;
-pub use m20260325_000026_create_terminal_command_history_table::Migration
-    as createTerminalCommandHistoryTable;
-pub use m20260325_000027_create_terminal_sessions_table::Migration
-    as createTerminalSessionsTable;
-pub use m20260325_000028_create_terminal_notes_table::Migration
-    as createTerminalNotesTable;
-pub use m20260325_000029_add_preset_key_to_pipelines::Migration
-    as addPresetKeyToPipelines;
-pub use m20260330_000030_create_deployments_table::Migration
-    as createDeploymentsTable;
+pub use m20260325_000026_create_terminal_command_history_table::Migration as createTerminalCommandHistoryTable;
+pub use m20260325_000027_create_terminal_sessions_table::Migration as createTerminalSessionsTable;
+pub use m20260325_000028_create_terminal_notes_table::Migration as createTerminalNotesTable;
+pub use m20260325_000029_add_preset_key_to_pipelines::Migration as addPresetKeyToPipelines;
+pub use m20260330_000030_create_deployments_table::Migration as createDeploymentsTable;
 pub use m20260706_000031_create_coder_tables::Migration as createCoderTables;
-pub use m20260706_000032_create_coder_file_changes_table::Migration
-    as createCoderFileChangesTable;
-pub use m20260707_000033_add_model_to_ai_conversations::Migration
-    as addModelToAiConversations;
-pub use m20260707_000034_add_platform_thread_id_to_coder_threads::Migration
-    as addPlatformThreadIdToCoderThreads;
+pub use m20260706_000032_create_coder_file_changes_table::Migration as createCoderFileChangesTable;
+pub use m20260707_000033_add_model_to_ai_conversations::Migration as addModelToAiConversations;
+pub use m20260707_000034_add_platform_thread_id_to_coder_threads::Migration as addPlatformThreadIdToCoderThreads;
+pub use m20260707_000035_add_llm_provider_to_coder_threads::Migration as addLlmProviderToCoderThreads;
+pub use m20260708_000036_create_github_tables::Migration as createGithubTables;
+pub use m20260708_000037_add_coder_multitask_tables::Migration as addCoderMultitaskTables;
 
 pub struct Migrator;
 
@@ -150,5 +148,8 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(createCoderFileChangesTable),
         Box::new(addModelToAiConversations),
         Box::new(addPlatformThreadIdToCoderThreads),
+        Box::new(addLlmProviderToCoderThreads),
+        Box::new(createGithubTables),
+        Box::new(addCoderMultitaskTables),
     ]
 }

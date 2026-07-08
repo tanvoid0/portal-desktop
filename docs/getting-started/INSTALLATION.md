@@ -6,6 +6,20 @@ This guide ensures smooth installation of Portal Desktop across Windows, macOS, 
 
 Portal Desktop requires native compilation for some dependencies (`node-pty`, `ws`, `esbuild`). This means you need build tools installed on your system.
 
+### Agent Platform (required for AI)
+
+Before using chat, tasks, documents, or Coder, run [agent-platform](https://github.com/tanvoid0/agent-platform/):
+
+```bash
+git clone https://github.com/tanvoid0/agent-platform.git
+cd agent-platform
+cp .env.example .env
+pnpm install
+pnpm dev:server
+```
+
+Then configure **AI → Providers** in Portal Desktop (`http://127.0.0.1:18410` by default). See [Agent Platform setup](./AGENT_PLATFORM.md).
+
 ### Node.js Version Requirements
 
 - **Required**: Node.js 22.12.0+ (see `.nvmrc`)

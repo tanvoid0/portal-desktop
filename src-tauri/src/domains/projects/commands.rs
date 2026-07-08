@@ -9,10 +9,7 @@ pub async fn get_all_projects(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<crate::domains::projects::entities::ProjectResponse>, String> {
     let service = ProjectService::new(&db_manager);
-    service
-        .get_all_projects()
-        .await
-        .map_err(|e| e.to_string())
+    service.get_all_projects().await.map_err(|e| e.to_string())
 }
 
 #[command]

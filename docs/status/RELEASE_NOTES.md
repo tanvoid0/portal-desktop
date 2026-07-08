@@ -1,5 +1,26 @@
 # Portal Desktop - Release Notes
 
+## Version 0.2.0
+
+### Required dependency
+
+**[agent-platform](https://github.com/tanvoid0/agent-platform/)** must be running for all AI features. See [Agent Platform setup](../getting-started/AGENT_PLATFORM.md).
+
+### Highlights
+
+- **Agent-platform migration** — unified AI provider; chat, tasks, documents, disk analysis, and Coder route through the platform API
+- **Coder workspace** — file explorer, git changes panel, smart commit dialog, terminal integration, browser panel
+- **Coder multitask** — sub-agent cards and parallel task bar
+- **GitHub integration** — connect account, browse repos and issues from the app
+- **Catalog UI** — live provider/model catalog from `GET /v1/catalog` with updated agent-platform format
+- **Responsive layout** — viewport tiers, shell sidebar improvements, chat markdown rendering
+
+### Install / upgrade
+
+Download from [GitHub Releases](https://github.com/tanvoid0/portal-desktop/releases) or let the built-in updater apply the new version. Configure **AI → Providers** after upgrade.
+
+---
+
 ## Version: Pre-Release Cleanup Complete
 
 ### 🎉 Major Improvements

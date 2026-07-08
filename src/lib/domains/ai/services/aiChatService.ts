@@ -14,6 +14,8 @@ export interface StreamCompletePayload {
 
 export interface SendMessageOptions {
   provider?: ProviderType;
+  /** agent-platform backend id (ollama, lm_studio, gemini, …) */
+  llm_provider?: string;
   conversation_id?: string;
   temperature?: number;
   max_tokens?: number;
@@ -43,6 +45,7 @@ export class AIChatService {
         content: msg.content,
       })),
       provider: options.provider || null,
+      llmProvider: options.llm_provider || null,
       conversationId: options.conversation_id || null,
       temperature: options.temperature || null,
       maxTokens: options.max_tokens || null,
@@ -105,6 +108,7 @@ export class AIChatService {
           content: msg.content,
         })),
         provider: options.provider || null,
+        llmProvider: options.llm_provider || null,
         conversationId: options.conversation_id || null,
         temperature: options.temperature || null,
         maxTokens: options.max_tokens || null,

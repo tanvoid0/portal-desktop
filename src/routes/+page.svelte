@@ -141,7 +141,7 @@
   <title>Overview - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto max-w-7xl space-y-6 p-6">
+<div class="space-y-6">
   <!-- Welcome Header -->
   <div class="mb-8">
     <h1 class="mb-2 text-4xl font-bold">{greeting}!</h1>

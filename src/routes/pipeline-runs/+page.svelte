@@ -78,7 +78,7 @@
   <title>Pipeline Runs - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <PageHeader
     title="Pipeline Runs"
     description="Global history of pipeline executions across all projects."

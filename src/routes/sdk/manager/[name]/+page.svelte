@@ -34,6 +34,21 @@
   import { Input } from "$lib/components/ui/input";
   import { PageLoading, PageError } from "$lib/components/shell";
   import { confirmAction } from "$lib/utils/confirm";
+  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
+
+  const MANAGER_TABS = ["installed", "available"] as const;
+  type ManagerTab = (typeof MANAGER_TABS)[number];
+
+  const activeTab = $derived(
+    resolveUrlTab($page.url.searchParams, MANAGER_TABS, "installed"),
+  );
+
+  function setActiveTab(tab: ManagerTab) {
+    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+      replaceState: true,
+      noScroll: true,
+    });
+  }
 
   interface SDKManager {
     id: string;
@@ -57,7 +72,6 @@
   let installedVersions = $state<string[]>([]);
   let availableVersions = $state<string[]>([]);
   let currentVersion = $state<string | null>(null);
-  let activeTab = $state<"installed" | "available">("installed");
   let loadingVersions = $state(false);
   let installingVersion = $state<string | null>(null);
   let switchingVersion = $state<string | null>(null);
@@ -210,7 +224,7 @@
   <title>{manager?.display_name || "SDK Manager"} - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
 {#if loading}
   <PageLoading message="Loading SDK manager..." />
 {:else if error}
@@ -220,7 +234,7 @@
     onRetry={loadManagerDetails}
   />
 {:else if manager}
-  <div class="w-full max-w-none space-y-6 p-6">
+  <div class="space-y-6">
     <!-- Header -->
     <div class="flex items-center gap-4">
       <div class="flex flex-1 items-center gap-3">
@@ -302,7 +316,10 @@
       {/if}
 
       <!-- Version Management Tabs -->
-      <Tabs bind:value={activeTab}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as ManagerTab)}
+      >
         <TabsList>
           <TabsTrigger value="installed">
             Installed ({installedVersions.length})

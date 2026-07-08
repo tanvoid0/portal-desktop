@@ -1,9 +1,9 @@
+use crate::process_ext::NoWindowExt;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
-use crate::process_ext::NoWindowExt;
 use std::process::{Command, Stdio};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -763,7 +763,11 @@ impl OllamaManager {
         // Execute ollama rm with timeout
         let timeout_duration = std::time::Duration::from_secs(30);
         let output = tokio::time::timeout(timeout_duration, async {
-            Command::new("ollama").no_window().arg("rm").arg(model_name).output()
+            Command::new("ollama")
+                .no_window()
+                .arg("rm")
+                .arg(model_name)
+                .output()
         })
         .await
         .map_err(|_| "Command timed out after 30 seconds")?

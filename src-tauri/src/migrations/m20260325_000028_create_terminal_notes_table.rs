@@ -25,11 +25,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(""),
                     )
-                    .col(
-                        ColumnDef::new(TerminalNotes::UpdatedAt)
-                            .text()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(TerminalNotes::UpdatedAt).text().not_null())
                     .to_owned(),
             )
             .await?;
@@ -51,4 +47,3 @@ enum TerminalNotes {
     Markdown,
     UpdatedAt,
 }
-

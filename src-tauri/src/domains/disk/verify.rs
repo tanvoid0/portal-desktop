@@ -130,7 +130,10 @@ fn client() -> Result<reqwest::blocking::Client, String> {
         .map_err(|e| e.to_string())
 }
 
-fn auth(req: reqwest::blocking::RequestBuilder, cfg: &AiConfig) -> reqwest::blocking::RequestBuilder {
+fn auth(
+    req: reqwest::blocking::RequestBuilder,
+    cfg: &AiConfig,
+) -> reqwest::blocking::RequestBuilder {
     let req = req.header("X-Agent-Platform-Client", CLIENT_ID);
     match cfg.api_token.as_deref().map(str::trim) {
         Some(k) if !k.is_empty() => req.bearer_auth(k),
@@ -198,7 +201,9 @@ fn resolve_team(c: &reqwest::blocking::Client, cfg: &AiConfig, base: &str) -> Re
             .get("description")
             .and_then(Value::as_str)
             .is_some_and(|d| d.contains(TEAM_MARKER));
-        has_marker.then(|| t.get("id").and_then(Value::as_i64)).flatten()
+        has_marker
+            .then(|| t.get("id").and_then(Value::as_i64))
+            .flatten()
     }) {
         return Ok(id);
     }
@@ -220,7 +225,11 @@ fn resolve_team(c: &reqwest::blocking::Client, cfg: &AiConfig, base: &str) -> Re
 }
 
 /// GET the platform's team templates as a raw array (handles both shapes).
-fn fetch_teams(c: &reqwest::blocking::Client, cfg: &AiConfig, base: &str) -> Result<Vec<Value>, String> {
+fn fetch_teams(
+    c: &reqwest::blocking::Client,
+    cfg: &AiConfig,
+    base: &str,
+) -> Result<Vec<Value>, String> {
     let resp = auth(c.get(format!("{base}/api/v1/teams/")), cfg)
         .send()
         .map_err(|e| e.to_string())?;
@@ -245,7 +254,11 @@ fn team_option(t: &Value) -> Option<TeamOption> {
         .to_string();
     Some(TeamOption {
         id,
-        name: t.get("name").and_then(Value::as_str).unwrap_or("").to_string(),
+        name: t
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string(),
         is_app_team: description.contains(TEAM_MARKER),
         description,
     })
@@ -504,7 +517,10 @@ fn run<F: FnMut(VerifyProgress)>(
         });
 
         let terminal = matches!(status.as_str(), "completed" | "failed" | "cancelled");
-        let gated = matches!(status.as_str(), "approval_required" | "task_review_required");
+        let gated = matches!(
+            status.as_str(),
+            "approval_required" | "task_review_required"
+        );
         if terminal || gated {
             let notes = collect_notes(&payload);
             let verdicts = parse_verdicts(&notes);

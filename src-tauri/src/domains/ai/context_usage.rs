@@ -57,11 +57,7 @@ pub fn parse_context_usage(value: &Value) -> Option<ContextUsage> {
             categories: value
                 .get("categories")
                 .and_then(Value::as_object)
-                .map(|m| {
-                    m.iter()
-                        .map(|(k, v)| (k.clone(), coerce_u64(v)))
-                        .collect()
-                })
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), coerce_u64(v))).collect())
                 .unwrap_or_default(),
         })
     })

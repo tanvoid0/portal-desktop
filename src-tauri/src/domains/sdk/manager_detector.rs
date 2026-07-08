@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::process_ext::NoWindowExt;
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 use which::which;
 
@@ -34,7 +34,11 @@ pub async fn detect_sdk_managers() -> Result<Vec<SDKInfo>, String> {
     }
 
     // Check for Python
-    if let Ok(output) = Command::new("python3").no_window().arg("--version").output() {
+    if let Ok(output) = Command::new("python3")
+        .no_window()
+        .arg("--version")
+        .output()
+    {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let path = which("python3")

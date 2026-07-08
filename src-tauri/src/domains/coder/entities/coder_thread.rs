@@ -11,8 +11,11 @@ pub struct Model {
     pub model: Option<String>,
     /// Agent-platform `coder_chat_threads.id` when using `/api/v1/coder/chat/stream`.
     pub platform_thread_id: Option<i64>,
+    /// Backend LLM provider id (e.g. `ollama`) for agent-platform routing.
+    pub llm_provider: Option<String>,
     /// The full transcript (`Vec<ChatMessage>`) serialized as JSON.
     pub messages_json: String,
+    pub thread_kind: String,
     pub created_at: String,
     pub updated_at: String,
 }

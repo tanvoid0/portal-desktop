@@ -84,6 +84,27 @@ export function buildMainNavSections(
           badge: projectCount > 0 ? projectCount : null,
         },
         {
+          title: "GitHub",
+          url: "/github",
+          icon: "github",
+          description: "GitHub repositories and issues",
+          badge: null,
+          submenu: [
+            {
+              title: "Repositories",
+              url: "/github/repos",
+              icon: "folder",
+              description: "Browse and clone repositories",
+            },
+            {
+              title: "Issues",
+              url: "/github/issues",
+              icon: "message-square",
+              description: "View and manage issues",
+            },
+          ],
+        },
+        {
           title: "Pipeline Runs",
           url: "/pipeline-runs",
           icon: "history",

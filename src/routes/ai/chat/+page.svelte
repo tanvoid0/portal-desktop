@@ -23,18 +23,22 @@
     isPlaceholderTitle,
     reconcileThreadTitle,
   } from "$lib/domains/chat/title.js";
-  import { MessageSquare } from "@lucide/svelte";
+  import { MessageSquare, PanelLeftOpen } from "@lucide/svelte";
+  import ResponsivePanel from "$lib/components/shell/responsive-panel.svelte";
+  import { Button } from "$lib/components/ui/button";
 
   let messages = $state<ChatMessage[]>([]);
   let isLoading = $state(false);
   let conversations = $state<Conversation[]>([]);
   let selectedConversation = $state<Conversation | null>(null);
   let selectedProvider = $state<ProviderType | null>(null);
+  let selectedBackendProvider = $state<string | null>(null);
   let selectedModel = $state<string | null>(null);
   let isSending = $state(false);
   let conversationId = $state<string | undefined>(undefined);
   /** Conversation ids with user-edited titles — ignore smart title events. */
   let userRenamedConversationIds = $state<Set<string>>(new Set());
+  let conversationsPanelOpen = $state(false);
 
   function patchConversationTitle(id: string, title: string) {
     if (userRenamedConversationIds.has(id)) return;
@@ -262,6 +266,7 @@
       const fullResponse = await aiChatService.streamMessage(message, history, {
         provider:
           selectedConversation?.provider || selectedProvider || undefined,
+        llm_provider: selectedBackendProvider || undefined,
         conversation_id: conversationId,
         model: selectedModel || undefined,
         onTitleUpdated: ({ conversation_id, title }) => {
@@ -323,38 +328,57 @@
 </script>
 
 <div class="flex h-full w-full overflow-hidden">
-  <!-- Conversation History Sidebar -->
-  <aside
-    class="flex w-64 flex-shrink-0 flex-col overflow-hidden border-r bg-background"
+  <ResponsivePanel
+    bind:open={conversationsPanelOpen}
+    side="left"
+    desktopClass="w-64"
   >
-    <div class="border-b p-2.5">
-      <h2 class="flex items-center gap-1.5 text-sm font-semibold">
-        <MessageSquare class="h-4 w-4" />
-        Conversations
-      </h2>
-    </div>
+    {#snippet header()}
+      <div class="border-b p-2.5">
+        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+          <MessageSquare class="h-4 w-4" />
+          Conversations
+        </h2>
+      </div>
+    {/snippet}
     <ConversationList
       bind:conversations
-      onConversationClick={handleConversationClick}
+      onConversationClick={(c) => {
+        handleConversationClick(c);
+        conversationsPanelOpen = false;
+      }}
       onCreateNew={handleNewConversation}
       onDeleteConversation={handleDeleteConversation}
       onDeleteAll={handleDeleteAllConversations}
       selectedConversationId={selectedConversation?.id}
     />
-  </aside>
+  </ResponsivePanel>
 
   <!-- Main Chat Area -->
   <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <div
       class="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2.5"
     >
-      <h2 class="truncate text-sm font-semibold">
-        {selectedConversation?.title || "AI Chat"}
-      </h2>
+      <div class="flex min-w-0 items-center gap-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          class="h-8 w-8 shrink-0 md:hidden"
+          title="Conversations"
+          onclick={() => (conversationsPanelOpen = true)}
+        >
+          <PanelLeftOpen class="h-4 w-4" />
+        </Button>
+        <h2 class="truncate text-sm font-semibold">
+          {selectedConversation?.title || "AI Chat"}
+        </h2>
+      </div>
       <ProviderModelSelector
         bind:selectedProvider
+        bind:selectedBackendProvider
         bind:selectedModel
         onModelChange={handleModelChange}
+        backendSelectClass="w-[130px]"
         modelSelectClass="w-[220px]"
       />
     </div>

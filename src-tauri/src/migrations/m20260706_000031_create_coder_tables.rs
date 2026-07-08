@@ -26,11 +26,7 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(CoderThreads::Model).string().null())
-                    .col(
-                        ColumnDef::new(CoderThreads::MessagesJson)
-                            .text()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(CoderThreads::MessagesJson).text().not_null())
                     .col(ColumnDef::new(CoderThreads::CreatedAt).string().not_null())
                     .col(ColumnDef::new(CoderThreads::UpdatedAt).string().not_null())
                     .to_owned(),

@@ -81,7 +81,26 @@ jobs:
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "portal-desktop v__VERSION__"
-          releaseBody: "See the assets below to download and install. Existing installs auto-update via the built-in updater."
+          releaseBody: |
+            ## Portal Desktop v__VERSION__
+
+            ### Required: Agent Platform
+
+            All AI features require [**agent-platform**](https://github.com/tanvoid0/agent-platform/) running separately.
+
+            1. Clone and start: `git clone https://github.com/tanvoid0/agent-platform.git && cd agent-platform && pnpm install && pnpm dev:server`
+            2. Configure providers at `http://127.0.0.1:18410/config`
+            3. In Portal Desktop: **AI → Providers** → set base URL and workspace token
+
+            Setup guide: [docs/getting-started/AGENT_PLATFORM.md](https://github.com/tanvoid0/portal-desktop/blob/main/docs/getting-started/AGENT_PLATFORM.md)
+
+            ### Downloads
+
+            Install the asset for your platform below. Existing installs auto-update via the built-in updater.
+
+            ### Changelog
+
+            See [RELEASE_NOTES.md](https://github.com/tanvoid0/portal-desktop/blob/main/docs/status/RELEASE_NOTES.md)
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
           includeUpdaterJson: true

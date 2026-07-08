@@ -1,26 +1,26 @@
 use crate::database::DatabaseManager;
+use crate::domains::ai::catalog::{CatalogQuery, PlatformCatalog};
+use crate::domains::ai::chat;
 use crate::domains::ai::chat_title::{
     fallback_title_from_message, generate_smart_title, is_placeholder_title,
     should_apply_generated_title, smart_titles_enabled, PLACEHOLDER_CHAT,
 };
-use crate::domains::ai::catalog::{CatalogQuery, PlatformCatalog};
-use crate::domains::ai::message::ChatMessage;
 use crate::domains::ai::conversation::{
     Conversation, ConversationMessage, ConversationWithMessages,
 };
 use crate::domains::ai::logging::{AILog, LogFilters};
+use crate::domains::ai::message::ChatMessage;
+use crate::domains::ai::platform_config::PlatformConfig;
 use crate::domains::ai::providers::{
     AIError, AgentPlatformProvider, ConfigurationStatus, GenerationOptions, GenerationResult,
     ProviderConfig, ProviderType,
 };
 use crate::domains::ai::services::{AIService, AISettingsService};
+use reqwest::Client;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Set,
 };
-use crate::domains::ai::chat;
-use crate::domains::ai::platform_config::PlatformConfig;
-use reqwest::Client;
 use std::sync::Arc;
 use tauri::{Emitter, State};
 // Use the centralized logger from utils
@@ -204,6 +204,7 @@ pub async fn ai_send_message(
     temperature: Option<f64>,
     max_tokens: Option<u32>,
     model: Option<String>,
+    llm_provider: Option<String>,
     ai_service: State<'_, Arc<AIService>>,
 ) -> Result<String, String> {
     let request = chat::SendMessageRequest {
@@ -214,6 +215,7 @@ pub async fn ai_send_message(
         temperature,
         max_tokens,
         model,
+        llm_provider,
     };
     chat::send_message(request, ai_service).await
 }
@@ -228,6 +230,7 @@ pub async fn ai_send_message_stream(
     temperature: Option<f64>,
     max_tokens: Option<u32>,
     model: Option<String>,
+    llm_provider: Option<String>,
     stream_id: String, // Unique ID for this stream
     app_handle: tauri::AppHandle,
     ai_service: State<'_, Arc<AIService>>,
@@ -299,6 +302,7 @@ pub async fn ai_send_message_stream(
         max_tokens,
         timeout_ms: None,
         model,
+        llm_provider,
         extra_options: None,
     };
 

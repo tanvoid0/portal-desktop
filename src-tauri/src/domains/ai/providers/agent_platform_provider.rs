@@ -63,7 +63,10 @@ impl AgentPlatformProvider {
     }
 
     fn authed(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        let req = req.header("X-Agent-Platform-Client", super::super::platform_config::DESKTOP_CLIENT_ID);
+        let req = req.header(
+            "X-Agent-Platform-Client",
+            super::super::platform_config::DESKTOP_CLIENT_ID,
+        );
         match self.api_token() {
             Some(token) => req.bearer_auth(token),
             None => req,
@@ -130,6 +133,14 @@ impl AgentPlatformProvider {
         }
         if let Some(max_tokens) = options.max_tokens {
             body["max_tokens"] = json!(max_tokens);
+        }
+        if let Some(provider) = options
+            .llm_provider
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            body["provider"] = json!(provider);
         }
 
         let timeout = std::time::Duration::from_millis(options.timeout_ms.unwrap_or(120_000));
@@ -274,11 +285,7 @@ impl AIProvider for AgentPlatformProvider {
 
         // Prefer /v1/catalog when a token is set — validates auth + upstream.
         if self.api_token().is_some() {
-            if self
-                .fetch_catalog(CatalogQuery::default())
-                .await
-                .is_ok()
-            {
+            if self.fetch_catalog(CatalogQuery::default()).await.is_ok() {
                 return Ok(());
             }
 
@@ -299,15 +306,12 @@ impl AIProvider for AgentPlatformProvider {
             }
         }
 
-        self.is_available()
-            .await?
-            .then_some(())
-            .ok_or_else(|| {
-                AIError::ProviderNotAvailable(format!(
-                    "agent-platform is not reachable at {}",
-                    self.base_url()
-                ))
-            })
+        self.is_available().await?.then_some(()).ok_or_else(|| {
+            AIError::ProviderNotAvailable(format!(
+                "agent-platform is not reachable at {}",
+                self.base_url()
+            ))
+        })
     }
 
     async fn generate(
@@ -340,9 +344,8 @@ impl AIProvider for AgentPlatformProvider {
         let start = Instant::now();
         let messages = vec![json!({"role": "user", "content": prompt})];
         let response = self.chat_completion(messages, options, true).await?;
-        let (content, model, tokens_used) = self
-            .consume_sse_stream(response, Some(on_chunk))
-            .await?;
+        let (content, model, tokens_used) =
+            self.consume_sse_stream(response, Some(on_chunk)).await?;
         Ok(GenerationResult {
             content,
             model,
@@ -412,9 +415,8 @@ impl AIProvider for AgentPlatformProvider {
             .map(|m| json!({"role": m.role, "content": m.content}))
             .collect();
         let response = self.chat_completion(api_messages, options, true).await?;
-        let (content, model, tokens_used) = self
-            .consume_sse_stream(response, Some(on_chunk))
-            .await?;
+        let (content, model, tokens_used) =
+            self.consume_sse_stream(response, Some(on_chunk)).await?;
         Ok(GenerationResult {
             content,
             model,

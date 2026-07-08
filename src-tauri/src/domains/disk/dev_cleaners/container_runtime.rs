@@ -85,9 +85,7 @@ impl DevCleaner for ContainerRuntimeCleaner {
 
         for item in items {
             let result = match item.kind.as_str() {
-                "stopped-container" | "created-container" => {
-                    self.run(&["rm", "-f", &item.path])
-                }
+                "stopped-container" | "created-container" => self.run(&["rm", "-f", &item.path]),
                 "dangling-image" | "unused-image" => self.run(&["rmi", "-f", &item.path]),
                 "dangling-volume" => self.run(&["volume", "rm", "-f", &item.path]),
                 "dangling-network" => self.run(&["network", "rm", &item.path]),
@@ -303,7 +301,8 @@ impl ContainerRuntimeCleaner {
                     cleaner_id: self.id().to_string(),
                     path: name.to_string(),
                     kind: "dangling-volume".to_string(),
-                    reason: "volume not attached to any container — review before removing".to_string(),
+                    reason: "volume not attached to any container — review before removing"
+                        .to_string(),
                     size_bytes: 0,
                     file_count: 0,
                     risk: Risk::Review,
@@ -375,10 +374,7 @@ impl ContainerRuntimeCleaner {
                     cleaner_id: self.id().to_string(),
                     path: "build-cache".to_string(),
                     kind: "build-cache".to_string(),
-                    reason: format!(
-                        "reclaimable build cache ({})",
-                        parts[2].trim()
-                    ),
+                    reason: format!("reclaimable build cache ({})", parts[2].trim()),
                     size_bytes: reclaimable,
                     file_count: 0,
                     risk: Risk::Safe,

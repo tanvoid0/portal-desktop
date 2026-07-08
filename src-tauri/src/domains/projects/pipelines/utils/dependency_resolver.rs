@@ -35,10 +35,7 @@ pub fn resolve_execution_order(steps: &[Value]) -> Result<Vec<Vec<String>>, Stri
     for (step_id, deps) in &dependencies {
         for dep in deps {
             if !step_id_set.contains(dep) {
-                return Err(format!(
-                    "Step {} depends on missing step {}",
-                    step_id, dep
-                ));
+                return Err(format!("Step {} depends on missing step {}", step_id, dep));
             }
         }
     }

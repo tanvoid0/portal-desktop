@@ -25,11 +25,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(CoderFileChanges::Path).string().not_null())
                     .col(ColumnDef::new(CoderFileChanges::Status).string().not_null())
                     // Full FileChange serialized as JSON (before, hunks, ...).
-                    .col(
-                        ColumnDef::new(CoderFileChanges::DataJson)
-                            .text()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(CoderFileChanges::DataJson).text().not_null())
                     .col(
                         ColumnDef::new(CoderFileChanges::CreatedAt)
                             .string()

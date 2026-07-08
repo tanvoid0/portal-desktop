@@ -25,6 +25,9 @@ pub struct AppSettings {
 
     // Updates
     pub updates: UpdateSettings,
+
+    #[serde(default)]
+    pub integrations: IntegrationSettings,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -82,6 +85,17 @@ pub struct UpdateSettings {
     pub check_interval: u32, // hours
     pub channel: String,
     pub notify_on_update: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct IntegrationSettings {
+    #[serde(default)]
+    pub github: GitHubIntegrationSettings,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct GitHubIntegrationSettings {
+    pub client_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -315,6 +329,7 @@ impl SettingsService {
                     channel: "stable".to_string(),
                     notify_on_update: true,
                 },
+                integrations: IntegrationSettings::default(),
             },
             editor: EditorSettings {
                 font_family: "Monaco, Consolas, 'Courier New', monospace".to_string(),

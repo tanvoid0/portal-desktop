@@ -1,15 +1,13 @@
+use crate::database::DatabaseManager;
 use crate::domains::terminal::manager::TerminalManager;
 use crate::domains::terminal::types::*;
-use crate::database::DatabaseManager;
 use crate::entities::terminal_command_history as terminal_command_history_entity;
 use crate::entities::terminal_note as terminal_note_entity;
 use crate::entities::terminal_session as terminal_session_entity;
-use serde::{Deserialize, Serialize};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set,
-};
-use std::collections::HashMap;
 use crate::process_ext::NoWindowExt;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::process::Command;
 use std::sync::Arc;
 use tauri::{command, State, Window};
@@ -567,15 +565,14 @@ pub async fn save_terminal_session(
 ) -> Result<(), String> {
     let db = db_manager.get_connection();
 
-    let environment_json = serde_json::to_string(&session.environment).map_err(|e| e.to_string())?;
+    let environment_json =
+        serde_json::to_string(&session.environment).map_err(|e| e.to_string())?;
     let scrollback_buffer_json =
         serde_json::to_string(&session.scrollback_buffer).map_err(|e| e.to_string())?;
 
     // Replace existing row for this tab.
     terminal_session_entity::Entity::delete_many()
-        .filter(
-            terminal_session_entity::Column::TabId.eq(session.tab_id.clone()),
-        )
+        .filter(terminal_session_entity::Column::TabId.eq(session.tab_id.clone()))
         .exec(db)
         .await
         .map_err(|e| e.to_string())?;
@@ -665,9 +662,7 @@ pub async fn delete_terminal_session(
 }
 
 #[command]
-pub async fn clear_all_sessions(
-    db_manager: State<'_, Arc<DatabaseManager>>,
-) -> Result<(), String> {
+pub async fn clear_all_sessions(db_manager: State<'_, Arc<DatabaseManager>>) -> Result<(), String> {
     let db = db_manager.get_connection();
     terminal_session_entity::Entity::delete_many()
         .exec(db)

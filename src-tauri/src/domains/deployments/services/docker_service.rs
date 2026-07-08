@@ -1,6 +1,6 @@
+use crate::process_ext::NoWindowExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::process_ext::NoWindowExt;
 use tokio::process::Command;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -121,16 +121,14 @@ impl DockerService {
             .map_err(|e| format!("Failed to execute docker command: {}", e))?;
 
         if info_output.status.success() {
-            let version = version_output
-                .ok()
-                .and_then(|output| {
-                    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    if value.is_empty() {
-                        None
-                    } else {
-                        Some(value)
-                    }
-                });
+            let version = version_output.ok().and_then(|output| {
+                let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if value.is_empty() {
+                    None
+                } else {
+                    Some(value)
+                }
+            });
 
             return Ok(DockerStatus {
                 running: true,
@@ -140,7 +138,9 @@ impl DockerService {
             });
         }
 
-        let stderr = String::from_utf8_lossy(&info_output.stderr).trim().to_string();
+        let stderr = String::from_utf8_lossy(&info_output.stderr)
+            .trim()
+            .to_string();
         let message = if stderr.contains("dockerDesktopLinuxEngine")
             || stderr.contains("Cannot connect to the Docker daemon")
             || stderr.contains("failed to connect to the docker API")
@@ -185,9 +185,7 @@ impl DockerService {
                         .spawn()
                         .map_err(|e| format!("Failed to start Docker Desktop: {}", e))?;
 
-                    return Ok(
-                        "Starting Docker Desktop. This may take a minute.".to_string(),
-                    );
+                    return Ok("Starting Docker Desktop. This may take a minute.".to_string());
                 }
             }
 
@@ -206,9 +204,7 @@ impl DockerService {
                 .map_err(|e| format!("Failed to start Docker Desktop: {}", e))?;
 
             if output.status.success() {
-                return Ok(
-                    "Starting Docker Desktop. This may take a minute.".to_string(),
-                );
+                return Ok("Starting Docker Desktop. This may take a minute.".to_string());
             }
 
             let stderr = String::from_utf8_lossy(&output.stderr);
