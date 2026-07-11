@@ -11,8 +11,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v5
-
     # pnpm must be installed before setup-node so its packageManager-based
     # cache detection can find pnpm on PATH.
     - name: Install pnpm

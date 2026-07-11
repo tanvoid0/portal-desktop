@@ -23,6 +23,8 @@ jobs:
   release-smoke:
     runs-on: ubuntu-22.04
     steps:
+      # Local actions must be on disk before they can be resolved.
+      - uses: actions/checkout@v5
       - name: Smoke test
         uses: ./.github/actions/release-smoke
 
@@ -45,6 +47,8 @@ jobs:
             args: ""
     runs-on: ${{ matrix.platform }}
     steps:
+      # Local actions must be on disk before they can be resolved.
+      - uses: actions/checkout@v5
       - name: Build and release (${{ matrix.platform }})
         uses: ./.github/actions/build-release
         with:

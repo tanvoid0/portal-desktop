@@ -61,7 +61,7 @@
   }
 </script>
 
-<div class="rounded-md border bg-background/60">
+<div class="rounded-lg border border-border/60 bg-card shadow-sm transition-shadow hover:shadow-md">
   <div class="flex items-center gap-3 p-3">
     <Button
       variant="ghost"

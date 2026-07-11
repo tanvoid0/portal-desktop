@@ -3,8 +3,6 @@ description: Fast pre-release validation before platform builds start
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v5
-
     - name: Install pnpm
       uses: pnpm/action-setup@v5
 
