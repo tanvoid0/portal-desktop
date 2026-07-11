@@ -2048,9 +2048,11 @@ impl CoderService {
         {
             let mut threads = self.threads.lock().await;
             if let Some(t) = threads.get_mut(local_id) {
-                t.messages = messages;
+                let old_messages = t.messages.clone();
+                let updated = now_iso();
+                t.messages = super::types::with_message_timestamps(messages, &old_messages, Some(&updated));
                 t.title = title;
-                t.updated_at = now_iso();
+                t.updated_at = updated;
             }
         }
         self.persist_thread(local_id).await;
@@ -2067,12 +2069,18 @@ impl CoderService {
         {
             let mut threads = self.threads.lock().await;
             if let Some(t) = threads.get_mut(local_id) {
+                let old_messages = t.messages.clone();
+                let updated = now_iso();
                 t.platform_thread_id = Some(platform_id);
-                t.messages = done.messages.clone();
+                t.messages = super::types::with_message_timestamps(
+                    done.messages.clone(),
+                    &old_messages,
+                    Some(&updated),
+                );
                 if should_apply_generated_title(&t.title, fallback_title) {
                     t.title = done.title.clone();
                 }
-                t.updated_at = now_iso();
+                t.updated_at = updated;
             }
         }
         self.persist_thread(local_id).await;

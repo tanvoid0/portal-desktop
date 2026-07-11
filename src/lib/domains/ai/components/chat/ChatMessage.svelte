@@ -11,6 +11,7 @@
     showLoader?: boolean;
     /** Show a blinking cursor after streamed content. */
     isStreaming?: boolean;
+    responseLatencyMs?: number | null;
     children?: Snippet;
   }
 
@@ -18,15 +19,47 @@
     message,
     showLoader = false,
     isStreaming = false,
+    responseLatencyMs = null,
     children,
   }: Props = $props();
 
   const isAssistant = $derived(message.role === "assistant");
   const isUser = $derived(message.role === "user");
+  const formattedTimestamp = $derived(formatTimestamp(message.timestamp));
+  const formattedLatency = $derived(formatLatency(responseLatencyMs));
   const showTypingBubble = $derived(
     showLoader && isAssistant && !message.content,
   );
   const hasBubbleContent = $derived(!!message.content || showTypingBubble);
+
+  function formatTimestamp(value: Date | string | undefined): string {
+    if (!value) return "";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const now = new Date();
+    const sameDay = now.toDateString() === date.toDateString();
+    if (sameDay) {
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    return date.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function formatLatency(ms: number | null): string {
+    if (ms == null || ms < 0) return "";
+    if (ms < 1000) return "< 1s";
+    const totalSeconds = Math.round(ms / 1000);
+    if (totalSeconds < 60) return `${totalSeconds}s`;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  }
 </script>
 
 <div class="flex flex-col {isUser ? 'items-end' : 'items-start'}">
@@ -48,6 +81,25 @@
         ? 'ring-1 ring-primary/20'
         : ''}"
     >
+      {#if formattedTimestamp || formattedLatency}
+        <div
+          class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] {isUser
+            ? 'text-primary-foreground/75'
+            : 'text-muted-foreground'}"
+        >
+          {#if formattedTimestamp}
+            <time datetime={typeof message.timestamp === 'string' ? message.timestamp : message.timestamp?.toISOString()}>
+              {formattedTimestamp}
+            </time>
+          {/if}
+          {#if formattedLatency}
+            {#if formattedTimestamp}
+              <span aria-hidden="true">•</span>
+            {/if}
+            <span>Replied in {formattedLatency}</span>
+          {/if}
+        </div>
+      {/if}
       <div class="flex items-start gap-2">
         {#if isAssistant}
           <Bot class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -75,10 +127,5 @@
     <div class="mt-2 w-full max-w-[85%] space-y-2">
       {@render children()}
     </div>
-  {/if}
-  {#if message.timestamp}
-    <span class="mt-1 px-1 text-xs text-muted-foreground">
-      {new Date(message.timestamp).toLocaleTimeString()}
-    </span>
   {/if}
 </div>

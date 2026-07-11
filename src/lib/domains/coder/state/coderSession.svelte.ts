@@ -6,6 +6,7 @@
 import { aiProviderService } from "$lib/domains/ai/services/aiProviderService.js";
 import { coderService } from "../services/coderService.js";
 import { getToolCallDisplay, formatFailedResult, isToolResultFailure } from "../utils/toolCallDisplay.js";
+import { withMessageTimestamps } from "../utils/messageTimestamps.js";
 import type {
   ChatMessage,
   CoderSubAgent,
@@ -318,29 +319,33 @@ class CoderSessionState {
 
     await coderService.onMessage(({ thread_id, message }) => {
       const rt = this.runtimeFor(thread_id);
-      if (message.role === "assistant") rt.streamingText = "";
+      const stampedMessage: ChatMessage = {
+        ...message,
+        timestamp: message.timestamp ?? new Date().toISOString(),
+      };
+      if (stampedMessage.role === "assistant") rt.streamingText = "";
       const last = rt.messages[rt.messages.length - 1];
       const dup =
         last &&
-        last.role === message.role &&
-        last.content === message.content &&
-        JSON.stringify(last.tool_calls) === JSON.stringify(message.tool_calls);
+        last.role === stampedMessage.role &&
+        last.content === stampedMessage.content &&
+        JSON.stringify(last.tool_calls) === JSON.stringify(stampedMessage.tool_calls);
       if (!dup) {
-        rt.messages = [...rt.messages, message];
+        rt.messages = [...rt.messages, stampedMessage];
       }
-        if (
-        message.role === "tool" &&
-        message.tool_call_id &&
-        message.content != null
+      if (
+        stampedMessage.role === "tool" &&
+        stampedMessage.tool_call_id &&
+        stampedMessage.content != null
       ) {
-        if (this.delegatedCommandIds.has(message.tool_call_id)) {
-          this.delegatedCommandIds.delete(message.tool_call_id);
+        if (this.delegatedCommandIds.has(stampedMessage.tool_call_id)) {
+          this.delegatedCommandIds.delete(stampedMessage.tool_call_id);
         } else {
           appendRunCommandToTerminal(
             thread_id,
             rt.messages,
-            message.tool_call_id,
-            message.content,
+            stampedMessage.tool_call_id,
+            stampedMessage.content,
           );
         }
         if (this.terminalOpen && thread_id) {
@@ -709,21 +714,22 @@ class CoderSessionState {
       return;
     }
     const rt = this.runtimeFor(threadId);
-    rt.messages = t.messages;
-    if (!rt.pending) rt.pending = inferPending(t.messages);
+    const stamped = withMessageTimestamps(t.messages, rt.messages, t.updated_at);
+    rt.messages = stamped;
+    if (!rt.pending) rt.pending = inferPending(stamped);
     this.touchRuntime();
     if (this.activeThreadId === threadId) {
-      this.thread = t;
+      this.thread = { ...t, messages: stamped };
     }
     const idx = this.threads.findIndex((x) => x.id === threadId);
     if (idx >= 0) {
-      this.threads[idx] = t;
+      this.threads[idx] = { ...t, messages: stamped };
       this.threads = [...this.threads];
       this.bumpThreads();
     } else {
-      this.upsertThread(t);
+      this.upsertThread({ ...t, messages: stamped });
     }
-    this.updateRetryFromMessages(rt, t.messages);
+    this.updateRetryFromMessages(rt, stamped);
     void this.refreshContextUsage(threadId);
   }
 
@@ -754,7 +760,6 @@ class CoderSessionState {
     const t = await coderService.getThread(id);
     if (!t) return;
     this.activeThreadId = id;
-    this.thread = t;
     this.upsertThread(t);
     this.workspaceRoot = t.workspace_root;
     this.selectedModel = t.model ?? this.selectedModel;
@@ -762,8 +767,10 @@ class CoderSessionState {
     this.multitaskMode = t.thread_kind === "coordinator";
 
     const rt = this.runtimeFor(id);
-    rt.messages = t.messages;
-    if (!rt.pending) rt.pending = inferPending(t.messages);
+    const stamped = withMessageTimestamps(t.messages, rt.messages, t.updated_at);
+    rt.messages = stamped;
+    this.thread = { ...t, messages: stamped };
+    if (!rt.pending) rt.pending = inferPending(stamped);
     rt.multitaskMode = this.multitaskMode;
     const running = await coderService.listRunning();
     rt.running = running.includes(id);
@@ -810,7 +817,7 @@ class CoderSessionState {
     this.activeThreadId = t.id;
     this.upsertThread(t);
     const rt = this.runtimeFor(t.id);
-    rt.messages = t.messages;
+    rt.messages = withMessageTimestamps(t.messages, rt.messages, t.updated_at);
     rt.multitaskMode = t.thread_kind === "coordinator";
     this.touchRuntime();
     await this.refreshThreads();

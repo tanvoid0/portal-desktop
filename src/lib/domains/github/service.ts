@@ -1,5 +1,4 @@
 import { invokeClient } from "$lib/utils/invokeClient";
-import { openExternalUrl } from "$lib/utils/tauri";
 import { logger } from "$lib/domains/shared/services/logger";
 import { normalizeProject } from "$lib/domains/projects/utils/normalizeProject";
 import { queryClient } from "$lib/domains/shared/query";
@@ -94,13 +93,6 @@ class GitHubService {
     );
 
     await callbacks?.onStarted?.(started);
-
-    const target = started.verificationUriComplete || started.verificationUri;
-    try {
-      await openExternalUrl(target);
-    } catch (error) {
-      log.warn("Failed to open GitHub authorization URL automatically", error);
-    }
 
     const startedAt = Date.now();
     while (Date.now() - startedAt < started.expiresIn * 1000) {

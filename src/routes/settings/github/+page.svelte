@@ -19,7 +19,7 @@
   } from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
   import { PageLoading, PageError } from "$lib/components/shell";
-  import { FolderGit2, Unplug, ExternalLink } from "@lucide/svelte";
+  import { Check, Copy, FolderGit2, Unplug, ExternalLink } from "@lucide/svelte";
 
   const settingsData = $derived($settings);
   const statusQuery = createGitHubStatusQuery();
@@ -30,6 +30,7 @@
   let disconnecting = $state(false);
   let deviceFlow = $state<GitHubDeviceFlowStart | null>(null);
   let flowMessage = $state<string | null>(null);
+  let codeCopied = $state(false);
 
   $effect(() => {
     clientId = settingsData?.app.integrations?.github?.clientId ?? "";
@@ -89,7 +90,7 @@
         onStarted: (start) => {
           deviceFlow = start;
           flowMessage =
-            "Authorize GitHub in your browser. If nothing opened, use the code below.";
+            "Copy the code below, open GitHub, paste it, then authorize.";
         },
         onPolling: () => {
           flowMessage = "Waiting for you to authorize on GitHub...";
@@ -108,12 +109,26 @@
     }
   }
 
+  async function handleCopyCode() {
+    if (!deviceFlow) return;
+    try {
+      await navigator.clipboard.writeText(deviceFlow.userCode);
+      codeCopied = true;
+      toast.success("Code copied to clipboard");
+      setTimeout(() => {
+        codeCopied = false;
+      }, 2000);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to copy code",
+      );
+    }
+  }
+
   async function handleOpenGitHub() {
     if (!deviceFlow) return;
-    const target =
-      deviceFlow.verificationUriComplete || deviceFlow.verificationUri;
     try {
-      await openExternalUrl(target);
+      await openExternalUrl(deviceFlow.verificationUri);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -269,11 +284,33 @@
                 <div class="text-xs uppercase tracking-wide text-muted-foreground">
                   Your code
                 </div>
-                <div class="mt-1 font-mono text-2xl font-semibold tracking-widest">
-                  {deviceFlow.userCode}
+                <div class="mt-1 flex items-center justify-center gap-2">
+                  <div class="font-mono text-2xl font-semibold tracking-widest">
+                    {deviceFlow.userCode}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onclick={handleCopyCode}
+                    title="Copy code"
+                    aria-label="Copy code"
+                  >
+                    {#if codeCopied}
+                      <Check class="h-4 w-4 text-green-600" />
+                    {:else}
+                      <Copy class="h-4 w-4" />
+                    {/if}
+                  </Button>
                 </div>
               </div>
               <div class="flex flex-wrap gap-2">
+                <Button onclick={handleCopyCode} variant="outline">
+                  {#if codeCopied}
+                    Copied
+                  {:else}
+                    Copy code
+                  {/if}
+                </Button>
                 <Button onclick={handleOpenGitHub}>Open GitHub</Button>
                 <Button variant="outline" disabled>Connecting...</Button>
               </div>

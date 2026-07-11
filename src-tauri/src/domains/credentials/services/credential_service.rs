@@ -34,19 +34,20 @@ impl CredentialService {
         request: CredentialCreateRequest,
     ) -> Result<CredentialModel, CredentialError> {
         let id = uuid::Uuid::new_v4().to_string();
+        let id_for_verify = id.clone();
         let now = Utc::now().naive_utc();
 
         // Encrypt the credential value
         let master_key = self.get_master_key()?;
         let encryption_result = self
             .encryption
-            .encrypt(&request.value, master_key.as_bytes())?;
+            .encrypt(&request.value, &master_key)?;
 
         // Encrypt additional fields
         let mut encrypted_fields = std::collections::HashMap::new();
         if let Some(fields) = request.fields {
             for (key, value) in fields {
-                let field_result = self.encryption.encrypt(&value, master_key.as_bytes())?;
+                let field_result = self.encryption.encrypt(&value, &master_key)?;
                 encrypted_fields.insert(key, serde_json::to_string(&field_result)?);
             }
         }
@@ -69,8 +70,26 @@ impl CredentialService {
             expires_at: Set(request.expires_at.map(|d| d.naive_utc())),
         };
 
-        let result = credential.insert(&self.db).await?;
-        Ok(result)
+        // SQLite string primary keys can fail to return the inserted row even when
+        // the insert succeeds. Verify by ID when SeaORM reports RecordNotFound.
+        match credential.insert(&self.db).await {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                let error_str = e.to_string();
+                if error_str.contains("RecordNotFound")
+                    || error_str.contains("Failed to find inserted item")
+                {
+                    CredentialEntity::find_by_id(&id_for_verify)
+                        .one(&self.db)
+                        .await?
+                        .ok_or_else(|| {
+                            CredentialError::CredentialNotFound(id_for_verify.clone())
+                        })
+                } else {
+                    Err(CredentialError::DatabaseError(e))
+                }
+            }
+        }
     }
 
     /// Get all credentials
@@ -117,7 +136,7 @@ impl CredentialService {
         // Update encrypted value if provided
         if let Some(value) = request.value {
             let master_key = self.get_master_key()?;
-            let encryption_result = self.encryption.encrypt(&value, master_key.as_bytes())?;
+            let encryption_result = self.encryption.encrypt(&value, &master_key)?;
             credential.encrypted_value = serde_json::to_string(&encryption_result)?;
         }
 
@@ -126,7 +145,7 @@ impl CredentialService {
             let master_key = self.get_master_key()?;
             let mut encrypted_fields = std::collections::HashMap::new();
             for (key, value) in fields {
-                let field_result = self.encryption.encrypt(&value, master_key.as_bytes())?;
+                let field_result = self.encryption.encrypt(&value, &master_key)?;
                 encrypted_fields.insert(key, serde_json::to_string(&field_result)?);
             }
             credential.encrypted_fields = serde_json::to_string(&encrypted_fields)?;
@@ -174,12 +193,13 @@ impl CredentialService {
             serde_json::from_str(&credential.encrypted_value)
                 .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
 
+        let master_key = self.get_master_key()?;
         let request = DecryptionRequest {
             encrypted: encryption_data.encrypted.clone(),
             iv: encryption_data.iv.clone(),
             tag: encryption_data.tag,
             algorithm: encryption_data.algorithm,
-            key: self.get_master_key()?,
+            key: master_key,
         };
 
         let decrypted = self.encryption.decrypt(request)?;
@@ -226,7 +246,7 @@ impl CredentialService {
     /// Uses device-specific key derived from app data directory
     /// SECURITY NOTE: In production, this should be derived from user's master password
     /// For now, uses a device-specific persistent key (better than hardcoded placeholder)
-    fn get_master_key(&self) -> Result<String, CredentialError> {
+    fn get_master_key(&self) -> Result<[u8; 32], CredentialError> {
         // Get app data directory (device-specific, persistent)
         let app_data_dir = dirs::data_dir()
             .ok_or_else(|| {
@@ -246,18 +266,13 @@ impl CredentialService {
         // Derive a 32-byte key from the seed using SHA-256
         let mut hasher = Sha256::new();
         hasher.update(seed.as_bytes());
-        let key_bytes = hasher.finalize();
-
-        // Convert to hex string (64 characters for 32 bytes)
-        let key_hex = hex::encode(key_bytes);
-
         // Log warning in development mode
         #[cfg(debug_assertions)]
         {
             log_warn!("Credentials", "Using device-specific master key. In production, implement user password-based key derivation.");
         }
 
-        Ok(key_hex)
+        Ok(hasher.finalize().into())
     }
 }
 

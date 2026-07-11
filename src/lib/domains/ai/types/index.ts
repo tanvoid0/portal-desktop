@@ -24,7 +24,7 @@ export interface ConfigurationStatus {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-  timestamp?: Date;
+  timestamp?: Date | string;
 }
 
 export interface Conversation {

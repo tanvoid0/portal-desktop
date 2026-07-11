@@ -39,6 +39,7 @@
   import CoderWorkspacePanel from './CoderWorkspacePanel.svelte';
   import GitCommitDialog from './GitCommitDialog.svelte';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import { withMessageTimestamps } from '../utils/messageTimestamps.js';
   import type { ChatMessage as AIChatMessage } from '$lib/domains/ai/types/index.js';
   import ResponsivePanel from '$lib/components/shell/responsive-panel.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
@@ -65,7 +66,11 @@
     coderSession.runtimeRevision;
     return coderSession.activeRuntime;
   });
-  const messages = $derived(rt.messages);
+  const messages = $derived.by(() => {
+    coderSession.runtimeRevision;
+    const raw = rt.messages;
+    return withMessageTimestamps(raw, raw, thread?.updated_at);
+  });
   const pending = $derived(rt.pending);
   const running = $derived(rt.running);
   const streamingText = $derived(rt.streamingText);
@@ -79,9 +84,40 @@
     coderSession.changes.filter((c) => c.status === 'pending').length,
   );
   const composerDisabled = $derived(!!pending);
-  const visibleMessages = $derived(
-    messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
-  );
+  type DisplayMessageMeta = {
+    message: ChatMessage;
+    responseLatencyMs: number | null;
+  };
+
+  function parseMessageTimestamp(value?: string | null): number | null {
+    if (!value) return null;
+    const ts = new Date(value).getTime();
+    return Number.isNaN(ts) ? null : ts;
+  }
+
+  const visibleMessages = $derived.by<DisplayMessageMeta[]>(() => {
+    const result: DisplayMessageMeta[] = [];
+    let lastUserTimestamp: number | null = null;
+
+    for (const message of messages) {
+      if (message.role !== 'user' && message.role !== 'assistant') continue;
+      const timestamp = parseMessageTimestamp(message.timestamp);
+
+      if (message.role === 'user') {
+        if (timestamp != null) lastUserTimestamp = timestamp;
+        result.push({ message, responseLatencyMs: null });
+        continue;
+      }
+
+      const responseLatencyMs =
+        timestamp != null && lastUserTimestamp != null
+          ? Math.max(0, timestamp - lastUserTimestamp)
+          : null;
+      result.push({ message, responseLatencyMs });
+    }
+
+    return result;
+  });
   const isEmpty = $derived(
     visibleMessages.length === 0 && !streamingText && !running,
   );
@@ -241,7 +277,11 @@
   });
 
   function toDisplayMessage(m: ChatMessage): AIChatMessage {
-    return { role: m.role as 'user' | 'assistant', content: m.content ?? '' };
+    return {
+      role: m.role as 'user' | 'assistant',
+      content: m.content ?? '',
+      timestamp: m.timestamp ?? undefined,
+    };
   }
 
   function callsOf(m: ChatMessage): ToolCall[] {
@@ -649,11 +689,14 @@
     {:else}
       <ScrollArea class="min-h-0 flex-1" bind:viewportRef={scrollViewport}>
         <PageContainer variant="chat" class="space-y-4 py-6">
-          {#each visibleMessages as m}
-            {#if callsOf(m).length > 0}
-              <ChatMessageComponent message={toDisplayMessage(m)}>
+          {#each visibleMessages as item}
+            {#if callsOf(item.message).length > 0}
+              <ChatMessageComponent
+                message={toDisplayMessage(item.message)}
+                responseLatencyMs={item.responseLatencyMs}
+              >
                 {#snippet children()}
-                  {#each callsOf(m) as call}
+                  {#each callsOf(item.message) as call}
                     <ToolCallCard
                       {call}
                       result={resultsById.get(call.id) ?? null}
@@ -664,7 +707,10 @@
                 {/snippet}
               </ChatMessageComponent>
             {:else}
-              <ChatMessageComponent message={toDisplayMessage(m)} />
+              <ChatMessageComponent
+                message={toDisplayMessage(item.message)}
+                responseLatencyMs={item.responseLatencyMs}
+              />
             {/if}
           {/each}
           {#if streamingText}

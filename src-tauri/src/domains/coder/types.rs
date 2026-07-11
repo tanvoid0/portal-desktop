@@ -21,6 +21,9 @@ pub struct ChatMessage {
     /// Present on `tool` messages — the id of the call this result answers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+    /// Message creation time (UTC RFC3339) for UI timing display.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "created_at")]
+    pub timestamp: Option<String>,
 }
 
 fn serialize_content<S>(content: &Option<String>, serializer: S) -> Result<S::Ok, S::Error>
@@ -37,6 +40,7 @@ impl ChatMessage {
             content: Some(text.into()),
             tool_calls: None,
             tool_call_id: None,
+            timestamp: Some(chrono::Utc::now().to_rfc3339()),
         }
     }
     pub fn user(text: impl Into<String>) -> Self {
@@ -45,6 +49,7 @@ impl ChatMessage {
             content: Some(text.into()),
             tool_calls: None,
             tool_call_id: None,
+            timestamp: Some(chrono::Utc::now().to_rfc3339()),
         }
     }
     pub fn tool_result(call_id: impl Into<String>, text: impl Into<String>) -> Self {
@@ -53,8 +58,78 @@ impl ChatMessage {
             content: Some(text.into()),
             tool_calls: None,
             tool_call_id: Some(call_id.into()),
+            timestamp: Some(chrono::Utc::now().to_rfc3339()),
         }
     }
+}
+
+fn tool_calls_match(a: &Option<Vec<ToolCall>>, b: &Option<Vec<ToolCall>>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(a_calls), Some(b_calls)) => {
+            a_calls.len() == b_calls.len()
+                && a_calls.iter().zip(b_calls.iter()).all(|(x, y)| {
+                    x.id == y.id
+                        && x.r#type == y.r#type
+                        && x.function.name == y.function.name
+                        && x.function.arguments == y.function.arguments
+                })
+        }
+        _ => false,
+    }
+}
+
+fn messages_match(a: &ChatMessage, b: &ChatMessage) -> bool {
+    a.content == b.content
+        && a.tool_call_id == b.tool_call_id
+        && tool_calls_match(&a.tool_calls, &b.tool_calls)
+}
+
+/// Preserve known timestamps and estimate missing ones for UI display.
+pub fn with_message_timestamps(
+    messages: Vec<ChatMessage>,
+    previous: &[ChatMessage],
+    anchor_iso: Option<&str>,
+) -> Vec<ChatMessage> {
+    let anchor_ms = anchor_iso
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.timestamp_millis())
+        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
+    let gap_ms: i64 = 1500;
+    let count = messages.len() as i64;
+
+    messages
+        .into_iter()
+        .enumerate()
+        .map(|(index, mut message)| {
+            if message.timestamp.is_some() {
+                return message;
+            }
+            if let Some(prev) = previous.get(index) {
+                if prev.role == message.role && messages_match(prev, &message) {
+                    if let Some(ts) = &prev.timestamp {
+                        message.timestamp = Some(ts.clone());
+                        return message;
+                    }
+                }
+            }
+            for prev in previous {
+                if prev.role == message.role && messages_match(prev, &message) {
+                    if let Some(ts) = &prev.timestamp {
+                        message.timestamp = Some(ts.clone());
+                        return message;
+                    }
+                }
+            }
+            let estimated_ms = anchor_ms - (count - 1 - index as i64) * gap_ms;
+            message.timestamp = Some(
+                chrono::DateTime::from_timestamp_millis(estimated_ms)
+                    .unwrap_or_else(chrono::Utc::now)
+                    .to_rfc3339(),
+            );
+            message
+        })
+        .collect()
 }
 
 /// An OpenAI-format tool call emitted by the model.

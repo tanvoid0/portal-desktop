@@ -11,6 +11,7 @@ export interface ChatMessage {
   content?: string | null;
   tool_calls?: ToolCall[] | null;
   tool_call_id?: string | null;
+  timestamp?: string | null;
 }
 
 export interface CoderThread {

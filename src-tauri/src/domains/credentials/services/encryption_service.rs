@@ -51,7 +51,7 @@ impl EncryptionService {
 
     /// Decrypt an encrypted value
     pub fn decrypt(&self, request: DecryptionRequest) -> Result<String, CredentialError> {
-        let unbound_key = UnboundKey::new(&AES_256_GCM, request.key.as_bytes())
+        let unbound_key = UnboundKey::new(&AES_256_GCM, &request.key)
             .map_err(|e| CredentialError::DecryptionFailed(e.to_string()))?;
 
         let nonce_bytes = general_purpose::STANDARD
@@ -128,7 +128,7 @@ pub struct DecryptionRequest {
     pub iv: String,
     pub tag: String,
     pub algorithm: String,
-    pub key: String,
+    pub key: [u8; 32],
 }
 
 #[cfg(test)]
@@ -139,7 +139,6 @@ mod tests {
     fn encrypt_decrypt_round_trip() {
         let service = EncryptionService::new();
         let key: [u8; 32] = *b"01234567890123456789012345678901";
-        let key_str = std::str::from_utf8(&key).unwrap().to_string();
         let plaintext = "portal-desktop-secret";
 
         let encrypted = service
@@ -152,7 +151,7 @@ mod tests {
                 iv: encrypted.iv,
                 tag: encrypted.tag,
                 algorithm: encrypted.algorithm,
-                key: key_str,
+                key,
             })
             .expect("decrypt should succeed");
 
