@@ -1,9 +1,11 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::Utc;
 use reqwest::header::{ACCEPT, AUTHORIZATION};
+use reqwest::redirect::Policy;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::{json, Value};
@@ -18,6 +20,7 @@ use crate::domains::settings::services::settings_service::SettingsService;
 use crate::entities::github_connection as github_connection_entity;
 use crate::entities::github_project_link as github_project_link_entity;
 use crate::entities::project as project_entity;
+use crate::log_warn;
 use crate::process_ext::NoWindowExt;
 
 use super::types::{
@@ -32,11 +35,28 @@ use super::types::{
 const GITHUB_CONNECTION_ID: &str = "github";
 const GITHUB_CREDENTIAL_TYPE: &str = "github_token";
 const DEFAULT_DEVICE_SCOPE: &str = "repo read:user";
+const WORKFLOW_LOGS_UNAVAILABLE_MSG: &str =
+    "Logs are not available yet. They usually appear shortly after the job starts producing output.";
 
 #[derive(Clone)]
 pub struct GitHubService {
     db: Arc<DatabaseManager>,
     client: reqwest::Client,
+    logs_client: reqwest::Client,
+}
+
+struct EnsuredProject {
+    project: ProjectResponse,
+    created_project_id: Option<i32>,
+}
+
+struct LinkProjectFailure {
+    message: String,
+    created_project_id: Option<i32>,
+}
+
+struct PathClaim {
+    exact_project: Option<project_entity::Model>,
 }
 
 impl GitHubService {
@@ -45,7 +65,16 @@ impl GitHubService {
             .user_agent("portal-desktop")
             .build()
             .expect("github client");
-        Self { db, client }
+        let logs_client = reqwest::Client::builder()
+            .user_agent("portal-desktop")
+            .redirect(Policy::none())
+            .build()
+            .expect("github logs client");
+        Self {
+            db,
+            client,
+            logs_client,
+        }
     }
 
     pub async fn get_connection_status(&self) -> Result<GitHubConnectionStatus, String> {
@@ -410,24 +439,43 @@ impl GitHubService {
             ));
         }
 
+        self.assert_path_can_be_claimed(&destination, &repo, false)
+            .await?;
+
         let clone_url = repo.clone_url.clone();
         let auth_clone_url = inject_token_into_clone_url(&clone_url, &token);
-        run_git_clone(&auth_clone_url, &destination)?;
+        run_git_clone(&auth_clone_url, &destination).map_err(|e| {
+            format!("Repository clone failed before any local project was linked: {e}")
+        })?;
+
         if auth_clone_url != clone_url {
-            let _ = run_git(
-                [
-                    "-C",
-                    destination.to_string_lossy().as_ref(),
-                    "remote",
-                    "set-url",
-                    "origin",
-                    clone_url.as_str(),
-                ]
-                .as_slice(),
-            );
+            if let Err(rewrite_error) = self.restore_origin_url(&destination, &clone_url) {
+                let cleanup_error = cleanup_cloned_directory(&destination).err();
+                return Err(format_remote_rewrite_failure(
+                    &destination,
+                    &rewrite_error,
+                    cleanup_error.as_deref(),
+                ));
+            }
         }
 
-        self.link_project_path_to_repo(&destination, &repo).await
+        match self.link_project_path_to_repo(&destination, &repo).await {
+            Ok(result) => Ok(result),
+            Err(error) => {
+                let project_cleanup_error = if let Some(project_id) = error.created_project_id {
+                    self.delete_project_if_present(project_id).await.err()
+                } else {
+                    None
+                };
+                let path_cleanup_error = cleanup_cloned_directory(&destination).err();
+                Err(format_clone_link_failure(
+                    &destination,
+                    &error.message,
+                    project_cleanup_error.as_deref(),
+                    path_cleanup_error.as_deref(),
+                ))
+            }
+        }
     }
 
     pub async fn link_existing_repository(
@@ -456,7 +504,9 @@ impl GitHubService {
         })?;
         let repo = self.get_repository(&owner, &repo_name).await?;
 
-        self.link_project_path_to_repo(&path, &repo).await
+        self.link_project_path_to_repo(&path, &repo)
+            .await
+            .map_err(|error| error.message)
     }
 
     pub async fn get_project_link(
@@ -566,7 +616,7 @@ impl GitHubService {
     ) -> Result<String, String> {
         let token = self.connection_token().await?;
         let response = self
-            .client
+            .logs_client
             .get(format!(
                 "https://api.github.com/repos/{owner}/{repo}/actions/jobs/{job_id}/logs"
             ))
@@ -577,28 +627,17 @@ impl GitHubService {
             .map_err(|e| format!("GitHub API request failed: {e}"))?;
 
         let status = response.status();
+        if status.as_u16() == 404 {
+            return Ok(WORKFLOW_LOGS_UNAVAILABLE_MSG.to_string());
+        }
+
         if status.is_redirection() {
             let log_url = response
                 .headers()
                 .get("location")
                 .and_then(|value| value.to_str().ok())
                 .ok_or_else(|| "GitHub job logs redirect missing location header".to_string())?;
-            let log_response = self
-                .client
-                .get(log_url)
-                .send()
-                .await
-                .map_err(|e| format!("Failed to fetch GitHub job logs: {e}"))?;
-            if !log_response.status().is_success() {
-                return Err(format!(
-                    "GitHub job logs request failed: {}",
-                    log_response.status()
-                ));
-            }
-            return log_response
-                .text()
-                .await
-                .map_err(|e| format!("Failed to read GitHub job logs: {e}"));
+            return self.fetch_workflow_log_blob(log_url).await;
         }
 
         if !status.is_success() {
@@ -610,6 +649,34 @@ impl GitHubService {
         }
 
         response
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read GitHub job logs: {e}"))
+    }
+
+    async fn fetch_workflow_log_blob(&self, log_url: &str) -> Result<String, String> {
+        let log_response = self
+            .client
+            .get(log_url)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch GitHub job logs: {e}"))?;
+
+        let status = log_response.status();
+        if status.as_u16() == 404 {
+            return Ok(WORKFLOW_LOGS_UNAVAILABLE_MSG.to_string());
+        }
+        if status.as_u16() == 403 {
+            return Ok(
+                "Log access expired or is temporarily unavailable. Refresh to fetch a new link."
+                    .to_string(),
+            );
+        }
+        if !status.is_success() {
+            return Err(format!("GitHub job logs request failed: {status}"));
+        }
+
+        log_response
             .text()
             .await
             .map_err(|e| format!("Failed to read GitHub job logs: {e}"))
@@ -648,11 +715,18 @@ impl GitHubService {
         &self,
         path: &Path,
         repo: &GitHubRepository,
-    ) -> Result<GitHubProjectLinkResult, String> {
-        let project = self.ensure_project_for_path(path, repo).await?;
-        let link = self.upsert_project_link(project.id, repo).await?;
+    ) -> Result<GitHubProjectLinkResult, LinkProjectFailure> {
+        let ensured = self.ensure_project_for_path(path, repo).await?;
+        let link = self
+            .upsert_project_link(ensured.project.id, repo)
+            .await
+            .map_err(|message| LinkProjectFailure {
+                message,
+                created_project_id: ensured.created_project_id,
+            })?;
+
         Ok(GitHubProjectLinkResult {
-            project,
+            project: ensured.project,
             link,
             local_path: path.to_string_lossy().to_string(),
         })
@@ -662,21 +736,63 @@ impl GitHubService {
         &self,
         path: &Path,
         repo: &GitHubRepository,
-    ) -> Result<ProjectResponse, String> {
-        let conn = self.db.get_connection();
-        if let Some(model) = project_entity::Entity::find()
-            .filter(project_entity::Column::Path.eq(path.to_string_lossy().to_string()))
-            .one(conn)
+    ) -> Result<EnsuredProject, LinkProjectFailure> {
+        let claim = self
+            .assert_path_can_be_claimed(path, repo, true)
             .await
-            .map_err(|e| format!("Failed to query project by path: {e}"))?
-        {
-            let service = ProjectService::new(&self.db);
-            if let Some(refreshed) = service.refresh_project_metadata(model.id).await? {
-                return Ok(refreshed);
+            .map_err(|message| LinkProjectFailure {
+                message,
+                created_project_id: None,
+            })?;
+        let service = ProjectService::new(&self.db);
+
+        if let Some(model) = claim.exact_project {
+            if let Ok(Some(existing_link)) = self.get_project_link(model.id).await {
+                if existing_link.repo_full_name != repo.full_name {
+                    return Err(LinkProjectFailure {
+                        message: format!(
+                            "Project at {} is already linked to {}, not {}.",
+                            path.display(),
+                            existing_link.repo_full_name,
+                            repo.full_name
+                        ),
+                        created_project_id: None,
+                    });
+                }
             }
+
+            let existing = service
+                .get_project(model.id)
+                .await
+                .map_err(|error| LinkProjectFailure {
+                    message: error.to_string(),
+                    created_project_id: None,
+                })?
+                .ok_or_else(|| LinkProjectFailure {
+                    message: format!("Project {} no longer exists.", model.id),
+                    created_project_id: None,
+                })?;
+
+            let project = match service.refresh_project_metadata(model.id).await {
+                Ok(Some(refreshed)) => refreshed,
+                Ok(None) => existing,
+                Err(refresh_error) => {
+                    log_warn!(
+                        "GitHub",
+                        "Failed to refresh metadata for existing project {}: {}",
+                        model.id,
+                        refresh_error
+                    );
+                    existing
+                }
+            };
+
+            return Ok(EnsuredProject {
+                project,
+                created_project_id: None,
+            });
         }
 
-        let service = ProjectService::new(&self.db);
         let created = service
             .create_project(
                 repo.name.clone(),
@@ -692,12 +808,113 @@ impl GitHubService {
                 None,
                 None,
             )
-            .await?;
-        if let Some(refreshed) = service.refresh_project_metadata(created.id).await? {
-            Ok(refreshed)
-        } else {
-            Ok(created)
+            .await
+            .map_err(|message| LinkProjectFailure {
+                message,
+                created_project_id: None,
+            })?;
+        let created_project_id = Some(created.id);
+
+        let project = match service.refresh_project_metadata(created.id).await {
+            Ok(Some(refreshed)) => refreshed,
+            Ok(None) => created,
+            Err(refresh_error) => {
+                log_warn!(
+                    "GitHub",
+                    "Failed to refresh metadata for new project {}: {}",
+                    created.id,
+                    refresh_error
+                );
+                created
+            }
+        };
+
+        Ok(EnsuredProject {
+            project,
+            created_project_id,
+        })
+    }
+
+    async fn assert_path_can_be_claimed(
+        &self,
+        path: &Path,
+        repo: &GitHubRepository,
+        require_existing_path: bool,
+    ) -> Result<PathClaim, String> {
+        let requested = normalize_path_for_comparison(path, require_existing_path)?;
+        let conn = self.db.get_connection();
+        let projects = project_entity::Entity::find()
+            .all(conn)
+            .await
+            .map_err(|e| format!("Failed to query project ownership for path checks: {e}"))?;
+
+        let mut exact_project = None;
+        for project in projects {
+            let project_path = PathBuf::from(&project.path);
+            let normalized_project =
+                normalize_path_for_comparison(&project_path, project_path.exists())?;
+
+            if requested == normalized_project {
+                exact_project = Some(project);
+                continue;
+            }
+
+            if paths_overlap(&requested, &normalized_project) {
+                return Err(format!(
+                    "Path conflict: {} overlaps with existing project path {}. Link or clone into a separate directory.",
+                    path.display(),
+                    project.path
+                ));
+            }
         }
+
+        if let Some(project) = &exact_project {
+            if let Some(existing_link) = self.get_project_link(project.id).await? {
+                if existing_link.repo_full_name != repo.full_name {
+                    return Err(format!(
+                        "Path {} is already owned by project {} and linked to {}.",
+                        path.display(),
+                        project.id,
+                        existing_link.repo_full_name
+                    ));
+                }
+            }
+        }
+
+        Ok(PathClaim { exact_project })
+    }
+
+    async fn delete_project_if_present(&self, project_id: i32) -> Result<(), String> {
+        let service = ProjectService::new(&self.db);
+        let deleted = service.delete_project(project_id).await?;
+        if deleted {
+            Ok(())
+        } else {
+            Err(format!(
+                "Temporary project {project_id} could not be deleted."
+            ))
+        }
+    }
+
+    fn restore_origin_url(&self, destination: &Path, clone_url: &str) -> Result<(), String> {
+        run_git(
+            [
+                "-C",
+                destination.to_string_lossy().as_ref(),
+                "remote",
+                "set-url",
+                "origin",
+                clone_url,
+            ]
+            .as_slice(),
+        )
+        .map_err(|e| {
+            format!(
+                "Clone completed at {}, but restoring the sanitized origin URL failed: {}",
+                destination.display(),
+                e
+            )
+        })
     }
 
     async fn upsert_project_link(
@@ -1293,6 +1510,108 @@ fn inject_token_into_clone_url(clone_url: &str, token: &str) -> String {
     clone_url.to_string()
 }
 
+fn normalize_path_for_comparison(
+    path: &Path,
+    require_existing_path: bool,
+) -> Result<PathBuf, String> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|e| format!("Failed to resolve current directory: {e}"))?
+            .join(path)
+    };
+
+    if require_existing_path || absolute.exists() {
+        return fs::canonicalize(&absolute).map_err(|e| {
+            format!(
+                "Failed to resolve project path {} for conflict checks: {}",
+                path.display(),
+                e
+            )
+        });
+    }
+
+    Ok(normalize_components(&absolute))
+}
+
+fn normalize_components(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    normalized
+}
+
+fn paths_overlap(left: &Path, right: &Path) -> bool {
+    left.starts_with(right) || right.starts_with(left)
+}
+
+fn cleanup_cloned_directory(path: &Path) -> Result<(), String> {
+    fs::remove_dir_all(path).map_err(|e| {
+        format!(
+            "Failed to remove cloned directory {}: {}",
+            path.display(),
+            e
+        )
+    })
+}
+
+fn format_remote_rewrite_failure(
+    path: &Path,
+    rewrite_error: &str,
+    cleanup_error: Option<&str>,
+) -> String {
+    if let Some(cleanup_error) = cleanup_error {
+        format!(
+            "{rewrite_error} Portal also failed to remove the cloned directory at {}. Manual cleanup is required because the repository may still contain the temporary authenticated origin URL: {}",
+            path.display(),
+            cleanup_error
+        )
+    } else {
+        format!(
+            "{rewrite_error} Portal removed the cloned directory at {} so the operation stays user-safe.",
+            path.display()
+        )
+    }
+}
+
+fn format_clone_link_failure(
+    path: &Path,
+    link_error: &str,
+    project_cleanup_error: Option<&str>,
+    path_cleanup_error: Option<&str>,
+) -> String {
+    let mut message = format!(
+        "Repository was cloned to {}, but linking it in Portal failed: {}.",
+        path.display(),
+        link_error
+    );
+
+    match (project_cleanup_error, path_cleanup_error) {
+        (None, None) => {
+            message.push_str(" Portal removed the cloned directory and rolled back any temporary project record.");
+        }
+        (project_error, path_error) => {
+            message.push_str(" Automatic rollback was only partially successful.");
+            if let Some(project_error) = project_error {
+                message.push_str(&format!(" Project cleanup error: {}.", project_error));
+            }
+            if let Some(path_error) = path_error {
+                message.push_str(&format!(" Directory cleanup error: {}.", path_error));
+            }
+        }
+    }
+
+    message
+}
+
 fn parse_github_remote(remote: &str) -> Option<(String, String)> {
     let trimmed = remote.trim().trim_end_matches(".git");
     if let Some(path) = trimmed.strip_prefix("https://github.com/") {
@@ -1355,4 +1674,60 @@ fn run_git_capture(args: &[&str]) -> Result<String, String> {
         "git command failed: {}",
         String::from_utf8_lossy(&output.stderr).trim()
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        format_clone_link_failure, inject_token_into_clone_url, parse_github_remote, paths_overlap,
+    };
+    use std::path::Path;
+
+    #[test]
+    fn injects_token_only_for_https_github_urls() {
+        assert_eq!(
+            inject_token_into_clone_url("https://github.com/acme/repo.git", "abc"),
+            "https://x-access-token:abc@github.com/acme/repo.git"
+        );
+        assert_eq!(
+            inject_token_into_clone_url("git@github.com:acme/repo.git", "abc"),
+            "git@github.com:acme/repo.git"
+        );
+    }
+
+    #[test]
+    fn parses_https_and_ssh_remotes() {
+        assert_eq!(
+            parse_github_remote("https://github.com/acme/repo.git"),
+            Some(("acme".to_string(), "repo".to_string()))
+        );
+        assert_eq!(
+            parse_github_remote("git@github.com:acme/repo.git"),
+            Some(("acme".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn detects_nested_path_conflicts() {
+        assert!(paths_overlap(
+            Path::new("D:/code/projects/repo"),
+            Path::new("D:/code/projects")
+        ));
+        assert!(!paths_overlap(
+            Path::new("D:/code/projects/repo-a"),
+            Path::new("D:/code/projects/repo-b")
+        ));
+    }
+
+    #[test]
+    fn clone_link_failure_mentions_rollback_status() {
+        let message = format_clone_link_failure(
+            Path::new("D:/tmp/repo"),
+            "db write failed",
+            None,
+            Some("permission denied"),
+        );
+        assert!(message.contains("Repository was cloned"));
+        assert!(message.contains("Directory cleanup error"));
+    }
 }
