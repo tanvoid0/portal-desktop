@@ -28,6 +28,10 @@ export interface ProcessedSDKConfig {
     supports_version_switching: boolean;
     install_command: string | null;
     website: string | null;
+    install_available: boolean;
+    install_unavailable_reason: string | null;
+    uninstall_available: boolean;
+    uninstall_unavailable_reason: string | null;
   }>;
   package_managers: Array<{
     id: string;

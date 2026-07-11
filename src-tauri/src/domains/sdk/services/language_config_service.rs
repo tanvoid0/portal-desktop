@@ -5,6 +5,7 @@
  * Frontend receives ready-to-display data without needing to know configuration details.
  */
 use crate::domains::sdk::configs::{get_all_sdk_configs, get_sdk_config, SDKCategory, SDKConfig};
+use crate::domains::sdk::commands::manager_commands::get_sdk_manager_workflow_support;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,6 +69,10 @@ pub struct ProcessedSDKManager {
     pub supports_version_switching: bool,
     pub install_command: Option<String>,
     pub website: Option<String>,
+    pub install_available: bool,
+    pub install_unavailable_reason: Option<String>,
+    pub uninstall_available: bool,
+    pub uninstall_unavailable_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,6 +153,7 @@ impl SDKConfigService {
                 // Use manager ID as key to deduplicate
                 if !managers_map.contains_key(&m.id) {
                     let (installed, version) = Self::check_manager_status(&m.binary).await;
+                    let workflow_support = get_sdk_manager_workflow_support(&m.id, installed);
                     managers_map.insert(
                         m.id.clone(),
                         ProcessedSDKManager {
@@ -160,6 +166,11 @@ impl SDKConfigService {
                             supports_version_switching: m.supports_version_switching,
                             install_command: m.install_command,
                             website: m.website,
+                            install_available: workflow_support.install_available,
+                            install_unavailable_reason: workflow_support.install_unavailable_reason,
+                            uninstall_available: workflow_support.uninstall_available,
+                            uninstall_unavailable_reason: workflow_support
+                                .uninstall_unavailable_reason,
                         },
                     );
                 }
@@ -220,6 +231,7 @@ impl SDKConfigService {
         let mut sdk_managers = Vec::new();
         for m in config.sdk_managers {
             let (installed, version) = Self::check_manager_status(&m.binary).await;
+            let workflow_support = get_sdk_manager_workflow_support(&m.id, installed);
             sdk_managers.push(ProcessedSDKManager {
                 id: m.id,
                 name: m.name,
@@ -230,6 +242,10 @@ impl SDKConfigService {
                 supports_version_switching: m.supports_version_switching,
                 install_command: m.install_command,
                 website: m.website,
+                install_available: workflow_support.install_available,
+                install_unavailable_reason: workflow_support.install_unavailable_reason,
+                uninstall_available: workflow_support.uninstall_available,
+                uninstall_unavailable_reason: workflow_support.uninstall_unavailable_reason,
             });
         }
 

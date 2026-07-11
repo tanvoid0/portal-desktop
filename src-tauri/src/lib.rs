@@ -387,8 +387,10 @@ pub fn run() {
             domains::sdk::commands::manager_commands::get_manager_available_versions,
             domains::sdk::commands::manager_commands::get_manager_current_version,
             domains::sdk::commands::manager_commands::install_version_via_manager,
+            domains::sdk::commands::manager_commands::install_sdk_manager,
             domains::sdk::commands::manager_commands::switch_version_via_manager,
             domains::sdk::commands::manager_commands::uninstall_version_via_manager,
+            domains::sdk::commands::manager_commands::uninstall_sdk_manager,
             domains::sdk::commands::manager_commands::is_manager_version_installed,
             // Package manager commands
             domains::sdk::commands::package_manager_commands::get_available_package_managers,

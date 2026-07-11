@@ -4,7 +4,6 @@
 -->
 
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
   import { goto } from "$app/navigation";
   import {
     Card,
@@ -21,26 +20,23 @@
     ExternalLink,
     RefreshCw,
     ArrowRight,
+    Loader2,
   } from "@lucide/svelte";
   import Devicon from "$lib/components/ui/devicon.svelte";
   import { PageLoading, PageError, PageEmpty } from "$lib/components/shell";
-
-  interface SDKManager {
-    id: string;
-    name: string;
-    display_name: string;
-    installed: boolean;
-    version: string | null;
-    supports_installation: boolean;
-    supports_version_switching: boolean;
-    install_command: string | null;
-    website: string | null;
-  }
+  import { toast } from "$lib/utils/toast";
+  import { confirmAction } from "$lib/utils/confirm";
+  import {
+    listSDKManagers,
+    installSDKManager,
+    uninstallSDKManager,
+    type SDKManagerInfo,
+  } from "$lib/domains/sdk/services/sdkManagerService";
 
   // State
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let managers = $state<SDKManager[]>([]);
+  let managers = $state<SDKManagerInfo[]>([]);
 
   // Load managers on mount
   $effect(() => {
@@ -52,9 +48,7 @@
     error = null;
 
     try {
-      // Load all SDK managers from the new config system
-      const allManagers = await invoke<SDKManager[]>("get_all_sdk_managers");
-      managers = allManagers;
+      managers = await listSDKManagers();
     } catch (err) {
       error =
         err instanceof Error ? err.message : "Failed to load SDK managers";
@@ -65,11 +59,17 @@
   }
 
   let installingManager = $state<string | null>(null);
+  let uninstallingManager = $state<string | null>(null);
   let installError = $state<Record<string, string>>({});
 
-  async function installManager(manager: SDKManager) {
-    if (!manager.install_command) {
-      error = "No installation command available for this manager";
+  async function installManager(manager: SDKManagerInfo) {
+    if (!manager.install_available) {
+      installError[manager.id] =
+        manager.install_unavailable_reason ||
+        "Automatic installation is not available for this manager.";
+      toast.error("Install unavailable", {
+        description: installError[manager.id],
+      });
       return;
     }
 
@@ -77,33 +77,56 @@
     installError[manager.id] = "";
 
     try {
-      // TODO: Execute installation command properly
-      // For now, just show that we would execute it
-      console.log("Would install:", manager.install_command);
-
-      // Simulate installation delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Reload data to get updated status
+      const result = await installSDKManager(manager.id);
+      toast.success("Manager installed", {
+        description: result,
+      });
       await loadManagers();
     } catch (err) {
       installError[manager.id] =
         err instanceof Error ? err.message : "Installation failed";
+      toast.error("Installation failed", {
+        description: installError[manager.id],
+      });
     } finally {
       installingManager = null;
     }
   }
 
-  async function uninstallManager(manager: SDKManager) {
-    try {
-      // TODO: Implement uninstallation logic - requires manager-specific uninstall commands
-      console.log("Would uninstall:", manager.id);
+  async function uninstallManager(manager: SDKManagerInfo) {
+    if (!manager.uninstall_available) {
+      installError[manager.id] =
+        manager.uninstall_unavailable_reason ||
+        "Automatic uninstall is not available for this manager.";
+      toast.error("Uninstall unavailable", {
+        description: installError[manager.id],
+      });
+      return;
+    }
 
-      // Reload data to get updated status
+    const confirmed = await confirmAction(
+      `Are you sure you want to uninstall ${manager.display_name}?`,
+      "Uninstall SDK manager",
+    );
+    if (!confirmed) return;
+
+    uninstallingManager = manager.id;
+    installError[manager.id] = "";
+
+    try {
+      const result = await uninstallSDKManager(manager.id);
+      toast.success("Manager uninstalled", {
+        description: result,
+      });
       await loadManagers();
     } catch (err) {
-      error =
+      installError[manager.id] =
         err instanceof Error ? err.message : "Failed to uninstall manager";
+      toast.error("Uninstall failed", {
+        description: installError[manager.id],
+      });
+    } finally {
+      uninstallingManager = null;
     }
   }
 
@@ -233,19 +256,31 @@
                   variant="outline"
                   size="sm"
                   onclick={() => uninstallManager(manager)}
+                  disabled={
+                    uninstallingManager === manager.id ||
+                    installingManager === manager.id ||
+                    !manager.uninstall_available
+                  }
                 >
-                  <XCircle class="mr-1 h-4 w-4" />
-                  Uninstall
+                  {#if uninstallingManager === manager.id}
+                    <Loader2 class="mr-1 h-4 w-4 animate-spin" />
+                    Uninstalling...
+                  {:else}
+                    <XCircle class="mr-1 h-4 w-4" />
+                    Uninstall
+                  {/if}
                 </Button>
               {:else if manager.supports_installation && manager.install_command}
                 <Button
                   variant="outline"
                   size="sm"
                   onclick={() => installManager(manager)}
-                  disabled={installingManager === manager.id}
+                  disabled={
+                    installingManager === manager.id || !manager.install_available
+                  }
                 >
                   {#if installingManager === manager.id}
-                    <Download class="mr-1 h-4 w-4 animate-pulse" />
+                    <Loader2 class="mr-1 h-4 w-4 animate-spin" />
                     Installing...
                   {:else}
                     <Download class="mr-1 h-4 w-4" />
@@ -277,6 +312,22 @@
                 >
                   {manager.install_command}
                 </code>
+              </div>
+            {/if}
+
+            {#if !manager.installed && manager.install_unavailable_reason}
+              <div class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <p class="text-xs text-amber-700">
+                  {manager.install_unavailable_reason}
+                </p>
+              </div>
+            {/if}
+
+            {#if manager.installed && manager.uninstall_unavailable_reason}
+              <div class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <p class="text-xs text-amber-700">
+                  {manager.uninstall_unavailable_reason}
+                </p>
               </div>
             {/if}
 

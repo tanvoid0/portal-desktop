@@ -5,7 +5,6 @@
 
 <script lang="ts">
   import { page } from "$app/stores";
-  import { invokeClient } from "$lib/utils/invokeClient";
   import {
     sdkConfigService,
     type ProcessedSDKConfig,
@@ -23,10 +22,19 @@
     XCircle,
     Download,
     ExternalLink,
+    Loader2,
+    Trash2,
   } from "@lucide/svelte";
   import Devicon from "$lib/components/ui/devicon.svelte";
   import { goto } from "$app/navigation";
   import { PageLoading, PageError } from "$lib/components/shell";
+  import { toast } from "$lib/utils/toast";
+  import { confirmAction } from "$lib/utils/confirm";
+  import {
+    installSDKManager,
+    uninstallSDKManager,
+    type SDKManagerInfo,
+  } from "$lib/domains/sdk/services/sdkManagerService";
 
   // Get SDK ID from URL
   let sdkId = $derived($page.params.sdk);
@@ -35,6 +43,7 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
   let sdkConfig = $state<ProcessedSDKConfig | null>(null);
+  let managerAction = $state<"install" | "uninstall" | null>(null);
 
   // Initialize data
   $effect(() => {
@@ -64,6 +73,74 @@
       console.error("Failed to load SDK config:", err);
     } finally {
       loading = false;
+    }
+  }
+
+  function getPrimaryManager(): SDKManagerInfo | null {
+    return (sdkConfig?.sdk_managers[0] as SDKManagerInfo | undefined) ?? null;
+  }
+
+  async function handleInstallManager(manager: SDKManagerInfo) {
+    if (!manager.install_available) {
+      toast.error("Install unavailable", {
+        description:
+          manager.install_unavailable_reason ||
+          "Automatic installation is not available for this manager.",
+      });
+      return;
+    }
+
+    managerAction = "install";
+    try {
+      const result = await installSDKManager(manager.id);
+      toast.success("Manager installed", {
+        description: result,
+      });
+      await loadData();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to install manager";
+      error = message;
+      toast.error("Installation failed", {
+        description: message,
+      });
+    } finally {
+      managerAction = null;
+    }
+  }
+
+  async function handleUninstallManager(manager: SDKManagerInfo) {
+    if (!manager.uninstall_available) {
+      toast.error("Uninstall unavailable", {
+        description:
+          manager.uninstall_unavailable_reason ||
+          "Automatic uninstall is not available for this manager.",
+      });
+      return;
+    }
+
+    const confirmed = await confirmAction(
+      `Are you sure you want to uninstall ${manager.display_name}?`,
+      "Uninstall SDK manager",
+    );
+    if (!confirmed) return;
+
+    managerAction = "uninstall";
+    try {
+      const result = await uninstallSDKManager(manager.id);
+      toast.success("Manager uninstalled", {
+        description: result,
+      });
+      await loadData();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to uninstall manager";
+      error = message;
+      toast.error("Uninstall failed", {
+        description: message,
+      });
+    } finally {
+      managerAction = null;
     }
   }
 </script>
@@ -283,18 +360,36 @@
         <CardHeader>
           <CardTitle>Actions</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div class="flex gap-4">
-            {#if sdkConfig.sdk_managers.length > 0}
-              {@const manager = sdkConfig.sdk_managers[0]}
+        <CardContent class="space-y-3">
+          {#if getPrimaryManager()}
+            {@const manager = getPrimaryManager()!}
+            <div class="flex gap-4">
               {#if !manager.installed && manager.install_command}
                 <Button
-                  onclick={() => {
-                    // TODO: Implement install manager
-                  }}
+                  onclick={() => handleInstallManager(manager)}
+                  disabled={managerAction === "install" || !manager.install_available}
                 >
-                  <Download class="mr-2 h-4 w-4" />
-                  Install Manager
+                  {#if managerAction === "install"}
+                    <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+                    Installing...
+                  {:else}
+                    <Download class="mr-2 h-4 w-4" />
+                    Install Manager
+                  {/if}
+                </Button>
+              {:else if manager.installed}
+                <Button
+                  variant="outline"
+                  onclick={() => handleUninstallManager(manager)}
+                  disabled={managerAction === "uninstall" || !manager.uninstall_available}
+                >
+                  {#if managerAction === "uninstall"}
+                    <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+                    Uninstalling...
+                  {:else}
+                    <Trash2 class="mr-2 h-4 w-4" />
+                    Uninstall Manager
+                  {/if}
                 </Button>
               {/if}
               {#if manager.website}
@@ -310,8 +405,18 @@
                   Visit Website
                 </Button>
               {/if}
+            </div>
+            {#if !manager.installed && manager.install_unavailable_reason}
+              <p class="text-sm text-amber-700">
+                {manager.install_unavailable_reason}
+              </p>
             {/if}
-          </div>
+            {#if manager.installed && manager.uninstall_unavailable_reason}
+              <p class="text-sm text-amber-700">
+                {manager.uninstall_unavailable_reason}
+              </p>
+            {/if}
+          {/if}
         </CardContent>
       </Card>
     </div>
