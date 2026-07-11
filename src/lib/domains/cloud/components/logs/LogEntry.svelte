@@ -49,7 +49,7 @@
 			message: data.message || data.msg || data.text || log.message,
 			logger: data.logger || data.component || data.service,
 			requestId: data.requestId || data.request_id || data.trace_id,
-			traceId: data['logging.googleapis.com/trace'] || data.requestId || data.request_id || data.trace_id,
+			traceId: data.traceId || data.trace_id || data.traceID || data.trace,
 			error: data.error || data.err || data.exception,
 			stackTrace: data.stackTrace || data.stack_trace || data.stack,
 			method: data.method || data.httpMethod,
