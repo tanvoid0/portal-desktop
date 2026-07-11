@@ -13,6 +13,12 @@ export const queryKeys = {
     repository: (owner: string, repo: string) =>
       ["github", "repository", owner, repo] as const,
     issues: (scope: string) => ["github", "issues", scope] as const,
+    workflowRuns: (owner: string, repo: string, scope: string) =>
+      ["github", "workflow-runs", owner, repo, scope] as const,
+    workflowRun: (owner: string, repo: string, runId: number) =>
+      ["github", "workflow-run", owner, repo, runId] as const,
+    workflowJobLogs: (owner: string, repo: string, jobId: number) =>
+      ["github", "workflow-job-logs", owner, repo, jobId] as const,
     projectLink: (projectId: number | string) =>
       ["github", "project-link", projectId] as const,
   },

@@ -8,9 +8,9 @@ use super::service::GitHubService;
 use super::types::{
     GitHubCloneRepositoryRequest, GitHubConnectionStatus, GitHubCreateIssueRequest,
     GitHubDeviceFlowPollResult, GitHubDeviceFlowStart, GitHubIssue,
-    GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest, GitHubLocalRepositoryDetection,
-    GitHubProjectLink, GitHubProjectLinkResult, GitHubRepoProjects, GitHubRepository,
-    GitHubUpdateIssueRequest,
+    GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest, GitHubListWorkflowRunsRequest,
+    GitHubLocalRepositoryDetection, GitHubProjectLink, GitHubProjectLinkResult, GitHubRepoProjects,
+    GitHubRepository, GitHubUpdateIssueRequest, GitHubWorkflowRun, GitHubWorkflowRunDetail,
 };
 
 #[tauri::command]
@@ -160,5 +160,39 @@ pub async fn github_detect_local_repository(
 ) -> Result<GitHubLocalRepositoryDetection, String> {
     GitHubService::new(db.inner().clone())
         .detect_local_repository(&path)
+        .await
+}
+
+#[tauri::command]
+pub async fn github_list_workflow_runs(
+    request: GitHubListWorkflowRunsRequest,
+    db: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<GitHubWorkflowRun>, String> {
+    GitHubService::new(db.inner().clone())
+        .list_workflow_runs(request)
+        .await
+}
+
+#[tauri::command]
+pub async fn github_get_workflow_run(
+    owner: String,
+    repo: String,
+    run_id: i64,
+    db: State<'_, Arc<DatabaseManager>>,
+) -> Result<GitHubWorkflowRunDetail, String> {
+    GitHubService::new(db.inner().clone())
+        .get_workflow_run(&owner, &repo, run_id)
+        .await
+}
+
+#[tauri::command]
+pub async fn github_get_workflow_job_logs(
+    owner: String,
+    repo: String,
+    job_id: i64,
+    db: State<'_, Arc<DatabaseManager>>,
+) -> Result<String, String> {
+    GitHubService::new(db.inner().clone())
+        .get_workflow_job_logs(&owner, &repo, job_id)
         .await
 }

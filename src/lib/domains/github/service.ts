@@ -14,12 +14,15 @@ import type {
   GitHubIssue,
   GitHubLinkExistingRepositoryRequest,
   GitHubListIssuesRequest,
+  GitHubListWorkflowRunsRequest,
   GitHubLocalRepositoryDetection,
   GitHubProjectLink,
   GitHubProjectLinkResult,
   GitHubRepoProjects,
   GitHubRepository,
   GitHubUpdateIssueRequest,
+  GitHubWorkflowRun,
+  GitHubWorkflowRunDetail,
 } from "./types";
 
 const log = logger.createScoped("GitHubService");
@@ -239,6 +242,38 @@ class GitHubService {
       ...raw,
       project: normalizeProject(raw.project),
     };
+  }
+
+  async listWorkflowRuns(
+    request: GitHubListWorkflowRunsRequest,
+  ): Promise<GitHubWorkflowRun[]> {
+    return invokeClient.post<GitHubWorkflowRun[]>("github_list_workflow_runs", {
+      request,
+    });
+  }
+
+  async getWorkflowRun(
+    owner: string,
+    repo: string,
+    runId: number,
+  ): Promise<GitHubWorkflowRunDetail> {
+    return invokeClient.post<GitHubWorkflowRunDetail>("github_get_workflow_run", {
+      owner,
+      repo,
+      runId,
+    });
+  }
+
+  async getWorkflowJobLogs(
+    owner: string,
+    repo: string,
+    jobId: number,
+  ): Promise<string> {
+    return invokeClient.post<string>("github_get_workflow_job_logs", {
+      owner,
+      repo,
+      jobId,
+    });
   }
 
   async invalidateGitHubCaches(): Promise<void> {

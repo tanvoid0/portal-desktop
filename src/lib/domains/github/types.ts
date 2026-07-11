@@ -148,3 +148,55 @@ export interface GitHubProjectLinkResult {
   link: GitHubProjectLink;
   localPath: string;
 }
+
+export interface GitHubWorkflowRun {
+  id: number;
+  name: string;
+  workflowId: number;
+  runNumber: number;
+  status: string;
+  conclusion?: string | null;
+  event: string;
+  headBranch?: string;
+  headSha: string;
+  displayTitle?: string;
+  htmlUrl: string;
+  createdAt?: string;
+  updatedAt?: string;
+  runStartedAt?: string;
+}
+
+export interface GitHubWorkflowJobStep {
+  name: string;
+  status: string;
+  conclusion?: string | null;
+  number: number;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface GitHubWorkflowJob {
+  id: number;
+  runId: number;
+  name: string;
+  status: string;
+  conclusion?: string | null;
+  htmlUrl: string;
+  startedAt?: string;
+  completedAt?: string;
+  steps: GitHubWorkflowJobStep[];
+}
+
+export interface GitHubWorkflowRunDetail {
+  run: GitHubWorkflowRun;
+  jobs: GitHubWorkflowJob[];
+}
+
+export interface GitHubListWorkflowRunsRequest {
+  owner: string;
+  repo: string;
+  branch?: string;
+  status?: string;
+  page?: number;
+  perPage?: number;
+}

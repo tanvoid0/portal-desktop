@@ -177,3 +177,65 @@ pub struct GitHubProjectLinkResult {
     pub link: GitHubProjectLink,
     pub local_path: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubWorkflowRun {
+    pub id: i64,
+    pub name: String,
+    pub workflow_id: i64,
+    pub run_number: i64,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub event: String,
+    pub head_branch: Option<String>,
+    pub head_sha: String,
+    pub display_title: Option<String>,
+    pub html_url: String,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub run_started_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubWorkflowJobStep {
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub number: i64,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubWorkflowJob {
+    pub id: i64,
+    pub run_id: i64,
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub html_url: String,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+    pub steps: Vec<GitHubWorkflowJobStep>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubWorkflowRunDetail {
+    pub run: GitHubWorkflowRun,
+    pub jobs: Vec<GitHubWorkflowJob>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubListWorkflowRunsRequest {
+    pub owner: String,
+    pub repo: String,
+    pub branch: Option<String>,
+    pub status: Option<String>,
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+}

@@ -331,6 +331,9 @@ pub fn run() {
             domains::github::commands::github_link_existing_repository,
             domains::github::commands::github_get_project_link,
             domains::github::commands::github_detect_local_repository,
+            domains::github::commands::github_list_workflow_runs,
+            domains::github::commands::github_get_workflow_run,
+            domains::github::commands::github_get_workflow_job_logs,
             // Credential commands
             domains::credentials::commands::create_credential,
             domains::credentials::commands::get_credentials,

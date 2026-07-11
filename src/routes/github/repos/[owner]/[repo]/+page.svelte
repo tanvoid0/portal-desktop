@@ -15,9 +15,10 @@
     createGitHubStatusQuery,
     githubService,
     GitHubConnectPrompt,
+    GitHubWorkflowRunsPanel,
   } from "$lib/domains/github";
   import { toast } from "$lib/utils/toast";
-  import { ExternalLink, FolderGit2, Link2, Bug, GitPullRequest, GitFork } from "@lucide/svelte";
+  import { ExternalLink, FolderGit2, Link2, Bug, GitPullRequest, GitFork, Workflow } from "@lucide/svelte";
 
   const owner = $derived($page.params.owner);
   const repo = $derived($page.params.repo);
@@ -221,102 +222,118 @@
         <CardTitle>Activity</CardTitle>
       </CardHeader>
       <CardContent>
-        {#if repoIssuesQuery.isPending}
-          <PageLoading message="Loading issues..." />
-        {:else if repoIssuesQuery.isError}
-          <PageError
-            title="Failed to load issues"
-            message={repoIssuesQuery.error instanceof Error
-              ? repoIssuesQuery.error.message
-              : "Unable to load issues"}
-            onRetry={() => repoIssuesQuery.refetch()}
-          />
-        {:else}
-          <Tabs value="issues" class="w-full">
-            <TabsList>
-              <TabsTrigger value="issues">
-                <Bug class="mr-1 h-4 w-4" />
-                Issues ({openIssues.length})
-              </TabsTrigger>
-              <TabsTrigger value="pulls">
-                <GitPullRequest class="mr-1 h-4 w-4" />
-                Pull Requests ({openPullRequests.length})
-              </TabsTrigger>
-            </TabsList>
+        <Tabs value="actions" class="w-full">
+          <TabsList>
+            <TabsTrigger value="actions">
+              <Workflow class="mr-1 h-4 w-4" />
+              Actions
+            </TabsTrigger>
+            <TabsTrigger value="issues">
+              <Bug class="mr-1 h-4 w-4" />
+              Issues ({openIssues.length})
+            </TabsTrigger>
+            <TabsTrigger value="pulls">
+              <GitPullRequest class="mr-1 h-4 w-4" />
+              Pull Requests ({openPullRequests.length})
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="issues" class="mt-4">
-              {#if openIssues.length === 0}
-                <p class="text-sm text-muted-foreground">No open issues.</p>
-              {:else}
-                <div class="space-y-3">
-                  {#each openIssues as issue}
-                    <div class="rounded border p-3">
-                      <div class="flex items-center justify-between gap-3">
-                        <div class="font-medium">
-                          #{issue.number} {issue.title}
-                        </div>
-                        <a
-                          href={issue.htmlUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          class="inline-flex items-center text-xs text-primary"
-                        >
-                          Open
-                          <ExternalLink class="ml-1 h-3 w-3" />
-                        </a>
-                      </div>
-                      <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span>{issue.state}</span>
-                        {#if issue.authorLogin}
-                          <span>by {issue.authorLogin}</span>
-                        {/if}
-                        {#if issue.labels.length > 0}
-                          <span>labels: {issue.labels.join(", ")}</span>
-                        {/if}
-                      </div>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </TabsContent>
+          <TabsContent value="actions" class="mt-4">
+            <GitHubWorkflowRunsPanel {owner} {repo} enabled={isConnected} />
+          </TabsContent>
 
-            <TabsContent value="pulls" class="mt-4">
-              {#if openPullRequests.length === 0}
-                <p class="text-sm text-muted-foreground">No open pull requests.</p>
-              {:else}
-                <div class="space-y-3">
-                  {#each openPullRequests as pr}
-                    <div class="rounded border p-3">
-                      <div class="flex items-center justify-between gap-3">
-                        <div class="font-medium">
-                          #{pr.number} {pr.title}
-                        </div>
-                        <a
-                          href={pr.htmlUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          class="inline-flex items-center text-xs text-primary"
-                        >
-                          Open
-                          <ExternalLink class="ml-1 h-3 w-3" />
-                        </a>
+          <TabsContent value="issues" class="mt-4">
+            {#if repoIssuesQuery.isPending}
+              <PageLoading message="Loading issues..." />
+            {:else if repoIssuesQuery.isError}
+              <PageError
+                title="Failed to load issues"
+                message={repoIssuesQuery.error instanceof Error
+                  ? repoIssuesQuery.error.message
+                  : "Unable to load issues"}
+                onRetry={() => repoIssuesQuery.refetch()}
+              />
+            {:else if openIssues.length === 0}
+              <p class="text-sm text-muted-foreground">No open issues.</p>
+            {:else}
+              <div class="space-y-3">
+                {#each openIssues as issue}
+                  <div class="rounded border p-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="font-medium">
+                        #{issue.number} {issue.title}
                       </div>
-                      <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span>{pr.state}</span>
-                        {#if pr.authorLogin}
-                          <span>by {pr.authorLogin}</span>
-                        {/if}
-                        {#if pr.labels.length > 0}
-                          <span>labels: {pr.labels.join(", ")}</span>
-                        {/if}
-                      </div>
+                      <a
+                        href={issue.htmlUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="inline-flex items-center text-xs text-primary"
+                      >
+                        Open
+                        <ExternalLink class="ml-1 h-3 w-3" />
+                      </a>
                     </div>
-                  {/each}
-                </div>
-              {/if}
-            </TabsContent>
-          </Tabs>
-        {/if}
+                    <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span>{issue.state}</span>
+                      {#if issue.authorLogin}
+                        <span>by {issue.authorLogin}</span>
+                      {/if}
+                      {#if issue.labels.length > 0}
+                        <span>labels: {issue.labels.join(", ")}</span>
+                      {/if}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </TabsContent>
+
+          <TabsContent value="pulls" class="mt-4">
+            {#if repoIssuesQuery.isPending}
+              <PageLoading message="Loading pull requests..." />
+            {:else if repoIssuesQuery.isError}
+              <PageError
+                title="Failed to load pull requests"
+                message={repoIssuesQuery.error instanceof Error
+                  ? repoIssuesQuery.error.message
+                  : "Unable to load pull requests"}
+                onRetry={() => repoIssuesQuery.refetch()}
+              />
+            {:else if openPullRequests.length === 0}
+              <p class="text-sm text-muted-foreground">No open pull requests.</p>
+            {:else}
+              <div class="space-y-3">
+                {#each openPullRequests as pr}
+                  <div class="rounded border p-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="font-medium">
+                        #{pr.number} {pr.title}
+                      </div>
+                      <a
+                        href={pr.htmlUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="inline-flex items-center text-xs text-primary"
+                      >
+                        Open
+                        <ExternalLink class="ml-1 h-3 w-3" />
+                      </a>
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span>{pr.state}</span>
+                      {#if pr.authorLogin}
+                        <span>by {pr.authorLogin}</span>
+                      {/if}
+                      {#if pr.labels.length > 0}
+                        <span>labels: {pr.labels.join(", ")}</span>
+                      {/if}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   {/if}

@@ -1,6 +1,9 @@
 import { createQuery } from "@tanstack/svelte-query";
 import { queryKeys } from "$lib/domains/shared/query/keys";
 import { githubService } from "./service";
+import { isWorkflowJobActive, isWorkflowRunActive } from "./utils/workflowDisplay";
+
+const WORKFLOW_POLL_INTERVAL_MS = 3_000;
 
 export function createGitHubStatusQuery() {
   return createQuery(() => ({
@@ -67,6 +70,94 @@ export function createGitHubIssuesQuery(
       queryKey: queryKeys.github.issues(scopeKey),
       enabled: enabled(),
       queryFn: () => githubService.listIssues(request),
+    };
+  });
+}
+
+export function createGitHubWorkflowRunsQuery(
+  scope: () => {
+    owner: string;
+    repo: string;
+    branch?: string;
+    status?: string;
+    page?: number;
+    perPage?: number;
+  },
+  enabled: () => boolean = () => true,
+) {
+  return createQuery(() => {
+    const request = scope();
+    const scopeKey = JSON.stringify(request);
+    return {
+      queryKey: queryKeys.github.workflowRuns(
+        request.owner,
+        request.repo,
+        scopeKey,
+      ),
+      enabled: enabled() && Boolean(request.owner && request.repo),
+      queryFn: () => githubService.listWorkflowRuns(request),
+      refetchInterval: (query) => {
+        const runs = query.state.data;
+        if (!runs?.some(isWorkflowRunActive)) return false;
+        return WORKFLOW_POLL_INTERVAL_MS;
+      },
+    };
+  });
+}
+
+export function createGitHubWorkflowRunQuery(
+  owner: () => string | undefined,
+  repo: () => string | undefined,
+  runId: () => number | undefined,
+  enabled: () => boolean = () => true,
+) {
+  return createQuery(() => {
+    const ownerValue = owner();
+    const repoValue = repo();
+    const runIdValue = runId();
+    return {
+      queryKey: queryKeys.github.workflowRun(
+        ownerValue ?? "",
+        repoValue ?? "",
+        runIdValue ?? 0,
+      ),
+      enabled:
+        enabled() && Boolean(ownerValue && repoValue && runIdValue != null),
+      queryFn: () =>
+        githubService.getWorkflowRun(ownerValue!, repoValue!, runIdValue!),
+      refetchInterval: (query) => {
+        const detail = query.state.data;
+        if (!detail) return false;
+        if (isWorkflowRunActive(detail.run)) return WORKFLOW_POLL_INTERVAL_MS;
+        if (detail.jobs.some((job) => isWorkflowJobActive(job.status))) {
+          return WORKFLOW_POLL_INTERVAL_MS;
+        }
+        return false;
+      },
+    };
+  });
+}
+
+export function createGitHubWorkflowJobLogsQuery(
+  owner: () => string | undefined,
+  repo: () => string | undefined,
+  jobId: () => number | undefined,
+  enabled: () => boolean = () => true,
+) {
+  return createQuery(() => {
+    const ownerValue = owner();
+    const repoValue = repo();
+    const jobIdValue = jobId();
+    return {
+      queryKey: queryKeys.github.workflowJobLogs(
+        ownerValue ?? "",
+        repoValue ?? "",
+        jobIdValue ?? 0,
+      ),
+      enabled:
+        enabled() && Boolean(ownerValue && repoValue && jobIdValue != null),
+      queryFn: () =>
+        githubService.getWorkflowJobLogs(ownerValue!, repoValue!, jobIdValue!),
     };
   });
 }

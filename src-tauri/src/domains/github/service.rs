@@ -23,9 +23,10 @@ use crate::process_ext::NoWindowExt;
 use super::types::{
     GitHubAccount, GitHubCloneRepositoryRequest, GitHubConnectionStatus, GitHubCreateIssueRequest,
     GitHubDeviceFlowPollResult, GitHubDeviceFlowStart, GitHubIssue,
-    GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest, GitHubLocalRepositoryDetection,
-    GitHubProjectLink, GitHubProjectLinkResult, GitHubRepoOwner, GitHubRepoProjects,
-    GitHubRepository, GitHubUpdateIssueRequest,
+    GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest, GitHubListWorkflowRunsRequest,
+    GitHubLocalRepositoryDetection, GitHubProjectLink, GitHubProjectLinkResult, GitHubRepoOwner,
+    GitHubRepoProjects, GitHubRepository, GitHubUpdateIssueRequest, GitHubWorkflowJob,
+    GitHubWorkflowJobStep, GitHubWorkflowRun, GitHubWorkflowRunDetail,
 };
 
 const GITHUB_CONNECTION_ID: &str = "github";
@@ -469,6 +470,149 @@ impl GitHubService {
             .await
             .map_err(|e| format!("Failed to load GitHub project link: {e}"))?;
         Ok(row.map(project_link_from_model))
+    }
+
+    pub async fn list_workflow_runs(
+        &self,
+        request: GitHubListWorkflowRunsRequest,
+    ) -> Result<Vec<GitHubWorkflowRun>, String> {
+        let token = self.connection_token().await?;
+        let owner = request.owner.trim();
+        let repo = request.repo.trim();
+        let page = request.page.unwrap_or(1);
+        let per_page = request.per_page.unwrap_or(20).min(100);
+
+        let mut query = vec![
+            ("page", page.to_string()),
+            ("per_page", per_page.to_string()),
+        ];
+        if let Some(branch) = request
+            .branch
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            query.push(("branch", branch.to_string()));
+        }
+        if let Some(status) = request
+            .status
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            query.push(("status", status.to_string()));
+        }
+
+        let value = self
+            .github_get_json(
+                &format!("/repos/{owner}/{repo}/actions/runs"),
+                &token,
+                &query,
+            )
+            .await?;
+
+        let runs = value
+            .get("workflow_runs")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| self.workflow_run_from_value(&item))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(runs)
+    }
+
+    pub async fn get_workflow_run(
+        &self,
+        owner: &str,
+        repo: &str,
+        run_id: i64,
+    ) -> Result<GitHubWorkflowRunDetail, String> {
+        let token = self.connection_token().await?;
+        let run_value = self
+            .github_get_json(
+                &format!("/repos/{owner}/{repo}/actions/runs/{run_id}"),
+                &token,
+                &[],
+            )
+            .await?;
+        let run = self.workflow_run_from_value(&run_value)?;
+
+        let jobs_value = self
+            .github_get_json(
+                &format!("/repos/{owner}/{repo}/actions/runs/{run_id}/jobs"),
+                &token,
+                &[],
+            )
+            .await?;
+        let jobs = jobs_value
+            .get("jobs")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| self.workflow_job_from_value(&item))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(GitHubWorkflowRunDetail { run, jobs })
+    }
+
+    pub async fn get_workflow_job_logs(
+        &self,
+        owner: &str,
+        repo: &str,
+        job_id: i64,
+    ) -> Result<String, String> {
+        let token = self.connection_token().await?;
+        let response = self
+            .client
+            .get(format!(
+                "https://api.github.com/repos/{owner}/{repo}/actions/jobs/{job_id}/logs"
+            ))
+            .header(ACCEPT, "application/vnd.github+json")
+            .header(AUTHORIZATION, format!("Bearer {token}"))
+            .send()
+            .await
+            .map_err(|e| format!("GitHub API request failed: {e}"))?;
+
+        let status = response.status();
+        if status.is_redirection() {
+            let log_url = response
+                .headers()
+                .get("location")
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| "GitHub job logs redirect missing location header".to_string())?;
+            let log_response = self
+                .client
+                .get(log_url)
+                .send()
+                .await
+                .map_err(|e| format!("Failed to fetch GitHub job logs: {e}"))?;
+            if !log_response.status().is_success() {
+                return Err(format!(
+                    "GitHub job logs request failed: {}",
+                    log_response.status()
+                ));
+            }
+            return log_response
+                .text()
+                .await
+                .map_err(|e| format!("Failed to read GitHub job logs: {e}"));
+        }
+
+        if !status.is_success() {
+            let text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(format!("GitHub API {status}: {text}"));
+        }
+
+        response
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read GitHub job logs: {e}"))
     }
 
     pub async fn detect_local_repository(
@@ -943,6 +1087,108 @@ impl GitHubService {
                 .get("updated_at")
                 .and_then(Value::as_str)
                 .map(str::to_string),
+        })
+    }
+
+    fn workflow_run_from_value(&self, value: &Value) -> Result<GitHubWorkflowRun, String> {
+        Ok(GitHubWorkflowRun {
+            id: value.get("id").and_then(Value::as_i64).unwrap_or_default(),
+            name: required_string(value, "name")?,
+            workflow_id: value
+                .get("workflow_id")
+                .and_then(Value::as_i64)
+                .unwrap_or_default(),
+            run_number: value
+                .get("run_number")
+                .and_then(Value::as_i64)
+                .unwrap_or_default(),
+            status: required_string(value, "status")?,
+            conclusion: value
+                .get("conclusion")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            event: required_string(value, "event")?,
+            head_branch: value
+                .get("head_branch")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            head_sha: required_string(value, "head_sha")?,
+            display_title: value
+                .get("display_title")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            html_url: required_string(value, "html_url")?,
+            created_at: value
+                .get("created_at")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            updated_at: value
+                .get("updated_at")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            run_started_at: value
+                .get("run_started_at")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        })
+    }
+
+    fn workflow_job_from_value(&self, value: &Value) -> Result<GitHubWorkflowJob, String> {
+        let steps = value
+            .get("steps")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|step| {
+                        Ok(GitHubWorkflowJobStep {
+                            name: required_string(step, "name")?,
+                            status: required_string(step, "status")?,
+                            conclusion: step
+                                .get("conclusion")
+                                .and_then(Value::as_str)
+                                .map(str::to_string),
+                            number: step
+                                .get("number")
+                                .and_then(Value::as_i64)
+                                .unwrap_or_default(),
+                            started_at: step
+                                .get("started_at")
+                                .and_then(Value::as_str)
+                                .map(str::to_string),
+                            completed_at: step
+                                .get("completed_at")
+                                .and_then(Value::as_str)
+                                .map(str::to_string),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+
+        Ok(GitHubWorkflowJob {
+            id: value.get("id").and_then(Value::as_i64).unwrap_or_default(),
+            run_id: value
+                .get("run_id")
+                .and_then(Value::as_i64)
+                .unwrap_or_default(),
+            name: required_string(value, "name")?,
+            status: required_string(value, "status")?,
+            conclusion: value
+                .get("conclusion")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            html_url: required_string(value, "html_url")?,
+            started_at: value
+                .get("started_at")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            completed_at: value
+                .get("completed_at")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            steps,
         })
     }
 
