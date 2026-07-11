@@ -1,5 +1,17 @@
 # Portal Desktop - Release Notes
 
+## Version 0.2.2
+
+### Fixes
+
+- Credential key safety hardening
+- GitHub device-flow UX improvements
+- Chat timestamp fixes
+- E2E test wiring
+- CI: un-ignore vitest tests, fix cross-platform Rust test
+
+---
+
 ## Version 0.2.0
 
 ### Required dependency
