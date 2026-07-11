@@ -1,5 +1,16 @@
 # Portal Desktop - Release Notes
 
+## Version 0.4.0
+
+### Highlights
+
+- GitHub Actions CI/CD: workflow runs panel, run monitor, and per-project actions panel with branch filter
+- GitHub clone/link hardening: transactional rollback, path-overlap safety, and sanitized-origin restore
+- SDK manager workflows for language/service configuration
+- UI: migrate separators to divider-edge utility classes
+
+---
+
 ## Version 0.3.0
 
 ### Highlights
