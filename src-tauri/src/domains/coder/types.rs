@@ -1,6 +1,7 @@
 //! Wire + persistence types for the coder agent.
 
 use serde::{Deserialize, Serialize, Serializer};
+use serde_json::Value;
 
 use super::diff::Hunk;
 
@@ -58,6 +59,30 @@ impl ChatMessage {
             content: Some(text.into()),
             tool_calls: None,
             tool_call_id: Some(call_id.into()),
+            timestamp: Some(chrono::Utc::now().to_rfc3339()),
+        }
+    }
+    /// Synthetic assistant turn announcing a single in-flight tool call, so the
+    /// UI can show it running before the (possibly slow) result comes back.
+    /// `content` carries any reasoning the model streamed before the call.
+    pub fn assistant_tool_call(
+        call_id: impl Into<String>,
+        name: impl Into<String>,
+        arguments: &Value,
+        content: Option<String>,
+    ) -> Self {
+        Self {
+            role: "assistant".into(),
+            content,
+            tool_calls: Some(vec![ToolCall {
+                id: call_id.into(),
+                r#type: default_tool_type(),
+                function: FunctionCall {
+                    name: name.into(),
+                    arguments: arguments.to_string(),
+                },
+            }]),
+            tool_call_id: None,
             timestamp: Some(chrono::Utc::now().to_rfc3339()),
         }
     }
@@ -237,16 +262,36 @@ pub struct CoderRunResult {
     pub exhausted: bool,
 }
 
-/// How aggressively tool calls are auto-approved for a session.
+/// Cursor-style agent operating mode for a coder session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CoderAgentMode {
+    /// Explore codebase, ask questions, write `.cursor/plans/*.plan.md`.
+    Plan,
+    /// Hypothesis-driven debugging with review prompts on mutating tools.
+    Debug,
+    /// Coordinator thread that fans out parallel worktree agents.
+    Multitask,
+    /// Read-only chat — explore code, no writes or commands.
+    Ask,
+    /// Full agent with auto-approve; adapts strategy to user intent.
+    Auto,
+}
+
+impl Default for CoderAgentMode {
+    fn default() -> Self {
+        CoderAgentMode::Auto
+    }
+}
+
+/// How aggressively mutating tools are auto-approved (independent of agent mode).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PermissionMode {
-    /// Every mutating tool auto-runs. Read-only tools always run.
-    AutoAcceptAll,
     /// Mutating tools prompt unless matched by the allowlist.
     Review,
-    /// Read-only only: mutating tools are hard-rejected (dry run / planning).
-    Plan,
+    /// Every allowed mutating tool auto-runs.
+    AutoAcceptAll,
 }
 
 impl Default for PermissionMode {

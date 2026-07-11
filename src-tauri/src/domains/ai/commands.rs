@@ -134,13 +134,18 @@ pub async fn get_ai_provider_models(
 pub async fn get_ai_platform_catalog(
     providers: Option<Vec<String>>,
     live: Option<bool>,
+    probe_capabilities: Option<bool>,
     settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<PlatformCatalog, String> {
     let config = settings_service
         .get_provider_config(ProviderType::AgentPlatform)
         .map_err(|e| e.to_string())?;
     let platform = AgentPlatformProvider::new(config);
-    let query = CatalogQuery { providers, live };
+    let query = CatalogQuery {
+        providers,
+        live,
+        probe_capabilities,
+    };
     platform
         .fetch_catalog(query)
         .await

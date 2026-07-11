@@ -129,7 +129,10 @@ export interface FileChange {
   created_at: string;
 }
 
-export type PermissionMode = "auto-accept-all" | "review" | "plan";
+export type CoderAgentMode = "plan" | "debug" | "multitask" | "ask" | "auto";
+
+/** Review vs auto-approve for mutating tools (orthogonal to agent mode). */
+export type PermissionMode = "review" | "auto-accept-all";
 
 export interface PermissionRule {
   tool: string;

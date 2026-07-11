@@ -17,6 +17,7 @@
     onThreadClick?: (thread: CoderThread) => void;
     onDeleteThread?: (thread: CoderThread) => void;
     queuedCountFor?: (threadId: string) => number;
+    subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
   }
 
   let {
@@ -31,6 +32,7 @@
     onThreadClick,
     onDeleteThread,
     queuedCountFor,
+    subAgentSummaryFor,
   }: Props = $props();
 
   const sessionCount = $derived(threads.length);
@@ -103,6 +105,7 @@
           isActive={selectedThreadId === t.id}
           isRunning={runningThreadIds.has(t.id)}
           queuedCount={queuedCountFor?.(t.id) ?? 0}
+          subAgentRunning={subAgentSummaryFor?.(t.id).running ?? 0}
         />
       {/each}
     </div>

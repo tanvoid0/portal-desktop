@@ -5,7 +5,7 @@
   import { goto } from "$app/navigation";
   import { AI_PROVIDER_SETTINGS_PATH } from "$lib/config/ai-nav";
   import { coderSession } from "../state/coderSession.svelte.js";
-  import type { PermissionMode, PermissionRule } from "../types.js";
+  import type { PermissionRule } from "../types.js";
 
   interface Props {
     showRules?: boolean;
@@ -13,12 +13,6 @@
   }
 
   let { showRules = false, onToggleRules }: Props = $props();
-
-  const MODES: { value: PermissionMode; label: string }[] = [
-    { value: "review", label: "Review" },
-    { value: "auto-accept-all", label: "Auto" },
-    { value: "plan", label: "Plan" },
-  ];
 
   function removeRule(r: PermissionRule) {
     coderSession.removeRule(r);
@@ -50,19 +44,6 @@
         <Settings2 class="h-3.5 w-3.5" />
       </Button>
     </div>
-  </div>
-
-  <div class="flex flex-wrap gap-1">
-    {#each MODES as m}
-      <Button
-        size="sm"
-        variant={coderSession.mode === m.value ? "secondary" : "ghost"}
-        class="h-6 px-2 text-[11px]"
-        onclick={() => void coderSession.changeMode(m.value)}
-      >
-        {m.label}
-      </Button>
-    {/each}
   </div>
 
   {#if showRules}

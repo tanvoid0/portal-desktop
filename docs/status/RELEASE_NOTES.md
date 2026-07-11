@@ -1,5 +1,17 @@
 # Portal Desktop - Release Notes
 
+## Version 0.3.0
+
+### Highlights
+
+- Coder agent modes: selectable agent + permission modes with a live activity feed
+- Coder feed blocks: assistant, thought, user, and inline sub-agent rendering
+- Coder file preview and per-run activity summary
+- Backend agent_mode + permission and platform-stream rework
+- Release CI split into reusable composite actions with a fail-fast smoke gate
+
+---
+
 ## Version 0.2.3
 
 ### Highlights

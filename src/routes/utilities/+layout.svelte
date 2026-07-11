@@ -15,6 +15,10 @@
     if (path.startsWith("/utilities/disk")) return "disk" as const;
     return "disk" as const;
   });
+
+  let containerVariant = $derived(
+    currentSection() === "disk" ? ("full" as const) : ("readable" as const),
+  );
 </script>
 
 <svelte:head>
@@ -48,7 +52,7 @@
     {/snippet}
 
     <div class="min-h-0 flex-1 overflow-y-auto">
-      <PageContainer variant="readable" class="py-6">
+      <PageContainer variant={containerVariant} class="py-6">
         {@render children()}
       </PageContainer>
     </div>

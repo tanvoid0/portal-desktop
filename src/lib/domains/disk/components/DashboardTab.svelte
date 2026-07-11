@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import type { AuditEntry, DiskUsage, Location } from "../types";
-  import { fmtBytes, fmtDate } from "../utils";
+  import { fmtBytes, fmtDate, DISK_DRIVE_GRID, DISK_PANEL_GRID, DISK_STAT_GRID } from "../utils";
   import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
   import { Button } from "$lib/components/ui/button";
   import { Progress } from "$lib/components/ui/progress";
@@ -97,7 +97,7 @@
 </div>
 
 <div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Disk storage</div>
-<div class="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
+<div class="{DISK_DRIVE_GRID} mb-6">
   {#each disks as d (d.mountPoint)}
     {@const pct = usePct(d)}
     {@const used = Math.max(0, d.totalBytes - d.availableBytes)}
@@ -128,7 +128,7 @@
     </Card>
   {/each}
   {#if disks.length === 0}
-    <Card class="md:col-span-2">
+    <Card class="col-span-full">
       <CardContent class="py-8 text-center text-sm text-muted-foreground">
         {loading ? "Reading drives…" : "No drives detected."}
       </CardContent>
@@ -160,7 +160,7 @@
 </div>
 
 <div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Cleanup summary</div>
-<div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+<div class="{DISK_STAT_GRID} mb-4">
   <Card class="gap-0 py-4">
     <CardContent class="px-4">
       <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Lifetime reclaimed</div>
@@ -184,7 +184,7 @@
   </Card>
 </div>
 
-<div class="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
+<div class="{DISK_PANEL_GRID} mb-6">
   <Card class="gap-0 overflow-hidden py-0">
     <CardHeader class="divider-edge-b divider-edge-full bg-muted/40 px-4 py-3 [.border-b]:pb-3">
       <CardTitle class="text-sm font-medium">Reclaimed by type</CardTitle>

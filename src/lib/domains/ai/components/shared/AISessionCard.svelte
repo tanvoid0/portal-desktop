@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { Component } from "svelte";
-  import { Button } from "$lib/components/ui/button";
+  import { Button, buttonVariants } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
   import { Clock, MessageSquare, Trash2 } from "@lucide/svelte";
+  import { cn } from "$lib/utils";
   import {
     formatCount,
     formatSessionDateTime,
@@ -64,17 +65,32 @@
   const updatedLabel = $derived(formatSessionDateTime(updatedIso));
   const updatedFull = $derived(formatSessionDateTimeFull(updatedIso));
   const SubtitleIcon = $derived(subtitleIcon);
+
+  function handleActivate() {
+    onClick?.();
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick?.();
+    }
+  }
 </script>
 
-<Button
-  type="button"
-  variant="ghost"
-  class="group relative h-auto w-full justify-start rounded-lg border bg-background text-left shadow-sm transition-colors
-    {compact ? 'px-2.5 py-2' : 'px-3 py-2.5'}
-    {isActive
-    ? 'border-primary/40 bg-primary/5 ring-1 ring-primary/20'
-    : 'border-border/60 hover:border-border hover:bg-muted/40'}"
-  onclick={onClick}
+<div
+  role="button"
+  tabindex="0"
+  class={cn(
+    buttonVariants({ variant: "ghost" }),
+    "group relative h-auto w-full justify-start rounded-lg border bg-background text-left shadow-sm transition-colors",
+    compact ? "px-2.5 py-2" : "px-3 py-2.5",
+    isActive
+      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+      : "border-border/60 hover:border-border hover:bg-muted/40",
+  )}
+  onclick={handleActivate}
+  onkeydown={handleKeydown}
 >
   {#if isActive}
     <span
@@ -169,4 +185,4 @@
       {/if}
     </div>
   </div>
-</Button>
+</div>

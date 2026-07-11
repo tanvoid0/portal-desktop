@@ -26,6 +26,7 @@
     RISK_BADGE,
     VERDICT_BADGE,
     verdictMap,
+    DISK_STAT_GRID_FOUR,
     type TreeNode,
   } from "../utils";
   import { confirmAction } from "$lib/utils/confirm";
@@ -412,7 +413,7 @@
 {/if}
 
 {#if summary && stats}
-  <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+  <div class="{DISK_STAT_GRID_FOUR} mb-4">
     {#each [["Reclaimable", stats.total, `${stats.count} proposal${stats.count === 1 ? "" : "s"}`, "text-foreground"], ["Safe", stats.byRisk.Safe.b, `${stats.byRisk.Safe.n} items`, "text-status-success"], ["Review", stats.byRisk.Review.b, `${stats.byRisk.Review.n} items`, "text-status-warning"], ["Danger", stats.byRisk.Danger.b, `${stats.byRisk.Danger.n} items`, "text-status-error"]] as [label, bytes, sub, accent]}
       <Card class="gap-0 py-4">
         <CardContent class="px-4">

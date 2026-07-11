@@ -6,6 +6,7 @@
 //! Thread state is mirrored locally for the sidebar; `platform_thread_id` links
 //! the SQLite row to `coder_chat_threads` on the platform.
 
+pub mod agent_mode;
 pub mod commands;
 pub mod diff;
 pub mod entities;

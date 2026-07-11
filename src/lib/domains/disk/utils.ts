@@ -196,6 +196,21 @@ export const KIND_BADGE: Record<string, string> = {
   podman: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
+/** Summary stat cards (3-up) — extra columns on ultrawide so cards don't stretch. */
+export const DISK_STAT_GRID =
+  "grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-6";
+
+/** Risk / scan stat cards (4-up) — one row across standard and ultrawide widths. */
+export const DISK_STAT_GRID_FOUR =
+  "grid gap-3 grid-cols-2 md:grid-cols-4 xl:grid-cols-4 3xl:grid-cols-4";
+
+/** Drive cards — scale column count as the main area widens. */
+export const DISK_DRIVE_GRID =
+  "grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4";
+
+/** Side-by-side dashboard panels (chart + list). */
+export const DISK_PANEL_GRID = "grid gap-3 grid-cols-1 lg:grid-cols-2 3xl:grid-cols-2";
+
 export function verdictMap(verdicts: ItemVerdict[]): Map<string, ItemVerdict> {
   const m = new Map<string, ItemVerdict>();
   for (const v of verdicts) m.set(v.path, v);

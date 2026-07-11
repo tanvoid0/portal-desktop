@@ -2,7 +2,14 @@
  * Workspace sidebar + main panel state for the coder session view.
  */
 
-export type WorkspacePanel = "chat" | "terminal" | "files" | "browser" | "changes" | "git-changes";
+export type WorkspacePanel =
+  | "chat"
+  | "terminal"
+  | "files"
+  | "file"
+  | "browser"
+  | "changes"
+  | "git-changes";
 
 export interface WorkspaceTab {
   id: string;
@@ -10,6 +17,8 @@ export interface WorkspaceTab {
   label: string;
   /** Terminal tab id when panel is terminal */
   terminalId?: string;
+  /** Workspace-relative path when panel is file */
+  filePath?: string;
 }
 
 class CoderWorkspaceStore {
@@ -93,6 +102,15 @@ class CoderWorkspaceStore {
 
   openFiles(label = "Files") {
     this.upsertTab({ id: "files", panel: "files", label });
+  }
+
+  openFile(filePath: string, label?: string) {
+    this.upsertTab({
+      id: `file:${filePath}`,
+      panel: "file",
+      label: label ?? filePath.split(/[/\\]/).pop() ?? filePath,
+      filePath,
+    });
   }
 
   openBrowser(url?: string, label = "Browser") {

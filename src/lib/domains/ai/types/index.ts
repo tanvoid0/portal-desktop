@@ -81,6 +81,27 @@ export interface CatalogResolvedDefaults {
   model: string;
 }
 
+/** Per-model capability flags from catalog probing. */
+export interface CatalogModelCapabilities {
+  chat?: boolean;
+  tools?: boolean;
+  vision_input?: boolean;
+  embeddings?: boolean;
+  image_generation?: boolean;
+  streaming?: boolean;
+  /** ollama_show | heuristic | provider_default */
+  probe_source?: string;
+}
+
+/** Provider-level capability summary from catalog. */
+export interface CatalogProviderCapabilities {
+  streaming?: boolean;
+  tools?: boolean;
+  json_mode?: boolean;
+  modalities?: Record<string, boolean>;
+  model_discovery?: Record<string, unknown>;
+}
+
 /** A model entry from agent-platform catalog. */
 export interface CatalogModel {
   id: string;
@@ -89,6 +110,7 @@ export interface CatalogModel {
   source: "alias" | "live" | string;
   backend_id?: string | null;
   metadata?: Record<string, unknown>;
+  capabilities?: CatalogModelCapabilities;
 }
 
 /** A provider entry from agent-platform catalog. */
@@ -98,6 +120,7 @@ export interface CatalogProvider {
   configured: boolean;
   reachable: boolean | null;
   default_model?: string | null;
+  capabilities?: CatalogProviderCapabilities;
   models: CatalogModel[];
 }
 
@@ -113,6 +136,8 @@ export interface CatalogQuery {
   providers?: string[] | null;
   /** `false` = YAML aliases only (no upstream fetches). */
   live?: boolean | null;
+  /** When true with live catalog, probe Ollama models for tools/vision flags. */
+  probe_capabilities?: boolean | null;
 }
 
 /** Estimated input context breakdown from agent-platform chat APIs. */

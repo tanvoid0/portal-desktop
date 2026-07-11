@@ -5,6 +5,8 @@
     content: string;
     variant?: "user" | "assistant";
     isStreaming?: boolean;
+    /** `compact` uses smaller typography for dense agent feeds. */
+    density?: "default" | "compact";
     class?: string;
   }
 
@@ -12,6 +14,7 @@
     content,
     variant = "assistant",
     isStreaming = false,
+    density = "default",
     class: className = "",
   }: Props = $props();
 
@@ -113,7 +116,9 @@
 
 <div
   bind:this={container}
-  class="chat-markdown prose prose-sm max-w-none text-sm {variant === 'user'
+  class="chat-markdown max-w-none {density === 'compact'
+    ? 'chat-markdown--compact prose prose-sm text-xs leading-relaxed'
+    : 'prose prose-sm text-xs leading-relaxed'} {variant === 'user'
     ? 'chat-markdown--user prose-invert'
     : 'dark:prose-invert'} {className}"
 >

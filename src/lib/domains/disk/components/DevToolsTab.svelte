@@ -11,7 +11,7 @@
     Location,
     ScanProgress,
   } from "../types";
-  import { fmtBytes, fmtDuration, KIND_BADGE, RISK_BADGE } from "../utils";
+  import { fmtBytes, fmtDuration, KIND_BADGE, RISK_BADGE, DISK_STAT_GRID } from "../utils";
   import { confirmAction } from "$lib/utils/confirm";
   import { Button } from "$lib/components/ui/button";
   import { Card, CardContent } from "$lib/components/ui/card";
@@ -263,7 +263,7 @@
 {/if}
 
 {#if scanResult}
-  <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+  <div class="{DISK_STAT_GRID} mb-4">
     <Card class="gap-0 py-4">
       <CardContent class="px-4">
         <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Reclaimable</div>

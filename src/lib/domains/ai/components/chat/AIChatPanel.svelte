@@ -129,8 +129,8 @@
   {#if showSelectors}
     <CardHeader class="pb-3">
       <div class="flex items-center justify-between">
-        <CardTitle class="flex items-center gap-2 text-lg">
-          <MessageSquare class="h-5 w-5" />
+        <CardTitle class="flex items-center gap-2 text-base">
+          <MessageSquare class="h-4 w-4" />
           {title}
         </CardTitle>
         <div class="flex items-center gap-2">
@@ -145,11 +145,11 @@
   {/if}
   <CardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
     <ScrollArea class="min-h-0 flex-1" bind:viewportRef={scrollViewport}>
-      <div class="space-y-4 px-4 py-4" bind:this={messagesContainer}>
+      <div class="space-y-3 px-3 py-3" bind:this={messagesContainer}>
         {#if messages.length === 0}
-          <div class="py-8 text-center text-muted-foreground">
-            <MessageCircle class="mx-auto mb-2 h-12 w-12 opacity-50" />
-            <p class="text-sm">Start a conversation</p>
+          <div class="py-6 text-center text-muted-foreground">
+            <MessageCircle class="mx-auto mb-2 h-10 w-10 opacity-50" />
+            <p class="text-xs">Start a conversation</p>
           </div>
         {:else}
           {#each messages as message, index}
@@ -173,12 +173,13 @@
         {/if}
       </div>
     </ScrollArea>
-    <div class="divider-edge-t divider-edge-full flex-shrink-0 bg-background">
+    <div class="shrink-0 bg-gradient-to-t from-background via-background to-transparent pt-2">
       <ChatInput
         bind:value={messageInput}
         onSend={handleSend}
         {placeholder}
         disabled={isLoading}
+        class="pt-0"
       />
     </div>
   </CardContent>

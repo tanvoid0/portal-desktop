@@ -33,6 +33,7 @@ use crate::domains::ai::services::AISettingsService;
 use crate::domains::github::service::GitHubService;
 use crate::domains::github::types::GitHubIssue;
 
+use super::agent_mode;
 use super::diff;
 use super::entities::{coder_file_change, coder_setting, coder_sub_agent, coder_thread};
 use super::multitask::{fallback_prompt_for_task, parse_issue_url, DEFAULT_MAX_PARALLEL_SUBAGENTS};
@@ -42,16 +43,81 @@ use super::tools;
 use super::types::{
     ChangeStatus, ChatMessage, CoderRunResult, CoderSubAgent, CoderSubAgentStatus, CoderThread,
     CoderThreadKind, CoderThreadSummary, FileChange, GitHubIssueRef, MultitaskCancelRequest,
-    MultitaskCleanupRequest, MultitaskSpawnRequest, PermissionMode, PermissionRule,
+    MultitaskCleanupRequest, MultitaskSpawnRequest, CoderAgentMode, PermissionMode, PermissionRule,
     SpawnSubAgentTask,
 };
 use super::worktree::{self, WorktreeSpec};
 
-/// Persisted permission config (mode + rules) stored as one JSON row.
+/// Persisted permission config (agent + permission modes + rules) stored as one JSON row.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct SettingsBlob {
-    mode: PermissionMode,
+    #[serde(alias = "mode")]
+    agent_mode: CoderAgentMode,
+    #[serde(default)]
+    permission_mode: PermissionMode,
+    #[serde(default)]
     rules: Vec<PermissionRule>,
+}
+
+#[derive(Deserialize)]
+struct LegacySettingsBlob {
+    mode: Value,
+    #[serde(default)]
+    rules: Vec<PermissionRule>,
+}
+
+fn migrate_legacy_settings(mode: &Value, rules: Vec<PermissionRule>) -> SettingsBlob {
+    match mode.as_str() {
+        Some("review") => SettingsBlob {
+            agent_mode: CoderAgentMode::Debug,
+            permission_mode: PermissionMode::Review,
+            rules,
+        },
+        Some("auto-accept-all") => SettingsBlob {
+            agent_mode: CoderAgentMode::Auto,
+            permission_mode: PermissionMode::AutoAcceptAll,
+            rules,
+        },
+        Some("plan") => SettingsBlob {
+            agent_mode: CoderAgentMode::Plan,
+            permission_mode: PermissionMode::Review,
+            rules,
+        },
+        Some("debug") => SettingsBlob {
+            agent_mode: CoderAgentMode::Debug,
+            permission_mode: PermissionMode::Review,
+            rules,
+        },
+        Some("auto") => SettingsBlob {
+            agent_mode: CoderAgentMode::Auto,
+            permission_mode: PermissionMode::AutoAcceptAll,
+            rules,
+        },
+        Some("ask") => SettingsBlob {
+            agent_mode: CoderAgentMode::Ask,
+            permission_mode: PermissionMode::Review,
+            rules,
+        },
+        Some("multitask") => SettingsBlob {
+            agent_mode: CoderAgentMode::Multitask,
+            permission_mode: PermissionMode::AutoAcceptAll,
+            rules,
+        },
+        _ => SettingsBlob {
+            rules,
+            ..SettingsBlob::default()
+        },
+    }
+}
+
+fn parse_settings_blob(data_json: &str) -> SettingsBlob {
+    if let Ok(blob) = serde_json::from_str::<SettingsBlob>(data_json) {
+        return blob;
+    }
+    if let Ok(legacy) = serde_json::from_str::<LegacySettingsBlob>(data_json) {
+        return migrate_legacy_settings(&legacy.mode, legacy.rules);
+    }
+    SettingsBlob::default()
 }
 
 const SYSTEM_PROMPT: &str = concat!(
@@ -92,7 +158,8 @@ pub struct CoderService {
     threads: Mutex<HashMap<String, CoderThread>>,
     sub_agents: Mutex<HashMap<String, CoderSubAgent>>,
     rules: Mutex<Vec<PermissionRule>>,
-    mode: Mutex<PermissionMode>,
+    agent_mode: Mutex<CoderAgentMode>,
+    permission_mode: Mutex<PermissionMode>,
     /// Agent file edits awaiting or completed review (Cursor-style).
     changes: Mutex<Vec<FileChange>>,
     client: reqwest::Client,
@@ -104,6 +171,8 @@ pub struct CoderService {
     active_runs: Mutex<HashMap<String, RunHandle>>,
     /// Frontend-delegated run_command results keyed by `{thread_id}:{call_id}`.
     pending_commands: Mutex<HashMap<String, PendingCommand>>,
+    /// Messages to prepend after an edit that rewinds the platform thread.
+    edit_prefix: Mutex<HashMap<String, Vec<ChatMessage>>>,
     multitask_semaphore: Arc<Semaphore>,
 }
 
@@ -120,13 +189,15 @@ impl CoderService {
             threads: Mutex::new(HashMap::new()),
             sub_agents: Mutex::new(HashMap::new()),
             rules: Mutex::new(Vec::new()),
-            mode: Mutex::new(PermissionMode::default()),
+            agent_mode: Mutex::new(CoderAgentMode::default()),
+            permission_mode: Mutex::new(PermissionMode::default()),
             changes: Mutex::new(Vec::new()),
             client: reqwest::Client::new(),
             settings,
             delegation_team_template_id,
             active_runs: Mutex::new(HashMap::new()),
             pending_commands: Mutex::new(HashMap::new()),
+            edit_prefix: Mutex::new(HashMap::new()),
             multitask_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_PARALLEL_SUBAGENTS)),
         };
         svc.load_from_db().await;
@@ -139,13 +210,38 @@ impl CoderService {
 
     /// Tool specs offered to the model, including platform delegation when
     /// configured.
-    fn tool_specs_for_request(&self, thread_kind: CoderThreadKind) -> Vec<Value> {
-        let mut specs = tools::tool_specs();
-        if matches!(thread_kind, CoderThreadKind::Coordinator) {
+    fn tool_specs_for_request(
+        &self,
+        thread_kind: CoderThreadKind,
+        mode: CoderAgentMode,
+    ) -> Vec<Value> {
+        let mut specs: Vec<Value> = tools::tool_specs()
+            .into_iter()
+            .filter(|spec| {
+                spec.get("function")
+                    .and_then(|f| f.get("name"))
+                    .and_then(Value::as_str)
+                    .map(|name| agent_mode::includes_tool(mode, name))
+                    .unwrap_or(false)
+            })
+            .collect();
+        if matches!(thread_kind, CoderThreadKind::Coordinator)
+            || mode == CoderAgentMode::Multitask
+        {
             specs.extend(tools::multitask_tool_specs());
         }
-        if self.delegation_team_template_id.is_some() {
-            specs.extend(tools::platform_tool_specs());
+        if self.delegation_team_template_id.is_some() && mode != CoderAgentMode::Ask {
+            specs.extend(
+                tools::platform_tool_specs()
+                    .into_iter()
+                    .filter(|spec| {
+                        spec.get("function")
+                            .and_then(|f| f.get("name"))
+                            .and_then(Value::as_str)
+                            .map(|name| agent_mode::includes_tool(mode, name))
+                            .unwrap_or(false)
+                    }),
+            );
         }
         specs
     }
@@ -266,7 +362,7 @@ impl CoderService {
         call_id: &str,
         tool: &str,
         args: &Value,
-    ) -> Result<(), String> {
+    ) -> Result<String, String> {
         let mutated = tools::mutated_path(tool, args);
         let before = mutated
             .as_ref()
@@ -317,7 +413,7 @@ impl CoderService {
         });
         self.platform_post(&format!("{base}/api/v1/coder/chat/tool-result"), body)
             .await?;
-        Ok(())
+        Ok(result)
     }
 
     /// Wire the Tauri handle so loop steps can be streamed to the UI.
@@ -492,10 +588,10 @@ impl CoderService {
         }
 
         if let Ok(Some(row)) = coder_setting::Entity::find_by_id("default").one(conn).await {
-            if let Ok(blob) = serde_json::from_str::<SettingsBlob>(&row.data_json) {
-                *self.mode.lock().await = blob.mode;
-                *self.rules.lock().await = blob.rules;
-            }
+            let blob = parse_settings_blob(&row.data_json);
+            *self.agent_mode.lock().await = blob.agent_mode;
+            *self.permission_mode.lock().await = blob.permission_mode;
+            *self.rules.lock().await = blob.rules;
         }
 
         if let Ok(rows) = coder_file_change::Entity::find().all(conn).await {
@@ -738,7 +834,8 @@ impl CoderService {
 
     async fn persist_settings(&self) {
         let blob = SettingsBlob {
-            mode: *self.mode.lock().await,
+            agent_mode: *self.agent_mode.lock().await,
+            permission_mode: *self.permission_mode.lock().await,
             rules: self.rules.lock().await.clone(),
         };
         let data_json = serde_json::to_string(&blob).unwrap_or_else(|_| "{}".into());
@@ -1374,12 +1471,27 @@ impl CoderService {
 
     // ---- permission config --------------------------------------------
 
-    pub async fn set_mode(&self, mode: PermissionMode) {
-        *self.mode.lock().await = mode;
+    pub async fn set_agent_mode(&self, mode: CoderAgentMode) {
+        *self.agent_mode.lock().await = mode;
         self.persist_settings().await;
     }
-    pub async fn get_mode(&self) -> PermissionMode {
-        *self.mode.lock().await
+    pub async fn get_agent_mode(&self) -> CoderAgentMode {
+        *self.agent_mode.lock().await
+    }
+    pub async fn set_permission_mode(&self, mode: PermissionMode) {
+        *self.permission_mode.lock().await = mode;
+        self.persist_settings().await;
+    }
+    pub async fn get_permission_mode(&self) -> PermissionMode {
+        *self.permission_mode.lock().await
+    }
+
+    /// Back-compat aliases used by existing Tauri commands.
+    pub async fn set_mode(&self, mode: CoderAgentMode) {
+        self.set_agent_mode(mode).await;
+    }
+    pub async fn get_mode(&self) -> CoderAgentMode {
+        self.get_agent_mode().await
     }
     pub async fn list_rules(&self) -> Vec<PermissionRule> {
         self.rules.lock().await.clone()
@@ -1531,6 +1643,58 @@ impl CoderService {
         let url = format!("{base}/api/v1/coder/chat/context-usage?thread_id={platform_id}");
         let value = self.platform_get(&url).await?;
         Ok(parse_context_usage(&value))
+    }
+
+    /// Edit a user message, truncate the transcript from that point, and reset
+    /// the platform thread so the agent restarts from the edited turn.
+    pub async fn prepare_edit_message(
+        &self,
+        thread_id: &str,
+        message_index: usize,
+        new_content: String,
+    ) -> Result<(), String> {
+        let trimmed = new_content.trim().to_string();
+        if trimmed.is_empty() {
+            return Err("message cannot be empty".into());
+        }
+
+        let prefix = {
+            let mut threads = self.threads.lock().await;
+            let thread = threads.get_mut(thread_id).ok_or("thread not found")?;
+            if message_index >= thread.messages.len() {
+                return Err("message index out of range".into());
+            }
+            let msg = &thread.messages[message_index];
+            if msg.role != "user" {
+                return Err("only user messages can be edited".into());
+            }
+
+            let prefix = if message_index > 0 {
+                thread.messages[..message_index].to_vec()
+            } else {
+                Vec::new()
+            };
+
+            thread.messages.truncate(message_index + 1);
+            if let Some(m) = thread.messages.get_mut(message_index) {
+                m.content = Some(trimmed);
+            }
+            thread.platform_thread_id = None;
+            thread.updated_at = now_iso();
+            prefix
+        };
+
+        if !prefix.is_empty() {
+            self.edit_prefix
+                .lock()
+                .await
+                .insert(thread_id.to_string(), prefix);
+        } else {
+            self.edit_prefix.lock().await.remove(thread_id);
+        }
+
+        self.persist_thread(thread_id).await;
+        Ok(())
     }
 
     /// Resume the agent loop from the current thread state (e.g. after a failed
@@ -1702,11 +1866,14 @@ impl CoderService {
                     t.thread_kind,
                 )
             };
-            let tool_specs = self.tool_specs_for_request(thread_kind);
+            let agent_mode = self.get_agent_mode().await;
+            let permission_mode = self.get_permission_mode().await;
+            let tool_specs = self.tool_specs_for_request(thread_kind, agent_mode);
 
             validate_workspace_root(&workspace_root)?;
 
-            let (allow_commands, auto_approve) = self.permission_flags().await;
+            let (allow_commands, auto_approve) =
+                agent_mode::permission_flags(agent_mode, permission_mode);
             let cfg = self.platform_config();
             let base = cfg.base_url.trim_end_matches('/');
 
@@ -1722,6 +1889,7 @@ impl CoderService {
                         "delegate_tools": true,
                         "tools": tool_specs.clone(),
                     });
+                    attach_agent_mode_fields(&mut body, agent_mode);
                     if let Some(m) = &model {
                         body["model"] = json!(m);
                     }
@@ -1751,6 +1919,7 @@ impl CoderService {
                         "delegate_tools": true,
                         "tools": tool_specs.clone(),
                     });
+                    attach_agent_mode_fields(&mut body, agent_mode);
                     if let Some(m) = &model {
                         body["model"] = json!(m);
                     }
@@ -1778,6 +1947,7 @@ impl CoderService {
                         "delegate_tools": true,
                         "tools": tool_specs.clone(),
                     });
+                    attach_agent_mode_fields(&mut body, agent_mode);
                     if let Some(m) = &model {
                         body["model"] = json!(m);
                     }
@@ -1809,6 +1979,9 @@ impl CoderService {
             let fallback_for_title = fallback_title.clone();
             let mut done: Option<PlatformDone> = None;
             let mut stream_error: Option<String> = None;
+            // Assistant reasoning streamed before a tool_call; attached to the
+            // synthetic tool-call message so it stays visible while the tool runs.
+            let mut pending_assistant_text = String::new();
             let platform_thread_id_for_tools = platform_thread_id;
             let workspace_root_for_tools = workspace_root.clone();
             let status = resp.status();
@@ -1856,10 +2029,12 @@ impl CoderService {
                         }
                         "assistant" => {
                             if let Some(content) = data.get("content").and_then(Value::as_str) {
-                                if !content.is_empty() {
+                                let cleaned = platform_stream::strip_leaked_tool_syntax(content);
+                                if !cleaned.is_empty() {
+                                    pending_assistant_text = cleaned.clone();
                                     self.emit(
                                     "coder://token",
-                                    json!({ "thread_id": thread_id_for_stream, "delta": content }),
+                                    json!({ "thread_id": thread_id_for_stream, "delta": cleaned }),
                                 );
                                 }
                             }
@@ -1874,19 +2049,52 @@ impl CoderService {
                             if call_id.is_empty() {
                                 stream_error =
                                     Some("platform tool_call missing call_id".to_string());
-                            } else if let Err(e) = self
-                                .execute_delegated_tool(
-                                    &thread_id_for_stream,
-                                    platform_thread_id_for_tools,
-                                    &workspace_root_for_tools,
-                                    call_id,
-                                    name,
-                                    &args,
-                                )
-                                .await
-                            {
-                                stream_error = Some(e);
+                            } else {
+                                let reasoning = if pending_assistant_text.trim().is_empty() {
+                                    None
+                                } else {
+                                    Some(std::mem::take(&mut pending_assistant_text))
+                                };
+                                self.emit(
+                                    "coder://message",
+                                    json!({
+                                        "thread_id": thread_id_for_stream,
+                                        "message": ChatMessage::assistant_tool_call(call_id, name, &args, reasoning),
+                                    }),
+                                );
+                                match self
+                                    .execute_delegated_tool(
+                                        &thread_id_for_stream,
+                                        platform_thread_id_for_tools,
+                                        &workspace_root_for_tools,
+                                        call_id,
+                                        name,
+                                        &args,
+                                    )
+                                    .await
+                                {
+                                    Ok(result) => {
+                                        self.emit(
+                                            "coder://message",
+                                            json!({
+                                                "thread_id": thread_id_for_stream,
+                                                "message": ChatMessage::tool_result(call_id, result),
+                                            }),
+                                        );
+                                    }
+                                    Err(e) => stream_error = Some(e),
+                                }
                             }
+                        }
+                        "heartbeat" => {
+                            let waited = data
+                                .get("waited_seconds")
+                                .and_then(Value::as_f64)
+                                .unwrap_or(0.0);
+                            self.emit(
+                                "coder://heartbeat",
+                                json!({ "thread_id": thread_id_for_stream, "waited_seconds": waited }),
+                            );
                         }
                         "error" => {
                             let detail = data
@@ -1931,13 +2139,27 @@ impl CoderService {
                 None => return Err("platform stream ended without done event".into()),
             };
 
+            if let Some(tool) = platform_stream::find_leaked_tool_call(&done.messages) {
+                return Err(format!(
+                    "The model wrote `<function={tool}>` as text instead of running a tool. \
+                     Choose a model with tool/function calling support in AI → Providers, then retry."
+                ));
+            }
+
             self.sync_thread_from_platform(thread_id, platform_thread_id, &done, &fallback_title)
                 .await;
 
             if let Some(pending) = done.pending.clone() {
-                let mode = self.get_mode().await;
+                let agent_mode = self.get_agent_mode().await;
+                let permission_mode = self.get_permission_mode().await;
                 let rules = self.list_rules().await;
-                match permissions::decide(mode, &rules, &pending.tool, &pending.arguments) {
+                match permissions::decide(
+                    agent_mode,
+                    permission_mode,
+                    &rules,
+                    &pending.tool,
+                    &pending.arguments,
+                ) {
                     Decision::Allow => {
                         turn = AgentTurn::Approve {
                             call_id: pending.call_id.clone(),
@@ -1977,14 +2199,6 @@ impl CoderService {
             }
 
             return Ok(self.finish(thread_id, done.final_text, false, false).await);
-        }
-    }
-
-    async fn permission_flags(&self) -> (bool, bool) {
-        match self.get_mode().await {
-            PermissionMode::AutoAcceptAll => (true, true),
-            PermissionMode::Review => (true, false),
-            PermissionMode::Plan => (false, false),
         }
     }
 
@@ -2050,6 +2264,8 @@ impl CoderService {
                     .collect()
             })
             .unwrap_or_default();
+        let mut messages = messages;
+        agent_mode::normalize_platform_user_messages(&mut messages);
         let title = data
             .get("title")
             .and_then(Value::as_str)
@@ -2076,14 +2292,24 @@ impl CoderService {
         done: &platform_stream::PlatformDone,
         fallback_title: &str,
     ) {
+        let edit_prefix = self.edit_prefix.lock().await.remove(local_id);
         {
             let mut threads = self.threads.lock().await;
             if let Some(t) = threads.get_mut(local_id) {
                 let old_messages = t.messages.clone();
                 let updated = now_iso();
                 t.platform_thread_id = Some(platform_id);
+                let mut messages = if let Some(prefix) = edit_prefix {
+                    let mut merged = prefix;
+                    merged.extend(done.messages.clone());
+                    merged
+                } else {
+                    done.messages.clone()
+                };
+                agent_mode::normalize_platform_user_messages(&mut messages);
+                platform_stream::sanitize_platform_messages(&mut messages);
                 t.messages = super::types::with_message_timestamps(
-                    done.messages.clone(),
+                    messages,
                     &old_messages,
                     Some(&updated),
                 );
@@ -2173,6 +2399,16 @@ fn attach_llm_provider(body: &mut Value, llm_provider: &Option<String>) {
         if let Some(obj) = body.as_object_mut() {
             obj.insert("provider".into(), json!(p));
         }
+    }
+}
+
+fn attach_agent_mode_fields(body: &mut Value, agent_mode: CoderAgentMode) {
+    if let Some(obj) = body.as_object_mut() {
+        obj.insert(
+            "mode_instruction".into(),
+            json!(agent_mode::mode_instruction(agent_mode)),
+        );
+        obj.insert("agent_mode".into(), json!(agent_mode::mode_as_str(agent_mode)));
     }
 }
 

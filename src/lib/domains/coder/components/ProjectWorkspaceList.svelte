@@ -28,6 +28,7 @@
     onDeleteThread?: (thread: CoderThread) => void;
     onProjectSelect?: (path: string, projectId?: string) => void;
     queuedCountFor?: (threadId: string) => number;
+    subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
   }
 
   let {
@@ -40,6 +41,7 @@
     onDeleteThread,
     onProjectSelect,
     queuedCountFor,
+    subAgentSummaryFor,
   }: Props = $props();
 
   let projects = $state<Project[]>([]);
@@ -228,6 +230,7 @@
             {onThreadClick}
             {onDeleteThread}
             {queuedCountFor}
+            {subAgentSummaryFor}
           />
         {/each}
       {/if}

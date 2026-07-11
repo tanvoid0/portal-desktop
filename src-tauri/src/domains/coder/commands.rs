@@ -12,8 +12,8 @@ use crate::domains::ai::services::AISettingsService;
 use super::service::{AgentTurn, CoderService};
 use super::types::{
     CoderSubAgent, CoderThread, CoderThreadKind, CoderThreadSummary, FileChange,
-    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PermissionMode,
-    PermissionRule,
+    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, CoderAgentMode,
+    PermissionMode, PermissionRule,
 };
 
 #[tauri::command]
@@ -103,6 +103,20 @@ pub async fn coder_retry(
 }
 
 #[tauri::command]
+pub async fn coder_edit_message(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+    message_index: usize,
+    content: String,
+) -> Result<(), String> {
+    service
+        .prepare_edit_message(&thread_id, message_index, content)
+        .await?;
+    CoderService::spawn_run(service.inner().clone(), thread_id, AgentTurn::Send);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn coder_approve(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -162,16 +176,32 @@ pub async fn coder_list_running(
 #[tauri::command]
 pub async fn coder_get_mode(
     service: State<'_, Arc<CoderService>>,
-) -> Result<PermissionMode, String> {
+) -> Result<CoderAgentMode, String> {
     Ok(service.get_mode().await)
 }
 
 #[tauri::command]
 pub async fn coder_set_mode(
     service: State<'_, Arc<CoderService>>,
-    mode: PermissionMode,
+    mode: CoderAgentMode,
 ) -> Result<(), String> {
     service.set_mode(mode).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn coder_get_permission_mode(
+    service: State<'_, Arc<CoderService>>,
+) -> Result<PermissionMode, String> {
+    Ok(service.get_permission_mode().await)
+}
+
+#[tauri::command]
+pub async fn coder_set_permission_mode(
+    service: State<'_, Arc<CoderService>>,
+    mode: PermissionMode,
+) -> Result<(), String> {
+    service.set_permission_mode(mode).await;
     Ok(())
 }
 
@@ -253,6 +283,17 @@ pub fn coder_list_dir(
 ) -> Result<Vec<super::types::WorkspaceDirEntry>, String> {
     let rel = path.unwrap_or_else(|| ".".to_string());
     super::tools::list_dir_entries(&workspace_root, &rel)
+}
+
+#[tauri::command]
+pub fn coder_read_file(workspace_root: String, path: String) -> Result<String, String> {
+    super::tools::read_file(&workspace_root, &path)
+}
+
+#[tauri::command]
+pub fn coder_write_file(workspace_root: String, path: String, content: String) -> Result<(), String> {
+    super::tools::write_file(&workspace_root, &path, &content)?;
+    Ok(())
 }
 
 #[tauri::command]

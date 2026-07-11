@@ -16,6 +16,7 @@ import type {
   MultitaskCleanupRequest,
   MultitaskSpawnRequest,
   PendingApproval,
+  CoderAgentMode,
   PermissionMode,
   PermissionRule,
   ThreadTitleEvent,
@@ -86,6 +87,19 @@ export class CoderService {
     return invoke<void>("coder_retry", { threadId });
   }
 
+  /** Edit a user message and rerun the agent from that point. */
+  editMessage(
+    threadId: string,
+    messageIndex: number,
+    content: string,
+  ): Promise<void> {
+    return invoke<void>("coder_edit_message", {
+      threadId,
+      messageIndex,
+      content,
+    });
+  }
+
   /** Resolve a pending approval and continue the run. */
   approve(
     threadId: string,
@@ -117,12 +131,20 @@ export class CoderService {
     return invoke<string[]>("coder_list_running");
   }
 
-  getMode(): Promise<PermissionMode> {
-    return invoke<PermissionMode>("coder_get_mode");
+  getMode(): Promise<CoderAgentMode> {
+    return invoke<CoderAgentMode>("coder_get_mode");
   }
 
-  setMode(mode: PermissionMode): Promise<void> {
+  setMode(mode: CoderAgentMode): Promise<void> {
     return invoke<void>("coder_set_mode", { mode });
+  }
+
+  getPermissionMode(): Promise<PermissionMode> {
+    return invoke<PermissionMode>("coder_get_permission_mode");
+  }
+
+  setPermissionMode(mode: PermissionMode): Promise<void> {
+    return invoke<void>("coder_set_permission_mode", { mode });
   }
 
   listRules(): Promise<PermissionRule[]> {
@@ -169,6 +191,16 @@ export class CoderService {
   }
 
   // ---- live streaming events (emitted during a run) ------------------
+
+  /** Still waiting on the LLM for the current step (no output yet). */
+  onHeartbeat(
+    cb: (p: { thread_id: string; waited_seconds: number }) => void,
+  ): Promise<UnlistenFn> {
+    return listen<{ thread_id: string; waited_seconds: number }>(
+      "coder://heartbeat",
+      (e) => cb(e.payload),
+    );
+  }
 
   /** An incremental assistant text token during generation. */
   onToken(

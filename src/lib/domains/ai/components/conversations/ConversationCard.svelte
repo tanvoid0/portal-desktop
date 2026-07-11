@@ -31,6 +31,6 @@
   messageCount={conversation.message_count ?? 0}
   subtitle={subtitle || null}
   deleteTitle="Delete conversation"
-  onclick={onClick}
+  {onClick}
   onDelete={onDelete ? () => onDelete(conversation) : undefined}
 />

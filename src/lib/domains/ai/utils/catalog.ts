@@ -1,4 +1,4 @@
-import type { CatalogModel, CatalogProvider } from "../types/index.js";
+import type { CatalogModel, CatalogModelCapabilities, CatalogProvider } from "../types/index.js";
 
 /** Local backends first, then cloud (matches agent-platform config UI). */
 export const CATALOG_PROVIDER_ORDER = [
@@ -178,7 +178,41 @@ const MODEL_BADGE_STYLES = {
       "border-zinc-200/80 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900/60",
     value: "text-zinc-600 dark:text-zinc-300",
   },
+  toolsYes: {
+    badge:
+      "border-emerald-200/80 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/60",
+    value: "text-emerald-700 dark:text-emerald-300",
+  },
+  toolsNo: {
+    badge:
+      "border-rose-200/80 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/60",
+    value: "text-rose-700 dark:text-rose-300",
+  },
+  vision: {
+    badge:
+      "border-cyan-200/80 bg-cyan-50 dark:border-cyan-800 dark:bg-cyan-950/60",
+    value: "text-cyan-700 dark:text-cyan-300",
+  },
 } as const;
+
+function capabilityBadges(
+  caps: CatalogModelCapabilities | undefined,
+): ModelDisplayBadge[] {
+  if (!caps) return [];
+  const out: ModelDisplayBadge[] = [];
+  if (caps.tools === true) {
+    out.push(makeBadge("tools", "Tools", "yes", "spec", "toolsYes"));
+  } else if (caps.tools === false) {
+    out.push(makeBadge("tools", "Tools", "no", "spec", "toolsNo"));
+  }
+  if (caps.vision_input === true) {
+    out.push(makeBadge("vision", "Vision", "yes", "spec", "vision"));
+  }
+  if (caps.embeddings === true) {
+    out.push(makeBadge("embeddings", "Embeddings", "yes", "spec", "extra"));
+  }
+  return out;
+}
 
 const KNOWN_METADATA_KEYS = new Set([
   "parameter_size",
@@ -254,6 +288,8 @@ export function getModelDisplayParts(model: CatalogModel): ModelDisplayParts {
       makeBadge("size", "Size", formatBytes(size), "spec", "size"),
     );
   }
+
+  specBadges.push(...capabilityBadges(model.capabilities));
 
   if (model.provider && model.provider !== "unknown") {
     specBadges.push(

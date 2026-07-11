@@ -64,26 +64,18 @@
 
 <div class="flex flex-col {isUser ? 'items-end' : 'items-start'}">
   {#if showTypingBubble}
-    <div class="flex max-w-[85%] items-start gap-2.5">
-      <div
-        class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
-        aria-hidden="true"
-      >
-        <Bot class="h-4 w-4" />
-      </div>
-      <TypingIndicator />
-    </div>
+    <TypingIndicator size="sm" label="Thinking…" />
   {:else if hasBubbleContent}
     <Card
-      class="max-w-[85%] px-4 py-2.5 {isUser
+      class="max-w-[90%] px-3 py-2 {isUser
         ? 'bg-primary text-primary-foreground'
-        : 'bg-muted/90 border-border/50 shadow-sm'} {isStreaming && isAssistant
-        ? 'ring-1 ring-primary/20'
+        : 'border-border/40 bg-muted/30 shadow-none'} {isStreaming && isAssistant
+        ? 'ring-1 ring-primary/15'
         : ''}"
     >
       {#if formattedTimestamp || formattedLatency}
         <div
-          class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] {isUser
+          class="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] {isUser
             ? 'text-primary-foreground/75'
             : 'text-muted-foreground'}"
         >
@@ -100,15 +92,15 @@
           {/if}
         </div>
       {/if}
-      <div class="flex items-start gap-2">
+      <div class="flex items-start gap-1.5">
         {#if isAssistant}
-          <Bot class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <Bot class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         {:else}
-          <User class="mt-0.5 h-4 w-4 shrink-0" />
+          <User class="mt-0.5 h-3.5 w-3.5 shrink-0" />
         {/if}
         {#if message.content}
           {#if isUser}
-            <p class="flex-1 whitespace-pre-wrap text-sm leading-relaxed">
+            <p class="flex-1 whitespace-pre-wrap text-xs leading-relaxed">
               {message.content}
             </p>
           {:else}
@@ -116,6 +108,7 @@
               content={message.content}
               variant="assistant"
               {isStreaming}
+              density="compact"
               class="flex-1"
             />
           {/if}
@@ -124,7 +117,7 @@
     </Card>
   {/if}
   {#if children}
-    <div class="mt-2 w-full max-w-[85%] space-y-2">
+    <div class="mt-1.5 w-full max-w-[90%] space-y-1.5">
       {@render children()}
     </div>
   {/if}

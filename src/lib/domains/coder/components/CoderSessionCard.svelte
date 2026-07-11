@@ -10,6 +10,7 @@
     isActive?: boolean;
     isRunning?: boolean;
     queuedCount?: number;
+    subAgentRunning?: number;
     hideProject?: boolean;
     compact?: boolean;
   }
@@ -21,6 +22,7 @@
     isActive = false,
     isRunning = false,
     queuedCount = 0,
+    subAgentRunning = 0,
     hideProject = false,
     compact = false,
   }: Props = $props();
@@ -44,9 +46,28 @@
       : [],
   );
 
-  const trailingBadges = $derived(
-    isRunning ? [{ label: "Active", variant: "outline" as const, class: "border-primary/30 text-primary" }] : [],
-  );
+  const trailingBadges = $derived.by(() => {
+    const badges: {
+      label: string;
+      variant: "outline";
+      class?: string;
+    }[] = [];
+    if (subAgentRunning > 0) {
+      badges.push({
+        label: `${subAgentRunning} agent${subAgentRunning === 1 ? "" : "s"}`,
+        variant: "outline",
+        class: "border-purple-500/30 text-purple-600 dark:text-purple-400",
+      });
+    }
+    if (isRunning) {
+      badges.push({
+        label: "Active",
+        variant: "outline",
+        class: "border-primary/30 text-primary",
+      });
+    }
+    return badges;
+  });
 </script>
 
 <AISessionCard
@@ -64,6 +85,6 @@
   {inlineBadges}
   {trailingBadges}
   deleteTitle="Delete session"
-  onclick={onClick}
+  {onClick}
   onDelete={onDelete ? () => onDelete(thread) : undefined}
 />

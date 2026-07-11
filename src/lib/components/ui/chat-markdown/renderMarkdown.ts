@@ -58,6 +58,11 @@ function resolveLanguage(lang?: string | null): string | null {
   return hljs.getLanguage(normalized) ? normalized : null;
 }
 
+/** Highlight raw source by file extension (e.g. "ts", "py"), reusing the languages registered above. */
+export function highlightByExtension(text: string, ext: string): string {
+  return highlightCode(text, ext);
+}
+
 function highlightCode(text: string, lang?: string | null): string {
   const resolved = resolveLanguage(lang);
   if (resolved) {

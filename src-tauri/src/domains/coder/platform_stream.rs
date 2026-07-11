@@ -3,10 +3,47 @@
 use crate::domains::ai::context_usage::{
     parse_context_usage, parse_llm_usage, ContextUsage, LlmUsage,
 };
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde_json::Value;
 
 use super::tools;
 use super::types::{ChatMessage, PendingApproval};
+
+static LEAKED_TOOL_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)<function=(\w+)[^>]*>(?:[\s\S]*?</function>)?").unwrap());
+
+/// Models without native tool support sometimes emit pseudo-calls like `<function=list_dir>`.
+pub fn strip_leaked_tool_syntax(text: &str) -> String {
+    LEAKED_TOOL_RE.replace_all(text, "").trim().to_string()
+}
+
+/// Latest assistant text bubble that leaked a tool call instead of using structured tools.
+pub fn find_leaked_tool_call(messages: &[ChatMessage]) -> Option<String> {
+    for m in messages.iter().rev() {
+        if m.role != "assistant" || m.tool_calls.is_some() {
+            continue;
+        }
+        let content = m.content.as_deref().unwrap_or("");
+        if content.is_empty() {
+            continue;
+        }
+        return LEAKED_TOOL_RE
+            .captures(content)
+            .map(|caps| caps[1].to_string());
+    }
+    None
+}
+
+pub fn sanitize_platform_messages(messages: &mut [ChatMessage]) {
+    for m in messages.iter_mut() {
+        if m.role == "assistant" && m.tool_calls.is_none() {
+            if let Some(content) = m.content.as_mut() {
+                *content = strip_leaked_tool_syntax(content);
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct PlatformDone {
@@ -116,5 +153,34 @@ pub fn done_from_event(data: &Value) -> PlatformDone {
         final_text,
         context_usage,
         llm_usage,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domains::coder::types::ChatMessage;
+
+    #[test]
+    fn strip_leaked_tool_syntax_removes_function_tag() {
+        assert_eq!(
+            strip_leaked_tool_syntax("I'll explore. <function=list_dir>"),
+            "I'll explore."
+        );
+    }
+
+    #[test]
+    fn find_leaked_tool_call_detects_latest_assistant_text() {
+        let messages = vec![
+            ChatMessage::user("hello"),
+            ChatMessage {
+                role: "assistant".into(),
+                content: Some("Let me look. <function=list_dir>".into()),
+                tool_calls: None,
+                tool_call_id: None,
+                timestamp: None,
+            },
+        ];
+        assert_eq!(find_leaked_tool_call(&messages).as_deref(), Some("list_dir"));
     }
 }

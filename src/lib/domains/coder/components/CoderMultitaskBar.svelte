@@ -2,10 +2,12 @@
   import { Button } from "$lib/components/ui/button";
   import { ChevronDown, ChevronRight, GitBranchPlus, Trash2 } from "@lucide/svelte";
   import type { CoderSubAgent } from "../types.js";
-  import CoderSubAgentCard from "./CoderSubAgentCard.svelte";
+  import CoderSubAgentInline from "./CoderSubAgentInline.svelte";
 
   interface Props {
     subAgents: CoderSubAgent[];
+    coordinatorId?: string;
+    onOpen?: (childThreadId: string, coordinatorId: string) => void;
     onCancel?: (subAgentId: string) => void;
     onCleanupOne?: (subAgentId: string) => void;
     onCleanupAll?: () => void;
@@ -13,6 +15,8 @@
 
   let {
     subAgents = [],
+    coordinatorId = "",
+    onOpen,
     onCancel,
     onCleanupOne,
     onCleanupAll,
@@ -60,14 +64,16 @@
   </div>
 
   {#if expanded && subAgents.length > 0}
-    <div class="mt-2 space-y-2">
-      {#each subAgents as subAgent (subAgent.id)}
-        <CoderSubAgentCard
-          {subAgent}
-          onCancel={onCancel}
-          onCleanup={onCleanupOne}
-        />
-      {/each}
+    <div class="mt-2">
+    <CoderSubAgentInline
+      {subAgents}
+      {coordinatorId}
+      {onOpen}
+      onCancel={onCancel}
+      onCleanup={onCleanupOne}
+      compact={true}
+      showHeader={false}
+    />
     </div>
   {/if}
 </div>

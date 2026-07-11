@@ -12,10 +12,12 @@ import type {
   CoderSubAgent,
   CoderThread,
   CoderThreadKind,
+  SpawnSubAgentTask,
   FileChange,
   PendingApproval,
-  PermissionMode,
   PermissionRule,
+  CoderAgentMode,
+  PermissionMode,
   ThreadTitleEvent,
 } from "../types.js";
 import { summaryToThread } from "../types.js";
@@ -37,11 +39,33 @@ import {
 } from "../services/coderTerminalCoordinator.js";
 import { coderTerminalStore } from "./coderTerminalStore.svelte.js";
 import { coderWorkspaceStore } from "./coderWorkspaceStore.svelte.js";
+import { inferEffectiveMode } from "../config/agentModes.js";
 import { coderUi } from "./coderUi.svelte.js";
+
+export type SubAgentNotificationEvent =
+  | {
+      type: "finished";
+      coordinatorId: string;
+      subAgent: CoderSubAgent;
+    }
+  | {
+      type: "complete";
+      coordinatorId: string;
+      subAgents: CoderSubAgent[];
+    }
+  | {
+      type: "spawned";
+      coordinatorId: string;
+      count: number;
+    };
+
+export type SubAgentNotificationHandler = (event: SubAgentNotificationEvent) => void;
 
 export interface ThreadRuntime {
   messages: ChatMessage[];
   streamingText: string;
+  /** Seconds waited on the current LLM step with no output yet (0 = not waiting). */
+  waitingSeconds: number;
   running: boolean;
   pending: PendingApproval | null;
   error: string | null;
@@ -63,12 +87,17 @@ export interface ThreadRuntime {
   messageQueue: string[];
   subAgents: CoderSubAgent[];
   multitaskMode: boolean;
+  /** Inferred sub-mode when agentMode is "auto" (UI subtitle only). */
+  effectiveMode: CoderAgentMode | null;
+  /** Set when viewing a sub-agent thread opened from a coordinator. */
+  parentCoordinatorId?: string | null;
 }
 
 function emptyRuntime(): ThreadRuntime {
   return {
     messages: [],
     streamingText: "",
+    waitingSeconds: 0,
     running: false,
     pending: null,
     error: null,
@@ -80,6 +109,7 @@ function emptyRuntime(): ThreadRuntime {
     messageQueue: [],
     subAgents: [],
     multitaskMode: false,
+    effectiveMode: null,
   };
 }
 
@@ -201,7 +231,8 @@ class CoderSessionState {
   activeThreadId = $state<string | null>(null);
   thread = $state<CoderThread | null>(null);
   workspaceRoot = $state("");
-  mode = $state<PermissionMode>("review");
+  agentMode = $state<CoderAgentMode>("auto");
+  permissionMode = $state<PermissionMode>("review");
   rules = $state<PermissionRule[]>([]);
   changes = $state<FileChange[]>([]);
   runningThreadIds = $state<Set<string>>(new Set());
@@ -209,6 +240,9 @@ class CoderSessionState {
   selectedBackendProvider = $state<string | null>(null);
   selectedModel = $state<string | null>(null);
   multitaskMode = $state(false);
+  /** Coordinator thread when drilling into a sub-agent session. */
+  parentCoordinatorId = $state<string | null>(null);
+  private subAgentNotificationHandler: SubAgentNotificationHandler | null = null;
   /** Bumped when any per-thread runtime changes (drives UI reactivity). */
   runtimeRevision = $state(0);
   /** Session terminal panel visibility (shared across threads). */
@@ -279,9 +313,15 @@ class CoderSessionState {
 
   private async runInit(): Promise<void> {
     try {
-      this.mode = await coderService.getMode();
+      this.agentMode = await coderService.getMode();
     } catch (e) {
       console.error("coder: getMode failed", e);
+    }
+
+    try {
+      this.permissionMode = await coderService.getPermissionMode();
+    } catch (e) {
+      console.error("coder: getPermissionMode failed", e);
     }
 
     try {
@@ -304,6 +344,13 @@ class CoderSessionState {
     await coderService.onToken(({ thread_id, delta }) => {
       const rt = this.runtimeFor(thread_id);
       rt.streamingText += delta;
+      rt.waitingSeconds = 0;
+      this.touchRuntime();
+    });
+
+    await coderService.onHeartbeat(({ thread_id, waited_seconds }) => {
+      const rt = this.runtimeFor(thread_id);
+      rt.waitingSeconds = waited_seconds;
       this.touchRuntime();
     });
 
@@ -325,6 +372,7 @@ class CoderSessionState {
         timestamp: message.timestamp ?? new Date().toISOString(),
       };
       if (stampedMessage.role === "assistant") rt.streamingText = "";
+      rt.waitingSeconds = 0;
       const last = rt.messages[rt.messages.length - 1];
       const dup =
         last &&
@@ -369,6 +417,7 @@ class CoderSessionState {
       rt.pending = pending;
       rt.running = false;
       rt.streamingText = "";
+      rt.waitingSeconds = 0;
       this.touchRuntime();
       this.setRunning(thread_id, false);
       void this.syncThreadFromBackend(thread_id);
@@ -378,6 +427,7 @@ class CoderSessionState {
       const rt = this.runtimeFor(thread_id);
       rt.running = false;
       rt.streamingText = "";
+      rt.waitingSeconds = 0;
       rt.pending = null;
       rt.canRetry = false;
       rt.lastRetry = null;
@@ -418,6 +468,7 @@ class CoderSessionState {
       const rt = this.runtimeFor(thread_id);
       rt.error = error;
       rt.running = false;
+      rt.waitingSeconds = 0;
       rt.canRetry = true;
       rt.lastRetry = { type: "send" };
       this.touchRuntime();
@@ -486,6 +537,13 @@ class CoderSessionState {
       const rt = this.runtimeFor(coordinator_id);
       rt.subAgents = subagents;
       this.touchRuntime();
+      if (this.shouldNotifyForCoordinator(coordinator_id)) {
+        this.emitSubAgentNotification({
+          type: "complete",
+          coordinatorId: coordinator_id,
+          subAgents: subagents,
+        });
+      }
     });
 
     this.initialized = true;
@@ -534,9 +592,27 @@ class CoderSessionState {
     }
   }
 
+  setSubAgentNotificationHandler(handler: SubAgentNotificationHandler | null) {
+    this.subAgentNotificationHandler = handler;
+  }
+
+  private shouldNotifyForCoordinator(
+    coordinatorId: string,
+    subAgent?: CoderSubAgent | null,
+  ): boolean {
+    if (this.activeThreadId === coordinatorId) return false;
+    if (subAgent && this.activeThreadId === subAgent.child_thread_id) return false;
+    return true;
+  }
+
+  private emitSubAgentNotification(event: SubAgentNotificationEvent) {
+    this.subAgentNotificationHandler?.(event);
+  }
+
   private upsertSubAgent(coordinatorId: string, subAgent: CoderSubAgent) {
     const rt = this.runtimeFor(coordinatorId);
     const idx = rt.subAgents.findIndex((item) => item.id === subAgent.id);
+    const previous = idx >= 0 ? rt.subAgents[idx] : null;
     if (idx >= 0) {
       rt.subAgents[idx] = subAgent;
       rt.subAgents = [...rt.subAgents];
@@ -545,6 +621,21 @@ class CoderSessionState {
     }
     rt.multitaskMode = true;
     this.touchRuntime();
+
+    const wasActive =
+      previous?.status === "running" || previous?.status === "pending";
+    const isDone = ["completed", "failed", "cancelled"].includes(subAgent.status);
+    if (
+      wasActive &&
+      isDone &&
+      this.shouldNotifyForCoordinator(coordinatorId, subAgent)
+    ) {
+      this.emitSubAgentNotification({
+        type: "finished",
+        coordinatorId,
+        subAgent,
+      });
+    }
   }
 
   async loadSubAgents(threadId: string) {
@@ -750,10 +841,64 @@ class CoderSessionState {
       this.threadsLoading = false;
     }
     this.bumpThreads();
+    void this.refreshCoordinatorSubAgents();
+  }
+
+  private async refreshCoordinatorSubAgents() {
+    const coordinators = this.threads.filter((t) => t.thread_kind === "coordinator");
+    await Promise.all(
+      coordinators.map((t) =>
+        this.loadSubAgents(t.id).catch((err) => {
+          console.warn(`coder: load sub-agents for ${t.id} failed`, err);
+        }),
+      ),
+    );
+  }
+
+  subAgentSummaryFor(threadId: string): { running: number; total: number } {
+    const rt = this.peekRuntime(threadId);
+    const running = rt.subAgents.filter(
+      (s) => s.status === "running" || s.status === "pending",
+    ).length;
+    return { running, total: rt.subAgents.length };
   }
 
   async refreshChanges(threadId?: string) {
     this.changes = await coderService.listChanges(threadId);
+  }
+
+  private findCoordinatorForSubAgent(childThreadId: string): string | null {
+    for (const [coordId, rt] of Object.entries(this.runtimes)) {
+      if (rt.subAgents.some((s) => s.child_thread_id === childThreadId)) {
+        return coordId;
+      }
+    }
+    return null;
+  }
+
+  private async resolveCoordinatorForSubAgent(childThreadId: string): Promise<string | null> {
+    const cached = this.findCoordinatorForSubAgent(childThreadId);
+    if (cached) return cached;
+
+    for (const summary of this.threads) {
+      if (summary.thread_kind !== "coordinator") continue;
+      await this.loadSubAgents(summary.id);
+      const coordId = this.findCoordinatorForSubAgent(childThreadId);
+      if (coordId) return coordId;
+    }
+    return null;
+  }
+
+  async openSubAgent(childThreadId: string, coordinatorId?: string) {
+    const coordId =
+      coordinatorId ??
+      this.findCoordinatorForSubAgent(childThreadId) ??
+      (await this.resolveCoordinatorForSubAgent(childThreadId));
+    if (coordId) {
+      this.parentCoordinatorId = coordId;
+      this.runtimeFor(childThreadId).parentCoordinatorId = coordId;
+    }
+    await this.selectThread(childThreadId);
   }
 
   async selectThread(id: string) {
@@ -766,6 +911,17 @@ class CoderSessionState {
     this.selectedModel = t.model ?? this.selectedModel;
     this.selectedBackendProvider = t.llm_provider ?? this.selectedBackendProvider;
     this.multitaskMode = t.thread_kind === "coordinator";
+
+    if (t.thread_kind === "sub-agent") {
+      const rt = this.runtimeFor(id);
+      this.parentCoordinatorId =
+        rt.parentCoordinatorId ?? (await this.resolveCoordinatorForSubAgent(id));
+      if (this.parentCoordinatorId) {
+        rt.parentCoordinatorId = this.parentCoordinatorId;
+      }
+    } else {
+      this.parentCoordinatorId = null;
+    }
 
     const rt = this.runtimeFor(id);
     const stamped = withMessageTimestamps(t.messages, rt.messages, t.updated_at);
@@ -812,7 +968,7 @@ class CoderSessionState {
       this.workspaceRoot.trim(),
       this.selectedModel || undefined,
       this.selectedBackendProvider || undefined,
-      this.multitaskMode ? "coordinator" : "session",
+      this.agentMode === "multitask" ? "coordinator" : "session",
       coderUi.activeProjectIdAsNumber(),
     );
     this.thread = t;
@@ -853,24 +1009,133 @@ class CoderSessionState {
     await this.sendNow(next, threadId);
   }
 
+  private looksLikeMultitaskInput(text: string): boolean {
+    if (this.extractIssueUrls(text).length >= 2) return true;
+    return (this.parseMultitaskTasks(text)?.length ?? 0) >= 2;
+  }
+
+  private async ensureCoordinatorThread(t: CoderThread): Promise<CoderThread> {
+    if (t.thread_kind === "coordinator") return t;
+    if (t.thread_kind === "sub-agent") return t;
+
+    await coderService.setThreadKind(t.id, "coordinator");
+    const updated: CoderThread = { ...t, thread_kind: "coordinator" };
+    if (this.thread?.id === t.id) {
+      this.thread = updated;
+    }
+    this.upsertThread(updated);
+    const rt = this.runtimeFor(t.id);
+    rt.multitaskMode = true;
+    if (this.activeThreadId === t.id) {
+      this.multitaskMode = true;
+    }
+    this.touchRuntime();
+    return updated;
+  }
+
+  private async trySpawnMultitask(
+    t: CoderThread,
+    text: string,
+  ): Promise<{ count: number; coordinatorId: string } | null> {
+    if (t.thread_kind === "sub-agent" || !this.looksLikeMultitaskInput(text)) {
+      return null;
+    }
+
+    const coord = await this.ensureCoordinatorThread(t);
+    if (coord.thread_kind !== "coordinator") return null;
+
+    const issueUrls = this.extractIssueUrls(text);
+    if (issueUrls.length >= 2) {
+      await this.spawnMultitask(coord.id, { issueUrls });
+      return { count: issueUrls.length, coordinatorId: coord.id };
+    }
+
+    const tasks = this.parseMultitaskTasks(text);
+    if (tasks && tasks.length >= 2) {
+      await this.spawnMultitask(coord.id, { tasks });
+      return { count: tasks.length, coordinatorId: coord.id };
+    }
+
+    return null;
+  }
+
+  async spawnBackgroundTask(text: string): Promise<boolean> {
+    await this.ensureInit();
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+
+    if (!this.workspaceRoot.trim()) {
+      if (this.activeThreadId) {
+        const rt = this.runtimeFor(this.activeThreadId);
+        rt.error = "Set a workspace folder first.";
+        this.touchRuntime();
+      }
+      return false;
+    }
+
+    const t = await this.createThreadIfNeeded();
+    this.activeThreadId = t.id;
+    this.thread = t;
+    this.upsertThread(t);
+    await this.syncThreadLlmConfig(t.id);
+
+    const coord = await this.ensureCoordinatorThread(t);
+    if (coord.thread_kind !== "coordinator") return false;
+
+    const title = trimmed.length > 72 ? `${trimmed.slice(0, 69)}…` : trimmed;
+    await this.spawnMultitask(coord.id, {
+      tasks: [{ title, prompt: trimmed }],
+    });
+
+    if (this.activeThreadId === coord.id) {
+      this.runtimeFor(coord.id).draftInput = "";
+    }
+
+    this.emitSubAgentNotification({
+      type: "spawned",
+      coordinatorId: coord.id,
+      count: 1,
+    });
+    return true;
+  }
+
   private extractIssueUrls(text: string): string[] {
     const matches = text.match(/https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/\d+/g);
     return matches ? [...new Set(matches)] : [];
   }
 
-  private async spawnIssueMultitask(threadId: string, text: string) {
-    const issueUrls = this.extractIssueUrls(text);
-    if (issueUrls.length < 2) return false;
+  private parseMultitaskTasks(text: string): SpawnSubAgentTask[] | null {
+    const stripped = text.replace(
+      /https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/\d+/g,
+      "",
+    );
+    const blocks = stripped.includes("\n---")
+      ? stripped.split(/\n---\n?/).map((line) => line.trim()).filter(Boolean)
+      : stripped
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+    if (blocks.length < 2) return null;
+
+    return blocks.map((block) => {
+      const title = block.length > 72 ? `${block.slice(0, 69)}…` : block;
+      return { title, prompt: block };
+    });
+  }
+
+  private async spawnMultitask(
+    threadId: string,
+    request: { tasks?: SpawnSubAgentTask[]; issueUrls?: string[] },
+  ) {
     const rt = this.runtimeFor(threadId);
     rt.error = null;
     await coderService.multitaskSpawn({
       coordinatorThreadId: threadId,
-      tasks: [],
-      issueUrls,
+      tasks: request.tasks ?? [],
+      issueUrls: request.issueUrls,
     });
     await this.loadSubAgents(threadId);
     this.touchRuntime();
-    return true;
   }
 
   async send(text: string) {
@@ -879,6 +1144,10 @@ class CoderSessionState {
     if (!trimmed) return;
 
     if (this.thread && this.shouldQueue(this.thread.id)) {
+      if (this.looksLikeMultitaskInput(trimmed)) {
+        await this.sendNow(trimmed);
+        return;
+      }
       const rt = this.runtimeFor(this.thread.id);
       rt.messageQueue = [...rt.messageQueue, trimmed];
       rt.draftInput = "";
@@ -916,19 +1185,27 @@ class CoderSessionState {
 
     await this.syncThreadLlmConfig(t.id);
 
-    if (t.thread_kind === "coordinator" && (await this.spawnIssueMultitask(t.id, trimmed))) {
+    const spawnResult = await this.trySpawnMultitask(t, trimmed);
+    if (spawnResult) {
       if (this.activeThreadId === t.id) {
         this.runtimeFor(t.id).draftInput = "";
       }
+      this.emitSubAgentNotification({
+        type: "spawned",
+        coordinatorId: spawnResult.coordinatorId,
+        count: spawnResult.count,
+      });
       return;
     }
 
     const rt = this.runtimeFor(t.id);
+    rt.effectiveMode = inferEffectiveMode(trimmed, this.agentMode);
     rt.error = null;
     rt.canRetry = false;
     rt.lastRetry = { type: "send" };
     rt.running = true;
     rt.streamingText = "";
+    rt.waitingSeconds = 0;
     this.touchRuntime();
     this.setRunning(t.id, true);
 
@@ -964,6 +1241,7 @@ class CoderSessionState {
     const rt = this.runtimeFor(threadId);
     rt.running = false;
     rt.streamingText = "";
+    rt.waitingSeconds = 0;
     rt.error = null;
     rt.pending = null;
     this.touchRuntime();
@@ -978,6 +1256,7 @@ class CoderSessionState {
     rt.error = null;
     rt.running = true;
     rt.streamingText = "";
+    rt.waitingSeconds = 0;
     rt.canRetry = false;
     this.touchRuntime();
     this.setRunning(threadId, true);
@@ -1008,6 +1287,38 @@ class CoderSessionState {
     }
   }
 
+  async editMessage(messageIndex: number, content: string) {
+    if (!this.thread || !this.activeThreadId) return;
+    const trimmed = content.trim();
+    if (!trimmed) return;
+
+    const threadId = this.thread.id;
+    const rt = this.runtimeFor(threadId);
+    if (rt.running || rt.pending) return;
+
+    rt.error = null;
+    rt.canRetry = false;
+    rt.lastRetry = { type: "send" };
+    rt.running = true;
+    rt.streamingText = "";
+    rt.waitingSeconds = 0;
+    rt.messageQueue = [];
+    this.touchRuntime();
+    this.setRunning(threadId, true);
+
+    try {
+      await coderService.editMessage(threadId, messageIndex, trimmed);
+      await this.syncThreadFromBackend(threadId);
+    } catch (e) {
+      rt.error = String(e);
+      rt.canRetry = true;
+      rt.lastRetry = { type: "send" };
+      rt.running = false;
+      this.touchRuntime();
+      this.setRunning(threadId, false);
+    }
+  }
+
   async decide(
     approve: boolean,
     remember: boolean,
@@ -1022,6 +1333,7 @@ class CoderSessionState {
 
     rt.running = true;
     rt.streamingText = "";
+    rt.waitingSeconds = 0;
     rt.error = null;
     rt.canRetry = false;
     rt.lastRetry = {
@@ -1089,9 +1401,20 @@ class CoderSessionState {
     this.touchRuntime();
   }
 
-  async changeMode(next: PermissionMode) {
-    this.mode = next;
+  async changeAgentMode(next: CoderAgentMode) {
+    this.agentMode = next;
     await coderService.setMode(next);
+
+    if (next === "multitask") {
+      await this.setMultitaskMode(true);
+    } else if (this.thread?.thread_kind === "coordinator") {
+      await this.setMultitaskMode(false);
+    }
+  }
+
+  async changePermissionMode(next: PermissionMode) {
+    this.permissionMode = next;
+    await coderService.setPermissionMode(next);
   }
 
   async removeRule(r: PermissionRule) {

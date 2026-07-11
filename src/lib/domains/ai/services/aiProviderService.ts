@@ -77,6 +77,7 @@ export class AIProviderService {
     return invoke<PlatformCatalog>("get_ai_platform_catalog", {
       providers: query.providers ?? null,
       live: query.live ?? null,
+      probe_capabilities: query.probe_capabilities ?? null,
     });
   }
 
@@ -85,9 +86,9 @@ export class AIProviderService {
     return this.getCatalog({ providers: ["all"], live: false });
   }
 
-  /** Full catalog with live upstream model lists. */
+  /** Full catalog with live upstream model lists and capability probes. */
   async getCatalogLive(): Promise<PlatformCatalog> {
-    return this.getCatalog({ providers: ["all"] });
+    return this.getCatalog({ providers: ["all"], probe_capabilities: true });
   }
 }
 

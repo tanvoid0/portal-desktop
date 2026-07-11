@@ -3,6 +3,38 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CatalogModelCapabilities {
+    #[serde(default)]
+    pub chat: Option<bool>,
+    #[serde(default)]
+    pub tools: Option<bool>,
+    #[serde(default)]
+    pub vision_input: Option<bool>,
+    #[serde(default)]
+    pub embeddings: Option<bool>,
+    #[serde(default)]
+    pub image_generation: Option<bool>,
+    #[serde(default)]
+    pub streaming: Option<bool>,
+    #[serde(default)]
+    pub probe_source: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CatalogProviderCapabilities {
+    #[serde(default)]
+    pub streaming: Option<bool>,
+    #[serde(default)]
+    pub tools: Option<bool>,
+    #[serde(default)]
+    pub json_mode: Option<bool>,
+    #[serde(default)]
+    pub modalities: Option<Value>,
+    #[serde(default)]
+    pub model_discovery: Option<Value>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformCatalog {
     pub object: String,
@@ -25,6 +57,8 @@ pub struct CatalogProvider {
     pub reachable: Option<bool>,
     #[serde(default)]
     pub default_model: Option<String>,
+    #[serde(default)]
+    pub capabilities: Option<CatalogProviderCapabilities>,
     pub models: Vec<CatalogModel>,
 }
 
@@ -39,6 +73,8 @@ pub struct CatalogModel {
     pub backend_id: Option<String>,
     #[serde(default)]
     pub metadata: Value,
+    #[serde(default)]
+    pub capabilities: Option<CatalogModelCapabilities>,
 }
 
 #[cfg(test)]
@@ -74,6 +110,8 @@ pub struct CatalogQuery {
     pub providers: Option<Vec<String>>,
     /// `Some(false)` = YAML aliases only (no upstream fetches).
     pub live: Option<bool>,
+    /// When true with live catalog, probe Ollama models for tools/vision flags.
+    pub probe_capabilities: Option<bool>,
 }
 
 impl CatalogQuery {
@@ -81,6 +119,7 @@ impl CatalogQuery {
         Self {
             providers: Some(vec!["all".to_string()]),
             live: Some(false),
+            probe_capabilities: None,
         }
     }
 
@@ -88,6 +127,7 @@ impl CatalogQuery {
         Self {
             providers: Some(vec!["all".to_string()]),
             live: None,
+            probe_capabilities: Some(true),
         }
     }
 }

@@ -4,6 +4,7 @@
   import { coderWorkspaceStore } from "../state/coderWorkspaceStore.svelte.js";
   import CoderTerminalPanel from "./CoderTerminalPanel.svelte";
   import CoderFileExplorer from "./CoderFileExplorer.svelte";
+  import CoderFilePreview from "./CoderFilePreview.svelte";
   import CoderBrowserPanel from "./CoderBrowserPanel.svelte";
   import ChangesPanel from "./ChangesPanel.svelte";
   import GitChangesPanel from "./GitChangesPanel.svelte";
@@ -74,6 +75,8 @@
       />
     {:else if panel === "files" && workspaceRoot}
       <CoderFileExplorer {workspaceRoot} />
+    {:else if panel === "file" && workspaceRoot && activeTab?.filePath}
+      <CoderFilePreview {workspaceRoot} filePath={activeTab.filePath} />
     {:else if panel === "browser"}
       <CoderBrowserPanel />
     {:else if panel === "changes"}

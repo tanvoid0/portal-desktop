@@ -4,14 +4,15 @@
 
 use serde_json::Value;
 
+use super::agent_mode;
 use super::tools;
-use super::types::{PermissionMode, PermissionRule};
+use super::types::{CoderAgentMode, PermissionMode, PermissionRule};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decision {
     /// Run it now.
     Allow,
-    /// Hard-refuse (Plan mode, or an explicit deny rule).
+    /// Hard-refuse (Ask/Plan mode, or an explicit deny rule).
     Deny(String),
     /// Pause and ask the user.
     Prompt,
@@ -19,13 +20,33 @@ pub enum Decision {
 
 /// Resolve what to do with a tool call.
 pub fn decide(
-    mode: PermissionMode,
+    agent: CoderAgentMode,
+    permission: PermissionMode,
     rules: &[PermissionRule],
     tool: &str,
     args: &Value,
 ) -> Decision {
     if tools::is_read_only(tool) {
         return Decision::Allow;
+    }
+
+    if agent == CoderAgentMode::Ask {
+        return Decision::Deny(format!("ask mode: tool `{tool}` is disabled"));
+    }
+
+    if agent == CoderAgentMode::Plan {
+        if matches!(tool, "write_file" | "edit_file") {
+            let path = args.get("path").and_then(Value::as_str).unwrap_or("");
+            if agent_mode::is_plan_write_allowed(path) {
+                return Decision::Allow;
+            }
+            return Decision::Deny(format!(
+                "plan mode: mutating tool `{tool}` is disabled (except .cursor/plans/*.plan.md)"
+            ));
+        }
+        if !matches!(tool, "run_command") && !tools::is_read_only(tool) {
+            return Decision::Deny(format!("plan mode: mutating tool `{tool}` is disabled"));
+        }
     }
 
     // Explicit deny rules win over everything except read-only.
@@ -38,20 +59,24 @@ pub fn decide(
         }
     }
 
-    match mode {
-        PermissionMode::Plan => {
-            Decision::Deny(format!("plan mode: mutating tool `{tool}` is disabled"))
-        }
-        PermissionMode::AutoAcceptAll => Decision::Allow,
-        PermissionMode::Review => {
-            for rule in rules.iter().filter(|r| r.allow && r.tool == tool) {
-                if matches(tool, &rule.pattern, args) {
-                    return Decision::Allow;
-                }
-            }
-            Decision::Prompt
+    apply_permission(permission, rules, tool, args)
+}
+
+fn apply_permission(
+    permission: PermissionMode,
+    rules: &[PermissionRule],
+    tool: &str,
+    args: &Value,
+) -> Decision {
+    if permission == PermissionMode::AutoAcceptAll {
+        return Decision::Allow;
+    }
+    for rule in rules.iter().filter(|r| r.allow && r.tool == tool) {
+        if matches(tool, &rule.pattern, args) {
+            return Decision::Allow;
         }
     }
+    Decision::Prompt
 }
 
 /// Does `pattern` cover this call's arguments?
@@ -142,7 +167,8 @@ mod tests {
     #[test]
     fn read_only_always_allowed() {
         let d = decide(
-            PermissionMode::Plan,
+            CoderAgentMode::Ask,
+            PermissionMode::Review,
             &[],
             "read_file",
             &json!({"path": "a"}),
@@ -151,9 +177,10 @@ mod tests {
     }
 
     #[test]
-    fn plan_blocks_writes() {
+    fn ask_blocks_writes() {
         let d = decide(
-            PermissionMode::Plan,
+            CoderAgentMode::Ask,
+            PermissionMode::AutoAcceptAll,
             &[],
             "write_file",
             &json!({"path": "a"}),
@@ -162,8 +189,33 @@ mod tests {
     }
 
     #[test]
-    fn review_prompts_without_rule() {
+    fn plan_blocks_writes_outside_plans_dir() {
         let d = decide(
+            CoderAgentMode::Plan,
+            PermissionMode::Review,
+            &[],
+            "write_file",
+            &json!({"path": "src/a.rs"}),
+        );
+        assert!(matches!(d, Decision::Deny(_)));
+    }
+
+    #[test]
+    fn plan_allows_plan_file_writes() {
+        let d = decide(
+            CoderAgentMode::Plan,
+            PermissionMode::Review,
+            &[],
+            "write_file",
+            &json!({"path": ".cursor/plans/feature.plan.md"}),
+        );
+        assert_eq!(d, Decision::Allow);
+    }
+
+    #[test]
+    fn debug_prompts_without_rule() {
+        let d = decide(
+            CoderAgentMode::Debug,
             PermissionMode::Review,
             &[],
             "run_command",
@@ -173,9 +225,22 @@ mod tests {
     }
 
     #[test]
+    fn auto_accepts_mutating_tools() {
+        let d = decide(
+            CoderAgentMode::Debug,
+            PermissionMode::AutoAcceptAll,
+            &[],
+            "run_command",
+            &json!({"command": "ls"}),
+        );
+        assert_eq!(d, Decision::Allow);
+    }
+
+    #[test]
     fn allowlist_grants_command_token() {
         let rules = [rule("run_command", "dir", true)];
         let d = decide(
+            CoderAgentMode::Debug,
             PermissionMode::Review,
             &rules,
             "run_command",
@@ -188,6 +253,7 @@ mod tests {
     fn allowlist_grants_command_arg_token() {
         let rules = [rule("run_command", "*moment*", true)];
         let d = decide(
+            CoderAgentMode::Debug,
             PermissionMode::Review,
             &rules,
             "run_command",
@@ -197,9 +263,10 @@ mod tests {
     }
 
     #[test]
-    fn deny_rule_beats_auto_accept() {
+    fn deny_rule_beats_auto() {
         let rules = [rule("run_command", "rm", false)];
         let d = decide(
+            CoderAgentMode::Auto,
             PermissionMode::AutoAcceptAll,
             &rules,
             "run_command",
@@ -212,6 +279,7 @@ mod tests {
     fn glob_scopes_writes() {
         let rules = [rule("write_file", "src/**", true)];
         let allow = decide(
+            CoderAgentMode::Debug,
             PermissionMode::Review,
             &rules,
             "write_file",
@@ -219,6 +287,7 @@ mod tests {
         );
         assert_eq!(allow, Decision::Allow);
         let prompt = decide(
+            CoderAgentMode::Debug,
             PermissionMode::Review,
             &rules,
             "write_file",

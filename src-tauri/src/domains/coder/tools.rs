@@ -306,12 +306,12 @@ fn resolve(root: &str, rel: &str) -> Result<PathBuf, String> {
     Ok(normalized)
 }
 
-fn read_file(root: &str, rel: &str) -> Result<String, String> {
+pub fn read_file(root: &str, rel: &str) -> Result<String, String> {
     let path = resolve(root, rel)?;
     std::fs::read_to_string(&path).map_err(|e| format!("read {rel}: {e}"))
 }
 
-fn write_file(root: &str, rel: &str, content: &str) -> Result<String, String> {
+pub fn write_file(root: &str, rel: &str, content: &str) -> Result<String, String> {
     let path = resolve(root, rel)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {e}"))?;

@@ -29,6 +29,7 @@
     selectedThreadId?: string | null;
     runningThreadIds?: Set<string>;
     queuedCountFor?: (threadId: string) => number;
+    subAgentSummaryFor?: (threadId: string) => { running: number; total: number };
     loading?: boolean;
     showRules?: boolean;
     onToggleRules?: () => void;
@@ -43,6 +44,7 @@
     selectedThreadId = null,
     runningThreadIds = new Set<string>(),
     queuedCountFor,
+    subAgentSummaryFor,
     loading = false,
     showRules = false,
     onToggleRules,
@@ -212,6 +214,7 @@
       {onDeleteThread}
       {onProjectSelect}
       {queuedCountFor}
+      {subAgentSummaryFor}
     />
   {/snippet}
 

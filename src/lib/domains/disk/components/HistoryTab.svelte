@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import type { AuditEntry } from "../types";
-  import { fmtBytes, fmtDate } from "../utils";
+  import { fmtBytes, fmtDate, DISK_STAT_GRID } from "../utils";
   import { Card, CardContent } from "$lib/components/ui/card";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
@@ -54,7 +54,7 @@
   }
 </script>
 
-<div class="mb-4 grid grid-cols-3 gap-3">
+<div class="{DISK_STAT_GRID} mb-4">
   <Card class="gap-0 py-4">
     <CardContent class="px-4">
       <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Total reclaimed</div>

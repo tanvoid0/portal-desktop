@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { Textarea } from "$lib/components/ui/textarea";
   import { Button } from "$lib/components/ui/button";
-  import { ArrowUp, Send } from "@lucide/svelte";
+  import { Plus } from "@lucide/svelte";
   import { cn } from "$lib/utils.js";
+  import AIComposerShell from "./AIComposerShell.svelte";
 
   interface Props {
     value: string;
@@ -11,7 +11,6 @@
     onSend: () => void;
     placeholder?: string;
     disabled?: boolean;
-    variant?: "default" | "floating";
     submitOn?: "enter" | "modifier-enter";
     rows?: number;
     class?: string;
@@ -25,9 +24,8 @@
     onSend,
     placeholder = "Type your message...",
     disabled = false,
-    variant = "default",
     submitOn = "enter",
-    rows = 3,
+    rows = 2,
     class: className = "",
     toolbar,
     hint = null,
@@ -40,23 +38,6 @@
         : "Enter to send, Shift+Enter for new line"),
   );
 
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key !== "Enter") return;
-
-    if (submitOn === "modifier-enter") {
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-        onSend();
-      }
-      return;
-    }
-
-    if (!event.shiftKey) {
-      event.preventDefault();
-      onSend();
-    }
-  }
-
   $effect(() => {
     if (onValueChange) {
       onValueChange(value);
@@ -64,61 +45,39 @@
   });
 </script>
 
-{#if variant === "floating"}
-  <div class={cn("px-4 pb-4 pt-2", className)}>
-    <div
-      class="mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background shadow-lg"
+<AIComposerShell
+  bind:value
+  {onSend}
+  {placeholder}
+  {disabled}
+  {submitOn}
+  {rows}
+  class={className}
+>
+  {#snippet leading()}
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      class="mb-0.5 h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-muted/80"
+      title="Add context"
+      disabled={disabled}
     >
-      <Textarea
-        bind:value
-        {placeholder}
-        {rows}
-        class="min-h-[52px] resize-none border-0 bg-transparent px-4 pt-4 text-sm shadow-none focus-visible:ring-0"
-        onkeydown={handleKeydown}
-        {disabled}
-      />
-      <div class="flex items-center justify-between gap-2 px-3 pb-3">
-        <div class="flex min-w-0 flex-1 items-center gap-2">
-          {#if toolbar}
-            {@render toolbar()}
-          {/if}
-        </div>
-        <Button
-          onclick={onSend}
-          disabled={!value.trim() || disabled}
-          size="icon"
-          class="h-8 w-8 shrink-0 rounded-full"
-        >
-          <ArrowUp class="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-    {#if hintText}
-      <p class="mt-2 text-center text-xs text-muted-foreground">{hintText}</p>
+      <Plus class="h-4 w-4" />
+    </Button>
+  {/snippet}
+
+  {#snippet trailing()}
+    {#if toolbar}
+      {@render toolbar()}
     {/if}
-  </div>
-{:else}
-  <div class={cn("divider-edge-t divider-edge-full p-4", className)}>
-    <div class="flex gap-2">
-      <Textarea
-        bind:value
-        {placeholder}
-        {rows}
-        class="resize-none"
-        onkeydown={handleKeydown}
-        {disabled}
-      />
-      <Button
-        onclick={onSend}
-        disabled={!value.trim() || disabled}
-        class="self-end"
-        size="sm"
-      >
-        <Send class="h-4 w-4" />
-      </Button>
-    </div>
+  {/snippet}
+
+  {#snippet footer()}
     {#if hintText}
-      <p class="mt-2 text-xs text-muted-foreground">{hintText}</p>
+      <p class={cn("text-xs text-muted-foreground", toolbar ? "px-1" : "text-center")}>
+        {hintText}
+      </p>
     {/if}
-  </div>
-{/if}
+  {/snippet}
+</AIComposerShell>

@@ -85,6 +85,12 @@ impl AgentPlatformProvider {
         if let Some(live) = query.live {
             req = req.query(&[("live", if live { "true" } else { "false" })]);
         }
+        if let Some(probe) = query.probe_capabilities {
+            req = req.query(&[(
+                "probe_capabilities",
+                if probe { "true" } else { "false" },
+            )]);
+        }
 
         let response = req
             .timeout(std::time::Duration::from_secs(30))
