@@ -105,7 +105,7 @@
     {#each tabHistory as entry (entry.id)}
       <Button
         variant="ghost"
-        class="h-auto w-full cursor-pointer justify-start border-b border-border p-3 text-left transition-colors hover:bg-accent/50"
+        class="divider-edge-b divider-edge-full h-auto w-full cursor-pointer justify-start p-3 text-left transition-colors hover:bg-accent/50"
         onclick={() => showEntryDetails(entry)}
         onkeydown={(e) => e.key === "Enter" && showEntryDetails(entry)}
         type="button"

@@ -311,7 +311,7 @@
 
       {#if showActions}
         <div
-          class="flex items-center gap-1 border-t pt-2 opacity-0 transition-opacity group-hover:opacity-100"
+          class="divider-edge-t divider-edge-full flex items-center gap-1 pt-2 opacity-0 transition-opacity group-hover:opacity-100"
         >
           <Button
             variant="ghost"

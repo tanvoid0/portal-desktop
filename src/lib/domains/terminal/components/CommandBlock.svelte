@@ -189,11 +189,11 @@
 
   <!-- Output -->
   {#if isExpanded && isAI && displayOutput}
-    <div class="border-t border-border/60 px-3 py-2">
+    <div class="divider-edge-t divider-edge-full px-3 py-2">
       <AiResponse content={displayOutput} onRunCommand={onRerun} />
     </div>
   {:else if isExpanded && (displayOutput || isRunning)}
-    <div class="relative border-t border-border/60">
+    <div class="divider-edge-t divider-edge-full relative">
       {#if isFailed && displayOutput && !isRunning}
         <ErrorOutput
           output={displayOutput}

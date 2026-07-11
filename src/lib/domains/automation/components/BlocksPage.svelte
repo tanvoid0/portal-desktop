@@ -559,7 +559,7 @@
 									</div>
 								{/if}
 
-								<div class="flex gap-2 pt-2 border-t">
+								<div class="divider-edge-t divider-edge-full flex gap-2 pt-2">
 									<Button
 										size="sm"
 										variant="outline"
@@ -676,7 +676,7 @@
 									<Badge variant="outline" class="text-xs">{template.framework}</Badge>
 								{/if}
 
-								<div class="flex gap-2 pt-2 border-t">
+								<div class="divider-edge-t divider-edge-full flex gap-2 pt-2">
 									<Button
 										size="sm"
 										variant="outline"

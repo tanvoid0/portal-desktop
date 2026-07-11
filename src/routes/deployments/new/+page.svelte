@@ -225,7 +225,7 @@
 
         <!-- Docker-specific fields -->
         {#if deploymentType === DeploymentType.DOCKER}
-          <div class="space-y-4 border-t pt-6">
+          <div class="divider-edge-t divider-edge-full space-y-4 pt-6">
             <h3 class="text-lg font-semibold">Docker Configuration</h3>
 
             <div>
@@ -266,7 +266,7 @@
 
         <!-- CLI-specific fields -->
         {#if deploymentType === DeploymentType.CLI}
-          <div class="space-y-4 border-t pt-6">
+          <div class="divider-edge-t divider-edge-full space-y-4 pt-6">
             <h3 class="text-lg font-semibold">CLI Configuration</h3>
 
             <div>
@@ -295,7 +295,7 @@
         {/if}
 
         <!-- Environment Variables -->
-        <div class="border-t pt-6">
+        <div class="divider-edge-t divider-edge-full pt-6">
           <div class="mb-4 flex items-center justify-between">
             <div>
               <h3 class="text-lg font-semibold">Environment Variables</h3>
@@ -351,7 +351,7 @@
         </div>
 
         <!-- Actions -->
-        <div class="flex gap-2 border-t pt-4">
+        <div class="divider-edge-t divider-edge-full flex gap-2 pt-4">
           <Button
             type="submit"
             disabled={!name ||

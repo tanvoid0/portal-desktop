@@ -121,7 +121,7 @@
   <Dialog.Content
     class="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden p-0"
   >
-    <div class="flex items-center justify-between border-b p-6">
+    <div class="divider-edge-b divider-edge-full flex items-center justify-between p-6">
       <div>
         <Dialog.Title class="flex items-center gap-2 text-2xl">
           {#if activeInstance?.script.icon}

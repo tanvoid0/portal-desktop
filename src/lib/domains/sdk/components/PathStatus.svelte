@@ -238,7 +238,7 @@
 
       <!-- Detailed Information -->
       {#if showDetails}
-        <div class="space-y-4 border-t pt-4">
+        <div class="divider-edge-t divider-edge-full space-y-4 pt-4">
           <!-- Binaries in PATH -->
           {#if status.binaries_in_path.length > 0}
             <div>

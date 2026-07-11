@@ -1015,7 +1015,7 @@
               },
               {} as Record<string, typeof unmappedFrameworks>,
             )}
-            <div class="space-y-4 border-t pt-4">
+            <div class="divider-edge-t divider-edge-full space-y-4 pt-4">
               <p class="mb-3 text-sm font-medium text-muted-foreground">
                 Add More Frameworks
               </p>

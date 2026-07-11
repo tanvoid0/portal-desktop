@@ -169,7 +169,7 @@
 
       <!-- Active Filters Summary -->
       {#if hasActiveFilters}
-        <div class="mt-4 border-t border-border pt-4">
+        <div class="divider-edge-t divider-edge-full mt-4 pt-4">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-xs text-muted-foreground">Active filters:</span>
             {#each statusFilters as status}

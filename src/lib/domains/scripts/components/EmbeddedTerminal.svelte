@@ -55,7 +55,7 @@
   class:expanded={isExpanded}
 >
   <div
-    class="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-3 py-2"
+    class="divider-edge-b divider-edge-full flex items-center justify-between bg-gray-800 px-3 py-2"
   >
     <div class="flex items-center gap-2">
       <div

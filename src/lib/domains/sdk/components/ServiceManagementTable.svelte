@@ -558,7 +558,7 @@
       </div>
 
       <!-- Service Stats -->
-      <div class="flex items-center justify-between border-t pt-4">
+      <div class="divider-edge-t divider-edge-full flex items-center justify-between pt-4">
         <div class="text-sm text-muted-foreground">
           {filteredServices().length} services
           {#if selectedServices.size > 0}

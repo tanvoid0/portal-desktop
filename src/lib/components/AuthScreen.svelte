@@ -238,7 +238,7 @@
             </Button>
           </div>
 
-          <div class="space-y-1 border-t pt-2 text-xs text-muted-foreground">
+          <div class="divider-edge-t divider-edge-full space-y-1 pt-2 text-xs text-muted-foreground">
             <p><strong>Device:</strong> {deviceInfo.device_name}</p>
             <p>
               <strong>Device ID:</strong>

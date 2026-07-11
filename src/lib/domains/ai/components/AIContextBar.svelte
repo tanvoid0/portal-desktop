@@ -117,7 +117,7 @@
         {/if}
 
         {#if llmUsage && llmUsage.total_tokens > 0}
-          <div class="border-t pt-2">
+          <div class="divider-edge-t divider-edge-full pt-2">
             <p class="text-xs font-medium text-muted-foreground">Last turn (LLM)</p>
             <p class="mt-0.5 text-xs tabular-nums">
               {formatTokenCount(llmUsage.total_tokens)} tokens

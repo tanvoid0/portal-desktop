@@ -467,7 +467,7 @@
       </div>
 
       <!-- Version Stats -->
-      <div class="flex items-center justify-between border-t pt-4">
+      <div class="divider-edge-t divider-edge-full flex items-center justify-between pt-4">
         <div class="text-sm text-muted-foreground">
           {filteredVersions().length} versions
           {#if selectedVersions.size > 0}

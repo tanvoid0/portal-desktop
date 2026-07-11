@@ -41,6 +41,7 @@
     Clock,
     Play,
     Loader2,
+    Workflow,
   } from "@lucide/svelte";
   import {
     Tabs,
@@ -94,6 +95,7 @@
   } from "$lib/components/shell";
   import { toast } from "$lib/utils/toast";
   import { Sparkles } from "@lucide/svelte";
+  import { GitHubProjectActionsPanel } from "$lib/domains/github";
 
   const log = logger.createScoped("ProjectDetailsPage");
 
@@ -128,6 +130,7 @@
     "overview",
     "dependencies",
     "pipelines",
+    "ci",
     "terminal",
   ] as const;
   type ProjectTab = (typeof PROJECT_TABS)[number];
@@ -779,7 +782,7 @@
       onValueChange={(v) => setActiveTab(v as ProjectTab)}
       class="w-full"
     >
-      <TabsList class="grid w-full grid-cols-4">
+      <TabsList class="grid w-full grid-cols-5">
         <TabsTrigger value="overview" class="gap-2">
           <FolderOpen class="h-4 w-4" />
           Overview
@@ -791,6 +794,10 @@
         <TabsTrigger value="pipelines" class="gap-2">
           <Code class="h-4 w-4" />
           Pipelines
+        </TabsTrigger>
+        <TabsTrigger value="ci" class="gap-2">
+          <Workflow class="h-4 w-4" />
+          CI/CD
         </TabsTrigger>
         <TabsTrigger value="terminal" class="gap-2">
           <Terminal class="h-4 w-4" />
@@ -1239,7 +1246,7 @@
 
               <!-- Add New Command Section -->
               {#if hasAnyCommands(project) && editingField === null}
-                <div class="border-t pt-2">
+                <div class="divider-edge-t divider-edge-full pt-2">
                   <div class="flex flex-wrap gap-2">
                     {#if !project.build_command && editingField !== "build_command"}
                       <Button
@@ -1649,6 +1656,13 @@
                 onSelect={handleViewRun}
               />
             {/if}
+        </TabsContent>
+
+        <TabsContent value="ci" class="mt-6 space-y-6">
+          <GitHubProjectActionsPanel
+            project={currentProject}
+            enabled={activeTab === "ci"}
+          />
         </TabsContent>
 
         <TabsContent value="terminal" class="mt-6">

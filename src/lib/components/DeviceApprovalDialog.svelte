@@ -180,7 +180,7 @@
                 </div>
               </div>
             </div>
-            <div class="flex items-center gap-2 border-t pt-2">
+            <div class="divider-edge-t divider-edge-full flex items-center gap-2 pt-2">
               <Button
                 variant="outline"
                 size="sm"

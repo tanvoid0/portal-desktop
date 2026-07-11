@@ -141,7 +141,7 @@
     </CollapsibleTrigger>
 
     <CollapsibleContent>
-      <CardContent class="space-y-3 border-t pt-4">
+      <CardContent class="divider-edge-t divider-edge-full space-y-3 pt-4">
         <div class="flex flex-wrap gap-2">
           {#if group.deployment}
             {#if group.deployment.status === "running"}

@@ -491,7 +491,7 @@
     </Collapsible>
 
     <!-- Actions -->
-    <div class="flex justify-end gap-3 border-t pt-4">
+    <div class="divider-edge-t divider-edge-full flex justify-end gap-3 pt-4">
       <Button variant="outline" onclick={onCancel} disabled={isSubmitting}>
         Cancel
       </Button>

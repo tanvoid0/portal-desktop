@@ -134,7 +134,7 @@
       {/if}
 
       {#if showDetails && metrics.timestamp}
-        <div class="border-t pt-2">
+        <div class="divider-edge-t divider-edge-full pt-2">
           <p class="text-xs text-muted-foreground">
             Last updated: {new Date(metrics.timestamp).toLocaleTimeString()}
           </p>

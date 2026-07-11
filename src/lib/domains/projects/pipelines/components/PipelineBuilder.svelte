@@ -254,7 +254,7 @@
       </div>
 
       <!-- Actions -->
-      <div class="flex justify-end gap-2 border-t pt-4">
+      <div class="divider-edge-t divider-edge-full flex justify-end gap-2 pt-4">
         <Button variant="outline" onclick={handleCancel}>Cancel</Button>
         <Button onclick={handleSave} disabled={validationErrors.length > 0}>
           Save Pipeline

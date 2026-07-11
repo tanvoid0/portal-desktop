@@ -123,7 +123,7 @@
   <Dialog.Content
     class="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0"
   >
-    <div class="flex items-center justify-between border-b p-6">
+    <div class="divider-edge-b divider-edge-full flex items-center justify-between p-6">
       <Dialog.Title class="text-2xl">
         {script ? "Edit Script" : "Create Script"}
       </Dialog.Title>
@@ -204,7 +204,7 @@
       </Card>
     </div>
 
-    <div class="flex justify-end gap-2 border-t p-6">
+    <div class="divider-edge-t divider-edge-full flex justify-end gap-2 p-6">
       <Button variant="outline" onclick={onClose} disabled={saving}>
         Cancel
       </Button>

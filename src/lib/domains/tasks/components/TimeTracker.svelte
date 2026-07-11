@@ -131,7 +131,7 @@
 
     <!-- Recent Sessions (placeholder) -->
     {#if !taskUi.currentlyTracking}
-      <div class="mt-4 border-t pt-4">
+      <div class="divider-edge-t divider-edge-full mt-4 pt-4">
         <div class="mb-2 text-xs text-muted-foreground">Recent Sessions</div>
         <div class="space-y-1">
           <div class="flex justify-between text-xs">

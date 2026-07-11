@@ -15,8 +15,12 @@
     getWorkflowStatusColor,
     getWorkflowStatusIcon,
     isWorkflowJobActive,
+    isWorkflowJobLogsFetchable,
+    isWorkflowLogsUnavailableMessage,
     isWorkflowRunActive,
   } from "$lib/domains/github/utils/workflowDisplay";
+
+  const WORKFLOW_POLL_INTERVAL_MS = 3_000;
   import { ChevronDown, ChevronRight, ExternalLink, RefreshCw } from "@lucide/svelte";
 
   interface Props {
@@ -45,12 +49,29 @@
       jobs.some((job) => isWorkflowJobActive(job.status)),
   );
 
+  const expandedJob = $derived(
+    expandedJobId != null ? jobs.find((job) => job.id === expandedJobId) : null,
+  );
+
   const logsQuery = createGitHubWorkflowJobLogsQuery(
     () => owner,
     () => repo,
     () => expandedJobId ?? undefined,
-    () => enabled && expandedJobId != null,
+    () =>
+      enabled &&
+      expandedJobId != null &&
+      expandedJob != null &&
+      isWorkflowJobLogsFetchable(expandedJob.status),
   );
+
+  $effect(() => {
+    if (!expandedJob || !isWorkflowJobActive(expandedJob.status)) return;
+    if (!isWorkflowJobLogsFetchable(expandedJob.status)) return;
+    const interval = setInterval(() => {
+      void logsQuery.refetch();
+    }, WORKFLOW_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  });
 
   function toggleJob(job: GitHubWorkflowJob) {
     expandedJobId = expandedJobId === job.id ? null : job.id;
@@ -158,7 +179,7 @@
             </Button>
 
             {#if expandedJobId === job.id}
-              <div class="space-y-3 border-t px-3 pb-3 pt-2">
+              <div class="divider-edge-t divider-edge-full space-y-3 px-3 pb-3 pt-2">
                 {#if job.steps.length > 0}
                   <div class="space-y-1">
                     {#each job.steps as step (step.number)}
@@ -197,7 +218,11 @@
                       <ExternalLink class="ml-1 h-3 w-3" />
                     </a>
                   </div>
-                  {#if logsQuery.isPending}
+                  {#if expandedJob && !isWorkflowJobLogsFetchable(expandedJob.status)}
+                    <p class="text-sm text-muted-foreground">
+                      Logs will appear once this job starts running.
+                    </p>
+                  {:else if logsQuery.isPending}
                     <PageLoading message="Loading job logs..." />
                   {:else if logsQuery.isError}
                     <p class="text-sm text-destructive">
@@ -205,6 +230,8 @@
                         ? logsQuery.error.message
                         : "Failed to load job logs"}
                     </p>
+                  {:else if logsQuery.data && isWorkflowLogsUnavailableMessage(logsQuery.data)}
+                    <p class="text-sm text-muted-foreground">{logsQuery.data}</p>
                   {:else if logsQuery.data}
                     <pre
                       class="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed"

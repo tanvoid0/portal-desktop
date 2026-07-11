@@ -67,7 +67,7 @@
   <DialogContent class="p-0 sm:max-w-[600px]">
     <div class="flex flex-col">
       <!-- Search Input -->
-      <div class="border-b p-4">
+      <div class="divider-edge-b divider-edge-full p-4">
         <Input
           bind:ref={inputElement}
           type="text"
@@ -126,7 +126,7 @@
 
       <!-- Footer -->
       <div
-        class="flex items-center justify-between border-t p-2 text-xs text-muted-foreground"
+        class="divider-edge-t divider-edge-full flex items-center justify-between p-2 text-xs text-muted-foreground"
       >
         <div class="flex items-center gap-4">
           <span>↑↓ Navigate</span>

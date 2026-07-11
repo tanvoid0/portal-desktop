@@ -264,7 +264,7 @@
 						{/if}
 
 						<!-- Actions -->
-						<div class="flex gap-2 pt-2 border-t" onclick={(e) => e.stopPropagation()}>
+						<div class="divider-edge-t divider-edge-full flex gap-2 pt-2" onclick={(e) => e.stopPropagation()}>
 							<Button size="sm" variant="outline" onclick={() => handleViewScript(script)} class="flex-1">
 								<Eye class="h-3 w-3 mr-1" />
 								View

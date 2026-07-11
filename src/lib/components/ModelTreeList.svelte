@@ -167,10 +167,10 @@
 
           <!-- Family Models -->
           {#if expandedFamilies.includes(family)}
-            <div class="border-t">
+            <div class="divider-edge-t divider-edge-full">
               {#each modelList as model}
                 <div
-                  class="flex items-center justify-between border-b p-4 transition-colors last:border-b-0 hover:bg-gray-50"
+                  class="divider-edge-b divider-edge-full flex items-center justify-between p-4 transition-colors last:[&::after]:hidden hover:bg-gray-50"
                 >
                   <div class="flex items-center gap-4">
                     <div class="flex items-center gap-2">

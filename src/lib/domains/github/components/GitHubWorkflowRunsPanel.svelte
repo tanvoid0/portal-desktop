@@ -20,15 +20,17 @@
   interface Props {
     owner: string;
     repo: string;
+    branch?: string;
     enabled?: boolean;
   }
 
-  let { owner, repo, enabled = true }: Props = $props();
+  let { owner, repo, branch, enabled = true }: Props = $props();
 
   const runsQuery = createGitHubWorkflowRunsQuery(
     () => ({
       owner,
       repo,
+      branch,
       page: 1,
       perPage: 20,
     }),
@@ -56,14 +58,20 @@
 {:else if runs.length === 0}
   <PageEmpty
     title="No workflow runs yet"
-    description="Push a commit or open a pull request to trigger GitHub Actions."
+    description={branch
+      ? `No GitHub Actions runs found for branch ${branch}. Try turning off branch filtering or push a commit to this branch.`
+      : "Push a commit or open a pull request to trigger GitHub Actions."}
     icon={Workflow}
   />
 {:else}
   <div class="space-y-3">
     <div class="flex items-center justify-between gap-2">
       <p class="text-sm text-muted-foreground">
-        {#if hasActiveRuns}
+        {#if branch}
+          Showing runs for branch {branch}.{hasActiveRuns
+            ? " Live updates every 3 seconds while runs are active."
+            : ""}
+        {:else if hasActiveRuns}
           Live updates every 3 seconds while runs are active.
         {:else}
           Recent GitHub Actions workflow runs.

@@ -131,7 +131,7 @@
   </div>
 
   {#if expanded}
-    <div class="border-t p-3">
+    <div class="divider-edge-t divider-edge-full p-3">
       <ContainerCard
         {container}
         {onStart}

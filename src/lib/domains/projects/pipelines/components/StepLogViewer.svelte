@@ -79,7 +79,7 @@
 
 <div class="flex h-full min-h-[400px] flex-col rounded-lg border bg-zinc-950">
   <div
-    class="flex items-center justify-between border-b border-zinc-800 px-4 py-2"
+    class="divider-edge-b divider-edge-full flex items-center justify-between px-4 py-2"
   >
     <div class="flex items-center gap-2">
       <span class="text-sm font-medium text-zinc-100">

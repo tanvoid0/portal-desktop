@@ -12,7 +12,7 @@
 </script>
 
 <div
-  class="flex h-9 items-center gap-2 border-b pl-3 pr-8"
+  class="flex h-9 items-center gap-2 divider-edge-b divider-edge-full pl-3 pr-8"
   data-slot="command-input-wrapper"
 >
   <SearchIcon class="size-4 shrink-0 opacity-50" />

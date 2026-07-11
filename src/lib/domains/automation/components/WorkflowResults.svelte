@@ -28,7 +28,7 @@
 </script>
 
 <Card>
-  <CardHeader class="border-b pb-4">
+  <CardHeader class="divider-edge-b divider-edge-full pb-4">
     <div class="flex items-center justify-between gap-4">
       <CardTitle class="flex items-center gap-2 text-lg">
         {#if result.success}

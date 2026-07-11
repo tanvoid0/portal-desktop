@@ -337,7 +337,7 @@
           {:else if g.cleanerId === "projects"}
             {#each projectSubgroups(g.items) as sub (sub.label)}
               {@const sel = groupSel(sub.items)}
-              <div class="border-b last:border-b-0">
+              <div class="divider-edge-b divider-edge-full last:[&::after]:hidden">
                 <div class="flex items-center gap-2 bg-muted/20 px-3 py-2">
                   <Checkbox
                     checked={sel.all}

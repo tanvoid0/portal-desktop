@@ -46,7 +46,7 @@
 
 <div class="flex h-full flex-col">
   <div
-    class="space-y-2 border-b px-3 py-2.5 transition-opacity {showLoadingSkeleton
+    class="divider-edge-b divider-edge-full space-y-2 px-3 py-2.5 transition-opacity {showLoadingSkeleton
       ? 'pointer-events-none opacity-50'
       : ''}"
   >

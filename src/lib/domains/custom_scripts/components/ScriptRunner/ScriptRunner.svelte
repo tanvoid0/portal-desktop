@@ -336,7 +336,7 @@
   <Dialog.Content
     class="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden p-0"
   >
-    <div class="flex items-center justify-between border-b p-6">
+    <div class="divider-edge-b divider-edge-full flex items-center justify-between p-6">
       <div>
         <Dialog.Title class="flex items-center gap-2 text-2xl">
           {#if script.icon}
@@ -572,7 +572,7 @@
       {/if}
     </div>
 
-    <div class="flex justify-end gap-2 border-t p-6">
+    <div class="divider-edge-t divider-edge-full flex justify-end gap-2 p-6">
       {#if isRunning}
         <Button variant="destructive" onclick={handleStop}>
           <Square class="mr-2 h-4 w-4" />

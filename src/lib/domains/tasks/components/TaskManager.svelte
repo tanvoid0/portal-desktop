@@ -480,7 +480,7 @@
 
         <!-- Active Filters Display -->
         {#if hasActiveFilters}
-          <div class="mt-3 border-t border-border pt-3">
+          <div class="divider-edge-t divider-edge-full mt-3 pt-3">
             <div class="flex flex-wrap items-center gap-2">
               <span class="text-xs font-medium text-muted-foreground"
                 >Active filters:</span
@@ -692,7 +692,7 @@
             </div>
           </div>
 
-          <div class="border-t border-border pt-4">
+          <div class="divider-edge-t divider-edge-full pt-4">
             <div class="flex items-center justify-end">
               <Button onclick={() => (showKeyboardShortcuts = false)}>
                 Got it

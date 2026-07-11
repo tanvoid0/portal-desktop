@@ -578,7 +578,7 @@
                   {/if}
 
                   {#if setupDetection?.tools.aws.installed}
-                    <div class="mt-4 space-y-2 border-t pt-3">
+                    <div class="divider-edge-t divider-edge-full mt-4 space-y-2 pt-3">
                       <p class="text-xs font-medium text-foreground">
                         AWS EKS
                       </p>
@@ -603,7 +603,7 @@
                   {/if}
 
                   {#if setupDetection?.tools.gcloud.installed && !detectedTargets.some((target) => target.provider === "gcloud")}
-                    <div class="mt-4 space-y-2 border-t pt-3">
+                    <div class="divider-edge-t divider-edge-full mt-4 space-y-2 pt-3">
                       <p class="text-xs font-medium text-foreground">Google GKE</p>
                       <div class="grid gap-2">
                         <div class="grid gap-1">
@@ -630,7 +630,7 @@
                   {/if}
 
                   {#if setupDetection?.tools.az.installed && !detectedTargets.some((target) => target.provider === "az")}
-                    <div class="mt-4 space-y-2 border-t pt-3">
+                    <div class="divider-edge-t divider-edge-full mt-4 space-y-2 pt-3">
                       <p class="text-xs font-medium text-foreground">Azure AKS</p>
                       <div class="grid gap-2">
                         <div class="grid gap-1">

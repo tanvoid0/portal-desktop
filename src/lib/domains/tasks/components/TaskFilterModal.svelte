@@ -210,7 +210,7 @@
 
         <!-- Action Buttons -->
         <div
-          class="flex items-center justify-between border-t border-border pt-4"
+          class="divider-edge-t divider-edge-full flex items-center justify-between pt-4"
         >
           <Button
             variant="outline"

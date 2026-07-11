@@ -150,7 +150,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
   <div
-    class="flex items-center justify-between gap-2 border-b px-3 py-2"
+    class="divider-edge-b divider-edge-full flex items-center justify-between gap-2 px-3 py-2"
   >
     <span class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
       Workspaces

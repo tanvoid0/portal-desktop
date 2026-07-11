@@ -880,7 +880,7 @@
 
             <!-- Interactive Terminal -->
             {#if showInteractiveTerminal && resolvedCommand}
-              <div class="space-y-3 border-t pt-4">
+              <div class="divider-edge-t divider-edge-full space-y-3 pt-4">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <Terminal class="h-4 w-4" />
@@ -906,7 +906,7 @@
             <!-- Execution Output (non-interactive mode) -->
             {#if currentExecution && !showInteractiveTerminal}
               {@const StatusIcon = getStatusIcon(currentExecution.status)}
-              <div class="space-y-3 border-t pt-4">
+              <div class="divider-edge-t divider-edge-full space-y-3 pt-4">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <Terminal class="h-4 w-4" />
