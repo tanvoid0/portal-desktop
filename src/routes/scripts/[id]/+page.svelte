@@ -738,8 +738,10 @@
                     {@const StatusIcon = getStatusIcon(execution.status)}
                     <Button
                       variant="outline"
-                      class="h-auto w-full justify-start rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
-                      class:bg-muted={currentExecution?.id === execution.id}
+                      class="h-auto w-full justify-start rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 {currentExecution?.id ===
+                      execution.id
+                        ? 'bg-muted'
+                        : ''}"
                       onclick={() => viewExecution(execution)}
                     >
                       <div class="flex items-center justify-between">
