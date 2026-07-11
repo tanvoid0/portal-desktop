@@ -105,6 +105,21 @@ export function createGitHubWorkflowRunsQuery(
   });
 }
 
+export function createGitHubProjectLinkQuery(
+  projectId: () => number | string | null | undefined,
+  enabled: () => boolean = () => true,
+) {
+  return createQuery(() => {
+    const id = projectId();
+    const numericId = id != null ? Number(id) : NaN;
+    return {
+      queryKey: queryKeys.github.projectLink(id ?? ""),
+      enabled: enabled() && Number.isFinite(numericId) && numericId > 0,
+      queryFn: () => githubService.getProjectLink(numericId),
+    };
+  });
+}
+
 export function createGitHubWorkflowRunQuery(
   owner: () => string | undefined,
   repo: () => string | undefined,

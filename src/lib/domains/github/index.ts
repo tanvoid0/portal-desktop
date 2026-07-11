@@ -22,12 +22,14 @@ export type {
 } from "./types";
 
 export { default as GitHubConnectPrompt } from "./components/GitHubConnectPrompt.svelte";
+export { default as GitHubProjectActionsPanel } from "./components/GitHubProjectActionsPanel.svelte";
 export { default as GitHubWorkflowRunsPanel } from "./components/GitHubWorkflowRunsPanel.svelte";
 export { default as GitHubWorkflowRunMonitor } from "./components/GitHubWorkflowRunMonitor.svelte";
 export { githubService } from "./service";
 export {
   createGitHubIssuesQuery,
   createGitHubLinkedRepositoriesQuery,
+  createGitHubProjectLinkQuery,
   createGitHubRepositoriesQuery,
   createGitHubRepositoryQuery,
   createGitHubStatusQuery,

@@ -137,3 +137,17 @@ export function isWorkflowJobActive(status: string): boolean {
     status === "pending"
   );
 }
+
+export function isWorkflowJobLogsFetchable(status: string): boolean {
+  return status === "in_progress" || status === "completed";
+}
+
+export const WORKFLOW_LOGS_UNAVAILABLE_PREFIX = "Logs are not available yet";
+
+export function isWorkflowLogsUnavailableMessage(message?: string | null): boolean {
+  if (!message) return false;
+  return (
+    message.startsWith(WORKFLOW_LOGS_UNAVAILABLE_PREFIX) ||
+    message.startsWith("Log access expired or is temporarily unavailable")
+  );
+}

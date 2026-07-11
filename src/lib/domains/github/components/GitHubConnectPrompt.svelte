@@ -14,7 +14,7 @@
 
   interface Props {
     status?: GitHubConnectionStatus | null;
-    onConnected?: () => void | Promise<void>;
+    onConnected?: () => unknown;
   }
 
   let { status = null, onConnected }: Props = $props();
