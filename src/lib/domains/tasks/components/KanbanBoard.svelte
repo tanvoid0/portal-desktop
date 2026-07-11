@@ -5,7 +5,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import Icon from "@iconify/svelte";
   import { taskActions } from "../stores/taskStore";
-  import { taskUi } from "../state/taskUi.svelte";
+  import { taskUi as defaultTaskUi, type TaskUiState } from "../state/taskUi.svelte";
   import {
     createDragDropState,
     handleDragStart,
@@ -20,6 +20,7 @@
   import TaskCard from "./TaskCard.svelte";
 
   interface Props {
+    ui?: TaskUiState;
     handleTaskSelect: (task: Task) => void;
     handleTaskStatusToggle: (taskId: string) => void;
     handleTaskSelection: (taskId: string) => void;
@@ -29,9 +30,12 @@
     getStatusBadgeColor: (status: string) => string;
     getPriorityColor: (priority: string) => string;
     getTaskIcon: (task: Task) => string;
+    onTaskMove?: (taskId: string, newStatus: string) => void;
+    showSubtaskActions?: boolean;
   }
 
   let {
+    ui = defaultTaskUi,
     handleTaskSelect,
     handleTaskStatusToggle,
     handleTaskSelection,
@@ -41,7 +45,10 @@
     getStatusBadgeColor,
     getPriorityColor,
     getTaskIcon,
+    onTaskMove,
+    showSubtaskActions = true,
   }: Props = $props();
+  let taskUi = $derived(ui);
 
   // Drag and drop state
   let dragDropState = $state(createDragDropState());
@@ -51,6 +58,10 @@
   }
 
   async function handleTaskMove(taskId: string, newStatus: string) {
+    if (onTaskMove) {
+      onTaskMove(taskId, newStatus);
+      return;
+    }
     try {
       await taskActions.updateTask(taskId, { status: newStatus as any });
     } catch (error) {
@@ -161,7 +172,7 @@
                   </div>
 
                   <div class="flex items-center gap-1">
-                    {#if !task.parentId}
+                    {#if showSubtaskActions && !task.parentId}
                       <Button
                         onclick={(e) => {
                           e.stopPropagation();

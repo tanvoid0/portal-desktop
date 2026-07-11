@@ -212,6 +212,19 @@ export class XtermSession {
     this.outputBuffer += output.content;
     this.opts.onOutputChunk?.(output.content);
 
+    // Live-stream output into the running command block (Warp-style blocks
+    // view). The block itself is created by shell-integration events.
+    if (
+      this.opts.mode !== "oneshot" &&
+      output.output_type === "stdout" &&
+      this.currentProcess
+    ) {
+      commandBlockStore.appendToRunningBlock(
+        this.currentProcess.id,
+        output.content,
+      );
+    }
+
     const injected = injectOsc8Links(output.content, this.osc8Tail, {
       maxTailChars: 256,
     });
@@ -311,10 +324,13 @@ export class XtermSession {
 
   async sendCommand(command: string): Promise<void> {
     if (!this.currentProcess) return;
+    const trimmed = command.replace(/\r?\n$/, "");
     const lineEnding = navigator.userAgent.includes("Windows") ? "\r\n" : "\n";
-    const payload = command.endsWith("\n") || command.endsWith("\r\n")
-      ? command
-      : `${command}${lineEnding}`;
+    // Bracketed paste for multi-line commands so the shell takes the block
+    // as one unit instead of stalling at continuation prompts.
+    const payload = trimmed.includes("\n")
+      ? `\x1b[200~${trimmed}\x1b[201~\r`
+      : `${trimmed}${lineEnding}`;
     await sendProcessInput(this.currentProcess.id, payload, this.opts.tabId);
   }
 

@@ -49,6 +49,7 @@ export interface GitHubRepository {
   owner: GitHubRepoOwner;
   description?: string;
   private: boolean;
+  fork: boolean;
   htmlUrl: string;
   cloneUrl: string;
   sshUrl?: string;
@@ -84,6 +85,7 @@ export interface GitHubListIssuesRequest {
   filter?: string;
   page?: number;
   perPage?: number;
+  includePullRequests?: boolean;
 }
 
 export interface GitHubCreateIssueRequest {

@@ -116,6 +116,13 @@ impl ShellIntegrationParser {
             self.current_block = Some(block.clone());
             events.push(ShellIntegrationEvent::CommandStarted(block));
         } else if marker.contains("133;B") {
+            // Orphan B (e.g. the shell's first prompt after startup, before any
+            // command): no block to complete, but it proves the shell hooks are
+            // live — surface it so the frontend can stop creating manual blocks.
+            if self.current_block.is_none() {
+                events.push(ShellIntegrationEvent::PromptDetected);
+                return events;
+            }
             // Command end marker
             if let Some(mut block) = self.current_block.take() {
                 block.end_time = Some(Utc::now());
@@ -133,8 +140,16 @@ impl ShellIntegrationParser {
                 events.push(ShellIntegrationEvent::CommandCompleted(block));
             }
         } else if marker.contains("133;C") {
-            // Prompt marker - could be used for command detection
-            events.push(ShellIntegrationEvent::PromptDetected);
+            // Command text marker: `133;C;<command>` (emitted by our shell
+            // hooks right after A). Bare `133;C` is a plain prompt marker.
+            if let Some(command) = Self::extract_marker_arg(marker, "133;C;") {
+                if let Some(ref mut block) = self.current_block {
+                    block.command = command.clone();
+                }
+                events.push(ShellIntegrationEvent::CommandDetected(command));
+            } else {
+                events.push(ShellIntegrationEvent::PromptDetected);
+            }
         }
 
         events
@@ -156,35 +171,12 @@ impl ShellIntegrationParser {
     }
 
     fn process_content(&mut self, content: &str) -> Vec<ShellIntegrationEvent> {
-        let mut events = Vec::new();
-
-        // Add content to current block if we have one
+        // Command text comes from the explicit `133;C` marker; content between
+        // markers is just output for the current block.
         if let Some(ref mut block) = self.current_block {
             block.output.push_str(content);
         }
-
-        // Check for command detection patterns
-        if let Some(command) = self.detect_command(content) {
-            if let Some(ref mut block) = self.current_block {
-                block.command = command.clone();
-            }
-            events.push(ShellIntegrationEvent::CommandDetected(command));
-        }
-
-        events
-    }
-
-    fn detect_command(&self, content: &str) -> Option<String> {
-        // Simple command detection - look for common shell prompt patterns
-        // This is a basic implementation; more sophisticated detection could be added
-        let lines: Vec<&str> = content.lines().collect();
-        for line in lines {
-            // Look for lines that might be commands (not output)
-            if line.trim().starts_with('$') || line.trim().starts_with('#') {
-                return Some(line.trim().to_string());
-            }
-        }
-        None
+        Vec::new()
     }
 }
 
@@ -202,4 +194,41 @@ pub enum ShellIntegrationEvent {
 pub struct ShellIntegrationEventV2 {
     pub process_id: String,
     pub event: ShellIntegrationEvent,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn full_command_cycle_captures_command_output_and_exit() {
+        let mut p = ShellIntegrationParser::new();
+        let events = p.process_output(
+            "\x1b]133;A;/home/tan\x1b\\\x1b]133;C;ls -la\x1b\\file1\nfile2\n\x1b]133;B;0\x1b\\",
+        );
+
+        let started = events.iter().any(|e| matches!(e, ShellIntegrationEvent::CommandStarted(b) if b.working_directory == "/home/tan"));
+        let detected = events.iter().any(|e| matches!(e, ShellIntegrationEvent::CommandDetected(c) if c == "ls -la"));
+        let completed = events.iter().find_map(|e| match e {
+            ShellIntegrationEvent::CommandCompleted(b) => Some(b.clone()),
+            _ => None,
+        });
+
+        assert!(started, "expected CommandStarted with cwd");
+        assert!(detected, "expected CommandDetected with command text");
+        let block = completed.expect("expected CommandCompleted");
+        assert_eq!(block.command, "ls -la");
+        assert_eq!(block.exit_code, Some(0));
+        assert!(block.output.contains("file1"));
+    }
+
+    #[test]
+    fn orphan_end_marker_is_ignored() {
+        let mut p = ShellIntegrationParser::new();
+        // First prompt after shell start emits B with no preceding A.
+        let events = p.process_output("\x1b]133;B;0\x1b\\");
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, ShellIntegrationEvent::CommandCompleted(_))));
+    }
 }

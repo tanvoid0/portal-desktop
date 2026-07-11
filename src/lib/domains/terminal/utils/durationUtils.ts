@@ -27,11 +27,11 @@ export function formatDuration(ms: number): string {
 
 export function getDurationColor(duration: number): string {
   if (duration < 5000) {
-    return "text-green-400"; // Fast: < 5s
+    return "text-status-success";
   } else if (duration < 30000) {
-    return "text-yellow-400"; // Medium: 5s - 30s
+    return "text-status-warning";
   } else {
-    return "text-orange-400"; // Slow: > 30s
+    return "text-status-error";
   }
 }
 

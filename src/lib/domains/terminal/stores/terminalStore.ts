@@ -5,10 +5,13 @@
 
 import { writable, derived } from "svelte/store";
 import type { TerminalConfig } from "../types/index";
+import { defaultTerminalConfig } from "../config/defaultTerminalConfig";
 
 // Storage keys
 const STORAGE_KEY = "portal-terminal-state";
-const STORAGE_VERSION = "1.0";
+// 1.0 → 1.1: default shell on Windows changed cmd.exe → powershell.exe (OSC
+// 133 blocks); old persisted state carried cmd.exe tabs/settings forward.
+const STORAGE_VERSION = "1.1";
 
 // Persistence functions
 function saveStateToStorage(state: TerminalState): void {
@@ -119,25 +122,10 @@ interface TerminalState {
   error: string | null;
 }
 
-// Default settings
-const defaultSettings: TerminalConfig = {
-  theme: "dark",
-  fontSize: 14,
-  fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-  cursorStyle: "block",
-  scrollbackLines: 1000,
-  bellSound: false,
-  autoClose: true,
-  confirmClose: true,
-  defaultShell:
-    typeof window !== "undefined" && navigator.userAgent.includes("Windows")
-      ? "cmd.exe"
-      : "zsh",
-  workingDirectory:
-    typeof window !== "undefined" && navigator.userAgent.includes("Windows")
-      ? "C:\\"
-      : "/home/tan",
-};
+// Single source of truth for terminal defaults lives in
+// config/defaultTerminalConfig.ts — this store previously duplicated it with
+// a stale cmd.exe default that overrode the real one via persisted state.
+const defaultSettings: TerminalConfig = defaultTerminalConfig;
 
 // Initial state
 const initialState: TerminalState = {

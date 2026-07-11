@@ -82,13 +82,13 @@
   });
 </script>
 
-<div class="project-terminal-container flex h-full w-full flex-col bg-gray-900">
-  <div class="border-b border-gray-700 bg-gray-800 px-4 py-2">
+<div class="project-terminal-container flex h-full w-full flex-col bg-background">
+  <div class="border-b border-border bg-card px-4 py-2">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-gray-100">
+      <h2 class="text-lg font-semibold text-foreground">
         {projectName} Terminal
       </h2>
-      <span class="font-mono text-xs text-gray-400">{projectPath}</span>
+      <span class="font-mono text-xs text-muted-foreground">{projectPath}</span>
     </div>
   </div>
 
@@ -106,6 +106,6 @@
 
 <style>
   .project-terminal-container {
-    background: #1f2937;
+    background: hsl(var(--background));
   }
 </style>

@@ -19,7 +19,7 @@ export const LAYOUT_CSS_VARS = {
 } as const;
 
 /** Routes whose pages manage their own full-viewport scroll regions. */
-export const VIEWPORT_FILL_ROUTES = ["/coder", "/ai/chat"] as const;
+export const VIEWPORT_FILL_ROUTES = ["/coder", "/ai/chat", "/terminal"] as const;
 
 /** Routes that use ShellSidebarLayout (domain sidebar + fixed height). */
 export const SHELL_SIDEBAR_ROUTES = [

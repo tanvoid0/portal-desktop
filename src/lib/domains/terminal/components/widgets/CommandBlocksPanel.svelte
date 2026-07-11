@@ -7,9 +7,10 @@
   interface Props {
     tabId: string;
     onRerun?: (command: string) => void;
+    onExplain?: (block: CapturedCommand) => void;
   }
 
-  let { tabId, onRerun }: Props = $props();
+  let { tabId, onRerun, onExplain }: Props = $props();
 
   let blocks = $state<CapturedCommand[]>([]);
 
@@ -26,16 +27,16 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="flex items-center justify-between border-b border-gray-700 p-2">
+  <div class="flex items-center justify-between border-b border-border p-2">
     <div class="flex items-center gap-2">
-      <div class="text-sm font-semibold text-gray-200">Command Blocks</div>
-      <Badge variant="outline" class="text-xs text-gray-300">
+      <div class="text-sm font-semibold text-foreground">Command Blocks</div>
+      <Badge variant="outline" class="text-xs text-muted-foreground">
         {blocks.length} total
       </Badge>
     </div>
     <button
       type="button"
-      class="rounded px-2 py-1 text-xs text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+      class="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
       onclick={clearBlocks}
       title="Clear command blocks"
     >
@@ -45,16 +46,13 @@
 
   <div class="min-h-0 flex-1 overflow-y-auto p-2">
     {#if blocks.length === 0}
-      <div class="py-6 text-center text-xs text-gray-400">
+      <div class="py-6 text-center text-xs text-muted-foreground">
         No structured commands yet. Run commands in the terminal or use the input bar below.
       </div>
     {:else}
       <div class="space-y-2">
         {#each blocks as block (block.id)}
-          <CommandBlock
-            {block}
-            onclick={onRerun ? () => onRerun(block.command) : undefined}
-          />
+          <CommandBlock {block} {onRerun} {onExplain} />
         {/each}
       </div>
     {/if}

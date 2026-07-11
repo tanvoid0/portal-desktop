@@ -153,12 +153,19 @@ impl TerminalManager {
             .openpty(size)
             .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-        // Empty working directory → fall back to the app's current dir so we
-        // never try to spawn in "" (which fails). Frontend sends "" by default.
+        // Empty working directory → fall back to the user's home dir (then the
+        // app's current dir) so we never try to spawn in "" (which fails).
+        // Frontend sends "" by default.
         let working_dir = if request.working_directory.trim().is_empty() {
-            std::env::current_dir()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|_| ".".to_string())
+            std::env::var("USERPROFILE")
+                .or_else(|_| std::env::var("HOME"))
+                .ok()
+                .or_else(|| {
+                    std::env::current_dir()
+                        .ok()
+                        .map(|p| p.to_string_lossy().to_string())
+                })
+                .unwrap_or_else(|| ".".to_string())
         } else {
             request.working_directory.clone()
         };
@@ -191,10 +198,71 @@ impl TerminalManager {
         environment.insert("FORCE_COLOR".to_string(), "1".to_string());
 
         // --- OSC 133 injection (command start/end tracking) ---
-        // Only for the interactive zsh/bash sessions we spawn; skipped for
-        // oneshot runs (no interactive prompt to instrument) and on Windows.
+        // Interactive sessions only (no interactive prompt to instrument in
+        // oneshot runs). Protocol (internal, Warp-style):
+        //   133;A;<cwd>     command started (pre-exec)
+        //   133;C;<command> command text for the current block
+        //   133;B;<exit>    command finished with exit code
         let mut temp_rc_path: Option<PathBuf> = None;
-        if !is_oneshot && !cfg!(target_os = "windows") {
+        if !is_oneshot && (shell_cmd.contains("powershell") || shell_cmd.contains("pwsh")) {
+            // PowerShell: PSConsoleHostReadLine fires after Enter and before
+            // execution (our pre-exec); prompt fires after each command.
+            let ps_profile_path = std::env::temp_dir().join(format!(
+                "portal_osc133_ps_{}.ps1",
+                process_id.replace('-', "_")
+            ));
+
+            // Loads the user's own profile first (we spawn with -NoProfile),
+            // then wraps — not replaces — their prompt, waveterm-style.
+            let ps_profile = r#"
+if (Test-Path $PROFILE) {
+  try { . $PROFILE } catch { Write-Host "portal: error loading profile: $_" }
+}
+
+function Global:__PortalOscWrite([string]$s) {
+  [Console]::Write("$([char]27)]133;$s$([char]27)\")
+}
+
+if (Test-Path Function:\prompt) {
+  $Global:__portal_original_prompt = $function:prompt
+} else {
+  $Global:__portal_original_prompt = {
+    "PS $($ExecutionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) "
+  }
+}
+
+function Global:prompt {
+  $code = if ($?) { 0 } elseif ($global:LASTEXITCODE) { $global:LASTEXITCODE } else { 1 }
+  __PortalOscWrite "B;$code"
+  & $Global:__portal_original_prompt
+}
+
+# Pre-exec hook: requires PSReadLine (loaded by default in console hosts).
+if (Get-Command -Name Set-PSReadLineOption -ErrorAction SilentlyContinue) {
+  function Global:PSConsoleHostReadLine {
+    $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($Host.Runspace, $ExecutionContext)
+    if ($line -and $line.Trim()) {
+      __PortalOscWrite "A;$($ExecutionContext.SessionState.Path.CurrentLocation.Path)"
+      __PortalOscWrite "C;$line"
+    }
+    $line
+  }
+}
+"#;
+
+            std::fs::write(&ps_profile_path, ps_profile).map_err(|e| {
+                format!("Failed to write temporary PowerShell profile for OSC133 injection: {e}")
+            })?;
+
+            shell_args = vec![
+                "-NoLogo".to_string(),
+                "-NoProfile".to_string(),
+                "-NoExit".to_string(),
+                "-Command".to_string(),
+                format!(". '{}'", ps_profile_path.to_string_lossy()),
+            ];
+            temp_rc_path = Some(ps_profile_path);
+        } else if !is_oneshot && !cfg!(target_os = "windows") {
             let shell_lower = request.shell.to_lowercase();
 
             if shell_cmd == "zsh" && shell_lower.contains("zsh") {
@@ -207,16 +275,30 @@ impl TerminalManager {
                 })?;
 
                 let zshrc_path = zsh_dir.join(".zshrc");
+                // Sources the user's real zshrc (aliases/PATH/prompt survive),
+                // then registers hooks additively via add-zsh-hook so any
+                // user-defined preexec/precmd keep working (waveterm-style).
                 let zshrc = r#"
-preexec() {
-  # Emit OSC 133 A with current working directory
+__PORTAL_ZDOTDIR="$ZDOTDIR"
+[ -f "$HOME/.zshrc" ] && source "$HOME/.zshrc"
+
+# Don't let history land in our temp ZDOTDIR
+if [[ "$HISTFILE" == "$__PORTAL_ZDOTDIR/.zsh_history" ]]; then
+  HISTFILE="$HOME/.zsh_history"
+fi
+
+__portal_preexec() {
   printf '\033]133;A;%s\033\\' "$PWD"
+  printf '\033]133;C;%s\033\\' "$1"
 }
 
-precmd() {
-  # Emit OSC 133 B with exit code of the last command
+__portal_precmd() {
   printf '\033]133;B;%s\033\\' "$?"
 }
+
+autoload -Uz add-zsh-hook
+add-zsh-hook preexec __portal_preexec
+add-zsh-hook precmd __portal_precmd
 "#;
 
                 std::fs::write(&zshrc_path, zshrc).map_err(|e| {
@@ -231,7 +313,13 @@ precmd() {
                     process_id.replace('-', "_")
                 ));
 
+                // Sources the user's bashrc first so aliases/PATH/PS1 survive.
+                // Our DEBUG trap + PROMPT_COMMAND are then set last and win —
+                // a user PROMPT_COMMAND hook is dropped (full bash-preexec
+                // would be needed to merge them; not worth 400 lines here).
                 let bashrc = r#"
+[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc"
+
 __portal_osc133_suppress=0
 
 __portal_osc133_preexec() {
@@ -245,6 +333,7 @@ __portal_osc133_preexec() {
   esac
 
   printf '\033]133;A;%s\033\\' "$PWD"
+  printf '\033]133;C;%s\033\\' "$BASH_COMMAND"
 }
 
 __portal_osc133_precmd() {
@@ -320,18 +409,8 @@ PROMPT_COMMAND='__portal_osc133_precmd'
             );
         }
 
-        // Inform the frontend the PTY is ready.
-        let initial_output = TerminalOutput {
-            process_id: process_id.clone(),
-            content: format!(
-                "PTY shell ready: {} {}\r\n",
-                shell_cmd,
-                shell_args.join(" ")
-            ),
-            output_type: "info".to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        };
-        let _ = window.emit("terminal-output", &initial_output);
+        // No banner line — the shell's own prompt is the "ready" signal,
+        // matching Warp/Wave. (The old "PTY shell ready: …" line was noise.)
 
         // Start PTY output streaming. The shell-integration parser is owned by
         // this thread (no shared map / lock needed) since it is only touched here.

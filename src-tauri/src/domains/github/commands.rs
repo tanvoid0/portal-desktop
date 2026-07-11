@@ -62,6 +62,15 @@ pub async fn github_list_repositories(
 }
 
 #[tauri::command]
+pub async fn github_list_linked_repos(
+    db: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<String>, String> {
+    GitHubService::new(db.inner().clone())
+        .list_linked_repo_full_names()
+        .await
+}
+
+#[tauri::command]
 pub async fn github_get_repository(
     owner: String,
     repo: String,

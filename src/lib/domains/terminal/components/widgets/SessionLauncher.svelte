@@ -81,19 +81,19 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="border-b border-gray-700 p-2">
-    <div class="text-sm font-medium text-gray-200">Session Launcher</div>
-    <p class="text-xs text-gray-400">Open terminals for projects or containers</p>
+  <div class="border-b border-border p-2">
+    <div class="text-sm font-medium text-foreground">Session Launcher</div>
+    <p class="text-xs text-muted-foreground">Open terminals for projects or containers</p>
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto p-3 space-y-4">
     <section>
-      <div class="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-gray-400">
+      <div class="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
         <FolderOpen class="h-3.5 w-3.5" />
         Projects
       </div>
       {#if projects.length === 0}
-        <p class="text-xs text-gray-500">No projects found</p>
+        <p class="text-xs text-muted-foreground">No projects found</p>
       {:else}
         <div class="space-y-1">
           {#each projects as project (project.id)}
@@ -112,7 +112,7 @@
     </section>
 
     <section>
-      <div class="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-gray-400">
+      <div class="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
         <Container class="h-3.5 w-3.5" />
         Containers
       </div>
@@ -122,7 +122,7 @@
         }}
       />
       {#if containerList.length === 0}
-        <p class="text-xs text-gray-500">
+        <p class="text-xs text-muted-foreground">
           {dockerOffline ? "Docker is offline" : "No containers found"}
         </p>
       {:else}

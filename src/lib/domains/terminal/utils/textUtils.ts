@@ -173,6 +173,43 @@ export function cleanTerminalOutput(text: string): string {
 }
 
 /**
+ * Light cleanup for rendering PTY output in a command block: strips ANSI/OSC
+ * sequences and resolves carriage-return line rewrites (progress bars), but
+ * preserves whitespace/alignment — unlike `cleanTerminalOutput`, which
+ * collapses spaces and drops lines.
+ */
+export function stripForDisplay(text: string): string {
+  if (!text) return "";
+
+  let cleaned = text
+    // OSC sequences (incl. our 133 markers): ESC ] ... (BEL | ESC \)
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, "")
+    // CSI sequences (colors, cursor, modes)
+    .replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, "")
+    // Remaining 2-char escapes (ESC + single char)
+    .replace(/\x1b[@-_]/g, "")
+    .replace(/\x07/g, "");
+
+  // Resolve \r rewrites: keep only the final content of each visual line.
+  cleaned = cleaned
+    .split("\n")
+    .map((line) => {
+      const parts = line.split("\r");
+      return parts[parts.length - 1] || parts[parts.length - 2] || "";
+    })
+    .join("\n");
+
+  // Backspace overstrikes
+  let prev = 0;
+  while (cleaned.length !== prev) {
+    prev = cleaned.length;
+    cleaned = cleaned.replace(/[^\n]\x08/g, "");
+  }
+
+  return cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+}
+
+/**
  * Truncates text to a specified length with ellipsis
  * Preserves line breaks and handles multi-line text
  */

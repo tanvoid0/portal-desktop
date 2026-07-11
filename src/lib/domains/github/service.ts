@@ -151,6 +151,10 @@ class GitHubService {
     });
   }
 
+  async listLinkedRepositories(): Promise<string[]> {
+    return invokeClient.post<string[]>("github_list_linked_repos");
+  }
+
   async getRepository(owner: string, repo: string): Promise<GitHubRepoProjects> {
     const raw = await invokeClient.post<GitHubRepoProjects>("github_get_repository", {
       owner,

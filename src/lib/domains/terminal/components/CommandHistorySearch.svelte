@@ -33,11 +33,11 @@
   }
 </script>
 
-<div class="command-history-search border-b border-gray-700 p-3">
+<div class="command-history-search border-b border-border bg-muted/50 p-3">
   <div class="flex items-center gap-2">
     <div class="relative flex-1">
       <Search
-        class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-400"
+        class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
       />
       <Input
         bind:value={searchQuery}
@@ -72,14 +72,8 @@
   </div>
 
   {#if isSearching}
-    <div class="mt-2 text-xs text-gray-400">
+    <div class="mt-2 text-xs text-muted-foreground">
       Searching for: "{searchQuery}"
     </div>
   {/if}
 </div>
-
-<style>
-  .command-history-search {
-    background: rgba(55, 65, 81, 0.5);
-  }
-</style>

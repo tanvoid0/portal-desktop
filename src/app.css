@@ -139,6 +139,13 @@
     --status-error-bg: 0 84.2% 96%;
     --status-info: 217 91% 60%;
     --status-info-bg: 217 91% 96%;
+
+    /* Terminal canvas (xterm) */
+    --terminal-background: hsl(0 0% 98%);
+    --terminal-foreground: hsl(222.2 84% 4.9%);
+    --terminal-cursor: hsl(222.2 84% 4.9%);
+    --terminal-cursor-accent: hsl(0 0% 100%);
+    --terminal-selection: hsl(221.2 83.2% 53.3% / 0.2);
   }
 
   .dark {
@@ -190,6 +197,13 @@
     --status-error-bg: 0 62.8% 20%;
     --status-info: 217 91% 60%;
     --status-info-bg: 217 91% 20%;
+
+    /* Terminal canvas (xterm) */
+    --terminal-background: hsl(222.2 84% 4.9%);
+    --terminal-foreground: hsl(210 40% 98%);
+    --terminal-cursor: hsl(210 40% 98%);
+    --terminal-cursor-accent: hsl(222.2 84% 4.9%);
+    --terminal-selection: hsl(217.2 91.2% 59.8% / 0.35);
   }
 }
 

@@ -153,7 +153,7 @@
                 variant="ghost"
                 size="sm"
                 onclick={() => closePane(pane.id)}
-                class="h-6 w-6 p-0 hover:bg-red-500/20 hover:text-red-400"
+                class="h-6 w-6 p-0 hover:bg-status-error-bg hover:text-status-error"
                 title="Close pane"
               >
                 <X class="h-3 w-3" />

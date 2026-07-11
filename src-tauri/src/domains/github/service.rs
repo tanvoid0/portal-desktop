@@ -290,14 +290,27 @@ impl GitHubService {
             .cloned()
             .unwrap_or_default();
 
+        let include_pull_requests = request.include_pull_requests.unwrap_or(false);
         let mut issues = Vec::new();
         for item in items {
             let issue = self.issue_from_value(&item)?;
-            if !issue.is_pull_request {
+            if include_pull_requests || !issue.is_pull_request {
                 issues.push(issue);
             }
         }
         Ok(issues)
+    }
+
+    pub async fn list_linked_repo_full_names(&self) -> Result<Vec<String>, String> {
+        let conn = self.db.get_connection();
+        let links = github_project_link_entity::Entity::find()
+            .all(conn)
+            .await
+            .map_err(|e| format!("Failed to query linked repositories: {e}"))?;
+        let mut names: Vec<String> = links.into_iter().map(|l| l.repo_full_name).collect();
+        names.sort();
+        names.dedup();
+        Ok(names)
     }
 
     pub async fn get_issue(
@@ -902,6 +915,7 @@ impl GitHubService {
                 .get("private")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            fork: value.get("fork").and_then(Value::as_bool).unwrap_or(false),
             html_url: required_string(value, "html_url")?,
             clone_url: required_string(value, "clone_url")?,
             ssh_url: value

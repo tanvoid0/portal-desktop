@@ -57,10 +57,10 @@
   }
 
   function getStatusColor(entry: CommandHistoryEntry): string {
-    if (entry.intercepted) return "text-blue-400";
-    if (entry.exitCode === 0) return "text-green-400";
-    if (entry.exitCode && entry.exitCode !== 0) return "text-red-400";
-    return "text-yellow-400";
+    if (entry.intercepted) return "text-status-info";
+    if (entry.exitCode === 0) return "text-status-success";
+    if (entry.exitCode && entry.exitCode !== 0) return "text-status-error";
+    return "text-status-warning";
   }
 
   function showEntryDetails(entry: CommandHistoryEntry) {
@@ -80,9 +80,9 @@
 
 <div class="command-history flex h-full flex-col">
   <!-- Header -->
-  <div class="flex items-center justify-between border-b border-gray-700 p-3">
+  <div class="flex items-center justify-between border-b border-border p-3">
     <div class="flex items-center space-x-2">
-      <h3 class="text-sm font-medium text-gray-300">Command History</h3>
+      <h3 class="text-sm font-medium text-foreground">Command History</h3>
       {#if averageDuration > 0}
         <Badge variant="outline" class="text-xs">
           Avg: {formatDuration(averageDuration)}
@@ -93,7 +93,7 @@
       variant="ghost"
       size="sm"
       onclick={clearHistory}
-      class="text-xs text-gray-400 hover:text-gray-200"
+      class="text-xs text-muted-foreground hover:text-foreground"
       title="Clear history"
     >
       Clear
@@ -105,7 +105,7 @@
     {#each tabHistory as entry (entry.id)}
       <Button
         variant="ghost"
-        class="h-auto w-full cursor-pointer justify-start border-b border-gray-800 p-3 text-left transition-colors hover:bg-gray-800"
+        class="h-auto w-full cursor-pointer justify-start border-b border-border p-3 text-left transition-colors hover:bg-accent/50"
         onclick={() => showEntryDetails(entry)}
         onkeydown={(e) => e.key === "Enter" && showEntryDetails(entry)}
         type="button"
@@ -116,7 +116,7 @@
               {getStatusIcon(entry)}
             </span>
             <code
-              class="rounded bg-gray-900 px-2 py-1 font-mono text-sm text-gray-200"
+              class="rounded bg-muted px-2 py-1 font-mono text-sm text-foreground"
             >
               {entry.command}
             </code>
@@ -129,17 +129,17 @@
               </Badge>
             {/if}
           </div>
-          <span class="text-xs text-gray-500">
+          <span class="text-xs text-muted-foreground">
             {formatTimestamp(entry.timestamp)}
           </span>
         </div>
 
-        <div class="text-xs text-gray-400">
+        <div class="text-xs text-muted-foreground">
           {formatCommandOutput(entry.output, 80)}
         </div>
       </Button>
     {:else}
-      <div class="p-6 text-center text-gray-500">
+      <div class="p-6 text-center text-muted-foreground">
         <div class="text-4xl mb-2">📝</div>
         <div class="text-sm">No commands executed yet</div>
         <div class="text-xs mt-1">
@@ -151,18 +151,18 @@
 </div>
 
 <Dialog.Root bind:open={showModal}>
-  <Dialog.Content class="mx-4 flex max-h-[80vh] max-w-4xl flex-col bg-gray-900 text-gray-200">
+  <Dialog.Content class="mx-4 flex max-h-[80vh] max-w-4xl flex-col bg-background text-foreground">
     {#if selectedEntry}
-      <Dialog.Header class="border-b border-gray-700">
+      <Dialog.Header class="border-b border-border">
         <Dialog.Title>Command Details</Dialog.Title>
       </Dialog.Header>
 
       <div class="flex-1 space-y-4 overflow-y-auto p-4">
         <!-- Command -->
         <div>
-          <h3 class="mb-2 text-sm font-medium text-gray-300">Command</h3>
+          <h3 class="mb-2 text-sm font-medium text-foreground">Command</h3>
           <code
-            class="block rounded bg-gray-800 p-3 font-mono text-sm text-green-400"
+            class="block rounded bg-muted p-3 font-mono text-sm text-status-success"
           >
             {selectedEntry.command}
           </code>
@@ -171,13 +171,13 @@
         <!-- Metadata -->
         <div class="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span class="text-gray-400">Timestamp:</span>
-            <span class="ml-2 text-gray-200"
+            <span class="text-muted-foreground">Timestamp:</span>
+            <span class="ml-2 text-foreground"
               >{selectedEntry.timestamp.toLocaleString()}</span
             >
           </div>
           <div>
-            <span class="text-gray-400">Status:</span>
+            <span class="text-muted-foreground">Status:</span>
             <span class="ml-2 {getStatusColor(selectedEntry)}">
               {getStatusIcon(selectedEntry)}
               {selectedEntry.intercepted
@@ -191,7 +191,7 @@
           </div>
           {#if selectedEntry.duration}
             <div>
-              <span class="text-gray-400">Duration:</span>
+              <span class="text-muted-foreground">Duration:</span>
               <span
                 class="ml-2 {getDurationColor(
                   selectedEntry.duration,
@@ -205,14 +205,14 @@
 
         <!-- Output -->
         <div>
-          <h3 class="mb-2 text-sm font-medium text-gray-300">Output</h3>
+          <h3 class="mb-2 text-sm font-medium text-foreground">Output</h3>
           <pre
-            class="overflow-x-auto whitespace-pre-wrap rounded bg-gray-800 p-3 text-xs text-gray-200">{selectedEntry.output ||
+            class="overflow-x-auto whitespace-pre-wrap rounded bg-muted p-3 text-xs text-foreground">{selectedEntry.output ||
               "(No output)"}</pre>
         </div>
       </div>
 
-      <div class="flex justify-end border-t border-gray-700 p-4">
+      <div class="flex justify-end border-t border-border p-4">
         <Button variant="secondary" onclick={closeModal}>Close</Button>
       </div>
     {/if}

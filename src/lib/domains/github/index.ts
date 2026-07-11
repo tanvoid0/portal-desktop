@@ -20,6 +20,7 @@ export { default as GitHubConnectPrompt } from "./components/GitHubConnectPrompt
 export { githubService } from "./service";
 export {
   createGitHubIssuesQuery,
+  createGitHubLinkedRepositoriesQuery,
   createGitHubRepositoriesQuery,
   createGitHubRepositoryQuery,
   createGitHubStatusQuery,

@@ -12,6 +12,9 @@ export const defaultTerminalConfig: TerminalConfig = {
   bellSound: false,
   autoClose: true,
   confirmClose: true,
-  defaultShell: isWindows ? "cmd.exe" : "zsh",
-  workingDirectory: isWindows ? "C:\\" : "/home/tan",
+  // PowerShell (not cmd) on Windows: cmd has no hooks for OSC 133 command
+  // tracking, so blocks/AI capture only work in powershell/pwsh/zsh/bash.
+  defaultShell: isWindows ? "powershell.exe" : "zsh",
+  // Empty → backend falls back to a sensible directory (home).
+  workingDirectory: "",
 };

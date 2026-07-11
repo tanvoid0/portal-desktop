@@ -58,6 +58,7 @@ pub struct GitHubRepository {
     pub owner: GitHubRepoOwner,
     pub description: Option<String>,
     pub private: bool,
+    pub fork: bool,
     pub html_url: String,
     pub clone_url: String,
     pub ssh_url: Option<String>,
@@ -97,6 +98,7 @@ pub struct GitHubListIssuesRequest {
     pub filter: Option<String>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
+    pub include_pull_requests: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

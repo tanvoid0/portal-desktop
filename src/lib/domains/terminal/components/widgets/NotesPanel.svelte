@@ -37,15 +37,15 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="border-b border-gray-700 p-2">
-    <div class="text-sm font-medium text-gray-200">Notes</div>
-    <div class="text-xs text-gray-400">
+  <div class="border-b border-border p-2">
+    <div class="text-sm font-medium text-foreground">Notes</div>
+    <div class="text-xs text-muted-foreground">
       Tab: <span class="font-mono">{tabId.slice(0, 8)}...</span>
     </div>
   </div>
   <div class="min-h-0 flex-1 overflow-y-auto p-3">
     <Textarea
-      class="h-full min-h-48 resize-none border-gray-700 bg-gray-900 font-mono text-xs text-gray-200"
+      class="h-full min-h-48 resize-none bg-background font-mono text-xs"
       bind:value={noteMarkdown}
       placeholder="Add notes for this terminal tab (markdown supported)..."
       oninput={(e) => {
@@ -54,7 +54,7 @@
         scheduleNotesSave(value);
       }}
     />
-    <div class="mt-2 text-xs text-gray-500">
+    <div class="mt-2 text-xs text-muted-foreground">
       {isTauri ? "Saved automatically (debounced)." : "Notes are disabled in browser mode."}
     </div>
   </div>

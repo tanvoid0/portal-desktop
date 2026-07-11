@@ -124,7 +124,7 @@
     {:else}
       <div class="flex h-full items-center justify-center">
         <div class="text-center">
-          <div class="mb-2 text-gray-400">No active tab</div>
+          <div class="mb-2 text-muted-foreground">No active tab</div>
           {#if onNewTab}
             <Button onclick={() => onNewTab?.()}>Create New Tab</Button>
           {/if}

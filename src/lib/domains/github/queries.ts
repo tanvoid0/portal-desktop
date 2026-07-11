@@ -22,6 +22,16 @@ export function createGitHubRepositoriesQuery(
   }));
 }
 
+export function createGitHubLinkedRepositoriesQuery(
+  enabled: () => boolean = () => true,
+) {
+  return createQuery(() => ({
+    queryKey: queryKeys.github.linkedRepos,
+    enabled: enabled(),
+    queryFn: () => githubService.listLinkedRepositories(),
+  }));
+}
+
 export function createGitHubRepositoryQuery(
   owner: () => string | undefined,
   repo: () => string | undefined,
@@ -46,6 +56,7 @@ export function createGitHubIssuesQuery(
     filter?: string;
     page?: number;
     perPage?: number;
+    includePullRequests?: boolean;
   },
   enabled: () => boolean = () => true,
 ) {

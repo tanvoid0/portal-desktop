@@ -164,16 +164,16 @@
   }}
 >
   <Dialog.Content
-    class="mx-4 flex max-h-[60vh] max-w-2xl flex-col bg-gray-900 p-0 text-gray-200"
+    class="mx-4 flex max-h-[60vh] max-w-2xl flex-col bg-background p-0 text-foreground"
     onkeydown={handleKeydown}
   >
-    <div class="flex items-center border-b border-gray-700 p-4">
-        <Search class="mr-3 h-5 w-5 text-gray-400" />
+    <div class="flex items-center border-b border-border p-4">
+        <Search class="mr-3 h-5 w-5 text-muted-foreground" />
         <Input
           bind:ref={searchInput}
           bind:value={query}
           placeholder="Search commands and actions..."
-          class="flex-1 border-0 bg-transparent text-gray-200 placeholder-gray-400 focus:ring-0"
+          class="flex-1 border-0 bg-transparent text-foreground placeholder:text-muted-foreground focus:ring-0"
           oninput={handleQueryChange}
           onkeydown={handleKeydown}
         />
@@ -195,30 +195,30 @@
               variant="ghost"
               class="flex h-auto w-full items-center space-x-3 p-3 text-left {selectedIndex ===
               index
-                ? 'bg-gray-800'
+                ? 'bg-accent'
                 : ''}"
               onclick={() => handleActionClick(action)}
               onkeydown={(e) => e.key === "Enter" && handleActionClick(action)}
             >
               <div class="flex-shrink-0">
                 {#if action.icon === "Square"}
-                  <Square class="h-5 w-5 text-red-400" />
+                  <Square class="h-5 w-5 text-status-error" />
                 {:else if action.icon === "Trash2"}
-                  <Trash2 class="h-5 w-5 text-orange-400" />
+                  <Trash2 class="h-5 w-5 text-status-warning" />
                 {:else if action.icon === "Play"}
-                  <Play class="h-5 w-5 text-green-400" />
+                  <Play class="h-5 w-5 text-status-success" />
                 {:else if action.icon === "Clock"}
-                  <Clock class="h-5 w-5 text-blue-400" />
+                  <Clock class="h-5 w-5 text-status-info" />
                 {:else}
-                  <Terminal class="h-5 w-5 text-gray-400" />
+                  <Terminal class="h-5 w-5 text-muted-foreground" />
                 {/if}
               </div>
 
               <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium text-gray-200">
+                <div class="truncate text-sm font-medium text-foreground">
                   {action.label}
                 </div>
-                <div class="truncate text-xs text-gray-400">
+                <div class="truncate text-xs text-muted-foreground">
                   {action.description}
                 </div>
               </div>
@@ -244,15 +244,15 @@
             </Button>
           {/each}
         {:else}
-          <div class="p-6 text-center text-gray-500">
-            <Zap class="mx-auto mb-2 h-8 w-8 text-gray-600" />
+          <div class="p-6 text-center text-muted-foreground">
+            <Zap class="mx-auto mb-2 h-8 w-8 text-muted-foreground/60" />
             <div class="text-sm">No actions found</div>
             <div class="mt-1 text-xs">Try a different search term</div>
           </div>
         {/if}
       </div>
 
-      <div class="border-t border-gray-700 p-3 text-xs text-gray-400">
+      <div class="border-t border-border p-3 text-xs text-muted-foreground">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-4">
             <span>↑↓ Navigate</span>

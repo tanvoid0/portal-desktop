@@ -6,11 +6,12 @@
   import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
   import { PageHeader, PageLoading, PageError, PageEmpty } from "$lib/components/shell";
   import {
+    createGitHubLinkedRepositoriesQuery,
     createGitHubRepositoriesQuery,
     createGitHubStatusQuery,
     GitHubConnectPrompt,
   } from "$lib/domains/github";
-  import { FolderGit2, Lock, Globe, ExternalLink } from "@lucide/svelte";
+  import { FolderGit2, Lock, Globe, ExternalLink, Link2, GitFork } from "@lucide/svelte";
 
   let search = $state("");
 
@@ -21,6 +22,8 @@
     () => isConnected,
   );
   const repositories = $derived(reposQuery.data ?? []);
+  const linkedReposQuery = createGitHubLinkedRepositoriesQuery(() => isConnected);
+  const linkedRepoNames = $derived(new Set(linkedReposQuery.data ?? []));
 </script>
 
 <svelte:head>
@@ -79,6 +82,12 @@
               <CardTitle class="flex items-center justify-between gap-3">
                 <span class="truncate">{repo.fullName}</span>
                 <div class="flex items-center gap-2">
+                  {#if linkedRepoNames.has(repo.fullName)}
+                    <Badge variant="default">
+                      <Link2 class="mr-1 h-3 w-3" />
+                      Linked
+                    </Badge>
+                  {/if}
                   <Badge variant={repo.private ? "secondary" : "outline"}>
                     {#if repo.private}
                       <Lock class="mr-1 h-3 w-3" />
@@ -88,6 +97,12 @@
                       Public
                     {/if}
                   </Badge>
+                  {#if repo.fork}
+                    <Badge variant="outline">
+                      <GitFork class="mr-1 h-3 w-3" />
+                      Fork
+                    </Badge>
+                  {/if}
                 </div>
               </CardTitle>
             </CardHeader>

@@ -109,9 +109,14 @@
 
         availableProfiles = uniqueProfiles;
 
-        // Set default profile
+        // Default to a shell with OSC 133 block support. Order matters:
+        // pwsh/powershell first — bash on Windows (Git Bash) has no hooks.
         if (availableProfiles.length > 0) {
-          selectedProfile = availableProfiles[0].name;
+          const preference = [/pwsh/i, /powershell/i, /zsh/i, /bash/i];
+          const preferred = preference
+            .map((re) => availableProfiles.find((p) => re.test(p.name)))
+            .find(Boolean);
+          selectedProfile = (preferred ?? availableProfiles[0]).name;
         }
       } else {
         // No terminal profiles found in system info
@@ -164,11 +169,11 @@
   function getTabStatusColor(tab: any) {
     switch (tab.status) {
       case "active":
-        return "border-blue-500";
+        return "border-status-info";
       case "loading":
-        return "border-yellow-500";
+        return "border-status-warning";
       case "error":
-        return "border-red-500";
+        return "border-status-error";
       default:
         return "border-transparent";
     }
@@ -191,17 +196,17 @@
 </script>
 
 <div
-  class="tab-bar flex min-h-[40px] items-center border-b border-gray-700 bg-gray-800"
+  class="tab-bar flex min-h-[40px] items-center border-b border-border bg-card"
 >
   <!-- Tab List -->
   <div class="flex flex-1 overflow-x-auto">
     {#each tabs as tab (tab.id)}
       <div
         onclick={() => handleTabClick(tab.id)}
-        class="tab flex min-w-0 cursor-pointer items-center space-x-2 border-b-2 border-r border-gray-700 px-4 py-2 text-sm transition-colors {activeTabId ===
+        class="tab flex min-w-0 cursor-pointer items-center space-x-2 border-b-2 border-r border-border px-4 py-2 text-sm transition-colors {activeTabId ===
         tab.id
-          ? 'bg-gray-700 text-white'
-          : 'bg-gray-800 text-gray-300 hover:bg-gray-700'} {getTabStatusColor(
+          ? 'bg-accent text-accent-foreground'
+          : 'bg-card text-muted-foreground hover:bg-accent/60 hover:text-foreground'} {getTabStatusColor(
           tab,
         )}"
         role="button"
@@ -214,7 +219,7 @@
         {#if closable && tab.closable !== false && tabs.length > 1}
           <button
             type="button"
-            class="ml-1 rounded p-1 text-gray-400 hover:bg-gray-600 hover:text-white"
+            class="ml-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
             onclick={(e) => handleCloseTab(tab.id, e)}
             aria-label="Close tab"
           >
@@ -230,7 +235,7 @@
     <div class="flex items-center space-x-2 px-2">
       <Select
         onSelect={handleProfileChange}
-        class="bg-gray-700 text-xs text-gray-200"
+        class="bg-muted text-xs text-foreground"
         options={availableProfiles.length === 0
           ? [{ value: "", label: "Loading profiles..." }]
           : availableProfiles.map((profile) => ({
@@ -248,7 +253,7 @@
       variant="ghost"
       size="sm"
       onclick={createNewTabWithProfile}
-      class="p-2 text-gray-400 hover:bg-gray-700 hover:text-white"
+      class="p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
       type="button"
       aria-label="New tab"
       title="New Tab with selected profile (Ctrl+T)"
@@ -261,7 +266,7 @@
 <style>
   .tab-bar {
     scrollbar-width: thin;
-    scrollbar-color: #4a5568 #2d3748;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) hsl(var(--muted));
   }
 
   .tab-bar::-webkit-scrollbar {
@@ -269,16 +274,16 @@
   }
 
   .tab-bar::-webkit-scrollbar-track {
-    background: #2d3748;
+    background: hsl(var(--muted));
   }
 
   .tab-bar::-webkit-scrollbar-thumb {
-    background: #4a5568;
+    background: hsl(var(--muted-foreground) / 0.4);
     border-radius: 2px;
   }
 
   .tab-bar::-webkit-scrollbar-thumb:hover {
-    background: #718096;
+    background: hsl(var(--muted-foreground) / 0.6);
   }
 
   .tab {

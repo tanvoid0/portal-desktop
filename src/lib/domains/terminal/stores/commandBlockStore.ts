@@ -50,6 +50,8 @@ function normalizeShellIntegrationEvent(raw: unknown): {
   payload: Record<string, unknown>;
   process_id?: string;
 } | null {
+  // Unit enum variants (e.g. PromptDetected) serialize as bare strings.
+  if (typeof raw === "string") return { type: raw, payload: {} };
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
 
@@ -86,6 +88,9 @@ function createCommandBlockStore() {
     Set<(blocks: CapturedCommand[]) => void>
   >();
   const processToTab = new Map<string, string>();
+  /** Processes whose shell emitted at least one OSC 133 event — for these,
+   *  blocks are created by shell integration, not manually on submit. */
+  const integrationActive = new Set<string>();
   let unsubs: (() => void)[] = [];
 
   function notifyTab(tabId: string, blocks: CapturedCommand[]) {
@@ -131,10 +136,57 @@ function createCommandBlockStore() {
           ? `${normalized.process_id}:`
           : "";
         const tabId = resolveTabId(normalized.process_id);
+        if (normalized.process_id) {
+          integrationActive.add(normalized.process_id);
+        }
+
+        if (type === "CommandDetected") {
+          // Payload is the raw command string (unit enum variant).
+          const command =
+            typeof payload === "string" ? payload : String(payload ?? "");
+          if (!command) return;
+          update((state) => {
+            const existing = state.blocksByTab[tabId] ?? [];
+            const idx = existing.findIndex(
+              (b) => b.status === "running" && b.source === "pty",
+            );
+            if (idx === -1) return state;
+            const next = existing.map((b, i) =>
+              i === idx ? { ...b, command } : b,
+            );
+            notifyTab(tabId, next);
+            return {
+              ...state,
+              blocksByTab: { ...state.blocksByTab, [tabId]: next },
+            };
+          });
+          return;
+        }
 
         if (type === "CommandStarted" || type === "CommandStart") {
           const started = payload;
           if (!started?.id) return;
+          // A manual block may exist for this same command (submitted before
+          // we knew integration was live) — the shell-integration block
+          // supersedes it.
+          update((state) => {
+            const existing = state.blocksByTab[tabId] ?? [];
+            const next = existing.filter(
+              (b) =>
+                !(
+                  b.status === "running" &&
+                  b.source === "pty" &&
+                  b.processId === normalized.process_id &&
+                  !b.id.startsWith(scopedIdPrefix)
+                ),
+            );
+            if (next.length === existing.length) return state;
+            notifyTab(tabId, next);
+            return {
+              ...state,
+              blocksByTab: { ...state.blocksByTab, [tabId]: next },
+            };
+          });
           upsertBlock(tabId, {
             id: `${scopedIdPrefix}${String(started.id)}`,
             tabId,
@@ -248,6 +300,34 @@ function createCommandBlockStore() {
       return id;
     },
 
+    /** True once the process's shell has emitted OSC 133 events — blocks are
+     *  then created/completed by shell integration, not manual submits. */
+    hasIntegration(processId: string): boolean {
+      return integrationActive.has(processId);
+    },
+
+    /** Stream a raw PTY output chunk into the currently running block for
+     *  this process (live output while the command runs). No-op when no
+     *  block is running. Raw chunk may contain ANSI; strip at render. */
+    appendToRunningBlock(processId: string, content: string) {
+      const tabId = resolveTabId(processId);
+      update((state) => {
+        const existing = state.blocksByTab[tabId] ?? [];
+        const idx = existing.findIndex(
+          (b) => b.status === "running" && b.source === "pty",
+        );
+        if (idx === -1) return state;
+        const next = existing.map((b, i) =>
+          i === idx ? { ...b, output: b.output + content } : b,
+        );
+        notifyTab(tabId, next);
+        return {
+          ...state,
+          blocksByTab: { ...state.blocksByTab, [tabId]: next },
+        };
+      });
+    },
+
     appendOutput(tabId: string, blockId: string, content: string) {
       update((state) => {
         const existing = state.blocksByTab[tabId] ?? [];
@@ -333,6 +413,8 @@ function createCommandBlockStore() {
         }
       }
       unsubs = [];
+      integrationActive.clear();
+      processToTab.clear();
       set(initialState);
     },
   };

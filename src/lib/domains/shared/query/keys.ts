@@ -9,6 +9,7 @@ export const queryKeys = {
   github: {
     status: ["github", "status"] as const,
     repositories: (search: string) => ["github", "repositories", search] as const,
+    linkedRepos: ["github", "linked-repos"] as const,
     repository: (owner: string, repo: string) =>
       ["github", "repository", owner, repo] as const,
     issues: (scope: string) => ["github", "issues", scope] as const,

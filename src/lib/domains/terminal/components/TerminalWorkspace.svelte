@@ -184,7 +184,7 @@
 <TabContainer
   onNewTab={createNewTerminalTab}
   {tabFilter}
-  className="terminal-workspace h-full bg-gray-900"
+  className="terminal-workspace h-full bg-background"
 >
   {#if tabs.length === 0}
     <div class="flex h-full items-center justify-center">
@@ -197,7 +197,7 @@
         style:display={tab.id === activeTabId ? "block" : "none"}
       >
         <div class="flex h-full flex-col">
-          <div class="flex items-center justify-end gap-1 border-b border-gray-700 bg-gray-800 px-2 py-1">
+          <div class="flex items-center justify-end gap-1 border-b border-border bg-card px-2 py-1">
             {#each widgetToggles as toggle (toggle.id)}
               <Button
                 variant={widgetRail.activeWidgets.includes(toggle.id)
@@ -247,18 +247,27 @@
                 </ResizablePane>
                 <ResizableHandle withHandle />
                 <ResizablePane defaultSize={30} minSize={20}>
-                  <div class="flex h-full flex-col divide-y divide-gray-700 overflow-hidden">
+                  <div class="flex h-full flex-col divide-y divide-border overflow-hidden">
                     {#if widgetRail.activeWidgets.includes("blocks")}
                       <div class="min-h-0 flex-1">
                         <CommandBlocksPanel
                           tabId={tab.id}
                           onRerun={(cmd) => handleRerun(tab.id, cmd)}
+                          onExplain={(block) =>
+                            sessionRefs[tab.id]?.explainError(block)}
                         />
                       </div>
                     {/if}
                     {#if widgetRail.activeWidgets.includes("ai")}
                       <div class="min-h-0 flex-1">
-                        <AIAssistantPanel tabId={tab.id} />
+                        <AIAssistantPanel
+                          tabId={tab.id}
+                          shell={tab.shell || settings.defaultShell}
+                          workingDirectory={
+                            tab.workingDirectory || settings.workingDirectory
+                          }
+                          onRunCommand={(cmd) => handleRerun(tab.id, cmd)}
+                        />
                       </div>
                     {/if}
                     {#if widgetRail.activeWidgets.includes("notes")}

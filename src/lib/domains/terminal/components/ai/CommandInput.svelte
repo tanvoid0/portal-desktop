@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Command, Sparkles, Terminal as TerminalIcon } from "@lucide/svelte";
+  import { Sparkles } from "@lucide/svelte";
   import { Input } from "$lib/components/ui/input";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
@@ -166,57 +166,45 @@
 </script>
 
 <div class="relative">
-  <div class="flex items-center gap-2">
+  <div
+    class={cn(
+      "flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5 transition-colors",
+      isAIMode
+        ? "border-primary/60 focus-within:border-primary"
+        : "border-border focus-within:border-ring",
+    )}
+  >
     <!-- Mode indicator -->
     <div class="flex-shrink-0">
       {#if isAIMode}
-        <Sparkles class="h-4 w-4 text-purple-500" />
+        <Sparkles class="h-4 w-4 text-primary" />
       {:else}
-        <TerminalIcon class="h-4 w-4 text-muted-foreground" />
+        <span class="font-mono text-sm font-bold text-status-success">❯</span>
       {/if}
     </div>
 
     <!-- Input field -->
-    <div class="relative flex-1">
+    <div class="relative min-w-0 flex-1">
       <Input
         bind:ref={inputRef}
         bind:value={inputValue}
         onkeydown={handleKeydown}
         {disabled}
         {placeholder}
-        class={cn(
-          "font-mono text-sm",
-          isAIMode
-            ? "border-purple-500 focus:border-purple-400 focus:ring-purple-400"
-            : "",
-        )}
+        class="h-8 border-0 bg-transparent font-mono text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
       />
 
-      <!-- AI Mode Badge -->
-      {#if isAIMode}
-        <div
-          class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2"
-        >
-          <Badge
-            variant="secondary"
-            class="border-purple-500/30 bg-purple-500/20 text-xs text-purple-300"
-          >
-            AI Mode
-          </Badge>
-        </div>
-      {/if}
-
-      <!-- Suggestions Dropdown -->
+      <!-- Suggestions Dropdown (opens upward, above the input) -->
       {#if showSuggestions && suggestions.length > 0}
         <div
-          class="suggestions-dropdown absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
+          class="suggestions-dropdown absolute bottom-full z-10 mb-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
         >
           {#each suggestions as suggestion}
             <Button
               type="button"
               variant="ghost"
               onclick={() => selectSuggestion(suggestion)}
-              class="h-auto w-full justify-start rounded-none px-3 py-2 font-mono text-sm"
+              class="h-auto w-full justify-start rounded-none px-3 py-1.5 font-mono text-xs text-popover-foreground"
             >
               {suggestion}
             </Button>
@@ -225,24 +213,39 @@
       {/if}
     </div>
 
-    <!-- AI Mode Toggle Button -->
+    {#if isAIMode}
+      <Badge
+        variant="secondary"
+        class="pointer-events-none flex-shrink-0 border-primary/30 bg-primary/20 text-[10px] text-primary"
+      >
+        AI
+      </Badge>
+    {/if}
+
+    <!-- AI Mode Toggle -->
     <Button
-      variant={isAIMode ? "default" : "outline"}
+      variant="ghost"
       size="sm"
       onclick={toggleAIMode}
       {disabled}
       class={cn(
-        "flex-shrink-0",
-        isAIMode && "border-purple-500 bg-purple-600 hover:bg-purple-700",
+        "h-6 w-6 flex-shrink-0 p-0",
+        isAIMode ? "text-primary" : "text-muted-foreground hover:text-foreground",
       )}
       title="Toggle AI Mode (Ctrl+Space)"
     >
-      <Sparkles class="h-4 w-4" />
+      <Sparkles class="h-3.5 w-3.5" />
     </Button>
 
-    <!-- Submit Button -->
-    <Button onclick={handleSubmit} {disabled} size="sm" class="flex-shrink-0">
-      Run
+    <!-- Submit -->
+    <Button
+      onclick={handleSubmit}
+      disabled={disabled || !inputValue.trim()}
+      variant="ghost"
+      size="sm"
+      class="h-6 flex-shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground"
+    >
+      Run ⏎
     </Button>
   </div>
 </div>
@@ -251,7 +254,7 @@
   /* Suggestions scrollbar */
   :global(.suggestions-dropdown) {
     scrollbar-width: thin;
-    scrollbar-color: #4b5563 #1f2937;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) hsl(var(--muted));
   }
 
   :global(.suggestions-dropdown)::-webkit-scrollbar {
@@ -259,11 +262,11 @@
   }
 
   :global(.suggestions-dropdown)::-webkit-scrollbar-track {
-    background: #1f2937;
+    background: hsl(var(--muted));
   }
 
   :global(.suggestions-dropdown)::-webkit-scrollbar-thumb {
-    background: #4b5563;
+    background: hsl(var(--muted-foreground) / 0.4);
     border-radius: 3px;
   }
 </style>

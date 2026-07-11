@@ -4,10 +4,11 @@
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
   import Icon from "@iconify/svelte";
-  import { taskUi } from "../state/taskUi.svelte";
+  import { taskUi as defaultTaskUi, type TaskUiState } from "../state/taskUi.svelte";
   import type { Task } from "../types";
 
   interface Props {
+    ui?: TaskUiState;
     handleTaskSelect: (task: Task) => void;
     handleTaskStatusToggle: (taskId: string) => void;
     handleTaskSelection: (taskId: string) => void;
@@ -17,9 +18,11 @@
     getStatusBadgeColor: (status: string) => string;
     getPriorityColor: (priority: string) => string;
     getTaskIcon: (task: Task) => string;
+    showSubtaskActions?: boolean;
   }
 
   let {
+    ui = defaultTaskUi,
     handleTaskSelect,
     handleTaskStatusToggle,
     handleTaskSelection,
@@ -29,7 +32,9 @@
     getStatusBadgeColor,
     getPriorityColor,
     getTaskIcon,
+    showSubtaskActions = true,
   }: Props = $props();
+  let taskUi = $derived(ui);
 
   function getTaskSubtasks(taskId: string): Task[] {
     return taskUi.tasks.filter((task) => task.parentId === taskId);
@@ -72,7 +77,7 @@
                 />
               {/if}
               <div class="flex items-center gap-1">
-                {#if !task.parentId}
+                {#if showSubtaskActions && !task.parentId}
                   <Button
                     onclick={(e) => {
                       e.stopPropagation();

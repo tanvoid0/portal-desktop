@@ -57,3 +57,15 @@ export { default as Terminal } from "./components/core/Terminal.svelte";
 export { default as TerminalSession } from "./components/core/TerminalSession.svelte";
 export { default as CommandPalette } from "./components/CommandPalette.svelte";
 export { default as CommandInput } from "./components/ai/CommandInput.svelte";
+export { default as BlocksView } from "./components/core/BlocksView.svelte";
+export { default as CommandBlock } from "./components/CommandBlock.svelte";
+export { default as AiResponse } from "./components/ai/AiResponse.svelte";
+
+// AI context helpers
+export {
+  buildTerminalContext,
+  buildExplainPrompt,
+  resolveShellMetadata,
+  parseAiResponse,
+  type AiResponseSegment,
+} from "./services/terminalAiContext";

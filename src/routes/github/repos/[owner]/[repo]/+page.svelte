@@ -7,6 +7,7 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import FolderPicker from "$lib/components/ui/folder-picker.svelte";
   import { Input } from "$lib/components/ui/input";
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from "$lib/components/ui/tabs";
   import { PageHeader, PageLoading, PageError, PageEmpty } from "$lib/components/shell";
   import {
     createGitHubIssuesQuery,
@@ -16,7 +17,7 @@
     GitHubConnectPrompt,
   } from "$lib/domains/github";
   import { toast } from "$lib/utils/toast";
-  import { ExternalLink, FolderGit2, Link2, Bug } from "@lucide/svelte";
+  import { ExternalLink, FolderGit2, Link2, Bug, GitPullRequest, GitFork } from "@lucide/svelte";
 
   const owner = $derived($page.params.owner);
   const repo = $derived($page.params.repo);
@@ -35,8 +36,15 @@
       state: "open",
       page: 1,
       perPage: 20,
+      includePullRequests: true,
     }),
     () => isConnected,
+  );
+  const openIssues = $derived(
+    (repoIssuesQuery.data ?? []).filter((issue) => !issue.isPullRequest),
+  );
+  const openPullRequests = $derived(
+    (repoIssuesQuery.data ?? []).filter((issue) => issue.isPullRequest),
   );
 
   let cloneDialogOpen = $state(false);
@@ -167,6 +175,12 @@
             <Badge variant={repoData.private ? "secondary" : "outline"}>
               {repoData.private ? "Private" : "Public"}
             </Badge>
+            {#if repoData.fork}
+              <Badge variant="outline">
+                <GitFork class="mr-1 h-3 w-3" />
+                Fork
+              </Badge>
+            {/if}
           </div>
           <div class="grid gap-2 text-sm">
             <div><span class="font-medium">Clone URL:</span> {repoData.cloneUrl}</div>
@@ -203,10 +217,7 @@
 
     <Card>
       <CardHeader>
-        <CardTitle class="flex items-center gap-2">
-          <Bug class="h-4 w-4" />
-          Open Issues
-        </CardTitle>
+        <CardTitle>Activity</CardTitle>
       </CardHeader>
       <CardContent>
         {#if repoIssuesQuery.isPending}
@@ -219,38 +230,91 @@
               : "Unable to load issues"}
             onRetry={() => repoIssuesQuery.refetch()}
           />
-        {:else if (repoIssuesQuery.data ?? []).length === 0}
-          <p class="text-sm text-muted-foreground">No open issues.</p>
         {:else}
-          <div class="space-y-3">
-            {#each repoIssuesQuery.data ?? [] as issue}
-              <div class="rounded border p-3">
-                <div class="flex items-center justify-between gap-3">
-                  <div class="font-medium">
-                    #{issue.number} {issue.title}
-                  </div>
-                  <a
-                    href={issue.htmlUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    class="inline-flex items-center text-xs text-primary"
-                  >
-                    Open
-                    <ExternalLink class="ml-1 h-3 w-3" />
-                  </a>
+          <Tabs value="issues" class="w-full">
+            <TabsList>
+              <TabsTrigger value="issues">
+                <Bug class="mr-1 h-4 w-4" />
+                Issues ({openIssues.length})
+              </TabsTrigger>
+              <TabsTrigger value="pulls">
+                <GitPullRequest class="mr-1 h-4 w-4" />
+                Pull Requests ({openPullRequests.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="issues" class="mt-4">
+              {#if openIssues.length === 0}
+                <p class="text-sm text-muted-foreground">No open issues.</p>
+              {:else}
+                <div class="space-y-3">
+                  {#each openIssues as issue}
+                    <div class="rounded border p-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="font-medium">
+                          #{issue.number} {issue.title}
+                        </div>
+                        <a
+                          href={issue.htmlUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          class="inline-flex items-center text-xs text-primary"
+                        >
+                          Open
+                          <ExternalLink class="ml-1 h-3 w-3" />
+                        </a>
+                      </div>
+                      <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>{issue.state}</span>
+                        {#if issue.authorLogin}
+                          <span>by {issue.authorLogin}</span>
+                        {/if}
+                        {#if issue.labels.length > 0}
+                          <span>labels: {issue.labels.join(", ")}</span>
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
                 </div>
-                <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span>{issue.state}</span>
-                  {#if issue.authorLogin}
-                    <span>by {issue.authorLogin}</span>
-                  {/if}
-                  {#if issue.labels.length > 0}
-                    <span>labels: {issue.labels.join(", ")}</span>
-                  {/if}
+              {/if}
+            </TabsContent>
+
+            <TabsContent value="pulls" class="mt-4">
+              {#if openPullRequests.length === 0}
+                <p class="text-sm text-muted-foreground">No open pull requests.</p>
+              {:else}
+                <div class="space-y-3">
+                  {#each openPullRequests as pr}
+                    <div class="rounded border p-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="font-medium">
+                          #{pr.number} {pr.title}
+                        </div>
+                        <a
+                          href={pr.htmlUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          class="inline-flex items-center text-xs text-primary"
+                        >
+                          Open
+                          <ExternalLink class="ml-1 h-3 w-3" />
+                        </a>
+                      </div>
+                      <div class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>{pr.state}</span>
+                        {#if pr.authorLogin}
+                          <span>by {pr.authorLogin}</span>
+                        {/if}
+                        {#if pr.labels.length > 0}
+                          <span>labels: {pr.labels.join(", ")}</span>
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
                 </div>
-              </div>
-            {/each}
-          </div>
+              {/if}
+            </TabsContent>
+          </Tabs>
         {/if}
       </CardContent>
     </Card>

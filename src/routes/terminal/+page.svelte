@@ -5,6 +5,6 @@
   import TerminalWorkspace from "$lib/domains/terminal/components/TerminalWorkspace.svelte";
 </script>
 
-<div class="flex h-full w-full flex-col overflow-hidden bg-gray-900">
+<div class="flex h-full w-full flex-col overflow-hidden bg-background">
   <TerminalWorkspace />
 </div>

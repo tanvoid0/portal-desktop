@@ -316,6 +316,7 @@ pub fn run() {
             domains::github::commands::github_poll_device_flow,
             domains::github::commands::github_disconnect,
             domains::github::commands::github_list_repositories,
+            domains::github::commands::github_list_linked_repos,
             domains::github::commands::github_get_repository,
             domains::github::commands::github_list_issues,
             domains::github::commands::github_get_issue,

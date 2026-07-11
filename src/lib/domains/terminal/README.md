@@ -1,6 +1,6 @@
 # Terminal Workspace
 
-Unified interactive terminal for Portal Desktop — WaveTerm-style widget rail with Warp-style command blocks and AI assistance.
+Unified interactive terminal for Portal Desktop — Warp-style command blocks as the primary view, with AI assistance and a collapsible widget rail.
 
 ## Architecture
 
@@ -9,11 +9,12 @@ Unified interactive terminal for Portal Desktop — WaveTerm-style widget rail w
   └── TerminalWorkspace
         ├── TabContainer / TabBar (multi-tab sessions)
         ├── TerminalSession (per tab)
-        │     ├── XtermPane (interactive PTY via xterm.js)
-        │     └── CommandInputBar (optional structured input + /ai)
+        │     ├── BlocksView (Warp-style: one block per command; default view)
+        │     ├── Terminal (raw xterm PTY; toggle for interactive apps)
+        │     └── CommandInputBar (view toggle + command/AI input)
         └── Widget rail (collapsible)
               ├── CommandBlocksPanel (OSC 133 capture)
-              ├── AIAssistantPanel
+              ├── AIAssistantPanel (context-aware, runnable suggestions)
               ├── NotesPanel
               ├── SessionLauncher (projects / containers)
               └── CommandHistoryPanel
@@ -23,11 +24,35 @@ Unified interactive terminal for Portal Desktop — WaveTerm-style widget rail w
 
 | Module | Purpose |
 |--------|---------|
-| `composables/useXtermSession.ts` | xterm lifecycle, OSC8 links, session persistence |
+| `composables/useXtermSession.ts` | xterm lifecycle, OSC8 links, session persistence, live block streaming |
 | `composables/useTerminalProcess.ts` | PTY create/input/resize/kill |
-| `components/core/XtermPane.svelte` | xterm canvas (interactive or one-shot) |
-| `components/core/TerminalSession.svelte` | xterm + command input + optional widget slot |
+| `components/core/Terminal.svelte` | xterm canvas (interactive / one-shot / display) |
+| `components/core/BlocksView.svelte` | Warp-style block list (primary surface) |
+| `components/core/TerminalSession.svelte` | blocks + xterm + command input + optional widget slot |
+| `components/CommandBlock.svelte` | one command block: status, actions, live output |
 | `stores/commandBlockStore.ts` | Unified command output capture |
+| `services/terminalAiContext.ts` | AI context building + response parsing (runnable suggestions) |
+
+### Shell integration (OSC 133)
+
+The backend injects hooks per shell so every command becomes a tracked block
+with command text, cwd, output, duration and exit code:
+
+- **PowerShell / pwsh** (Windows default): temp profile overriding `prompt` +
+  `PSConsoleHostReadLine` (needs PSReadLine, present by default).
+- **zsh**: temp `ZDOTDIR` with `preexec`/`precmd`.
+- **bash**: temp `--rcfile` with `DEBUG` trap + `PROMPT_COMMAND`.
+- **cmd.exe**: no hooks — blocks fall back to input-bar submissions only.
+
+Internal marker protocol: `133;A;<cwd>` command started, `133;C;<command>`
+command text, `133;B;<exit>` command finished.
+
+### AI
+
+The AI assistant (side panel, `/ai` prefix, or Ctrl+Space in the input bar)
+receives session context: OS, shell, cwd, and the last commands with output.
+Fenced code blocks in AI answers render with **Run** buttons that execute in
+the session. Failed blocks get an **Explain** action.
 
 ### Embedded terminals
 

@@ -139,7 +139,7 @@ export function getSubtaskCount(taskId: string, allTasks: Task[]): number {
   return allTasks.filter((task) => task.parentId === taskId).length;
 }
 
-class TaskUiState {
+export class TaskUiState {
   tasks = $state<Task[]>([]);
   selectedTask = $state<Task | null>(null);
   selectedTaskIds = $state<Set<string>>(new Set());
@@ -408,3 +408,7 @@ class TaskUiState {
 }
 
 export const taskUi = new TaskUiState();
+
+export function createTaskUiState(): TaskUiState {
+  return new TaskUiState();
+}
