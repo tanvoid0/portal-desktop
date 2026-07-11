@@ -8,6 +8,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import { Button } from "$lib/components/ui/button";
+  import { Checkbox } from "$lib/components/ui/checkbox";
   import { X } from "@lucide/svelte";
   import { FilePicker } from "$lib/domains/shared/components";
   import type { ScriptParameter } from "$lib/domains/custom_scripts/services/customScriptService";
@@ -150,14 +151,10 @@
   </div>
 
   <div class="flex items-center gap-2">
-    <input
-      type="checkbox"
+    <Checkbox
       checked={parameter.required}
-      onchange={(e) =>
-        onUpdate(index, {
-          required: (e.target as HTMLInputElement).checked,
-        })}
-      class="rounded border-gray-300"
+      onCheckedChange={(checked) =>
+        onUpdate(index, { required: checked === true })}
     />
     <Label>Required</Label>
   </div>

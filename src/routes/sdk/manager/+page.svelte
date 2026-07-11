@@ -167,9 +167,10 @@
         <Card class="relative">
           <CardHeader>
             <div class="flex items-center justify-between">
-              <button
+              <Button
                 type="button"
-                class="flex flex-1 cursor-pointer items-center gap-3 text-left hover:opacity-80"
+                variant="ghost"
+                class="h-auto flex-1 justify-start gap-3 px-0 text-left hover:opacity-80"
                 onclick={() => navigateToManagerDetails(manager.id)}
                 onkeydown={(e) =>
                   e.key === "Enter" && navigateToManagerDetails(manager.id)}
@@ -183,7 +184,7 @@
                     </p>
                   {/if}
                 </div>
-              </button>
+              </Button>
               <div class="flex items-center gap-2">
                 {#if manager.installed}
                   <Badge variant="default" class="bg-green-100 text-green-800">

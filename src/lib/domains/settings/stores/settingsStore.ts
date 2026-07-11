@@ -2,11 +2,12 @@
  * Settings Store - State management for application settings
  */
 
-import { writable, derived } from "svelte/store";
+import { writable, derived, get } from "svelte/store";
 import {
   loadingState,
   loadingActions,
 } from "$lib/domains/shared/stores/loadingState";
+import { resolvedTheme } from "$lib/domains/shared/stores/themeStore";
 import { settingsService } from "../services/settingsService";
 import { logger } from "$lib/domains/shared";
 import type {
@@ -25,6 +26,13 @@ if (typeof window !== "undefined") {
   settings.subscribe((settingsData) => {
     if (settingsData?.theme) {
       applyCustomTheme(settingsData.theme);
+    }
+  });
+
+  resolvedTheme.subscribe(() => {
+    const current = get(settings);
+    if (current?.theme) {
+      applyCustomTheme(current.theme);
     }
   });
 }

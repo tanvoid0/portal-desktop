@@ -5,6 +5,10 @@
   import { defaultTerminalConfig } from "../config/defaultTerminalConfig";
   import TerminalWorkspace from "./TerminalWorkspace.svelte";
   import type { TerminalConfig } from "../types";
+  import {
+    migratedProjectTabFields,
+    projectTabNeedsMigration,
+  } from "../utils/resolveSessionSettings";
 
   const log = logger.createScoped("ProjectTerminal");
 
@@ -40,31 +44,34 @@
     const tabNumber = tabs.length + 1;
     const actualShellCommand = shellCommand || settings.defaultShell;
 
-    const tabId = terminalActions.createTab({
+    return terminalActions.createTabWithProcess({
       title: `${projectName} Terminal ${tabNumber}`,
-      type: "terminal",
       workingDirectory: projectPath,
       shell: actualShellCommand,
-      icon: "💻",
-      closable: true,
       resourceName: "project",
       resourceId: projectId,
     });
-
-    terminalActions.createProcess({
-      tabId,
-      command: actualShellCommand,
-      workingDirectory: projectPath,
-      environment: {},
-      status: "running",
-    });
-
-    return tabId;
   }
 
   onMount(() => {
     log.info("ProjectTerminal mounted", { projectId });
     terminalActions.cleanupStaleData();
+
+    for (const tab of $terminalStore.tabs) {
+      if (
+        projectTabNeedsMigration(
+          tab,
+          projectId,
+          projectPath,
+          settings.defaultShell,
+        )
+      ) {
+        terminalActions.updateTab(
+          tab.id,
+          migratedProjectTabFields(projectPath, settings.defaultShell),
+        );
+      }
+    }
 
     if (tabs.length === 0) {
       createNewTerminalTab();
@@ -83,7 +90,7 @@
 </script>
 
 <div class="project-terminal-container flex h-full w-full flex-col bg-background">
-  <div class="border-b border-border bg-card px-4 py-2">
+  <div class="divider-edge-b divider-edge-full bg-card px-4 py-2">
     <div class="flex items-center justify-between">
       <h2 class="text-lg font-semibold text-foreground">
         {projectName} Terminal
@@ -98,6 +105,7 @@
       showLauncher={false}
       showHistory={false}
       autoCreateTab={false}
+      onNewTab={createNewTerminalTab}
       tabFilter={(tab) =>
         tab.resourceName === "project" && tab.resourceId === projectId}
     />

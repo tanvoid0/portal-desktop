@@ -18,6 +18,7 @@
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
   import { Label } from "$lib/components/ui/label";
+  import { Checkbox } from "$lib/components/ui/checkbox";
   import Select from "$lib/components/ui/select.svelte";
   import {
     ArrowLeft,
@@ -211,8 +212,9 @@
     <!-- JSON Import Card -->
     <Card>
       <CardHeader class="pb-3">
-        <button
-          class="flex w-full items-center justify-between text-left"
+        <Button
+          variant="ghost"
+          class="h-auto w-full justify-between px-0 text-left"
           onclick={() => (showJsonImport = !showJsonImport)}
         >
           <div>
@@ -226,7 +228,7 @@
           {:else}
             <ChevronDown class="h-5 w-5 text-muted-foreground" />
           {/if}
-        </button>
+        </Button>
       </CardHeader>
       {#if showJsonImport}
         <CardContent class="space-y-4">
@@ -434,15 +436,9 @@
                   class="mt-1"
                 />
               </div>
-              <div class="flex items-end pb-2">
-                <label class="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    bind:checked={newParameter.required}
-                    class="rounded"
-                  />
-                  <span class="text-sm">Required parameter</span>
-                </label>
+              <div class="flex items-end gap-2 pb-2">
+                <Checkbox bind:checked={newParameter.required} id="new-param-required" />
+                <Label for="new-param-required" class="text-sm">Required parameter</Label>
               </div>
             </div>
             <div class="flex gap-2">

@@ -37,7 +37,7 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="border-b border-border p-2">
+  <div class="divider-edge-b divider-edge-full p-2">
     <div class="text-sm font-medium text-foreground">Notes</div>
     <div class="text-xs text-muted-foreground">
       Tab: <span class="font-mono">{tabId.slice(0, 8)}...</span>

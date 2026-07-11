@@ -10,6 +10,8 @@
   import { Label } from "$lib/components/ui/label";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Switch } from "$lib/components/ui/switch";
+  import { Checkbox } from "$lib/components/ui/checkbox";
+  import Select from "$lib/components/ui/select.svelte";
   import {
     Card,
     CardContent,
@@ -265,22 +267,21 @@
 
                 <div>
                   <Label>Type</Label>
-                  <select
-                    value={(param as ScriptParameter).parameter_type}
-                    onchange={(e: Event) =>
+                  <Select
+                    defaultValue={(param as ScriptParameter).parameter_type}
+                    options={[
+                      { value: "string", label: "String" },
+                      { value: "file", label: "File" },
+                      { value: "folder", label: "Folder" },
+                      { value: "number", label: "Number" },
+                      { value: "boolean", label: "Boolean" },
+                      { value: "password", label: "Password" },
+                    ]}
+                    onSelect={(value) =>
                       updateParameter(index, {
-                        parameter_type: (e.target as HTMLSelectElement)
-                          .value as ScriptParameter["parameter_type"],
+                        parameter_type: value as ScriptParameter["parameter_type"],
                       })}
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="string">String</option>
-                    <option value="file">File</option>
-                    <option value="folder">Folder</option>
-                    <option value="number">Number</option>
-                    <option value="boolean">Boolean</option>
-                    <option value="password">Password</option>
-                  </select>
+                  />
                 </div>
 
                 {#if param.parameter_type === "file"}
@@ -360,14 +361,10 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={(param as ScriptParameter).required}
-                    onchange={(e: Event) =>
-                      updateParameter(index, {
-                        required: (e.target as HTMLInputElement).checked,
-                      })}
-                    class="rounded border-gray-300"
+                    onCheckedChange={(checked) =>
+                      updateParameter(index, { required: checked === true })}
                   />
                   <Label>Required</Label>
                 </div>

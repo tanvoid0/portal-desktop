@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import { Label } from "$lib/components/ui/label";
   import {
     Card,
     CardContent,
@@ -194,9 +195,9 @@
           {/if}
 
           <div>
-            <label for="passcode" class="mb-2 block text-sm font-medium">
+            <Label for="passcode" class="mb-2 block">
               Enter Passcode
-            </label>
+            </Label>
             <Input
               id="passcode"
               type="text"

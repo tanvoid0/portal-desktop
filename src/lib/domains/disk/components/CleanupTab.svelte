@@ -28,6 +28,7 @@
     verdictMap,
     type TreeNode,
   } from "../utils";
+  import { confirmAction } from "$lib/utils/confirm";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
@@ -262,8 +263,10 @@
     const items = summary.proposals
       .filter((p) => selected.has(p.id))
       .map((p) => ({ path: p.path, kind: p.kind }));
-    const ok = window.confirm(
+    const ok = await confirmAction(
       `Move ${items.length} item(s) (${fmtBytes(selectedBytes)}) to the Recycle Bin?\n\nNothing is permanently deleted — you can restore from the Recycle Bin.`,
+      "Move to Recycle Bin",
+      { confirmLabel: "Move" },
     );
     if (!ok) return;
     busy = true;
@@ -450,7 +453,7 @@
 
   {#if verifying && verifyProgress}
     <Card class="mb-4 gap-0 overflow-hidden py-0">
-      <CardHeader class="border-b bg-muted/40 px-4 py-2.5 [.border-b]:pb-2.5">
+      <CardHeader class="divider-edge-b divider-edge-full bg-muted/40 px-4 py-2.5 [.border-b]:pb-2.5">
         <div class="flex items-center gap-2">
           <CardTitle class="text-sm font-medium">AI verification</CardTitle>
           <span class="text-xs text-muted-foreground">process #{verifyProgress.processId} · {verifyProgress.status.replace(/_/g, " ")}</span>
@@ -477,7 +480,7 @@
 
   {#if verifyErr || verification}
     <Card class="mb-4 gap-0 overflow-hidden py-0">
-      <CardHeader class="border-b bg-muted/40 px-4 py-2.5 [.border-b]:pb-2.5">
+      <CardHeader class="divider-edge-b divider-edge-full bg-muted/40 px-4 py-2.5 [.border-b]:pb-2.5">
         <div class="flex items-center gap-2">
           <CardTitle class="text-sm font-medium">AI verification</CardTitle>
           {#if verification}
@@ -557,7 +560,7 @@
             <TableCell class="break-all align-top font-mono text-xs">
               <div class="flex items-start" style="padding-left: {depth * 16}px">
                 {#if isFolder}
-                  <button onclick={() => toggleExp(node.fullPath)} class="mr-1.5 mt-px w-4 shrink-0 text-muted-foreground hover:text-foreground">{expanded.has(node.fullPath) ? "▾" : "▸"}</button>
+                  <Button type="button" variant="ghost" size="icon-sm" class="mr-1.5 mt-px h-4 w-4 shrink-0 p-0 text-muted-foreground" onclick={() => toggleExp(node.fullPath)}>{expanded.has(node.fullPath) ? "▾" : "▸"}</Button>
                 {:else}
                   <span class="mr-1.5 w-4 shrink-0 text-muted-foreground/50">·</span>
                 {/if}

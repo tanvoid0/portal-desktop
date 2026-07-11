@@ -783,13 +783,14 @@
                                   subtask.status,
                                 )}"
                               />
-                              <button
+                              <Button
+                                variant="link"
+                                class="h-auto p-0 text-left font-medium"
                                 onclick={() => goto(`/tasks/${subtask.id}`)}
-                                class="text-left font-medium transition-colors hover:text-primary"
                                 title="View subtask details"
                               >
                                 {subtask.title}
-                              </button>
+                              </Button>
                               {#if subtask.type}
                                 <Badge variant="outline" class="text-xs"
                                   >{subtask.type}</Badge

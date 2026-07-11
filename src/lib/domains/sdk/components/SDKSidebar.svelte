@@ -659,7 +659,7 @@
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
   {#if sidebar.state === "collapsed"}
     <!-- Header (icon-only) -->
-    <div class="flex-shrink-0 border-b border-border p-1">
+    <div class="divider-edge-b divider-edge-full flex-shrink-0 p-1">
       <SidebarMenuButton
         size="sm"
         tooltipContent="Back to Portal Desktop"
@@ -837,7 +837,7 @@
     </ScrollArea>
   {:else}
     <!-- Header -->
-    <div class="flex-shrink-0 border-b border-border bg-background p-3">
+    <div class="divider-edge-b divider-edge-full flex-shrink-0 bg-background p-3">
       <h2 class="text-base font-semibold">SDK Manager</h2>
       <p class="text-xs text-muted-foreground">
         Manage your development environment
@@ -1023,7 +1023,7 @@
     </ScrollArea>
 
     <!-- Footer -->
-    <div class="border-t border-border p-3">
+    <div class="divider-edge-t divider-edge-full p-3">
       <div class="space-y-1 text-center text-xs text-muted-foreground">
         <div>
           {allSDKs().filter((sdk) => sdk.installed).length} of {allSDKs()

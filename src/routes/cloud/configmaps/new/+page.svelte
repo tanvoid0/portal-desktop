@@ -14,6 +14,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import { Textarea } from "$lib/components/ui/textarea";
+  import Select from "$lib/components/ui/select.svelte";
   import { ArrowLeft, Save, Plus, X } from "@lucide/svelte";
   import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
   import { toastActions } from "$lib/utils/toast";
@@ -183,17 +184,11 @@ ${dataSection}
 
             <div class="space-y-2">
               <Label for="namespace">Namespace *</Label>
-              <select
-                id="namespace"
-                value={namespace}
-                onchange={(e) =>
-                  (namespace = (e.target as HTMLSelectElement).value)}
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {#each namespaceOptions() as ns}
-                  <option value={ns}>{ns}</option>
-                {/each}
-              </select>
+              <Select
+                bind:value={namespace}
+                options={namespaceOptions()}
+                placeholder="Select namespace"
+              />
             </div>
 
             <div class="space-y-2">

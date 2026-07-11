@@ -7,6 +7,7 @@ import { defineConfig } from "eslint/config";
 import globals from "globals";
 import ts from "typescript-eslint";
 import svelteConfig from "./svelte.config.js";
+import portalPlugin from "./eslint-rules/index.mjs";
 
 const gitignorePath = fileURLToPath(new URL("./.gitignore", import.meta.url));
 
@@ -18,7 +19,11 @@ export default defineConfig(
   prettier,
   ...svelte.configs.prettier,
   {
-    ignores: ["src-tauri/target/**", "src-tauri/Cargo.lock"],
+    ignores: [
+      "src-tauri/target/**",
+      "src-tauri/Cargo.lock",
+      "src-tauri/target/debug/build/**",
+    ],
   },
   {
     languageOptions: {
@@ -82,6 +87,16 @@ export default defineConfig(
     files: ["src/lib/components/ui/**/*.svelte"],
     rules: {
       "svelte/no-navigation-without-resolve": "off",
+    },
+  },
+  {
+    files: ["src/**/*.svelte"],
+    ignores: ["src/lib/components/ui/**"],
+    plugins: {
+      portal: portalPlugin,
+    },
+    rules: {
+      "portal/no-raw-ui-elements": "error",
     },
   },
 );

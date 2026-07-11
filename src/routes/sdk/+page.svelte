@@ -820,9 +820,10 @@
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
                     {#each quickNavSDKs().manager as sdk}
-                      <button
+                      <Button
+                        variant="outline"
                         onclick={() => handleSDKClick(sdk)}
-                        class="relative rounded-lg border p-3 text-left transition-all hover:shadow-md
+                        class="relative h-auto w-full flex-col items-start rounded-lg border p-3 text-left transition-all hover:shadow-md
 													{sdk.installed
                           ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20'
                           : 'border-border bg-muted/30'}"
@@ -853,7 +854,7 @@
                             />
                           {/if}
                         </div>
-                      </button>
+                      </Button>
                     {/each}
                   </div>
                 </div>
@@ -870,9 +871,10 @@
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
                     {#each quickNavSDKs().language as sdk}
-                      <button
+                      <Button
+                        variant="outline"
                         onclick={() => handleSDKClick(sdk)}
-                        class="relative rounded-lg border p-3 text-left transition-all hover:shadow-md
+                        class="relative h-auto w-full flex-col items-start rounded-lg border p-3 text-left transition-all hover:shadow-md
 													{sdk.installed
                           ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20'
                           : 'border-border bg-muted/30'}"
@@ -912,7 +914,7 @@
                             {/if}
                           </div>
                         </div>
-                      </button>
+                      </Button>
                     {/each}
                   </div>
                 </div>
@@ -929,9 +931,10 @@
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
                     {#each quickNavSDKs().database as sdk}
-                      <button
+                      <Button
+                        variant="outline"
                         onclick={() => handleSDKClick(sdk)}
-                        class="relative rounded-lg border p-3 text-left transition-all hover:shadow-md
+                        class="relative h-auto w-full flex-col items-start rounded-lg border p-3 text-left transition-all hover:shadow-md
 													{sdk.installed
                           ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20'
                           : 'border-border bg-muted/30'}"
@@ -971,7 +974,7 @@
                             {/if}
                           </div>
                         </div>
-                      </button>
+                      </Button>
                     {/each}
                   </div>
                 </div>
@@ -988,9 +991,10 @@
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
                     {#each quickNavSDKs().web as sdk}
-                      <button
+                      <Button
+                        variant="outline"
                         onclick={() => handleSDKClick(sdk)}
-                        class="relative rounded-lg border p-3 text-left transition-all hover:shadow-md
+                        class="relative h-auto w-full flex-col items-start rounded-lg border p-3 text-left transition-all hover:shadow-md
 													{sdk.installed
                           ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20'
                           : 'border-border bg-muted/30'}"
@@ -1030,7 +1034,7 @@
                             {/if}
                           </div>
                         </div>
-                      </button>
+                      </Button>
                     {/each}
                   </div>
                 </div>
@@ -1047,9 +1051,10 @@
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
                     {#each quickNavSDKs().container as sdk}
-                      <button
+                      <Button
+                        variant="outline"
                         onclick={() => handleSDKClick(sdk)}
-                        class="relative rounded-lg border p-3 text-left transition-all hover:shadow-md
+                        class="relative h-auto w-full flex-col items-start rounded-lg border p-3 text-left transition-all hover:shadow-md
 													{sdk.installed
                           ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20'
                           : 'border-border bg-muted/30'}"
@@ -1089,7 +1094,7 @@
                             {/if}
                           </div>
                         </div>
-                      </button>
+                      </Button>
                     {/each}
                   </div>
                 </div>

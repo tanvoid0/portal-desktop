@@ -16,7 +16,7 @@ Unified interactive terminal for Portal Desktop — Warp-style command blocks as
               ├── CommandBlocksPanel (OSC 133 capture)
               ├── AIAssistantPanel (context-aware, runnable suggestions)
               ├── NotesPanel
-              ├── SessionLauncher (projects / containers)
+              ├── SessionLauncher (projects → project page; containers → global tabs)
               └── CommandHistoryPanel
 ```
 
@@ -56,8 +56,10 @@ the session. Failed blocks get an **Explain** action.
 
 ### Embedded terminals
 
-- **Project pages:** `ProjectTerminal.svelte` — scoped tabs via `resourceName: "project"`
+- **Project pages:** `ProjectTerminal.svelte` — project-scoped workspace (`/projects/{id}?tab=terminal`); cwd starts at project path; future project-specific features live here
+- **Global terminal:** `/terminal` — unscoped tabs; container exec via Session Launcher or `?container=`
 - **Script runs:** `EmbeddedTerminal.svelte` — one-shot mode via `XtermPane mode="oneshot"`
+- **Coder:** `CoderSessionTerminal.svelte` — lightweight `Terminal` primitive with per-thread tabs
 
 ## Keyboard shortcuts
 
@@ -73,8 +75,8 @@ the session. Failed blocks get an **Explain** action.
 | URL param | Behavior |
 |-----------|----------|
 | `?command=` | Pre-fill and run command in active tab |
-| `?container={id}` | Open Docker exec terminal tab |
-| `?project={id}` | Focus existing project-scoped tab |
+| `?container={id}` | Open Docker exec terminal tab (global `/terminal`) |
+| `?project={id}` | Redirect to `/projects/{id}?tab=terminal` |
 
 ## Readonly command capture
 

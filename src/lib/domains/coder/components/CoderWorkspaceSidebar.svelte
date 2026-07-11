@@ -8,6 +8,7 @@
     Plus,
     Bot,
   } from "@lucide/svelte";
+  import { Button } from "$lib/components/ui/button";
   import { coderWorkspaceStore } from "../state/coderWorkspaceStore.svelte.js";
   import { coderTerminalStore } from "../state/coderTerminalStore.svelte.js";
   import { coderSession } from "../state/coderSession.svelte.js";
@@ -78,24 +79,25 @@
 </script>
 
 <aside
-  class="flex w-56 shrink-0 flex-col overflow-hidden border-l border-border bg-muted/20"
+  class="divider-edge-l flex w-56 shrink-0 flex-col overflow-hidden bg-muted/20"
 >
-  <div class="flex items-center border-b border-border px-2 py-1.5">
+  <div class="divider-edge-b divider-edge-full flex items-center px-2 py-1.5">
     <span class="text-[11px] font-medium text-muted-foreground">Workspace</span>
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto text-sm">
     {#if openTabs.length > 0}
-      <div class="border-b border-border px-2 py-2">
+      <div class="divider-edge-b divider-edge-full px-2 py-2">
         <div class="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Open tabs
         </div>
         <ul class="space-y-0.5">
           {#each openTabs as tab (tab.id)}
             <li>
-              <button
+              <Button
                 type="button"
-                class="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors {coderWorkspaceStore.activeTabId ===
+                variant="ghost"
+                class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1 text-xs {coderWorkspaceStore.activeTabId ===
                 tab.id
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted/60'}"
@@ -113,7 +115,7 @@
                   <FileText class="h-3.5 w-3.5 shrink-0" />
                 {/if}
                 <span class="truncate">{tab.label}</span>
-              </button>
+              </Button>
             </li>
           {/each}
         </ul>
@@ -127,9 +129,10 @@
 
       <!-- Agent changes -->
       <div class="rounded-md">
-        <button
+        <Button
           type="button"
-          class="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs hover:bg-muted/60"
+          variant="ghost"
+          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
             coderWorkspaceStore.expandSection("changes");
             coderWorkspaceStore.openChanges();
@@ -148,14 +151,15 @@
               {agentDiffLabel}
             </span>
           {/if}
-        </button>
+        </Button>
       </div>
 
       <!-- Git changes -->
       <div class="rounded-md">
-        <button
+        <Button
           type="button"
-          class="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs hover:bg-muted/60"
+          variant="ghost"
+          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
             coderWorkspaceStore.expandSection("git-changes");
             coderWorkspaceStore.openGitChanges();
@@ -173,14 +177,15 @@
               {gitDiffLabel}
             </span>
           {/if}
-        </button>
+        </Button>
       </div>
 
       <!-- Browser -->
       <div class="rounded-md">
-        <button
+        <Button
           type="button"
-          class="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs hover:bg-muted/60"
+          variant="ghost"
+          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
             coderWorkspaceStore.expandSection("browser");
             coderWorkspaceStore.openBrowser();
@@ -193,14 +198,15 @@
           />
           <Globe class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span>Browser</span>
-        </button>
+        </Button>
       </div>
 
       <!-- Terminal -->
       <div class="rounded-md">
-        <button
+        <Button
           type="button"
-          class="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs hover:bg-muted/60"
+          variant="ghost"
+          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
             coderWorkspaceStore.toggleSection("terminal");
             if (terminalTabs.length > 0) {
@@ -224,33 +230,29 @@
             {terminalTabs.length === 1 ? "Terminal" : "Terminals"}
           </span>
           {#if threadId}
-            <span
-              role="button"
-              tabindex="0"
-              class="rounded p-0.5 hover:bg-background"
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              class="h-6 w-6 shrink-0 rounded p-0.5 hover:bg-background"
               title="New terminal"
               onclick={(e) => {
                 e.stopPropagation();
                 createTerminal();
               }}
-              onkeydown={(e) => {
-                if (e.key === "Enter") {
-                  e.stopPropagation();
-                  createTerminal();
-                }
-              }}
             >
               <Plus class="h-3.5 w-3.5" />
-            </span>
+            </Button>
           {/if}
-        </button>
+        </Button>
         {#if terminalExpanded}
-          <ul class="mb-1 ml-6 space-y-0.5 border-l border-border pl-2">
+          <ul class="divider-edge-l mb-1 ml-6 space-y-0.5 pl-2">
             {#each terminalTabs as tab (tab.id)}
               <li>
-                <button
+                <Button
                   type="button"
-                  class="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors {coderWorkspaceStore.activeTerminalId() ===
+                  variant="ghost"
+                  class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1 text-xs {coderWorkspaceStore.activeTerminalId() ===
                   tab.id
                     ? 'bg-muted text-foreground'
                     : 'text-muted-foreground hover:bg-muted/60'}"
@@ -264,18 +266,19 @@
                     <TerminalIcon class="h-3 w-3 shrink-0 opacity-50" />
                   {/if}
                   <span class="truncate">{tab.label}</span>
-                </button>
+                </Button>
               </li>
             {:else}
               <li class="px-2 py-1 text-[11px] text-muted-foreground">
                 {#if threadId}
-                  <button
+                  <Button
                     type="button"
-                    class="text-primary hover:underline"
+                    variant="link"
+                    class="h-auto p-0 text-[11px]"
                     onclick={createTerminal}
                   >
                     Create terminal
-                  </button>
+                  </Button>
                 {:else}
                   Start a session first
                 {/if}
@@ -287,9 +290,10 @@
 
       <!-- Files -->
       <div class="rounded-md">
-        <button
+        <Button
           type="button"
-          class="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs hover:bg-muted/60"
+          variant="ghost"
+          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
             coderWorkspaceStore.expandSection("files");
             coderWorkspaceStore.openFiles();
@@ -302,7 +306,7 @@
           />
           <FileText class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span>Files</span>
-        </button>
+        </Button>
       </div>
     </div>
   </div>

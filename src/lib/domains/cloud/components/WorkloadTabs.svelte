@@ -89,7 +89,7 @@
 </script>
 
 <!-- Tab Navigation -->
-<div class="border-b bg-background">
+<div class="divider-edge-b divider-edge-full bg-background">
   <div class="px-6">
     <nav class="flex space-x-8">
       {#each tabs as tab}

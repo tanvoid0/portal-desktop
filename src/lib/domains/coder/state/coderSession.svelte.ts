@@ -37,6 +37,7 @@ import {
 } from "../services/coderTerminalCoordinator.js";
 import { coderTerminalStore } from "./coderTerminalStore.svelte.js";
 import { coderWorkspaceStore } from "./coderWorkspaceStore.svelte.js";
+import { coderUi } from "./coderUi.svelte.js";
 
 export interface ThreadRuntime {
   messages: ChatMessage[];
@@ -812,6 +813,7 @@ class CoderSessionState {
       this.selectedModel || undefined,
       this.selectedBackendProvider || undefined,
       this.multitaskMode ? "coordinator" : "session",
+      coderUi.activeProjectIdAsNumber(),
     );
     this.thread = t;
     this.activeThreadId = t.id;

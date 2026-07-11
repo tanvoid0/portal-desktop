@@ -202,13 +202,14 @@
             </p>
           {:else}
             {#each repoQuery.data.linkedProjects as project}
-              <button
-                class="w-full rounded border p-3 text-left transition-colors hover:border-primary/50"
+              <Button
+                variant="outline"
+                class="h-auto w-full justify-start rounded border p-3 text-left transition-colors hover:border-primary/50"
                 onclick={() => goto(`/projects/${project.id}`)}
               >
                 <div class="font-medium">{project.name}</div>
                 <div class="text-xs text-muted-foreground">{project.path}</div>
-              </button>
+              </Button>
             {/each}
           {/if}
         </CardContent>

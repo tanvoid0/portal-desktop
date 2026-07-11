@@ -160,6 +160,8 @@ pub struct CoderThread {
     pub title: String,
     /// Absolute path the agent's relative tool paths resolve against.
     pub workspace_root: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<i32>,
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platform_thread_id: Option<i64>,
@@ -180,6 +182,8 @@ pub struct CoderThreadSummary {
     pub id: String,
     pub title: String,
     pub workspace_root: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<i32>,
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platform_thread_id: Option<i64>,

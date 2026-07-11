@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from "./ui/button";
+  import { Input } from "./ui/input";
   import { Badge } from "./ui/badge";
   import { parseAndFormatSize } from "$lib/utils/fileSize";
 
@@ -110,11 +111,11 @@
   <div class="space-y-4">
     <!-- Search -->
     <div class="relative">
-      <input
+      <Input
         type="text"
         placeholder="Search models..."
         bind:value={searchQuery}
-        class="w-full rounded-lg border px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+        class="rounded-lg focus-visible:ring-blue-500"
       />
       <svg
         class="absolute right-3 top-3 h-4 w-4 text-gray-400"
@@ -136,9 +137,10 @@
       {#each Object.entries(filteredModels) as [family, modelList]}
         <div class="rounded-lg border">
           <!-- Family Header -->
-          <button
+          <Button
+            variant="ghost"
+            class="h-auto w-full justify-between rounded-none p-4 hover:bg-muted/50"
             onclick={() => toggleFamily(family)}
-            class="flex w-full items-center justify-between p-4 transition-colors hover:bg-gray-50"
           >
             <div class="flex items-center gap-3">
               <svg
@@ -161,7 +163,7 @@
               <span class="font-medium">{family}</span>
               <Badge variant="secondary">{modelList.length} models</Badge>
             </div>
-          </button>
+          </Button>
 
           <!-- Family Models -->
           {#if expandedFamilies.includes(family)}

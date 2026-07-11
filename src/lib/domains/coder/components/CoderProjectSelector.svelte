@@ -3,15 +3,17 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { FolderOpen, FolderPlus } from "@lucide/svelte";
   import { Button } from "$lib/components/ui/button";
+  import Select from "$lib/components/ui/select.svelte";
   import { projectService } from "$lib/domains/projects";
   import type { Project } from "$lib/domains/projects";
 
   interface Props {
     value: string;
     disabled?: boolean;
+    onSelect?: (path: string, projectId?: string) => void;
   }
 
-  let { value = $bindable(""), disabled = false }: Props = $props();
+  let { value = $bindable(""), disabled = false, onSelect }: Props = $props();
 
   let projects = $state<Project[]>([]);
   let loading = $state(false);
@@ -74,8 +76,20 @@
     return parts[parts.length - 1] ?? p;
   }
 
-  function onSelect(e: Event) {
-    value = (e.currentTarget as HTMLSelectElement).value;
+  const projectOptions = $derived.by(() => {
+    const opts = projects.map((p) => ({
+      value: p.path,
+      label: `${p.name} — ${p.path}`,
+    }));
+    if (value && !projects.some((p) => p.path === value)) {
+      opts.push({ value, label: value });
+    }
+    return opts;
+  });
+
+  function handleProjectChange(path: string) {
+    const match = projects.find((p) => p.path === path);
+    onSelect?.(path, match?.id);
   }
 
   async function browse() {
@@ -84,6 +98,7 @@
     const match = projects.find((p) => p.path === dir);
     if (match) {
       value = match.path;
+      handleProjectChange(match.path);
       importPath = null;
     } else {
       // Unknown path — offer to import it as a project.
@@ -103,6 +118,7 @@
       });
       projects = [...projects, project];
       value = project.path;
+      handleProjectChange(project.path);
       importPath = null;
     } catch (e) {
       importError = String(e);
@@ -119,22 +135,14 @@
 
 <div class="flex flex-1 flex-col gap-1">
   <div class="flex flex-1 items-center gap-1">
-    <select
-      value={value}
-      onchange={onSelect}
-      {disabled}
-      class="flex-1 rounded border border-border bg-background px-2 py-1 font-mono text-xs disabled:opacity-60"
-    >
-      <option value="">
-        {loading ? "Loading projects…" : "Select a project…"}
-      </option>
-      {#each projects as p (p.id)}
-        <option value={p.path}>{p.name} — {p.path}</option>
-      {/each}
-      {#if value && !projects.some((p) => p.path === value)}
-        <option value={value}>{value}</option>
-      {/if}
-    </select>
+    <Select
+      bind:value
+      options={projectOptions}
+      placeholder={loading ? "Loading projects…" : "Select a project…"}
+      disabled={disabled || loading}
+      class="flex-1 font-mono text-xs"
+      onSelect={handleProjectChange}
+    />
 
     <Button
       size="icon"

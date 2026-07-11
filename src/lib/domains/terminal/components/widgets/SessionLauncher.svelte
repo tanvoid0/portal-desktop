@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { projectTerminalHref } from "../../navigation";
   import { createProjectsQuery } from "$lib/domains/projects/queries/projectQueries";
   import {
     containers,
@@ -10,14 +12,17 @@
   import { defaultTerminalConfig } from "../../config/defaultTerminalConfig";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
-  import { FolderOpen, Container, Terminal } from "@lucide/svelte";
+  import { FolderOpen, Container } from "@lucide/svelte";
+  import ShellIcon from "../ShellIcon.svelte";
+  import { TERMINAL_ICONS } from "../../utils/shellIcons";
   import DockerStatusBanner from "$lib/domains/deployments/components/DockerStatusBanner.svelte";
 
   interface Props {
-    onSessionOpened?: (tabId: string) => void;
+    /** Called when a container tab is opened in the global terminal workspace. */
+    onContainerOpened?: (tabId: string) => void;
   }
 
-  let { onSessionOpened }: Props = $props();
+  let { onContainerOpened }: Props = $props();
 
   const projectsQuery = createProjectsQuery();
   const projects = $derived(projectsQuery.data ?? []);
@@ -28,62 +33,34 @@
     await deploymentActions.loadContainers();
   });
 
-  function openProjectTerminal(project: {
-    id: string;
-    name: string;
-    path: string;
-  }) {
-    const tabId = terminalActions.createTab({
-      title: `${project.name} Terminal`,
-      type: "terminal",
-      workingDirectory: project.path,
-      shell: defaultTerminalConfig.defaultShell,
-      icon: "💻",
-      closable: true,
-      resourceName: "project",
-      resourceId: project.id,
-    });
-    terminalActions.createProcess({
-      tabId,
-      command: defaultTerminalConfig.defaultShell,
-      workingDirectory: project.path,
-      environment: {},
-      status: "running",
-    });
-    terminalActions.setActiveTab(tabId);
-    onSessionOpened?.(tabId);
+  function openProjectTerminal(project: { id: string; name: string; path: string }) {
+    goto(projectTerminalHref(project.id));
   }
 
   function openContainerTerminal(containerId: string, containerName: string) {
     const shell = navigator.userAgent.includes("Windows")
       ? "cmd.exe"
       : "bash";
-    const tabId = terminalActions.createTab({
+    const command = `docker exec -it ${containerId} ${shell}`;
+    const tabId = terminalActions.createTabWithProcess({
       title: `Container: ${containerName}`,
-      type: "terminal",
       workingDirectory: defaultTerminalConfig.workingDirectory,
-      shell: `docker exec -it ${containerId} ${shell}`,
-      icon: "🐳",
-      closable: true,
+      shell: command,
+      icon: TERMINAL_ICONS.container,
       resourceName: "container",
       resourceId: containerId,
     });
-    terminalActions.createProcess({
-      tabId,
-      command: `docker exec -it ${containerId} ${shell}`,
-      workingDirectory: defaultTerminalConfig.workingDirectory,
-      environment: {},
-      status: "running",
-    });
     terminalActions.setActiveTab(tabId);
-    onSessionOpened?.(tabId);
+    onContainerOpened?.(tabId);
   }
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="border-b border-border p-2">
+  <div class="divider-edge-b divider-edge-full p-2">
     <div class="text-sm font-medium text-foreground">Session Launcher</div>
-    <p class="text-xs text-muted-foreground">Open terminals for projects or containers</p>
+    <p class="text-xs text-muted-foreground">
+      Open project terminals in the project workspace, or attach to containers here
+    </p>
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto p-3 space-y-4">
@@ -103,7 +80,7 @@
               class="h-auto w-full justify-start py-2 text-left"
               onclick={() => openProjectTerminal(project)}
             >
-              <Terminal class="mr-2 h-3.5 w-3.5 shrink-0" />
+              <ShellIcon icon="codicon:terminal" class="mr-2" />
               <span class="truncate">{project.name}</span>
             </Button>
           {/each}
@@ -137,8 +114,7 @@
                 onclick={() =>
                   openContainerTerminal(container.id, container.name)}
               >
-                <Terminal class="mr-2 h-3.5 w-3.5 shrink-0" />
-                <span class="truncate">{container.name}</span>
+                <ShellIcon icon={TERMINAL_ICONS.container} class="mr-2" />
               </Button>
               <Badge variant="outline" class="text-xs shrink-0">
                 {container.status}

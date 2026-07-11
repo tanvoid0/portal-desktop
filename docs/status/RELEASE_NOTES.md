@@ -1,5 +1,19 @@
 # Portal Desktop - Release Notes
 
+## Version 0.2.3
+
+### Highlights
+
+- Terminal shell profiles, command blocks, and workspace navigation improvements
+- Coder project workspaces integrated into the AI layout
+- Deployments dashboard workload grouping and container overview
+- Environment utilities section for local tooling checks
+- Updater CI publishes `latest.json`; graceful update-check errors in Settings
+- shadcn UI lint enforcement and shared confirm dialog
+- `pnpm release:prepare` script for version bumping and tagging
+
+---
+
 ## Version 0.2.2
 
 ### Fixes

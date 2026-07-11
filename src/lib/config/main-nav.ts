@@ -154,24 +154,31 @@ export function buildMainNavSections(
           badge: null,
         },
         {
-          title: "Disk Utility",
-          url: "/utilities/disk",
-          icon: "hard-drive",
-          description: "AI-assisted disk cleanup with human review",
+          title: "Utilities",
+          url: "/utilities",
+          icon: "wrench",
+          description: "Disk cleanup, environment variables, and system tools",
           badge: null,
+          submenu: [
+            {
+              title: "Disk Utility",
+              url: "/utilities/disk",
+              icon: "hard-drive",
+              description: "AI-assisted disk cleanup with human review",
+            },
+            {
+              title: "Environment Variables",
+              url: "/utilities/environment",
+              icon: "variable",
+              description: "Edit user and system environment variables",
+            },
+          ],
         },
         {
           title: "AI",
           url: "/ai",
           icon: "sparkles",
-          description: "AI chat and management",
-          badge: null,
-        },
-        {
-          title: "Coder",
-          url: "/coder",
-          icon: "robot",
-          description: "AI coding agent",
+          description: "AI chat and coding agent",
           badge: null,
         },
         {

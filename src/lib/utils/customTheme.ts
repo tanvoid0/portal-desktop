@@ -41,6 +41,30 @@ const MANAGED_CSS_VARS = [
   "--card-gradient-to",
 ] as const;
 
+/** Surface tokens — keep CSS `.dark` values in dark mode; only apply custom hex in light mode */
+const SURFACE_CSS_VARS = [
+  "--background",
+  "--foreground",
+  "--card",
+  "--card-foreground",
+  "--muted",
+  "--muted-foreground",
+  "--popover",
+  "--popover-foreground",
+  "--border",
+  "--input",
+  "--gradient-from",
+  "--gradient-to",
+  "--card-gradient-from",
+  "--card-gradient-to",
+] as const;
+
+function clearSurfaceOverrides(html: HTMLElement): void {
+  for (const variable of SURFACE_CSS_VARS) {
+    html.style.removeProperty(variable);
+  }
+}
+
 function ensureHex(hex: string | undefined | null, fallback: string): string {
   return typeof hex === "string" && hex.length > 0 ? hex : fallback;
 }
@@ -203,6 +227,14 @@ export function applyCustomTheme(settings: ThemeSettings): void {
     "--accent-foreground",
     contrastingForeground(colors.accent),
   );
+
+  const isDark = html.classList.contains("dark");
+  if (isDark) {
+    // Brand colors only — structural dark tokens come from app.css `.dark`
+    clearSurfaceOverrides(html);
+    return;
+  }
+
   html.style.setProperty("--background", background);
   html.style.setProperty("--foreground", foreground);
   html.style.setProperty("--card", surface);

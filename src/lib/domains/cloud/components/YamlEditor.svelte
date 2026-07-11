@@ -11,13 +11,17 @@
   import { AlertCircle, CheckCircle, Save, X, RotateCcw } from "@lucide/svelte";
   import { confirmAction } from "$lib/utils/confirm";
   import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-  } from "$lib/components/ui/dialog";
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+  } from "$lib/components/ui/alert-dialog";
+  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn } from "$lib/utils";
 
   interface Props {
     value: string;
@@ -254,11 +258,11 @@
   </div>
 
   <!-- Confirmation Dialog -->
-  <Dialog bind:open={showConfirmDialog}>
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Confirm Update</DialogTitle>
-        <DialogDescription>
+  <AlertDialog bind:open={showConfirmDialog}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Confirm Update</AlertDialogTitle>
+        <AlertDialogDescription>
           You are about to update <strong>{resourceKind}</strong> "<strong
             >{resourceName}</strong
           >" in namespace "<strong>{namespace}</strong>".
@@ -266,20 +270,18 @@
           <strong class="text-destructive">Warning:</strong> This will modify the
           resource in your Kubernetes cluster. Make sure the YAML is correct before
           proceeding.
-        </DialogDescription>
-      </DialogHeader>
-      <DialogFooter>
-        <Button
-          variant="outline"
-          onclick={() => (showConfirmDialog = false)}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          class={cn(buttonVariants({ variant: "destructive" }))}
+          onclick={performSave}
           disabled={isSaving}
         >
-          Cancel
-        </Button>
-        <Button variant="destructive" onclick={performSave} disabled={isSaving}>
           {isSaving ? "Applying..." : "Apply Changes"}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </div>

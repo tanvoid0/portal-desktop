@@ -68,12 +68,11 @@
     <div class="flex flex-col">
       <!-- Search Input -->
       <div class="border-b p-4">
-        <input
-          bind:this={inputElement}
+        <Input
+          bind:ref={inputElement}
           type="text"
           placeholder="Type a command or search..."
           bind:value={$queryStore}
-          class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         />
       </div>
 
@@ -88,18 +87,16 @@
             <div class="space-y-1">
               {#each $filteredCommandsStore as command, index}
                 {@const isSelected = index === $selectedIndexStore}
-                <button
+                <Button
                   type="button"
-                  class="w-full rounded-md px-3 py-2 text-left text-sm transition-colors {isSelected
+                  variant="ghost"
+                  class="h-auto w-full justify-start rounded-md px-3 py-2 text-left text-sm transition-colors {isSelected
                     ? 'bg-accent text-accent-foreground'
                     : 'hover:bg-muted'}"
                   onclick={async () => {
-                    // Temporarily set selected index
                     const currentCommands = $filteredCommandsStore;
                     const commandIndex = currentCommands.indexOf(command);
                     if (commandIndex >= 0) {
-                      // We need to update the hook's selectedIndex
-                      // For now, execute directly
                       await command.action();
                       handleClose();
                     }
@@ -120,7 +117,7 @@
                       </span>
                     {/if}
                   </div>
-                </button>
+                </Button>
               {/each}
             </div>
           {/if}

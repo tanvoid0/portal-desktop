@@ -52,6 +52,23 @@ pub struct DockerContainer {
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resource_stats: Option<ContainerResourceStats>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compose_project: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compose_service: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub networks: Vec<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub labels: HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DockerImageSummary {
+    pub id: String,
+    pub repository: String,
+    pub tag: String,
+    pub size_bytes: u64,
+    pub created_at: String,
 }
 
 fn parse_percent(value: &str) -> f64 {
@@ -320,6 +337,10 @@ impl DockerService {
                         .collect(),
                     created_at: container["CreatedAt"].as_str().unwrap_or("").to_string(),
                     resource_stats: None,
+                    compose_project: None,
+                    compose_service: None,
+                    networks: Vec::new(),
+                    labels: HashMap::new(),
                 };
                 containers.push(container);
             }
@@ -336,7 +357,77 @@ impl DockerService {
             }
         }
 
+        self.enrich_containers_from_inspect(&mut containers).await?;
+
         Ok(containers)
+    }
+
+    /// Enrich container list with compose labels and network info from `docker inspect`
+    async fn enrich_containers_from_inspect(
+        &self,
+        containers: &mut [DockerContainer],
+    ) -> Result<(), String> {
+        if containers.is_empty() {
+            return Ok(());
+        }
+
+        let mut args = vec!["inspect".to_string()];
+        args.extend(containers.iter().map(|c| c.id.clone()));
+
+        let output = Command::new("docker")
+            .no_window()
+            .args(&args)
+            .output()
+            .await
+            .map_err(|e| format!("Failed to inspect containers: {}", e))?;
+
+        if !output.status.success() {
+            // Non-fatal: grouping heuristics still work without inspect data
+            return Ok(());
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let inspections: Vec<serde_json::Value> =
+            serde_json::from_str(&stdout).unwrap_or_default();
+
+        for (index, inspect) in inspections.iter().enumerate() {
+            if index >= containers.len() {
+                break;
+            }
+
+            let container = &mut containers[index];
+            let labels_value = inspect
+                .pointer("/Config/Labels")
+                .and_then(|v| v.as_object());
+
+            if let Some(labels_obj) = labels_value {
+                for (key, value) in labels_obj {
+                    if let Some(val) = value.as_str() {
+                        container.labels.insert(key.clone(), val.to_string());
+                    }
+                }
+
+                container.compose_project = container
+                    .labels
+                    .get("com.docker.compose.project")
+                    .cloned()
+                    .filter(|s| !s.is_empty());
+                container.compose_service = container
+                    .labels
+                    .get("com.docker.compose.service")
+                    .cloned()
+                    .filter(|s| !s.is_empty());
+            }
+
+            if let Some(networks_obj) = inspect
+                .pointer("/NetworkSettings/Networks")
+                .and_then(|v| v.as_object())
+            {
+                container.networks = networks_obj.keys().cloned().collect();
+            }
+        }
+
+        Ok(())
     }
 
     /// Fetch live resource usage for all running containers via `docker stats`
@@ -616,6 +707,49 @@ impl DockerService {
                 String::from_utf8_lossy(&output.stderr)
             ))
         }
+    }
+
+    /// List local Docker images
+    pub async fn list_images(&self) -> Result<Vec<DockerImageSummary>, String> {
+        let output = Command::new("docker")
+            .no_window()
+            .args(["images", "--format", "{{json .}}"])
+            .output()
+            .await
+            .map_err(|e| format!("Failed to list images: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "Docker images command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut images = Vec::new();
+
+        for line in stdout.lines().filter(|l| !l.trim().is_empty()) {
+            if let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) {
+                let repository = entry["Repository"].as_str().unwrap_or("").to_string();
+                let tag = entry["Tag"].as_str().unwrap_or("").to_string();
+
+                if repository == "<none>" && tag == "<none>" {
+                    continue;
+                }
+
+                images.push(DockerImageSummary {
+                    id: entry["ID"].as_str().unwrap_or("").to_string(),
+                    repository,
+                    tag,
+                    size_bytes: parse_docker_bytes(
+                        entry["Size"].as_str().unwrap_or("0B"),
+                    ),
+                    created_at: entry["CreatedAt"].as_str().unwrap_or("").to_string(),
+                });
+            }
+        }
+
+        Ok(images)
     }
 
     /// Get container status

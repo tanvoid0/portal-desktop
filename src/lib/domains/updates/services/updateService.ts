@@ -2,26 +2,171 @@ import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { invoke } from "@tauri-apps/api/core";
 import { logger } from "$lib/domains/shared";
+import type {
+  UpdateCheckResult,
+  UpdateErrorInfo,
+  UpdateInfo,
+  UpdateInstallResult,
+} from "../types";
 
-export interface UpdateInfo {
-  version: string;
-  date?: string;
-  body?: string;
-  available: boolean;
-}
+export type {
+  UpdateCheckResult,
+  UpdateErrorInfo,
+  UpdateInfo,
+  UpdateInstallResult,
+  UpdateStatus,
+} from "../types";
 
-export interface UpdateStatus {
-  checking: boolean;
-  available: boolean;
-  installing: boolean;
-  error: string | null;
-  info: UpdateInfo | null;
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") {
+      return message;
+    }
+  }
+
+  return "An unexpected error occurred";
 }
 
 /**
- * Check for available updates
+ * Map raw updater errors to user-friendly, actionable messages.
  */
-export async function checkForUpdates(): Promise<UpdateInfo> {
+export function parseUpdateError(error: unknown): UpdateErrorInfo {
+  const technical = extractErrorMessage(error);
+  const normalized = technical.toLowerCase();
+
+  if (
+    normalized.includes("signature") ||
+    normalized.includes("minisign") ||
+    normalized.includes("verify") ||
+    normalized.includes("verification failed")
+  ) {
+    return {
+      category: "signature",
+      title: "Update verification failed",
+      message:
+        "The available update could not be verified. For your safety, it was not installed.",
+      hint: "Download the latest release manually from GitHub Releases, or try again later.",
+      recoverable: true,
+      technical,
+    };
+  }
+
+  if (
+    normalized.includes("release json") ||
+    normalized.includes("valid release") ||
+    normalized.includes("latest.json") ||
+    (normalized.includes("could not fetch") &&
+      (normalized.includes("json") || normalized.includes("remote")))
+  ) {
+    return {
+      category: "manifest",
+      title: "Update feed unavailable",
+      message:
+        "The app could not read update information from the release server.",
+      hint: "The release may not be published yet, or the update feed may require a public download URL. You can still download updates manually from GitHub Releases.",
+      recoverable: true,
+      technical,
+    };
+  }
+
+  if (
+    normalized.includes("404") ||
+    normalized.includes("not found") ||
+    normalized.includes("no such file")
+  ) {
+    return {
+      category: "manifest",
+      title: "Update feed not found",
+      message: "No update information was found at the configured release URL.",
+      hint: "If this app was built from source, install updates manually until a release feed is published.",
+      recoverable: true,
+      technical,
+    };
+  }
+
+  if (
+    normalized.includes("network") ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("connection") ||
+    normalized.includes("dns") ||
+    normalized.includes("offline") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("unable to connect") ||
+    normalized.includes("internet")
+  ) {
+    return {
+      category: "network",
+      title: "Connection problem",
+      message: "Could not reach the update server.",
+      hint: "Check your internet connection and try again.",
+      recoverable: true,
+      technical,
+    };
+  }
+
+  if (
+    normalized.includes("updater") &&
+    (normalized.includes("disabled") ||
+      normalized.includes("not enabled") ||
+      normalized.includes("not configured") ||
+      normalized.includes("not available"))
+  ) {
+    return {
+      category: "disabled",
+      title: "Updates unavailable in this build",
+      message: "Automatic updates are only supported in packaged release builds.",
+      hint: "Run a release build or download the latest installer from GitHub Releases.",
+      recoverable: false,
+      technical,
+    };
+  }
+
+  if (normalized.includes("download")) {
+    return {
+      category: "download",
+      title: "Download failed",
+      message: "The update could not be downloaded.",
+      hint: "Check your connection and try again, or download the installer manually.",
+      recoverable: true,
+      technical,
+    };
+  }
+
+  if (normalized.includes("install")) {
+    return {
+      category: "install",
+      title: "Installation failed",
+      message: "The update downloaded but could not be installed.",
+      hint: "Try again, or download and run the latest installer manually.",
+      recoverable: true,
+      technical,
+    };
+  }
+
+  return {
+    category: "unknown",
+    title: "Update check failed",
+    message: "Something went wrong while checking for updates.",
+    hint: "Try again in a moment, or download updates manually from GitHub Releases.",
+    recoverable: true,
+    technical,
+  };
+}
+
+/**
+ * Check for available updates without throwing.
+ */
+export async function checkForUpdates(): Promise<UpdateCheckResult> {
   try {
     logger.info("Checking for updates...");
     const update = await check();
@@ -30,42 +175,61 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
       logger.info("Update available", { version: update.version });
 
       return {
-        version: update.version || "unknown",
-        date: update.date,
-        body: update.body,
-        available: true,
-      };
-    } else {
-      logger.info("No updates available");
-      const currentVersion = await getCurrentVersion();
-      return {
-        version: currentVersion,
-        available: false,
+        status: "available",
+        info: {
+          version: update.version || "unknown",
+          date: update.date,
+          body: update.body,
+          available: true,
+        },
       };
     }
+
+    logger.info("No updates available");
+    const currentVersion = await getCurrentVersion();
+
+    return {
+      status: "current",
+      info: {
+        version: currentVersion ?? "unknown",
+        available: false,
+      },
+    };
   } catch (error) {
-    logger.error("Failed to check for updates", { error });
-    throw error;
+    const parsed = parseUpdateError(error);
+    logger.error("Failed to check for updates", {
+      category: parsed.category,
+      message: parsed.message,
+      technical: parsed.technical,
+    });
+
+    return { status: "error", error: parsed };
   }
 }
 
 /**
- * Install the available update
+ * Install the available update without throwing.
  */
-export async function installUpdateAndRelaunch(): Promise<void> {
+export async function installUpdateAndRelaunch(): Promise<UpdateInstallResult | void> {
   try {
     logger.info("Installing update...");
 
-    // Check for update first
     const update = await check();
 
     if (update === null) {
-      throw new Error("No update available to install");
+      return {
+        status: "error",
+        error: {
+          category: "unknown",
+          title: "No update available",
+          message: "There is no update ready to install.",
+          hint: "Check for updates again before installing.",
+          recoverable: true,
+        },
+      };
     }
 
-    // Download and install the update
     await update.downloadAndInstall((progress) => {
-      // Progress callback
       if (progress.event === "Started") {
         logger.info("Download started");
       } else if (progress.event === "Progress") {
@@ -77,24 +241,27 @@ export async function installUpdateAndRelaunch(): Promise<void> {
     });
 
     logger.info("Update installed, relaunching...");
-
-    // Relaunch the application
     await relaunch();
   } catch (error) {
-    logger.error("Failed to install update", { error });
-    throw error;
+    const parsed = parseUpdateError(error);
+    logger.error("Failed to install update", {
+      category: parsed.category,
+      message: parsed.message,
+      technical: parsed.technical,
+    });
+
+    return { status: "error", error: parsed };
   }
 }
 
 /**
- * Get the current application version
+ * Get the current application version, or null if unavailable.
  */
-export async function getCurrentVersion(): Promise<string> {
+export async function getCurrentVersion(): Promise<string | null> {
   try {
-    const version = await invoke<string>("get_app_version_command");
-    return version;
+    return await invoke<string>("get_app_version_command");
   } catch (error) {
     logger.error("Failed to get app version", { error });
-    throw error;
+    return null;
   }
 }

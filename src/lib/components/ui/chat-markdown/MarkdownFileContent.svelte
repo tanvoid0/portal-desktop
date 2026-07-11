@@ -1,5 +1,6 @@
 <script lang="ts">
   import ChatMarkdown from "./ChatMarkdown.svelte";
+  import { Button } from "../button";
 
   interface Props {
     content: string;
@@ -19,24 +20,28 @@
 
 <div class="space-y-2 {className}">
   <div class="flex items-center gap-1">
-    <button
+    <Button
       type="button"
-      class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors {view === 'rendered'
+      variant="ghost"
+      size="sm"
+      class="h-auto rounded px-2 py-0.5 text-[10px] font-medium {view === 'rendered'
         ? 'bg-primary/15 text-primary'
         : 'text-muted-foreground hover:text-foreground'}"
       onclick={() => (view = "rendered")}
     >
       Rendered
-    </button>
-    <button
+    </Button>
+    <Button
       type="button"
-      class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors {view === 'source'
+      variant="ghost"
+      size="sm"
+      class="h-auto rounded px-2 py-0.5 text-[10px] font-medium {view === 'source'
         ? 'bg-primary/15 text-primary'
         : 'text-muted-foreground hover:text-foreground'}"
       onclick={() => (view = "source")}
     >
       Source
-    </button>
+    </Button>
   </div>
 
   {#if view === "rendered"}

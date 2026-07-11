@@ -26,53 +26,63 @@
     AlertCircle,
     Loader2,
     Info,
+    WifiOff,
   } from "@lucide/svelte";
   import {
     checkForUpdates,
     installUpdateAndRelaunch,
     getCurrentVersion,
+    type UpdateErrorInfo,
     type UpdateInfo,
   } from "../services/updateService";
   import { toast } from "$lib/utils/toast";
   import { logger } from "$lib/domains/shared";
 
-  let currentVersion = $state<string>("");
+  let currentVersion = $state<string | null>(null);
   let updateInfo = $state<UpdateInfo | null>(null);
+  let checkError = $state<UpdateErrorInfo | null>(null);
+  let installError = $state<UpdateErrorInfo | null>(null);
   let isChecking = $state(false);
   let isInstalling = $state(false);
-  let error = $state<string | null>(null);
+  let versionLoadFailed = $state(false);
 
   onMount(async () => {
-    try {
-      currentVersion = await getCurrentVersion();
-    } catch (err) {
-      logger.error("Failed to load current version", { error: err });
-      error = "Failed to load current version";
+    const version = await getCurrentVersion();
+    if (version) {
+      currentVersion = version;
+    } else {
+      versionLoadFailed = true;
+      logger.warn("Current version unavailable in update settings");
     }
   });
 
+  function notifyCheckError(error: UpdateErrorInfo) {
+    toast.warning(error.title, { description: error.message });
+  }
+
+  function notifyInstallError(error: UpdateErrorInfo) {
+    toast.error(error.title, { description: error.message });
+  }
+
   async function handleCheckForUpdates() {
     isChecking = true;
-    error = null;
+    checkError = null;
     updateInfo = null;
 
-    try {
-      const info = await checkForUpdates();
-      updateInfo = info;
+    const result = await checkForUpdates();
 
-      if (info.available) {
-        toast.success(`Update available: ${info.version}`);
-      } else {
-        toast.info("You are running the latest version");
-      }
-    } catch (err: any) {
-      const errorMsg = err?.message || "Failed to check for updates";
-      error = errorMsg;
-      logger.error("Update check failed", { error: err });
-      toast.error(errorMsg);
-    } finally {
-      isChecking = false;
+    if (result.status === "available") {
+      updateInfo = result.info;
+      toast.success(`Update available: ${result.info.version}`);
+    } else if (result.status === "current") {
+      updateInfo = result.info;
+      toast.info("You are running the latest version");
+    } else {
+      checkError = result.error;
+      notifyCheckError(result.error);
     }
+
+    isChecking = false;
   }
 
   async function handleInstallUpdate() {
@@ -81,17 +91,15 @@
     }
 
     isInstalling = true;
-    error = null;
+    installError = null;
 
-    try {
-      toast.info("Installing update... The app will restart automatically.");
-      await installUpdateAndRelaunch();
-      // Note: The app will relaunch, so this code may not execute
-    } catch (err: any) {
-      const errorMsg = err?.message || "Failed to install update";
-      error = errorMsg;
-      logger.error("Update installation failed", { error: err });
-      toast.error(errorMsg);
+    toast.info("Installing update... The app will restart automatically.");
+
+    const result = await installUpdateAndRelaunch();
+
+    if (result?.status === "error") {
+      installError = result.error;
+      notifyInstallError(result.error);
       isInstalling = false;
     }
   }
@@ -104,12 +112,29 @@
       <CardTitle>Current Version</CardTitle>
       <CardDescription>Your current application version</CardDescription>
     </CardHeader>
-    <CardContent>
+    <CardContent class="space-y-3">
       <div class="flex items-center gap-2">
         <Badge variant="outline" class="px-3 py-1 text-lg">
-          {currentVersion || "Loading..."}
+          {#if currentVersion}
+            {currentVersion}
+          {:else if versionLoadFailed}
+            Unknown
+          {:else}
+            Loading...
+          {/if}
         </Badge>
       </div>
+
+      {#if versionLoadFailed}
+        <Alert>
+          <AlertCircle class="h-4 w-4" />
+          <AlertTitle>Version unavailable</AlertTitle>
+          <AlertDescription>
+            The installed version could not be read, but you can still check
+            for updates.
+          </AlertDescription>
+        </Alert>
+      {/if}
     </CardContent>
   </Card>
 
@@ -120,11 +145,37 @@
       <CardDescription>Manually check for available updates</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
-      {#if error}
-        <Alert variant="destructive">
+      {#if checkError}
+        <Alert variant={checkError.recoverable ? "default" : "destructive"}>
+          {#if checkError.category === "network"}
+            <WifiOff class="h-4 w-4" />
+          {:else}
+            <AlertCircle class="h-4 w-4" />
+          {/if}
+          <AlertTitle>{checkError.title}</AlertTitle>
+          <AlertDescription>
+            <div class="space-y-2">
+              <p>{checkError.message}</p>
+              {#if checkError.hint}
+                <p class="text-sm text-muted-foreground">{checkError.hint}</p>
+              {/if}
+            </div>
+          </AlertDescription>
+        </Alert>
+      {/if}
+
+      {#if installError}
+        <Alert variant={installError.recoverable ? "default" : "destructive"}>
           <AlertCircle class="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertTitle>{installError.title}</AlertTitle>
+          <AlertDescription>
+            <div class="space-y-2">
+              <p>{installError.message}</p>
+              {#if installError.hint}
+                <p class="text-sm text-muted-foreground">{installError.hint}</p>
+              {/if}
+            </div>
+          </AlertDescription>
         </Alert>
       {/if}
 

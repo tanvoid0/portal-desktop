@@ -20,6 +20,7 @@
     CardTitle,
   } from "$lib/components/ui/card";
   import { Input } from "$lib/components/ui/input";
+  import Select from "$lib/components/ui/select.svelte";
   import { RefreshCw } from "@lucide/svelte";
   import {
     useTableNavigation,
@@ -199,15 +200,14 @@
       class="max-w-sm"
     />
     {#if statusOptions().length > 0}
-      <select
+      <Select
         bind:value={statusFilter}
-        class="rounded-md border bg-background px-3 py-2 text-foreground"
-      >
-        <option value="">All Statuses</option>
-        {#each statusOptions() as status}
-          <option value={status}>{status}</option>
-        {/each}
-      </select>
+        options={[
+          { value: "", label: "All Statuses" },
+          ...statusOptions().map((status) => ({ value: status, label: status })),
+        ]}
+        class="w-[180px]"
+      />
     {/if}
   </div>
 

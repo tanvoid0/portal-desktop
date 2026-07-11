@@ -334,7 +334,7 @@
     desktopClass="w-64"
   >
     {#snippet header()}
-      <div class="border-b p-2.5">
+      <div class="divider-edge-b divider-edge-full p-2.5">
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <MessageSquare class="h-4 w-4" />
           Conversations
@@ -357,7 +357,7 @@
   <!-- Main Chat Area -->
   <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <div
-      class="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2.5"
+      class="divider-edge-b divider-edge-full flex flex-wrap items-center justify-between gap-2 bg-background px-4 py-2.5"
     >
       <div class="flex min-w-0 items-center gap-2">
         <Button

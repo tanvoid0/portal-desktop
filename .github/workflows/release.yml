@@ -103,5 +103,9 @@ jobs:
             See [RELEASE_NOTES.md](https://github.com/tanvoid0/portal-desktop/blob/main/docs/status/RELEASE_NOTES.md)
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-          includeUpdaterJson: true
+          # Requires bundle.createUpdaterArtifacts in tauri.conf.json so .sig files
+          # are generated and latest.json can be assembled across matrix jobs.
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}

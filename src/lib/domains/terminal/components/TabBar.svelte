@@ -8,9 +8,11 @@
   import { Plus, X, ChevronDown } from "@lucide/svelte";
   import { TerminalService } from "../services/terminalService";
   import { Button } from "$lib/components/ui/button";
-  import Select from "$lib/components/ui/select.svelte";
   import { onMount } from "svelte";
   import { logger } from "$lib/domains/shared";
+  import ShellIcon from "./ShellIcon.svelte";
+  import ShellProfileSelect from "./ShellProfileSelect.svelte";
+  import { resolveShellIcon } from "../utils/shellIcons";
 
   const log = logger.createScoped("TabBar");
 
@@ -80,7 +82,7 @@
               profiles.push({
                 name,
                 command: info.command || name,
-                icon: getProfileIcon(name),
+                icon: resolveShellIcon(name),
                 category: "shell",
               });
             },
@@ -94,7 +96,7 @@
               profiles.push({
                 name: profile.name,
                 command: profile.commandline || profile.name,
-                icon: getProfileIcon(profile.name),
+                icon: resolveShellIcon(profile.name),
                 category: "windows_terminal",
               });
             },
@@ -126,17 +128,6 @@
       log.error("Failed to load system info", { error });
       availableProfiles = [];
     }
-  }
-
-  function getProfileIcon(profileName: string): string {
-    const name = profileName.toLowerCase();
-    if (name.includes("cmd")) return "🖥️";
-    if (name.includes("powershell") || name.includes("pwsh")) return "💙";
-    if (name.includes("bash")) return "🐧";
-    if (name.includes("zsh")) return "⚡";
-    if (name.includes("fish")) return "🐠";
-    if (name.includes("wsl")) return "🐧";
-    return "💻";
   }
 
   function handleProfileChange(value: string) {
@@ -179,31 +170,17 @@
     }
   }
 
-  function getTabIcon(tab: any) {
-    if (tab.icon) return tab.icon;
-
-    switch (tab.type) {
-      case "terminal":
-        return "💻";
-      case "editor":
-        return "📝";
-      case "file":
-        return "📄";
-      default:
-        return "📋";
-    }
-  }
 </script>
 
 <div
-  class="tab-bar flex min-h-[40px] items-center border-b border-border bg-card"
+  class="tab-bar divider-edge-b divider-edge-full flex min-h-[40px] items-center bg-card"
 >
   <!-- Tab List -->
   <div class="flex flex-1 overflow-x-auto">
     {#each tabs as tab (tab.id)}
       <div
         onclick={() => handleTabClick(tab.id)}
-        class="tab flex min-w-0 cursor-pointer items-center space-x-2 border-b-2 border-r border-border px-4 py-2 text-sm transition-colors {activeTabId ===
+        class="tab divider-edge-r flex min-w-0 cursor-pointer items-center space-x-2 border-b-2 px-4 py-2 text-sm transition-colors {activeTabId ===
         tab.id
           ? 'bg-accent text-accent-foreground'
           : 'bg-card text-muted-foreground hover:bg-accent/60 hover:text-foreground'} {getTabStatusColor(
@@ -214,17 +191,19 @@
         onkeydown={(e) => e.key === "Enter" && handleTabClick(tab.id)}
         title={tab.title}
       >
-        <span class="text-xs">{getTabIcon(tab)}</span>
+        <ShellIcon tab={tab} size="sm" />
         <span class="max-w-32 truncate">{tab.title}</span>
         {#if closable && tab.closable !== false && tabs.length > 1}
-          <button
+          <Button
             type="button"
-            class="ml-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            variant="ghost"
+            size="icon-sm"
+            class="ml-1 h-6 w-6 text-muted-foreground"
             onclick={(e) => handleCloseTab(tab.id, e)}
             aria-label="Close tab"
           >
             <X size={12} />
-          </button>
+          </Button>
         {/if}
       </div>
     {/each}
@@ -233,16 +212,14 @@
   <!-- Profile Selector -->
   {#if showProfileSelector}
     <div class="flex items-center space-x-2 px-2">
-      <Select
+      <ShellProfileSelect
+        profiles={availableProfiles}
+        bind:value={selectedProfile}
         onSelect={handleProfileChange}
-        class="bg-muted text-xs text-foreground"
-        options={availableProfiles.length === 0
-          ? [{ value: "", label: "Loading profiles..." }]
-          : availableProfiles.map((profile) => ({
-              value: profile.name,
-              label: `${profile.icon} ${profile.name}`,
-            }))}
-        defaultValue={selectedProfile}
+        placeholder={availableProfiles.length === 0
+          ? "Loading profiles..."
+          : "Select shell..."}
+        disabled={availableProfiles.length === 0}
       />
     </div>
   {/if}

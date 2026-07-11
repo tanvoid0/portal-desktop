@@ -3,14 +3,8 @@
   import { onMount } from "svelte";
 
   onMount(() => {
-    goto("/automation/utilities", { replaceState: true });
+    goto("/utilities/disk", { replaceState: true });
   });
 </script>
 
-<svelte:head>
-  <title>Utilities - Portal Desktop</title>
-</svelte:head>
-
-<div class="container mx-auto p-6 text-muted-foreground">
-  Redirecting to automation…
-</div>
+<div class="text-sm text-muted-foreground">Opening utilities…</div>

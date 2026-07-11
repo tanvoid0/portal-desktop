@@ -120,7 +120,7 @@
 
   enableShortcut={false}
 
-  style="--sidebar-width: var(--sidebar-width-domain, 14rem);"
+  style="--sidebar-width: var(--sidebar-width-domain, 20rem);"
 
   class="flex h-full min-h-0 w-full flex-col overflow-hidden"
 
@@ -130,7 +130,7 @@
 
     <div
 
-      class="flex shrink-0 items-center gap-2 border-b bg-background px-3 py-2 md:hidden"
+      class="divider-edge-b divider-edge-full flex shrink-0 items-center gap-2 bg-background px-3 py-2 md:hidden"
 
     >
 

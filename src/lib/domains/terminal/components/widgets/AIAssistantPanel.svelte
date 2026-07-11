@@ -89,7 +89,7 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="flex items-center gap-2 border-b border-border p-2">
+  <div class="divider-edge-b divider-edge-full flex items-center gap-2 p-2">
     <Bot class="h-4 w-4 text-primary" />
     <div class="text-sm font-medium text-foreground">AI Assistant</div>
   </div>
@@ -120,7 +120,7 @@
     {/if}
   </div>
 
-  <div class="border-t border-border p-2">
+  <div class="divider-edge-t divider-edge-full p-2">
     <form
       class="flex gap-2"
       onsubmit={(e) => {

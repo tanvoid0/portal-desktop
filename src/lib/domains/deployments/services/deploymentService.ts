@@ -91,6 +91,7 @@ export class DeploymentService {
         ? new Date(backendDeployment.stopped_at)
         : undefined,
       // Map backend fields to frontend
+      containerId: backendDeployment.container_id,
       dockerImageName: backendDeployment.docker_image_name,
       dockerfilePath: backendDeployment.dockerfile_path,
       workingDirectory: backendDeployment.working_directory,
@@ -380,6 +381,10 @@ export class DeploymentService {
         : backendContainer.ports
           ? [backendContainer.ports]
           : [],
+      composeProject: backendContainer.compose_project ?? undefined,
+      composeService: backendContainer.compose_service ?? undefined,
+      networks: backendContainer.networks ?? [],
+      labels: backendContainer.labels ?? {},
       createdAt: (() => {
         if (
           !backendContainer.created_at ||

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
   import CommandBlock from "../CommandBlock.svelte";
   import { commandBlockStore, type CapturedCommand } from "../../stores/commandBlockStore";
 
@@ -27,21 +28,23 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="flex items-center justify-between border-b border-border p-2">
+  <div class="divider-edge-b divider-edge-full flex items-center justify-between p-2">
     <div class="flex items-center gap-2">
       <div class="text-sm font-semibold text-foreground">Command Blocks</div>
       <Badge variant="outline" class="text-xs text-muted-foreground">
         {blocks.length} total
       </Badge>
     </div>
-    <button
+    <Button
       type="button"
-      class="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+      variant="ghost"
+      size="sm"
+      class="h-auto px-2 py-1 text-xs text-muted-foreground"
       onclick={clearBlocks}
       title="Clear command blocks"
     >
       Clear
-    </button>
+    </Button>
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto p-2">

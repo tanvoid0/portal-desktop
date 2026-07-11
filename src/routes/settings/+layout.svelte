@@ -47,6 +47,7 @@
     const section = path.replace("/settings/", "").replace(/\/$/, "");
     // Redirect framework-ides to ides
     if (section === "framework-ides") return "ides" as const;
+    if (section.startsWith("ai")) return "ai" as const;
     return (section || "general") as
       | "general"
       | "editor"
@@ -166,7 +167,7 @@
 <div class="flex h-full min-h-0 w-full flex-col overflow-hidden">
   <!-- Top Bar -->
   <div
-    class="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+    class="divider-edge-b divider-edge-full flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
     <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 3xl:px-8">
       <div class="min-w-0">

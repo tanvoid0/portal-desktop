@@ -15,11 +15,11 @@
         destructive:
           "bg-gradient-to-r from-destructive via-destructive/95 to-destructive text-white shadow-button hover:shadow-button-hover focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         outline:
-          "bg-background/80 backdrop-blur-sm shadow-button border-2 border-border/50 hover:bg-accent/50 hover:border-primary/50 hover:text-accent-foreground hover:shadow-button-hover dark:bg-input/20 dark:border-input/50 dark:hover:bg-input/40",
+          "bg-background/80 text-foreground backdrop-blur-sm shadow-button border-2 border-border/50 hover:bg-accent/50 hover:border-primary/50 hover:text-accent-foreground hover:shadow-button-hover dark:bg-input/20 dark:border-input/50 dark:hover:bg-input/40",
         secondary:
           "bg-gradient-to-r from-secondary via-secondary/95 to-secondary text-secondary-foreground shadow-button hover:shadow-button-hover hover:from-secondary/90 hover:via-secondary hover:to-secondary/90",
         ghost:
-          "hover:bg-accent/60 hover:text-accent-foreground dark:hover:bg-accent/40 rounded-lg",
+          "text-foreground hover:bg-accent/60 hover:text-accent-foreground dark:hover:bg-accent/40 rounded-lg",
         link: "text-primary underline-offset-4 hover:underline hover:text-primary/80",
       },
       size: {

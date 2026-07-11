@@ -1659,20 +1659,6 @@
                   projectId={project.id}
                   projectName={project.name}
                   projectPath={project.path}
-                  settings={{
-                    theme: "dark",
-                    fontSize: 14,
-                    fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                    cursorStyle: "block",
-                    scrollbackLines: 1000,
-                    bellSound: false,
-                    autoClose: true,
-                    confirmClose: true,
-                    defaultShell: navigator.userAgent.includes("Windows")
-                      ? "cmd.exe"
-                      : "bash",
-                    workingDirectory: project.path,
-                  }}
                 />
               </div>
             </CardContent>

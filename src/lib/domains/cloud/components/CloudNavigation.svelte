@@ -230,7 +230,7 @@
 
 <div class="space-y-6">
   <!-- Namespace Selector -->
-  <div class="border-b border-border pb-4 group-data-[collapsible=icon]:hidden">
+  <div class="divider-edge-b divider-edge-full pb-4 group-data-[collapsible=icon]:hidden">
     <NamespaceSelector />
   </div>
 
@@ -270,7 +270,7 @@
       </div>
       {#if group !== navGroups[navGroups.length - 1]}
         <div
-          class="border-t border-border group-data-[collapsible=icon]:hidden"
+          class="divider-line-h group-data-[collapsible=icon]:hidden"
         ></div>
       {/if}
     {/each}

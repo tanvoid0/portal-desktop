@@ -1,7 +1,7 @@
 use super::services::deployment_service::{
     CreateDeploymentRequest, DeploymentService, UpdateDeploymentRequest,
 };
-use super::services::docker_service::{Deployment, DockerContainer, DockerStatus};
+use super::services::docker_service::{Deployment, DockerContainer, DockerImageSummary, DockerStatus};
 use std::sync::Arc;
 use tauri::State;
 

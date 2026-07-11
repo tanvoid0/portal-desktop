@@ -80,7 +80,7 @@
 
 <div class="command-history flex h-full flex-col">
   <!-- Header -->
-  <div class="flex items-center justify-between border-b border-border p-3">
+  <div class="divider-edge-b divider-edge-full flex items-center justify-between p-3">
     <div class="flex items-center space-x-2">
       <h3 class="text-sm font-medium text-foreground">Command History</h3>
       {#if averageDuration > 0}
@@ -153,7 +153,7 @@
 <Dialog.Root bind:open={showModal}>
   <Dialog.Content class="mx-4 flex max-h-[80vh] max-w-4xl flex-col bg-background text-foreground">
     {#if selectedEntry}
-      <Dialog.Header class="border-b border-border">
+      <Dialog.Header class="divider-edge-b divider-edge-full">
         <Dialog.Title>Command Details</Dialog.Title>
       </Dialog.Header>
 
@@ -212,7 +212,7 @@
         </div>
       </div>
 
-      <div class="flex justify-end border-t border-border p-4">
+      <div class="divider-edge-t divider-edge-full flex justify-end p-4">
         <Button variant="secondary" onclick={closeModal}>Close</Button>
       </div>
     {/if}

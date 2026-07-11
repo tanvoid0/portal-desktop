@@ -124,7 +124,7 @@
 
 <Dialog.Root bind:open>
   <Dialog.Content class="flex max-h-[85vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
-    <Dialog.Header class="border-b border-border px-6 py-4">
+    <Dialog.Header class="divider-edge-b divider-edge-full px-6 py-4">
       <Dialog.Title class="flex items-center gap-2 text-lg">
         <GitCommitHorizontal class="h-5 w-5" />
         Commit changes
@@ -206,13 +206,14 @@
               {#each flatRows as row (row.node.path + String(row.node.isFile))}
                 {@const node = row.node}
                 <div
-                  class="flex items-center gap-1.5 border-b border-border px-2 py-1.5 text-xs last:border-b-0"
+                  class="divider-edge-b divider-edge-full flex items-center gap-1.5 px-2 py-1.5 text-xs last:border-b-0"
                   style="padding-left: {8 + row.depth * 14}px"
                 >
                   {#if !node.isFile}
-                    <button
+                    <Button
                       type="button"
-                      class="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:text-foreground"
+                      variant="ghost"
+                      class="h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 text-xs hover:text-foreground"
                       onclick={() => toggleFolder(node.path)}
                     >
                       <ChevronRight
@@ -230,7 +231,7 @@
                           <span class="text-red-600 dark:text-red-400">-{node.deletions}</span>
                         {/if}
                       </span>
-                    </button>
+                    </Button>
                   {:else if node.change}
                     <File class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <span class="min-w-0 flex-1 truncate font-mono">{node.name}</span>
@@ -262,7 +263,7 @@
       {/if}
     </div>
 
-    <Dialog.Footer class="border-t border-border px-6 py-4">
+    <Dialog.Footer class="divider-edge-t divider-edge-full px-6 py-4">
       <Button variant="outline" onclick={() => (open = false)} disabled={committing}>
         Cancel
       </Button>

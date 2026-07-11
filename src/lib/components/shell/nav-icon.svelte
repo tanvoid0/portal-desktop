@@ -20,6 +20,7 @@
     Settings,
     Sparkles,
     Terminal,
+    Variable,
     Workflow,
     Wrench,
   } from "@lucide/svelte";
@@ -73,6 +74,8 @@
   <History class={className} />
 {:else if icon === "hard-drive"}
   <HardDrive class={className} />
+{:else if icon === "variable"}
+  <Variable class={className} />
 {:else}
   <Home class={className} />
 {/if}

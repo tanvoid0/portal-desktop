@@ -623,6 +623,14 @@ pub fn run() {
             domains::disk::commands::verify_proposals,
             domains::disk::commands::cancel_verify,
             domains::disk::commands::open_recycle_bin,
+            // Environment variable utilities
+            domains::environment::commands::env_list_variables,
+            domains::environment::commands::env_get_permissions,
+            domains::environment::commands::env_set_variable,
+            domains::environment::commands::env_delete_variable,
+            domains::environment::commands::env_apply_changes,
+            domains::environment::commands::env_refresh_process,
+            domains::environment::commands::env_request_elevation,
         ])
         .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
         .expect("error while running tauri application");

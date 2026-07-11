@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
+  import { Textarea } from "$lib/components/ui/textarea";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import {
     Plus,
@@ -159,11 +160,13 @@
   {#if (hasAgentChanges && onToggleChanges) || (hasGitChanges && onToggleGitChanges)}
     <div class="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-2 lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
       {#if hasAgentChanges && onToggleChanges}
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onclick={onToggleChanges}
           class={cn(
-            "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            "h-auto rounded-full px-3 py-1 text-xs font-medium",
             showChanges
               ? "border-primary/40 bg-primary/10 text-foreground"
               : "border-border bg-background text-foreground hover:bg-muted/60",
@@ -175,14 +178,16 @@
           <span class="rounded-full bg-amber-500 px-1.5 font-mono text-[10px] text-white">
             {pendingChangeCount}
           </span>
-        </button>
+        </Button>
       {/if}
       {#if hasGitChanges && onToggleGitChanges}
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onclick={onToggleGitChanges}
           class={cn(
-            "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            "h-auto rounded-full px-3 py-1 text-xs font-medium",
             showGitChanges
               ? "border-primary/40 bg-primary/10 text-foreground"
               : "border-border bg-background text-foreground hover:bg-muted/60",
@@ -201,18 +206,20 @@
               -{gitStats.deletions}
             </span>
           {/if}
-        </button>
+        </Button>
       {/if}
     </div>
   {/if}
 
   {#if onToggleMultitask}
     <div class="mx-auto mb-2 flex w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onclick={() => onToggleMultitask(!multitaskMode)}
         class={cn(
-          "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+          "h-auto rounded-full px-3 py-1 text-xs font-medium",
           multitaskMode
             ? "border-primary/40 bg-primary/10 text-foreground"
             : "border-border bg-background text-foreground hover:bg-muted/60",
@@ -221,7 +228,7 @@
       >
         <GitBranchPlus class="h-3.5 w-3.5 text-muted-foreground" />
         <span>{multitaskMode ? "Multitask on" : "Multitask off"}</span>
-      </button>
+      </Button>
     </div>
   {/if}
 
@@ -238,14 +245,16 @@
           >
             <span class="min-w-0 flex-1 truncate text-foreground/80">{msg}</span>
             {#if onRemoveQueued}
-              <button
+              <Button
                 type="button"
-                class="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                variant="ghost"
+                size="icon-sm"
+                class="h-5 w-5 shrink-0"
                 title="Remove from queue"
                 onclick={() => onRemoveQueued(i)}
               >
                 <X class="h-3 w-3" />
-              </button>
+              </Button>
             {/if}
           </div>
         {/each}
@@ -266,8 +275,8 @@
         <Plus class="h-4 w-4" />
       </Button>
 
-      <textarea
-        bind:this={textareaEl}
+      <Textarea
+        bind:ref={textareaEl}
         bind:value
         rows={rows}
         placeholder={followUpPlaceholder}
@@ -275,7 +284,7 @@
         onkeydown={handleKeydown}
         oninput={autoResize}
         class="max-h-40 min-h-[36px] flex-1 resize-none border-0 bg-transparent px-1 py-1.5 text-sm leading-relaxed shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0"
-      ></textarea>
+      />
 
       <div class="mb-0.5 flex shrink-0 items-center gap-1">
         <DropdownMenu.Root>

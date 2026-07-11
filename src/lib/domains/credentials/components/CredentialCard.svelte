@@ -17,12 +17,15 @@
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
   import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-  } from "$lib/components/ui/dialog";
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+  } from "$lib/components/ui/alert-dialog";
   import {
     Eye,
     EyeOff,
@@ -244,20 +247,23 @@
 </Card>
 
 <!-- Delete Confirmation Dialog -->
-<Dialog bind:open={showDeleteDialog}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Delete Credential</DialogTitle>
-      <DialogDescription>
+<AlertDialog bind:open={showDeleteDialog}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Delete Credential</AlertDialogTitle>
+      <AlertDialogDescription>
         Are you sure you want to delete "{credential.name}"? This action cannot
         be undone.
-      </DialogDescription>
-    </DialogHeader>
-    <div class="flex justify-end gap-2">
-      <Button variant="outline" onclick={() => (showDeleteDialog = false)}>
-        Cancel
-      </Button>
-      <Button variant="destructive" onclick={confirmDelete}>Delete</Button>
-    </div>
-  </DialogContent>
-</Dialog>
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction
+        class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        onclick={confirmDelete}
+      >
+        Delete
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>

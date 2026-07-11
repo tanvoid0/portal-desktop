@@ -13,6 +13,7 @@
     width: 100%;
     margin: 0;
     padding: 0;
+    color: hsl(var(--foreground));
     background: hsl(var(--background));
     background-image:
       radial-gradient(
@@ -46,6 +47,15 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: hsl(var(--foreground));
   }
 
   #app {
@@ -116,7 +126,7 @@
     /* Layout variables */
     --header-height: 3.5rem;
     --sidebar-width: 16rem;
-    --sidebar-width-domain: 14rem;
+    --sidebar-width-domain: 20rem;
     --sidebar-width-icon: 3rem;
     --content-max-width-readable: 48rem;
     --content-max-width-chat: 72rem;
@@ -149,28 +159,6 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --card-elevated: 217.2 32.6% 12%;
-    --card-surface: 217.2 32.6% 10%;
-    --card-accent: 217.2 32.6% 17.5%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
     --sidebar: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -180,13 +168,37 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
+    /* App surfaces — match sidebar neutral palette (not blue-tinted shadcn defaults) */
+    --background: var(--sidebar);
+    --foreground: var(--sidebar-foreground);
+    --card: var(--sidebar);
+    --card-foreground: var(--sidebar-foreground);
+    --card-elevated: var(--sidebar-accent);
+    --card-surface: var(--sidebar);
+    --card-accent: var(--sidebar-accent);
+    --popover: var(--sidebar);
+    --popover-foreground: var(--sidebar-foreground);
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: var(--sidebar-accent);
+    --secondary-foreground: var(--sidebar-foreground);
+    --muted: var(--sidebar-accent);
+    --muted-foreground: 240 5% 64.9%;
+    --accent: var(--sidebar-accent);
+    --accent-foreground: var(--sidebar-accent-foreground);
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: var(--sidebar-foreground);
+    --border: var(--sidebar-border);
+    --input: var(--sidebar-border);
+    --ring: 224.3 76.3% 48%;
+
     /* Gradient variables (dark mode) */
-    --gradient-from: 222.2 84% 4.9%;
-    --gradient-to: 217.2 32.6% 12%;
-    --card-gradient-from: 222.2 84% 4.9%;
-    --card-gradient-to: 217.2 32.6% 10%;
-    --surface-gradient-from: 222.2 84% 4.9%;
-    --surface-gradient-to: 217.2 32.6% 12%;
+    --gradient-from: var(--sidebar);
+    --gradient-to: var(--sidebar-accent);
+    --card-gradient-from: var(--sidebar);
+    --card-gradient-to: var(--sidebar-accent);
+    --surface-gradient-from: var(--sidebar);
+    --surface-gradient-to: var(--sidebar-accent);
 
     /* Status colors (dark mode) */
     --status-success: 142 76% 36%;
@@ -199,11 +211,41 @@
     --status-info-bg: 217 91% 20%;
 
     /* Terminal canvas (xterm) */
-    --terminal-background: hsl(222.2 84% 4.9%);
-    --terminal-foreground: hsl(210 40% 98%);
-    --terminal-cursor: hsl(210 40% 98%);
-    --terminal-cursor-accent: hsl(222.2 84% 4.9%);
+    --terminal-background: hsl(240 5.9% 10%);
+    --terminal-foreground: hsl(240 4.8% 95.9%);
+    --terminal-cursor: hsl(240 4.8% 95.9%);
+    --terminal-cursor-accent: hsl(240 5.9% 10%);
     --terminal-selection: hsl(217.2 91.2% 59.8% / 0.35);
+  }
+
+  /* Global scrollbars — match shadcn ScrollArea (thin, rounded, theme tokens) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.45);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 
@@ -228,6 +270,146 @@
 
 .k8s-navigable-table tbody tr[data-selected="true"]:hover {
   background-color: hsl(var(--accent) / 0.8);
+}
+
+/* Soft dividers — visible separation without solid filled lines */
+@layer utilities {
+  .divider-soft {
+    --divider-color: var(--border);
+    --divider-opacity: 0.42;
+    --divider-fade: 18%;
+    background: transparent;
+  }
+
+  .divider-soft[data-orientation="horizontal"] {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
+      hsl(var(--divider-color) / var(--divider-opacity))
+        calc(100% - var(--divider-fade)),
+      transparent
+    );
+  }
+
+  .divider-soft[data-orientation="vertical"] {
+    background: linear-gradient(
+      180deg,
+      transparent,
+      hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
+      hsl(var(--divider-color) / var(--divider-opacity))
+        calc(100% - var(--divider-fade)),
+      transparent
+    );
+  }
+
+  .divider-soft-sidebar {
+    --divider-color: var(--sidebar-border);
+  }
+
+  .divider-edge-b,
+  .divider-edge-t,
+  .divider-edge-r,
+  .divider-edge-l {
+    --divider-color: var(--border);
+    --divider-opacity: 0.42;
+    --divider-fade: 14%;
+    --divider-inset: 0.75rem;
+    position: relative;
+  }
+
+  .divider-edge-sidebar {
+    --divider-color: var(--sidebar-border);
+  }
+
+  .divider-edge-full {
+    --divider-inset: 0;
+  }
+
+  .divider-edge-b::after,
+  .divider-edge-t::after,
+  .divider-edge-r::after,
+  .divider-edge-l::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .divider-edge-b::after {
+    bottom: 0;
+    left: var(--divider-inset);
+    right: var(--divider-inset);
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
+      hsl(var(--divider-color) / var(--divider-opacity))
+        calc(100% - var(--divider-fade)),
+      transparent
+    );
+  }
+
+  .divider-edge-t::after {
+    top: 0;
+    left: var(--divider-inset);
+    right: var(--divider-inset);
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
+      hsl(var(--divider-color) / var(--divider-opacity))
+        calc(100% - var(--divider-fade)),
+      transparent
+    );
+  }
+
+  .divider-edge-r::after {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 1px;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      hsl(var(--divider-color) / var(--divider-opacity)) 6%,
+      hsl(var(--divider-color) / var(--divider-opacity)) 94%,
+      transparent
+    );
+  }
+
+  .divider-edge-l::after {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 1px;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      hsl(var(--divider-color) / var(--divider-opacity)) 6%,
+      hsl(var(--divider-color) / var(--divider-opacity)) 94%,
+      transparent
+    );
+  }
+
+  /* Standalone horizontal rule (e.g. between nav groups) */
+  .divider-line-h {
+    --divider-color: var(--border);
+    --divider-opacity: 0.42;
+    --divider-fade: 14%;
+    height: 1px;
+    width: 100%;
+    flex-shrink: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
+      hsl(var(--divider-color) / var(--divider-opacity))
+        calc(100% - var(--divider-fade)),
+      transparent
+    );
+  }
 }
 
 /* Gradient utilities for dark mode compatibility */
@@ -268,7 +450,7 @@
   }
 
   .dark .glass {
-    background: rgba(17, 24, 39, 0.7);
+    background: hsl(var(--sidebar) / 0.7);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
@@ -280,7 +462,7 @@
   }
 
   .dark .glass-strong {
-    background: rgba(17, 24, 39, 0.85);
+    background: hsl(var(--sidebar) / 0.85);
     border: 1px solid rgba(255, 255, 255, 0.15);
   }
 

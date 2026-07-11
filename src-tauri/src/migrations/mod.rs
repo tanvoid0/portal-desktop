@@ -37,6 +37,7 @@ pub mod m20260707_000034_add_platform_thread_id_to_coder_threads;
 pub mod m20260707_000035_add_llm_provider_to_coder_threads;
 pub mod m20260708_000036_create_github_tables;
 pub mod m20260708_000037_add_coder_multitask_tables;
+pub mod m20260708_000038_add_project_id_to_coder_threads;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -77,6 +78,7 @@ pub use m20260707_000034_add_platform_thread_id_to_coder_threads::Migration as a
 pub use m20260707_000035_add_llm_provider_to_coder_threads::Migration as addLlmProviderToCoderThreads;
 pub use m20260708_000036_create_github_tables::Migration as createGithubTables;
 pub use m20260708_000037_add_coder_multitask_tables::Migration as addCoderMultitaskTables;
+pub use m20260708_000038_add_project_id_to_coder_threads::Migration as addProjectIdToCoderThreads;
 
 pub struct Migrator;
 
@@ -151,5 +153,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(addLlmProviderToCoderThreads),
         Box::new(createGithubTables),
         Box::new(addCoderMultitaskTables),
+        Box::new(addProjectIdToCoderThreads),
     ]
 }

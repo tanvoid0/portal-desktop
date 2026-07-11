@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
   import {
     Bot,
     ChevronRight,
@@ -98,9 +99,10 @@
     ? 'border-destructive/40 bg-destructive/5'
     : 'border-border bg-muted/40'}"
 >
-  <button
+  <Button
     type="button"
-    class="flex w-full items-center gap-2 px-3 py-2 text-left"
+    variant="ghost"
+    class="h-auto w-full justify-start gap-2 rounded-none px-3 py-2 text-left text-sm"
     onclick={() => (open = !open)}
   >
     <ChevronRight
@@ -139,7 +141,7 @@
     {:else}
       <Badge variant="outline" class="shrink-0 text-[10px]">pending</Badge>
     {/if}
-  </button>
+  </Button>
 
   {#if open}
     <div class="space-y-2 border-t border-border px-3 py-2">

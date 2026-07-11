@@ -6,11 +6,8 @@
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import {
     Bot,
-    Settings2,
-    Trash2,
     GitBranch,
     GitCommitHorizontal,
-    Sparkles,
     RotateCcw,
     FolderOpen,
     Square,
@@ -21,16 +18,16 @@
     PanelLeftOpen,
   } from '@lucide/svelte';
   import { toast } from '$lib/utils/toast';
-  import { goto, replaceState } from '$app/navigation';
-  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
+  import { replaceState } from '$app/navigation';
   import { coderSession } from '../state/coderSession.svelte.js';
+  import { coderUi } from '../state/coderUi.svelte.js';
   import { coderService } from '../services/coderService.js';
   import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
   import type { ChatMessage, PermissionMode, PermissionRule, ToolCall, GitDiffStats } from '../types.js';
   import ToolCallCard from './ToolCallCard.svelte';
   import ApprovalBanner from './ApprovalBanner.svelte';
-  import CoderProjectSelector from './CoderProjectSelector.svelte';
   import CoderSessionList from './CoderSessionList.svelte';
+  import CoderProjectSelector from './CoderProjectSelector.svelte';
   import CoderMultitaskBar from './CoderMultitaskBar.svelte';
   import ProviderModelSelector from '$lib/domains/ai/components/ProviderModelSelector.svelte';
   import CoderComposer from './CoderComposer.svelte';
@@ -193,6 +190,11 @@
   });
 
   onMount(async () => {
+    coderUi.initFromStorage();
+    if (coderUi.activeProjectPath && !coderSession.workspaceRoot) {
+      coderSession.workspaceRoot = coderUi.activeProjectPath;
+    }
+
     try {
       await coderSession.ensureInit();
     } catch (e) {
@@ -226,14 +228,29 @@
 
   async function selectThread(id: string) {
     await coderSession.selectThread(id);
+    const t = coderSession.thread;
+    if (t) {
+      coderUi.syncFromThread(t.workspace_root, t.project_id);
+    } else if (coderSession.workspaceRoot) {
+      coderUi.syncFromThread(coderSession.workspaceRoot);
+    }
     input = coderSession.activeRuntime.draftInput;
     syncUrl(id);
   }
 
   function newSession() {
+    const project = coderUi.activeProjectPath;
     coderSession.newSession();
+    if (project) coderSession.workspaceRoot = project;
     input = '';
     syncUrl(null);
+  }
+
+  function handleProjectSelect(path: string, projectId?: string) {
+    coderUi.setActiveProject(path, projectId ?? null);
+    if (!coderSession.activeThreadId) {
+      coderSession.workspaceRoot = path;
+    }
   }
 
   async function send() {
@@ -379,7 +396,7 @@
     desktopClass="w-80 bg-muted/20"
   >
     {#snippet header()}
-      <div class="border-b bg-background px-3 py-2.5">
+      <div class="divider-edge-b divider-edge-full bg-background px-3 py-2.5">
         <h2 class="flex items-center gap-2 text-sm font-semibold tracking-tight">
           <Bot class="h-4 w-4 text-primary" />
           Sessions
@@ -399,6 +416,9 @@
       loading={sessionsLoading}
       selectedThreadId={activeThreadId}
       runningThreadIds={runningThreadIds}
+      showRules={showSettings}
+      onToggleRules={() => (showSettings = !showSettings)}
+      onProjectSelect={handleProjectSelect}
       onThreadClick={(t) => {
         selectThread(t.id);
         sessionsPanelOpen = false;
@@ -414,7 +434,7 @@
 
   <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <div
-      class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2.5"
+      class="divider-edge-b divider-edge-full flex shrink-0 flex-wrap items-center justify-between gap-2 bg-background px-4 py-2.5"
     >
       <div class="flex min-w-0 items-center gap-2">
         <Button
@@ -448,11 +468,15 @@
         {/if}
       </div>
 
-      <div class="flex flex-wrap items-center gap-1.5">
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:max-w-md">
         <CoderProjectSelector
           bind:value={coderSession.workspaceRoot}
           disabled={!!thread}
+          onSelect={handleProjectSelect}
         />
+      </div>
+
+      <div class="flex flex-wrap items-center gap-1.5">
         <ProviderModelSelector
           bind:selectedProvider={coderSession.selectedProvider}
           bind:selectedBackendProvider={coderSession.selectedBackendProvider}
@@ -571,24 +595,6 @@
           <GitCommitHorizontal class="h-3.5 w-3.5" />
           Commit
         </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          class="h-8 w-8"
-          title="AI provider settings"
-          onclick={() => goto(AI_PROVIDER_SETTINGS_PATH)}
-        >
-          <Sparkles class="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          class="h-8 w-8"
-          title="Permission rules"
-          onclick={() => (showSettings = !showSettings)}
-        >
-          <Settings2 class="h-3.5 w-3.5" />
-        </Button>
       </div>
     </div>
 
@@ -599,36 +605,6 @@
         onCleanupOne={(id) => void coderSession.cleanupSubAgents([id], true)}
         onCleanupAll={() => void coderSession.cleanupSubAgents([], true)}
       />
-    {/if}
-
-    {#if showSettings}
-      <div class="shrink-0 border-b border-border bg-muted/30 p-3 text-sm">
-        <div class="mb-2 font-medium">Allow / deny rules</div>
-        {#if coderSession.rules.length === 0}
-          <div class="text-xs text-muted-foreground">
-            No saved rules. "Accept &amp; remember" on an approval adds one.
-          </div>
-        {:else}
-          <ul class="space-y-1">
-            {#each coderSession.rules as r}
-              <li class="flex items-center gap-2 text-xs">
-                <Badge variant={r.allow ? 'secondary' : 'destructive'}>
-                  {r.allow ? 'allow' : 'deny'}
-                </Badge>
-                <span class="font-mono">{r.tool}</span>
-                <span class="font-mono text-muted-foreground">{r.pattern || '*'}</span>
-                <button
-                  type="button"
-                  class="ml-auto text-muted-foreground hover:text-destructive"
-                  onclick={() => coderSession.removeRule(r)}
-                >
-                  <Trash2 class="h-3.5 w-3.5" />
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
     {/if}
 
     <div class="flex min-h-0 flex-1 overflow-hidden">
@@ -817,7 +793,7 @@
         <ResponsivePanel
           bind:open={coderWorkspaceStore.sidebarOpen}
           side="right"
-          desktopClass="w-56 border-l border-border bg-muted/20"
+          desktopClass="divider-edge-l w-56 bg-muted/20"
           borderClass=""
         >
           <CoderWorkspaceSidebar

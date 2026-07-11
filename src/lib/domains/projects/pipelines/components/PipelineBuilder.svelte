@@ -13,6 +13,7 @@
   } from "$lib/components/ui/card";
   import { Input } from "$lib/components/ui/input";
   import { Textarea } from "$lib/components/ui/textarea";
+  import { Label } from "$lib/components/ui/label";
   import type { Pipeline, PipelineStep, ExecutionContext } from "../types";
   import { pipelineService } from "../services/pipelineService";
   import { blockLibraryService } from "../services/blockLibraryService";
@@ -138,16 +139,12 @@
     <CardContent class="space-y-4">
       <!-- Pipeline Info -->
       <div class="space-y-2">
-        <label for="pipeline-name" class="text-sm font-medium"
-          >Pipeline Name</label
-        >
+        <Label for="pipeline-name">Pipeline Name</Label>
         <Input id="pipeline-name" bind:value={name} placeholder="My Pipeline" />
       </div>
 
       <div class="space-y-2">
-        <label for="pipeline-description" class="text-sm font-medium"
-          >Description</label
-        >
+        <Label for="pipeline-description">Description</Label>
         <Textarea
           id="pipeline-description"
           bind:value={description}
@@ -157,9 +154,7 @@
 
       <!-- Execution Context -->
       <div class="space-y-2">
-        <label for="execution-context" class="text-sm font-medium"
-          >Execution Context</label
-        >
+        <Label for="execution-context">Execution Context</Label>
         <div class="flex gap-2">
           <Select
             bind:value={executionContext.type}
@@ -196,7 +191,7 @@
       <!-- Steps -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
-          <label class="text-sm font-medium">Pipeline Steps</label>
+          <Label>Pipeline Steps</Label>
           <Button onclick={() => (showBlockLibrary = true)}>Add Step</Button>
         </div>
 

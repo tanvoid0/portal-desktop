@@ -19,9 +19,9 @@
   import { toast } from "$lib/utils/toast";
   import { confirmAction } from "$lib/utils/confirm";
   import DeploymentCard from "./DeploymentCard.svelte";
-  import ContainerCard from "./ContainerCard.svelte";
   import ContainerOverview from "./ContainerOverview.svelte";
   import DockerStatusBanner from "./DockerStatusBanner.svelte";
+  import WorkloadList from "./WorkloadList.svelte";
   import { Button } from "$lib/components/ui/button";
   import {
     Card,
@@ -57,14 +57,19 @@
     Box,
   } from "@lucide/svelte";
   import type { DeploymentStatus, DockerContainer } from "../types";
+  import type { GroupByMode } from "../utils/workloadGrouping";
+  import { groupWorkloads } from "../utils/workloadGrouping";
   import { containerStatusGroup } from "../utils/format";
 
   type TabValue = "deployments" | "containers";
+  type ContainerStatusTab = "running" | "stopped" | "other";
 
   let activeTab = $state<TabValue>("containers");
+  let containerStatusTab = $state<ContainerStatusTab>("running");
   let searchQuery = $state("");
   let selectedStatus = $state<DeploymentStatus | null>(null);
   let containerSearchQuery = $state("");
+  let groupByMode = $state<GroupByMode>("stack");
   let isLoadingContainers = $state(false);
 
   // Reactive stores
@@ -213,29 +218,75 @@
     );
   }
 
-  function groupContainers(list: DockerContainer[]) {
-    const filtered = filterContainers(list);
-    const groups: { key: string; label: string; items: DockerContainer[] }[] =
-      [
-        { key: "running", label: "Running", items: [] },
-        { key: "stopped", label: "Stopped", items: [] },
-        { key: "other", label: "Other", items: [] },
-      ];
-
-    for (const c of filtered) {
-      const group = containerStatusGroup(c.status);
-      const target = groups.find((g) => g.key === group);
-      target?.items.push(c);
-    }
-
-    for (const g of groups) {
-      g.items.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    return groups.filter((g) => g.items.length > 0);
+  function containersForStatus(
+    list: DockerContainer[],
+    status: ContainerStatusTab,
+  ): DockerContainer[] {
+    return filterContainers(list)
+      .filter((c) => containerStatusGroup(c.status) === status)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  let groupedContainers = $derived(groupContainers(containerList));
+  let containerStatusCounts = $derived({
+    running: containersForStatus(containerList, "running").length,
+    stopped: containersForStatus(containerList, "stopped").length,
+    other: containersForStatus(containerList, "other").length,
+  });
+
+  let visibleContainers = $derived(
+    containersForStatus(containerList, containerStatusTab),
+  );
+
+  let visibleWorkloadGroups = $derived(
+    groupWorkloads(containerList, deploymentList, groupByMode, {
+      statusFilter: containerStatusTab,
+      searchQuery: containerSearchQuery,
+    }),
+  );
+
+  let hasVisibleWorkloads = $derived(
+    groupByMode === "flat"
+      ? visibleContainers.length > 0
+      : visibleWorkloadGroups.length > 0,
+  );
+
+  const containerStatusLabels: Record<ContainerStatusTab, string> = {
+    running: "Running",
+    stopped: "Stopped",
+    other: "Other",
+  };
+
+  async function handleDeploymentStart(deploymentId: string) {
+    try {
+      await deploymentActions.startDeployment(deploymentId);
+      toast.success("Deployment started");
+      await loadContainers();
+    } catch (err) {
+      logger.error("Failed to start deployment", {
+        context: "DeploymentDashboard",
+        error: err,
+      });
+      toast.error(
+        err instanceof Error ? err.message : "Failed to start deployment",
+      );
+    }
+  }
+
+  async function handleDeploymentStop(deploymentId: string) {
+    try {
+      await deploymentActions.stopDeployment(deploymentId);
+      toast.success("Deployment stopped");
+      await loadContainers();
+    } catch (err) {
+      logger.error("Failed to stop deployment", {
+        context: "DeploymentDashboard",
+        error: err,
+      });
+      toast.error(
+        err instanceof Error ? err.message : "Failed to stop deployment",
+      );
+    }
+  }
 
   function getStatusColor(status: DeploymentStatus): string {
     return deploymentService.getStatusColor(status);
@@ -310,20 +361,46 @@
     <TabsContent value="containers" class="mt-6 space-y-6">
       <ContainerOverview containers={containerList} />
 
-      <!-- Container Search -->
-      <div class="flex flex-col gap-4 sm:flex-row">
-        <div class="flex-1">
-          <div class="relative">
-            <Search
-              class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
-            />
-            <Input
-              placeholder="Search containers by name, image, or ID..."
-              bind:value={containerSearchQuery}
-              class="pl-10"
-            />
-          </div>
+      <!-- Container Search + Status Tabs -->
+      <div class="flex flex-col gap-4">
+        <div class="relative">
+          <Search
+            class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+          />
+          <Input
+            placeholder="Search containers by name, image, or ID..."
+            bind:value={containerSearchQuery}
+            class="pl-10"
+          />
         </div>
+
+        {#if !isLoadingContainers && containerList.length > 0}
+          <Tabs bind:value={containerStatusTab} class="w-full">
+            <TabsList class="grid w-full grid-cols-3 sm:w-fit">
+              <TabsTrigger value="running" class="gap-2">
+                <Play class="h-4 w-4" />
+                Running
+                <Badge variant="outline" class="tabular-nums">
+                  {containerStatusCounts.running}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="stopped" class="gap-2">
+                <Square class="h-4 w-4" />
+                Stopped
+                <Badge variant="outline" class="tabular-nums">
+                  {containerStatusCounts.stopped}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="other" class="gap-2">
+                <Box class="h-4 w-4" />
+                Other
+                <Badge variant="outline" class="tabular-nums">
+                  {containerStatusCounts.other}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        {/if}
       </div>
 
       <!-- Loading State -->
@@ -346,30 +423,21 @@
         </div>
       {/if}
 
-      <!-- Grouped Containers -->
-      {#if !isLoadingContainers && groupedContainers.length > 0}
-        {#each groupedContainers as group (group.key)}
-          <section class="space-y-3">
-            <div class="flex items-center gap-2">
-              <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {group.label}
-              </h2>
-              <Badge variant="outline" class="tabular-nums">
-                {group.items.length}
-              </Badge>
-            </div>
-            <div class="grid gap-4 md:grid-cols-2">
-              {#each group.items as container (container.id)}
-                <ContainerCard
-                  {container}
-                  onStart={handleContainerStart}
-                  onStop={handleContainerStop}
-                  onRemove={handleContainerRemove}
-                />
-              {/each}
-            </div>
-          </section>
-        {/each}
+      <!-- Container List -->
+      {#if !isLoadingContainers && hasVisibleWorkloads}
+        <WorkloadList
+          containers={containerList}
+          deployments={deploymentList}
+          groupBy={groupByMode}
+          statusFilter={containerStatusTab}
+          searchQuery={containerSearchQuery}
+          onGroupByChange={(mode) => (groupByMode = mode)}
+          onStart={handleContainerStart}
+          onStop={handleContainerStop}
+          onRemove={handleContainerRemove}
+          onStartDeployment={handleDeploymentStart}
+          onStopDeployment={handleDeploymentStop}
+        />
       {/if}
 
       <!-- Empty State -->
@@ -391,11 +459,19 @@
             </p>
           </CardContent>
         </Card>
-      {:else if !isLoadingContainers && groupedContainers.length === 0 && containerSearchQuery}
+      {:else if !isLoadingContainers && containerList.length > 0 && !hasVisibleWorkloads}
         <Card>
           <CardContent class="flex flex-col items-center justify-center py-8">
             <p class="text-muted-foreground">
-              No containers match "{containerSearchQuery}"
+              {#if containerSearchQuery}
+                No {containerStatusLabels[
+                  containerStatusTab
+                ].toLowerCase()} containers match "{containerSearchQuery}"
+              {:else}
+                No {containerStatusLabels[
+                  containerStatusTab
+                ].toLowerCase()} containers
+              {/if}
             </p>
           </CardContent>
         </Card>

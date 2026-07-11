@@ -1,0 +1,57 @@
+---
+description: Use shadcn-svelte components instead of raw HTML form controls
+globs: src/**/*.svelte
+alwaysApply: false
+---
+
+# shadcn-svelte UI conventions
+
+Use primitives from `$lib/components/ui` for interactive controls. Config: [components.json](../../components.json).
+
+## Required mappings
+
+| Raw HTML | Use instead |
+|----------|-------------|
+| `<button>` | `{ Button }` from `$lib/components/ui/button` |
+| `<input>` (text, search, etc.) | `{ Input }` from `$lib/components/ui/input` |
+| `<textarea>` | `{ Textarea }` from `$lib/components/ui/textarea` |
+| `<select>` | `import Select from "$lib/components/ui/select.svelte"` |
+| `<label>` | `{ Label }` from `$lib/components/ui/label` |
+| checkbox | `{ Checkbox }` from `$lib/components/ui/checkbox` |
+| toggle / on-off | `{ Switch }` from `$lib/components/ui/switch` |
+| pill / segmented toggles | `{ Toggle }` / `{ ToggleGroup }` |
+| card layout | `{ Card, CardHeader, CardContent, ... }` |
+
+## Button variants (common patterns)
+
+- Primary actions: `variant="default"` or `variant="outline"`
+- Sidebar nav, list rows, tabs: `variant="ghost"` + `class="h-auto w-full justify-start ..."`
+- Icon-only (close, chevron): `variant="ghost" size="icon-sm"`
+- Full-card / full-row click targets: `variant="ghost" class="h-auto w-full text-left ..."`
+- Inline links in tables: `variant="link" class="h-auto p-0"`
+
+## Simplified Select
+
+Prefer `$lib/components/ui/select.svelte` wrapper:
+
+```svelte
+<Select bind:value={namespace} options={namespaceOptions()} placeholder="Select namespace" />
+```
+
+## Allowed exceptions
+
+- Hidden `<input type="file">` or `type="hidden"` (triggered by `Button`)
+- Files under `src/lib/components/ui/**` (shadcn primitives and thin wrappers)
+- `<label>` wrapping `{ Checkbox }` for click-target accessibility (see `TaskFilterModal.svelte`)
+- Semantic non-form elements (`<kbd>`, layout divs, terminal canvas areas)
+
+## Do not
+
+- Hand-copy Input/Select Tailwind classes onto raw `<input>` / `<select>`
+- Build DIY toggle switches with `peer sr-only` when `Switch` exists
+- Add raw modal overlays — use `Dialog`, `Sheet`, or `AlertDialog`
+- Use `@/` imports — use `$lib/`
+
+## Enforcement
+
+ESLint rule `portal/no-raw-ui-elements` flags violations in app code. Run `pnpm lint`.

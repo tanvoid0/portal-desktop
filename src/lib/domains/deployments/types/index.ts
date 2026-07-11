@@ -58,6 +58,10 @@ export interface DockerContainer {
   stoppedAt?: Date;
   restartCount?: number;
   resourceStats?: ResourceUsage;
+  composeProject?: string;
+  composeService?: string;
+  networks?: string[];
+  labels?: Record<string, string>;
 }
 
 export interface PortMapping {
@@ -115,6 +119,7 @@ export interface Deployment {
   status: DeploymentStatus;
   // Docker-specific fields
   container?: DockerContainer;
+  containerId?: string;
   dockerImageName?: string;
   dockerfilePath?: string;
   // CLI-specific fields

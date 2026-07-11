@@ -205,7 +205,7 @@
     </DialogHeader>
 
     <!-- Controls -->
-    <div class="flex items-center gap-4 border-b p-4">
+    <div class="divider-edge-b divider-edge-full flex items-center gap-4 p-4">
       <div class="flex flex-1 items-center gap-2">
         <Search class="h-4 w-4 text-muted-foreground" />
         <Input
@@ -248,7 +248,7 @@
     </div>
 
     <!-- Log Stats -->
-    <div class="flex items-center gap-4 border-b bg-muted/50 p-2">
+    <div class="divider-edge-b divider-edge-full flex items-center gap-4 bg-muted/50 p-2">
       <Badge variant="outline">
         {filteredLogsCount} / {totalLogsCount} logs
       </Badge>

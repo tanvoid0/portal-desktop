@@ -24,11 +24,12 @@
   );
 </script>
 
-<div class="border-b bg-muted/20 px-4 py-2">
+<div class="divider-edge-b divider-edge-full bg-muted/20 px-4 py-2">
   <div class="flex items-center justify-between gap-2">
-    <button
+    <Button
       type="button"
-      class="flex min-w-0 items-center gap-2 text-left"
+      variant="ghost"
+      class="h-auto min-w-0 flex-1 justify-start gap-2 px-0 text-left"
       onclick={() => (expanded = !expanded)}
     >
       {#if expanded}
@@ -43,7 +44,7 @@
           {runningCount} working, {subAgents.length} total
         </p>
       </div>
-    </button>
+    </Button>
     {#if subAgents.length > 0}
       <Button
         size="sm"

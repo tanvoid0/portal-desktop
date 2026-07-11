@@ -112,7 +112,7 @@
 
 {#if $cloudStore.connection.isConnected}
   <div
-    class="flex items-center gap-2 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+    class="divider-edge-b divider-edge-full flex items-center gap-2 bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
     <div class="flex min-w-0 flex-1 items-center gap-2">
       <span class="shrink-0 text-sm font-medium text-muted-foreground"

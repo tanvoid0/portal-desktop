@@ -18,10 +18,11 @@
     homeItem,
     showHome,
   } from "$lib/domains/shared/stores/breadcrumbStore";
-  import { terminalActions } from "$lib/domains/terminal/stores/terminalStore";
+  import { terminalActions } from "$lib/domains/terminal";
   import { learningService } from "$lib/domains/learning";
   import { settingsActions } from "$lib/domains/settings/stores/settingsStore";
   import ToastContainer from "$lib/components/ui/toast-container.svelte";
+  import ConfirmDialog from "$lib/components/ui/confirm-dialog.svelte";
   import QRCodeDialog from "$lib/components/QRCodeDialog.svelte";
   import DeviceApprovalDialog from "$lib/components/DeviceApprovalDialog.svelte";
   import DeviceAuthGuard from "$lib/components/DeviceAuthGuard.svelte";
@@ -231,12 +232,12 @@
     >
       <!-- Top Bar -->
       <header
-        class="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+        class="divider-edge-b divider-edge-full flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
       >
         <div class="flex h-14 items-center gap-2 px-3 md:px-4 3xl:px-6">
           <SidebarTrigger />
           <!-- Navigation Buttons -->
-          <div class="mr-2 flex items-center gap-1 border-r pr-2">
+          <div class="divider-edge-r mr-2 flex items-center gap-1 pr-2">
             <Button
               variant="ghost"
               size="icon"
@@ -297,9 +298,10 @@
           <SidebarRoot collapsible="icon">
             <div class="flex h-full min-h-0 min-w-0 flex-col">
               <!-- Sidebar Header -->
-              <button
+              <Button
                 type="button"
-                class="flex w-full items-center gap-3 border-b px-4 py-4 text-left transition-colors hover:bg-sidebar-accent/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+                variant="ghost"
+                class="divider-edge-b divider-edge-full divider-edge-sidebar h-auto w-full justify-start gap-3 px-4 py-4 text-left transition-colors hover:bg-sidebar-accent/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
                 onclick={() => goto("/")}
               >
                 <div
@@ -349,7 +351,7 @@
                       : "Development Environment"}
                   </p>
                 </div>
-              </button>
+              </Button>
 
               <!-- Sidebar Content -->
               <div class="min-h-0 flex-1 overflow-y-auto">
@@ -382,7 +384,7 @@
               </div>
 
               <!-- Sidebar Footer -->
-              <div class="flex-shrink-0 border-t p-4">
+              <div class="divider-edge-t divider-edge-full divider-edge-sidebar flex-shrink-0 p-4">
                 <div class="flex items-center justify-between gap-2">
                   <ThemeToggle />
                   <div class="flex items-center gap-1">
@@ -459,6 +461,9 @@
 
   <!-- Toast Container -->
   <ToastContainer />
+
+  <!-- Global confirmation dialog -->
+  <ConfirmDialog />
 
   <!-- Floating Avatar Assistant -->
   <FloatingAvatar />

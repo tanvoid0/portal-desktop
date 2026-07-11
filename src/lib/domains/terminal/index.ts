@@ -7,6 +7,7 @@ export type * from "./types";
 
 // Config
 export { defaultTerminalConfig } from "./config/defaultTerminalConfig";
+export { projectTerminalHref } from "./navigation";
 
 // Services
 export { TerminalService } from "./services/terminalService";
@@ -24,6 +25,7 @@ export {
   activeProcess,
   tabCount,
   runningProcesses,
+  type TerminalTab,
 } from "./stores/terminalStore";
 export {
   commandHistoryStore,
@@ -69,3 +71,15 @@ export {
   parseAiResponse,
   type AiResponseSegment,
 } from "./services/terminalAiContext";
+export {
+  shellSupportsIntegration,
+  resolveSessionSettings,
+  canonicalShellExecutable,
+} from "./utils/resolveSessionSettings";
+export {
+  resolveShellIcon,
+  resolveTabIcon,
+  TERMINAL_ICONS,
+} from "./utils/shellIcons";
+export { default as ShellIcon } from "./components/ShellIcon.svelte";
+export { default as ShellProfileSelect } from "./components/ShellProfileSelect.svelte";

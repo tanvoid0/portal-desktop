@@ -26,8 +26,7 @@
     useRunningScripts,
     type RunningScript,
   } from "../../hooks/useRunningScripts";
-  import { TerminalService } from "$lib/domains/terminal/services/terminalService";
-  import type { TerminalOutput } from "$lib/domains/terminal/types";
+  import { TerminalService, type TerminalOutput } from "$lib/domains/terminal";
 
   interface Props {
     scriptId: number;

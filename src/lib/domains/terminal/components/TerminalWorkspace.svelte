@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { projectTerminalHref } from "../navigation";
   import { terminalStore, terminalActions } from "../stores/terminalStore";
   import { commandBlockStore } from "../stores/commandBlockStore";
   import { defaultTerminalConfig } from "../config/defaultTerminalConfig";
@@ -35,6 +37,8 @@
   } from "@lucide/svelte";
   import type { TerminalTab } from "../stores/terminalStore";
   import type { TerminalConfig } from "../types";
+  import { resolveSessionSettings } from "../utils/resolveSessionSettings";
+  import { TERMINAL_ICONS } from "../utils/shellIcons";
 
   interface Props {
     settings?: TerminalConfig;
@@ -42,6 +46,8 @@
     showLauncher?: boolean;
     showHistory?: boolean;
     autoCreateTab?: boolean;
+    /** Override tab creation (e.g. project-scoped tabs in ProjectTerminal). */
+    onNewTab?: (shellCommand?: string) => string;
   }
 
   let {
@@ -50,6 +56,7 @@
     showLauncher = true,
     showHistory = true,
     autoCreateTab = true,
+    onNewTab: onNewTabOverride,
   }: Props = $props();
 
   let widgetRail = $state<WidgetRailState>(loadWidgetRailState());
@@ -72,24 +79,17 @@
     ];
 
   function createNewTerminalTab(shellCommand?: string) {
+    if (onNewTabOverride) {
+      return onNewTabOverride(shellCommand);
+    }
+
     const tabNumber = tabs.length + 1;
     const actualShell = shellCommand || settings.defaultShell;
-    const tabId = terminalActions.createTab({
+    return terminalActions.createTabWithProcess({
       title: `Terminal ${tabNumber}`,
-      type: "terminal",
       workingDirectory: settings.workingDirectory,
       shell: actualShell,
-      icon: "💻",
-      closable: true,
     });
-    terminalActions.createProcess({
-      tabId,
-      command: actualShell,
-      workingDirectory: settings.workingDirectory,
-      environment: {},
-      status: "running",
-    });
-    return tabId;
   }
 
   function handleWidgetToggle(widget: WidgetId) {
@@ -111,34 +111,22 @@
     const projectId = params.get("project");
 
     if (projectId) {
-      const existing = tabs.find(
-        (t) => t.resourceName === "project" && t.resourceId === projectId,
-      );
-      if (existing) {
-        terminalActions.setActiveTab(existing.id);
-      }
+      goto(projectTerminalHref(projectId));
+      return;
     }
 
     if (containerId) {
       const shell = navigator.userAgent.includes("Windows")
         ? "cmd.exe"
         : "bash";
-      const tabId = terminalActions.createTab({
+      const command = `docker exec -it ${containerId} ${shell}`;
+      const tabId = terminalActions.createTabWithProcess({
         title: `Container ${containerId.slice(0, 8)}`,
-        type: "terminal",
         workingDirectory: settings.workingDirectory,
-        shell: `docker exec -it ${containerId} ${shell}`,
-        icon: "🐳",
-        closable: true,
+        shell: command,
+        icon: TERMINAL_ICONS.container,
         resourceName: "container",
         resourceId: containerId,
-      });
-      terminalActions.createProcess({
-        tabId,
-        command: `docker exec -it ${containerId} ${shell}`,
-        workingDirectory: settings.workingDirectory,
-        environment: {},
-        status: "running",
       });
       terminalActions.setActiveTab(tabId);
     }
@@ -192,12 +180,13 @@
     </div>
   {:else}
     {#each tabs as tab (tab.id)}
+      {@const sessionSettings = resolveSessionSettings(tab, settings)}
       <div
         class="h-full w-full"
         style:display={tab.id === activeTabId ? "block" : "none"}
       >
         <div class="flex h-full flex-col">
-          <div class="flex items-center justify-end gap-1 border-b border-border bg-card px-2 py-1">
+          <div class="divider-edge-b divider-edge-full flex items-center justify-end gap-1 bg-card px-2 py-1">
             {#each widgetToggles as toggle (toggle.id)}
               <Button
                 variant={widgetRail.activeWidgets.includes(toggle.id)
@@ -232,17 +221,14 @@
               <ResizablePaneGroup direction="horizontal" class="h-full">
                 <ResizablePane defaultSize={70} minSize={40} class="min-h-0">
                   <div class="h-full min-h-0">
+                    {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}
                     <TerminalSession
                     bind:this={sessionRefs[tab.id]}
                     tabId={tab.id}
                     initialCommand={tab.id === activeTabId ? pendingCommand ?? undefined : undefined}
-                    settings={{
-                      ...settings,
-                      defaultShell: tab.shell || settings.defaultShell,
-                      workingDirectory:
-                        tab.workingDirectory || settings.workingDirectory,
-                    }}
+                    settings={sessionSettings}
                   />
+                    {/key}
                   </div>
                 </ResizablePane>
                 <ResizableHandle withHandle />
@@ -262,10 +248,8 @@
                       <div class="min-h-0 flex-1">
                         <AIAssistantPanel
                           tabId={tab.id}
-                          shell={tab.shell || settings.defaultShell}
-                          workingDirectory={
-                            tab.workingDirectory || settings.workingDirectory
-                          }
+                          shell={sessionSettings.defaultShell}
+                          workingDirectory={sessionSettings.workingDirectory}
                           onRunCommand={(cmd) => handleRerun(tab.id, cmd)}
                         />
                       </div>
@@ -278,7 +262,7 @@
                     {#if showLauncher && widgetRail.activeWidgets.includes("launcher")}
                       <div class="min-h-0 flex-1">
                         <SessionLauncher
-                          onSessionOpened={(id) =>
+                          onContainerOpened={(id) =>
                             terminalActions.setActiveTab(id)}
                         />
                       </div>
@@ -292,16 +276,13 @@
                 </ResizablePane>
               </ResizablePaneGroup>
             {:else}
+              {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}
               <TerminalSession
                 bind:this={sessionRefs[tab.id]}
                 tabId={tab.id}
-                settings={{
-                  ...settings,
-                  defaultShell: tab.shell || settings.defaultShell,
-                  workingDirectory:
-                    tab.workingDirectory || settings.workingDirectory,
-                }}
+                settings={sessionSettings}
               />
+              {/key}
             {/if}
           </div>
         </div>

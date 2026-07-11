@@ -5,6 +5,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import type { DevCleanerCleanProgress, DevCleanerCleanResult, Location, ProjectScan, ScanProgress } from "../types";
   import { fmtBytes, fmtDuration, KIND_BADGE } from "../utils";
+  import { confirmAction } from "$lib/utils/confirm";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Card, CardContent } from "$lib/components/ui/card";
@@ -104,8 +105,10 @@
       path: t.path,
       kind: t.tempKind,
     }));
-    const ok = window.confirm(
+    const ok = await confirmAction(
       `Move ${items.length} project temp dir(s) (${fmtBytes(selectedBytes)}) to the Recycle Bin?\n\nThese are regenerable (rebuilt by your toolchain). Nothing is permanently deleted — restore from the Recycle Bin.`,
+      "Move to Recycle Bin",
+      { confirmLabel: "Move" },
     );
     if (!ok) return;
     busy = true;
@@ -244,13 +247,13 @@
     {#each scanResult.projects as p (p.root)}
       {@const sel = projSel(p.temps)}
       <Card class="gap-0 overflow-hidden py-0">
-        <div class="flex items-center gap-2.5 border-b bg-muted/40 px-3 py-2.5">
+        <div class="divider-edge-b divider-edge-full flex items-center gap-2.5 bg-muted/40 px-3 py-2.5">
           <Checkbox
             checked={sel.all}
             indeterminate={sel.some}
             onCheckedChange={() => toggleSel(sel.ids, !sel.all)}
           />
-          <button onclick={() => toggleCollapse(p.root)} class="w-4 shrink-0 text-muted-foreground hover:text-foreground">{collapsed.has(p.root) ? "▸" : "▾"}</button>
+          <Button type="button" variant="ghost" size="icon-sm" class="h-4 w-4 shrink-0 p-0 text-muted-foreground" onclick={() => toggleCollapse(p.root)}>{collapsed.has(p.root) ? "▸" : "▾"}</Button>
           <span class="break-all font-mono text-xs text-foreground" title={p.root}>{rel(p.root, scanResult.root)}</span>
           <span class="inline-flex gap-1">
             {#each p.kind.split("+") as k (k)}

@@ -23,9 +23,10 @@ pub async fn coder_create_thread(
     model: Option<String>,
     llm_provider: Option<String>,
     thread_kind: Option<CoderThreadKind>,
+    project_id: Option<i32>,
 ) -> Result<CoderThread, String> {
     Ok(service
-        .create_thread(workspace_root, model, llm_provider, thread_kind)
+        .create_thread(workspace_root, model, llm_provider, thread_kind, project_id)
         .await)
 }
 

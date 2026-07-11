@@ -104,9 +104,10 @@
   {:else}
     {#each changes as c (c.path)}
       <div class="rounded-md border border-border">
-        <button
+        <Button
           type="button"
-          class="flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left text-xs hover:bg-muted/40"
+          variant="ghost"
+          class="divider-edge-b divider-edge-full h-auto w-full justify-start gap-2 rounded-none px-3 py-2 text-xs hover:bg-muted/40"
           onclick={() => toggle(c.path)}
         >
           <FileEdit class="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -124,7 +125,7 @@
               -{c.deletions}
             </span>
           {/if}
-        </button>
+        </Button>
         {#if expanded.has(c.path) && c.diff}
           <pre
             class="max-h-80 overflow-auto p-2 font-mono text-[11px] leading-relaxed"><code>{c.diff}</code></pre>

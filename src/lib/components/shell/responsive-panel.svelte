@@ -28,7 +28,7 @@
 
   const resolvedBorder = $derived(
     borderClass ??
-      (side === "left" ? "border-r border-border" : "border-l border-border"),
+      (side === "left" ? "divider-edge-r" : "divider-edge-l"),
   );
 </script>
 
@@ -42,11 +42,11 @@
       )}
     >
       {#if header}
-        <div class="shrink-0 border-b bg-background">
+        <div class="divider-edge-b divider-edge-full shrink-0 bg-background">
           {@render header()}
         </div>
       {:else if title}
-        <Sheet.Header class="shrink-0 border-b px-4 py-3 text-left">
+        <Sheet.Header class="divider-edge-b divider-edge-full shrink-0 px-4 py-3 text-left">
           <Sheet.Title class="text-sm font-semibold">{title}</Sheet.Title>
         </Sheet.Header>
       {/if}
@@ -64,11 +64,11 @@
     )}
   >
     {#if header}
-      <div class="shrink-0 border-b bg-background">
+      <div class="divider-edge-b divider-edge-full shrink-0 bg-background">
         {@render header()}
       </div>
     {:else if title}
-      <div class="shrink-0 border-b px-4 py-3">
+      <div class="divider-edge-b divider-edge-full shrink-0 px-4 py-3">
         <h2 class="text-sm font-semibold">{title}</h2>
       </div>
     {/if}

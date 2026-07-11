@@ -72,8 +72,8 @@
         "transition-[width] duration-200 ease-linear",
         "group-data-[collapsible=icon]:w-[var(--sidebar-width-icon)]",
         side === "left"
-          ? "border-r border-sidebar-border"
-          : "border-l border-sidebar-border",
+          ? "divider-edge-r divider-edge-sidebar"
+          : "divider-edge-l divider-edge-sidebar",
         // Adjust the padding for floating and inset variants (keep it minimal in flow).
         variant === "floating" || variant === "inset" ? "p-2" : "",
         className,

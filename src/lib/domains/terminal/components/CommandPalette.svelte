@@ -167,7 +167,7 @@
     class="mx-4 flex max-h-[60vh] max-w-2xl flex-col bg-background p-0 text-foreground"
     onkeydown={handleKeydown}
   >
-    <div class="flex items-center border-b border-border p-4">
+    <div class="divider-edge-b divider-edge-full flex items-center p-4">
         <Search class="mr-3 h-5 w-5 text-muted-foreground" />
         <Input
           bind:ref={searchInput}
@@ -252,7 +252,7 @@
         {/if}
       </div>
 
-      <div class="border-t border-border p-3 text-xs text-muted-foreground">
+      <div class="divider-edge-t divider-edge-full p-3 text-xs text-muted-foreground">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-4">
             <span>↑↓ Navigate</span>

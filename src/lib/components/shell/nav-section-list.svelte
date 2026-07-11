@@ -1,7 +1,9 @@
 <script lang="ts">
   import { Badge } from "$lib/components/ui/badge";
   import {
+    MenuAction as SidebarMenuAction,
     MenuButton as SidebarMenuButton,
+    MenuItem as SidebarMenuItem,
     MenuSub,
     MenuSubButton,
     MenuSubItem,
@@ -23,6 +25,8 @@
 
   let { sections = [], currentPath, onNavigate }: Props = $props();
 
+  let submenuExpanded = $state<Record<string, boolean>>({});
+
   function isNavItemActive(url: string, path: string): boolean {
     if (path === url) return true;
     if (url === "/") return false;
@@ -34,8 +38,19 @@
     return item.submenu?.some((sub) => isNavItemActive(sub.url, path)) ?? false;
   }
 
-  function submenuOpen(item: NavItem): boolean {
-    return isSubmenuActive(item, currentPath);
+  function isSubmenuExpanded(item: NavItem): boolean {
+    if (isSubmenuActive(item, currentPath)) return true;
+    return submenuExpanded[item.url] ?? false;
+  }
+
+  function handleSubmenuOpenChange(item: NavItem, open: boolean) {
+    if (isSubmenuActive(item, currentPath) && !open) return;
+    submenuExpanded = { ...submenuExpanded, [item.url]: open };
+  }
+
+  function navigateToParent(item: NavItem) {
+    onNavigate(item.url);
+    submenuExpanded = { ...submenuExpanded, [item.url]: true };
   }
 </script>
 
@@ -49,44 +64,57 @@
     <div class="space-y-1">
       {#each section.items as item}
         {#if item.submenu && item.submenu.length > 0}
-          <Collapsible open={submenuOpen(item)} class="group/collapsible">
-            <CollapsibleTrigger class="w-full">
+          <Collapsible
+            open={isSubmenuExpanded(item)}
+            onOpenChange={(open) => handleSubmenuOpenChange(item, open)}
+            class="group/collapsible"
+          >
+            <SidebarMenuItem>
               <SidebarMenuButton
                 size="lg"
                 isActive={isSubmenuActive(item, currentPath)}
                 tooltipContent={item.title}
-                class="w-full"
+                onclick={() => navigateToParent(item)}
               >
                 <NavIcon icon={item.icon} />
                 <span class="group-data-[collapsible=icon]:hidden">{item.title}</span>
                 {#if item.badge}
                   <Badge
                     variant="secondary"
-                    class="ml-auto text-xs group-data-[collapsible=icon]:hidden"
+                    class="ml-auto mr-6 text-xs group-data-[collapsible=icon]:hidden"
                   >
                     {item.badge}
                   </Badge>
                 {/if}
-                <ChevronDown
-                  class="ml-auto h-4 w-4 shrink-0 transition-transform group-data-[collapsible=icon]:hidden group-data-[state=open]/collapsible:rotate-180"
-                />
               </SidebarMenuButton>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <MenuSub>
-                {#each item.submenu as subItem}
-                  <MenuSubItem>
-                    <MenuSubButton
-                      isActive={isNavItemActive(subItem.url, currentPath)}
-                      onclick={() => onNavigate(subItem.url)}
-                    >
-                      <NavIcon icon={subItem.icon} />
-                      <span>{subItem.title}</span>
-                    </MenuSubButton>
-                  </MenuSubItem>
-                {/each}
-              </MenuSub>
-            </CollapsibleContent>
+              <CollapsibleTrigger>
+                {#snippet child({ props })}
+                  <SidebarMenuAction
+                    {...props}
+                    aria-label="Toggle {item.title} submenu"
+                  >
+                    <ChevronDown
+                      class="transition-transform group-data-[state=open]/collapsible:rotate-180"
+                    />
+                  </SidebarMenuAction>
+                {/snippet}
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <MenuSub>
+                  {#each item.submenu as subItem}
+                    <MenuSubItem>
+                      <MenuSubButton
+                        isActive={isNavItemActive(subItem.url, currentPath)}
+                        onclick={() => onNavigate(subItem.url)}
+                      >
+                        <NavIcon icon={subItem.icon} />
+                        <span>{subItem.title}</span>
+                      </MenuSubButton>
+                    </MenuSubItem>
+                  {/each}
+                </MenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
           </Collapsible>
         {:else}
           <SidebarMenuButton

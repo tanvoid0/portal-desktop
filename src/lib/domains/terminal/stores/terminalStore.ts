@@ -6,6 +6,7 @@
 import { writable, derived } from "svelte/store";
 import type { TerminalConfig } from "../types/index";
 import { defaultTerminalConfig } from "../config/defaultTerminalConfig";
+import { resolveShellIcon } from "../utils/shellIcons";
 
 // Storage keys
 const STORAGE_KEY = "portal-terminal-state";
@@ -167,6 +168,39 @@ export const runningProcesses = derived(terminalStore, ($store) =>
 
 // Store actions
 export const terminalActions = {
+  /** Create a tab and its backing process in one step (shared by workspace, project, launcher). */
+  createTabWithProcess: (options: {
+    title: string;
+    workingDirectory: string;
+    shell: string;
+    icon?: string;
+    closable?: boolean;
+    resourceName?: string;
+    resourceId?: string;
+    type?: TerminalTab["type"];
+  }) => {
+    const tabId = terminalActions.createTab({
+      title: options.title,
+      type: options.type ?? "terminal",
+      workingDirectory: options.workingDirectory,
+      shell: options.shell,
+      icon: options.icon ?? resolveShellIcon(options.shell),
+      closable: options.closable ?? true,
+      resourceName: options.resourceName,
+      resourceId: options.resourceId,
+    });
+
+    terminalActions.createProcess({
+      tabId,
+      command: options.shell,
+      workingDirectory: options.workingDirectory,
+      environment: {},
+      status: "running",
+    });
+
+    return tabId;
+  },
+
   // Tab management
   createTab: (tab: Omit<TerminalTab, "id" | "createdAt" | "status">) => {
     console.log("TerminalStore: Creating new tab:", tab);

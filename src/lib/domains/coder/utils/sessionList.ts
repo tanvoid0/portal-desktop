@@ -1,4 +1,12 @@
+import type { Project } from "$lib/domains/projects/types";
 import type { CoderThread } from "../types.js";
+
+export interface ProjectWorkspace {
+  path: string;
+  label: string;
+  projectId?: string;
+  threads: CoderThread[];
+}
 
 export type SessionSortKey =
   | "updated_desc"
@@ -14,6 +22,8 @@ export type SessionStatusFilter = "all" | "running" | "queued" | "idle";
 export interface SessionListFilters {
   search: string;
   project: string;
+  /** Portal project id — preferred over path when set. */
+  projectId: string;
   status: SessionStatusFilter;
   provider: string;
   sort: SessionSortKey;
@@ -28,6 +38,7 @@ export interface ProjectOption {
 export const DEFAULT_SESSION_FILTERS: SessionListFilters = {
   search: "",
   project: "all",
+  projectId: "all",
   status: "all",
   provider: "all",
   sort: "updated_desc",
@@ -169,7 +180,16 @@ export function filterAndSortSessions(
   }
 
   if (filters.project !== "all") {
-    result = result.filter((t) => t.workspace_root === filters.project);
+    result = result.filter((t) => {
+      if (filters.projectId !== "all" && t.project_id != null) {
+        return String(t.project_id) === filters.projectId;
+      }
+      return t.workspace_root === filters.project;
+    });
+  } else if (filters.projectId !== "all") {
+    result = result.filter(
+      (t) => t.project_id != null && String(t.project_id) === filters.projectId,
+    );
   }
 
   if (filters.provider !== "all") {
@@ -197,8 +217,65 @@ export function hasActiveFilters(filters: SessionListFilters): boolean {
   return (
     filters.search.trim() !== "" ||
     filters.project !== "all" ||
+    filters.projectId !== "all" ||
     filters.status !== "all" ||
     filters.provider !== "all" ||
     filters.sort !== "updated_desc"
+  );
+}
+
+/** Group threads by workspace path, merging portal projects with orphan paths. */
+export function groupSessionsByProject(
+  threads: CoderThread[],
+  projects: Project[],
+): ProjectWorkspace[] {
+  const byPath = new Map<string, CoderThread[]>();
+
+  for (const t of threads) {
+    let path = t.workspace_root ?? "";
+    if (t.project_id != null) {
+      const fromId = projects.find((p) => p.id === String(t.project_id));
+      if (fromId) path = fromId.path;
+    }
+    if (!path) continue;
+    const list = byPath.get(path) ?? [];
+    list.push(t);
+    byPath.set(path, list);
+  }
+
+  const result: ProjectWorkspace[] = [];
+  const seen = new Set<string>();
+
+  for (const p of projects) {
+    seen.add(p.path);
+    result.push({
+      path: p.path,
+      label: p.name,
+      projectId: p.id,
+      threads: byPath.get(p.path) ?? [],
+    });
+  }
+
+  for (const [path, pathThreads] of byPath) {
+    if (seen.has(path)) continue;
+    result.push({
+      path,
+      label: workspaceFolderName(path),
+      threads: pathThreads,
+    });
+  }
+
+  return result.sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+  );
+}
+
+export function sortThreadsForWorkspace(
+  threads: CoderThread[],
+  sort: SessionSortKey,
+  runningThreadIds: Set<string>,
+): CoderThread[] {
+  return [...threads].sort((a, b) =>
+    compareSessions(a, b, sort, runningThreadIds),
   );
 }

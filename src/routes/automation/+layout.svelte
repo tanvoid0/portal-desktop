@@ -27,7 +27,7 @@
   );
 </script>
 
-<div class="border-b bg-background px-[var(--content-gutter)] pt-4">
+<div class="divider-edge-b divider-edge-full bg-background px-[var(--content-gutter)] pt-4">
   <Tabs value={activeTab}>
     <TabsList class="h-auto w-full justify-start overflow-x-auto">
       {#each tabs as tab}

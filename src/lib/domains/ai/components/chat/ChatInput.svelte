@@ -98,7 +98,7 @@
     {/if}
   </div>
 {:else}
-  <div class={cn("border-t p-4", className)}>
+  <div class={cn("divider-edge-t divider-edge-full p-4", className)}>
     <div class="flex gap-2">
       <Textarea
         bind:value

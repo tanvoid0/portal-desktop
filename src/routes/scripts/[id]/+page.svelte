@@ -18,6 +18,8 @@
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
   import { Label } from "$lib/components/ui/label";
+  import { Checkbox } from "$lib/components/ui/checkbox";
+  import { Switch } from "$lib/components/ui/switch";
   import Select from "$lib/components/ui/select.svelte";
   import {
     ArrowLeft,
@@ -662,15 +664,9 @@
                       class="mt-1"
                     />
                   </div>
-                  <div class="flex items-end pb-2">
-                    <label class="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        bind:checked={newParameter.required}
-                        class="rounded"
-                      />
-                      <span class="text-sm">Required</span>
-                    </label>
+                  <div class="flex items-end gap-2 pb-2">
+                    <Checkbox bind:checked={newParameter.required} id="edit-param-required" />
+                    <Label for="edit-param-required" class="text-sm">Required</Label>
                   </div>
                 </div>
                 <div class="flex gap-2">
@@ -740,8 +736,9 @@
                 <div class="space-y-2">
                   {#each executionHistory as execution}
                     {@const StatusIcon = getStatusIcon(execution.status)}
-                    <button
-                      class="w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+                    <Button
+                      variant="outline"
+                      class="h-auto w-full justify-start rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
                       class:bg-muted={currentExecution?.id === execution.id}
                       onclick={() => viewExecution(execution)}
                     >
@@ -766,7 +763,7 @@
                           )}
                         </p>
                       {/if}
-                    </button>
+                    </Button>
                   {/each}
                 </div>
               {:else}
@@ -827,16 +824,7 @@
                   confirmations, etc.)
                 </p>
               </div>
-              <label class="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  bind:checked={interactiveMode}
-                  class="peer sr-only"
-                />
-                <div
-                  class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-primary/40"
-                ></div>
-              </label>
+              <Switch bind:checked={interactiveMode} />
             </div>
 
             <!-- Parameters -->
@@ -863,23 +851,19 @@
                             `Select ${param.name}`}
                         />
                       {:else if param.type === "boolean"}
-                        <label class="flex items-center gap-2">
-                          <input
-                            type="checkbox"
+                        <div class="flex items-center gap-2">
+                          <Checkbox
                             checked={parameterValues[param.name] === "true"}
-                            onchange={(e) => {
-                              parameterValues[param.name] = (
-                                e.target as HTMLInputElement
-                              ).checked
-                                ? "true"
-                                : "false";
+                            onCheckedChange={(checked) => {
+                              parameterValues[param.name] =
+                                checked === true ? "true" : "false";
                             }}
-                            class="rounded"
+                            id={`param-${param.name}`}
                           />
-                          <span class="text-sm text-muted-foreground"
-                            >{param.description}</span
-                          >
-                        </label>
+                          <Label for={`param-${param.name}`} class="text-sm text-muted-foreground">
+                            {param.description}
+                          </Label>
+                        </div>
                       {:else}
                         <Input
                           bind:value={parameterValues[param.name]}

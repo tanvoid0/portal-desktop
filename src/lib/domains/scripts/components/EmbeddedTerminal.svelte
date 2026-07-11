@@ -1,7 +1,9 @@
 <script lang="ts">
-  import Terminal from "$lib/domains/terminal/components/core/Terminal.svelte";
-  import { defaultTerminalConfig } from "$lib/domains/terminal/config/defaultTerminalConfig";
-  import type { TerminalConfig } from "$lib/domains/terminal/types";
+  import {
+    Terminal,
+    defaultTerminalConfig,
+    type TerminalConfig,
+  } from "$lib/domains/terminal";
   import { Copy, Square, Maximize2, Minimize2 } from "@lucide/svelte";
   import { Button } from "$lib/components/ui/button";
   import { toast } from "$lib/utils/toast";

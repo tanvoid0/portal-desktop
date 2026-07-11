@@ -1,7 +1,7 @@
 {
   "name": "portal-desktop",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "packageManager": "pnpm@9.15.9",
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-check --tsconfig ./tsconfig.json --watch",
     "format": "prettier --write .",
-    "lint": "prettier --check . && eslint src",
+    "lint": "prettier --check . && eslint src && node scripts/check-shadcn-ui.mjs",
     "test:unit": "vitest",
     "test": "pnpm test:unit -- --run && pnpm test:e2e",
     "test:coverage": "vitest --coverage",
@@ -30,7 +30,8 @@
     "ai:test": "node test-ollama-integration.js",
     "run:install": "node scripts/install.js",
     "postrun:install": "echo 'Installation complete - no build tools required'",
-    "postupdate": "cargo update --manifest-path src-tauri/Cargo.toml"
+    "postupdate": "cargo update --manifest-path src-tauri/Cargo.toml",
+    "release:prepare": "node scripts/prepare-release.mjs"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.0",

@@ -68,12 +68,13 @@
 {#if open}
   <div class="flex h-full min-h-0 flex-col">
     <div
-      class="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border px-2 py-1"
+      class="divider-edge-b divider-edge-full flex shrink-0 items-center gap-1 overflow-x-auto px-2 py-1"
     >
       {#each tabs as tab (tab.id)}
-        <button
+        <Button
           type="button"
-          class="group flex max-w-[140px] items-center gap-1 rounded px-2 py-1 text-xs transition-colors {activeId ===
+          variant="ghost"
+          class="h-auto max-w-[140px] gap-1 rounded px-2 py-1 text-xs {activeId ===
           tab.id
             ? 'bg-muted text-foreground'
             : 'text-muted-foreground hover:bg-muted/60'}"
@@ -89,19 +90,18 @@
           {/if}
           <span class="truncate">{tab.label}</span>
           {#if tabs.length > 1}
-            <span
-              role="button"
-              tabindex="0"
-              class="ml-0.5 hidden rounded p-0.5 hover:bg-background group-hover:inline-flex"
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              class="ml-0.5 hidden h-5 w-5 group-hover:inline-flex"
               onclick={(e) => closeTab(tab.id, e)}
-              onkeydown={(e) => {
-                if (e.key === "Enter") closeTab(tab.id, e as unknown as MouseEvent);
-              }}
+              title="Close tab"
             >
               <X class="h-3 w-3" />
-            </span>
+            </Button>
           {/if}
-        </button>
+        </Button>
       {/each}
       <Button
         size="icon"

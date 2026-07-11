@@ -186,7 +186,7 @@
 
 <div class="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
   <Card class="gap-0 overflow-hidden py-0">
-    <CardHeader class="border-b bg-muted/40 px-4 py-3 [.border-b]:pb-3">
+    <CardHeader class="divider-edge-b divider-edge-full bg-muted/40 px-4 py-3 [.border-b]:pb-3">
       <CardTitle class="text-sm font-medium">Reclaimed by type</CardTitle>
     </CardHeader>
     <CardContent class="p-4">
@@ -232,7 +232,7 @@
   </Card>
 
   <Card class="gap-0 overflow-hidden py-0">
-    <CardHeader class="border-b bg-muted/40 px-4 py-3 [.border-b]:pb-3">
+    <CardHeader class="divider-edge-b divider-edge-full bg-muted/40 px-4 py-3 [.border-b]:pb-3">
       <CardTitle class="text-sm font-medium">Recent activity</CardTitle>
     </CardHeader>
     <CardContent class="p-0">

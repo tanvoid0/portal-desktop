@@ -3,8 +3,7 @@
  * Supports the same script running multiple times or different scripts running simultaneously
  */
 
-import { TerminalService } from "$lib/domains/terminal/services/terminalService";
-import type { TerminalProcess } from "$lib/domains/terminal/types";
+import { TerminalService, type TerminalProcess } from "$lib/domains/terminal";
 import type { CustomScript } from "../services/customScriptService";
 
 export interface RunningScript {

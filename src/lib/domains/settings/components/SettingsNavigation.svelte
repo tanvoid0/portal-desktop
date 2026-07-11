@@ -56,6 +56,35 @@
 
   let { currentSection, className = "" }: Props = $props();
 
+  // Check if we're in the AI settings section or any of its sub-sections
+  const isAiSection = $derived(() => {
+    const path = $page.url.pathname;
+    return path.startsWith("/settings/ai");
+  });
+
+  // State for collapsible open/close per section
+  let submenuExpanded = $state<Record<string, boolean>>({});
+
+  function isSubmenuExpanded(sectionId: string): boolean {
+    if (sectionId === "frameworks-languages" && isFrameworksLanguagesSection()) {
+      return true;
+    }
+    if (sectionId === "ai" && isAiSection()) {
+      return true;
+    }
+    return submenuExpanded[sectionId] ?? false;
+  }
+
+  function handleSubmenuOpenChange(sectionId: string, open: boolean) {
+    if (sectionId === "frameworks-languages" && isFrameworksLanguagesSection() && !open) {
+      return;
+    }
+    if (sectionId === "ai" && isAiSection() && !open) {
+      return;
+    }
+    submenuExpanded = { ...submenuExpanded, [sectionId]: open };
+  }
+
   // Check if we're in the frameworks-languages section or any of its sub-sections
   const isFrameworksLanguagesSection = $derived(() => {
     const path = $page.url.pathname;
@@ -65,13 +94,6 @@
       path.startsWith("/settings/package-managers") ||
       path.startsWith("/settings/languages")
     );
-  });
-
-  // State for collapsible open/close
-  let collapsibleOpen = $state(false);
-
-  $effect(() => {
-    collapsibleOpen = isFrameworksLanguagesSection();
   });
 
   const sidebar = useSidebar();
@@ -159,10 +181,22 @@
     },
     {
       id: "ai" as const,
-      label: "AI Providers",
-      description: "Agent platform & model connections",
+      label: "AI",
+      description: "Providers, models, and training data",
       icon: Sparkles,
       path: "/settings/ai",
+      subSections: [
+        {
+          id: "providers" as const,
+          label: "Providers",
+          path: "/settings/ai",
+        },
+        {
+          id: "training" as const,
+          label: "Training Data",
+          path: "/settings/ai/training",
+        },
+      ],
     },
     {
       id: "autonomy" as const,
@@ -184,6 +218,7 @@
     const section = path.replace("/settings/", "").replace(/\/$/, "");
     // Redirect framework-ides to ides
     if (section === "framework-ides") return "ides";
+    if (section.startsWith("ai")) return "ai";
     // Map old paths to new structure
     if (
       section === "frameworks" ||
@@ -219,6 +254,11 @@
 
   // Get active sub-section for frameworks-languages
   const activeSubSection = $derived(() => {
+    if (isAiSection()) {
+      const path = $page.url.pathname;
+      if (path.startsWith("/settings/ai/training")) return "training";
+      return "providers";
+    }
     if (!isFrameworksLanguagesSection()) return null;
     const path = $page.url.pathname;
     if (path.includes("/languages")) return "languages";
@@ -251,6 +291,14 @@
       }
     }
 
+    if (sectionId === "ai") {
+      const sub = activeSubSection();
+      if (sub === "training") {
+        goto("/settings/ai/training");
+        return;
+      }
+    }
+
     goto(path);
   }
 </script>
@@ -272,7 +320,11 @@
     {#each sections as section}
       {@const isActive = activeSection() === section.id}
       {#if section.subSections}
-        <Collapsible bind:open={collapsibleOpen} class="w-full">
+        <Collapsible
+          open={isSubmenuExpanded(section.id)}
+          onOpenChange={(open) => handleSubmenuOpenChange(section.id, open)}
+          class="w-full"
+        >
           <CollapsibleTrigger
             type="button"
             onclick={() => handleSectionClick(section.id, section.path)}
@@ -293,13 +345,13 @@
               </p>
             </div>
             <ChevronDown
-              class="ml-2 mt-0.5 h-4 w-4 transition-transform {collapsibleOpen
+              class="ml-2 mt-0.5 h-4 w-4 transition-transform {isSubmenuExpanded(section.id)
                 ? 'rotate-180'
                 : ''}"
             />
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div class="ml-4 mt-1 space-y-1 border-l-2 border-border pl-4">
+            <div class="divider-edge-l ml-4 mt-1 space-y-1 pl-4">
               {#each section.subSections as subSection}
                 {@const isSubActive = activeSubSection() === subSection.id}
                 <Button

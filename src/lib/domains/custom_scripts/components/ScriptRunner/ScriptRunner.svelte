@@ -24,11 +24,11 @@
     type CustomScript,
     type ScriptParameter,
   } from "$lib/domains/custom_scripts/services/customScriptService";
-  import { TerminalService } from "$lib/domains/terminal/services/terminalService";
-  import type {
-    TerminalProcess,
-    TerminalOutput,
-  } from "$lib/domains/terminal/types";
+  import {
+    TerminalService,
+    type TerminalProcess,
+    type TerminalOutput,
+  } from "$lib/domains/terminal";
   import { useRunningScripts } from "$lib/domains/custom_scripts/hooks/useRunningScripts";
   import FilePicker from "$lib/components/ui/file-picker.svelte";
 

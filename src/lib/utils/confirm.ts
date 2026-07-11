@@ -1,17 +1,17 @@
-import { isTauriEnvironment } from "./tauri";
+import {
+  confirmActions,
+  type ConfirmOptions,
+} from "$lib/domains/shared/stores/confirmStore";
 
 /**
- * Cross-environment confirmation dialog.
- * Tauri 2 replaces window.confirm with an async dialog API.
+ * Cross-environment confirmation dialog using shadcn AlertDialog.
  */
 export async function confirmAction(
   message: string,
   title = "Confirm",
+  options?: ConfirmOptions,
 ): Promise<boolean> {
-  if (isTauriEnvironment()) {
-    const { confirm } = await import("@tauri-apps/plugin-dialog");
-    return confirm(message, { title, kind: "warning" });
-  }
-
-  return window.confirm(message);
+  return confirmActions.request(message, title, options);
 }
+
+export type { ConfirmOptions };

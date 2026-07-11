@@ -12,6 +12,7 @@
     ScanProgress,
   } from "../types";
   import { fmtBytes, fmtDuration, KIND_BADGE, RISK_BADGE } from "../utils";
+  import { confirmAction } from "$lib/utils/confirm";
   import { Button } from "$lib/components/ui/button";
   import { Card, CardContent } from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
@@ -154,8 +155,10 @@
     const items = allItems
       .filter((i) => selected.has(i.id))
       .map((i) => ({ cleanerId: i.cleanerId, id: i.id, path: i.path, kind: i.kind }));
-    const ok = window.confirm(
+    const ok = await confirmAction(
       `Remove ${items.length} selected item(s) (${fmtBytes(selectedBytes)})?\n\nProject dirs go to the Recycle Bin. Container resources are removed via Docker/Podman. Review "Review" items carefully.`,
+      "Remove Items",
+      { confirmLabel: "Remove" },
     );
     if (!ok) return;
     busy = true;
@@ -298,7 +301,7 @@
   <div class="space-y-3">
     {#each scanResult.groups as g (g.cleanerId)}
       <Card class="gap-0 overflow-hidden py-0">
-        <div class="flex items-center gap-2.5 border-b bg-muted/40 px-3 py-2.5">
+        <div class="divider-edge-b divider-edge-full flex items-center gap-2.5 bg-muted/40 px-3 py-2.5">
           {#if g.available && g.items.length > 0}
             {@const sel = groupSel(g.items)}
             <Checkbox
@@ -309,12 +312,15 @@
           {:else}
             <span class="w-4"></span>
           {/if}
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            class="h-4 w-4 shrink-0 p-0 text-muted-foreground"
             onclick={() => toggleCollapse(g.cleanerId)}
-            class="w-4 shrink-0 text-muted-foreground hover:text-foreground"
           >
             {collapsed.has(g.cleanerId) ? "▸" : "▾"}
-          </button>
+          </Button>
           <Badge variant="outline" class={KIND_BADGE[g.cleanerId] ?? ""}>{g.label}</Badge>
           {#if !g.available}
             <span class="text-xs text-muted-foreground">{g.unavailableReason ?? "not available"}</span>
@@ -338,16 +344,19 @@
                     indeterminate={sel.some}
                     onCheckedChange={() => toggleSel(sel.ids, !sel.all)}
                   />
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="h-4 w-4 shrink-0 p-0 text-muted-foreground"
                     onclick={() => {
                       const next = new Set(subCollapsed);
                       next.has(sub.label) ? next.delete(sub.label) : next.add(sub.label);
                       subCollapsed = next;
                     }}
-                    class="w-4 shrink-0 text-muted-foreground hover:text-foreground"
                   >
                     {subCollapsed.has(sub.label) ? "▸" : "▾"}
-                  </button>
+                  </Button>
                   <span class="break-all font-mono text-xs text-foreground" title={sub.label}>{sub.label}</span>
                   <span class="ml-auto text-sm font-semibold tabular-nums">{fmtBytes(sub.bytes)}</span>
                 </div>

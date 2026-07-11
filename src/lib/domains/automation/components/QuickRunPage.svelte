@@ -449,9 +449,10 @@
           {:else}
             <div class="max-h-64 space-y-1 overflow-y-auto">
               {#each filteredBlocks() as block (block.id)}
-                <button
+                <Button
                   type="button"
-                  class="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left transition-colors hover:bg-accent disabled:opacity-50"
+                  variant="outline"
+                  class="h-auto w-full justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-accent disabled:opacity-50"
                   disabled={queuedBlockIds.has(block.id)}
                   onclick={() => addBlock(block)}
                 >
@@ -469,7 +470,7 @@
                       <Plus class="h-4 w-4 text-muted-foreground" />
                     {/if}
                   </div>
-                </button>
+                </Button>
               {/each}
             </div>
           {/if}

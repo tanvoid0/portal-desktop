@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { ChevronRight, ExternalLink, File, Folder } from "@lucide/svelte";
+  import { Button } from "$lib/components/ui/button";
 
   interface Props {
     workspaceRoot: string;
@@ -61,15 +62,16 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
-  <div class="flex items-center gap-1 border-b border-border px-3 py-2 text-xs">
+  <div class="divider-edge-b divider-edge-full flex items-center gap-1 px-3 py-2 text-xs">
     {#if currentPath !== "."}
-      <button
+      <Button
         type="button"
-        class="text-muted-foreground hover:text-foreground"
+        variant="link"
+        class="h-auto p-0 text-muted-foreground"
         onclick={() => loadDir(parentPath())}
       >
         ..
-      </button>
+      </Button>
       <span class="text-muted-foreground">/</span>
     {/if}
     <span class="truncate font-mono text-muted-foreground">
@@ -90,18 +92,21 @@
           <li>
             {#if entry.is_dir}
               <div class="group flex items-center gap-1">
-                <button
+                <Button
                   type="button"
-                  class="flex min-w-0 flex-1 items-center gap-1.5 rounded px-2 py-1 text-left text-xs hover:bg-muted/60"
+                  variant="ghost"
+                  class="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded px-2 py-1 text-xs hover:bg-muted/60"
                   onclick={() => loadDir(entry.path)}
                 >
                   <ChevronRight class="h-3 w-3 shrink-0 opacity-40" />
                   <Folder class="h-3.5 w-3.5 shrink-0 text-amber-600/80" />
                   <span class="truncate">{entry.name}</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  class="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                  variant="ghost"
+                  size="icon-sm"
+                  class="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
                   title="Open in file explorer"
                   aria-label="Open in file explorer"
                   onclick={(e) => {
@@ -110,7 +115,7 @@
                   }}
                 >
                   <ExternalLink class="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             {:else}
               <div class="group flex items-center gap-1">
@@ -120,9 +125,11 @@
                   <File class="h-3.5 w-3.5 shrink-0" />
                   <span class="truncate">{entry.name}</span>
                 </div>
-                <button
+                <Button
                   type="button"
-                  class="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                  variant="ghost"
+                  size="icon-sm"
+                  class="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
                   title="Open in file explorer"
                   aria-label="Open in file explorer"
                   onclick={(e) => {
@@ -131,7 +138,7 @@
                   }}
                 >
                   <ExternalLink class="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             {/if}
           </li>

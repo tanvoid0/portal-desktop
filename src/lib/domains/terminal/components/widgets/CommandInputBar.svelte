@@ -16,7 +16,7 @@
   let { tabId, onSubmit, onStop, view, onViewChange }: Props = $props();
 </script>
 
-<div class="flex items-center gap-2 border-t border-border bg-card p-2">
+<div class="divider-edge-t divider-edge-full flex items-center gap-2 bg-card p-2">
   {#if view && onViewChange}
     <div class="flex flex-shrink-0 overflow-hidden rounded-md border border-border">
       <Button

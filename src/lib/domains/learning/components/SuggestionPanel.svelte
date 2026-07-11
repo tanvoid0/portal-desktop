@@ -108,7 +108,6 @@
               variant="default"
               size="sm"
               onclick={() => handleAccept(suggestion)}
-              class="btn-accept"
             >
               Accept
             </Button>
@@ -116,7 +115,6 @@
               variant="outline"
               size="sm"
               onclick={() => handleReject(suggestion)}
-              class="btn-reject"
             >
               Reject
             </Button>

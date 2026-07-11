@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
   import { ShieldQuestion } from "@lucide/svelte";
   import type { PendingApproval } from "../types.js";
   import { getToolCallDisplay } from "../utils/toolCallDisplay.js";
@@ -42,9 +43,9 @@
 
   <div class="mb-3 flex items-center gap-2">
     <span class="text-xs text-muted-foreground">remember rule</span>
-    <input
+    <Input
       bind:value={rule}
-      class="flex-1 rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+      class="flex-1 font-mono text-xs"
       placeholder="pattern to allow"
     />
   </div>

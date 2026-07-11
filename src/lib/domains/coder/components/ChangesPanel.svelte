@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { Button } from "$lib/components/ui/button";
+  import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
   import { Check, X, FileEdit, Pencil, ChevronDown, ChevronUp } from "@lucide/svelte";
   import { coderService } from "../services/coderService.js";
@@ -295,7 +296,7 @@
         ? ''
         : 'opacity-60'} {focusChangeId === c.id ? 'ring-1 ring-primary/40' : ''}"
     >
-      <div class="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+      <div class="divider-edge-b divider-edge-full flex flex-wrap items-center gap-2 px-3 py-2">
         <FileEdit class="h-4 w-4 text-muted-foreground" />
         <span class="font-mono text-xs">{c.path}</span>
         {#if c.created}
@@ -329,11 +330,11 @@
 
       {#if editing === c.id}
         <div class="space-y-2 p-3">
-          <textarea
+          <Textarea
             bind:value={draft}
             rows={12}
-            class="w-full rounded border border-border bg-background p-2 font-mono text-xs"
-          ></textarea>
+            class="font-mono text-xs"
+          />
           <div class="flex gap-2">
             <Button size="sm" onclick={() => saveEdit(c)}>Save to disk</Button>
             <Button size="sm" variant="ghost" onclick={() => (editing = null)}>Cancel</Button>

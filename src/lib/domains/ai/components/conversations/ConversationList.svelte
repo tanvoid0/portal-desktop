@@ -1,9 +1,8 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
-  import ConversationCard from "./ConversationCard.svelte";
   import { Plus, MessageCircle, Trash2 } from "@lucide/svelte";
+  import AISessionSidebar from "$lib/domains/ai/components/shared/AISessionSidebar.svelte";
+  import ConversationCard from "./ConversationCard.svelte";
   import type { Conversation } from "../../types/index.js";
 
   interface Props {
@@ -25,26 +24,21 @@
   }: Props = $props();
 
   let searchQuery = $state("");
-  let filteredConversations = $derived(
+  const filteredConversations = $derived(
     conversations.filter((conv) =>
       conv.title.toLowerCase().includes(searchQuery.toLowerCase()),
     ),
   );
+  const isEmpty = $derived(filteredConversations.length === 0);
 </script>
 
-<div class="flex h-full flex-col">
-  <div class="flex items-center gap-2 border-b p-2.5">
-    <Input
-      placeholder="Search conversations..."
-      bind:value={searchQuery}
-      class="h-8 flex-1 text-sm"
-    />
-    <Button
-      onclick={onCreateNew}
-      size="sm"
-      class="h-8"
-      title="New Conversation"
-    >
+<AISessionSidebar
+  searchPlaceholder="Search conversations..."
+  bind:searchValue={searchQuery}
+  {isEmpty}
+>
+  {#snippet toolbar()}
+    <Button onclick={onCreateNew} size="sm" class="h-8 shrink-0" title="New conversation">
       <Plus class="h-3.5 w-3.5" />
     </Button>
     {#if onDeleteAll && conversations.length > 0}
@@ -58,26 +52,25 @@
         <Trash2 class="h-3.5 w-3.5" />
       </Button>
     {/if}
-  </div>
-  <ScrollArea class="flex-1">
-    <div class="space-y-2 p-2">
-      {#if filteredConversations.length === 0}
-        <div class="py-6 text-center text-muted-foreground">
-          <MessageCircle class="mx-auto mb-1.5 h-8 w-8 opacity-50" />
-          <p class="text-xs">
-            {searchQuery ? "No conversations found" : "No conversations yet"}
-          </p>
-        </div>
-      {:else}
-        {#each filteredConversations as conversation}
-          <ConversationCard
-            {conversation}
-            onClick={() => onConversationClick?.(conversation)}
-            onDelete={onDeleteConversation}
-            isActive={selectedConversationId === conversation.id}
-          />
-        {/each}
-      {/if}
+  {/snippet}
+
+  {#snippet empty()}
+    <div class="flex flex-1 flex-col items-center justify-center py-8 text-center text-muted-foreground">
+      <MessageCircle class="mx-auto mb-1.5 h-8 w-8 opacity-50" />
+      <p class="text-xs">
+        {searchQuery ? "No conversations found" : "No conversations yet"}
+      </p>
     </div>
-  </ScrollArea>
-</div>
+  {/snippet}
+
+  {#snippet children()}
+    {#each filteredConversations as conversation (conversation.id)}
+      <ConversationCard
+        {conversation}
+        onClick={() => onConversationClick?.(conversation)}
+        onDelete={onDeleteConversation}
+        isActive={selectedConversationId === conversation.id}
+      />
+    {/each}
+  {/snippet}
+</AISessionSidebar>

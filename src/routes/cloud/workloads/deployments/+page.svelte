@@ -326,15 +326,16 @@
                             ? 'bg-yellow-500'
                             : 'bg-red-500'}"
                       ></div>
-                      <button
-                        class="cursor-pointer font-medium hover:underline"
+                      <Button
+                        variant="link"
+                        class="h-auto p-0 font-medium"
                         onclick={() =>
                           goto(
                             `/cloud/workloads/deployments/${deployment.name}?namespace=${deployment.namespace}`,
                           )}
                       >
                         {deployment.name}
-                      </button>
+                      </Button>
                     </div>
                   </td>
                   <td class="p-2">

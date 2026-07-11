@@ -4,13 +4,13 @@
  * mounted yet.
  */
 
-import Terminal from "$lib/domains/terminal/components/core/Terminal.svelte";
-import { defaultTerminalConfig } from "$lib/domains/terminal/config/defaultTerminalConfig";
 import {
+  Terminal,
+  defaultTerminalConfig,
   createTerminalProcess,
   getProcessExitCode,
   subscribeProcessOutput,
-} from "$lib/domains/terminal/composables/useTerminalProcess";
+} from "$lib/domains/terminal";
 import { coderTerminalStore } from "../state/coderTerminalStore.svelte.js";
 import { isTauriEnvironment } from "$lib/utils/tauri";
 

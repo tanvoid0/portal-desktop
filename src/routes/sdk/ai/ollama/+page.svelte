@@ -23,6 +23,8 @@
   } from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import { Label } from "$lib/components/ui/label";
+  import { Textarea } from "$lib/components/ui/textarea";
   import { logger } from "$lib/domains/shared";
   import { toast } from "$lib/utils/toast";
   import ModelList from "$lib/components/ModelList.svelte";
@@ -703,7 +705,7 @@
 
 <!-- Service Header -->
 <div
-  class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+  class="divider-edge-b divider-edge-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
 >
   <div class="flex h-14 w-full items-center px-4">
     <div class="mr-4 hidden md:flex">
@@ -1166,17 +1168,15 @@
                 </div>
               {/if}
               <div>
-                <label
-                  for="config-content"
-                  class="mb-2 block text-sm font-medium"
-                  >Configuration File Content</label
-                >
-                <textarea
+                <Label for="config-content" class="mb-2 block">
+                  Configuration File Content
+                </Label>
+                <Textarea
                   id="config-content"
-                  class="h-64 w-full rounded-md border p-3 font-mono text-sm"
+                  class="h-64 font-mono text-sm"
                   bind:value={configContent}
                   placeholder="OLLAMA_HOST=0.0.0.0:11434&#10;OLLAMA_KEEP_ALIVE=5m&#10;OLLAMA_DEBUG=false"
-                ></textarea>
+                />
               </div>
               <div class="flex gap-2">
                 <Button onclick={saveConfiguration}>Save Configuration</Button>

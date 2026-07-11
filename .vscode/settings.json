@@ -1,40 +1,11 @@
-{
-	"code-runner.executorMap": {
-		"javascript": "node",
-		"typescript": "ts-node",
-		"shellscript": "bash",
-		"rust": "cd $dir && cargo run",
-		"json": "node"
-	},
-	"code-runner.executorMapByFileExtension": {
-		".js": "node",
-		".ts": "ts-node",
-		".mjs": "node",
-		".cjs": "node",
-		".sh": "bash",
-		".bash": "bash",
-		".zsh": "zsh",
-		".rs": "cd $dir && cargo run",
-		".json": "node"
-	},
-	"code-runner.executorMapByGlob": {
-		"package.json": "cd $dir && pnpm run",
-		"*.test.ts": "cd $dir && pnpm test:unit",
-		"*.test.js": "cd $dir && pnpm test:unit",
-		"*.spec.ts": "cd $dir && pnpm test:unit",
-		"*.spec.js": "cd $dir && pnpm test:unit",
-		"scripts/*.sh": "cd $dir && bash",
-		"scripts/*.js": "cd $dir && node"
-	},
-	"code-runner.runInTerminal": true,
-	"code-runner.saveFileBeforeRun": true,
-	"code-runner.clearPreviousOutput": true,
-	"code-runner.saveAllFilesBeforeRun": false,
-	"code-runner.fileDirectoryAsCwd": true,
-	"code-runner.showExecutionMessage": true,
-	"code-runner.preserveFocus": false,
-	"code-runner.showIcon": true,
-	"code-runner.ignoreSelection": false,
-	"code-runner.customCommand": "",
-	"code-runner.terminalRoot": "/"
+﻿{
+  "terminal.integrated.shellIntegration.enabled": false,
+  "terminal.integrated.defaultProfile.windows": "PowerShell 7",
+  "terminal.integrated.profiles.windows": {
+    "PowerShell 7": {
+      "path": "pwsh.exe",
+      "args": ["-NoLogo"],
+      "icon": "terminal-powershell"
+    }
+  }
 }

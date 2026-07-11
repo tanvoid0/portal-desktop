@@ -476,6 +476,7 @@ impl CoderService {
                             id: row.id,
                             title: row.title,
                             workspace_root: row.workspace_root,
+                            project_id: row.project_id,
                             model: row.model,
                             platform_thread_id: row.platform_thread_id,
                             llm_provider: row.llm_provider,
@@ -703,6 +704,7 @@ impl CoderService {
             id: Set(thread.id.clone()),
             title: Set(thread.title),
             workspace_root: Set(thread.workspace_root),
+            project_id: Set(thread.project_id),
             model: Set(thread.model),
             platform_thread_id: Set(thread.platform_thread_id),
             llm_provider: Set(thread.llm_provider.clone()),
@@ -717,6 +719,7 @@ impl CoderService {
                     .update_columns([
                         coder_thread::Column::Title,
                         coder_thread::Column::WorkspaceRoot,
+                        coder_thread::Column::ProjectId,
                         coder_thread::Column::Model,
                         coder_thread::Column::PlatformThreadId,
                         coder_thread::Column::LlmProvider,
@@ -764,12 +767,14 @@ impl CoderService {
         model: Option<String>,
         llm_provider: Option<String>,
         thread_kind: Option<CoderThreadKind>,
+        project_id: Option<i32>,
     ) -> CoderThread {
         self.create_thread_with_kind(
             workspace_root,
             model,
             llm_provider,
             thread_kind.unwrap_or(CoderThreadKind::Session),
+            project_id,
         )
         .await
     }
@@ -780,12 +785,14 @@ impl CoderService {
         model: Option<String>,
         llm_provider: Option<String>,
         thread_kind: CoderThreadKind,
+        project_id: Option<i32>,
     ) -> CoderThread {
         let now = now_iso();
         let thread = CoderThread {
             id: uuid::Uuid::new_v4().to_string(),
             title: PLACEHOLDER_SESSION.into(),
             workspace_root,
+            project_id,
             model: model.or_else(|| self.platform_config().default_model.clone()),
             platform_thread_id: None,
             llm_provider,
@@ -828,6 +835,7 @@ impl CoderService {
                     id: t.id.clone(),
                     title: t.title.clone(),
                     workspace_root: t.workspace_root.clone(),
+                    project_id: t.project_id,
                     model: t.model.clone(),
                     platform_thread_id: t.platform_thread_id,
                     llm_provider: t.llm_provider.clone(),
@@ -849,6 +857,7 @@ impl CoderService {
                 id: id.clone(),
                 title: "Running session".into(),
                 workspace_root: String::new(),
+                project_id: None,
                 model: None,
                 platform_thread_id: None,
                 llm_provider: None,
@@ -1060,6 +1069,7 @@ impl CoderService {
                     coordinator.model.clone(),
                     coordinator.llm_provider.clone(),
                     CoderThreadKind::SubAgent,
+                    coordinator.project_id,
                 )
                 .await;
             {

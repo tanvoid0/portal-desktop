@@ -125,14 +125,16 @@
                 class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary"
               >
                 {option.label}
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   onclick={(e) => handleRemove(option.value, e)}
-                  class="rounded-full p-0.5 hover:bg-primary/20"
-                  tabindex="-1"
+                  class="h-4 w-4 rounded-full p-0 hover:bg-primary/20"
+                  tabindex={-1}
                 >
                   <X class="h-3 w-3" />
-                </button>
+                </Button>
               </span>
             {/each}
             {#if selectedOptions.length > maxDisplay}

@@ -173,7 +173,7 @@
         {/if}
       </div>
     </ScrollArea>
-    <div class="flex-shrink-0 border-t bg-background">
+    <div class="divider-edge-t divider-edge-full flex-shrink-0 bg-background">
       <ChatInput
         bind:value={messageInput}
         onSend={handleSend}

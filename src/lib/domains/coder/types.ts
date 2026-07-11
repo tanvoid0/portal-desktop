@@ -18,6 +18,7 @@ export interface CoderThread {
   id: string;
   title: string;
   workspace_root: string;
+  project_id?: number | null;
   model?: string | null;
   llm_provider?: string | null;
   platform_thread_id?: number | null;
@@ -33,6 +34,7 @@ export interface CoderThreadSummary {
   id: string;
   title: string;
   workspace_root: string;
+  project_id?: number | null;
   model?: string | null;
   llm_provider?: string | null;
   platform_thread_id?: number | null;
@@ -48,6 +50,7 @@ export function summaryToThread(summary: CoderThreadSummary): CoderThread {
     id: summary.id,
     title: summary.title,
     workspace_root: summary.workspace_root,
+    project_id: summary.project_id,
     model: summary.model,
     llm_provider: summary.llm_provider,
     platform_thread_id: summary.platform_thread_id,

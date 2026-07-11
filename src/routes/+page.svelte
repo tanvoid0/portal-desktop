@@ -144,7 +144,7 @@
 <div class="space-y-6">
   <!-- Welcome Header -->
   <div class="mb-8">
-    <h1 class="mb-2 text-4xl font-bold">{greeting}!</h1>
+    <h1 class="mb-2 text-4xl font-bold text-foreground">{greeting}!</h1>
     <p class="text-lg text-muted-foreground">
       Welcome to Portal Desktop. Here's what's happening with your workspace.
     </p>

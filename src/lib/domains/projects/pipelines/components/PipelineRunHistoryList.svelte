@@ -77,9 +77,10 @@
       <div class="space-y-2">
         {#each executions as execution (execution.id)}
           {@const StatusIcon = getExecutionStatusIcon(execution.status)}
-          <button
+          <Button
             type="button"
-            class="w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+            variant="outline"
+            class="h-auto w-full justify-start rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
             onclick={() => onSelect?.(execution)}
             disabled={!onSelect}
           >
@@ -118,7 +119,7 @@
                 <span class="truncate text-destructive">{execution.error}</span>
               {/if}
             </div>
-          </button>
+          </Button>
         {/each}
       </div>
     {/if}

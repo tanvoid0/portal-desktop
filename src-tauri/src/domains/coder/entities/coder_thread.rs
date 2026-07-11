@@ -8,6 +8,7 @@ pub struct Model {
     pub id: String,
     pub title: String,
     pub workspace_root: String,
+    pub project_id: Option<i32>,
     pub model: Option<String>,
     /// Agent-platform `coder_chat_threads.id` when using `/api/v1/coder/chat/stream`.
     pub platform_thread_id: Option<i64>,

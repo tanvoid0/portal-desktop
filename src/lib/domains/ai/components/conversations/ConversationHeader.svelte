@@ -59,7 +59,7 @@
   });
 </script>
 
-<div class="flex items-center gap-4 border-b p-4">
+<div class="divider-edge-b divider-edge-full flex items-center gap-4 p-4">
   {#if onBack}
     <Button variant="ghost" size="sm" onclick={onBack}>
       <Icon icon="lucide:arrow-left" class="mr-2 h-4 w-4" />

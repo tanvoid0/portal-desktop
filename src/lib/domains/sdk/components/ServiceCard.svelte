@@ -14,6 +14,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
   import Select from "$lib/components/ui/select.svelte";
+  import { Label } from "$lib/components/ui/label";
   import { Progress } from "$lib/components/ui/progress";
   import {
     Power,
@@ -215,9 +216,7 @@
   <CardContent class="space-y-4">
     <!-- Version Selector -->
     <div class="flex items-center gap-3">
-      <label for="version-select" class="w-16 text-sm font-medium"
-        >Version:</label
-      >
+      <Label for="version-select" class="w-16">Version:</Label>
       <Select
         options={availableVersions}
         defaultValue={service.version}

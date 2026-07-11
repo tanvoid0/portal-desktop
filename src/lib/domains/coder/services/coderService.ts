@@ -33,12 +33,14 @@ export class CoderService {
     model?: string,
     llmProvider?: string,
     threadKind?: CoderThreadKind | null,
+    projectId?: number | null,
   ): Promise<CoderThread> {
     return invoke<CoderThread>("coder_create_thread", {
       workspaceRoot,
       model: model ?? null,
       llmProvider: llmProvider ?? null,
       threadKind: threadKind ?? null,
+      projectId: projectId ?? null,
     });
   }
 

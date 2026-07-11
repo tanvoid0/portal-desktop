@@ -15,6 +15,7 @@
     buildTerminalContext,
     buildExplainPrompt,
   } from "../../services/terminalAiContext";
+  import { shellSupportsIntegration } from "../../utils/resolveSessionSettings";
   import { isTauriEnvironment } from "$lib/utils/tauri";
 
   export type SessionView = "blocks" | "terminal";
@@ -39,14 +40,13 @@
     widgets,
   }: Props = $props();
 
-  const INTEGRATION_SHELLS = /powershell|pwsh|zsh|bash/i;
-  const shellSupportsBlocks = INTEGRATION_SHELLS.test(settings.defaultShell);
+  let view = $state<SessionView>(
+    defaultView ??
+      (shellSupportsIntegration(settings.defaultShell) ? "blocks" : "terminal"),
+  );
 
   let terminal = $state<ReturnType<typeof Terminal> | null>(null);
   let currentProcess = $state<TerminalProcess | null>(null);
-  let view = $state<SessionView>(
-    defaultView ?? (shellSupportsBlocks ? "blocks" : "terminal"),
-  );
   const isTauri = isTauriEnvironment();
 
   async function handleCommandSubmit(command: string, isAIMode = false) {
@@ -213,7 +213,7 @@
   </div>
 
   {#if widgets}
-    <aside class="flex w-96 min-w-0 flex-col border-l border-border bg-card">
+    <aside class="divider-edge-l flex w-96 min-w-0 flex-col bg-card">
       {@render widgets({ tabId, process: currentProcess })}
     </aside>
   {/if}

@@ -36,16 +36,18 @@
   }
 </script>
 
-<div class="h-full w-full p-6">
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-2xl font-bold">Training Data</h1>
-      <p class="text-muted-foreground">View and manage AI training data</p>
-    </div>
-    {#if isLoading}
-      <p class="text-muted-foreground">Loading...</p>
-    {:else}
-      <TrainingDataViewer data={trainingData} onDelete={handleDelete} />
-    {/if}
+<svelte:head>
+  <title>AI Training Data - Portal Desktop</title>
+</svelte:head>
+
+<div class="space-y-4">
+  <div>
+    <h1 class="text-2xl font-bold">Training Data</h1>
+    <p class="text-muted-foreground">View and manage AI training datasets</p>
   </div>
+  {#if isLoading}
+    <p class="text-muted-foreground">Loading...</p>
+  {:else}
+    <TrainingDataViewer data={trainingData} onDelete={handleDelete} />
+  {/if}
 </div>

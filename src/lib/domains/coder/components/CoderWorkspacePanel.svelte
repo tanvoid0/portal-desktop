@@ -33,9 +33,9 @@
   }
 </script>
 
-<div class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-border bg-background">
+<div class="divider-edge-l flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
   <div
-    class="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2"
+    class="divider-edge-b divider-edge-full flex shrink-0 items-center justify-between gap-2 px-3 py-2"
   >
     <div class="flex min-w-0 items-center gap-2">
       <h3 class="truncate text-sm font-medium">{title}</h3>

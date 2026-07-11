@@ -33,7 +33,7 @@
   }
 </script>
 
-<div class="command-history-search border-b border-border bg-muted/50 p-3">
+<div class="command-history-search divider-edge-b divider-edge-full bg-muted/50 p-3">
   <div class="flex items-center gap-2">
     <div class="relative flex-1">
       <Search

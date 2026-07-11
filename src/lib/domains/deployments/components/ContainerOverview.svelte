@@ -213,64 +213,78 @@
       </CardContent>
     </Card>
 
-    <Card>
-      <CardHeader class="pb-2">
+    <Card class="flex flex-col">
+      <CardHeader class="shrink-0 pb-2">
         <CardTitle class="text-sm font-medium">Top resource consumers</CardTitle>
       </CardHeader>
-      <CardContent class="space-y-4">
+      <CardContent class="overflow-hidden">
         {#if stats.topMemory.length === 0 && stats.topCpu.length === 0}
           <p class="py-4 text-center text-sm text-muted-foreground">
             Start containers to see live resource usage
           </p>
         {:else}
-          <div class="space-y-3">
-            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Memory
-            </div>
-            {#each stats.topMemory as c (c.id)}
-              {@const mem = c.resourceStats?.memoryBytes ?? 0}
-              {@const pct = c.resourceStats?.memoryPercent ?? 0}
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="truncate font-medium" title={c.name}
-                    >{c.name}</span
-                  >
-                  <span class="tabular-nums text-muted-foreground"
-                    >{fmtBytes(mem)} · {fmtPercent(pct)}</span
-                  >
-                </div>
-                <Progress
-                  value={(mem / maxMem) * 100}
-                  class="h-1.5 [&>[data-slot=progress-indicator]]:bg-blue-500"
-                />
+          <div class="grid grid-cols-2 gap-4">
+            <div class="min-w-0 max-h-48 space-y-3 overflow-y-auto pr-1">
+              <div
+                class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
+                Memory
               </div>
-            {/each}
-          </div>
+              {#if stats.topMemory.length === 0}
+                <p class="text-xs text-muted-foreground">No data</p>
+              {:else}
+                {#each stats.topMemory as c (c.id)}
+                  {@const mem = c.resourceStats?.memoryBytes ?? 0}
+                  {@const pct = c.resourceStats?.memoryPercent ?? 0}
+                  <div class="space-y-1">
+                    <div class="flex flex-col gap-0.5 text-xs">
+                      <span class="truncate font-medium" title={c.name}
+                        >{c.name}</span
+                      >
+                      <span class="tabular-nums text-muted-foreground"
+                        >{fmtBytes(mem)} · {fmtPercent(pct)}</span
+                      >
+                    </div>
+                    <Progress
+                      value={(mem / maxMem) * 100}
+                      class="h-1.5 [&>[data-slot=progress-indicator]]:bg-blue-500"
+                    />
+                  </div>
+                {/each}
+              {/if}
+            </div>
 
-          {#if stats.topCpu.length > 0}
-            <div class="space-y-3">
-              <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div
+              class="divider-edge-l min-w-0 max-h-48 space-y-3 overflow-y-auto pl-4"
+            >
+              <div
+                class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
                 CPU
               </div>
-              {#each stats.topCpu as c (c.id)}
-                {@const cpu = c.resourceStats?.cpuPercent ?? 0}
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="truncate font-medium" title={c.name}
-                      >{c.name}</span
-                    >
-                    <span class="tabular-nums text-muted-foreground"
-                      >{fmtPercent(cpu)}</span
-                    >
+              {#if stats.topCpu.length === 0}
+                <p class="text-xs text-muted-foreground">No data</p>
+              {:else}
+                {#each stats.topCpu as c (c.id)}
+                  {@const cpu = c.resourceStats?.cpuPercent ?? 0}
+                  <div class="space-y-1">
+                    <div class="flex flex-col gap-0.5 text-xs">
+                      <span class="truncate font-medium" title={c.name}
+                        >{c.name}</span
+                      >
+                      <span class="tabular-nums text-muted-foreground"
+                        >{fmtPercent(cpu)}</span
+                      >
+                    </div>
+                    <Progress
+                      value={(cpu / maxCpu) * 100}
+                      class="h-1.5 [&>[data-slot=progress-indicator]]:bg-emerald-500"
+                    />
                   </div>
-                  <Progress
-                    value={(cpu / maxCpu) * 100}
-                    class="h-1.5 [&>[data-slot=progress-indicator]]:bg-emerald-500"
-                  />
-                </div>
-              {/each}
+                {/each}
+              {/if}
             </div>
-          {/if}
+          </div>
         {/if}
       </CardContent>
     </Card>
