@@ -80,3 +80,4 @@ build-output/*
 raw/
 # Local-only VPN helper (contains internal infra references)
 scripts/vpn.sh
+.devswarm-temp/
