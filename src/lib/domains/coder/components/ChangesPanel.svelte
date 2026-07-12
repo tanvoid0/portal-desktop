@@ -181,6 +181,24 @@
     await advanceAfterReview(c.id, h.index);
   }
 
+  async function acceptAllFiles() {
+    const list = [...pendingChanges];
+    for (const c of list) {
+      await coderService.acceptChange(c.id);
+      markAllReviewed(c);
+    }
+    await refresh();
+  }
+
+  async function rejectAllFiles() {
+    const list = [...pendingChanges];
+    for (const c of list) {
+      await coderService.rejectChange(c.id);
+      markAllReviewed(c);
+    }
+    await refresh();
+  }
+
   async function acceptAll(c: FileChange) {
     await coderService.acceptChange(c.id);
     markAllReviewed(c);
@@ -252,44 +270,57 @@
     </div>
   {/if}
 
-  {#if focusChange && focusPosition}
+  {#if pendingChanges.length > 0}
     <div
-      class="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-md border border-border bg-background/95 px-3 py-2 backdrop-blur-sm"
+      class="sticky top-0 z-10 flex flex-col gap-2 rounded-md border border-border bg-background px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
     >
-      <div class="min-w-0 text-xs text-muted-foreground">
-        <span class="font-medium text-foreground">{focusChange.path}</span>
-        <span class="mx-1">·</span>
-        hunk {focusPosition.hunkIdx + 1} of {focusPosition.totalHunks}
-        <span class="mx-1">·</span>
-        file {focusPosition.changeIdx + 1} of {focusPosition.totalChanges}
+      <div class="min-w-0 truncate text-xs text-muted-foreground">
+        {#if focusChange && focusPosition}
+          <span class="font-medium text-foreground">{focusChange.path}</span>
+          <span class="mx-1">·</span>
+          hunk {focusPosition.hunkIdx + 1} of {focusPosition.totalHunks}
+          <span class="mx-1">·</span>
+          file {focusPosition.changeIdx + 1} of {focusPosition.totalChanges}
+        {:else}
+          {pendingChanges.length} file{pendingChanges.length === 1 ? "" : "s"} to review
+        {/if}
       </div>
-      <div class="flex shrink-0 items-center gap-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          class="h-7 w-7"
-          title="Previous hunk"
-          onclick={goToPrevHunk}
-          disabled={focusPosition.changeIdx === 0 && focusPosition.hunkIdx === 0}
-        >
-          <ChevronUp class="h-3.5 w-3.5" />
+      <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
+        {#if focusPosition}
+          <Button
+            size="sm"
+            variant="ghost"
+            class="h-7 w-7"
+            title="Previous hunk"
+            onclick={goToPrevHunk}
+            disabled={focusPosition.changeIdx === 0 && focusPosition.hunkIdx === 0}
+          >
+            <ChevronUp class="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            class="h-7 w-7"
+            title="Next hunk"
+            onclick={goToNextHunk}
+            disabled={focusPosition.changeIdx === focusPosition.totalChanges - 1 &&
+              focusPosition.hunkIdx === focusPosition.totalHunks - 1}
+          >
+            <ChevronDown class="h-3.5 w-3.5" />
+          </Button>
+          <div class="mx-1 h-4 w-px bg-border"></div>
+        {/if}
+        <Button size="sm" variant="secondary" class="h-7" onclick={acceptAllFiles}>
+          <Check class="mr-1 h-3.5 w-3.5" /> Accept all
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          class="h-7 w-7"
-          title="Next hunk"
-          onclick={goToNextHunk}
-          disabled={focusPosition.changeIdx === focusPosition.totalChanges - 1 &&
-            focusPosition.hunkIdx === focusPosition.totalHunks - 1}
-        >
-          <ChevronDown class="h-3.5 w-3.5" />
+        <Button size="sm" variant="destructive" class="h-7" onclick={rejectAllFiles}>
+          <X class="mr-1 h-3.5 w-3.5" /> Reject all
         </Button>
       </div>
     </div>
   {/if}
 
-  {#each changes as c (c.id)}
+  {#each pendingChanges as c (c.id)}
     {@const isPending = c.status === "pending"}
     <div
       class="rounded-md border border-border transition-opacity {isPending
