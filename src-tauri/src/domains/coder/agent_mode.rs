@@ -17,7 +17,9 @@ pub fn permission_flags(agent: CoderAgentMode, permission: PermissionMode) -> (b
 pub fn includes_tool(mode: CoderAgentMode, tool: &str) -> bool {
     match mode {
         CoderAgentMode::Ask => tools::is_read_only(tool),
-        CoderAgentMode::Plan => tools::is_read_only(tool) || tool == "run_command",
+        CoderAgentMode::Plan => {
+            tools::is_read_only(tool) || matches!(tool, "run_command" | "write_file" | "edit_file")
+        }
         CoderAgentMode::Debug | CoderAgentMode::Auto | CoderAgentMode::Multitask => true,
     }
 }
@@ -133,7 +135,9 @@ mod tests {
     #[test]
     fn plan_includes_run_command() {
         assert!(includes_tool(CoderAgentMode::Plan, "run_command"));
-        assert!(!includes_tool(CoderAgentMode::Plan, "write_file"));
+        // Plan mode advertises write_file so the model can save the .plan.md;
+        // the permission gate restricts the path to .cursor/plans/*.plan.md.
+        assert!(includes_tool(CoderAgentMode::Plan, "write_file"));
     }
 
     #[test]
