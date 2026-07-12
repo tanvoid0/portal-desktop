@@ -183,4 +183,17 @@ mod tests {
         ];
         assert_eq!(find_leaked_tool_call(&messages).as_deref(), Some("list_dir"));
     }
+
+    #[test]
+    fn drain_flushes_final_event_only_after_terminator() {
+        // A final `done` event that arrives without a trailing blank line stays
+        // buffered — this is the case the stream-EOF flush handles.
+        let mut buf = b"event: done\ndata: {\"ok\":true}\n".to_vec();
+        assert!(drain_sse_events(&mut buf).is_empty());
+        // Terminating the buffer (as the EOF handler does) flushes it.
+        buf.extend_from_slice(b"\n\n");
+        let events = drain_sse_events(&mut buf);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].0, "done");
+    }
 }

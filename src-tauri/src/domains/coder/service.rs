@@ -2005,12 +2005,27 @@ impl CoderService {
                     } => break,
                     c = stream.next() => c,
                 };
-                let Some(chunk) = chunk else { break };
-                if is_cancelled() {
-                    break;
+                let mut eof = false;
+                match chunk {
+                    Some(chunk) => {
+                        if is_cancelled() {
+                            break;
+                        }
+                        let bytes =
+                            chunk.map_err(|e| format!("platform stream read error: {e}"))?;
+                        buf.extend_from_slice(&bytes);
+                    }
+                    // Stream closed. A trailing SSE event (e.g. `done`) may not be
+                    // terminated by a blank line before the connection closes, which
+                    // would leave it unparsed in the buffer. Terminate the buffer so
+                    // the final event still flushes instead of being silently dropped.
+                    None => {
+                        if !buf.is_empty() {
+                            buf.extend_from_slice(b"\n\n");
+                        }
+                        eof = true;
+                    }
                 }
-                let bytes = chunk.map_err(|e| format!("platform stream read error: {e}"))?;
-                buf.extend_from_slice(&bytes);
 
                 for (event, data) in platform_stream::drain_sse_events(&mut buf) {
                     if is_cancelled() {
@@ -2120,6 +2135,10 @@ impl CoderService {
                         }
                         _ => {}
                     }
+                }
+
+                if eof {
+                    break;
                 }
             }
 
