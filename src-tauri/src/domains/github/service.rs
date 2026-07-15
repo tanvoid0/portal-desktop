@@ -25,11 +25,12 @@ use crate::process_ext::NoWindowExt;
 
 use super::types::{
     GitHubAccount, GitHubCloneRepositoryRequest, GitHubConnectionStatus, GitHubCreateIssueRequest,
-    GitHubDeviceFlowPollResult, GitHubDeviceFlowStart, GitHubIssue,
+    GitHubDeviceFlowPollResult, GitHubDeviceFlowStart, GitHubDispatchWorkflowRequest, GitHubIssue,
     GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest, GitHubListWorkflowRunsRequest,
-    GitHubLocalRepositoryDetection, GitHubProjectLink, GitHubProjectLinkResult, GitHubRepoOwner,
-    GitHubRepoProjects, GitHubRepository, GitHubUpdateIssueRequest, GitHubWorkflowJob,
-    GitHubWorkflowJobStep, GitHubWorkflowRun, GitHubWorkflowRunDetail,
+    GitHubListWorkflowsRequest, GitHubLocalRepositoryDetection, GitHubProjectLink,
+    GitHubProjectLinkResult, GitHubRepoOwner, GitHubRepoProjects, GitHubRepository,
+    GitHubUpdateIssueRequest, GitHubWorkflow, GitHubWorkflowJob, GitHubWorkflowJobStep,
+    GitHubWorkflowRun, GitHubWorkflowRunDetail,
 };
 
 const GITHUB_CONNECTION_ID: &str = "github";
@@ -520,6 +521,77 @@ impl GitHubService {
             .await
             .map_err(|e| format!("Failed to load GitHub project link: {e}"))?;
         Ok(row.map(project_link_from_model))
+    }
+
+    pub async fn list_workflows(
+        &self,
+        request: GitHubListWorkflowsRequest,
+    ) -> Result<Vec<GitHubWorkflow>, String> {
+        let token = self.connection_token().await?;
+        let owner = request.owner.trim();
+        let repo = request.repo.trim();
+        let page = request.page.unwrap_or(1);
+        let per_page = request.per_page.unwrap_or(50).min(100);
+
+        let value = self
+            .github_get_json(
+                &format!("/repos/{owner}/{repo}/actions/workflows"),
+                &token,
+                &[
+                    ("page", page.to_string()),
+                    ("per_page", per_page.to_string()),
+                ],
+            )
+            .await?;
+
+        value
+            .get("workflows")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| self.workflow_from_value(&item))
+            .collect()
+    }
+
+    pub async fn dispatch_workflow(
+        &self,
+        request: GitHubDispatchWorkflowRequest,
+    ) -> Result<(), String> {
+        let token = self.connection_token().await?;
+        let owner = request.owner.trim();
+        let repo = request.repo.trim();
+        let workflow_id = request.workflow_id;
+        let ref_name = request.ref_name.trim();
+        if ref_name.is_empty() {
+            return Err("ref_name is required to dispatch a workflow".to_string());
+        }
+
+        let body = json!({ "ref": ref_name });
+        let path =
+            format!("/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches");
+        let response = self
+            .client
+            .post(format!("https://api.github.com{path}"))
+            .header(ACCEPT, "application/vnd.github+json")
+            .header(AUTHORIZATION, format!("Bearer {token}"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("GitHub API request failed: {e}"))?;
+
+        let status = response.status();
+        if status.as_u16() == 204 || status.is_success() {
+            return Ok(());
+        }
+
+        let text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "unknown error".to_string());
+        Err(format!(
+            "Failed to dispatch workflow ({status}): {text}"
+        ))
     }
 
     pub async fn list_workflow_runs(
@@ -1304,6 +1376,16 @@ impl GitHubService {
                 .get("updated_at")
                 .and_then(Value::as_str)
                 .map(str::to_string),
+        })
+    }
+
+    fn workflow_from_value(&self, value: &Value) -> Result<GitHubWorkflow, String> {
+        Ok(GitHubWorkflow {
+            id: value.get("id").and_then(Value::as_i64).unwrap_or_default(),
+            name: required_string(value, "name")?,
+            path: required_string(value, "path")?,
+            state: required_string(value, "state")?,
+            html_url: required_string(value, "html_url")?,
         })
     }
 

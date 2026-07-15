@@ -1,5 +1,15 @@
 # Portal Desktop - Release Notes
 
+## Version 0.6.0
+
+### Highlights
+
+- Unified Actions model for local, GitHub, and automation workflows
+- Pipeline and script execution improvements
+- Coder tool-call UI updates and removal of unused AI avatar UI
+
+---
+
 ## Version 0.4.0
 
 ### Highlights

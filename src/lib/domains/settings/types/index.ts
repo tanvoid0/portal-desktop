@@ -23,9 +23,6 @@ export interface AppSettings {
   // Updates
   updates: UpdateSettings;
 
-  // AI Avatar
-  avatarEnabled?: boolean;
-
   integrations?: AppIntegrationSettings;
 }
 

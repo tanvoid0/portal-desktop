@@ -105,10 +105,10 @@ export function buildMainNavSections(
           ],
         },
         {
-          title: "Pipeline Runs",
+          title: "Action Runs",
           url: "/pipeline-runs",
           icon: "history",
-          description: "Global history of pipeline executions",
+          description: "Global history of action and pipeline executions",
           badge: null,
         },
         {
@@ -150,7 +150,7 @@ export function buildMainNavSections(
           title: "Automation",
           url: "/automation",
           icon: "workflow",
-          description: "Pipeline blocks, scripts, and custom utilities",
+          description: "Quick-run actions, blocks, scripts, and utilities",
           badge: null,
         },
         {

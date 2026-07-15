@@ -80,6 +80,9 @@ export * from "./shared";
 // Project domain exports
 export * from "./projects";
 
+// Unified Actions domain
+export * from "./actions";
+
 // Deployment domain exports
 export * from "./deployments";
 

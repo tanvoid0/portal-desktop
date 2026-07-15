@@ -1,4 +1,4 @@
-//! pnpm workspace file quirks shared by pipeline execution and Coder tools.
+//! pnpm workspace file quirks shared by pipeline, script, and Coder runners.
 
 use std::path::Path;
 

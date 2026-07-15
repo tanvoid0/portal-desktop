@@ -23,7 +23,7 @@
   });
 
   function handleBack() {
-    goto(`/projects/${projectId}?tab=pipelines`);
+    goto(`/projects/${projectId}?tab=actions`);
   }
 </script>
 
@@ -34,7 +34,7 @@
 <div class="container mx-auto flex h-[calc(100vh-4rem)] flex-col space-y-4 p-6">
   <Button variant="ghost" size="sm" onclick={handleBack} class="w-fit gap-2">
     <ArrowLeft class="h-4 w-4" />
-    Back to Pipelines
+    Back to Actions
   </Button>
 
   {#if executionId}

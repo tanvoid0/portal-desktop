@@ -200,3 +200,25 @@ export interface GitHubListWorkflowRunsRequest {
   page?: number;
   perPage?: number;
 }
+
+export interface GitHubWorkflow {
+  id: number;
+  name: string;
+  path: string;
+  state: string;
+  htmlUrl: string;
+}
+
+export interface GitHubListWorkflowsRequest {
+  owner: string;
+  repo: string;
+  page?: number;
+  perPage?: number;
+}
+
+export interface GitHubDispatchWorkflowRequest {
+  owner: string;
+  repo: string;
+  workflowId: number;
+  refName: string;
+}

@@ -16,8 +16,12 @@ export type {
   AutomationPlanPreview,
 } from "./services/automationExecutionService";
 
+/** Prefer the unified Actions API for new integrations */
+export { actions, actionsService } from "$lib/domains/actions";
+
 export * from "./utils/blockResolver";
 export * from "./utils/automationContext";
 export * from "./utils/stepRefs";
 export * from "./types";
 export { automationStore } from "./stores/automationStore";
+export type { AutomationProjectRef } from "./utils/automationContext";

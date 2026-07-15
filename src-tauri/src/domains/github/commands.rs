@@ -7,10 +7,11 @@ use crate::database::DatabaseManager;
 use super::service::GitHubService;
 use super::types::{
     GitHubCloneRepositoryRequest, GitHubConnectionStatus, GitHubCreateIssueRequest,
-    GitHubDeviceFlowPollResult, GitHubDeviceFlowStart, GitHubIssue,
-    GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest, GitHubListWorkflowRunsRequest,
-    GitHubLocalRepositoryDetection, GitHubProjectLink, GitHubProjectLinkResult, GitHubRepoProjects,
-    GitHubRepository, GitHubUpdateIssueRequest, GitHubWorkflowRun, GitHubWorkflowRunDetail,
+    GitHubDeviceFlowPollResult, GitHubDeviceFlowStart, GitHubDispatchWorkflowRequest,
+    GitHubIssue, GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest,
+    GitHubListWorkflowRunsRequest, GitHubListWorkflowsRequest, GitHubLocalRepositoryDetection,
+    GitHubProjectLink, GitHubProjectLinkResult, GitHubRepoProjects, GitHubRepository,
+    GitHubUpdateIssueRequest, GitHubWorkflow, GitHubWorkflowRun, GitHubWorkflowRunDetail,
 };
 
 #[tauri::command]
@@ -170,6 +171,26 @@ pub async fn github_list_workflow_runs(
 ) -> Result<Vec<GitHubWorkflowRun>, String> {
     GitHubService::new(db.inner().clone())
         .list_workflow_runs(request)
+        .await
+}
+
+#[tauri::command]
+pub async fn github_list_workflows(
+    request: GitHubListWorkflowsRequest,
+    db: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<GitHubWorkflow>, String> {
+    GitHubService::new(db.inner().clone())
+        .list_workflows(request)
+        .await
+}
+
+#[tauri::command]
+pub async fn github_dispatch_workflow(
+    request: GitHubDispatchWorkflowRequest,
+    db: State<'_, Arc<DatabaseManager>>,
+) -> Result<(), String> {
+    GitHubService::new(db.inner().clone())
+        .dispatch_workflow(request)
         .await
 }
 

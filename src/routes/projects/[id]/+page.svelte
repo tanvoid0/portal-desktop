@@ -59,8 +59,7 @@
   import { logger } from "$lib/domains/shared/services/logger";
   import { confirmAction } from "$lib/utils/confirm";
   import type { Project } from "$lib/domains/projects/types";
-  import PipelineBuilder from "$lib/domains/projects/pipelines/components/PipelineBuilder.svelte";
-  import PipelineRunHistoryList from "$lib/domains/projects/pipelines/components/PipelineRunHistoryList.svelte";
+  import ProjectActionsPanel from "$lib/domains/actions/components/ProjectActionsPanel.svelte";
   import type {
     Pipeline,
     PipelineExecutionListItem,
@@ -95,7 +94,7 @@
   } from "$lib/components/shell";
   import { toast } from "$lib/utils/toast";
   import { Sparkles } from "@lucide/svelte";
-  import { GitHubProjectActionsPanel } from "$lib/domains/github";
+  import { actions } from "$lib/domains/actions";
 
   const log = logger.createScoped("ProjectDetailsPage");
 
@@ -129,17 +128,29 @@
   const PROJECT_TABS = [
     "overview",
     "dependencies",
-    "pipelines",
-    "ci",
+    "actions",
     "terminal",
   ] as const;
   type ProjectTab = (typeof PROJECT_TABS)[number];
 
   const activeTab = $derived(
-    resolveUrlTab($page.url.searchParams, PROJECT_TABS, "overview"),
+    resolveUrlTab(
+      (() => {
+        // Legacy tab aliases
+        const params = new URLSearchParams($page.url.searchParams);
+        const tab = params.get("tab");
+        if (tab === "pipelines" || tab === "ci") {
+          params.set("tab", "actions");
+        }
+        return params;
+      })(),
+      PROJECT_TABS,
+      "overview",
+    ),
   );
 
   function setActiveTab(tab: ProjectTab) {
+    if (tab === activeTab) return;
     goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
       replaceState: true,
       noScroll: true,
@@ -472,42 +483,8 @@
   }
 
   async function tryAutoProvisionPipelines() {
-    const projectId = getValidProjectId(projectIdParam);
-    if (!projectId || !project || autoProvisionAttempted) return;
-
-    await projectIconRegistry.ensureLoaded();
-    const status = frameworkStarterService.getStarterPackForProject(
-      project,
-      pipelines,
-    );
-    starterPackStatus = status;
-
-    if (pipelines.length > 0 || !status || status.missingKeys.length === 0) {
-      autoProvisionAttempted = true;
-      return;
-    }
-
+    // Deprecated: smart Actions catalog replaces DB starter provisioning.
     autoProvisionAttempted = true;
-    provisioningPipelines = true;
-    try {
-      const created =
-        await frameworkStarterService.autoProvisionStarterPipelines(
-          projectId,
-          project,
-          pipelines,
-        );
-      await loadPipelines();
-      if (created.length > 0) {
-        toast.success(
-          `Set up ${created.length} ${status.pack.displayName} pipeline(s)`,
-        );
-      }
-    } catch (err) {
-      log.error("Auto-provision starter pipelines failed", err);
-      toast.error("Failed to set up default pipelines");
-    } finally {
-      provisioningPipelines = false;
-    }
   }
 
   function handleCreatePipeline() {
@@ -610,38 +587,39 @@
   async function handleRunCommand(kind: ProjectCommandKind) {
     if (!project || runningCommand) return;
 
-    const command = getProjectCommand(project, kind);
-    if (!command) {
-      toast.error(`No ${commandKindLabel(kind).toLowerCase()} command configured`);
-      return;
-    }
-
-    const pipeline = findPipelineForCommand(pipelines, kind);
-    if (pipeline) {
-      await handleExecutePipeline(pipeline.id);
-      return;
-    }
-
-    if (kind === "start") {
-      setActiveTab("terminal");
-      toast.info(`No dev pipeline found. Run in terminal: ${command}`);
-      return;
-    }
+    const actionId =
+      kind === "build" ? "build" : kind === "start" ? "dev" : "test";
 
     runningCommand = kind;
     try {
-      const result = await runShellCommand(project.path, command);
+      const result = await actions.forProject(project).run(actionId);
       if (result.success) {
         toast.success(`${commandKindLabel(kind)} completed`);
-        if (result.output.trim()) {
-          log.info(`${commandKindLabel(kind)} output`, { output: result.output });
-        }
       } else {
-        toast.error(`${commandKindLabel(kind)} failed`, result.output);
+        const err =
+          result.steps.find((s) => s.error)?.error ??
+          `${commandKindLabel(kind)} failed`;
+        toast.error(err);
       }
     } catch (err) {
-      log.error(`Failed to run ${kind} command`, err);
-      toast.error(`Failed to run ${commandKindLabel(kind).toLowerCase()} command`);
+      // Fallback: shell command if action missing
+      const command = getProjectCommand(project, kind);
+      if (command) {
+        if (kind === "start") {
+          setActiveTab("terminal");
+          toast.info(`Run in terminal: ${command}`);
+          return;
+        }
+        const result = await runShellCommand(project.path, command);
+        if (result.success) {
+          toast.success(`${commandKindLabel(kind)} completed`);
+        } else {
+          toast.error(`${commandKindLabel(kind)} failed`, result.output);
+        }
+      } else {
+        log.error(`Failed to run ${kind} command`, err);
+        toast.error(`Failed to run ${commandKindLabel(kind).toLowerCase()} command`);
+      }
     } finally {
       runningCommand = null;
     }
@@ -664,24 +642,15 @@
   });
 
   $effect(() => {
-    if (
-      activeTab === "pipelines" &&
-      project &&
-      !pipelinesLoading &&
-      !provisioningPipelines
-    ) {
-      void tryAutoProvisionPipelines();
-    }
+    // Auto-provision of DB starter pipelines removed — Actions catalog is ephemeral.
   });
 
   onMount(() => {
     void projectIconRegistry.ensureLoaded();
     const tabParam = $page.url.searchParams.get("tab");
-    if (
-      tabParam &&
-      ["overview", "dependencies", "pipelines", "terminal"].includes(tabParam)
-    ) {
-      setActiveTab(tabParam as ProjectTab);
+    // Only rewrite legacy aliases — avoid goto when already on a valid tab
+    if (tabParam === "pipelines" || tabParam === "ci") {
+      setActiveTab("actions");
     }
     loadPipelines();
   });
@@ -782,7 +751,7 @@
       onValueChange={(v) => setActiveTab(v as ProjectTab)}
       class="w-full"
     >
-      <TabsList class="grid w-full grid-cols-5">
+      <TabsList class="grid w-full grid-cols-4">
         <TabsTrigger value="overview" class="gap-2">
           <FolderOpen class="h-4 w-4" />
           Overview
@@ -791,13 +760,9 @@
           <Package class="h-4 w-4" />
           Dependencies
         </TabsTrigger>
-        <TabsTrigger value="pipelines" class="gap-2">
-          <Code class="h-4 w-4" />
-          Pipelines
-        </TabsTrigger>
-        <TabsTrigger value="ci" class="gap-2">
+        <TabsTrigger value="actions" class="gap-2">
           <Workflow class="h-4 w-4" />
-          CI/CD
+          Actions
         </TabsTrigger>
         <TabsTrigger value="terminal" class="gap-2">
           <Terminal class="h-4 w-4" />
@@ -930,7 +895,7 @@
                     Commands & Configuration
                   </CardTitle>
                   <CardDescription class="mt-1">
-                    Scripts detected from your project. Run via matching pipelines
+                    Scripts detected from your project. Run via the Actions tab
                     when available, or directly for build/test.
                   </CardDescription>
                 </div>
@@ -1535,133 +1500,10 @@
           {/if}
         </TabsContent>
 
-        <TabsContent value="pipelines" class="mt-6 space-y-6">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <h2 class="text-xl font-semibold">Pipelines</h2>
-              <div class="flex flex-wrap gap-2">
-                {#if starterPackStatus && starterPackStatus.missingKeys.length > 0}
-                  <Button
-                    variant="default"
-                    disabled={provisioningPipelines}
-                    onclick={handleSetupDefaultPipelines}
-                    class="gap-2"
-                  >
-                    <Sparkles class="h-4 w-4" />
-                    {provisioningPipelines
-                      ? "Setting up..."
-                      : `Setup default pipelines (${starterPackStatus.pack.displayName})`}
-                  </Button>
-                {/if}
-                <Button
-                  variant="outline"
-                  onclick={() => {
-                    const projectId = getValidProjectId(projectIdParam);
-                    if (projectId) goto(`/projects/${projectId}/pipelines/new`);
-                  }}
-                >
-                  Create from Template
-                </Button>
-                <Button onclick={handleCreatePipeline}>Create Pipeline</Button>
-              </div>
-            </div>
-
-            {#if showBuilder}
-              <PipelineBuilder
-                pipeline={selectedPipeline || undefined}
-                projectId={getValidProjectId(projectIdParam) || ""}
-                onSave={handleBuilderClose}
-                onCancel={handleBuilderClose}
-              />
-            {:else if pipelinesLoading || provisioningPipelines}
-              <PageLoading
-                message={provisioningPipelines
-                  ? `Setting up ${starterPackStatus?.pack.displayName ?? "default"} pipelines…`
-                  : "Loading pipelines..."}
-              />
-            {:else if pipelines.length === 0}
-              <PageEmpty
-                title="No pipelines yet"
-                description={starterPackStatus
-                  ? `Set up Install, Dev, and Build pipelines for ${starterPackStatus.pack.displayName}`
-                  : "Create a pipeline to automate install, dev, build, and deploy workflows for this project."}
-                icon={Code}
-                actionLabel={starterPackStatus
-                  ? "Setup default pipelines"
-                  : "Create pipeline"}
-                onAction={starterPackStatus
-                  ? handleSetupDefaultPipelines
-                  : handleCreatePipeline}
-              />
-            {:else}
-              <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {#each pipelines as pipeline (pipeline.id)}
-                  <Card>
-                    <CardHeader>
-                      <div class="flex items-start justify-between gap-2">
-                        <CardTitle class="text-base">{pipeline.name}</CardTitle>
-                        {#if pipeline.category}
-                          <Badge variant={categoryBadgeVariant(pipeline.category)}>
-                            {pipeline.category}
-                          </Badge>
-                        {/if}
-                      </div>
-                      {#if pipeline.description}
-                        <CardDescription>{pipeline.description}</CardDescription
-                        >
-                      {/if}
-                    </CardHeader>
-                    <CardContent class="space-y-2">
-                      <p class="text-sm text-muted-foreground">
-                        {pipeline.steps.length} step{pipeline.steps.length !== 1
-                          ? "s"
-                          : ""}
-                      </p>
-                      <div class="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onclick={() => handleExecutePipeline(pipeline.id)}
-                          disabled={!pipeline.enabled}
-                        >
-                          {runButtonLabel(pipeline)}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onclick={() => handleEditPipeline(pipeline)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onclick={() => handleDeletePipeline(pipeline.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                {/each}
-              </div>
-            {/if}
-
-            {#if !showBuilder && !pipelinesLoading && !provisioningPipelines}
-              <PipelineRunHistoryList
-                executions={runHistory}
-                loading={runHistoryLoading}
-                title="Run history"
-                description="Recent pipeline runs for this project"
-                showPipeline
-                onRefresh={loadRunHistory}
-                onSelect={handleViewRun}
-              />
-            {/if}
-        </TabsContent>
-
-        <TabsContent value="ci" class="mt-6 space-y-6">
-          <GitHubProjectActionsPanel
+        <TabsContent value="actions" class="mt-6 space-y-6">
+          <ProjectActionsPanel
             project={currentProject}
-            enabled={activeTab === "ci"}
+            enabled={activeTab === "actions"}
           />
         </TabsContent>
 

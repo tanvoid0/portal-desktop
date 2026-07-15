@@ -30,6 +30,7 @@ impl ScriptExecutionState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecuteScriptParams {
     pub block_id: Option<String>,
     pub command: String,

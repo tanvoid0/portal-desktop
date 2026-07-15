@@ -184,9 +184,6 @@ function normalizeAppSettings(
     updates:
       (app.updates as AppSettings["updates"] | undefined) ??
       DEFAULT_APP_SETTINGS.updates,
-    avatarEnabled:
-      (app.avatarEnabled as boolean | undefined) ??
-      (app.avatar_enabled as boolean | undefined),
     integrations: {
       github: {
         clientId:
@@ -294,7 +291,6 @@ function serializeAppSettings(app: AppSettings): Record<string, unknown> {
     notifications: app.notifications,
     privacy: app.privacy,
     updates: app.updates,
-    avatar_enabled: app.avatarEnabled,
     integrations: {
       github: {
         client_id: app.integrations?.github?.clientId ?? "",

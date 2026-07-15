@@ -1,6 +1,7 @@
 use crate::database::DatabaseManager;
 use crate::domains::scripts::repositories::ScriptExecutionRepository;
 use crate::process_ext::NoWindowExt;
+use crate::utils::pnpm_workspace::prepare_shell_command;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -9,6 +10,7 @@ use tokio::process::{Child, Command};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecuteScriptRequest {
     pub block_id: Option<String>,
     pub command: String,
@@ -17,6 +19,7 @@ pub struct ExecuteScriptRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScriptExecutionInfo {
     pub id: String,
     pub block_id: Option<String>,
@@ -64,14 +67,45 @@ impl ScriptExecutionService {
         resolved
     }
 
+    /// Build a short error message from exit code + captured output.
+    fn failure_message(exit_code: Option<i32>, output: &str) -> String {
+        let meaningful: Vec<&str> = output
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+        let tail = meaningful
+            .iter()
+            .rev()
+            .take(8)
+            .cloned()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        match (exit_code, tail.is_empty()) {
+            (Some(code), false) => format!("Exit code {code}\n{tail}"),
+            (Some(code), true) => format!("Exit code {code}"),
+            (None, false) => tail,
+            (None, true) => "Process failed with no output".to_string(),
+        }
+    }
+
     /// Execute a script and track it persistently
     pub async fn execute_script(&self, request: ExecuteScriptRequest) -> Result<String, String> {
         let execution_id = Uuid::new_v4().to_string();
         let parameters_json = serde_json::to_string(&request.parameters)
             .map_err(|e| format!("Failed to serialize parameters: {}", e))?;
 
-        // Resolve command with parameters
+        // Resolve command with parameters, then apply shell rewrites (e.g. broken pnpm workspace)
         let resolved_command = Self::resolve_command(&request.command, &request.parameters);
+        let exec_command = if let Some(ref wd) = request.working_directory {
+            prepare_shell_command(&resolved_command, wd)
+        } else {
+            resolved_command
+        };
 
         // Create execution record in database
         let _execution = self
@@ -79,7 +113,7 @@ impl ScriptExecutionService {
             .create(
                 execution_id.clone(),
                 request.block_id.clone(),
-                resolved_command.clone(),
+                exec_command.clone(),
                 parameters_json,
                 request.working_directory.clone(),
                 "user".to_string(),
@@ -93,7 +127,7 @@ impl ScriptExecutionService {
         }
 
         // Parse command - use shell for complex commands
-        let parts: Vec<&str> = resolved_command.split_whitespace().collect();
+        let parts: Vec<&str> = exec_command.split_whitespace().collect();
         if parts.is_empty() {
             self.repository
                 .update_status(
@@ -110,11 +144,11 @@ impl ScriptExecutionService {
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = Command::new("cmd");
             c.no_window();
-            c.args(["/C", &resolved_command]);
+            c.args(["/C", &exec_command]);
             c
         } else {
             let mut c = Command::new("sh");
-            c.args(["-c", &resolved_command]);
+            c.args(["-c", &exec_command]);
             c
         };
 
@@ -126,6 +160,7 @@ impl ScriptExecutionService {
         // Configure stdio
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
+        cmd.kill_on_drop(true);
 
         // Spawn process
         let mut child = match cmd.spawn() {
@@ -166,46 +201,54 @@ impl ScriptExecutionService {
         let running_processes = Arc::clone(&self.running_processes);
 
         tokio::spawn(async move {
+            // Read stdout + stderr in parallel (sequential reads can deadlock on full pipes)
+            let exec_id_out = exec_id_clone.clone();
+            let buffers_out = Arc::clone(&output_buffers);
+            let stdout_task = async move {
+                let mut lines = Vec::new();
+                if let Some(stdout) = stdout {
+                    let mut reader = BufReader::new(stdout).lines();
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        let formatted = format!("{}\n", line);
+                        {
+                            let mut bufs = buffers_out.lock().unwrap();
+                            if let Some(buf) = bufs.get_mut(&exec_id_out) {
+                                buf.push(formatted.clone());
+                            }
+                        }
+                        lines.push(formatted);
+                    }
+                }
+                lines
+            };
+
+            let exec_id_err = exec_id_clone.clone();
+            let buffers_err = Arc::clone(&output_buffers);
+            let stderr_task = async move {
+                let mut lines = Vec::new();
+                if let Some(stderr) = stderr {
+                    let mut reader = BufReader::new(stderr).lines();
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        let formatted = format!("[stderr] {}\n", line);
+                        {
+                            let mut bufs = buffers_err.lock().unwrap();
+                            if let Some(buf) = bufs.get_mut(&exec_id_err) {
+                                buf.push(formatted.clone());
+                            }
+                        }
+                        lines.push(formatted);
+                    }
+                }
+                lines
+            };
+
+            let (stdout_lines, stderr_lines) = tokio::join!(stdout_task, stderr_task);
             let mut combined_output = String::new();
-
-            // Read stdout
-            if let Some(stdout) = stdout {
-                let exec_id = exec_id_clone.clone();
-                let buffers = Arc::clone(&output_buffers);
-                let mut reader = BufReader::new(stdout).lines();
-
-                while let Ok(Some(line)) = reader.next_line().await {
-                    let formatted = format!("{}\n", line);
-                    combined_output.push_str(&formatted);
-
-                    // Update live buffer
-                    {
-                        let mut bufs = buffers.lock().unwrap();
-                        if let Some(buf) = bufs.get_mut(&exec_id) {
-                            buf.push(formatted);
-                        }
-                    }
-                }
+            for line in &stdout_lines {
+                combined_output.push_str(line);
             }
-
-            // Read stderr
-            if let Some(stderr) = stderr {
-                let exec_id = exec_id_clone.clone();
-                let buffers = Arc::clone(&output_buffers);
-                let mut reader = BufReader::new(stderr).lines();
-
-                while let Ok(Some(line)) = reader.next_line().await {
-                    let formatted = format!("[stderr] {}\n", line);
-                    combined_output.push_str(&formatted);
-
-                    // Update live buffer
-                    {
-                        let mut bufs = buffers.lock().unwrap();
-                        if let Some(buf) = bufs.get_mut(&exec_id) {
-                            buf.push(formatted);
-                        }
-                    }
-                }
+            for line in &stderr_lines {
+                combined_output.push_str(line);
             }
 
             // Wait for process to complete - extract child from map first, then await
@@ -214,28 +257,43 @@ impl ScriptExecutionService {
                 processes.remove(&exec_id_clone)
             };
 
-            let exit_status = if let Some(mut child) = child_opt {
-                child.wait().await.ok()
+            let wait_result = if let Some(mut child) = child_opt {
+                child.wait().await
             } else {
-                None
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Process handle lost before wait",
+                ))
             };
 
             // Update final status in database
-            let (status, exit_code) = match exit_status {
-                Some(status) => {
-                    if status.success() {
-                        ("success".to_string(), status.code())
-                    } else {
-                        ("failed".to_string(), status.code())
-                    }
+            let (status, exit_code, error) = match wait_result {
+                Ok(status) if status.success() => {
+                    ("success".to_string(), status.code(), None)
                 }
-                None => ("failed".to_string(), None),
+                Ok(status) => {
+                    let code = status.code();
+                    (
+                        "failed".to_string(),
+                        code,
+                        Some(Self::failure_message(code, &combined_output)),
+                    )
+                }
+                Err(e) => (
+                    "failed".to_string(),
+                    None,
+                    Some(format!(
+                        "{}\n{}",
+                        e,
+                        Self::failure_message(None, &combined_output)
+                    )),
+                ),
             };
 
             // Save output and final status
             let _ = repo.append_output(&exec_id_clone, &combined_output).await;
             let _ = repo
-                .update_status(&exec_id_clone, status, exit_code, None)
+                .update_status(&exec_id_clone, status, exit_code, error)
                 .await;
 
             // Clean up output buffer

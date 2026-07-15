@@ -1,5 +1,5 @@
 <!--
-  Global Pipeline Runs Page
+  Global Action Runs Page
 -->
 <script lang="ts">
   import { onMount } from "svelte";
@@ -21,7 +21,7 @@
   import { logger } from "$lib/domains/shared";
   import { RefreshCw } from "@lucide/svelte";
 
-  const log = logger.createScoped("PipelineRunsPage");
+  const log = logger.createScoped("ActionRunsPage");
 
   let executions = $state<PipelineExecutionListItem[]>([]);
   let loading = $state(true);
@@ -75,13 +75,13 @@
 </script>
 
 <svelte:head>
-  <title>Pipeline Runs - Portal Desktop</title>
+  <title>Action Runs - Portal Desktop</title>
 </svelte:head>
 
 <div class="space-y-6">
   <PageHeader
-    title="Pipeline Runs"
-    description="Global history of pipeline executions across all projects."
+    title="Action Runs"
+    description="Global history of local action and pipeline executions."
   >
     {#snippet actions()}
       <Button variant="outline" onclick={loadExecutions} disabled={loading}>

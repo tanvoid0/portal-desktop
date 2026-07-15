@@ -345,16 +345,19 @@ export function getStarterPackForProject(
   };
 }
 
-/** Ensure icon registry is loaded, then provision missing starter pipelines */
+/** @deprecated Prefer actions.forProject(project).list() — no longer writes DB rows */
 export async function autoProvisionStarterPipelines(
-  projectId: string,
-  project: Project,
-  existingPipelines: Pipeline[],
+  _projectId: string,
+  _project: Project,
+  _existingPipelines: Pipeline[],
 ): Promise<Pipeline[]> {
-  await projectIconRegistry.ensureLoaded();
-  return provisionStarterPipelines(projectId, project, existingPipelines);
+  log.info(
+    "autoProvisionStarterPipelines is a no-op; use the Actions catalog instead",
+  );
+  return [];
 }
 
+/** @deprecated Prefer actions.forProject(project) — kept for migration/tests only */
 export async function provisionStarterPipelines(
   projectId: string,
   project: Project,

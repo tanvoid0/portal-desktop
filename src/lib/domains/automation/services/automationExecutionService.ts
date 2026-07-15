@@ -25,12 +25,10 @@ import {
   scriptExecutionService,
   type ScriptExecutionInfo,
 } from "$lib/domains/scripts/services/scriptExecutionService";
-import type { Project } from "$lib/domains/projects/types";
 import type {
   ExecutePipelineRequest,
   Pipeline,
   PipelineExecution,
-  PipelineStep,
 } from "$lib/domains/projects/pipelines/types";
 import type {
   AutomationStepInput,
@@ -46,6 +44,7 @@ import {
 import {
   createAutomationContext,
   type AutomationContextOptions,
+  type AutomationProjectRef,
 } from "../utils/automationContext";
 import {
   normalizeStepRefs,
@@ -65,9 +64,9 @@ export interface RunAutomationOptions {
   variables?: Record<string, string | number | boolean>;
   secrets?: Record<string, string>;
   stopOnError?: boolean;
-  /** Optional: run via project pipeline (requires registered project) */
+  /** Optional: legacy — ignored for execution path (no throwaway pipelines) */
   projectId?: string;
-  project?: Pick<Project, "id" | "name" | "path" | "package_manager">;
+  project?: AutomationProjectRef;
 }
 
 export interface ResolveAutomationOptions {
@@ -75,7 +74,7 @@ export interface ResolveAutomationOptions {
   blocks: AutomationStepRef[];
   variables?: Record<string, string | number | boolean>;
   secrets?: Record<string, string>;
-  project?: Pick<Project, "id" | "name" | "path" | "package_manager">;
+  project?: AutomationProjectRef;
 }
 
 export interface AutomationStepResult {
@@ -170,14 +169,12 @@ class AutomationExecutionService {
     return preview.steps;
   }
 
-  /** Run blocks in any directory — no project or pipeline required */
+  /** Run blocks in any directory — no project or pipeline required.
+   * Prefer `actions.run` for the unified Actions API. */
   async run(options: RunAutomationOptions): Promise<AutomationRunResult> {
     const stopOnError = options.stopOnError ?? true;
 
-    if (options.projectId) {
-      return this.runViaPipeline(options);
-    }
-
+    // Always use script execution — never create throwaway DB pipelines
     const plan = await this.resolve({
       cwd: options.cwd,
       blocks: options.blocks,
@@ -210,6 +207,19 @@ class AutomationExecutionService {
 
         const finished = await this.waitForExecution(executionId, step.longRunning);
         const stepSuccess = finished.status === "success";
+        const failureError = stepSuccess
+          ? undefined
+          : finished.error?.trim() ||
+            (finished.exitCode != null
+              ? `Exit code ${finished.exitCode}`
+              : undefined) ||
+            finished.output
+              ?.split(/\r?\n/)
+              .map((l) => l.trim())
+              .filter(Boolean)
+              .slice(-6)
+              .join("\n") ||
+            `Execution ${finished.status}`;
 
         results.push({
           name: step.name,
@@ -219,7 +229,7 @@ class AutomationExecutionService {
           executionId,
           exitCode: finished.exitCode,
           output: finished.output,
-          error: finished.error ?? undefined,
+          error: failureError,
         });
 
         if (!stepSuccess) {
@@ -267,17 +277,17 @@ class AutomationExecutionService {
   }
 
   forProject(
-    project: Pick<Project, "id" | "name" | "path" | "package_manager">,
+    project: AutomationProjectRef,
   ): AutomationRunner & { runAsPipeline: (blocks: AutomationStepRef[]) => Promise<AutomationRunResult> } {
     const runner = this.in(project.path, project);
     return {
       ...runner,
+      /** @deprecated Use actions.forProject(project).run(...) — no longer creates DB pipelines */
       runAsPipeline: (blocks) =>
         this.run({
           cwd: project.path,
           blocks,
           project,
-          projectId: project.id,
         }),
     };
   }
@@ -363,93 +373,6 @@ class AutomationExecutionService {
       await new Promise((r) => setTimeout(r, pollMs));
     }
   }
-
-  private async runViaPipeline(
-    options: RunAutomationOptions,
-  ): Promise<AutomationRunResult> {
-    if (!options.projectId) {
-      throw new Error("projectId required for pipeline execution");
-    }
-
-    const plan = await this.resolve({
-      cwd: options.cwd,
-      blocks: options.blocks,
-      variables: options.variables,
-      secrets: options.secrets,
-      project: options.project,
-    });
-
-    const steps: PipelineStep[] = plan.map((resolved) => ({
-      id: resolved.id,
-      blockId: resolved.blockId,
-      name: resolved.name,
-      config: {
-        command: resolved.command,
-        longRunning: resolved.longRunning,
-        workingDirectory: resolved.workingDirectory,
-        ...resolved.parameters,
-      },
-      dependsOn: resolved.dependsOn,
-    }));
-
-    const context = this.buildContext({
-      cwd: options.cwd,
-      variables: options.variables,
-      secrets: options.secrets,
-      project: options.project,
-    });
-
-    const pipeline = await pipelineService.createPipeline({
-      name: `Automation ${new Date().toISOString()}`,
-      projectId: options.projectId,
-      steps,
-      variables: Object.entries(context.variables ?? {}).map(([name, value]) => ({
-        name,
-        value,
-        type: "string" as const,
-        scope: "pipeline" as const,
-      })),
-      executionContext: {
-        type: "sdk",
-        workingDirectory: options.cwd,
-      },
-      enabled: true,
-    });
-
-    const execution = await this.executePipeline({
-      pipelineId: pipeline.id,
-      variables: Object.fromEntries(
-        Object.entries(options.variables ?? {}).map(([k, v]) => [
-          k,
-          typeof v === "boolean" ? (v ? "true" : "false") : String(v),
-        ]),
-      ),
-      secrets: options.secrets,
-    });
-
-    const stepResults: AutomationStepResult[] = (execution.stepExecutions ?? []).map(
-      (s) => ({
-        name: s.stepName,
-        command: "",
-        blockId: "",
-        status:
-          s.status === "success"
-            ? "success"
-            : s.status === "skipped"
-              ? "skipped"
-              : "failed",
-        exitCode: s.exitCode,
-        output: s.output,
-        error: s.error,
-      }),
-    );
-
-    return {
-      success: execution.status === "success",
-      cwd: options.cwd,
-      steps: stepResults,
-    };
-  }
 }
 
 export const automationExecutionService =
@@ -474,9 +397,8 @@ export const automation = {
     automationExecutionService.in(cwd, project),
 
   /** Bind to a registered project */
-  forProject: (
-    project: Pick<Project, "id" | "name" | "path" | "package_manager">,
-  ) => automationExecutionService.forProject(project),
+  forProject: (project: AutomationProjectRef) =>
+    automationExecutionService.forProject(project),
 
   /** Common block sequences */
   presets,

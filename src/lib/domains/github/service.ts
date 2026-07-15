@@ -11,16 +11,19 @@ import type {
   GitHubDeviceFlowCallbacks,
   GitHubDeviceFlowPollResult,
   GitHubDeviceFlowStart,
+  GitHubDispatchWorkflowRequest,
   GitHubIssue,
   GitHubLinkExistingRepositoryRequest,
   GitHubListIssuesRequest,
   GitHubListWorkflowRunsRequest,
+  GitHubListWorkflowsRequest,
   GitHubLocalRepositoryDetection,
   GitHubProjectLink,
   GitHubProjectLinkResult,
   GitHubRepoProjects,
   GitHubRepository,
   GitHubUpdateIssueRequest,
+  GitHubWorkflow,
   GitHubWorkflowRun,
   GitHubWorkflowRunDetail,
 } from "./types";
@@ -250,6 +253,20 @@ class GitHubService {
     return invokeClient.post<GitHubWorkflowRun[]>("github_list_workflow_runs", {
       request,
     });
+  }
+
+  async listWorkflows(
+    request: GitHubListWorkflowsRequest,
+  ): Promise<GitHubWorkflow[]> {
+    return invokeClient.post<GitHubWorkflow[]>("github_list_workflows", {
+      request,
+    });
+  }
+
+  async dispatchWorkflow(
+    request: GitHubDispatchWorkflowRequest,
+  ): Promise<void> {
+    await invokeClient.post<void>("github_dispatch_workflow", { request });
   }
 
   async getWorkflowRun(

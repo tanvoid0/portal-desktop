@@ -195,7 +195,7 @@ impl ExecutionService {
         steps: Vec<Value>,
         project_path: String,
         variables: HashMap<String, String>,
-        build_command: Option<String>,
+        _build_command: Option<String>,
         detected_pm: String,
         children: Arc<Mutex<Vec<Child>>>,
         mut cancel_rx: watch::Receiver<bool>,
@@ -254,20 +254,10 @@ impl ExecutionService {
 
                 let mut command = substitute_variables(&command_template, &variables);
 
-                if is_install_step(&command_template) {
-                    command = normalize_package_manager_command(&command, &detected_pm);
-                } else if is_build_step(&command_template, &step_name) {
-                    let source = build_command
-                        .as_deref()
-                        .filter(|s| !s.trim().is_empty())
-                        .unwrap_or(&command);
-                    command = normalize_node_script_command(source, &detected_pm, Some("build"));
-                } else if is_dev_step(&command_template, &step_name) {
-                    command = normalize_node_script_command(&command, &detected_pm, Some("dev"));
-                } else {
-                    command = normalize_package_manager_command(&command, &detected_pm);
-                    command = normalize_node_script_command(&command, &detected_pm, None);
-                }
+                // Honor the resolved command from the Actions catalog / FE.
+                // Only normalize the package-manager binary name — do not replace
+                // build/dev commands with project metadata heuristics.
+                command = normalize_package_manager_command(&command, &detected_pm);
 
                 self.set_step_running(&execution_id, &step_id).await?;
                 if let Ok(Some(exec)) = self.get_execution(&execution_id).await {
@@ -948,17 +938,20 @@ fn normalize_package_manager_command(command: &str, detected_pm: &str) -> String
     }
 }
 
+#[allow(dead_code)]
 fn is_install_step(command_template: &str) -> bool {
     let lower = command_template.to_lowercase();
     lower.contains("install") && !lower.contains("run install")
 }
 
+#[allow(dead_code)]
 fn is_build_step(command_template: &str, step_name: &str) -> bool {
     let lower = command_template.to_lowercase();
     let name_lower = step_name.to_lowercase();
     lower.contains("run build") || lower.ends_with(" build") || name_lower.contains("build")
 }
 
+#[allow(dead_code)]
 fn is_dev_step(command_template: &str, step_name: &str) -> bool {
     let lower = command_template.to_lowercase();
     let name_lower = step_name.to_lowercase();
@@ -967,6 +960,7 @@ fn is_dev_step(command_template: &str, step_name: &str) -> bool {
 }
 
 /// Normalize package-manager script commands, respecting pnpm/yarn shorthand.
+#[allow(dead_code)]
 fn normalize_node_script_command(command: &str, detected_pm: &str, script: Option<&str>) -> String {
     let trimmed = command.trim();
     if trimmed.is_empty() {

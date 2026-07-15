@@ -4,6 +4,14 @@ Architecture guides, patterns, and development best practices.
 
 ## 📚 Documentation
 
+### [Actions](./ACTIONS.md)
+
+Unified project Actions model (local / GitHub / n8n):
+
+- Smart defaults from project metadata
+- Optional `.portal/pipeline.yml`
+- `actions.run` / list / workflow API
+
 ### [Complete Project Blueprint](./COMPLETE_PROJECT_BLUEPRINT.md)
 
 Comprehensive project architecture and structure:

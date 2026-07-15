@@ -239,3 +239,31 @@ pub struct GitHubListWorkflowRunsRequest {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubWorkflow {
+    pub id: i64,
+    pub name: String,
+    pub path: String,
+    pub state: String,
+    pub html_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubListWorkflowsRequest {
+    pub owner: String,
+    pub repo: String,
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubDispatchWorkflowRequest {
+    pub owner: String,
+    pub repo: String,
+    pub workflow_id: i64,
+    pub ref_name: String,
+}

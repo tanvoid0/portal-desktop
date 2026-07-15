@@ -26,7 +26,6 @@
   import QRCodeDialog from "$lib/components/QRCodeDialog.svelte";
   import DeviceApprovalDialog from "$lib/components/DeviceApprovalDialog.svelte";
   import DeviceAuthGuard from "$lib/components/DeviceAuthGuard.svelte";
-  import FloatingAvatar from "$lib/components/ai/FloatingAvatar.svelte";
   import { isTauriEnvironment } from "$lib/utils/tauri";
   import { InvokeClient } from "$lib/utils/invokeClient";
   import {
@@ -464,9 +463,6 @@
 
   <!-- Global confirmation dialog -->
   <ConfirmDialog />
-
-  <!-- Floating Avatar Assistant -->
-  <FloatingAvatar />
 
   <!-- QR Code Dialog -->
   <QRCodeDialog bind:open={qrCodeDialogOpen} />
