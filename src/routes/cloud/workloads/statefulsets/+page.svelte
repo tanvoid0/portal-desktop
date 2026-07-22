@@ -60,7 +60,7 @@
     ).length,
   });
 
-  const statusOptions = $derived(() => {
+  const statusOptions = $derived.by(() => {
     const statuses = new Set(
       $cloudStore.resources[ResourceType.STATEFULSET].map(
         (ss: any) => ss.status,
@@ -199,12 +199,12 @@
       bind:value={searchQuery}
       class="max-w-sm"
     />
-    {#if statusOptions().length > 0}
+    {#if statusOptions.length > 0}
       <Select
         bind:value={statusFilter}
         options={[
           { value: "", label: "All Statuses" },
-          ...statusOptions().map((status) => ({ value: status, label: status })),
+          ...statusOptions.map((status) => ({ value: status, label: status })),
         ]}
         class="w-[180px]"
       />

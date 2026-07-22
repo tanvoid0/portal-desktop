@@ -135,7 +135,7 @@
     replaceState(url, {});
   }
 
-  const ports = $derived(() => {
+  const ports = $derived.by(() => {
     if (!service || !service.metadata?.ports) return [];
     const portArray = Array.isArray(service.metadata.ports)
       ? service.metadata.ports
@@ -151,7 +151,7 @@
     }));
   });
 
-  const selector = $derived(() => {
+  const selector = $derived.by(() => {
     if (!service || !service.metadata?.selector) return {};
     return service.metadata.selector || {};
   });
@@ -231,9 +231,9 @@
               <CardTitle>Ports</CardTitle>
             </CardHeader>
             <CardContent>
-              {#if ports().length > 0}
+              {#if ports.length > 0}
                 <div class="space-y-2">
-                  {#each ports() as port (port.port)}
+                  {#each ports as port (port.port)}
                     <div class="rounded-md border p-3">
                       <div class="flex items-center justify-between">
                         <div>

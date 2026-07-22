@@ -59,15 +59,15 @@
   let lastUpdate = $state<string | null>(null);
 
   // Derived state
-  let healthStatus = $derived(() => {
+  let healthStatus = $derived.by(() => {
     if (!health) return "unknown";
     if (health.is_healthy) return "healthy";
     if (health.error_message) return "error";
     return "unhealthy";
   });
 
-  let statusColor = $derived(() => {
-    switch (healthStatus()) {
+  let statusColor = $derived.by(() => {
+    switch (healthStatus) {
       case "healthy":
         return "text-green-600";
       case "error":
@@ -79,8 +79,8 @@
     }
   });
 
-  let statusIcon = $derived(() => {
-    switch (healthStatus()) {
+  let statusIcon = $derived.by(() => {
+    switch (healthStatus) {
       case "healthy":
         return CheckCircle;
       case "error":
@@ -92,8 +92,8 @@
     }
   });
 
-  let statusText = $derived(() => {
-    switch (healthStatus()) {
+  let statusText = $derived.by(() => {
+    switch (healthStatus) {
       case "healthy":
         return "Healthy";
       case "error":
@@ -156,15 +156,15 @@
   <CardHeader class="pb-3">
     <div class="flex items-center justify-between">
       <CardTitle class="flex items-center gap-2">
-        {@const StatusIcon = statusIcon()}
-        <StatusIcon class="h-5 w-5 {statusColor()}" />
+        {@const StatusIcon = statusIcon}
+        <StatusIcon class="h-5 w-5 {statusColor}" />
         Service Health
       </CardTitle>
       <div class="flex items-center gap-2">
         <Badge
-          variant={healthStatus() === "healthy" ? "default" : "destructive"}
+          variant={healthStatus === "healthy" ? "default" : "destructive"}
         >
-          {statusText()}
+          {statusText}
         </Badge>
         <Button
           variant="ghost"

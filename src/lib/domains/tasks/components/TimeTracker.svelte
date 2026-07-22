@@ -20,24 +20,24 @@
   let { onStartTracking, onStopTracking }: Props = $props();
 
   let elapsedTime = $state(0);
-  let intervalId: ReturnType<typeof setInterval> | null = null;
   let currentlyTrackingId = $derived(taskUi.timeTrackingSession?.taskId || null);
 
-  // Update elapsed time every second when tracking
+  // Update elapsed time every second when tracking. The cleanup return is what
+  // stops the interval — both on unmount and when the session changes.
   $effect(() => {
-    if (taskUi.currentlyTracking && taskUi.timeTrackingSession?.isActive) {
-      intervalId = setInterval(() => {
-        const now = new Date();
-        const startTime = new Date(taskUi.timeTrackingSession!.startTime);
-        elapsedTime = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-      }, 1000);
-    } else {
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
+    if (!taskUi.currentlyTracking || !taskUi.timeTrackingSession?.isActive) {
       elapsedTime = 0;
+      return;
     }
+
+    const startTime = new Date(taskUi.timeTrackingSession.startTime).getTime();
+    const tick = () => {
+      elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+    };
+
+    tick();
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
   });
 
   function formatTime(seconds: number): string {

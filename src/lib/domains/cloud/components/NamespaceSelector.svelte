@@ -13,7 +13,7 @@
   import KeyboardShortcutHint from "$lib/domains/k8s-navigation/components/KeyboardShortcutHint.svelte";
 
   // Get namespace list for selector
-  const namespaceOptions = $derived(() => {
+  const namespaceOptions = $derived.by(() => {
     const namespaces = $cloudStore.resources[ResourceType.NAMESPACE];
     const names = namespaces.map((ns: any) => ns.name).sort();
     return [
@@ -23,8 +23,8 @@
   });
 
   // Derived namespace shortcuts array
-  const namespaceShortcutsArray = $derived(() => {
-    return namespaceOptions()
+  const namespaceShortcutsArray = $derived.by(() => {
+    return namespaceOptions
       .slice(1)
       .map((opt, index) => ({
         value: opt.value,
@@ -35,7 +35,7 @@
 
   // Namespace shortcuts - pass getter function to make it reactive
   const namespaceShortcuts = useNamespaceShortcuts({
-    namespaces: () => namespaceShortcutsArray(),
+    namespaces: () => namespaceShortcutsArray,
     selectedNamespace: $cloudStore.selectedNamespace || "",
     onSelect: async (namespace) => {
       await handleNamespaceChange(namespace);
@@ -119,7 +119,7 @@
         >Namespace:</span
       >
       <SearchableSelect
-        options={namespaceOptions()}
+        options={namespaceOptions}
         value={$cloudStore.selectedNamespace || ""}
         placeholder="All Namespaces"
         searchPlaceholder="Search namespaces..."

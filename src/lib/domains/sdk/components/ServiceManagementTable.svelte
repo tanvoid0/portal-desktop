@@ -267,7 +267,7 @@
   }
 
   function selectAllServices() {
-    selectedServices = new Set(filteredServices().map((s) => s.id));
+    selectedServices = new Set(filteredServices.map((s) => s.id));
   }
 
   function clearSelection() {
@@ -275,7 +275,7 @@
   }
 
   // Filter services based on search term and status
-  let filteredServices = $derived(() => {
+  let filteredServices = $derived.by(() => {
     let filtered = services;
 
     // Search filter
@@ -359,7 +359,7 @@
         ></div>
         <span class="ml-2">Loading services...</span>
       </div>
-    {:else if filteredServices().length === 0}
+    {:else if filteredServices.length === 0}
       <div class="py-8 text-center text-muted-foreground">
         <Activity class="mx-auto mb-4 h-12 w-12 opacity-50" />
         <p>No services found</p>
@@ -377,8 +377,8 @@
             <tr class="border-b">
               <th class="p-3 text-left">
                 <Checkbox
-                  checked={selectedServices.size === filteredServices().length &&
-                    filteredServices().length > 0}
+                  checked={selectedServices.size === filteredServices.length &&
+                    filteredServices.length > 0}
                   onCheckedChange={(checked) => {
                     if (checked) selectAllServices();
                     else clearSelection();
@@ -394,7 +394,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each filteredServices() as service}
+            {#each filteredServices as service}
               {@const StatusIcon = getStatusIcon(service.status)}
               {@const HealthIcon = getHealthStatusIcon(service.health_status)}
               <tr class="border-b transition-colors hover:bg-muted/50">
@@ -560,7 +560,7 @@
       <!-- Service Stats -->
       <div class="divider-edge-t divider-edge-full flex items-center justify-between pt-4">
         <div class="text-sm text-muted-foreground">
-          {filteredServices().length} services
+          {filteredServices.length} services
           {#if selectedServices.size > 0}
             • {selectedServices.size} selected
           {/if}

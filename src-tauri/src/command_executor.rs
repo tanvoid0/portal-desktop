@@ -6,7 +6,9 @@ use std::path::Path;
  * This module provides a cross-platform command execution utility that handles
  * different operating systems and shell environments consistently.
  */
-use std::process::Command;
+use std::sync::OnceLock;
+use std::time::Duration;
+use tokio::process::Command;
 
 use crate::process_ext::NoWindowExt;
 
@@ -41,6 +43,38 @@ pub enum ShellType {
 
 /// Unified command executor
 pub struct CommandExecutor;
+
+/// Run a prepared command to completion, honouring `timeout_seconds`.
+///
+/// These all run inside `#[tauri::command]` async fns. A blocking
+/// `std::process::Command::output()` parks a tokio worker thread for the whole
+/// subprocess, so a handful of concurrent slow commands (git, docker, winget)
+/// is enough to stall every other IPC call behind them — the UI freezes.
+///
+/// `kill_on_drop` matters for the timeout path: without it, dropping the future
+/// abandons the child instead of terminating it.
+async fn run(
+    cmd: &mut Command,
+    timeout_seconds: Option<u64>,
+    describe: &str,
+) -> Result<CommandResult, String> {
+    cmd.kill_on_drop(true);
+
+    let output = match timeout_seconds {
+        Some(secs) => tokio::time::timeout(Duration::from_secs(secs), cmd.output())
+            .await
+            .map_err(|_| format!("{} timed out after {}s", describe, secs))?,
+        None => cmd.output().await,
+    }
+    .map_err(|e| format!("Failed to execute {}: {}", describe, e))?;
+
+    Ok(CommandResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        success: output.status.success(),
+        exit_code: output.status.code(),
+    })
+}
 
 impl CommandExecutor {
     /// Execute a command with options
@@ -77,22 +111,12 @@ impl CommandExecutor {
             }
         }
 
-        // Execute command
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to execute command '{}': {}", command, e))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        let success = output.status.success();
-        let exit_code = output.status.code();
-
-        Ok(CommandResult {
-            stdout,
-            stderr,
-            success,
-            exit_code,
-        })
+        run(
+            &mut cmd,
+            opts.timeout_seconds,
+            &format!("command '{}'", command),
+        )
+        .await
     }
 
     /// Execute a command with arguments (not shell-based)
@@ -119,25 +143,12 @@ impl CommandExecutor {
             }
         }
 
-        // Execute command
-        let output = cmd.output().map_err(|e| {
-            format!(
-                "Failed to execute command '{}' with args {:?}: {}",
-                command, args, e
-            )
-        })?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        let success = output.status.success();
-        let exit_code = output.status.code();
-
-        Ok(CommandResult {
-            stdout,
-            stderr,
-            success,
-            exit_code,
-        })
+        run(
+            &mut cmd,
+            opts.timeout_seconds,
+            &format!("command '{}' with args {:?}", command, args),
+        )
+        .await
     }
 
     /// Execute a shell command (cross-platform)
@@ -176,22 +187,12 @@ impl CommandExecutor {
             }
         }
 
-        // Execute command
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to execute shell command '{}': {}", command, e))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        let success = output.status.success();
-        let exit_code = output.status.code();
-
-        Ok(CommandResult {
-            stdout,
-            stderr,
-            success,
-            exit_code,
-        })
+        run(
+            &mut cmd,
+            opts.timeout_seconds,
+            &format!("shell command '{}'", command),
+        )
+        .await
     }
 
     /// Check if a command exists in PATH
@@ -219,7 +220,7 @@ impl CommandExecutor {
             ("cmd".to_string(), vec!["/C".to_string()])
         } else {
             // Try bash first, fallback to sh
-            if Self::shell_exists("bash") {
+            if Self::bash_exists() {
                 ("bash".to_string(), vec!["-c".to_string()])
             } else {
                 ("sh".to_string(), vec!["-c".to_string()])
@@ -227,14 +228,22 @@ impl CommandExecutor {
         }
     }
 
-    /// Check if a shell exists
-    fn shell_exists(shell: &str) -> bool {
-        Command::new(shell)
-            .no_window()
-            .arg("--version")
-            .output()
-            .map(|output| output.status.success())
-            .unwrap_or(false)
+    /// Whether `bash` is on PATH.
+    ///
+    /// Cached: the answer can't change while the app runs, and this used to
+    /// spawn a probe subprocess on *every* `execute()` call on non-Windows.
+    /// Deliberately the blocking `std::process` API — it runs at most once and
+    /// `get_shell_command` is sync.
+    fn bash_exists() -> bool {
+        static BASH_EXISTS: OnceLock<bool> = OnceLock::new();
+        *BASH_EXISTS.get_or_init(|| {
+            std::process::Command::new("bash")
+                .no_window()
+                .arg("--version")
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false)
+        })
     }
 }
 

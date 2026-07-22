@@ -40,7 +40,7 @@
   let isResetting = $state(false);
 
   // Get current section from URL
-  let currentSection = $derived(() => {
+  let currentSection = $derived.by(() => {
     const path = $page.url.pathname;
     if (path === "/settings" || path === "/settings/")
       return "general" as const;
@@ -235,7 +235,7 @@
     {#snippet sidebar()}
       <div class="p-4">
         <Card class="p-3">
-          <SettingsNavigation currentSection={currentSection()} />
+          <SettingsNavigation currentSection={currentSection} />
         </Card>
       </div>
     {/snippet}

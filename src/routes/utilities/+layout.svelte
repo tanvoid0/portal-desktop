@@ -9,7 +9,7 @@
 
   let { children }: { children: Snippet<[]> } = $props();
 
-  let currentSection = $derived(() => {
+  let currentSection = $derived.by(() => {
     const path = $page.url.pathname;
     if (path.startsWith("/utilities/environment")) return "environment" as const;
     if (path.startsWith("/utilities/disk")) return "disk" as const;
@@ -17,7 +17,7 @@
   });
 
   let containerVariant = $derived(
-    currentSection() === "disk" ? ("full" as const) : ("readable" as const),
+    currentSection === "disk" ? ("full" as const) : ("readable" as const),
   );
 </script>
 
@@ -46,7 +46,7 @@
     {#snippet sidebar()}
       <div class="p-4">
         <Card class="p-3">
-          <UtilitiesNavigation currentSection={currentSection()} />
+          <UtilitiesNavigation currentSection={currentSection} />
         </Card>
       </div>
     {/snippet}

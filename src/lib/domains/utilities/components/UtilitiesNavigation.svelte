@@ -36,7 +36,7 @@
     },
   ];
 
-  const activeSection = $derived((): UtilitySection => {
+  const activeSection = $derived.by((): UtilitySection => {
     if (currentSection) return currentSection;
     const path = $page.url.pathname;
     if (path.startsWith("/utilities/environment")) return "environment";
@@ -52,7 +52,7 @@
 <nav class="space-y-2 {className}">
   {#if sidebar.state === "collapsed"}
     {#each sections as section}
-      {@const isActive = activeSection() === section.id}
+      {@const isActive = activeSection === section.id}
       {@const Icon = section.icon}
       <SidebarMenuButton
         {isActive}
@@ -64,7 +64,7 @@
     {/each}
   {:else}
     {#each sections as section}
-      {@const isActive = activeSection() === section.id}
+      {@const isActive = activeSection === section.id}
       <Button
         type="button"
         variant="ghost"

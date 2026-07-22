@@ -385,7 +385,7 @@ status:
     }
   }
 
-  const containers = $derived(() => {
+  const containers = $derived.by(() => {
     if (!pod || !pod.metadata?.containers) return [];
     return Array.isArray(pod.metadata.containers)
       ? pod.metadata.containers
@@ -536,9 +536,9 @@ status:
               <CardTitle>Containers</CardTitle>
             </CardHeader>
             <CardContent>
-              {#if containers().length > 0}
+              {#if containers.length > 0}
                 <div class="space-y-3">
-                  {#each containers() as container}
+                  {#each containers as container}
                     <div class="rounded-lg border p-3">
                       <div class="mb-2 flex items-center justify-between">
                         <span class="font-medium"
@@ -864,9 +864,9 @@ status:
               Execute commands in a container within this pod. This will open a
               terminal session.
             </p>
-            {#if containers().length > 0}
+            {#if containers.length > 0}
               <div class="space-y-4">
-                {#each containers() as container}
+                {#each containers as container}
                   <div class="rounded-lg border p-4">
                     <div class="flex items-center justify-between">
                       <div>

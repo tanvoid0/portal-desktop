@@ -169,6 +169,9 @@ export default {
       },
       fontFamily: {
         sans: [
+          // "Inter Variable" is the family name @fontsource-variable/inter
+          // registers; plain "Inter" covers a system-installed copy.
+          "Inter Variable",
           "Inter",
           "system-ui",
           "-apple-system",

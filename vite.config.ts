@@ -6,8 +6,29 @@ import tailwindcss from "@tailwindcss/vite";
 const host = process.env.TAURI_DEV_HOST;
 const isProduction = process.env.NODE_ENV === "production";
 
+/**
+ * devicon's @font-face lists eot/ttf/woff/svg. Vite emits an asset for every
+ * `url()` it sees, so importing it ships ~9.5 MB of font formats that a Tauri
+ * WebView (always Chromium/WebKit) will never request. Rewrite the block to
+ * woff only — the relative url stays so the file is still hashed and emitted.
+ */
+function deviconWoffOnly() {
+  return {
+    name: "devicon-woff-only",
+    enforce: "pre" as const,
+    transform(code: string, id: string) {
+      if (!id.endsWith(".css") || !id.includes("devicon")) return null;
+      if (!/@font-face/.test(code)) return null;
+      return code.replace(
+        /@font-face\s*\{[^}]*\}/,
+        `@font-face{font-family:"devicon";src:url("fonts/devicon.woff") format("woff");font-weight:normal;font-style:normal;font-display:block}`,
+      );
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [tailwindcss(), sveltekit()],
+  plugins: [deviconWoffOnly(), tailwindcss(), sveltekit()],
 
   // Vite options tailored for Tauri development
   clearScreen: false,

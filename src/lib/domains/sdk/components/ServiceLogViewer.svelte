@@ -57,13 +57,13 @@
   let isStreaming = $state(false);
 
   // Derived state
-  let logLevels = $derived(() => {
+  let logLevels = $derived.by(() => {
     const levels = new Set(logs.map((log) => log.level));
     return Array.from(levels).sort();
   });
 
-  let filteredLogsCount = $derived(() => filteredLogs.length);
-  let totalLogsCount = $derived(() => logs.length);
+  let filteredLogsCount = $derived(filteredLogs.length);
+  let totalLogsCount = $derived(logs.length);
 
   // Initialize
   onMount(async () => {
@@ -219,7 +219,7 @@
       <Select
         options={[
           { value: "all", label: "All Levels" },
-          ...logLevels().map((level) => ({ value: level, label: level })),
+          ...logLevels.map((level) => ({ value: level, label: level })),
         ]}
         defaultValue={selectedLevel}
         onSelect={handleLevelChange}

@@ -169,7 +169,7 @@
 
   // Allow the parent layout to trim the sidebar navigation per-section.
   // This keeps the sidebar reusable and avoids page-specific nav markup.
-  let resolvedNavigationItems = $derived((): NavigationItem[] =>
+  let resolvedNavigationItems = $derived.by((): NavigationItem[] =>
     navigationItemIds?.length
       ? navigationItems.filter((item) => navigationItemIds.includes(item.id))
       : navigationItems,
@@ -212,7 +212,7 @@
   }
 
   // Convert SDK configs to SDKItem format
-  let languageSDKs = $derived(() => {
+  let languageSDKs = $derived.by(() => {
     return sdkConfigs
       .filter((config) => config.category === "language")
       .map((config) => {
@@ -245,7 +245,7 @@
       });
   });
 
-  let managerSDKs = $derived(() => {
+  let managerSDKs = $derived.by(() => {
     return sdkManagers.map((m) => {
       const rawVersion = m.version ? m.version.trim() : null;
       const version = rawVersion ? rawVersion.replace(/^v/, "") : null;
@@ -268,7 +268,7 @@
     });
   });
 
-  let databaseSDKs = $derived(() => {
+  let databaseSDKs = $derived.by(() => {
     return sdkConfigs
       .filter((config) => config.category === "database")
       .map((config) => {
@@ -294,7 +294,7 @@
       });
   });
 
-  let webServerSDKs = $derived(() => {
+  let webServerSDKs = $derived.by(() => {
     return sdkConfigs
       .filter((config) => config.category === "server")
       .map((config) => {
@@ -320,7 +320,7 @@
       });
   });
 
-  let containerSDKs = $derived(() => {
+  let containerSDKs = $derived.by(() => {
     return sdkConfigs
       .filter((config) => config.category === "container")
       .map((config) => {
@@ -346,7 +346,7 @@
       });
   });
 
-  let aiSDKs = $derived(() => {
+  let aiSDKs = $derived.by(() => {
     return sdkConfigs
       .filter((config) => config.category === "ai")
       .map((config) => {
@@ -385,16 +385,16 @@
     if (!selectedItem) return false;
     const listForCategory =
       category === "manager"
-        ? managerSDKs()
+        ? managerSDKs
         : category === "language"
-        ? languageSDKs()
+        ? languageSDKs
         : category === "database"
-          ? databaseSDKs()
+          ? databaseSDKs
           : category === "web"
-            ? webServerSDKs()
+            ? webServerSDKs
             : category === "container"
-              ? containerSDKs()
-              : aiSDKs();
+              ? containerSDKs
+              : aiSDKs;
     return listForCategory.some((s) => s.id === selectedItem);
   }
 
@@ -427,13 +427,13 @@
   }
 
   // Reactive state
-  let allSDKs = $derived(() => [
-    ...managerSDKs(),
-    ...languageSDKs(),
-    ...databaseSDKs(),
-    ...webServerSDKs(),
-    ...containerSDKs(),
-    ...aiSDKs(),
+  let allSDKs = $derived([
+    ...managerSDKs,
+    ...languageSDKs,
+    ...databaseSDKs,
+    ...webServerSDKs,
+    ...containerSDKs,
+    ...aiSDKs,
   ]);
 
   let selectedItem = $state<string | null>(null);
@@ -447,22 +447,22 @@
     if (!selectedItem) return;
     if (selectedItem === lastSelectedItemId) return;
 
-    if (managerSDKs().some((s) => s.id === selectedItem)) {
+    if (managerSDKs.some((s) => s.id === selectedItem)) {
       openSections = { ...openSections, manager: true };
     }
-    if (languageSDKs().some((s) => s.id === selectedItem)) {
+    if (languageSDKs.some((s) => s.id === selectedItem)) {
       openSections = { ...openSections, language: true };
     }
-    if (databaseSDKs().some((s) => s.id === selectedItem)) {
+    if (databaseSDKs.some((s) => s.id === selectedItem)) {
       openSections = { ...openSections, database: true };
     }
-    if (webServerSDKs().some((s) => s.id === selectedItem)) {
+    if (webServerSDKs.some((s) => s.id === selectedItem)) {
       openSections = { ...openSections, web: true };
     }
-    if (containerSDKs().some((s) => s.id === selectedItem)) {
+    if (containerSDKs.some((s) => s.id === selectedItem)) {
       openSections = { ...openSections, container: true };
     }
-    if (aiSDKs().some((s) => s.id === selectedItem)) {
+    if (aiSDKs.some((s) => s.id === selectedItem)) {
       openSections = { ...openSections, ai: true };
     }
 
@@ -474,8 +474,8 @@
     if (loading || managersLoading) return;
     if (selectedItem) return;
     if (openSections.language) return;
-    const hasManagers = managerSDKs().length > 0;
-    const hasLanguageSDKs = languageSDKs().length > 0;
+    const hasManagers = managerSDKs.length > 0;
+    const hasLanguageSDKs = languageSDKs.length > 0;
     openSections = {
       ...openSections,
       language: hasLanguageSDKs,
@@ -492,7 +492,7 @@
     package: Package,
   };
 
-  let sidebarLoading = $derived(() => loading || managersLoading);
+  let sidebarLoading = $derived(loading || managersLoading);
 
   // Map SDK types to their route paths - use dynamic route
   function getSDKRoute(sdkId: string, category: string): string {
@@ -674,7 +674,7 @@
       <div class="space-y-3 p-1">
         <!-- Navigation Section (icon-only) -->
         <div class="space-y-0.5">
-          {#each resolvedNavigationItems() as item}
+          {#each resolvedNavigationItems as item}
             <SidebarMenuButton
               size="sm"
               isActive={isNavigationItemActive(item.id)}
@@ -698,18 +698,18 @@
 
         <Separator />
 
-        {#if sidebarLoading()}
+        {#if sidebarLoading}
           <div class="py-4 text-center text-muted-foreground">
             <div class="mb-1 text-xl">⏳</div>
             <h3 class="text-sm font-medium">Loading SDKs...</h3>
           </div>
         {:else if
-          managerSDKs().length === 0 &&
-            languageSDKs().length === 0 &&
-            databaseSDKs().length === 0 &&
-            webServerSDKs().length === 0 &&
-            containerSDKs().length === 0 &&
-            aiSDKs().length === 0}
+          managerSDKs.length === 0 &&
+            languageSDKs.length === 0 &&
+            databaseSDKs.length === 0 &&
+            webServerSDKs.length === 0 &&
+            containerSDKs.length === 0 &&
+            aiSDKs.length === 0}
           <div class="py-4 text-center text-muted-foreground">
             <div class="mb-1 text-xl">🔍</div>
             <h3 class="mb-1 text-sm font-medium">No SDKs Detected</h3>
@@ -718,12 +718,12 @@
             </p>
           </div>
         {:else}
-          {#if managerSDKs().length > 0}
+          {#if managerSDKs.length > 0}
             <SDKCategorySection
               variant="collapsed"
               title="SDK Managers"
               iconComponent={Settings}
-              items={managerSDKs()}
+              items={managerSDKs}
               selectedItemId={selectedItem}
               collapsible={true}
               isOpen={openSections.manager}
@@ -734,17 +734,17 @@
               onServiceToggle={(sdk, next) =>
                 setServiceRunning(sdk, next)}
             />
-            {#if languageSDKs().length > 0}
+            {#if languageSDKs.length > 0}
               <Separator />
             {/if}
           {/if}
 
-          {#if languageSDKs().length > 0}
+          {#if languageSDKs.length > 0}
             <SDKCategorySection
               variant="collapsed"
               title={getCategoryName("language")}
               iconComponent={getCategoryIcon("language")}
-              items={languageSDKs()}
+              items={languageSDKs}
               selectedItemId={selectedItem}
               collapsible={true}
               isOpen={openSections.language}
@@ -757,13 +757,13 @@
             />
           {/if}
 
-          {#if databaseSDKs().length > 0}
+          {#if databaseSDKs.length > 0}
             <Separator />
             <SDKCategorySection
               variant="collapsed"
               title={getCategoryName("database")}
               iconComponent={getCategoryIcon("database")}
-              items={databaseSDKs()}
+              items={databaseSDKs}
               selectedItemId={selectedItem}
               collapsible={true}
               isOpen={openSections.database}
@@ -776,13 +776,13 @@
             />
           {/if}
 
-          {#if webServerSDKs().length > 0}
+          {#if webServerSDKs.length > 0}
             <Separator />
             <SDKCategorySection
               variant="collapsed"
               title={getCategoryName("web")}
               iconComponent={getCategoryIcon("web")}
-              items={webServerSDKs()}
+              items={webServerSDKs}
               selectedItemId={selectedItem}
               collapsible={true}
               isOpen={openSections.web}
@@ -795,13 +795,13 @@
             />
           {/if}
 
-          {#if containerSDKs().length > 0}
+          {#if containerSDKs.length > 0}
             <Separator />
             <SDKCategorySection
               variant="collapsed"
               title={getCategoryName("container")}
               iconComponent={getCategoryIcon("container")}
-              items={containerSDKs()}
+              items={containerSDKs}
               selectedItemId={selectedItem}
               collapsible={true}
               isOpen={openSections.container}
@@ -814,13 +814,13 @@
             />
           {/if}
 
-          {#if aiSDKs().length > 0}
+          {#if aiSDKs.length > 0}
             <Separator />
             <SDKCategorySection
               variant="collapsed"
               title="AI SDKs"
               iconComponent={getCategoryIcon("ai")}
-              items={aiSDKs()}
+              items={aiSDKs}
               selectedItemId={selectedItem}
               collapsible={true}
               isOpen={openSections.ai}
@@ -851,7 +851,7 @@
         <div class="space-y-2">
           <h3 class="text-xs font-medium text-muted-foreground">Navigation</h3>
           <div class="space-y-0.5">
-            {#each resolvedNavigationItems() as item}
+            {#each resolvedNavigationItems as item}
               <Button
                 variant="ghost"
                 class="flex h-auto w-full cursor-pointer items-center gap-2 rounded-md p-1.5 text-left {isNavigationItemActive(item.id)
@@ -883,12 +883,12 @@
 
         <Separator />
 
-        {#if managerSDKs().length > 0}
+        {#if managerSDKs.length > 0}
           <SDKCategorySection
             variant="expanded"
             title="SDK Managers"
             iconComponent={Settings}
-            items={managerSDKs()}
+            items={managerSDKs}
             selectedItemId={selectedItem}
             collapsible={true}
             isOpen={openSections.manager}
@@ -900,12 +900,12 @@
           />
         {/if}
 
-        {#if languageSDKs().length > 0}
+        {#if languageSDKs.length > 0}
           <SDKCategorySection
             variant="expanded"
             title={getCategoryName("language")}
             iconComponent={getCategoryIcon("language")}
-            items={languageSDKs()}
+            items={languageSDKs}
             selectedItemId={selectedItem}
             collapsible={true}
             isOpen={openSections.language}
@@ -920,12 +920,12 @@
 
         <Separator />
 
-        {#if databaseSDKs().length > 0}
+        {#if databaseSDKs.length > 0}
           <SDKCategorySection
             variant="expanded"
             title={getCategoryName("database")}
             iconComponent={getCategoryIcon("database")}
-            items={databaseSDKs()}
+            items={databaseSDKs}
             selectedItemId={selectedItem}
             collapsible={true}
             isOpen={openSections.database}
@@ -940,12 +940,12 @@
 
         <Separator />
 
-        {#if webServerSDKs().length > 0}
+        {#if webServerSDKs.length > 0}
           <SDKCategorySection
             variant="expanded"
             title={getCategoryName("web")}
             iconComponent={getCategoryIcon("web")}
-            items={webServerSDKs()}
+            items={webServerSDKs}
             selectedItemId={selectedItem}
             collapsible={true}
             isOpen={openSections.web}
@@ -960,12 +960,12 @@
 
         <Separator />
 
-        {#if containerSDKs().length > 0}
+        {#if containerSDKs.length > 0}
           <SDKCategorySection
             variant="expanded"
             title={getCategoryName("container")}
             iconComponent={getCategoryIcon("container")}
-            items={containerSDKs()}
+            items={containerSDKs}
             selectedItemId={selectedItem}
             collapsible={true}
             isOpen={openSections.container}
@@ -978,12 +978,12 @@
           />
         {/if}
 
-        {#if aiSDKs().length > 0}
+        {#if aiSDKs.length > 0}
           <SDKCategorySection
             variant="expanded"
             title="AI SDKs"
             iconComponent={getCategoryIcon("ai")}
-            items={aiSDKs()}
+            items={aiSDKs}
             selectedItemId={selectedItem}
             collapsible={true}
             isOpen={openSections.ai}
@@ -998,18 +998,18 @@
         {/if}
 
         <!-- No Data Fallback -->
-        {#if sidebarLoading()}
+        {#if sidebarLoading}
           <div class="py-4 text-center text-muted-foreground">
             <div class="mb-2 text-xl">⏳</div>
             <h3 class="mb-1 text-sm font-medium">Loading SDKs...</h3>
           </div>
         {:else if
-          managerSDKs().length === 0 &&
-            languageSDKs().length === 0 &&
-            databaseSDKs().length === 0 &&
-            webServerSDKs().length === 0 &&
-            containerSDKs().length === 0 &&
-            aiSDKs().length === 0}
+          managerSDKs.length === 0 &&
+            languageSDKs.length === 0 &&
+            databaseSDKs.length === 0 &&
+            webServerSDKs.length === 0 &&
+            containerSDKs.length === 0 &&
+            aiSDKs.length === 0}
           <div class="py-4 text-center text-muted-foreground">
             <div class="mb-2 text-xl">🔍</div>
             <h3 class="mb-1 text-sm font-medium">No SDKs Detected</h3>
@@ -1026,7 +1026,7 @@
     <div class="divider-edge-t divider-edge-full p-3">
       <div class="space-y-1 text-center text-xs text-muted-foreground">
         <div>
-          {allSDKs().filter((sdk) => sdk.installed).length} of {allSDKs()
+          {allSDKs.filter((sdk) => sdk.installed).length} of {allSDKs
             .length} SDKs
         </div>
       </div>

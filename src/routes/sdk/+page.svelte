@@ -568,7 +568,7 @@
   }
 
   // Organize SDKs by category
-  let quickNavSDKs = $derived(() => {
+  let quickNavSDKs = $derived.by(() => {
     const categories: Record<string, any[]> = {
       manager: [],
       language: [],
@@ -810,7 +810,7 @@
           <CardContent>
             <div class="space-y-6">
               <!-- SDK Managers -->
-              {#if quickNavSDKs().manager.length > 0}
+              {#if quickNavSDKs.manager.length > 0}
                 <div class="space-y-3">
                   <div class="flex items-center gap-2">
                     <Package class="h-4 w-4 text-muted-foreground" />
@@ -819,7 +819,7 @@
                   <div
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
-                    {#each quickNavSDKs().manager as sdk}
+                    {#each quickNavSDKs.manager as sdk}
                       <Button
                         variant="outline"
                         onclick={() => handleSDKClick(sdk)}
@@ -861,7 +861,7 @@
               {/if}
 
               <!-- Language & Runtime -->
-              {#if quickNavSDKs().language.length > 0}
+              {#if quickNavSDKs.language.length > 0}
                 <div class="space-y-3">
                   <div class="flex items-center gap-2">
                     <Code class="h-4 w-4 text-muted-foreground" />
@@ -870,7 +870,7 @@
                   <div
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
-                    {#each quickNavSDKs().language as sdk}
+                    {#each quickNavSDKs.language as sdk}
                       <Button
                         variant="outline"
                         onclick={() => handleSDKClick(sdk)}
@@ -921,7 +921,7 @@
               {/if}
 
               <!-- Database Server -->
-              {#if quickNavSDKs().database.length > 0}
+              {#if quickNavSDKs.database.length > 0}
                 <div class="space-y-3">
                   <div class="flex items-center gap-2">
                     <Database class="h-4 w-4 text-muted-foreground" />
@@ -930,7 +930,7 @@
                   <div
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
-                    {#each quickNavSDKs().database as sdk}
+                    {#each quickNavSDKs.database as sdk}
                       <Button
                         variant="outline"
                         onclick={() => handleSDKClick(sdk)}
@@ -981,7 +981,7 @@
               {/if}
 
               <!-- Web Server -->
-              {#if quickNavSDKs().web.length > 0}
+              {#if quickNavSDKs.web.length > 0}
                 <div class="space-y-3">
                   <div class="flex items-center gap-2">
                     <Globe class="h-4 w-4 text-muted-foreground" />
@@ -990,7 +990,7 @@
                   <div
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
-                    {#each quickNavSDKs().web as sdk}
+                    {#each quickNavSDKs.web as sdk}
                       <Button
                         variant="outline"
                         onclick={() => handleSDKClick(sdk)}
@@ -1041,7 +1041,7 @@
               {/if}
 
               <!-- Container Platform -->
-              {#if quickNavSDKs().container.length > 0}
+              {#if quickNavSDKs.container.length > 0}
                 <div class="space-y-3">
                   <div class="flex items-center gap-2">
                     <Container class="h-4 w-4 text-muted-foreground" />
@@ -1050,7 +1050,7 @@
                   <div
                     class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
                   >
-                    {#each quickNavSDKs().container as sdk}
+                    {#each quickNavSDKs.container as sdk}
                       <Button
                         variant="outline"
                         onclick={() => handleSDKClick(sdk)}
@@ -1101,7 +1101,7 @@
               {/if}
 
               <!-- Empty State -->
-              {#if quickNavSDKs().manager.length === 0 && quickNavSDKs().language.length === 0 && quickNavSDKs().database.length === 0 && quickNavSDKs().web.length === 0 && quickNavSDKs().container.length === 0}
+              {#if quickNavSDKs.manager.length === 0 && quickNavSDKs.language.length === 0 && quickNavSDKs.database.length === 0 && quickNavSDKs.web.length === 0 && quickNavSDKs.container.length === 0}
                 <div class="py-8 text-center text-muted-foreground">
                   <AlertCircle class="mx-auto mb-2 h-12 w-12 opacity-50" />
                   <p class="mb-2 text-sm">No SDKs detected.</p>

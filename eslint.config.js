@@ -99,4 +99,14 @@ export default defineConfig(
       "portal/no-raw-ui-elements": "error",
     },
   },
+  {
+    // Applies everywhere runes are valid, including the ui/ primitives.
+    files: ["src/**/*.svelte", "src/**/*.svelte.ts", "src/**/*.ts"],
+    plugins: {
+      portal: portalPlugin,
+    },
+    rules: {
+      "portal/no-derived-closure": "error",
+    },
+  },
 );

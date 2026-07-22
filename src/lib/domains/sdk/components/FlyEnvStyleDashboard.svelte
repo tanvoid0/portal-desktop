@@ -104,7 +104,7 @@
   });
 
   // Group managers by category
-  let managersByCategory = $derived(() => {
+  let managersByCategory = $derived.by(() => {
     const categories: Record<string, any[]> = {
       language: [],
       web: [],
@@ -674,7 +674,7 @@
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">
-                {managersByCategory().language?.length || 0}
+                {managersByCategory.language?.length || 0}
               </div>
             </CardContent>
           </Card>
@@ -687,7 +687,7 @@
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">
-                {managersByCategory().web?.length || 0}
+                {managersByCategory.web?.length || 0}
               </div>
             </CardContent>
           </Card>
@@ -747,7 +747,7 @@
 
       <TabsContent value="managers" class="space-y-4">
         {#if managers.length > 0}
-          {#each Object.entries(managersByCategory()) as [category, categoryManagers]}
+          {#each Object.entries(managersByCategory) as [category, categoryManagers]}
             {#if categoryManagers && categoryManagers.length > 0}
               <Card>
                 <CardHeader>

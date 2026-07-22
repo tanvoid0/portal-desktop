@@ -255,7 +255,7 @@
 		}
 	}
 
-	const filteredBlocks = $derived(() => {
+	const filteredBlocks = $derived.by(() => {
 		let filtered: Block[] = blocks;
 
 		if (searchQuery) {
@@ -403,7 +403,7 @@
 		}
 	}
 
-	const filteredTemplates = $derived(() => {
+	const filteredTemplates = $derived.by(() => {
 		if (!templateSearchQuery) return templates;
 		const query = templateSearchQuery.toLowerCase();
 		return templates.filter(
@@ -503,7 +503,7 @@
 				<PageLoading message="Loading blocks..." />
 			{:else if loadError}
 				<PageError title="Failed to load blocks" message={loadError} onRetry={loadBlocks} />
-			{:else if filteredBlocks().length === 0}
+			{:else if filteredBlocks.length === 0}
 				<PageEmpty
 					title="No blocks found"
 					description="Create your first block to get started."
@@ -515,7 +515,7 @@
 				/>
 			{:else}
 				<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{#each filteredBlocks() as block (block.id)}
+					{#each filteredBlocks as block (block.id)}
 						{@const CategoryIcon = getCategoryIcon(block.category)}
 						<Card>
 							<CardHeader>
@@ -614,7 +614,7 @@
 			</div>
 
 			<!-- Templates Grid -->
-			{#if filteredTemplates().length === 0}
+			{#if filteredTemplates.length === 0}
 				<PageEmpty
 					title="No templates found"
 					description="Import a pipeline template to get started."
@@ -626,7 +626,7 @@
 				/>
 			{:else}
 				<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{#each filteredTemplates() as template (template.key)}
+					{#each filteredTemplates as template (template.key)}
 						<Card>
 							<CardHeader>
 								<div class="flex items-start justify-between">
