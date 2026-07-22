@@ -234,8 +234,7 @@ pub struct SettingsService {
 
 impl SettingsService {
     pub fn new() -> Self {
-        let mut settings_path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-        settings_path.push("portal-desktop");
+        let mut settings_path = crate::app_paths::config_dir();
         settings_path.push("settings.json");
 
         Self { settings_path }

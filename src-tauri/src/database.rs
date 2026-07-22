@@ -59,15 +59,6 @@ impl DatabaseManager {
         Ok(DatabaseManager { conn })
     }
 
-    /// Resolve the default application data directory using dirs crate.
-    pub fn default_data_dir() -> Result<PathBuf, sea_orm::DbErr> {
-        dirs::data_dir()
-            .map(|dir| dir.join("com.tan.portal-desktop"))
-            .ok_or_else(|| {
-                sea_orm::DbErr::Custom("Failed to resolve application data directory".to_string())
-            })
-    }
-
     pub fn get_connection(&self) -> &DatabaseConnection {
         &self.conn
     }
@@ -80,6 +71,17 @@ impl DatabaseManager {
         let new_db = data_dir.join("portal_desktop.db");
         if new_db.exists() {
             return;
+        }
+
+        // Data dir of the pre-rename identifier. Copy the whole directory so the
+        // disk-utility DB and any sibling state come across with the main DB.
+        if let Some(legacy_dir) =
+            dirs::data_dir().map(|d| d.join(crate::app_paths::LEGACY_APP_IDENTIFIER))
+        {
+            if legacy_dir.join("portal_desktop.db").exists() {
+                crate::app_paths::copy_files_into(&legacy_dir, data_dir);
+                return;
+            }
         }
 
         if let Ok(cwd) = std::env::current_dir() {

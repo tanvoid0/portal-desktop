@@ -249,7 +249,7 @@ impl CredentialService {
     /// Note: credentials encrypted under the previous path-derived key cannot be
     /// decrypted with this key and must be re-entered (pre-1.0 migration).
     fn get_master_key(&self) -> Result<[u8; 32], CredentialError> {
-        const SERVICE: &str = "com.tan.portal-desktop";
+        const SERVICE: &str = crate::app_paths::APP_IDENTIFIER;
         const KEY_NAME: &str = "credential-master-key-v1";
 
         let entry = keyring::Entry::new(SERVICE, KEY_NAME).map_err(|e| {
@@ -266,10 +266,16 @@ impl CredentialService {
                 "Stored master key has unexpected length".to_string(),
             )),
             Err(keyring::Error::NoEntry) => {
-                // First run: generate a random key and persist it in the keychain.
-                use rand::RngCore;
-                let mut key = [0u8; 32];
-                rand::rngs::OsRng.fill_bytes(&mut key);
+                // No entry under the current service name: either a genuine first run,
+                // or an install that predates the bundle-identifier rename. Carry the
+                // old key across when there is one, so existing credentials stay
+                // decryptable; otherwise mint a fresh random key.
+                let key = Self::legacy_master_key(KEY_NAME).unwrap_or_else(|| {
+                    use rand::RngCore;
+                    let mut key = [0u8; 32];
+                    rand::rngs::OsRng.fill_bytes(&mut key);
+                    key
+                });
                 entry.set_secret(&key).map_err(|e| {
                     CredentialError::EncryptionFailed(format!(
                         "Failed to store master key in keychain: {}",
@@ -283,6 +289,17 @@ impl CredentialService {
                 e
             ))),
         }
+    }
+
+    /// Master key stored under the pre-rename bundle identifier, if one is there.
+    /// Drop this once no pre-rename installs remain in the wild.
+    fn legacy_master_key(key_name: &str) -> Option<[u8; 32]> {
+        keyring::Entry::new(crate::app_paths::LEGACY_APP_IDENTIFIER, key_name)
+            .ok()?
+            .get_secret()
+            .ok()?
+            .try_into()
+            .ok()
     }
 }
 

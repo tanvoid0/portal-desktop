@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prepare a portal-desktop release:
+ * Prepare a Portal Desktop release:
  * - sync semver across package.json, tauri.conf.json, and Cargo.toml
  * - optionally prepend a RELEASE_NOTES.md section
  * - optionally create an annotated git tag vX.Y.Z
@@ -100,7 +100,7 @@ function writeVersions(version) {
 }
 
 /**
- * Refresh the `portal-desktop` entry in Cargo.lock to match Cargo.toml.
+ * Refresh the `portal_desktop` entry in Cargo.lock to match Cargo.toml.
  *
  * The release workflow's smoke job runs `cargo check --locked`, which refuses
  * to update the lock. Bumping Cargo.toml without this leaves the lock one
@@ -110,13 +110,13 @@ function writeVersions(version) {
  * @param {string} version
  */
 function syncCargoLock(version) {
-  run("cargo update -p portal-desktop --offline --manifest-path src-tauri/Cargo.toml");
+  run("cargo update -p portal_desktop --offline --manifest-path src-tauri/Cargo.toml");
 
   const lock = readFileSync(FILES.cargoLock, "utf8");
-  const entry = lock.match(/name = "portal-desktop"\nversion = "([^"]+)"/);
+  const entry = lock.match(/name = "portal_desktop"\nversion = "([^"]+)"/);
   if (entry?.[1] !== version) {
     throw new Error(
-      `Cargo.lock still reports portal-desktop ${entry?.[1] ?? "?"} after update; expected ${version}. ` +
+      `Cargo.lock still reports portal_desktop ${entry?.[1] ?? "?"} after update; expected ${version}. ` +
         `Release smoke (\`cargo check --locked\`) would fail.`,
     );
   }
@@ -179,7 +179,7 @@ function createTag(tag, version, dryRun) {
     return;
   }
 
-  run(`git tag -a ${tag} -m "portal-desktop v${version}"`);
+  run(`git tag -a ${tag} -m "Portal Desktop v${version}"`);
   console.log(`Created tag ${tag}`);
 }
 
@@ -294,7 +294,7 @@ After running:
   if (!flags.noTag && !flags.dryRun) {
     console.log(`  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git push origin main --tags`);
   } else {
-    console.log(`  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git tag -a ${tag} -m "portal-desktop v${nextVersion}"`);
+    console.log(`  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git tag -a ${tag} -m "Portal Desktop v${nextVersion}"`);
     console.log(`  ${nextVersion !== fromVersion || !flags.noNotes ? 5 : 4}. git push origin main --tags`);
   }
   console.log("");

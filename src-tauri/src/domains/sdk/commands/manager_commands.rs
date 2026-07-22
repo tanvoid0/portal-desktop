@@ -193,12 +193,14 @@ fn resolve_uninstall_workflow(config: &SDKManagerConfig) -> Option<ManagerWorkfl
     }
 }
 
+/// Whether `command` resolves on PATH.
+///
+/// Deliberately a PATH lookup, not a `<command> --version` spawn: this runs
+/// twice per manager while building the SDK manager list, and on Windows a
+/// spawn from a GUI process (no attached console) pops a console window each
+/// time. `which` resolves in-process and honours PATHEXT.
 fn has_command(command: &str) -> bool {
-    std::process::Command::new(command)
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    which::which(command).is_ok()
 }
 
 async fn execute_workflow(

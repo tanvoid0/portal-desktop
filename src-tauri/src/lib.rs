@@ -1,3 +1,4 @@
+mod app_paths;
 mod command_executor;
 mod database;
 mod domains;

@@ -58,7 +58,7 @@ runs:
         TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       with:
         tagName: ${{ github.event.inputs.tag || github.ref_name }}
-        releaseName: "portal-desktop v__VERSION__"
+        releaseName: "Portal Desktop v__VERSION__"
         releaseBody: |
           ## Portal Desktop v__VERSION__
 

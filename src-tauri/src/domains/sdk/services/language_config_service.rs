@@ -360,11 +360,11 @@ impl SDKConfigService {
             }
         }
 
-        // Try to check if binary exists in PATH
-        if let Ok(output) = Command::new("which").arg(binary).output() {
-            if output.status.success() {
-                return (true, None);
-            }
+        // Try to check if binary exists in PATH.
+        // In-process lookup, not a `which` spawn: `which` is not a Windows command,
+        // and spawning from a GUI process pops a console window per check.
+        if which::which(binary).is_ok() {
+            return (true, None);
         }
 
         // For conda, also check common installation paths
@@ -433,33 +433,31 @@ impl SDKConfigService {
 
         // Fallback: check if any of the binary names exist
         for binary_name in &detection.binary_names {
-            if let Ok(output) = Command::new("which").arg(binary_name).output() {
-                if output.status.success() {
-                    // Try to get version
-                    if let Ok(version_output) = Command::new(binary_name)
-                        .no_window()
-                        .arg("--version")
-                        .output()
-                    {
-                        if version_output.status.success() {
-                            // Some commands output to stderr instead of stdout
-                            let raw_output = if !version_output.stdout.is_empty() {
-                                String::from_utf8_lossy(&version_output.stdout)
-                                    .trim()
-                                    .to_string()
-                            } else if !version_output.stderr.is_empty() {
-                                String::from_utf8_lossy(&version_output.stderr)
-                                    .trim()
-                                    .to_string()
-                            } else {
-                                "installed".to_string()
-                            };
-                            let version = Self::parse_version_output(binary_name, &raw_output);
-                            return (true, Some(version));
-                        }
+            if which::which(binary_name).is_ok() {
+                // Try to get version
+                if let Ok(version_output) = Command::new(binary_name)
+                    .no_window()
+                    .arg("--version")
+                    .output()
+                {
+                    if version_output.status.success() {
+                        // Some commands output to stderr instead of stdout
+                        let raw_output = if !version_output.stdout.is_empty() {
+                            String::from_utf8_lossy(&version_output.stdout)
+                                .trim()
+                                .to_string()
+                        } else if !version_output.stderr.is_empty() {
+                            String::from_utf8_lossy(&version_output.stderr)
+                                .trim()
+                                .to_string()
+                        } else {
+                            "installed".to_string()
+                        };
+                        let version = Self::parse_version_output(binary_name, &raw_output);
+                        return (true, Some(version));
                     }
-                    return (true, None);
                 }
+                return (true, None);
             }
         }
 

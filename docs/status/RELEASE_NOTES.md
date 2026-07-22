@@ -1,5 +1,16 @@
 # Portal Desktop - Release Notes
 
+## Version 0.9.0
+
+### Highlights
+
+- The app is now named **Portal Desktop** everywhere: window title, installer, Start Menu, and OS search. It previously showed as `portal-desktop`.
+- ACTION REQUIRED (Windows): this release changes the bundle identifier, so it installs alongside the old build instead of replacing it. After updating, uninstall the old **portal-desktop** entry from Add/Remove Programs by hand. Your data is not affected — see below.
+- Your database, disk-utility data, settings, and saved credentials migrate automatically on first launch. Nothing needs re-entering. The old files are left in place, so nothing is lost if the migration fails.
+- Windows: detecting installed SDK managers and language binaries no longer flashes a console window. PATH lookups now resolve in-process instead of spawning `which`, which is not a Windows command anyway.
+
+---
+
 ## Version 0.8.0
 
 ### Highlights
