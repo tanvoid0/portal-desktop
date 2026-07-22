@@ -20,10 +20,9 @@
   interface Props {
     sections: NavSection[];
     currentPath: string;
-    onNavigate: (url: string) => void;
   }
 
-  let { sections = [], currentPath, onNavigate }: Props = $props();
+  let { sections = [], currentPath }: Props = $props();
 
   let submenuExpanded = $state<Record<string, boolean>>({});
 
@@ -48,8 +47,7 @@
     submenuExpanded = { ...submenuExpanded, [item.url]: open };
   }
 
-  function navigateToParent(item: NavItem) {
-    onNavigate(item.url);
+  function expandOnNavigate(item: NavItem) {
     submenuExpanded = { ...submenuExpanded, [item.url]: true };
   }
 </script>
@@ -74,18 +72,25 @@
                 size="lg"
                 isActive={isSubmenuActive(item, currentPath)}
                 tooltipContent={item.title}
-                onclick={() => navigateToParent(item)}
               >
-                <NavIcon icon={item.icon} />
-                <span class="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                {#if item.badge}
-                  <Badge
-                    variant="secondary"
-                    class="ml-auto mr-6 text-xs group-data-[collapsible=icon]:hidden"
+                {#snippet child({ props })}
+                  <a
+                    {...props}
+                    href={item.url}
+                    onclick={() => expandOnNavigate(item)}
                   >
-                    {item.badge}
-                  </Badge>
-                {/if}
+                    <NavIcon icon={item.icon} />
+                    <span class="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                    {#if item.badge}
+                      <Badge
+                        variant="secondary"
+                        class="ml-auto mr-6 text-xs group-data-[collapsible=icon]:hidden"
+                      >
+                        {item.badge}
+                      </Badge>
+                    {/if}
+                  </a>
+                {/snippet}
               </SidebarMenuButton>
               <CollapsibleTrigger>
                 {#snippet child({ props })}
@@ -105,7 +110,7 @@
                     <MenuSubItem>
                       <MenuSubButton
                         isActive={isNavItemActive(subItem.url, currentPath)}
-                        onclick={() => onNavigate(subItem.url)}
+                        href={subItem.url}
                       >
                         <NavIcon icon={subItem.icon} />
                         <span>{subItem.title}</span>
@@ -121,18 +126,21 @@
             size="lg"
             isActive={isNavItemActive(item.url, currentPath)}
             tooltipContent={item.title}
-            onclick={() => onNavigate(item.url)}
           >
-            <NavIcon icon={item.icon} />
-            <span class="group-data-[collapsible=icon]:hidden">{item.title}</span>
-            {#if item.badge}
-              <Badge
-                variant="secondary"
-                class="ml-auto text-xs group-data-[collapsible=icon]:hidden"
-              >
-                {item.badge}
-              </Badge>
-            {/if}
+            {#snippet child({ props })}
+              <a {...props} href={item.url}>
+                <NavIcon icon={item.icon} />
+                <span class="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                {#if item.badge}
+                  <Badge
+                    variant="secondary"
+                    class="ml-auto text-xs group-data-[collapsible=icon]:hidden"
+                  >
+                    {item.badge}
+                  </Badge>
+                {/if}
+              </a>
+            {/snippet}
           </SidebarMenuButton>
         {/if}
       {/each}

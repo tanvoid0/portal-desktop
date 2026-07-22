@@ -28,6 +28,7 @@
     Loader2,
   } from "@lucide/svelte";
   import { toast } from "$lib/utils/toast";
+  import { confirmAction } from "$lib/utils/confirm";
   import { logger } from "$lib/domains/shared";
   import { PageLoading, PageError } from "$lib/components/shell";
   import { get } from "svelte/store";
@@ -128,6 +129,13 @@
   }
 
   async function handleReset() {
+    const confirmed = await confirmAction(
+      "This resets every setting to its default, including theme and custom colors. This cannot be undone.",
+      "Reset all settings",
+      { confirmLabel: "Reset", destructive: true },
+    );
+    if (!confirmed) return;
+
     isResetting = true;
     try {
       await settingsActions.resetSettings();

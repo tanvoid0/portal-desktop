@@ -69,3 +69,14 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 [dev-dependencies]
 tempfile = "3.14"
 
+# Ship a smaller, faster binary. Slower to compile, so release-only — `cargo
+# build`/`cargo check` during development are unaffected.
+#
+# Deliberately NOT `panic = "abort"`: there are ~109 unwrap/expect sites, and
+# unwinding lets tokio contain a panic at the task boundary so one bad Tauri
+# command fails alone instead of taking the whole app down.
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
