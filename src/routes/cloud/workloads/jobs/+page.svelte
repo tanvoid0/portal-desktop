@@ -59,7 +59,7 @@
     ).length,
   });
 
-  const statusOptions = $derived(() => {
+  const statusOptions = $derived.by(() => {
     const statuses = new Set(
       $cloudStore.resources[ResourceType.JOB].map((j: any) => j.status),
     );
@@ -200,7 +200,7 @@
     <Select
       options={[
         { value: "", label: "All Statuses" },
-        ...statusOptions().map((s) => ({ value: s, label: s })),
+        ...statusOptions.map((s) => ({ value: s, label: s })),
       ]}
       bind:value={statusFilter}
       placeholder="Filter by status"

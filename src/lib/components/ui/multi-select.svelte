@@ -66,7 +66,7 @@
     options.filter((opt) => value.includes(opt.value)),
   );
 
-  const displayText = $derived(() => {
+  const displayText = $derived.by(() => {
     if (selectedOptions.length === 0) {
       return placeholder;
     }

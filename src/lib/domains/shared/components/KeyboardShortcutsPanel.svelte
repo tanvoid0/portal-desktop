@@ -46,7 +46,7 @@
   let isOpen = $state(false);
 
   // Normalize shortcuts to groups
-  const shortcutGroups = $derived(() => {
+  const shortcutGroups = $derived.by(() => {
     // If already in group format
     if (
       shortcuts.length > 0 &&
@@ -107,7 +107,7 @@
       </h3>
     {/if}
     <div class="space-y-3">
-      {#each shortcutGroups() as group}
+      {#each shortcutGroups as group}
         <div>
           {#if showCategoryHeaders}
             <h4
@@ -154,7 +154,7 @@
           class="space-y-4"
           style="max-height: {maxHeight}; overflow-y: auto;"
         >
-          {#each shortcutGroups() as group}
+          {#each shortcutGroups as group}
             <div>
               {#if showCategoryHeaders}
                 <h4
@@ -198,7 +198,7 @@
         class="space-y-6 px-6 pb-6"
         style="max-height: calc(80vh - 120px); overflow-y: auto;"
       >
-        {#each shortcutGroups() as group}
+        {#each shortcutGroups as group}
           <div>
             {#if showCategoryHeaders}
               <h4 class="mb-3 text-sm font-semibold">{group.title}</h4>

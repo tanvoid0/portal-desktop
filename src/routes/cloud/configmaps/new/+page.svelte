@@ -37,7 +37,7 @@
     }
   });
 
-  const namespaceOptions = $derived(() => {
+  const namespaceOptions = $derived.by(() => {
     const namespaces = $cloudStore.resources[ResourceType.NAMESPACE];
     return namespaces.map((ns: any) => ns.name).sort();
   });
@@ -186,7 +186,7 @@ ${dataSection}
               <Label for="namespace">Namespace *</Label>
               <Select
                 bind:value={namespace}
-                options={namespaceOptions()}
+                options={namespaceOptions}
                 placeholder="Select namespace"
               />
             </div>

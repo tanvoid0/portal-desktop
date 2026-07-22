@@ -216,7 +216,7 @@
   }
 
   // Filter versions based on search term
-  let filteredVersions = $derived(() => {
+  let filteredVersions = $derived.by(() => {
     if (!searchTerm.trim()) return versions;
 
     const term = searchTerm.toLowerCase();
@@ -239,7 +239,7 @@
   }
 
   function selectAllVersions() {
-    selectedVersions = new Set(filteredVersions().map((v) => v.version));
+    selectedVersions = new Set(filteredVersions.map((v) => v.version));
   }
 
   function clearSelection() {
@@ -315,7 +315,7 @@
         ></div>
         <span class="ml-2">Loading versions...</span>
       </div>
-    {:else if filteredVersions().length === 0}
+    {:else if filteredVersions.length === 0}
       <div class="py-8 text-center text-muted-foreground">
         <Download class="mx-auto mb-4 h-12 w-12 opacity-50" />
         <p>No versions found</p>
@@ -349,7 +349,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each filteredVersions() as version}
+            {#each filteredVersions as version}
               <tr class="border-b transition-colors hover:bg-muted/50">
                 <td class="p-3">
                   <Checkbox
@@ -469,7 +469,7 @@
       <!-- Version Stats -->
       <div class="divider-edge-t divider-edge-full flex items-center justify-between pt-4">
         <div class="text-sm text-muted-foreground">
-          {filteredVersions().length} versions
+          {filteredVersions.length} versions
           {#if selectedVersions.size > 0}
             • {selectedVersions.size} selected
           {/if}

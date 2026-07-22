@@ -133,7 +133,7 @@
 	}
 
 	// Filter scripts based on search query
-	const filteredScripts = $derived(() => {
+	const filteredScripts = $derived.by(() => {
 		if (!searchQuery.trim()) return scripts;
 		const query = searchQuery.toLowerCase();
 		return scripts.filter(script =>
@@ -158,7 +158,7 @@
 		<PageLoading message="Loading scripts..." />
 	{:else if error}
 		<PageError title="Failed to load scripts" message={error} onRetry={loadScripts} />
-	{:else if filteredScripts().length === 0}
+	{:else if filteredScripts.length === 0}
 		<PageEmpty
 			title="No scripts found"
 			description="Get started by creating your first custom script."
@@ -178,7 +178,7 @@
 			/>
 
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{#each filteredScripts() as script (script.id)}
+				{#each filteredScripts as script (script.id)}
 					{@const runningInstances = runningScripts.getByScriptId(script.id)}
 					<Card>
 						<CardHeader>

@@ -205,7 +205,7 @@
     }
   }
 
-  const labels = $derived(() => {
+  const labels = $derived.by(() => {
     if (!deployment || !deployment.metadata?.labels) return {};
     return deployment.metadata.labels || {};
   });

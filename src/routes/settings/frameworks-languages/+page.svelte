@@ -16,7 +16,7 @@
   import FrameworksSettings from "$lib/domains/settings/components/FrameworksSettings.svelte";
 
   // Get active tab from URL params or default to languages
-  const activeTab = $derived(() => {
+  const activeTab = $derived.by(() => {
     const tab = $page.url.searchParams.get("tab");
     if (
       tab === "languages" ||
@@ -49,7 +49,7 @@
     </p>
   </div>
 
-  <Tabs value={activeTab()} onValueChange={handleTabChange} class="w-full">
+  <Tabs value={activeTab} onValueChange={handleTabChange} class="w-full">
     <TabsList class="grid w-full grid-cols-3">
       <TabsTrigger value="languages" class="flex items-center gap-2">
         <svg

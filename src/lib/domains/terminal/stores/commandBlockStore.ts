@@ -32,6 +32,42 @@ const initialState: CommandBlockState = {
   listenerStarted: false,
 };
 
+/**
+ * Cap on the output retained per command block.
+ *
+ * Output arrives one PTY chunk at a time and every chunk re-concatenates the
+ * whole buffer here, then re-runs `stripForDisplay` over it in CommandBlock.
+ * Uncapped that is O(total²): a `cargo build` emitting a few MB stalls the UI
+ * for tens of seconds. The full stream is still in the terminal view itself —
+ * a block only needs enough scrollback to be readable.
+ *
+ * ponytail: bounds the pathological case but leaves O(cap × chunks) of strip
+ * work. If fast builds still feel choppy, coalesce chunks on a rAF before
+ * writing rather than raising/lowering this number.
+ */
+export const MAX_BLOCK_OUTPUT = 128 * 1024;
+export const TRUNCATION_NOTICE = "…[earlier output truncated]\n";
+/** How far past the cut point to look for a line boundary before hard-cutting. */
+const LINE_BOUNDARY_SCAN = 4096;
+
+/** Append a chunk, keeping only the trailing `MAX_BLOCK_OUTPUT` characters. */
+export function appendCapped(existing: string, content: string): string {
+  const combined = existing + content;
+  if (combined.length <= MAX_BLOCK_OUTPUT) return combined;
+
+  const excess = combined.length - MAX_BLOCK_OUTPUT;
+  // Prefer cutting at a line boundary so we don't slice an escape sequence in
+  // half — but only if one is close by. Scanning to an arbitrarily distant
+  // newline would discard live output (or everything, for output that has no
+  // newlines at all), so fall back to a hard cut.
+  const boundary = combined.indexOf("\n", excess);
+  const kept =
+    boundary !== -1 && boundary - excess <= LINE_BOUNDARY_SCAN
+      ? combined.slice(boundary + 1)
+      : combined.slice(excess);
+  return TRUNCATION_NOTICE + kept;
+}
+
 function parseDateMaybe(v: unknown): string {
   if (!v) return new Date().toISOString();
   const d = v instanceof Date ? v : new Date(String(v));
@@ -318,7 +354,7 @@ function createCommandBlockStore() {
         );
         if (idx === -1) return state;
         const next = existing.map((b, i) =>
-          i === idx ? { ...b, output: b.output + content } : b,
+          i === idx ? { ...b, output: appendCapped(b.output, content) } : b,
         );
         notifyTab(tabId, next);
         return {
@@ -332,7 +368,7 @@ function createCommandBlockStore() {
       update((state) => {
         const existing = state.blocksByTab[tabId] ?? [];
         const next = existing.map((b) =>
-          b.id === blockId ? { ...b, output: b.output + content } : b,
+          b.id === blockId ? { ...b, output: appendCapped(b.output, content) } : b,
         );
         notifyTab(tabId, next);
         return { ...state, blocksByTab: { ...state.blocksByTab, [tabId]: next } };

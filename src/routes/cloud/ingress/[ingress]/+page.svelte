@@ -136,12 +136,12 @@
     replaceState(url, {});
   }
 
-  const addresses = $derived(() => {
+  const addresses = $derived.by(() => {
     if (!ingress || !ingress.metadata?.addresses) return [];
     return ingress.metadata.addresses;
   });
 
-  const hosts = $derived(() => {
+  const hosts = $derived.by(() => {
     if (!ingress || !ingress.metadata?.ports) return [];
     return ingress.metadata.ports;
   });
@@ -212,27 +212,27 @@
             </CardContent>
           </Card>
 
-          {#if addresses().length > 0 || hosts().length > 0}
+          {#if addresses.length > 0 || hosts.length > 0}
             <Card>
               <CardHeader>
                 <CardTitle>Network Information</CardTitle>
               </CardHeader>
               <CardContent class="space-y-3">
-                {#if addresses().length > 0}
+                {#if addresses.length > 0}
                   <div>
                     <p class="text-sm text-muted-foreground">Addresses</p>
                     <div class="mt-1 flex flex-wrap gap-2">
-                      {#each addresses() as addr}
+                      {#each addresses as addr}
                         <Badge variant="outline">{addr}</Badge>
                       {/each}
                     </div>
                   </div>
                 {/if}
-                {#if hosts().length > 0}
+                {#if hosts.length > 0}
                   <div>
                     <p class="text-sm text-muted-foreground">Hosts</p>
                     <div class="mt-1 flex flex-wrap gap-2">
-                      {#each hosts() as host}
+                      {#each hosts as host}
                         <Badge variant="secondary">{host}</Badge>
                       {/each}
                     </div>

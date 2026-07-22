@@ -29,7 +29,7 @@
   }: Props = $props();
 
   // Filter projects based on type and search query
-  const filteredProjects = $derived(() => {
+  const filteredProjects = $derived.by(() => {
     let filtered = projects;
 
     // Filter by search query
@@ -57,7 +57,7 @@
 </script>
 
 <div class="space-y-4">
-  {#if filteredProjects().length === 0}
+  {#if filteredProjects.length === 0}
     <div class="py-12 text-center">
       <div class="mb-2 text-neutral-400 dark:text-neutral-500">
         <svg
@@ -87,7 +87,7 @@
     </div>
   {:else}
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {#each filteredProjects() as project (project.id)}
+      {#each filteredProjects as project (project.id)}
         <ProjectCard
           {project}
           onClick={onProjectClick}

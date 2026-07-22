@@ -173,7 +173,7 @@
   }
 
   // Filter aliases based on search term
-  let filteredAliases = $derived(() => {
+  let filteredAliases = $derived.by(() => {
     if (!searchTerm.trim()) return aliases;
 
     const term = searchTerm.toLowerCase();
@@ -232,7 +232,7 @@
       ></div>
       <span class="ml-2">Loading aliases...</span>
     </div>
-  {:else if filteredAliases().length === 0}
+  {:else if filteredAliases.length === 0}
     <div class="py-8 text-center text-muted-foreground">
       <Tag class="mx-auto mb-4 h-12 w-12 opacity-50" />
       <p>No aliases found</p>
@@ -245,7 +245,7 @@
   {:else}
     <!-- Aliases List -->
     <div class="space-y-3">
-      {#each filteredAliases() as alias}
+      {#each filteredAliases as alias}
         <Card class="transition-shadow hover:shadow-md">
           <CardContent class="p-4">
             <div class="flex items-center justify-between">

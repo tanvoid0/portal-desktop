@@ -120,7 +120,7 @@
 		goto('/scripts/new?import=true');
 	}
 
-	const filteredScripts = $derived(() => {
+	const filteredScripts = $derived.by(() => {
 		let filtered = scripts;
 
 		if (searchQuery) {
@@ -202,7 +202,7 @@
 		<PageLoading message="Loading scripts..." />
 	{:else if loadError}
 		<PageError title="Failed to load scripts" message={loadError} onRetry={loadScripts} />
-	{:else if filteredScripts().length === 0}
+	{:else if filteredScripts.length === 0}
 		<PageEmpty
 			title="No scripts found"
 			description="Create your first script to get started."
@@ -214,7 +214,7 @@
 		/>
 	{:else}
 		<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-			{#each filteredScripts() as script (script.id)}
+			{#each filteredScripts as script (script.id)}
 				<Card class="hover:border-primary/50 transition-colors cursor-pointer" onclick={() => handleViewScript(script)}>
 					<CardHeader class="pb-3">
 						<div class="flex items-start justify-between">

@@ -1,4 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
+/* Fonts and icon fonts are bundled, never fetched. This is a desktop app: a
+   remote @import here blocks first paint on a network round-trip and leaves
+   the UI unstyled when offline. */
+@import "@fontsource-variable/inter";
 @import "tailwindcss";
 @config "../tailwind.config.js";
 @plugin "@tailwindcss/typography";

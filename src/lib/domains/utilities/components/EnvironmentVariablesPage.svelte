@@ -75,30 +75,30 @@
     });
   }
 
-  const userRows = $derived(() =>
+  const userRows = $derived(
     rowsForScope("user").filter((row) => matchesSearch(row, userSearch)),
   );
 
-  const systemRows = $derived(() =>
+  const systemRows = $derived(
     rowsForScope("system").filter((row) => matchesSearch(row, systemSearch)),
   );
 
   const dirtyCount = $derived(
-    () => rows.filter((r) => r.isDirty || r.isNew || r.isDeleted).length,
+    rows.filter((r) => r.isDirty || r.isNew || r.isDeleted).length,
   );
 
-  const userDirtyCount = $derived(() => {
+  const userDirtyCount = $derived.by(() => {
     const changes = buildChanges(original, rows);
     return changes.filter((c) => c.scope === "user" || c.scope === "session")
       .length;
   });
 
-  const systemDirtyCount = $derived(() => {
+  const systemDirtyCount = $derived.by(() => {
     const changes = buildChanges(original, rows);
     return changes.filter((c) => c.scope === "system").length;
   });
 
-  const needsElevation = $derived(() => {
+  const needsElevation = $derived.by(() => {
     if (!permissions) return false;
     const changes = buildChanges(original, rows);
     return hasSystemChanges(changes) && !permissions.canEditSystem;
@@ -384,7 +384,7 @@
             </div>
           </CardHeader>
           <CardContent class="space-y-3">
-            {@render variableList(userRows())}
+            {@render variableList(userRows)}
           </CardContent>
         </Card>
       </TabsContent>
@@ -433,7 +433,7 @@
                 </AlertDescription>
               </Alert>
             {/if}
-            {@render variableList(systemRows())}
+            {@render variableList(systemRows)}
           </CardContent>
         </Card>
       </TabsContent>
@@ -446,7 +446,7 @@
         {:else}
           <Save class="mr-2 h-4 w-4" />
         {/if}
-        {needsElevation() ? "Save with elevation" : "Save all changes"}
+        {needsElevation ? "Save with elevation" : "Save all changes"}
       </Button>
       <Button
         variant="outline"

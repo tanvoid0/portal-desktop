@@ -57,7 +57,7 @@
   let { currentSection, className = "" }: Props = $props();
 
   // Check if we're in the AI settings section or any of its sub-sections
-  const isAiSection = $derived(() => {
+  const isAiSection = $derived.by(() => {
     const path = $page.url.pathname;
     return path.startsWith("/settings/ai");
   });
@@ -66,27 +66,27 @@
   let submenuExpanded = $state<Record<string, boolean>>({});
 
   function isSubmenuExpanded(sectionId: string): boolean {
-    if (sectionId === "frameworks-languages" && isFrameworksLanguagesSection()) {
+    if (sectionId === "frameworks-languages" && isFrameworksLanguagesSection) {
       return true;
     }
-    if (sectionId === "ai" && isAiSection()) {
+    if (sectionId === "ai" && isAiSection) {
       return true;
     }
     return submenuExpanded[sectionId] ?? false;
   }
 
   function handleSubmenuOpenChange(sectionId: string, open: boolean) {
-    if (sectionId === "frameworks-languages" && isFrameworksLanguagesSection() && !open) {
+    if (sectionId === "frameworks-languages" && isFrameworksLanguagesSection && !open) {
       return;
     }
-    if (sectionId === "ai" && isAiSection() && !open) {
+    if (sectionId === "ai" && isAiSection && !open) {
       return;
     }
     submenuExpanded = { ...submenuExpanded, [sectionId]: open };
   }
 
   // Check if we're in the frameworks-languages section or any of its sub-sections
-  const isFrameworksLanguagesSection = $derived(() => {
+  const isFrameworksLanguagesSection = $derived.by(() => {
     const path = $page.url.pathname;
     return (
       path.startsWith("/settings/frameworks-languages") ||
@@ -208,7 +208,7 @@
   ];
 
   // Derive current section from URL if not provided
-  const activeSection = $derived((): SettingsSectionType => {
+  const activeSection = $derived.by((): SettingsSectionType => {
     if (currentSection) {
       // Map framework-ides to ides
       return currentSection === "framework-ides" ? "ides" : currentSection;
@@ -253,13 +253,13 @@
   });
 
   // Get active sub-section for frameworks-languages
-  const activeSubSection = $derived(() => {
-    if (isAiSection()) {
+  const activeSubSection = $derived.by(() => {
+    if (isAiSection) {
       const path = $page.url.pathname;
       if (path.startsWith("/settings/ai/training")) return "training";
       return "providers";
     }
-    if (!isFrameworksLanguagesSection()) return null;
+    if (!isFrameworksLanguagesSection) return null;
     const path = $page.url.pathname;
     if (path.includes("/languages")) return "languages";
     if (path.includes("/package-managers")) return "package-managers";
@@ -284,7 +284,7 @@
   function handleCollapsedSectionClick(sectionId: string, path: string) {
     // Preserve the "tab" query param when collapsing from a sub-section.
     if (sectionId === "frameworks-languages") {
-      const tab = activeSubSection();
+      const tab = activeSubSection;
       if (tab) {
         goto(`${path}?tab=${tab}`);
         return;
@@ -292,7 +292,7 @@
     }
 
     if (sectionId === "ai") {
-      const sub = activeSubSection();
+      const sub = activeSubSection;
       if (sub === "training") {
         goto("/settings/ai/training");
         return;
@@ -306,7 +306,7 @@
 <nav class="space-y-2 {className}">
   {#if sidebar.state === "collapsed"}
     {#each sections as section}
-      {@const isActive = activeSection() === section.id}
+      {@const isActive = activeSection === section.id}
       {@const Icon = section.icon}
       <SidebarMenuButton
         {isActive}
@@ -318,7 +318,7 @@
     {/each}
   {:else}
     {#each sections as section}
-      {@const isActive = activeSection() === section.id}
+      {@const isActive = activeSection === section.id}
       {#if section.subSections}
         <Collapsible
           open={isSubmenuExpanded(section.id)}
@@ -353,7 +353,7 @@
           <CollapsibleContent>
             <div class="divider-edge-l ml-4 mt-1 space-y-1 pl-4">
               {#each section.subSections as subSection}
-                {@const isSubActive = activeSubSection() === subSection.id}
+                {@const isSubActive = activeSubSection === subSection.id}
                 <Button
                   type="button"
                   variant="ghost"

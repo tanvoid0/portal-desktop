@@ -91,7 +91,7 @@
     return unsubscribe;
   });
 
-  const filteredBlocks = $derived(() => {
+  const filteredBlocks = $derived.by(() => {
     if (!blockSearch.trim()) return blocks;
     const q = blockSearch.toLowerCase();
     return blocks.filter(
@@ -448,7 +448,7 @@
             <PageLoading message="Loading blocks…" />
           {:else}
             <div class="max-h-64 space-y-1 overflow-y-auto">
-              {#each filteredBlocks() as block (block.id)}
+              {#each filteredBlocks as block (block.id)}
                 <Button
                   type="button"
                   variant="outline"

@@ -38,7 +38,6 @@
     onClose,
     class: className = "",
   }: ToastProps = $props();
-  let progress = $state(100);
   let isRemoving = $state(false);
   let isVisible = $state(false);
 
@@ -103,22 +102,6 @@
     dismiss();
   }
 
-  // Progress bar animation
-  function updateProgress() {
-    if (duration > 0) {
-      const startTime = Date.now();
-      const updateInterval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const remaining = Math.max(0, duration - elapsed);
-        progress = (remaining / duration) * 100;
-
-        if (remaining <= 0) {
-          clearInterval(updateInterval);
-        }
-      }, 50);
-    }
-  }
-
   onMount(() => {
     // Show toast with animation
     setTimeout(() => {
@@ -127,7 +110,6 @@
 
     // Start auto-dismiss
     startTimer();
-    updateProgress();
   });
 </script>
 
@@ -178,15 +160,40 @@
     <X class="h-3.5 w-3.5" />
   </Button>
 
-  <!-- Progress bar -->
+  <!-- Progress bar — CSS-driven so it costs no main-thread work and can't
+       outlive the component the way a setInterval handle could. -->
   {#if duration > 0}
     <div
       class="absolute bottom-0 left-0 h-[2px] w-full overflow-hidden bg-border"
     >
       <div
-        class="h-full bg-muted-foreground/30 transition-all duration-75 ease-linear"
-        style="width: {progress}%"
+        class="toast-progress h-full w-full bg-muted-foreground/30"
+        style="animation-duration: {duration}ms"
       ></div>
     </div>
   {/if}
 </div>
+
+<style>
+  .toast-progress {
+    transform-origin: left;
+    animation-name: toast-progress;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+  }
+
+  @keyframes toast-progress {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast-progress {
+      animation: none;
+    }
+  }
+</style>

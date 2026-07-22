@@ -77,7 +77,7 @@
     ).length,
   });
 
-  const statusOptions = $derived(() => {
+  const statusOptions = $derived.by(() => {
     const statuses = new Set(
       $cloudStore.resources[ResourceType.DEPLOYMENT].map((d: any) => d.status),
     );
@@ -263,7 +263,7 @@
         <Select
           options={[
             { value: "", label: "All Statuses" },
-            ...statusOptions().map((s) => ({ value: s, label: s })),
+            ...statusOptions.map((s) => ({ value: s, label: s })),
           ]}
           bind:value={statusFilter}
           placeholder="All Statuses"

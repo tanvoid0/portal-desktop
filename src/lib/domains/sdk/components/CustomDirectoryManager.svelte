@@ -197,7 +197,7 @@
   }
 
   // Filter directories based on search term
-  let filteredDirectories = $derived(() => {
+  let filteredDirectories = $derived.by(() => {
     if (!searchTerm.trim()) return directories;
 
     const term = searchTerm.toLowerCase();
@@ -260,7 +260,7 @@
       ></div>
       <span class="ml-2">Loading directories...</span>
     </div>
-  {:else if filteredDirectories().length === 0}
+  {:else if filteredDirectories.length === 0}
     <div class="py-8 text-center text-muted-foreground">
       <FolderOpen class="mx-auto mb-4 h-12 w-12 opacity-50" />
       <p>No custom directories found</p>
@@ -273,7 +273,7 @@
   {:else}
     <!-- Directories Grid -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {#each filteredDirectories() as directory}
+      {#each filteredDirectories as directory}
         <Card class="transition-shadow hover:shadow-md">
           <CardHeader class="pb-3">
             <div class="flex items-start justify-between">

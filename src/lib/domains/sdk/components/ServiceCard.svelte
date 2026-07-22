@@ -66,7 +66,7 @@
   let showHealth = $state(false);
 
   // Derived state
-  let statusType = $derived(() => {
+  let statusType = $derived.by(() => {
     switch (service.status) {
       case "running":
         return "success";
@@ -83,7 +83,7 @@
     }
   });
 
-  let statusColor = $derived(() => {
+  let statusColor = $derived.by(() => {
     switch (service.status) {
       case "running":
         return "text-green-600";
@@ -100,7 +100,7 @@
     }
   });
 
-  let statusText = $derived(() => {
+  let statusText = $derived.by(() => {
     switch (service.status) {
       case "running":
         return "Running";
@@ -118,10 +118,10 @@
   });
 
   let canToggle = $derived(
-    () => service.status === "running" || service.status === "stopped",
+    service.status === "running" || service.status === "stopped",
   );
 
-  let buttonText = $derived(() => {
+  let buttonText = $derived.by(() => {
     switch (service.status) {
       case "running":
         return "Stop";
@@ -136,7 +136,9 @@
     }
   });
 
-  let buttonVariant = $derived(() => {
+  // Return type annotated so $derived.by infers the literal union rather than
+  // widening it to `string`, which Button's `variant` prop rejects.
+  let buttonVariant = $derived.by((): "destructive" | "default" | "secondary" => {
     switch (service.status) {
       case "running":
         return "destructive";
@@ -149,7 +151,7 @@
 
   // Event handlers
   function handleToggle() {
-    if (canToggle()) {
+    if (canToggle) {
       onToggle(service);
     }
   }
@@ -200,9 +202,9 @@
       <div class="flex items-center gap-2">
         <Badge
           variant={service.status === "running" ? "default" : "secondary"}
-          class="capitalize {statusColor()}"
+          class="capitalize {statusColor}"
         >
-          {statusText()}
+          {statusText}
         </Badge>
         {#if service.port}
           <Badge variant="outline" class="text-xs">
@@ -231,7 +233,7 @@
     {#if service.status === "starting" || service.status === "stopping"}
       <div class="space-y-2">
         <div class="flex justify-between text-sm">
-          <span>{statusText()}</span>
+          <span>{statusText}</span>
           <span>{service.progress || 0}%</span>
         </div>
         <Progress value={service.progress || 0} class="h-2" />
@@ -260,13 +262,13 @@
     <div class="flex items-center gap-2 pt-2">
       <Button
         onclick={handleToggle}
-        disabled={!canToggle()}
-        variant={buttonVariant()}
+        disabled={!canToggle}
+        variant={buttonVariant}
         size="sm"
         class="flex-1"
       >
         <Power class="mr-2 h-4 w-4" />
-        {buttonText()}
+        {buttonText}
       </Button>
 
       <Button
