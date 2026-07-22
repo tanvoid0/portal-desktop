@@ -1,5 +1,19 @@
 # Portal Desktop - Release Notes
 
+## Version 0.8.0
+
+### Highlights
+
+- Terminal: command block output is no longer quadratic — large builds (cargo, webpack) no longer stall the UI.
+- Startup: Inter and devicon are now bundled instead of fetched from Google Fonts and jsdelivr. The app renders correctly offline and makes no network requests at launch.
+- Fixed 63 miswritten $derived declarations that re-ran their bodies on every read; a lint rule now prevents regressions.
+- Fixed: Deployment Labels and Service Selector panels always showed "No labels/selector configured" regardless of data.
+- Fixed: Environment Variables page never enabled its Save button and never showed a pending-change count.
+- Fixed: SDK service log viewer showed raw function text instead of log counts.
+- Backend: shell commands no longer block the async runtime, and the previously ignored command timeout is now honoured.
+
+---
+
 ## Version 0.7.0
 
 ### Highlights
