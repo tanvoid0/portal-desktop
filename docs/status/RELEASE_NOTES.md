@@ -1,5 +1,14 @@
 # Portal Desktop - Release Notes
 
+## Version 0.7.0
+
+### Highlights
+
+- Security: remove leaked debug telemetry, sanitize markdown (XSS), tighten CSP, move credential master key to OS keychain
+- BREAKING: existing saved credentials must be re-entered (master key moved to OS keychain)
+
+---
+
 ## Version 0.6.0
 
 ### Highlights
