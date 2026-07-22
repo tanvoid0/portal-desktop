@@ -14,11 +14,21 @@
   import { FolderGit2, Lock, Globe, ExternalLink, Link2, GitFork } from "@lucide/svelte";
 
   let search = $state("");
+  // The query key is derived from the search term, so binding the input
+  // straight to it fired a GitHub API request per keystroke and filled the
+  // cache with an entry per prefix. Trail it instead.
+  let debouncedSearch = $state("");
+
+  $effect(() => {
+    const value = search;
+    const id = setTimeout(() => (debouncedSearch = value), 300);
+    return () => clearTimeout(id);
+  });
 
   const statusQuery = createGitHubStatusQuery();
   const isConnected = $derived(statusQuery.data?.connected ?? false);
   const reposQuery = createGitHubRepositoriesQuery(
-    () => search,
+    () => debouncedSearch,
     () => isConnected,
   );
   const repositories = $derived(reposQuery.data ?? []);

@@ -255,10 +255,16 @@
         },
       ];
 
-      // Check installation status for each manager
-      for (const manager of sdkManagers) {
-        managerInstallationStatus[manager.id] =
-          await sdkService.checkManagerInstalled(manager.id);
+      // Check installation status for each manager. These are independent
+      // probes — running them serially made page load N round-trips deep.
+      const installStatuses = await Promise.all(
+        sdkManagers.map(async (manager) => ({
+          id: manager.id,
+          installed: await sdkService.checkManagerInstalled(manager.id),
+        })),
+      );
+      for (const { id, installed } of installStatuses) {
+        managerInstallationStatus[id] = installed;
       }
 
       // Load service status for each SDK type

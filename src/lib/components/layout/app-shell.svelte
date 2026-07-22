@@ -63,8 +63,6 @@
     isLocalhost = InvokeClient.isLocalhost();
   });
 
-  let navigationLoading = $state(false);
-  let navigationError: string | null = $state(null);
   let isSdkPage = $derived($page.url.pathname.startsWith("/sdk"));
 
   const dashboardQuery = createDashboardOverviewQuery(() => ({
@@ -352,34 +350,14 @@
                 </div>
               </Button>
 
-              <!-- Sidebar Content -->
+              <!-- Sidebar Content — nav renders immediately; the dashboard
+                   query only supplies badge counts, so there is nothing to
+                   wait for. -->
               <div class="min-h-0 flex-1 overflow-y-auto">
-                {#if navigationLoading}
-                  <div class="flex items-center justify-center p-4">
-                    <div
-                      class="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"
-                    ></div>
-                    <span
-                      class="ml-2 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden"
-                      >Loading navigation...</span
-                    >
-                  </div>
-                {:else if navigationError}
-                  <div class="p-4">
-                    <div class="text-sm text-destructive">
-                      <p class="font-medium">Failed to load navigation</p>
-                      <p class="mt-1 text-xs text-muted-foreground">
-                        {navigationError}
-                      </p>
-                    </div>
-                  </div>
-                {:else}
-                  <NavSectionList
-                    sections={navigationSections}
-                    currentPath={$page.url.pathname}
-                    onNavigate={(url) => goto(url)}
-                  />
-                {/if}
+                <NavSectionList
+                  sections={navigationSections}
+                  currentPath={$page.url.pathname}
+                />
               </div>
 
               <!-- Sidebar Footer -->

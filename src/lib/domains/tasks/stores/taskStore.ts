@@ -15,6 +15,7 @@ import {
 } from "$lib/domains/shared/query";
 import { invalidateTaskCaches } from "../queries/invalidateTasks";
 import { taskUi } from "../state/taskUi.svelte";
+import { toastActions } from "$lib/utils/toast";
 
 // Mutation loading/error (list loading comes from TanStack Query)
 export const isLoading = writable(false);
@@ -39,10 +40,7 @@ export const taskActions = {
         err instanceof Error ? err.message : "Failed to load tasks";
       error.set(errorMessage);
       console.error("❌ Failed to load tasks:", err);
-
-      if (typeof window !== "undefined" && window.alert) {
-        window.alert(`Failed to load tasks: ${errorMessage}`);
-      }
+      toastActions.error("Failed to load tasks", errorMessage);
     } finally {
       isLoading.set(false);
     }

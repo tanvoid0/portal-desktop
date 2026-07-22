@@ -29,6 +29,7 @@ const FILES = {
   packageJson: join(ROOT, "package.json"),
   tauriConf: join(ROOT, "src-tauri/tauri.conf.json"),
   cargoToml: join(ROOT, "src-tauri/Cargo.toml"),
+  cargoLock: join(ROOT, "src-tauri/Cargo.lock"),
   releaseNotes: join(ROOT, "docs/status/RELEASE_NOTES.md"),
 };
 
@@ -96,6 +97,31 @@ function writeVersions(version) {
     throw new Error("Could not update version in src-tauri/Cargo.toml");
   }
   writeFileSync(FILES.cargoToml, updatedCargo);
+}
+
+/**
+ * Refresh the `portal-desktop` entry in Cargo.lock to match Cargo.toml.
+ *
+ * The release workflow's smoke job runs `cargo check --locked`, which refuses
+ * to update the lock. Bumping Cargo.toml without this leaves the lock one
+ * version behind, the smoke job fails, and it gates all four platform builds —
+ * so the tag publishes no binaries at all. This is what killed v0.7.0.
+ *
+ * @param {string} version
+ */
+function syncCargoLock(version) {
+  run("cargo update -p portal-desktop --offline --manifest-path src-tauri/Cargo.toml");
+
+  const lock = readFileSync(FILES.cargoLock, "utf8");
+  const entry = lock.match(/name = "portal-desktop"\nversion = "([^"]+)"/);
+  if (entry?.[1] !== version) {
+    throw new Error(
+      `Cargo.lock still reports portal-desktop ${entry?.[1] ?? "?"} after update; expected ${version}. ` +
+        `Release smoke (\`cargo check --locked\`) would fail.`,
+    );
+  }
+
+  console.log("Synced Cargo.lock");
 }
 
 /** @param {string} version @param {string[]} notes */
@@ -233,10 +259,11 @@ After running:
 
   if (nextVersion !== fromVersion) {
     if (flags.dryRun) {
-      console.log("[dry-run] would update package.json, tauri.conf.json, Cargo.toml");
+      console.log("[dry-run] would update package.json, tauri.conf.json, Cargo.toml, Cargo.lock");
     } else {
       writeVersions(nextVersion);
       console.log("Updated version files");
+      syncCargoLock(nextVersion);
     }
   } else {
     console.log("Version files already at target version");
