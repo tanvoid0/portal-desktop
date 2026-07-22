@@ -18,6 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Blocking guard: leftover debug telemetry must never ship (see #27).
+      - name: No debug telemetry
+        run: |
+          if grep -rnE '#region agent log|/ingest/|127\.0\.0\.1:7704' src/; then
+            echo "::error::Debug telemetry / agent-log blocks found in src/. Remove before merge."
+            exit 1
+          fi
+
       # pnpm must be installed before setup-node so its packageManager-based
       # cache detection can find pnpm on PATH.
       - name: Install pnpm
