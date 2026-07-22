@@ -1,53 +1,54 @@
-import { marked } from "marked";
-import hljs from "highlight.js/lib/core";
-import bash from "highlight.js/lib/languages/bash";
-import css from "highlight.js/lib/languages/css";
-import go from "highlight.js/lib/languages/go";
-import java from "highlight.js/lib/languages/java";
-import javascript from "highlight.js/lib/languages/javascript";
-import json from "highlight.js/lib/languages/json";
-import markdown from "highlight.js/lib/languages/markdown";
-import python from "highlight.js/lib/languages/python";
-import rust from "highlight.js/lib/languages/rust";
-import sql from "highlight.js/lib/languages/sql";
-import typescript from "highlight.js/lib/languages/typescript";
-import xml from "highlight.js/lib/languages/xml";
-import yaml from "highlight.js/lib/languages/yaml";
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+import hljs from 'highlight.js/lib/core';
+import bash from 'highlight.js/lib/languages/bash';
+import css from 'highlight.js/lib/languages/css';
+import go from 'highlight.js/lib/languages/go';
+import java from 'highlight.js/lib/languages/java';
+import javascript from 'highlight.js/lib/languages/javascript';
+import json from 'highlight.js/lib/languages/json';
+import markdown from 'highlight.js/lib/languages/markdown';
+import python from 'highlight.js/lib/languages/python';
+import rust from 'highlight.js/lib/languages/rust';
+import sql from 'highlight.js/lib/languages/sql';
+import typescript from 'highlight.js/lib/languages/typescript';
+import xml from 'highlight.js/lib/languages/xml';
+import yaml from 'highlight.js/lib/languages/yaml';
 
 const LANG_ALIASES: Record<string, string> = {
-  ts: "typescript",
-  tsx: "typescript",
-  js: "javascript",
-  jsx: "javascript",
-  py: "python",
-  rb: "ruby",
-  sh: "bash",
-  shell: "bash",
-  zsh: "bash",
-  yml: "yaml",
-  md: "markdown",
-  rs: "rust",
-  "c++": "cpp",
-  h: "c",
-  hpp: "cpp",
-  plaintext: "text",
-  txt: "text",
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  py: 'python',
+  rb: 'ruby',
+  sh: 'bash',
+  shell: 'bash',
+  zsh: 'bash',
+  yml: 'yaml',
+  md: 'markdown',
+  rs: 'rust',
+  'c++': 'cpp',
+  h: 'c',
+  hpp: 'cpp',
+  plaintext: 'text',
+  txt: 'text',
 };
 
 for (const [name, lang] of [
-  ["bash", bash],
-  ["css", css],
-  ["go", go],
-  ["java", java],
-  ["javascript", javascript],
-  ["json", json],
-  ["markdown", markdown],
-  ["python", python],
-  ["rust", rust],
-  ["sql", sql],
-  ["typescript", typescript],
-  ["xml", xml],
-  ["yaml", yaml],
+  ['bash', bash],
+  ['css', css],
+  ['go', go],
+  ['java', java],
+  ['javascript', javascript],
+  ['json', json],
+  ['markdown', markdown],
+  ['python', python],
+  ['rust', rust],
+  ['sql', sql],
+  ['typescript', typescript],
+  ['xml', xml],
+  ['yaml', yaml],
 ] as const) {
   hljs.registerLanguage(name, lang);
 }
@@ -69,43 +70,64 @@ function highlightCode(text: string, lang?: string | null): string {
     return hljs.highlight(text, { language: resolved }).value;
   }
   const auto = hljs.highlightAuto(text, [
-    "typescript",
-    "javascript",
-    "python",
-    "rust",
-    "bash",
-    "json",
-    "yaml",
-    "sql",
-    "go",
-    "java",
-    "css",
-    "xml",
-    "markdown",
+    'typescript',
+    'javascript',
+    'python',
+    'rust',
+    'bash',
+    'json',
+    'yaml',
+    'sql',
+    'go',
+    'java',
+    'css',
+    'xml',
+    'markdown',
   ]);
   return auto.value;
 }
 
 function escapeHtml(text: string): string {
   return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-const MARKDOWN_FENCE_LANGS = new Set(["markdown", "md"]);
+/** Allow only http(s)/mailto links; anything else (javascript:, data:) becomes inert. */
+function safeHref(href: string): string {
+  try {
+    const url = new URL(href, 'http://localhost');
+    if (['http:', 'https:', 'mailto:'].includes(url.protocol)) return href;
+  } catch {
+    // relative/hash links fail URL() with a base; treat those below
+  }
+  // Permit fragment and relative paths, reject scheme-bearing hrefs.
+  if (/^(#|\/|\.{0,2}\/)/.test(href)) return href;
+  return '#';
+}
+
+/**
+ * Sanitize rendered markdown HTML. DOMPurify needs a DOM; during SSR/prerender
+ * there is no window and no attacker-supplied chat content, so pass through.
+ */
+function sanitize(html: string): string {
+  if (typeof window === 'undefined') return html;
+  return DOMPurify.sanitize(html, {
+    ADD_ATTR: ['target'], // keep target="_blank" on links
+  });
+}
+
+const MARKDOWN_FENCE_LANGS = new Set(['markdown', 'md']);
 
 let configured = false;
 let renderingMarkdownPreview = false;
 
 function renderCodeBlock(text: string, lang?: string | null): string {
-  const displayLang = (lang || "text").toLowerCase();
+  const displayLang = (lang || 'text').toLowerCase();
 
-  if (
-    !renderingMarkdownPreview &&
-    MARKDOWN_FENCE_LANGS.has(displayLang)
-  ) {
+  if (!renderingMarkdownPreview && MARKDOWN_FENCE_LANGS.has(displayLang)) {
     renderingMarkdownPreview = true;
     try {
       const body = marked.parse(text) as string;
@@ -149,8 +171,8 @@ function configureMarked() {
         return renderCodeBlock(text, lang);
       },
       link({ href, title, text }) {
-        const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
-        return `<a href="${escapeHtml(href)}"${titleAttr} target="_blank" rel="noopener noreferrer" class="chat-md-link">${text}</a>`;
+        const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+        return `<a href="${escapeHtml(safeHref(href))}"${titleAttr} target="_blank" rel="noopener noreferrer" class="chat-md-link">${text}</a>`;
       },
       blockquote({ text }) {
         return `<blockquote class="chat-blockquote">${text}</blockquote>`;
@@ -168,13 +190,8 @@ export function prepareStreamingMarkdown(content: string): string {
   return content;
 }
 
-export function renderMarkdown(
-  content: string,
-  options: { streaming?: boolean } = {},
-): string {
+export function renderMarkdown(content: string, options: { streaming?: boolean } = {}): string {
   configureMarked();
-  const source = options.streaming
-    ? prepareStreamingMarkdown(content)
-    : content;
-  return marked.parse(source) as string;
+  const source = options.streaming ? prepareStreamingMarkdown(content) : content;
+  return sanitize(marked.parse(source) as string);
 }

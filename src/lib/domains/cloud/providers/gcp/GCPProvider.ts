@@ -1,102 +1,34 @@
 // GCP Provider implementation
 // Maps GCP/GKE (Kubernetes) backend to abstract cloud provider interface
 
-import { invokeClient } from "$lib/utils/invokeClient";
-import { BaseProvider } from "../base/BaseProvider";
-import type { ICluster, ICloudResource, ResourceEvent } from "../../core/types";
-import {
-  ResourceType,
-  CloudProviderType,
-  ClusterStatus,
-  ResourceStatus,
-} from "../../core/types";
+import { invokeClient } from '$lib/utils/invokeClient';
+import { BaseProvider } from '../base/BaseProvider';
+import type { ICluster, ICloudResource, ResourceEvent } from '../../core/types';
+import { ResourceType, CloudProviderType, ClusterStatus, ResourceStatus } from '../../core/types';
 import type {
   KubernetesCluster,
   PodInfo,
   ServiceInfo,
   DeploymentInfo,
   NamespaceInfo,
-} from "./GCPTypes";
+} from './GCPTypes';
 
 export class GCPProvider extends BaseProvider {
-  readonly name = "Google Cloud Platform";
+  readonly name = 'Google Cloud Platform';
   readonly type = CloudProviderType.GCP;
 
   async initialize(): Promise<void> {
     try {
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H2",
-            location: "GCPProvider.ts:29",
-            message: "GCPProvider.initialize start",
-            data: {},
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
-      await invokeClient.post("k8s_initialize_manager");
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H2",
-            location: "GCPProvider.ts:31",
-            message: "GCPProvider.initialize after invoke",
-            data: {},
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
+      await invokeClient.post('k8s_initialize_manager');
     } catch (error) {
-      console.error("Failed to initialize GCP provider:", error);
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H2",
-            location: "GCPProvider.ts:33",
-            message: "GCPProvider.initialize error",
-            data: { error: String(error) },
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
+      console.error('Failed to initialize GCP provider:', error);
       throw error;
     }
   }
 
   async connect(clusterId: string): Promise<void> {
     try {
-      await invokeClient.post("k8s_connect_cluster", {
+      await invokeClient.post('k8s_connect_cluster', {
         clusterName: clusterId,
       });
       this.connected = true;
@@ -106,7 +38,7 @@ export class GCPProvider extends BaseProvider {
       this.currentCluster = clusters.find((c) => c.id === clusterId) || null;
     } catch (error) {
       this.connected = false;
-      console.error("Failed to connect to cluster:", error);
+      console.error('Failed to connect to cluster:', error);
       throw error;
     }
   }
@@ -118,52 +50,7 @@ export class GCPProvider extends BaseProvider {
 
   async listClusters(): Promise<ICluster[]> {
     try {
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H3",
-            location: "GCPProvider.ts:58",
-            message: "listClusters start",
-            data: {},
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
-      const clusters =
-        await invokeClient.post<KubernetesCluster[]>("k8s_load_clusters");
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H3",
-            location: "GCPProvider.ts:60",
-            message: "listClusters after invoke",
-            data: {
-              clusterCount: Array.isArray(clusters) ? clusters.length : null,
-            },
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
+      const clusters = await invokeClient.post<KubernetesCluster[]>('k8s_load_clusters');
       // Handle null/undefined response (can happen with localhost strategy or errors)
       if (!clusters || !Array.isArray(clusters)) {
         // In browser/localhost mode, this might be expected
@@ -173,37 +60,12 @@ export class GCPProvider extends BaseProvider {
       return clusters.map((c) => this.mapToCluster(c));
     } catch (error) {
       // Log the error but still return empty array to allow UI to show helpful message
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error("Failed to list clusters:", error);
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H3",
-            location: "GCPProvider.ts:69",
-            message: "listClusters error",
-            data: { error: errorMessage },
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Failed to list clusters:', error);
 
       // Re-throw if it's a meaningful error (not just "empty" or localhost strategy)
       // This allows the UI to show the actual error
-      if (
-        !errorMessage.includes("localhost") &&
-        !errorMessage.includes("empty")
-      ) {
+      if (!errorMessage.includes('localhost') && !errorMessage.includes('empty')) {
         throw error;
       }
 
@@ -216,92 +78,75 @@ export class GCPProvider extends BaseProvider {
     return clusters.find((c) => c.id === id || c.name === id) || null;
   }
 
-  async listResources(
-    type: ResourceType,
-    namespace?: string,
-  ): Promise<ICloudResource[]> {
+  async listResources(type: ResourceType, namespace?: string): Promise<ICloudResource[]> {
     try {
       switch (type) {
         case ResourceType.POD:
-          const pods = await invokeClient.post<PodInfo[]>("k8s_list_pods", {
+          const pods = await invokeClient.post<PodInfo[]>('k8s_list_pods', {
             namespace,
           });
           if (!pods || !Array.isArray(pods)) return [];
           return pods.map((p) => this.mapToPod(p));
 
         case ResourceType.SERVICE:
-          const services = await invokeClient.post<ServiceInfo[]>(
-            "k8s_list_services",
-            { namespace },
-          );
+          const services = await invokeClient.post<ServiceInfo[]>('k8s_list_services', {
+            namespace,
+          });
           if (!services || !Array.isArray(services)) return [];
           return services.map((s) => this.mapToService(s));
 
         case ResourceType.DEPLOYMENT:
-          const deployments = await invokeClient.post<DeploymentInfo[]>(
-            "k8s_list_deployments",
-            { namespace },
-          );
+          const deployments = await invokeClient.post<DeploymentInfo[]>('k8s_list_deployments', {
+            namespace,
+          });
           if (!deployments || !Array.isArray(deployments)) return [];
           return deployments.map((d) => this.mapToDeployment(d));
 
         case ResourceType.STATEFULSET:
-          const statefulsets = await invokeClient.post<any[]>(
-            "k8s_list_statefulsets",
-            { namespace },
-          );
+          const statefulsets = await invokeClient.post<any[]>('k8s_list_statefulsets', {
+            namespace,
+          });
           if (!statefulsets || !Array.isArray(statefulsets)) return [];
           return statefulsets.map((ss) => this.mapToStatefulSet(ss));
 
         case ResourceType.DAEMONSET:
-          const daemonsets = await invokeClient.post<any[]>(
-            "k8s_list_daemonsets",
-            { namespace },
-          );
+          const daemonsets = await invokeClient.post<any[]>('k8s_list_daemonsets', { namespace });
           if (!daemonsets || !Array.isArray(daemonsets)) return [];
           return daemonsets.map((ds) => this.mapToDaemonSet(ds));
 
         case ResourceType.JOB:
-          const jobs = await invokeClient.post<any[]>("k8s_list_jobs", {
+          const jobs = await invokeClient.post<any[]>('k8s_list_jobs', {
             namespace,
           });
           if (!jobs || !Array.isArray(jobs)) return [];
           return jobs.map((j) => this.mapToJob(j));
 
         case ResourceType.CRONJOB:
-          const cronjobs = await invokeClient.post<any[]>("k8s_list_cronjobs", {
+          const cronjobs = await invokeClient.post<any[]>('k8s_list_cronjobs', {
             namespace,
           });
           if (!cronjobs || !Array.isArray(cronjobs)) return [];
           return cronjobs.map((cj) => this.mapToCronJob(cj));
 
         case ResourceType.CONFIGMAP:
-          const configmaps = await invokeClient.post<any[]>(
-            "k8s_list_configmaps",
-            { namespace },
-          );
+          const configmaps = await invokeClient.post<any[]>('k8s_list_configmaps', { namespace });
           if (!configmaps || !Array.isArray(configmaps)) return [];
           return configmaps.map((cm) => this.mapToConfigMap(cm));
 
         case ResourceType.SECRET:
-          const secrets = await invokeClient.post<any[]>("k8s_list_secrets", {
+          const secrets = await invokeClient.post<any[]>('k8s_list_secrets', {
             namespace,
           });
           if (!secrets || !Array.isArray(secrets)) return [];
           return secrets.map((s) => this.mapToSecret(s));
 
         case ResourceType.INGRESS:
-          const ingresses = await invokeClient.post<any[]>(
-            "k8s_list_ingresses",
-            { namespace },
-          );
+          const ingresses = await invokeClient.post<any[]>('k8s_list_ingresses', { namespace });
           if (!ingresses || !Array.isArray(ingresses)) return [];
           return ingresses.map((i) => this.mapToIngress(i));
 
         case ResourceType.NAMESPACE:
-          const namespaces = await invokeClient.post<NamespaceInfo[]>(
-            "k8s_list_namespaces",
-          );
+          const namespaces = await invokeClient.post<NamespaceInfo[]>('k8s_list_namespaces');
           if (!namespaces || !Array.isArray(namespaces)) return [];
           return namespaces.map((n) => this.mapToNamespace(n));
 
@@ -317,16 +162,13 @@ export class GCPProvider extends BaseProvider {
   async getResource(
     type: ResourceType,
     id: string,
-    namespace: string,
+    namespace: string
   ): Promise<ICloudResource | null> {
     const resources = await this.listResources(type, namespace);
     return resources.find((r) => r.id === id || r.name === id) || null;
   }
 
-  async *watchResources(
-    type: ResourceType,
-    namespace?: string,
-  ): AsyncIterable<ResourceEvent> {
+  async *watchResources(type: ResourceType, namespace?: string): AsyncIterable<ResourceEvent> {
     // Note: Real-time updates are handled via Tauri events in the cloudStore
     // This async iterator pattern is kept for interface compliance but watch is managed
     // at the store level via startWatchingResources() which uses Tauri events
@@ -336,13 +178,11 @@ export class GCPProvider extends BaseProvider {
 
   async listNamespaces(): Promise<string[]> {
     try {
-      const namespaces = await invokeClient.post<NamespaceInfo[]>(
-        "k8s_list_namespaces",
-      );
+      const namespaces = await invokeClient.post<NamespaceInfo[]>('k8s_list_namespaces');
       if (!namespaces || !Array.isArray(namespaces)) return [];
       return namespaces.map((n) => n.name);
     } catch (error) {
-      console.error("Failed to list namespaces:", error);
+      console.error('Failed to list namespaces:', error);
       return [];
     }
   }
@@ -352,13 +192,9 @@ export class GCPProvider extends BaseProvider {
   private mapToCluster(data: KubernetesCluster): ICluster {
     let status: ClusterStatus;
 
-    if (typeof data.status === "string") {
+    if (typeof data.status === 'string') {
       status = this.mapClusterStatus(data.status);
-    } else if (
-      data.status &&
-      typeof data.status === "object" &&
-      "Error" in data.status
-    ) {
+    } else if (data.status && typeof data.status === 'object' && 'Error' in data.status) {
       status = ClusterStatus.ERROR;
     } else {
       status = ClusterStatus.DISCONNECTED;
@@ -400,15 +236,11 @@ export class GCPProvider extends BaseProvider {
     };
 
     // Add optional methods
-    resource.getLogs = async (
-      container?: string,
-      tailLines?: number,
-      follow?: boolean,
-    ) => {
+    resource.getLogs = async (container?: string, tailLines?: number, follow?: boolean) => {
       try {
         // For non-streaming logs (follow: false), use regular post
         if (!follow) {
-          return await invokeClient.post<string>("k8s_get_pod_logs", {
+          return await invokeClient.post<string>('k8s_get_pod_logs', {
             namespace: data.namespace,
             podName: data.name,
             container: container || null,
@@ -422,9 +254,9 @@ export class GCPProvider extends BaseProvider {
         // TODO: Implement streaming logs using invokeClient.live when backend supports it
         // For now, fall back to non-streaming
         console.warn(
-          "Streaming logs (follow: true) not yet implemented, falling back to non-streaming",
+          'Streaming logs (follow: true) not yet implemented, falling back to non-streaming'
         );
-        return await invokeClient.post<string>("k8s_get_pod_logs", {
+        return await invokeClient.post<string>('k8s_get_pod_logs', {
           namespace: data.namespace,
           podName: data.name,
           container: container || null,
@@ -433,15 +265,14 @@ export class GCPProvider extends BaseProvider {
         });
       } catch (error) {
         // Don't log PodInitializing errors - they're expected and handled in the UI
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         const isPodInitializing =
-          errorMessage.includes("PodInitializing") ||
-          errorMessage.includes("waiting to start") ||
-          errorMessage.includes("is waiting to start");
+          errorMessage.includes('PodInitializing') ||
+          errorMessage.includes('waiting to start') ||
+          errorMessage.includes('is waiting to start');
 
         if (!isPodInitializing) {
-          console.error("Failed to get pod logs:", error);
+          console.error('Failed to get pod logs:', error);
         }
         throw error;
       }
@@ -453,11 +284,11 @@ export class GCPProvider extends BaseProvider {
       onData: (data: string) => void,
       onError?: (error: Error) => void,
       container?: string,
-      tailLines?: number,
+      tailLines?: number
     ): Promise<() => void> => {
       // Use invokeClient.live for streaming logs
       // Backend should emit events: k8s_get_pod_logs:stream:{streamId}
-      return await invokeClient.live<string>("k8s_get_pod_logs", {
+      return await invokeClient.live<string>('k8s_get_pod_logs', {
         data: {
           namespace: data.namespace,
           podName: data.name,
@@ -472,26 +303,26 @@ export class GCPProvider extends BaseProvider {
 
     resource.exec = async (command: string[]) => {
       try {
-        return await invokeClient.post<string>("k8s_exec_pod", {
+        return await invokeClient.post<string>('k8s_exec_pod', {
           namespace: data.namespace,
           podName: data.name,
           container: null,
           command: command,
         });
       } catch (error) {
-        console.error("Failed to exec into pod:", error);
+        console.error('Failed to exec into pod:', error);
         throw error;
       }
     };
 
     resource.delete = async () => {
       try {
-        await invokeClient.post("k8s_delete_pod", {
+        await invokeClient.post('k8s_delete_pod', {
           namespace: data.namespace,
           podName: data.name,
         });
       } catch (error) {
-        console.error("Failed to delete pod:", error);
+        console.error('Failed to delete pod:', error);
         throw error;
       }
     };
@@ -525,10 +356,7 @@ export class GCPProvider extends BaseProvider {
       name: data.name,
       namespace: data.namespace,
       type: ResourceType.DEPLOYMENT,
-      status:
-        data.available === data.desired
-          ? ResourceStatus.RUNNING
-          : ResourceStatus.PENDING,
+      status: data.available === data.desired ? ResourceStatus.RUNNING : ResourceStatus.PENDING,
       provider: CloudProviderType.GCP,
       metadata: {
         desired: data.desired,
@@ -545,13 +373,13 @@ export class GCPProvider extends BaseProvider {
     // Add optional methods
     resource.scale = async (replicas: number) => {
       try {
-        await invokeClient.post("k8s_scale_deployment", {
+        await invokeClient.post('k8s_scale_deployment', {
           namespace: data.namespace,
           deploymentName: data.name,
           replicas: replicas,
         });
       } catch (error) {
-        console.error("Failed to scale deployment:", error);
+        console.error('Failed to scale deployment:', error);
         throw error;
       }
     };
@@ -565,10 +393,7 @@ export class GCPProvider extends BaseProvider {
       name: data.name,
       namespace: data.namespace,
       type: ResourceType.STATEFULSET,
-      status:
-        data.ready === data.desired
-          ? ResourceStatus.RUNNING
-          : ResourceStatus.PENDING,
+      status: data.ready === data.desired ? ResourceStatus.RUNNING : ResourceStatus.PENDING,
       provider: CloudProviderType.GCP,
       metadata: {
         desired: data.desired,
@@ -590,10 +415,7 @@ export class GCPProvider extends BaseProvider {
       name: data.name,
       namespace: data.namespace,
       type: ResourceType.DAEMONSET,
-      status:
-        data.ready === data.desired
-          ? ResourceStatus.RUNNING
-          : ResourceStatus.PENDING,
+      status: data.ready === data.desired ? ResourceStatus.RUNNING : ResourceStatus.PENDING,
       provider: CloudProviderType.GCP,
       metadata: {
         desired: data.desired,
@@ -617,7 +439,7 @@ export class GCPProvider extends BaseProvider {
       name: data.name,
       namespace: data.namespace,
       type: ResourceType.JOB,
-      status: this.mapResourceStatus(data.status || "unknown"),
+      status: this.mapResourceStatus(data.status || 'unknown'),
       provider: CloudProviderType.GCP,
       metadata: {
         completions: data.completions || 0,
@@ -626,7 +448,7 @@ export class GCPProvider extends BaseProvider {
         active: data.active || 0,
         parallelism: data.parallelism || 1,
         backoff_limit: data.backoff_limit || 6,
-        age: data.age || "N/A",
+        age: data.age || 'N/A',
         image: data.image,
         status: data.status,
       },
@@ -645,7 +467,7 @@ export class GCPProvider extends BaseProvider {
         data: data.data || {},
         dataKeys: Object.keys(data.data || {}),
         dataCount: Object.keys(data.data || {}).length,
-        age: data.age || "N/A",
+        age: data.age || 'N/A',
         labels: data.labels || {},
       },
     };
@@ -663,9 +485,9 @@ export class GCPProvider extends BaseProvider {
         data: data.data || {}, // Base64 encoded
         dataKeys: Object.keys(data.data || {}),
         dataCount: Object.keys(data.data || {}).length,
-        age: data.age || "N/A",
+        age: data.age || 'N/A',
         labels: data.labels || {},
-        type: data.secret_type || "Opaque",
+        type: data.secret_type || 'Opaque',
       },
     };
   }
@@ -679,12 +501,12 @@ export class GCPProvider extends BaseProvider {
       status: data.suspend ? ResourceStatus.PENDING : ResourceStatus.RUNNING,
       provider: CloudProviderType.GCP,
       metadata: {
-        schedule: data.schedule || "N/A",
+        schedule: data.schedule || 'N/A',
         suspend: data.suspend || false,
         active: data.active || 0,
         last_schedule_time: data.last_schedule_time || null,
         last_successful_time: data.last_successful_time || null,
-        age: data.age || "N/A",
+        age: data.age || 'N/A',
         image: data.image,
       },
     };
@@ -699,10 +521,10 @@ export class GCPProvider extends BaseProvider {
       status: ResourceStatus.RUNNING, // Ingress doesn't have a status
       provider: CloudProviderType.GCP,
       metadata: {
-        class: data.class || "N/A",
+        class: data.class || 'N/A',
         addresses: data.addresses || [],
         ports: data.ports || [],
-        age: data.age || "N/A",
+        age: data.age || 'N/A',
         labels: data.labels || {},
       },
     };
@@ -714,10 +536,7 @@ export class GCPProvider extends BaseProvider {
       name: data.name,
       namespace: data.name,
       type: ResourceType.NAMESPACE,
-      status:
-        data.status === "Active"
-          ? ResourceStatus.RUNNING
-          : ResourceStatus.UNKNOWN,
+      status: data.status === 'Active' ? ResourceStatus.RUNNING : ResourceStatus.UNKNOWN,
       provider: CloudProviderType.GCP,
       metadata: {
         status: data.status,

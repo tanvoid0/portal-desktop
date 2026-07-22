@@ -1,28 +1,18 @@
 <!-- CloudConnectionGuard - Middleware-like component that ensures cluster connection -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import type { Snippet } from "svelte";
-  import {
-    cloudStore,
-    loadClusters,
-    initializeProvider,
-    connectToCluster,
-  } from "../stores";
-  import { CloudProviderType, type ICluster } from "../core/types";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import Loading from "$lib/components/ui/loading.svelte";
-  import { Badge } from "$lib/components/ui/badge";
-  import { invokeClient } from "$lib/utils/invokeClient";
-  import { isTauriEnvironment } from "$lib/utils/tauri";
-  import { toast } from "$lib/utils/toast";
+  import { onMount } from 'svelte';
+  import type { Snippet } from 'svelte';
+  import { cloudStore, loadClusters, initializeProvider, connectToCluster } from '../stores';
+  import { CloudProviderType, type ICluster } from '../core/types';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import Loading from '$lib/components/ui/loading.svelte';
+  import { Badge } from '$lib/components/ui/badge';
+  import { invokeClient } from '$lib/utils/invokeClient';
+  import { isTauriEnvironment } from '$lib/utils/tauri';
+  import { toast } from '$lib/utils/toast';
 
   interface KubeSetupToolStatus {
     installed: boolean;
@@ -74,19 +64,17 @@
   let setupDetectionError = $state<string | null>(null);
   let isGeneratingKubeconfig = $state(false);
   let kubeconfigActionOutput = $state<string | null>(null);
-  let awsClusterName = $state("");
-  let awsRegion = $state("");
-  let gkeClusterName = $state("");
-  let gkeLocation = $state("");
-  let gkeProject = $state("");
-  let aksClusterName = $state("");
-  let aksResourceGroup = $state("");
+  let awsClusterName = $state('');
+  let awsRegion = $state('');
+  let gkeClusterName = $state('');
+  let gkeLocation = $state('');
+  let gkeProject = $state('');
+  let aksClusterName = $state('');
+  let aksResourceGroup = $state('');
   const isExpectedNoClustersState = $derived(
-    !!clusterLoadError && clusterLoadError.startsWith("No clusters found"),
+    !!clusterLoadError && clusterLoadError.startsWith('No clusters found')
   );
-  const canOfferAutoSetup = $derived(
-    isExpectedNoClustersState && isTauriEnvironment(),
-  );
+  const canOfferAutoSetup = $derived(isExpectedNoClustersState && isTauriEnvironment());
   const detectedTargets = $derived(setupDetection?.targets ?? []);
   const installedToolLabels = $derived.by(() => {
     if (!setupDetection) return [];
@@ -98,75 +86,12 @@
 
   onMount(async () => {
     try {
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H1",
-            location: "CloudConnectionGuard.svelte:21",
-            message: "onMount start",
-            data: {},
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
       // Initialize GCP provider
       await initializeProvider(CloudProviderType.GCP);
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H1",
-            location: "CloudConnectionGuard.svelte:24",
-            message: "after initializeProvider",
-            data: {},
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
       await loadClustersList();
       if (canOfferAutoSetup) {
         await loadSetupDetection();
       }
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H1",
-            location: "CloudConnectionGuard.svelte:25",
-            message: "after loadClustersList",
-            data: { clusterCount: clusters.length },
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
 
       // If already connected, we're done
       if ($cloudStore.connection.isConnected && $cloudStore.currentCluster) {
@@ -176,97 +101,12 @@
 
       // Attempt auto-connect
       if (clusters.length > 0 && !$cloudStore.connection.isConnecting) {
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "7cbddc",
-            },
-            body: JSON.stringify({
-              sessionId: "7cbddc",
-              runId: "pre-fix",
-              hypothesisId: "H4",
-              location: "CloudConnectionGuard.svelte:43",
-              message: "before attemptAutoConnect",
-              data: { clusterCount: clusters.length },
-              timestamp: Date.now(),
-            }),
-          },
-        ).catch(() => {});
-        // #endregion agent log
         await attemptAutoConnect();
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "7cbddc",
-            },
-            body: JSON.stringify({
-              sessionId: "7cbddc",
-              runId: "pre-fix",
-              hypothesisId: "H4",
-              location: "CloudConnectionGuard.svelte:45",
-              message: "after attemptAutoConnect",
-              data: {},
-              timestamp: Date.now(),
-            }),
-          },
-        ).catch(() => {});
-        // #endregion agent log
       }
     } catch (error) {
-      console.error("Failed to initialize cloud connection:", error);
-      autoConnectError =
-        error instanceof Error ? error.message : "Failed to initialize";
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H1",
-            location: "CloudConnectionGuard.svelte:37",
-            message: "onMount error",
-            data: { error: String(error) },
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
+      console.error('Failed to initialize cloud connection:', error);
+      autoConnectError = error instanceof Error ? error.message : 'Failed to initialize';
     } finally {
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7704/ingest/4c51fb7c-6c3e-4188-9012-a753ceea53c2",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "7cbddc",
-          },
-          body: JSON.stringify({
-            sessionId: "7cbddc",
-            runId: "pre-fix",
-            hypothesisId: "H1",
-            location: "CloudConnectionGuard.svelte:40",
-            message: "onMount finally",
-            data: {},
-            timestamp: Date.now(),
-          }),
-        },
-      ).catch(() => {});
-      // #endregion agent log
       isInitializing = false;
       hasAttemptedAutoConnect = true;
     }
@@ -281,16 +121,15 @@
       if (clusters.length === 0) {
         if (isTauriEnvironment()) {
           clusterLoadError =
-            "No clusters found. Add or export a kubeconfig, then retry. Expected locations: ~/.kube/config (macOS/Linux) or %USERPROFILE%\\.kube\\config (Windows), or set KUBECONFIG.";
+            'No clusters found. Add or export a kubeconfig, then retry. Expected locations: ~/.kube/config (macOS/Linux) or %USERPROFILE%\\.kube\\config (Windows), or set KUBECONFIG.';
         } else {
           clusterLoadError =
-            "No clusters found. Kubernetes commands are only available in the desktop app.";
+            'No clusters found. Kubernetes commands are only available in the desktop app.';
         }
       }
     } catch (error) {
-      clusterLoadError =
-        error instanceof Error ? error.message : "Failed to load clusters";
-      console.error("Failed to load clusters:", error);
+      clusterLoadError = error instanceof Error ? error.message : 'Failed to load clusters';
+      console.error('Failed to load clusters:', error);
       clusters = []; // Ensure clusters is set even on error
     } finally {
       isLoadingClusters = false;
@@ -304,15 +143,13 @@
     setupDetectionError = null;
     try {
       setupDetection = await invokeClient.post<KubeSetupDetectionResult>(
-        "k8s_detect_setup_tools",
+        'k8s_detect_setup_tools',
         undefined,
-        { localhostStrategy: "error" },
+        { localhostStrategy: 'error' }
       );
     } catch (error) {
       setupDetectionError =
-        error instanceof Error
-          ? error.message
-          : "Failed to detect Kubernetes setup tools";
+        error instanceof Error ? error.message : 'Failed to detect Kubernetes setup tools';
     } finally {
       isLoadingSetupOptions = false;
     }
@@ -329,25 +166,24 @@
         command: string;
         stdout: string;
         stderr: string;
-      }>("k8s_generate_kubeconfig", {
+      }>('k8s_generate_kubeconfig', {
         request,
       });
 
       kubeconfigActionOutput = [result.command, result.stdout, result.stderr]
         .filter(Boolean)
-        .join("\n\n");
+        .join('\n\n');
 
-      toast.success("Kubeconfig generated", {
-        description: "Retrying cluster detection.",
+      toast.success('Kubeconfig generated', {
+        description: 'Retrying cluster detection.',
       });
 
       await loadClustersList();
       await attemptAutoConnect();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to generate kubeconfig";
+      const message = error instanceof Error ? error.message : 'Failed to generate kubeconfig';
       kubeconfigActionOutput = message;
-      toast.error("Kubeconfig setup failed", { description: message });
+      toast.error('Kubeconfig setup failed', { description: message });
     } finally {
       isGeneratingKubeconfig = false;
     }
@@ -367,12 +203,12 @@
 
   async function handleAwsSetup() {
     if (!awsClusterName || !awsRegion) {
-      toast.error("AWS setup needs cluster name and region");
+      toast.error('AWS setup needs cluster name and region');
       return;
     }
 
     await generateKubeconfig({
-      provider: "aws",
+      provider: 'aws',
       cluster_name: awsClusterName,
       region: awsRegion,
     });
@@ -380,13 +216,13 @@
 
   async function handleManualGkeSetup() {
     if (!gkeClusterName || !gkeLocation) {
-      toast.error("GKE setup needs cluster name and location");
+      toast.error('GKE setup needs cluster name and location');
       return;
     }
 
     const isZone = /[a-z]+-[a-z]+\d-[a-z]$/.test(gkeLocation);
     await generateKubeconfig({
-      provider: "gcloud",
+      provider: 'gcloud',
       cluster_name: gkeClusterName,
       project: gkeProject || undefined,
       zone: isZone ? gkeLocation : undefined,
@@ -396,12 +232,12 @@
 
   async function handleManualAksSetup() {
     if (!aksClusterName || !aksResourceGroup) {
-      toast.error("AKS setup needs cluster name and resource group");
+      toast.error('AKS setup needs cluster name and resource group');
       return;
     }
 
     await generateKubeconfig({
-      provider: "az",
+      provider: 'az',
       cluster_name: aksClusterName,
       resource_group: aksResourceGroup,
     });
@@ -411,10 +247,7 @@
     try {
       // Try to reconnect to previously connected cluster first
       const previousCluster = $cloudStore.currentCluster;
-      if (
-        previousCluster &&
-        clusters.some((c) => c.id === previousCluster.id)
-      ) {
+      if (previousCluster && clusters.some((c) => c.id === previousCluster.id)) {
         await connectToCluster(CloudProviderType.GCP, previousCluster.id);
         return;
       }
@@ -424,9 +257,8 @@
         await connectToCluster(CloudProviderType.GCP, clusters[0].id);
       }
     } catch (error) {
-      console.warn("Auto-connect failed:", error);
-      autoConnectError =
-        error instanceof Error ? error.message : "Auto-connect failed";
+      console.warn('Auto-connect failed:', error);
+      autoConnectError = error instanceof Error ? error.message : 'Auto-connect failed';
     }
   }
 
@@ -435,8 +267,7 @@
       autoConnectError = null;
       await connectToCluster(CloudProviderType.GCP, clusterId);
     } catch (error) {
-      autoConnectError =
-        error instanceof Error ? error.message : "Failed to connect";
+      autoConnectError = error instanceof Error ? error.message : 'Failed to connect';
     }
   }
 
@@ -449,9 +280,7 @@
   }
 
   const showConnectionUI = $derived(
-    !isInitializing &&
-      !$cloudStore.connection.isConnected &&
-      hasAttemptedAutoConnect,
+    !isInitializing && !$cloudStore.connection.isConnected && hasAttemptedAutoConnect
   );
 
   // Watch for connection state changes after mount
@@ -478,28 +307,26 @@
       </CardHeader>
       <CardContent class="space-y-4">
         {#if autoConnectError}
-          <div
-            class="rounded-md border border-destructive/20 bg-destructive/10 p-3"
-          >
-            <p class="text-sm font-medium text-destructive">
-              Connection Failed
-            </p>
+          <div class="rounded-md border border-destructive/20 bg-destructive/10 p-3">
+            <p class="text-sm font-medium text-destructive">Connection Failed</p>
             <p class="mt-1 text-xs text-muted-foreground">{autoConnectError}</p>
           </div>
         {:else if clusterLoadError}
           <div
-            class={`rounded-md border p-3 ${isExpectedNoClustersState
-              ? "border-primary/20 bg-primary/5"
-              : "border-destructive/20 bg-destructive/10"}`}
+            class={`rounded-md border p-3 ${
+              isExpectedNoClustersState
+                ? 'border-primary/20 bg-primary/5'
+                : 'border-destructive/20 bg-destructive/10'
+            }`}
           >
             <p
-              class={`text-sm font-medium ${isExpectedNoClustersState
-                ? "text-foreground"
-                : "text-destructive"}`}
+              class={`text-sm font-medium ${
+                isExpectedNoClustersState ? 'text-foreground' : 'text-destructive'
+              }`}
             >
               {isExpectedNoClustersState
-                ? "No Kubernetes clusters configured yet"
-                : "Failed to Load Clusters"}
+                ? 'No Kubernetes clusters configured yet'
+                : 'Failed to Load Clusters'}
             </p>
             <p class="mt-1 text-xs text-muted-foreground">{clusterLoadError}</p>
             {#if isExpectedNoClustersState}
@@ -520,8 +347,7 @@
           <div class="space-y-3">
             {#if !clusterLoadError}
               <p class="text-sm text-muted-foreground">
-                No Kubernetes clusters found. Make sure your kubeconfig is
-                configured.
+                No Kubernetes clusters found. Make sure your kubeconfig is configured.
               </p>
             {/if}
 
@@ -546,7 +372,7 @@
                 {:else}
                   {#if installedToolLabels.length > 0}
                     <p class="text-xs text-muted-foreground">
-                      Detected tools: {installedToolLabels.join(", ")}
+                      Detected tools: {installedToolLabels.join(', ')}
                     </p>
                   {/if}
 
@@ -558,9 +384,7 @@
 
                   {#if detectedTargets.length > 0}
                     <div class="mt-3 space-y-2">
-                      <p class="text-xs font-medium text-foreground">
-                        Discovered clusters
-                      </p>
+                      <p class="text-xs font-medium text-foreground">Discovered clusters</p>
                       {#each detectedTargets as target (target.id)}
                         <Button
                           variant="outline"
@@ -569,9 +393,7 @@
                           disabled={isGeneratingKubeconfig}
                         >
                           <span class="truncate">{target.label}</span>
-                          <span class="text-xs text-muted-foreground">
-                            Use
-                          </span>
+                          <span class="text-xs text-muted-foreground"> Use </span>
                         </Button>
                       {/each}
                     </div>
@@ -579,9 +401,7 @@
 
                   {#if setupDetection?.tools.aws.installed}
                     <div class="divider-edge-t divider-edge-full mt-4 space-y-2 pt-3">
-                      <p class="text-xs font-medium text-foreground">
-                        AWS EKS
-                      </p>
+                      <p class="text-xs font-medium text-foreground">AWS EKS</p>
                       <div class="grid gap-2">
                         <div class="grid gap-1">
                           <Label for="aws-cluster-name">Cluster name</Label>
@@ -602,7 +422,7 @@
                     </div>
                   {/if}
 
-                  {#if setupDetection?.tools.gcloud.installed && !detectedTargets.some((target) => target.provider === "gcloud")}
+                  {#if setupDetection?.tools.gcloud.installed && !detectedTargets.some((target) => target.provider === 'gcloud')}
                     <div class="divider-edge-t divider-edge-full mt-4 space-y-2 pt-3">
                       <p class="text-xs font-medium text-foreground">Google GKE</p>
                       <div class="grid gap-2">
@@ -612,7 +432,11 @@
                         </div>
                         <div class="grid gap-1">
                           <Label for="gke-location">Zone or region</Label>
-                          <Input id="gke-location" bind:value={gkeLocation} placeholder="europe-west1-b" />
+                          <Input
+                            id="gke-location"
+                            bind:value={gkeLocation}
+                            placeholder="europe-west1-b"
+                          />
                         </div>
                         <div class="grid gap-1">
                           <Label for="gke-project">Project ID</Label>
@@ -629,7 +453,7 @@
                     </div>
                   {/if}
 
-                  {#if setupDetection?.tools.az.installed && !detectedTargets.some((target) => target.provider === "az")}
+                  {#if setupDetection?.tools.az.installed && !detectedTargets.some((target) => target.provider === 'az')}
                     <div class="divider-edge-t divider-edge-full mt-4 space-y-2 pt-3">
                       <p class="text-xs font-medium text-foreground">Azure AKS</p>
                       <div class="grid gap-2">
@@ -653,7 +477,8 @@
                   {/if}
 
                   {#if kubeconfigActionOutput}
-                    <pre class="mt-3 max-h-48 overflow-auto rounded-md bg-background p-3 text-xs text-muted-foreground">{kubeconfigActionOutput}</pre>
+                    <pre
+                      class="mt-3 max-h-48 overflow-auto rounded-md bg-background p-3 text-xs text-muted-foreground">{kubeconfigActionOutput}</pre>
                   {/if}
                 {/if}
               </div>
@@ -686,10 +511,8 @@
                 >
                   <div class="flex items-center gap-2">
                     <span>{clusterTyped.name}</span>
-                    {#if clusterTyped.status === "connected"}
-                      <Badge variant="default" class="bg-green-500"
-                        >Connected</Badge
-                      >
+                    {#if clusterTyped.status === 'connected'}
+                      <Badge variant="default" class="bg-green-500">Connected</Badge>
                     {/if}
                   </div>
                   {#if $cloudStore.connection.isConnecting && $cloudStore.currentCluster?.id === clusterTyped.id}

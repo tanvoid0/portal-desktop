@@ -4,15 +4,12 @@ use crate::domains::credentials::entities::Column;
 use crate::domains::credentials::entities::{
     ActiveModel as CredentialActive, Entity as CredentialEntity, Model as CredentialModel,
 };
-use crate::log_warn;
 use chrono::Utc;
-use dirs;
 /**
  * Credential Service - Business logic for credential management
  */
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde_json;
-use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone)]
 pub struct CredentialService {
@@ -242,37 +239,50 @@ impl CredentialService {
         Ok(credentials)
     }
 
-    /// Get master encryption key
-    /// Uses device-specific key derived from app data directory
-    /// SECURITY NOTE: In production, this should be derived from user's master password
-    /// For now, uses a device-specific persistent key (better than hardcoded placeholder)
+    /// Get the master encryption key.
+    ///
+    /// The key is a random 32 bytes stored in the OS keychain (Windows Credential
+    /// Manager / macOS Keychain / Linux Secret Service), so it is protected by the
+    /// user's OS login and is NOT derivable from anything on disk. Generated on first
+    /// use and persisted thereafter.
+    ///
+    /// Note: credentials encrypted under the previous path-derived key cannot be
+    /// decrypted with this key and must be re-entered (pre-1.0 migration).
     fn get_master_key(&self) -> Result<[u8; 32], CredentialError> {
-        // Get app data directory (device-specific, persistent)
-        let app_data_dir = dirs::data_dir()
-            .ok_or_else(|| {
-                CredentialError::EncryptionFailed("Cannot determine app data directory".to_string())
-            })?
-            .join("portal-desktop");
+        const SERVICE: &str = "com.tan.portal-desktop";
+        const KEY_NAME: &str = "credential-master-key-v1";
 
-        // Create directory if it doesn't exist
-        std::fs::create_dir_all(&app_data_dir).map_err(|e| {
-            CredentialError::EncryptionFailed(format!("Cannot create app data directory: {}", e))
+        let entry = keyring::Entry::new(SERVICE, KEY_NAME).map_err(|e| {
+            CredentialError::EncryptionFailed(format!("Keychain access failed: {}", e))
         })?;
 
-        // Use app data directory path as seed for key derivation
-        // This ensures the key is device-specific and persistent
-        let seed = format!("{}-portal-credential-master-key-v1", app_data_dir.display());
-
-        // Derive a 32-byte key from the seed using SHA-256
-        let mut hasher = Sha256::new();
-        hasher.update(seed.as_bytes());
-        // Log warning in development mode
-        #[cfg(debug_assertions)]
-        {
-            log_warn!("Credentials", "Using device-specific master key. In production, implement user password-based key derivation.");
+        match entry.get_secret() {
+            Ok(bytes) if bytes.len() == 32 => {
+                let mut key = [0u8; 32];
+                key.copy_from_slice(&bytes);
+                Ok(key)
+            }
+            Ok(_) => Err(CredentialError::EncryptionFailed(
+                "Stored master key has unexpected length".to_string(),
+            )),
+            Err(keyring::Error::NoEntry) => {
+                // First run: generate a random key and persist it in the keychain.
+                use rand::RngCore;
+                let mut key = [0u8; 32];
+                rand::rngs::OsRng.fill_bytes(&mut key);
+                entry.set_secret(&key).map_err(|e| {
+                    CredentialError::EncryptionFailed(format!(
+                        "Failed to store master key in keychain: {}",
+                        e
+                    ))
+                })?;
+                Ok(key)
+            }
+            Err(e) => Err(CredentialError::EncryptionFailed(format!(
+                "Failed to read master key from keychain: {}",
+                e
+            ))),
         }
-
-        Ok(hasher.finalize().into())
     }
 }
 
