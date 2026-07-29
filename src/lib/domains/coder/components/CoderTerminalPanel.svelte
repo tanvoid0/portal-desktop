@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Plus, X, Terminal as TerminalIcon } from "@lucide/svelte";
-  import { coderTerminalStore } from "../state/coderTerminalStore.svelte.js";
-  import { coderWorkspaceStore } from "../state/coderWorkspaceStore.svelte.js";
-  import CoderSessionTerminal from "./CoderSessionTerminal.svelte";
+  import { Button } from '$lib/components/ui/button';
+  import { Plus, X, Terminal as TerminalIcon } from '@lucide/svelte';
+  import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
+  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import CoderSessionTerminal from './CoderSessionTerminal.svelte';
 
   interface Props {
     threadId: string;
@@ -13,12 +13,7 @@
     activeTerminalId?: string | null;
   }
 
-  let {
-    threadId,
-    workspaceRoot,
-    open = true,
-    activeTerminalId = null,
-  }: Props = $props();
+  let { threadId, workspaceRoot, open = true, activeTerminalId = null }: Props = $props();
 
   const tabs = $derived.by(() => {
     coderTerminalStore.revision;
@@ -33,8 +28,8 @@
   function createTerminal() {
     const tab = coderTerminalStore.createTab(threadId, {
       workspaceRoot,
-      createdBy: "user",
-      kind: "interactive",
+      createdBy: 'user',
+      kind: 'interactive',
     });
     coderWorkspaceStore.openTerminal(threadId, tab.id, tab.label);
   }
@@ -50,10 +45,7 @@
   }
 
   $effect(() => {
-    if (
-      activeTerminalId &&
-      coderTerminalStore.activeByThread[threadId] !== activeTerminalId
-    ) {
+    if (activeTerminalId && coderTerminalStore.activeByThread[threadId] !== activeTerminalId) {
       coderTerminalStore.setActive(threadId, activeTerminalId);
     }
   });
@@ -74,17 +66,14 @@
         <Button
           type="button"
           variant="ghost"
-          class="h-auto max-w-[140px] gap-1 rounded px-2 py-1 text-xs {activeId ===
-          tab.id
+          class="h-auto max-w-[140px] gap-1 rounded px-2 py-1 text-xs {activeId === tab.id
             ? 'bg-muted text-foreground'
             : 'text-muted-foreground hover:bg-muted/60'}"
           onclick={() => selectTab(tab.id)}
           title={tab.label}
         >
           {#if tab.running}
-            <span
-              class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary"
-            ></span>
+            <span class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary"></span>
           {:else}
             <TerminalIcon class="h-3 w-3 shrink-0 opacity-60" />
           {/if}

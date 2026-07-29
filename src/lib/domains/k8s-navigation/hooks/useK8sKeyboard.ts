@@ -1,22 +1,13 @@
 // K8s-specific keyboard hook - wraps generic useKeyboard with K8s-specific functionality
 // This hook combines table navigation, resource actions, and command palette for K8s pages
 
-import { get } from "svelte/store";
-import {
-  useTableNavigation,
-  type TableNavigationOptions,
-} from "./useTableNavigation";
-import {
-  useResourceActions,
-  type UseResourceActionsOptions,
-} from "./useResourceActions";
-import {
-  useCommandPalette,
-  type UseCommandPaletteOptions,
-} from "./useCommandPalette";
-import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
-import { NAVIGATION_SHORTCUTS } from "../utils/keyboardConstants";
-import type { Command, KeyboardShortcut } from "../types";
+import { get } from 'svelte/store';
+import { useTableNavigation, type TableNavigationOptions } from './useTableNavigation';
+import { useResourceActions, type UseResourceActionsOptions } from './useResourceActions';
+import { useCommandPalette, type UseCommandPaletteOptions } from './useCommandPalette';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { NAVIGATION_SHORTCUTS } from '../utils/keyboardConstants';
+import type { Command, KeyboardShortcut } from '../types';
 
 export interface K8sKeyboardConfig {
   // Table navigation
@@ -82,17 +73,11 @@ export function useK8sKeyboard(config: K8sKeyboardConfig): K8sKeyboardReturn {
   // Initialize hooks - support both direct values and getter functions for reactivity
   const tableNav = tableNavigation
     ? useTableNavigation(
-        typeof tableNavigation === "function"
-          ? tableNavigation()
-          : tableNavigation,
+        typeof tableNavigation === 'function' ? tableNavigation() : tableNavigation
       )
     : undefined;
-  const resourceActionsHook = resourceActions
-    ? useResourceActions(resourceActions)
-    : undefined;
-  const commandPaletteHook = commandPalette
-    ? useCommandPalette(commandPalette)
-    : undefined;
+  const resourceActionsHook = resourceActions ? useResourceActions(resourceActions) : undefined;
+  const commandPaletteHook = commandPalette ? useCommandPalette(commandPalette) : undefined;
   const customShortcuts = customShortcutsConfig
     ? useKeyboardShortcuts(customShortcutsConfig, { enabled })
     : undefined;
@@ -148,15 +133,15 @@ export function useK8sKeyboard(config: K8sKeyboardConfig): K8sKeyboardReturn {
     // Table navigation shortcuts
     if (tableNav) {
       shortcuts.push(
-        { key: "↑/k", description: "Move up", category: "Navigation" },
-        { key: "↓/j", description: "Move down", category: "Navigation" },
+        { key: '↑/k', description: 'Move up', category: 'Navigation' },
+        { key: '↓/j', description: 'Move down', category: 'Navigation' },
         {
-          key: "Enter",
-          description: "Activate selected",
-          category: "Navigation",
+          key: 'Enter',
+          description: 'Activate selected',
+          category: 'Navigation',
         },
-        { key: "g", description: "Go to top", category: "Navigation" },
-        { key: "G", description: "Go to bottom", category: "Navigation" },
+        { key: 'g', description: 'Go to top', category: 'Navigation' },
+        { key: 'G', description: 'Go to bottom', category: 'Navigation' }
       );
     }
 
@@ -169,7 +154,7 @@ export function useK8sKeyboard(config: K8sKeyboardConfig): K8sKeyboardReturn {
         shortcuts.push({
           key: action.shortcut,
           description: action.label,
-          category: "Actions",
+          category: 'Actions',
         });
       });
     }
@@ -179,8 +164,8 @@ export function useK8sKeyboard(config: K8sKeyboardConfig): K8sKeyboardReturn {
       customShortcutsConfig.forEach((shortcut) => {
         shortcuts.push({
           key: shortcut.key,
-          description: shortcut.description || "",
-          category: "Custom",
+          description: shortcut.description || '',
+          category: 'Custom',
         });
       });
     }
@@ -190,8 +175,8 @@ export function useK8sKeyboard(config: K8sKeyboardConfig): K8sKeyboardReturn {
       globalShortcutsConfig.forEach((shortcut) => {
         shortcuts.push({
           key: shortcut.key,
-          description: shortcut.description || "",
-          category: "Global",
+          description: shortcut.description || '',
+          category: 'Global',
         });
       });
     }
@@ -199,8 +184,8 @@ export function useK8sKeyboard(config: K8sKeyboardConfig): K8sKeyboardReturn {
     // Command palette
     if (commandPaletteHook) {
       shortcuts.push(
-        { key: "/", description: "Open command palette", category: "Global" },
-        { key: ":", description: "Open command palette", category: "Global" },
+        { key: '/', description: 'Open command palette', category: 'Global' },
+        { key: ':', description: 'Open command palette', category: 'Global' }
       );
     }
 

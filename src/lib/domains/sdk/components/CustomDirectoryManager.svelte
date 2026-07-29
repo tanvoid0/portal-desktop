@@ -4,28 +4,23 @@
 -->
 
 <script lang="ts">
-  import Select from "$lib/components/ui/select.svelte";
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import { confirmAction } from "$lib/utils/confirm";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Badge } from "$lib/components/ui/badge";
+  import Select from '$lib/components/ui/select.svelte';
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from "$lib/components/ui/dialog";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
+  } from '$lib/components/ui/dialog';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import {
     FolderPlus,
     FolderOpen,
@@ -37,7 +32,7 @@
     X,
     Search,
     Settings,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface CustomDirectory {
     id: string;
@@ -56,7 +51,7 @@
     is_active: boolean;
   }
 
-  let { sdkType = "all" }: { sdkType?: string } = $props();
+  let { sdkType = 'all' }: { sdkType?: string } = $props();
 
   // State
   let directories = $state<CustomDirectory[]>([]);
@@ -65,13 +60,13 @@
   let showAddDialog = $state(false);
   let showEditDialog = $state(false);
   let selectedDirectory: CustomDirectory | null = $state(null);
-  let searchTerm = $state("");
+  let searchTerm = $state('');
 
   // Form state
-  let newDirectoryPath = $state("");
-  let newDirectoryName = $state("");
-  let newDirectoryDescription = $state("");
-  let newDirectorySdkType = $state("nodejs");
+  let newDirectoryPath = $state('');
+  let newDirectoryName = $state('');
+  let newDirectoryDescription = $state('');
+  let newDirectorySdkType = $state('nodejs');
 
   // Initialize
   onMount(() => {
@@ -83,14 +78,11 @@
     error = null;
 
     try {
-      const result = await invoke("get_custom_directories", { sdkType });
+      const result = await invoke('get_custom_directories', { sdkType });
       directories = Array.isArray(result) ? result : [];
     } catch (err) {
-      error =
-        err instanceof Error
-          ? err.message
-          : "Failed to load custom directories";
-      console.error("Failed to load custom directories:", err);
+      error = err instanceof Error ? err.message : 'Failed to load custom directories';
+      console.error('Failed to load custom directories:', err);
     } finally {
       loading = false;
     }
@@ -98,7 +90,7 @@
 
   async function addDirectory() {
     if (!newDirectoryPath.trim() || !newDirectoryName.trim()) {
-      error = "Path and name are required";
+      error = 'Path and name are required';
       return;
     }
 
@@ -106,7 +98,7 @@
     error = null;
 
     try {
-      await invoke("add_custom_sdk_directory", {
+      await invoke('add_custom_sdk_directory', {
         path: newDirectoryPath,
         sdkType: newDirectorySdkType,
         name: newDirectoryName,
@@ -114,18 +106,17 @@
       });
 
       // Reset form
-      newDirectoryPath = "";
-      newDirectoryName = "";
-      newDirectoryDescription = "";
-      newDirectorySdkType = "nodejs";
+      newDirectoryPath = '';
+      newDirectoryName = '';
+      newDirectoryDescription = '';
+      newDirectorySdkType = 'nodejs';
       showAddDialog = false;
 
       // Reload directories
       await loadDirectories();
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to add custom directory";
-      console.error("Failed to add custom directory:", err);
+      error = err instanceof Error ? err.message : 'Failed to add custom directory';
+      console.error('Failed to add custom directory:', err);
     } finally {
       loading = false;
     }
@@ -133,8 +124,8 @@
 
   async function removeDirectory(directoryId: string) {
     const confirmed = await confirmAction(
-      "Are you sure you want to remove this custom directory?",
-      "Remove directory",
+      'Are you sure you want to remove this custom directory?',
+      'Remove directory'
     );
     if (!confirmed) return;
 
@@ -142,14 +133,11 @@
     error = null;
 
     try {
-      await invoke("remove_custom_sdk_directory", { directoryId });
+      await invoke('remove_custom_sdk_directory', { directoryId });
       await loadDirectories();
     } catch (err) {
-      error =
-        err instanceof Error
-          ? err.message
-          : "Failed to remove custom directory";
-      console.error("Failed to remove custom directory:", err);
+      error = err instanceof Error ? err.message : 'Failed to remove custom directory';
+      console.error('Failed to remove custom directory:', err);
     } finally {
       loading = false;
     }
@@ -160,11 +148,11 @@
     error = null;
 
     try {
-      await invoke("rescan_custom_directory", { directoryId });
+      await invoke('rescan_custom_directory', { directoryId });
       await loadDirectories();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to rescan directory";
-      console.error("Failed to rescan directory:", err);
+      error = err instanceof Error ? err.message : 'Failed to rescan directory';
+      console.error('Failed to rescan directory:', err);
     } finally {
       loading = false;
     }
@@ -177,22 +165,22 @@
 
   function getSdkTypeColor(sdkType: string) {
     switch (sdkType.toLowerCase()) {
-      case "nodejs":
-        return "bg-green-100 text-green-800";
-      case "python":
-        return "bg-blue-100 text-blue-800";
-      case "java":
-        return "bg-orange-100 text-orange-800";
-      case "rust":
-        return "bg-red-100 text-red-800";
-      case "go":
-        return "bg-cyan-100 text-cyan-800";
-      case "php":
-        return "bg-purple-100 text-purple-800";
-      case "ruby":
-        return "bg-pink-100 text-pink-800";
+      case 'nodejs':
+        return 'bg-green-100 text-green-800';
+      case 'python':
+        return 'bg-blue-100 text-blue-800';
+      case 'java':
+        return 'bg-orange-100 text-orange-800';
+      case 'rust':
+        return 'bg-red-100 text-red-800';
+      case 'go':
+        return 'bg-cyan-100 text-cyan-800';
+      case 'php':
+        return 'bg-purple-100 text-purple-800';
+      case 'ruby':
+        return 'bg-pink-100 text-pink-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   }
 
@@ -206,7 +194,7 @@
         dir.name.toLowerCase().includes(term) ||
         dir.path.toLowerCase().includes(term) ||
         dir.sdk_type.toLowerCase().includes(term) ||
-        (dir.description && dir.description.toLowerCase().includes(term)),
+        (dir.description && dir.description.toLowerCase().includes(term))
     );
   });
 </script>
@@ -216,9 +204,7 @@
   <div class="flex items-center justify-between">
     <div>
       <h2 class="text-2xl font-bold">Custom Directories</h2>
-      <p class="text-muted-foreground">
-        Manage custom SDK installation directories
-      </p>
+      <p class="text-muted-foreground">Manage custom SDK installation directories</p>
     </div>
     <Button onclick={() => (showAddDialog = true)}>
       <Plus class="mr-2 h-4 w-4" />
@@ -232,11 +218,7 @@
       <Search
         class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
       />
-      <Input
-        placeholder="Search directories..."
-        bind:value={searchTerm}
-        class="pl-10"
-      />
+      <Input placeholder="Search directories..." bind:value={searchTerm} class="pl-10" />
     </div>
     <Button variant="outline" onclick={loadDirectories} disabled={loading}>
       <RefreshCw class="mr-2 h-4 w-4" />
@@ -255,9 +237,7 @@
   <!-- Loading State -->
   {#if loading && directories.length === 0}
     <div class="flex items-center justify-center py-8">
-      <div
-        class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
-      ></div>
+      <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
       <span class="ml-2">Loading directories...</span>
     </div>
   {:else if filteredDirectories.length === 0}
@@ -280,10 +260,7 @@
               <div class="min-w-0 flex-1">
                 <CardTitle class="truncate text-lg">{directory.name}</CardTitle>
                 <div class="mt-1 flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    class={getSdkTypeColor(directory.sdk_type)}
-                  >
+                  <Badge variant="outline" class={getSdkTypeColor(directory.sdk_type)}>
                     {directory.sdk_type}
                   </Badge>
                   {#if directory.is_valid}
@@ -326,26 +303,20 @@
             <div class="space-y-3">
               <div>
                 <Label class="text-xs text-muted-foreground">Path</Label>
-                <p
-                  class="mt-1 break-all rounded bg-muted p-2 font-mono text-sm"
-                >
+                <p class="mt-1 break-all rounded bg-muted p-2 font-mono text-sm">
                   {directory.path}
                 </p>
               </div>
 
               {#if directory.description}
                 <div>
-                  <Label class="text-xs text-muted-foreground"
-                    >Description</Label
-                  >
+                  <Label class="text-xs text-muted-foreground">Description</Label>
                   <p class="mt-1 text-sm">{directory.description}</p>
                 </div>
               {/if}
 
               <div>
-                <Label class="text-xs text-muted-foreground"
-                  >Installations</Label
-                >
+                <Label class="text-xs text-muted-foreground">Installations</Label>
                 <div class="mt-1 flex flex-wrap gap-1">
                   {#if directory.installations.length > 0}
                     {#each directory.installations as installation}
@@ -357,9 +328,7 @@
                       </Badge>
                     {/each}
                   {:else}
-                    <span class="text-xs text-muted-foreground"
-                      >No installations found</span
-                    >
+                    <span class="text-xs text-muted-foreground">No installations found</span>
                   {/if}
                 </div>
               </div>
@@ -390,11 +359,7 @@
 
       <div>
         <Label for="directory-name">Name</Label>
-        <Input
-          id="directory-name"
-          placeholder="My Custom SDKs"
-          bind:value={newDirectoryName}
-        />
+        <Input id="directory-name" placeholder="My Custom SDKs" bind:value={newDirectoryName} />
       </div>
 
       <div>
@@ -402,13 +367,13 @@
         <Select
           bind:value={newDirectorySdkType}
           options={[
-            { value: "nodejs", label: "Node.js" },
-            { value: "python", label: "Python" },
-            { value: "java", label: "Java" },
-            { value: "rust", label: "Rust" },
-            { value: "go", label: "Go" },
-            { value: "php", label: "PHP" },
-            { value: "ruby", label: "Ruby" },
+            { value: 'nodejs', label: 'Node.js' },
+            { value: 'python', label: 'Python' },
+            { value: 'java', label: 'Java' },
+            { value: 'rust', label: 'Rust' },
+            { value: 'go', label: 'Go' },
+            { value: 'php', label: 'PHP' },
+            { value: 'ruby', label: 'Ruby' },
           ]}
         />
       </div>
@@ -424,11 +389,9 @@
     </div>
 
     <div class="mt-6 flex justify-end gap-2">
-      <Button variant="outline" onclick={() => (showAddDialog = false)}>
-        Cancel
-      </Button>
+      <Button variant="outline" onclick={() => (showAddDialog = false)}>Cancel</Button>
       <Button onclick={addDirectory} disabled={loading}>
-        {loading ? "Adding..." : "Add Directory"}
+        {loading ? 'Adding...' : 'Add Directory'}
       </Button>
     </div>
   </DialogContent>
@@ -452,10 +415,7 @@
 
         <div>
           <Label>SDK Type</Label>
-          <Badge
-            variant="outline"
-            class={getSdkTypeColor(selectedDirectory.sdk_type)}
-          >
+          <Badge variant="outline" class={getSdkTypeColor(selectedDirectory.sdk_type)}>
             {selectedDirectory.sdk_type}
           </Badge>
         </div>
@@ -473,9 +433,7 @@
                 </Badge>
               {/each}
             {:else}
-              <span class="text-xs text-muted-foreground"
-                >No installations found</span
-              >
+              <span class="text-xs text-muted-foreground">No installations found</span>
             {/if}
           </div>
         </div>
@@ -483,9 +441,7 @@
     {/if}
 
     <div class="mt-6 flex justify-end gap-2">
-      <Button variant="outline" onclick={() => (showEditDialog = false)}>
-        Close
-      </Button>
+      <Button variant="outline" onclick={() => (showEditDialog = false)}>Close</Button>
       <Button
         variant="destructive"
         onclick={() => {

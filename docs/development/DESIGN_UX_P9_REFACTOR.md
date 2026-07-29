@@ -10,13 +10,13 @@ Last phase of the design consistency initiative — long-tail detail views, layo
 
 ## Summary
 
-| Phase | Scope | Result |
-|-------|--------|--------|
-| **9a** | Cloud K8s detail (10 routes) | Page-level `Loading` → `PageLoading` / `PageError` + retry. Tab spinners (YAML, logs, etc.) unchanged. |
-| **9b** | Settings layout | `settings/+layout.svelte` — layout-level load/error for all sub-pages. No per-sub-page `PageHeader`. |
-| **9c** | Task/document detail | `tasks/[id]`, `tasks/[id]/edit`, `documents/[id]` migrated. |
-| **9d** | Form wrappers | Skipped — `TaskForm` / `DocumentEditor` own full-page layout. |
-| **9e** | Cloud workloads overview | `cloud/workloads/+page.svelte` — initial load/error shell; refresh keeps dashboard visible, failures toast. |
+| Phase  | Scope                        | Result                                                                                                      |
+| ------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **9a** | Cloud K8s detail (10 routes) | Page-level `Loading` → `PageLoading` / `PageError` + retry. Tab spinners (YAML, logs, etc.) unchanged.      |
+| **9b** | Settings layout              | `settings/+layout.svelte` — layout-level load/error for all sub-pages. No per-sub-page `PageHeader`.        |
+| **9c** | Task/document detail         | `tasks/[id]`, `tasks/[id]/edit`, `documents/[id]` migrated.                                                 |
+| **9d** | Form wrappers                | Skipped — `TaskForm` / `DocumentEditor` own full-page layout.                                               |
+| **9e** | Cloud workloads overview     | `cloud/workloads/+page.svelte` — initial load/error shell; refresh keeps dashboard visible, failures toast. |
 
 ---
 
@@ -24,18 +24,18 @@ Last phase of the design consistency initiative — long-tail detail views, layo
 
 ### 9a — Cloud detail (10)
 
-| Route | File |
-|-------|------|
-| Secret | `src/routes/cloud/secrets/[secret]/+page.svelte` |
-| ConfigMap | `src/routes/cloud/configmaps/[configmap]/+page.svelte` |
-| Ingress | `src/routes/cloud/ingress/[ingress]/+page.svelte` |
-| Pod | `src/routes/cloud/workloads/pods/[pod]/+page.svelte` |
-| Deployment | `src/routes/cloud/workloads/deployments/[deployment]/+page.svelte` |
-| Service | `src/routes/cloud/workloads/services/[service]/+page.svelte` |
-| Job | `src/routes/cloud/workloads/jobs/[job]/+page.svelte` |
-| CronJob | `src/routes/cloud/workloads/cronjobs/[cronjob]/+page.svelte` |
+| Route       | File                                                                 |
+| ----------- | -------------------------------------------------------------------- |
+| Secret      | `src/routes/cloud/secrets/[secret]/+page.svelte`                     |
+| ConfigMap   | `src/routes/cloud/configmaps/[configmap]/+page.svelte`               |
+| Ingress     | `src/routes/cloud/ingress/[ingress]/+page.svelte`                    |
+| Pod         | `src/routes/cloud/workloads/pods/[pod]/+page.svelte`                 |
+| Deployment  | `src/routes/cloud/workloads/deployments/[deployment]/+page.svelte`   |
+| Service     | `src/routes/cloud/workloads/services/[service]/+page.svelte`         |
+| Job         | `src/routes/cloud/workloads/jobs/[job]/+page.svelte`                 |
+| CronJob     | `src/routes/cloud/workloads/cronjobs/[cronjob]/+page.svelte`         |
 | StatefulSet | `src/routes/cloud/workloads/statefulsets/[statefulset]/+page.svelte` |
-| DaemonSet | `src/routes/cloud/workloads/daemonsets/[daemonset]/+page.svelte` |
+| DaemonSet   | `src/routes/cloud/workloads/daemonsets/[daemonset]/+page.svelte`     |
 
 ### 9b — Settings
 
@@ -59,8 +59,8 @@ Last phase of the design consistency initiative — long-tail detail views, layo
 **Detail pages (9a, 9c):**
 
 ```svelte
-import { PageLoading, PageError } from "$lib/components/shell";
-import Loading from "$lib/components/ui/loading.svelte"; // keep for tab-level only
+import {(PageLoading, PageError)} from "$lib/components/shell"; import Loading from "$lib/components/ui/loading.svelte";
+// keep for tab-level only
 
 {#if isLoading}
   <PageLoading message="Loading secret..." />
@@ -77,7 +77,11 @@ import Loading from "$lib/components/ui/loading.svelte"; // keep for tab-level o
 {#if $isLoadingSettings}
   <PageLoading message="Loading settings..." />
 {:else if $settingsError}
-  <PageError title="Failed to load settings" message={$settingsError} onRetry={() => settingsActions.loadSettings()} />
+  <PageError
+    title="Failed to load settings"
+    message={$settingsError}
+    onRetry={() => settingsActions.loadSettings()}
+  />
 {:else}
   {@render children()}
 {/if}
@@ -138,11 +142,11 @@ With `pnpm tauri dev` and a connected cluster:
 
 See parent doc [Follow-up table](./DESIGN_UX_CONSISTENCY.md#follow-up-optional):
 
-| Item | Notes |
-|------|-------|
-| Terminal domain | Separate epic — imports, confirm API, icons |
-| `sdk/+page.svelte`, `sdk/ai/ollama` | Large specialty pages; migrate when touched |
-| `tasks/[id]/generate`, `TaskGenerationPage` | Wizard step spinners — not page-level shell |
-| `documents/generate` | Thin wrapper around `DocumentGenerationPage` — no page-level load needed |
-| Cloud emoji nav → Lucide | Cosmetic only — skip |
-| TanStack Query migration | Architecture — [`SVELTE_MAINTAINABILITY_PLAN.md`](./SVELTE_MAINTAINABILITY_PLAN.md) |
+| Item                                        | Notes                                                                               |
+| ------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Terminal domain                             | Separate epic — imports, confirm API, icons                                         |
+| `sdk/+page.svelte`, `sdk/ai/ollama`         | Large specialty pages; migrate when touched                                         |
+| `tasks/[id]/generate`, `TaskGenerationPage` | Wizard step spinners — not page-level shell                                         |
+| `documents/generate`                        | Thin wrapper around `DocumentGenerationPage` — no page-level load needed            |
+| Cloud emoji nav → Lucide                    | Cosmetic only — skip                                                                |
+| TanStack Query migration                    | Architecture — [`SVELTE_MAINTAINABILITY_PLAN.md`](./SVELTE_MAINTAINABILITY_PLAN.md) |

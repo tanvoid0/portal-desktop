@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Bot, Send } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { aiChatService } from "$lib/domains/ai/services/aiChatService";
-  import { commandBlockStore } from "../../stores/commandBlockStore";
-  import { buildTerminalContext } from "../../services/terminalAiContext";
-  import AiResponse from "../ai/AiResponse.svelte";
+  import { Bot, Send } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { aiChatService } from '$lib/domains/ai/services/aiChatService';
+  import { commandBlockStore } from '../../stores/commandBlockStore';
+  import { buildTerminalContext } from '../../services/terminalAiContext';
+  import AiResponse from '../ai/AiResponse.svelte';
 
   interface Props {
     tabId: string;
@@ -19,29 +19,26 @@
 
   let { tabId, shell, workingDirectory, onRunCommand }: Props = $props();
 
-  let messages = $state<
-    Array<{ role: "user" | "assistant"; content: string; timestamp: Date }>
-  >([]);
-  let inputValue = $state("");
+  let messages = $state<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }>>(
+    []
+  );
+  let inputValue = $state('');
   let isLoading = $state(false);
 
   async function handleSend() {
     const question = inputValue.trim();
     if (!question || isLoading) return;
 
-    messages = [
-      ...messages,
-      { role: "user", content: question, timestamp: new Date() },
-    ];
-    inputValue = "";
+    messages = [...messages, { role: 'user', content: question, timestamp: new Date() }];
+    inputValue = '';
     isLoading = true;
 
-    let assistantContent = "";
+    let assistantContent = '';
     const blockId = commandBlockStore.addBlock(tabId, {
       command: `/ai ${question}`,
-      output: "",
-      source: "ai",
-      status: "running",
+      output: '',
+      source: 'ai',
+      status: 'running',
     });
 
     const context = buildTerminalContext(tabId, { shell, workingDirectory });
@@ -55,10 +52,7 @@
       const errorMessage = `Error: ${msg}`;
       commandBlockStore.appendOutput(tabId, blockId, `\n\n${errorMessage}`);
       commandBlockStore.completeBlock(tabId, blockId, 1);
-      messages = [
-        ...messages,
-        { role: "assistant", content: errorMessage, timestamp: new Date() },
-      ];
+      messages = [...messages, { role: 'assistant', content: errorMessage, timestamp: new Date() }];
       isLoading = false;
     };
 
@@ -73,7 +67,7 @@
           messages = [
             ...messages,
             {
-              role: "assistant",
+              role: 'assistant',
               content: assistantContent,
               timestamp: new Date(),
             },
@@ -83,7 +77,7 @@
         onError: (error) => fail(error.message),
       });
     } catch (error) {
-      fail(error instanceof Error ? error.message : "Unknown error");
+      fail(error instanceof Error ? error.message : 'Unknown error');
     }
   }
 </script>
@@ -97,8 +91,8 @@
   <div class="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
     {#if messages.length === 0}
       <p class="text-xs text-muted-foreground">
-        Ask about your recent commands, errors, or describe what you want to do
-        — the AI sees this tab's command history and suggests runnable commands.
+        Ask about your recent commands, errors, or describe what you want to do — the AI sees this
+        tab's command history and suggests runnable commands.
       </p>
     {:else}
       {#each messages as msg (msg.timestamp.getTime() + msg.role)}
@@ -107,7 +101,7 @@
             ? 'bg-primary text-primary-foreground'
             : 'border border-border bg-muted/60 text-foreground'}"
         >
-          {#if msg.role === "assistant"}
+          {#if msg.role === 'assistant'}
             <AiResponse content={msg.content} {onRunCommand} />
           {:else}
             {msg.content}

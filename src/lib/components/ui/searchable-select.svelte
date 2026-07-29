@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
-  import * as Popover from "./popover";
-  import * as Command from "./command";
-  import { Button } from "./button";
-  import { Check, ChevronsUpDown } from "@lucide/svelte";
+  import { cn } from '$lib/utils.js';
+  import * as Popover from './popover';
+  import * as Command from './command';
+  import { Button } from './button';
+  import { Check, ChevronsUpDown } from '@lucide/svelte';
 
   interface Props {
     options: Array<{ value: string; label: string }>;
@@ -17,18 +17,18 @@
 
   let {
     options = [],
-    value = "",
-    placeholder = "Select option...",
-    searchPlaceholder = "Search...",
+    value = '',
+    placeholder = 'Select option...',
+    searchPlaceholder = 'Search...',
     onValueChange,
     disabled = false,
-    class: className = "",
+    class: className = '',
   }: Props = $props();
 
   type Option = { value: string; label: string };
 
   let open = $state(false);
-  let search = $state("");
+  let search = $state('');
 
   function filterOptions(opts: Option[], searchQuery: string): Option[] {
     if (!searchQuery.trim()) {
@@ -37,26 +37,23 @@
     const query = searchQuery.toLowerCase();
     return opts.filter((option) => {
       return (
-        option.label.toLowerCase().includes(query) ||
-        option.value.toLowerCase().includes(query)
+        option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query)
       );
     });
   }
 
   const filteredOptions = $derived(filterOptions(options, search));
 
-  const selectedOption = $derived(
-    options.find((opt) => opt.value === value) as Option | undefined,
-  );
+  const selectedOption = $derived(options.find((opt) => opt.value === value) as Option | undefined);
 
   function handleSelect(optionValue: string) {
     onValueChange?.(optionValue);
     open = false;
-    search = "";
+    search = '';
   }
 </script>
 
-<div class={cn("relative", className)}>
+<div class={cn('relative', className)}>
   <Popover.Root bind:open>
     <Popover.Trigger>
       <Button
@@ -66,9 +63,9 @@
         {disabled}
         size="sm"
         class={cn(
-          "w-full justify-between",
-          !selectedOption && "text-muted-foreground",
-          open && "ring-2 ring-ring ring-offset-2",
+          'w-full justify-between',
+          !selectedOption && 'text-muted-foreground',
+          open && 'ring-2 ring-ring ring-offset-2'
         )}
       >
         <span class="truncate text-left">
@@ -76,8 +73,8 @@
         </span>
         <ChevronsUpDown
           class={cn(
-            "ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200",
-            open && "rotate-180",
+            'ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200',
+            open && 'rotate-180'
           )}
         />
       </Button>
@@ -88,11 +85,7 @@
       sideOffset={4}
     >
       <Command.Root shouldFilter={false} class="rounded-lg">
-        <Command.Input
-          placeholder={searchPlaceholder}
-          bind:value={search}
-          class="h-9"
-        />
+        <Command.Input placeholder={searchPlaceholder} bind:value={search} class="h-9" />
         <Command.Empty class="py-6 text-center text-sm text-muted-foreground">
           No results found.
         </Command.Empty>
@@ -103,18 +96,16 @@
                 value={option.value}
                 onclick={() => handleSelect(option.value)}
                 class={cn(
-                  "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
-                  "aria-selected:bg-accent aria-selected:text-accent-foreground",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  value === option.value && "bg-accent/50 font-medium",
+                  'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
+                  'aria-selected:bg-accent aria-selected:text-accent-foreground',
+                  'hover:bg-accent hover:text-accent-foreground',
+                  value === option.value && 'bg-accent/50 font-medium'
                 )}
               >
                 <Check
                   class={cn(
-                    "mr-2 h-4 w-4 shrink-0 transition-opacity",
-                    value === option.value
-                      ? "text-primary opacity-100"
-                      : "opacity-0",
+                    'mr-2 h-4 w-4 shrink-0 transition-opacity',
+                    value === option.value ? 'text-primary opacity-100' : 'opacity-0'
                   )}
                 />
                 <span class="flex-1 truncate">{option.label}</span>

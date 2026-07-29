@@ -1,16 +1,13 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { PageEmpty } from "$lib/components/shell";
-  import { Button } from "$lib/components/ui/button";
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { githubService } from "$lib/domains/github";
-  import type {
-    GitHubConnectionStatus,
-    GitHubDeviceFlowStart,
-  } from "$lib/domains/github";
-  import { openExternalUrl } from "$lib/utils/tauri";
-  import { toast } from "$lib/utils/toast";
-  import { Check, Copy, FolderGit2 } from "@lucide/svelte";
+  import { goto } from '$app/navigation';
+  import { PageEmpty } from '$lib/components/shell';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { githubService } from '$lib/domains/github';
+  import type { GitHubConnectionStatus, GitHubDeviceFlowStart } from '$lib/domains/github';
+  import { openExternalUrl } from '$lib/utils/tauri';
+  import { toast } from '$lib/utils/toast';
+  import { Check, Copy, FolderGit2 } from '@lucide/svelte';
 
   interface Props {
     status?: GitHubConnectionStatus | null;
@@ -26,13 +23,13 @@
 
   const description = $derived(
     status?.clientIdConfigured
-      ? "Connect your GitHub account to browse repositories, clone projects, and manage issues."
-      : "GitHub OAuth is not configured yet. Add your GitHub Client ID in Settings > GitHub, then connect your account.",
+      ? 'Connect your GitHub account to browse repositories, clone projects, and manage issues.'
+      : 'GitHub OAuth is not configured yet. Add your GitHub Client ID in Settings > GitHub, then connect your account.'
   );
 
   async function handleConnect() {
     if (!status?.clientIdConfigured) {
-      goto("/settings/github");
+      goto('/settings/github');
       return;
     }
 
@@ -43,19 +40,16 @@
       await githubService.connectWithDeviceFlow(undefined, {
         onStarted: (start) => {
           deviceFlow = start;
-          flowMessage =
-            "Copy the code below, open GitHub, paste it, then authorize.";
+          flowMessage = 'Copy the code below, open GitHub, paste it, then authorize.';
         },
         onPolling: () => {
-          flowMessage = "Waiting for you to authorize on GitHub...";
+          flowMessage = 'Waiting for you to authorize on GitHub...';
         },
       });
-      toast.success("GitHub connected");
+      toast.success('GitHub connected');
       await onConnected?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to connect GitHub",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to connect GitHub');
     } finally {
       connecting = false;
       deviceFlow = null;
@@ -68,14 +62,12 @@
     try {
       await navigator.clipboard.writeText(deviceFlow.userCode);
       codeCopied = true;
-      toast.success("Code copied to clipboard");
+      toast.success('Code copied to clipboard');
       setTimeout(() => {
         codeCopied = false;
       }, 2000);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to copy code",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to copy code');
     }
   }
 
@@ -85,9 +77,7 @@
       await openExternalUrl(deviceFlow.verificationUri);
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to open GitHub authorization page",
+        error instanceof Error ? error.message : 'Failed to open GitHub authorization page'
       );
     }
   }
@@ -102,9 +92,7 @@
         {flowMessage}
       </p>
       <div class="mb-4 w-full max-w-sm rounded-lg border bg-muted/40 px-6 py-4 text-center">
-        <div class="text-xs uppercase tracking-wide text-muted-foreground">
-          Your code
-        </div>
+        <div class="text-xs uppercase tracking-wide text-muted-foreground">Your code</div>
         <div class="mt-1 flex items-center justify-center gap-2">
           <div class="font-mono text-3xl font-semibold tracking-widest">
             {deviceFlow.userCode}
@@ -144,9 +132,9 @@
     icon={FolderGit2}
     actionLabel={status?.clientIdConfigured
       ? connecting
-        ? "Connecting..."
-        : "Connect GitHub"
-      : "Open GitHub Settings"}
+        ? 'Connecting...'
+        : 'Connect GitHub'
+      : 'Open GitHub Settings'}
     onAction={handleConnect}
   />
 {/if}

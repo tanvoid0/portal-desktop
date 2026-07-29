@@ -1,9 +1,9 @@
 <script lang="ts">
-  import Devicon from "$lib/components/ui/devicon.svelte";
-  import { MenuButton as SidebarMenuButton } from "$lib/components/ui/sidebar";
-  import SDKInstallStatusIcon from "./SDKInstallStatusIcon.svelte";
-  import SDKServiceToggle from "./SDKServiceToggle.svelte";
-  import type { SDKItem, SDKSidebarVariant } from "./sdkSidebarTypes";
+  import Devicon from '$lib/components/ui/devicon.svelte';
+  import { MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
+  import SDKInstallStatusIcon from './SDKInstallStatusIcon.svelte';
+  import SDKServiceToggle from './SDKServiceToggle.svelte';
+  import type { SDKItem, SDKSidebarVariant } from './sdkSidebarTypes';
 
   interface Props {
     variant: SDKSidebarVariant;
@@ -26,20 +26,18 @@
   }: Props = $props();
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onSDKClick();
     }
   }
 </script>
 
-{#if variant === "collapsed"}
+{#if variant === 'collapsed'}
   <SidebarMenuButton
     size="sm"
     isActive={selected}
-    tooltipContent={
-      sdk.version ? `${sdk.displayName} (${sdk.version})` : sdk.displayName
-    }
+    tooltipContent={sdk.version ? `${sdk.displayName} (${sdk.version})` : sdk.displayName}
     onclick={onSDKClick}
     class="!w-auto !p-1 !gap-1"
   >
@@ -73,12 +71,10 @@
           {sdk.version}
         </div>
       {:else if !sdk.installed}
-        <div class="text-[11px] text-muted-foreground leading-3">
-          Not installed
-        </div>
+        <div class="text-[11px] text-muted-foreground leading-3">Not installed</div>
       {/if}
 
-      {#if sdk.category === "database" && sdk.port}
+      {#if sdk.category === 'database' && sdk.port}
         <div class="text-[11px] text-muted-foreground leading-3">
           Port: {sdk.port}
         </div>
@@ -98,4 +94,3 @@
     </div>
   </div>
 {/if}
-

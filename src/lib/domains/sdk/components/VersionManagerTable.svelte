@@ -4,22 +4,17 @@
 -->
 
 <script lang="ts">
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import { confirmAction } from "$lib/utils/confirm";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import { sdkService } from "$lib/domains/sdk/services/sdkService";
-  import { Sparkles } from "@lucide/svelte";
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { sdkService } from '$lib/domains/sdk/services/sdkService';
+  import { Sparkles } from '@lucide/svelte';
   import {
     CheckCircle,
     XCircle,
@@ -36,12 +31,12 @@
     FolderOpen,
     Play,
     Square,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface VersionInfo {
     version: string;
     path: string;
-    env_status: "app-managed" | "system-managed" | "not-in-path";
+    env_status: 'app-managed' | 'system-managed' | 'not-in-path';
     aliases: string[];
     is_active: boolean;
     is_installed: boolean;
@@ -55,7 +50,7 @@
   let versions = $state<VersionInfo[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
-  let searchTerm = $state("");
+  let searchTerm = $state('');
   let selectedVersions = $state<Set<string>>(new Set());
   let suggestedVersion = $state<string | null>(null);
 
@@ -70,11 +65,11 @@
     error = null;
 
     try {
-      const result = await invoke("get_sdk_versions", { sdkType });
+      const result = await invoke('get_sdk_versions', { sdkType });
       versions = Array.isArray(result) ? result : [];
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load versions";
-      console.error("Failed to load versions:", err);
+      error = err instanceof Error ? err.message : 'Failed to load versions';
+      console.error('Failed to load versions:', err);
     } finally {
       loading = false;
     }
@@ -85,7 +80,7 @@
       const suggested = await sdkService.getSuggestedVersion(sdkType);
       suggestedVersion = suggested;
     } catch (err) {
-      console.error("Failed to load suggested version:", err);
+      console.error('Failed to load suggested version:', err);
       suggestedVersion = null;
     }
   }
@@ -95,13 +90,13 @@
     error = null;
 
     try {
-      await invoke("install_sdk_version", { sdkType, version });
+      await invoke('install_sdk_version', { sdkType, version });
       await loadVersions();
       // Reload suggestion after installing (may have changed)
       await loadSuggestedVersion();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to install version";
-      console.error("Failed to install version:", err);
+      error = err instanceof Error ? err.message : 'Failed to install version';
+      console.error('Failed to install version:', err);
     } finally {
       loading = false;
     }
@@ -110,7 +105,7 @@
   async function uninstallVersion(version: string) {
     const confirmed = await confirmAction(
       `Are you sure you want to uninstall version ${version}?`,
-      "Uninstall version",
+      'Uninstall version'
     );
     if (!confirmed) return;
 
@@ -118,12 +113,11 @@
     error = null;
 
     try {
-      await invoke("uninstall_sdk_version", { sdkType, version });
+      await invoke('uninstall_sdk_version', { sdkType, version });
       await loadVersions();
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to uninstall version";
-      console.error("Failed to uninstall version:", err);
+      error = err instanceof Error ? err.message : 'Failed to uninstall version';
+      console.error('Failed to uninstall version:', err);
     } finally {
       loading = false;
     }
@@ -134,13 +128,13 @@
     error = null;
 
     try {
-      await invoke("switch_sdk_version", { sdkType, version });
+      await invoke('switch_sdk_version', { sdkType, version });
       await loadVersions();
       // Reload suggestion after switching (may have changed)
       await loadSuggestedVersion();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to switch version";
-      console.error("Failed to switch version:", err);
+      error = err instanceof Error ? err.message : 'Failed to switch version';
+      console.error('Failed to switch version:', err);
     } finally {
       loading = false;
     }
@@ -148,11 +142,11 @@
 
   function getEnvStatusIcon(status: string) {
     switch (status) {
-      case "app-managed":
+      case 'app-managed':
         return Shield;
-      case "system-managed":
+      case 'system-managed':
         return Settings;
-      case "not-in-path":
+      case 'not-in-path':
         return ShieldOff;
       default:
         return AlertTriangle;
@@ -161,58 +155,58 @@
 
   function getEnvStatusColor(status: string) {
     switch (status) {
-      case "app-managed":
-        return "text-blue-600";
-      case "system-managed":
-        return "text-yellow-600";
-      case "not-in-path":
-        return "text-gray-600";
+      case 'app-managed':
+        return 'text-blue-600';
+      case 'system-managed':
+        return 'text-yellow-600';
+      case 'not-in-path':
+        return 'text-gray-600';
       default:
-        return "text-red-600";
+        return 'text-red-600';
     }
   }
 
   function getEnvStatusBadgeVariant(status: string) {
     switch (status) {
-      case "app-managed":
-        return "default";
-      case "system-managed":
-        return "secondary";
-      case "not-in-path":
-        return "outline";
+      case 'app-managed':
+        return 'default';
+      case 'system-managed':
+        return 'secondary';
+      case 'not-in-path':
+        return 'outline';
       default:
-        return "destructive";
+        return 'destructive';
     }
   }
 
   function getEnvStatusText(status: string) {
     switch (status) {
-      case "app-managed":
-        return "App Managed";
-      case "system-managed":
-        return "System Managed";
-      case "not-in-path":
-        return "Not in PATH";
+      case 'app-managed':
+        return 'App Managed';
+      case 'system-managed':
+        return 'System Managed';
+      case 'not-in-path':
+        return 'Not in PATH';
       default:
-        return "Unknown";
+        return 'Unknown';
     }
   }
 
   function formatFileSize(bytes?: number) {
-    if (!bytes) return "Unknown";
-    const sizes = ["Bytes", "KB", "MB", "GB"];
+    if (!bytes) return 'Unknown';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i];
+    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
   }
 
   function formatDate(timestamp?: string) {
-    if (!timestamp) return "Unknown";
+    if (!timestamp) return 'Unknown';
     return new Date(timestamp).toLocaleDateString();
   }
 
   function openInExplorer(path: string) {
     // This would open the path in the system file explorer
-    console.log("Opening in explorer:", path);
+    console.log('Opening in explorer:', path);
   }
 
   // Filter versions based on search term
@@ -224,7 +218,7 @@
       (version) =>
         version.version.toLowerCase().includes(term) ||
         version.path.toLowerCase().includes(term) ||
-        version.aliases.some((alias) => alias.toLowerCase().includes(term)),
+        version.aliases.some((alias) => alias.toLowerCase().includes(term))
     );
   });
 
@@ -261,12 +255,7 @@
         {/if}
       </div>
       <div class="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={loadVersions}
-          disabled={loading}
-        >
+        <Button variant="outline" size="sm" onclick={loadVersions} disabled={loading}>
           <RefreshCw class="h-4 w-4" />
         </Button>
       </div>
@@ -280,11 +269,7 @@
         <Search
           class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
         />
-        <Input
-          placeholder="Search versions..."
-          bind:value={searchTerm}
-          class="pl-10"
-        />
+        <Input placeholder="Search versions..." bind:value={searchTerm} class="pl-10" />
       </div>
 
       {#if selectedVersions.size > 0}
@@ -292,9 +277,7 @@
           <span class="text-sm text-muted-foreground">
             {selectedVersions.size} selected
           </span>
-          <Button variant="outline" size="sm" onclick={clearSelection}>
-            Clear
-          </Button>
+          <Button variant="outline" size="sm" onclick={clearSelection}>Clear</Button>
         </div>
       {/if}
     </div>
@@ -310,9 +293,7 @@
     <!-- Loading State -->
     {#if loading && versions.length === 0}
       <div class="flex items-center justify-center py-8">
-        <div
-          class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
-        ></div>
+        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
         <span class="ml-2">Loading versions...</span>
       </div>
     {:else if filteredVersions.length === 0}
@@ -333,8 +314,7 @@
             <tr class="border-b">
               <th class="p-3 text-left">
                 <Checkbox
-                  checked={selectedVersions.size === versions.length &&
-                    versions.length > 0}
+                  checked={selectedVersions.size === versions.length && versions.length > 0}
                   onCheckedChange={(checked) => {
                     if (checked) selectAllVersions();
                     else clearSelection();
@@ -354,16 +334,13 @@
                 <td class="p-3">
                   <Checkbox
                     checked={selectedVersions.has(version.version)}
-                    onCheckedChange={() =>
-                      toggleVersionSelection(version.version)}
+                    onCheckedChange={() => toggleVersionSelection(version.version)}
                   />
                 </td>
 
                 <td class="p-3">
                   <div class="flex items-center gap-2">
-                    <code class="font-mono text-sm font-medium"
-                      >{version.version}</code
-                    >
+                    <code class="font-mono text-sm font-medium">{version.version}</code>
                     {#if version.is_active}
                       <Badge variant="default" class="text-xs">
                         <Play class="mr-1 h-3 w-3" />
@@ -384,9 +361,7 @@
 
                 <td class="p-3">
                   <div class="flex min-w-0 items-center gap-2">
-                    <code
-                      class="max-w-xs truncate font-mono text-sm text-muted-foreground"
-                    >
+                    <code class="max-w-xs truncate font-mono text-sm text-muted-foreground">
                       {version.path}
                     </code>
                     <Button
@@ -481,11 +456,7 @@
               <Download class="mr-2 h-4 w-4" />
               Install Selected
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              class="text-red-500 hover:text-red-700"
-            >
+            <Button variant="outline" size="sm" class="text-red-500 hover:text-red-700">
               <Trash2 class="mr-2 h-4 w-4" />
               Remove Selected
             </Button>

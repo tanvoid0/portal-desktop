@@ -10,7 +10,7 @@ export enum LogLevel {
   ERROR = 3,
 }
 
-export type LogSource = "frontend" | "backend";
+export type LogSource = 'frontend' | 'backend';
 
 export interface LogEntry {
   timestamp: Date;
@@ -83,7 +83,7 @@ class LoggerService {
    */
   initBackendLogListener(): void {
     // Only initialize if in Tauri environment
-    if (typeof window === "undefined" || !("__TAURI__" in window)) {
+    if (typeof window === 'undefined' || !('__TAURI__' in window)) {
       return;
     }
 
@@ -92,39 +92,36 @@ class LoggerService {
       this.backendLogListener();
     }
 
-    import("@tauri-apps/api/event").then(({ listen }) => {
-      listen<{ level: string; context?: string; message: string }>(
-        "backend-log",
-        (event) => {
-          const { level, context, message } = event.payload;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen<{ level: string; context?: string; message: string }>('backend-log', (event) => {
+        const { level, context, message } = event.payload;
 
-          // Map backend log level to frontend LogLevel
-          let logLevel: LogLevel;
-          switch (level.toUpperCase()) {
-            case "DEBUG":
-              logLevel = LogLevel.DEBUG;
-              break;
-            case "INFO":
-              logLevel = LogLevel.INFO;
-              break;
-            case "WARN":
-              logLevel = LogLevel.WARN;
-              break;
-            case "ERROR":
-              logLevel = LogLevel.ERROR;
-              break;
-            default:
-              logLevel = LogLevel.INFO;
-          }
+        // Map backend log level to frontend LogLevel
+        let logLevel: LogLevel;
+        switch (level.toUpperCase()) {
+          case 'DEBUG':
+            logLevel = LogLevel.DEBUG;
+            break;
+          case 'INFO':
+            logLevel = LogLevel.INFO;
+            break;
+          case 'WARN':
+            logLevel = LogLevel.WARN;
+            break;
+          case 'ERROR':
+            logLevel = LogLevel.ERROR;
+            break;
+          default:
+            logLevel = LogLevel.INFO;
+        }
 
-          this.addEntry(logLevel, message, { context }, "backend", context);
-        },
-      )
+        this.addEntry(logLevel, message, { context }, 'backend', context);
+      })
         .then((unlisten) => {
           this.backendLogListener = unlisten;
         })
         .catch((err) => {
-          console.error("Failed to set up backend log listener:", err);
+          console.error('Failed to set up backend log listener:', err);
         });
     });
   }
@@ -136,8 +133,8 @@ class LoggerService {
     level: LogLevel,
     message: string,
     data?: any,
-    source: LogSource = "frontend",
-    context?: string,
+    source: LogSource = 'frontend',
+    context?: string
   ): void {
     if (level < this.config.level) return;
 
@@ -174,11 +171,11 @@ class LoggerService {
     const timestamp = entry.timestamp.toISOString();
     const levelName = LogLevel[entry.level];
     const sourceTag = `[${entry.source.toUpperCase()}]`;
-    const contextTag = entry.context ? `[${entry.context}]` : "";
+    const contextTag = entry.context ? `[${entry.context}]` : '';
     const prefix = `[${timestamp}] ${sourceTag} [${levelName}]${contextTag}`;
 
     // Format data for better console output
-    let dataStr = "";
+    let dataStr = '';
     if (entry.data) {
       // Handle different error types properly
       if (entry.data instanceof Error) {
@@ -187,28 +184,25 @@ class LoggerService {
         if (entry.level === LogLevel.DEBUG && entry.data.stack) {
           dataStr += `\n${entry.data.stack}`;
         }
-      } else if (typeof entry.data === "string") {
+      } else if (typeof entry.data === 'string') {
         dataStr = entry.data;
-      } else if (typeof entry.data === "object" && entry.data !== null) {
+      } else if (typeof entry.data === 'object' && entry.data !== null) {
         // Check if it's an object with an error property (Error object or string)
-        if ("error" in entry.data) {
+        if ('error' in entry.data) {
           const errorValue = entry.data.error;
           if (errorValue instanceof Error) {
             dataStr = errorValue.message;
             if (entry.level === LogLevel.DEBUG && errorValue.stack) {
               dataStr += `\n${errorValue.stack}`;
             }
-          } else if (typeof errorValue === "string") {
+          } else if (typeof errorValue === 'string') {
             dataStr = errorValue;
           } else {
             // For non-string, non-Error values, try to extract meaningful info
             try {
               // If it's an object, try to find a message property
-              if (typeof errorValue === "object" && errorValue !== null) {
-                if (
-                  "message" in errorValue &&
-                  typeof errorValue.message === "string"
-                ) {
+              if (typeof errorValue === 'object' && errorValue !== null) {
+                if ('message' in errorValue && typeof errorValue.message === 'string') {
                   dataStr = errorValue.message;
                 } else {
                   dataStr = JSON.stringify(errorValue, null, 2);
@@ -220,10 +214,7 @@ class LoggerService {
               dataStr = String(errorValue);
             }
           }
-        } else if (
-          "message" in entry.data &&
-          typeof entry.data.message === "string"
-        ) {
+        } else if ('message' in entry.data && typeof entry.data.message === 'string') {
           dataStr = entry.data.message;
         } else {
           // Try to safely stringify, handling circular references
@@ -231,7 +222,7 @@ class LoggerService {
             dataStr = JSON.stringify(entry.data, null, 2);
           } catch (e) {
             // If stringification fails (circular reference, etc.), use a safe fallback
-            dataStr = "[Object]";
+            dataStr = '[Object]';
           }
         }
       } else {
@@ -294,8 +285,8 @@ class LoggerService {
           LogLevel.DEBUG,
           message,
           data ? { ...data, context } : { context },
-          "frontend",
-          context,
+          'frontend',
+          context
         );
       },
       info: (message: string, data?: any) => {
@@ -303,8 +294,8 @@ class LoggerService {
           LogLevel.INFO,
           message,
           data ? { ...data, context } : { context },
-          "frontend",
-          context,
+          'frontend',
+          context
         );
       },
       warn: (message: string, data?: any) => {
@@ -312,8 +303,8 @@ class LoggerService {
           LogLevel.WARN,
           message,
           data ? { ...data, context } : { context },
-          "frontend",
-          context,
+          'frontend',
+          context
         );
       },
       error: (message: string, data?: any) => {
@@ -321,8 +312,8 @@ class LoggerService {
           LogLevel.ERROR,
           message,
           data ? { ...data, context } : { context },
-          "frontend",
-          context,
+          'frontend',
+          context
         );
       },
     };
@@ -356,7 +347,7 @@ class LoggerService {
       filtered = filtered.filter(
         (entry) =>
           entry.message.toLowerCase().includes(searchLower) ||
-          entry.context?.toLowerCase().includes(searchLower),
+          entry.context?.toLowerCase().includes(searchLower)
       );
     }
 

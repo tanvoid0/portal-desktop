@@ -3,27 +3,23 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount } from 'svelte';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Switch } from "$lib/components/ui/switch";
-  import { Separator } from "$lib/components/ui/separator";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import Select from "$lib/components/ui/select.svelte";
-  import {
-    autonomyService,
-    type AutonomyLevel,
-    type ApprovalStats,
-  } from "$lib/domains/autonomy";
-  import { logger } from "$lib/domains/shared/services/logger";
-  import { toast } from "$lib/utils/toast";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Separator } from '$lib/components/ui/separator';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import Select from '$lib/components/ui/select.svelte';
+  import { autonomyService, type AutonomyLevel, type ApprovalStats } from '$lib/domains/autonomy';
+  import { logger } from '$lib/domains/shared/services/logger';
+  import { toast } from '$lib/utils/toast';
   import {
     Bot,
     Shield,
@@ -36,9 +32,9 @@
     Activity,
     Zap,
     Settings,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
-  const log = logger.createScoped("AutonomySettings");
+  const log = logger.createScoped('AutonomySettings');
 
   let autonomyEnabled = $state(false);
   let autonomyLevel = $state<AutonomyLevel | null>(null);
@@ -48,44 +44,44 @@
 
   const levelOptions = [
     {
-      value: "observation" as AutonomyLevel,
-      label: "Observation",
-      description: "No autonomous actions - suggestions only",
+      value: 'observation' as AutonomyLevel,
+      label: 'Observation',
+      description: 'No autonomous actions - suggestions only',
       icon: Eye,
-      color: "text-muted-foreground",
+      color: 'text-muted-foreground',
     },
     {
-      value: "conservative" as AutonomyLevel,
-      label: "Conservative",
-      description: "Safe actions only (read-only, UI updates)",
+      value: 'conservative' as AutonomyLevel,
+      label: 'Conservative',
+      description: 'Safe actions only (read-only, UI updates)',
       icon: Shield,
-      color: "text-blue-500",
+      color: 'text-blue-500',
     },
     {
-      value: "balanced" as AutonomyLevel,
-      label: "Balanced",
-      description: "Safe and low-risk actions (common commands)",
+      value: 'balanced' as AutonomyLevel,
+      label: 'Balanced',
+      description: 'Safe and low-risk actions (common commands)',
       icon: Zap,
-      color: "text-yellow-500",
+      color: 'text-yellow-500',
     },
     {
-      value: "aggressive" as AutonomyLevel,
-      label: "Aggressive",
-      description: "Most actions (includes medium-risk with high confidence)",
+      value: 'aggressive' as AutonomyLevel,
+      label: 'Aggressive',
+      description: 'Most actions (includes medium-risk with high confidence)',
       icon: Activity,
-      color: "text-orange-500",
+      color: 'text-orange-500',
     },
   ];
 
   const levelDescriptions: Record<AutonomyLevel, string> = {
     observation:
-      "The system will observe and learn, but never take autonomous actions. All suggestions require manual approval.",
+      'The system will observe and learn, but never take autonomous actions. All suggestions require manual approval.',
     conservative:
-      "Only the safest actions will be executed automatically (read-only operations, suggestions, UI updates).",
+      'Only the safest actions will be executed automatically (read-only operations, suggestions, UI updates).',
     balanced:
-      "Safe actions and common low-risk commands (npm install, git status, etc.) will execute automatically.",
+      'Safe actions and common low-risk commands (npm install, git status, etc.) will execute automatically.',
     aggressive:
-      "Safe, low-risk, and medium-risk actions (with high confidence) will execute automatically. Use with caution.",
+      'Safe, low-risk, and medium-risk actions (with high confidence) will execute automatically. Use with caution.',
   };
 
   onMount(async () => {
@@ -100,10 +96,10 @@
         autonomyService.getEnabled(),
         autonomyService.getLevel(),
       ]);
-      log.info("Autonomy settings loaded", { autonomyEnabled, autonomyLevel });
+      log.info('Autonomy settings loaded', { autonomyEnabled, autonomyLevel });
     } catch (error) {
-      log.error("Failed to load autonomy settings", error);
-      toast.error("Failed to load autonomy settings");
+      log.error('Failed to load autonomy settings', error);
+      toast.error('Failed to load autonomy settings');
     } finally {
       isLoading = false;
     }
@@ -112,19 +108,19 @@
   async function loadStats() {
     try {
       approvalStats = await autonomyService.getApprovalStats();
-      log.info("Approval stats loaded");
+      log.info('Approval stats loaded');
     } catch (error) {
-      log.error("Failed to load approval stats", error);
+      log.error('Failed to load approval stats', error);
     }
   }
 
   async function handleToggleEnabled() {
     try {
       await autonomyService.setEnabled(autonomyEnabled);
-      toast.success(`Autonomy ${autonomyEnabled ? "enabled" : "disabled"}`);
+      toast.success(`Autonomy ${autonomyEnabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
-      log.error("Failed to toggle autonomy enabled state", error);
-      toast.error("Failed to update autonomy enabled state");
+      log.error('Failed to toggle autonomy enabled state', error);
+      toast.error('Failed to update autonomy enabled state');
       autonomyEnabled = !autonomyEnabled; // Revert
     }
   }
@@ -134,11 +130,11 @@
       autonomyLevel = newLevel;
       await autonomyService.setLevel(newLevel);
       toast.success(
-        `Autonomy level set to ${levelOptions.find((o) => o.value === newLevel)?.label}`,
+        `Autonomy level set to ${levelOptions.find((o) => o.value === newLevel)?.label}`
       );
     } catch (error) {
-      log.error("Failed to set autonomy level", error);
-      toast.error("Failed to update autonomy level");
+      log.error('Failed to set autonomy level', error);
+      toast.error('Failed to update autonomy level');
       await loadSettings(); // Reload to revert
     }
   }
@@ -148,7 +144,7 @@
     try {
       await loadStats();
     } catch (error) {
-      log.error("Failed to refresh stats", error);
+      log.error('Failed to refresh stats', error);
     } finally {
       isRefreshing = false;
     }
@@ -172,16 +168,13 @@
         Autonomous Action System
       </CardTitle>
       <CardDescription>
-        Control how the system autonomously executes actions based on learned
-        patterns
+        Control how the system autonomously executes actions based on learned patterns
       </CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <Label for="autonomy-enabled" class="text-base font-medium"
-            >Autonomy Enabled</Label
-          >
+          <Label for="autonomy-enabled" class="text-base font-medium">Autonomy Enabled</Label>
           {#if autonomyEnabled}
             <Badge variant="default" class="bg-green-500">
               <CheckCircle2 class="mr-1 h-3 w-3" />
@@ -207,16 +200,12 @@
       <div class="space-y-2">
         <Label>Current Autonomy Level</Label>
         {#if autonomyLevel === null}
-          <div
-            class="h-10 animate-pulse rounded-md border border-input bg-muted"
-          ></div>
+          <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
         {:else}
           {#each levelOptions as option}
             {#if option.value === autonomyLevel}
               {@const Icon = option.icon}
-              <div
-                class="flex items-center gap-2 rounded-md border bg-muted/50 p-3"
-              >
+              <div class="flex items-center gap-2 rounded-md border bg-muted/50 p-3">
                 <Icon class="h-5 w-5 {option.color}" />
                 <div class="flex-1">
                   <div class="font-medium">{option.label}</div>
@@ -253,14 +242,11 @@
               label: `${o.label} - ${o.description}`,
             }))}
             defaultValue={autonomyLevel}
-            onSelect={(value) =>
-              value && handleLevelChange(value as AutonomyLevel)}
+            onSelect={(value) => value && handleLevelChange(value as AutonomyLevel)}
             disabled={!autonomyEnabled || isLoading}
           />
         {:else}
-          <div
-            class="h-10 animate-pulse rounded-md border border-input bg-muted"
-          ></div>
+          <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
         {/if}
         {#if autonomyLevel !== null}
           <div class="rounded-md bg-muted p-3 text-sm text-muted-foreground">
@@ -275,20 +261,15 @@
         </div>
       {/if}
 
-      {#if autonomyLevel === "aggressive"}
-        <div
-          class="rounded-md border border-orange-500/20 bg-orange-500/10 p-3"
-        >
+      {#if autonomyLevel === 'aggressive'}
+        <div class="rounded-md border border-orange-500/20 bg-orange-500/10 p-3">
           <div class="flex items-start gap-2">
             <AlertCircle class="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-500" />
             <div class="text-sm">
-              <strong class="text-orange-700 dark:text-orange-400"
-                >Warning:</strong
-              >
+              <strong class="text-orange-700 dark:text-orange-400">Warning:</strong>
               <span class="text-orange-600 dark:text-orange-300">
-                {" "}Aggressive mode allows medium-risk actions to execute
-                automatically. Monitor the system closely and review approval
-                statistics regularly.
+                {' '}Aggressive mode allows medium-risk actions to execute automatically. Monitor
+                the system closely and review approval statistics regularly.
               </span>
             </div>
           </div>
@@ -304,17 +285,13 @@
         <TrendingUp class="h-5 w-5" />
         Approval Statistics
       </CardTitle>
-      <CardDescription>
-        Track autonomous action approval rates and patterns
-      </CardDescription>
+      <CardDescription>Track autonomous action approval rates and patterns</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       {#if approvalStats && Object.keys(approvalStats).length > 0}
         <div class="space-y-3">
           {#each Object.entries(approvalStats) as [actionType, stats]}
-            <div
-              class="flex items-center justify-between rounded-md border p-3"
-            >
+            <div class="flex items-center justify-between rounded-md border p-3">
               <div class="flex-1">
                 <div class="font-medium">{actionType}</div>
                 <div class="text-sm text-muted-foreground">
@@ -334,15 +311,8 @@
         <Separator />
 
         <div class="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            onclick={refreshStats}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              class="mr-2 h-4 w-4 {isRefreshing ? 'animate-spin' : ''}"
-            />
+          <Button variant="ghost" size="sm" onclick={refreshStats} disabled={isRefreshing}>
+            <RefreshCw class="mr-2 h-4 w-4 {isRefreshing ? 'animate-spin' : ''}" />
             Refresh Stats
           </Button>
         </div>
@@ -371,29 +341,26 @@
     </CardHeader>
     <CardContent class="space-y-3 text-sm text-muted-foreground">
       <p>
-        The autonomous action system learns from your workflow patterns and
-        gradually increases its autonomy based on successful actions.
+        The autonomous action system learns from your workflow patterns and gradually increases its
+        autonomy based on successful actions.
       </p>
       <ul class="ml-2 list-inside list-disc space-y-1">
         <li>
           <strong>Safe actions:</strong> Read-only operations, suggestions, UI updates
         </li>
         <li>
-          <strong>Low-risk actions:</strong> Common commands like npm install, git
-          status
+          <strong>Low-risk actions:</strong> Common commands like npm install, git status
         </li>
         <li>
           <strong>Medium-risk actions:</strong> Configuration changes, file creation
         </li>
         <li>
-          <strong>High-risk actions:</strong> Always require approval (file deletion,
-          system changes)
+          <strong>High-risk actions:</strong> Always require approval (file deletion, system changes)
         </li>
       </ul>
       <p class="pt-2">
-        The system tracks approval rates and success rates to determine when
-        actions can be executed autonomously. You can always review and adjust
-        these settings.
+        The system tracks approval rates and success rates to determine when actions can be executed
+        autonomously. You can always review and adjust these settings.
       </p>
     </CardContent>
   </Card>

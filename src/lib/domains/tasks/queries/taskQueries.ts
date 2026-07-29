@@ -1,6 +1,6 @@
-import { createQuery } from "@tanstack/svelte-query";
-import { queryKeys } from "$lib/domains/shared/query/keys";
-import { fetchAllTasks, fetchTaskById } from "../api/taskApi";
+import { createQuery } from '@tanstack/svelte-query';
+import { queryKeys } from '$lib/domains/shared/query/keys';
+import { fetchAllTasks, fetchTaskById } from '../api/taskApi';
 
 export function createTasksQuery() {
   return createQuery(() => ({
@@ -14,7 +14,7 @@ export function createTaskQuery(taskId: () => string | null | undefined) {
     const id = taskId();
 
     return {
-      queryKey: queryKeys.tasks.detail(id ?? ""),
+      queryKey: queryKeys.tasks.detail(id ?? ''),
       queryFn: () => fetchTaskById(id!),
       enabled: Boolean(id),
     };

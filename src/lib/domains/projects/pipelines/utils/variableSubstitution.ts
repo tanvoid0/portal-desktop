@@ -2,9 +2,9 @@
  * Variable Substitution Engine - Replace variables in command templates
  */
 
-import { logger } from "$lib/domains/shared";
+import { logger } from '$lib/domains/shared';
 
-const log = logger.createScoped("VariableSubstitution");
+const log = logger.createScoped('VariableSubstitution');
 
 export interface SubstitutionContext {
   variables: Record<string, string>;
@@ -16,10 +16,7 @@ export interface SubstitutionContext {
  * Substitute variables in a command template
  * Supports ${variable} and ${variable:default} syntax
  */
-export function substituteVariables(
-  template: string,
-  context: SubstitutionContext,
-): string {
+export function substituteVariables(template: string, context: SubstitutionContext): string {
   let result = template;
 
   // Merge all variable sources (secrets override variables, project variables are fallback)
@@ -44,7 +41,7 @@ export function substituteVariables(
       return defaultValue.trim();
     }
 
-    log.warn("Variable not found and no default provided", {
+    log.warn('Variable not found and no default provided', {
       variable: trimmedName,
       template,
     });
@@ -77,7 +74,7 @@ export function extractVariables(template: string): string[] {
  */
 export function validateVariables(
   template: string,
-  context: SubstitutionContext,
+  context: SubstitutionContext
 ): { valid: boolean; missing: string[] } {
   const required = extractVariables(template);
   const allVariables: Record<string, string> = {
@@ -109,9 +106,9 @@ export function validateVariables(
 export function sanitizeVariable(value: string): string {
   // Remove potentially dangerous characters
   return value
-    .replace(/[;&|`$(){}[\]<>]/g, "")
-    .replace(/\n/g, " ")
-    .replace(/\r/g, "")
+    .replace(/[;&|`$(){}[\]<>]/g, '')
+    .replace(/\n/g, ' ')
+    .replace(/\r/g, '')
     .trim();
 }
 

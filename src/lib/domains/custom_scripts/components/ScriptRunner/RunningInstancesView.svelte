@@ -4,29 +4,21 @@
 -->
 
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import { Square, X } from "@lucide/svelte";
-  import {
-    useRunningScripts,
-    type RunningScript,
-  } from "../../hooks/useRunningScripts";
-  import { TerminalService, type TerminalOutput } from "$lib/domains/terminal";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Square, X } from '@lucide/svelte';
+  import { useRunningScripts, type RunningScript } from '../../hooks/useRunningScripts';
+  import { TerminalService, type TerminalOutput } from '$lib/domains/terminal';
 
   interface Props {
     scriptId: number;
@@ -37,7 +29,7 @@
 
   const runningScripts = useRunningScripts();
   let runningInstances = $state<RunningScript[]>([]);
-  let activeTab = $state<string>("");
+  let activeTab = $state<string>('');
 
   // Subscribe to running scripts changes
   $effect(() => {
@@ -49,7 +41,7 @@
       }
       // If active tab instance no longer exists, switch to first available
       if (activeTab && !runningInstances.find((s) => s.id === activeTab)) {
-        activeTab = runningInstances.length > 0 ? runningInstances[0].id : "";
+        activeTab = runningInstances.length > 0 ? runningInstances[0].id : '';
       }
     });
     return unsubscribe;
@@ -62,12 +54,9 @@
     for (const instance of runningInstances) {
       // Only subscribe if not already subscribed
       if (!instance.outputUnsubscribe) {
-        TerminalService.subscribeToOutput(
-          instance.processId,
-          (output: TerminalOutput) => {
-            runningScripts.appendOutput(instance.id, output.content);
-          },
-        )
+        TerminalService.subscribeToOutput(instance.processId, (output: TerminalOutput) => {
+          runningScripts.appendOutput(instance.id, output.content);
+        })
           .then((unsub) => {
             // Update instance with unsubscribe function
             const updated = runningScripts.getById(instance.id);
@@ -95,9 +84,7 @@
     }
   }
 
-  const activeInstance = $derived(
-    runningInstances.find((i) => i.id === activeTab),
-  );
+  const activeInstance = $derived(runningInstances.find((i) => i.id === activeTab));
   let activeOutputContainer = $state<HTMLDivElement | null>(null);
 
   // Auto-scroll output when it updates
@@ -118,16 +105,14 @@
     if (!isOpen) onClose();
   }}
 >
-  <Dialog.Content
-    class="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden p-0"
-  >
+  <Dialog.Content class="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden p-0">
     <div class="divider-edge-b divider-edge-full flex items-center justify-between p-6">
       <div>
         <Dialog.Title class="flex items-center gap-2 text-2xl">
           {#if activeInstance?.script.icon}
             <span>{activeInstance.script.icon}</span>
           {/if}
-          {activeInstance?.script.name || "Running Scripts"}
+          {activeInstance?.script.name || 'Running Scripts'}
         </Dialog.Title>
         {#if activeInstance?.script.description}
           <p class="mt-1 text-sm text-muted-foreground">
@@ -163,40 +148,31 @@
           </TabsList>
 
           {#each runningInstances as instance (instance.id)}
-            <TabsContent
-              value={instance.id}
-              class="mt-0 flex flex-1 flex-col overflow-hidden"
-            >
+            <TabsContent value={instance.id} class="mt-0 flex flex-1 flex-col overflow-hidden">
               {@const isActive = activeTab === instance.id}
               <Card class="flex flex-1 flex-col overflow-hidden">
                 <CardHeader>
                   <div class="flex items-center justify-between">
                     <CardTitle>Output</CardTitle>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onclick={() => handleStop(instance.id)}
-                    >
+                    <Button variant="destructive" size="sm" onclick={() => handleStop(instance.id)}>
                       <Square class="mr-2 h-4 w-4" />
                       Stop
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent
-                  class="flex flex-1 flex-col space-y-4 overflow-hidden"
-                >
+                <CardContent class="flex flex-1 flex-col space-y-4 overflow-hidden">
                   {#if isActive}
                     <div
                       bind:this={activeOutputContainer}
                       class="flex-1 overflow-y-auto rounded-md bg-black p-4 font-mono text-sm text-green-400"
                     >
-                      {instance.output || "Waiting for output..."}
+                      {instance.output || 'Waiting for output...'}
                     </div>
                   {:else}
                     <div
                       class="flex-1 overflow-y-auto rounded-md bg-black p-4 font-mono text-sm text-green-400"
                     >
-                      {instance.output || "Waiting for output..."}
+                      {instance.output || 'Waiting for output...'}
                     </div>
                   {/if}
 
@@ -207,11 +183,10 @@
                       class="flex-1"
                       autofocus
                       onkeydown={(e) => {
-                        if (e.key === "Enter") {
-                          const input =
-                            (e.target as HTMLInputElement).value + "\n";
+                        if (e.key === 'Enter') {
+                          const input = (e.target as HTMLInputElement).value + '\n';
                           sendInput(instance.id, input);
-                          (e.target as HTMLInputElement).value = "";
+                          (e.target as HTMLInputElement).value = '';
                         }
                       }}
                     />

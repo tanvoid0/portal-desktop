@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { ChevronDown } from "@lucide/svelte";
-  import { MenuButton as SidebarMenuButton } from "$lib/components/ui/sidebar";
-  import { Button } from "$lib/components/ui/button";
-  import SDKSidebarItem from "./SDKSidebarItem.svelte";
-  import type { SDKItem, SDKSidebarVariant } from "./sdkSidebarTypes";
+  import { ChevronDown } from '@lucide/svelte';
+  import { MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
+  import { Button } from '$lib/components/ui/button';
+  import SDKSidebarItem from './SDKSidebarItem.svelte';
+  import type { SDKItem, SDKSidebarVariant } from './sdkSidebarTypes';
 
   interface Props {
     variant: SDKSidebarVariant;
@@ -41,7 +41,7 @@
   }
 </script>
 
-{#if variant === "collapsed"}
+{#if variant === 'collapsed'}
   <div class="space-y-1">
     <SidebarMenuButton
       size="sm"
@@ -64,7 +64,7 @@
         {#each items as sdk}
           <SDKSidebarItem
             variant="collapsed"
-            sdk={sdk}
+            {sdk}
             selected={selectedItemId === sdk.id}
             iconColor={getSDKIconColor(sdk.id)}
             serviceToggleDisabled={isServiceToggleDisabled(sdk)}
@@ -99,7 +99,7 @@
         {#each items as sdk}
           <SDKSidebarItem
             variant="expanded"
-            sdk={sdk}
+            {sdk}
             selected={selectedItemId === sdk.id}
             iconColor={getSDKIconColor(sdk.id)}
             serviceToggleDisabled={isServiceToggleDisabled(sdk)}
@@ -111,4 +111,3 @@
     {/if}
   </div>
 {/if}
-

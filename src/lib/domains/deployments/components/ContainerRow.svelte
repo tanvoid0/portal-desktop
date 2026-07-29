@@ -1,16 +1,12 @@
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import { Progress } from "$lib/components/ui/progress";
-  import type { DockerContainer } from "../types";
-  import {
-    fmtBytes,
-    fmtPercent,
-    isContainerRunning,
-  } from "../utils/format";
-  import { resolveComposeService as getService } from "../utils/workloadGrouping";
-  import ContainerCard from "./ContainerCard.svelte";
-  import { Play, Square, Trash2, ChevronDown, Cpu, MemoryStick } from "@lucide/svelte";
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { Progress } from '$lib/components/ui/progress';
+  import type { DockerContainer } from '../types';
+  import { fmtBytes, fmtPercent, isContainerRunning } from '../utils/format';
+  import { resolveComposeService as getService } from '../utils/workloadGrouping';
+  import ContainerCard from './ContainerCard.svelte';
+  import { Play, Square, Trash2, ChevronDown, Cpu, MemoryStick } from '@lucide/svelte';
 
   interface Props {
     container: DockerContainer;
@@ -25,39 +21,39 @@
 
   const running = $derived(isContainerRunning(container.status));
   const stats = $derived(container.resourceStats);
-  const displayName = $derived(getService(container) ?? container.name.replace(/^\//, ""));
+  const displayName = $derived(getService(container) ?? container.name.replace(/^\//, ''));
 
   function getStatusColor(): string {
     if (running) {
-      return "bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300";
+      return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300';
     }
-    const s = container.status?.toLowerCase() || "";
-    if (s.includes("paused")) {
-      return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    const s = container.status?.toLowerCase() || '';
+    if (s.includes('paused')) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     }
-    return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300";
+    return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300';
   }
 
   function getStatusLabel(): string {
-    if (running) return "Running";
-    const s = container.status?.toLowerCase() || "";
-    if (s.includes("exited")) return "Exited";
-    if (s.includes("paused")) return "Paused";
-    if (s.includes("created")) return "Created";
-    return "Stopped";
+    if (running) return 'Running';
+    const s = container.status?.toLowerCase() || '';
+    if (s.includes('exited')) return 'Exited';
+    if (s.includes('paused')) return 'Paused';
+    if (s.includes('created')) return 'Created';
+    return 'Stopped';
   }
 
   function formatPorts(): string {
     if (Array.isArray(container.ports)) {
-      if (container.ports.length === 0) return "—";
+      if (container.ports.length === 0) return '—';
       return container.ports
         .map((p: string | { hostPort?: number; containerPort?: number }) => {
-          if (typeof p === "string") return p;
-          return `${p.hostPort || ""}:${p.containerPort || ""}`;
+          if (typeof p === 'string') return p;
+          return `${p.hostPort || ''}:${p.containerPort || ''}`;
         })
-        .join(", ");
+        .join(', ');
     }
-    return "—";
+    return '—';
   }
 </script>
 
@@ -69,20 +65,18 @@
       class="shrink-0"
       onclick={() => (expanded = !expanded)}
       aria-expanded={expanded}
-      aria-label={expanded ? "Collapse container details" : "Expand container details"}
+      aria-label={expanded ? 'Collapse container details' : 'Expand container details'}
     >
-      <ChevronDown
-        class="h-4 w-4 transition-transform {expanded ? 'rotate-180' : ''}"
-      />
+      <ChevronDown class="h-4 w-4 transition-transform {expanded ? 'rotate-180' : ''}" />
     </Button>
 
     <div class="min-w-0 flex-1">
       <div class="flex flex-wrap items-center gap-2">
         <span class="truncate font-medium" title={displayName}>{displayName}</span>
         <Badge class={getStatusColor()}>{getStatusLabel()}</Badge>
-        {#if getService(container) && container.name.replace(/^\//, "") !== displayName}
+        {#if getService(container) && container.name.replace(/^\//, '') !== displayName}
           <span class="truncate text-xs text-muted-foreground" title={container.name}>
-            {container.name.replace(/^\//, "")}
+            {container.name.replace(/^\//, '')}
           </span>
         {/if}
       </div>
@@ -132,12 +126,7 @@
 
   {#if expanded}
     <div class="divider-edge-t divider-edge-full p-3">
-      <ContainerCard
-        {container}
-        {onStart}
-        {onStop}
-        {onRemove}
-      />
+      <ContainerCard {container} {onStart} {onStop} {onRemove} />
     </div>
   {/if}
 </div>

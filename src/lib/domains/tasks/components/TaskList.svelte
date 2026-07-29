@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import Icon from "@iconify/svelte";
-  import { taskUi as defaultTaskUi, type TaskUiState } from "../state/taskUi.svelte";
-  import type { Task } from "../types";
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import Icon from '@iconify/svelte';
+  import { taskUi as defaultTaskUi, type TaskUiState } from '../state/taskUi.svelte';
+  import type { Task } from '../types';
 
   interface Props {
     ui?: TaskUiState;
@@ -47,22 +47,18 @@
       {#each taskUi.filteredTasks as task}
         <div
           onclick={() =>
-            taskUi.isMultiSelectMode
-              ? handleTaskSelection(task.id)
-              : handleTaskSelect(task)}
+            taskUi.isMultiSelectMode ? handleTaskSelection(task.id) : handleTaskSelect(task)}
           onkeydown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
+            if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              taskUi.isMultiSelectMode
-                ? handleTaskSelection(task.id)
-                : handleTaskSelect(task);
+              taskUi.isMultiSelectMode ? handleTaskSelection(task.id) : handleTaskSelect(task);
             }
           }}
           role="button"
           tabindex="0"
           aria-label="Select task: {task.title}"
           class="cursor-pointer p-3 transition-colors hover:bg-muted/50 {taskUi.selectedTaskIds.has(
-            task.id,
+            task.id
           )
             ? 'bg-warning-50 dark:bg-warning-900/20'
             : ''}"
@@ -88,10 +84,7 @@
                     class="h-8 w-8 p-0"
                     title="Create subtask"
                   >
-                    <Icon
-                      icon="mdi:plus"
-                      class="h-4 w-4 text-muted-foreground"
-                    />
+                    <Icon icon="mdi:plus" class="h-4 w-4 text-muted-foreground" />
                   </Button>
                 {/if}
                 <Button
@@ -114,13 +107,8 @@
                 <div class="flex items-center gap-2">
                   <h4 class="font-medium text-foreground">{task.title}</h4>
                   {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
-                    <div
-                      class="flex items-center gap-1 text-xs text-muted-foreground"
-                    >
-                      <Icon
-                        icon="mdi:subdirectory-arrow-right"
-                        class="h-3 w-3"
-                      />
+                    <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Icon icon="mdi:subdirectory-arrow-right" class="h-3 w-3" />
                       <span>{getSubtaskCount(task.id, taskUi.tasks)}</span>
                     </div>
                   {/if}
@@ -141,10 +129,7 @@
               {/if}
 
               <div class="flex items-center gap-1">
-                <Icon
-                  icon="mdi:flag"
-                  class="h-4 w-4 {getPriorityColor(task.priority)}"
-                />
+                <Icon icon="mdi:flag" class="h-4 w-4 {getPriorityColor(task.priority)}" />
                 <Badge variant="outline" class="text-xs uppercase">
                   {task.priority}
                 </Badge>
@@ -166,7 +151,7 @@
                     handleTaskSelect(subtask);
                   }}
                   onkeydown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
+                    if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       e.stopPropagation();
                       handleTaskSelect(subtask);
@@ -229,9 +214,7 @@
                         </Badge>
                       </div>
 
-                      <Badge
-                        class="text-sm {getStatusBadgeColor(subtask.status)}"
-                      >
+                      <Badge class="text-sm {getStatusBadgeColor(subtask.status)}">
                         {subtask.status}
                       </Badge>
                     </div>

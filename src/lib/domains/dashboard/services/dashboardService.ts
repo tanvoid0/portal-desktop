@@ -1,8 +1,8 @@
-import { invokeClient } from "$lib/utils/invokeClient";
-import { cache } from "$lib/domains/shared/services/cache";
-import type { Project } from "$lib/domains/projects/types";
+import { invokeClient } from '$lib/utils/invokeClient';
+import { cache } from '$lib/domains/shared/services/cache';
+import type { Project } from '$lib/domains/projects/types';
 
-export const DASHBOARD_OVERVIEW_CACHE_KEY = "dashboard_overview";
+export const DASHBOARD_OVERVIEW_CACHE_KEY = 'dashboard_overview';
 
 export interface DashboardTaskStats {
   total: number;
@@ -36,7 +36,7 @@ const EMPTY_OVERVIEW: DashboardOverview = {
     active_projects: 0,
     archived_projects: 0,
     total_size: 0,
-    most_used_framework: "Unknown",
+    most_used_framework: 'Unknown',
     recent_projects: [],
   },
   task_stats: {
@@ -53,9 +53,7 @@ const EMPTY_OVERVIEW: DashboardOverview = {
 /** Pure fetch for TanStack Query — no manual cache layer. */
 export async function fetchDashboardOverview(): Promise<DashboardOverview> {
   try {
-    const overview = await invokeClient.post<DashboardOverview>(
-      "get_dashboard_overview",
-    );
+    const overview = await invokeClient.post<DashboardOverview>('get_dashboard_overview');
     return overview ?? EMPTY_OVERVIEW;
   } catch {
     return EMPTY_OVERVIEW;
@@ -88,7 +86,7 @@ export function invalidateDashboardOverview(): void {
 
 export function primeDashboardOverview(
   overview: DashboardOverview,
-  ttlMs: number = DEFAULT_TTL_MS,
+  ttlMs: number = DEFAULT_TTL_MS
 ): void {
   cache.set(DASHBOARD_OVERVIEW_CACHE_KEY, overview, ttlMs);
 }

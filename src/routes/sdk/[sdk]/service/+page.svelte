@@ -4,25 +4,20 @@
 -->
 
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { invokeClient } from "$lib/utils/invokeClient";
+  import { page } from '$app/stores';
+  import { invokeClient } from '$lib/utils/invokeClient';
   import {
     sdkConfigService,
     type ProcessedSDKConfig,
-  } from "$lib/domains/sdk/services/sdkConfigService";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import { AlertCircle, RefreshCw, ArrowLeft } from "@lucide/svelte";
-  import ServiceCard from "$lib/domains/sdk/components/ServiceCard.svelte";
-  import { goto } from "$app/navigation";
-  import { PageLoading, PageError } from "$lib/components/shell";
+  } from '$lib/domains/sdk/services/sdkConfigService';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { AlertCircle, RefreshCw, ArrowLeft } from '@lucide/svelte';
+  import ServiceCard from '$lib/domains/sdk/components/ServiceCard.svelte';
+  import { goto } from '$app/navigation';
+  import { PageLoading, PageError } from '$lib/components/shell';
 
   // Get SDK ID from URL
   let sdkId = $derived($page.params.sdk);
@@ -32,7 +27,7 @@
     name: string;
     description: string;
     version: string;
-    status: "running" | "stopped" | "error" | "starting" | "stopping";
+    status: 'running' | 'stopped' | 'error' | 'starting' | 'stopping';
     port?: number;
     pid?: number;
     progress?: number;
@@ -57,7 +52,7 @@
 
     try {
       if (!sdkId) {
-        error = "SDK ID is required";
+        error = 'SDK ID is required';
         return;
       }
 
@@ -75,9 +70,8 @@
         await loadServiceStatus();
       }
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to load SDK configuration";
-      console.error("Failed to load SDK config:", err);
+      error = err instanceof Error ? err.message : 'Failed to load SDK configuration';
+      console.error('Failed to load SDK config:', err);
     } finally {
       loading = false;
     }
@@ -93,36 +87,32 @@
         pid?: number;
         port?: number;
         status: string;
-      }>("get_service_status", { sdkType: sdkConfig.id });
+      }>('get_service_status', { sdkType: sdkConfig.id });
 
       const rawVersion = sdkConfig.sdk_version || null;
-      const version = rawVersion
-        ? rawVersion.trim().replace(/^v/, "")
-        : "Unknown";
+      const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : 'Unknown';
 
       service = {
         id: sdkConfig.id,
         name: sdkConfig.display_name,
         description: sdkConfig.description,
         version: version,
-        status: status.running ? "running" : "stopped",
+        status: status.running ? 'running' : 'stopped',
         port: status.port || sdkConfig.service_port || undefined,
         pid: status.pid || undefined,
       };
     } catch (err) {
-      console.error("Failed to load service status:", err);
+      console.error('Failed to load service status:', err);
       // Create service object even if status check fails
       if (sdkConfig) {
         const rawVersion = sdkConfig.sdk_version || null;
-        const version = rawVersion
-          ? rawVersion.trim().replace(/^v/, "")
-          : "Unknown";
+        const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : 'Unknown';
         service = {
           id: sdkConfig.id,
           name: sdkConfig.display_name,
           description: sdkConfig.description,
           version: version,
-          status: "stopped",
+          status: 'stopped',
           port: sdkConfig.service_port || undefined,
         };
       }
@@ -135,20 +125,20 @@
     if (!sdkConfig || togglingService) return;
 
     togglingService = true;
-    const wasRunning = serviceInfo.status === "running";
+    const wasRunning = serviceInfo.status === 'running';
 
     // Update UI immediately
     if (service) {
-      service.status = wasRunning ? "stopping" : "starting";
+      service.status = wasRunning ? 'stopping' : 'starting';
     }
 
     try {
       if (wasRunning) {
-        await invokeClient.post<string>("stop_service", {
+        await invokeClient.post<string>('stop_service', {
           sdkType: sdkConfig.id,
         });
       } else {
-        await invokeClient.post<string>("start_service", {
+        await invokeClient.post<string>('start_service', {
           sdkType: sdkConfig.id,
         });
       }
@@ -158,14 +148,12 @@
       await loadServiceStatus();
     } catch (err) {
       error =
-        err instanceof Error
-          ? err.message
-          : `Failed to ${wasRunning ? "stop" : "start"} service`;
-      console.error("Failed to toggle service:", err);
+        err instanceof Error ? err.message : `Failed to ${wasRunning ? 'stop' : 'start'} service`;
+      console.error('Failed to toggle service:', err);
 
       // Revert status on error
       if (service) {
-        service.status = wasRunning ? "running" : "stopped";
+        service.status = wasRunning ? 'running' : 'stopped';
       }
     } finally {
       togglingService = false;
@@ -174,7 +162,7 @@
 
   function handleOpenUrl(serviceInfo: ServiceInfo) {
     if (serviceInfo.port) {
-      window.open(`http://localhost:${serviceInfo.port}`, "_blank");
+      window.open(`http://localhost:${serviceInfo.port}`, '_blank');
     }
   }
 </script>
@@ -189,11 +177,7 @@
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onclick={() => goto(`/sdk/${sdkId}`)}
-          >
+          <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
             <ArrowLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -212,9 +196,7 @@
           <CardContent class="pt-6">
             <Alert>
               <AlertCircle class="h-4 w-4" />
-              <AlertDescription>
-                Service management is not available for this SDK.
-              </AlertDescription>
+              <AlertDescription>Service management is not available for this SDK.</AlertDescription>
             </Alert>
           </CardContent>
         </Card>
@@ -231,9 +213,7 @@
                 onclick={loadServiceStatus}
                 disabled={loadingStatus}
               >
-                <RefreshCw
-                  class={`mr-2 h-4 w-4 ${loadingStatus ? "animate-spin" : ""}`}
-                />
+                <RefreshCw class={`mr-2 h-4 w-4 ${loadingStatus ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
@@ -261,9 +241,7 @@
       {:else}
         <Card>
           <CardContent class="pt-6">
-            <p class="text-muted-foreground">
-              Unable to load service information.
-            </p>
+            <p class="text-muted-foreground">Unable to load service information.</p>
           </CardContent>
         </Card>
       {/if}

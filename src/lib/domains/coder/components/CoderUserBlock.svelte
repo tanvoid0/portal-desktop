@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Undo2, Check, X } from "@lucide/svelte";
-  import type { ChatMessage } from "../types.js";
+  import { Button } from '$lib/components/ui/button';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Undo2, Check, X } from '@lucide/svelte';
+  import type { ChatMessage } from '../types.js';
 
   interface Props {
     message: ChatMessage;
@@ -11,25 +11,20 @@
     onEdit?: (messageIndex: number, content: string) => void;
   }
 
-  let {
-    message,
-    messageIndex,
-    canEdit = false,
-    onEdit,
-  }: Props = $props();
+  let { message, messageIndex, canEdit = false, onEdit }: Props = $props();
 
   let editing = $state(false);
-  let draft = $state("");
+  let draft = $state('');
 
   function startEdit() {
     if (!canEdit || !onEdit) return;
-    draft = message.content ?? "";
+    draft = message.content ?? '';
     editing = true;
   }
 
   function cancelEdit() {
     editing = false;
-    draft = "";
+    draft = '';
   }
 
   function saveEdit() {
@@ -37,16 +32,16 @@
     if (!trimmed || !onEdit) return;
     onEdit(messageIndex, trimmed);
     editing = false;
-    draft = "";
+    draft = '';
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       event.preventDefault();
       cancelEdit();
       return;
     }
-    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       saveEdit();
     }
@@ -75,13 +70,7 @@
             <Check class="h-3.5 w-3.5" />
             Save & rerun
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            class="h-7 gap-1"
-            onclick={cancelEdit}
-          >
+          <Button type="button" size="sm" variant="ghost" class="h-7 gap-1" onclick={cancelEdit}>
             <X class="h-3.5 w-3.5" />
             Cancel
           </Button>

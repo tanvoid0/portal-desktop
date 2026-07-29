@@ -3,7 +3,7 @@
  * Server data lives in TanStack Query (see projectQueries.ts).
  */
 
-import { writable } from "svelte/store";
+import { writable } from 'svelte/store';
 
 interface ProjectSessionState {
   activeProjectId: string | null;

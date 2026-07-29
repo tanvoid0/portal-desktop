@@ -1,4 +1,4 @@
-import { isTauriEnvironment, tauriInvoke } from "$lib/utils/tauri";
+import { isTauriEnvironment, tauriInvoke } from '$lib/utils/tauri';
 
 const DEFAULT_PORT = 1420;
 
@@ -13,13 +13,10 @@ export class NetworkService {
   static async getLocalNetworkIP(): Promise<string> {
     if (isTauriEnvironment()) {
       try {
-        const ip = await tauriInvoke<string>("get_local_network_ip");
+        const ip = await tauriInvoke<string>('get_local_network_ip');
         return ip;
       } catch (error) {
-        console.warn(
-          "Failed to get IP from Tauri, falling back to JavaScript method:",
-          error,
-        );
+        console.warn('Failed to get IP from Tauri, falling back to JavaScript method:', error);
         return this.getLocalIPFallback();
       }
     } else {
@@ -41,16 +38,16 @@ export class NetworkService {
 
       if (!RTCPeerConnection) {
         // Fallback to localhost
-        resolve("127.0.0.1");
+        resolve('127.0.0.1');
         return;
       }
 
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
       });
 
       const ips: string[] = [];
-      pc.createDataChannel("");
+      pc.createDataChannel('');
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
@@ -59,7 +56,7 @@ export class NetworkService {
           if (match) {
             const ip = match[1];
             // Filter out loopback and link-local
-            if (ip !== "127.0.0.1" && !ip.startsWith("169.254.")) {
+            if (ip !== '127.0.0.1' && !ip.startsWith('169.254.')) {
               ips.push(ip);
             }
           }
@@ -70,28 +67,28 @@ export class NetworkService {
             // Prefer private IPs
             const privateIP = ips.find(
               (ip) =>
-                ip.startsWith("192.168.") ||
-                ip.startsWith("10.") ||
-                ip.startsWith("172.16.") ||
-                ip.startsWith("172.17.") ||
-                ip.startsWith("172.18.") ||
-                ip.startsWith("172.19.") ||
-                ip.startsWith("172.20.") ||
-                ip.startsWith("172.21.") ||
-                ip.startsWith("172.22.") ||
-                ip.startsWith("172.23.") ||
-                ip.startsWith("172.24.") ||
-                ip.startsWith("172.25.") ||
-                ip.startsWith("172.26.") ||
-                ip.startsWith("172.27.") ||
-                ip.startsWith("172.28.") ||
-                ip.startsWith("172.29.") ||
-                ip.startsWith("172.30.") ||
-                ip.startsWith("172.31."),
+                ip.startsWith('192.168.') ||
+                ip.startsWith('10.') ||
+                ip.startsWith('172.16.') ||
+                ip.startsWith('172.17.') ||
+                ip.startsWith('172.18.') ||
+                ip.startsWith('172.19.') ||
+                ip.startsWith('172.20.') ||
+                ip.startsWith('172.21.') ||
+                ip.startsWith('172.22.') ||
+                ip.startsWith('172.23.') ||
+                ip.startsWith('172.24.') ||
+                ip.startsWith('172.25.') ||
+                ip.startsWith('172.26.') ||
+                ip.startsWith('172.27.') ||
+                ip.startsWith('172.28.') ||
+                ip.startsWith('172.29.') ||
+                ip.startsWith('172.30.') ||
+                ip.startsWith('172.31.')
             );
-            resolve(privateIP || ips[0] || "127.0.0.1");
+            resolve(privateIP || ips[0] || '127.0.0.1');
           } else {
-            resolve("127.0.0.1");
+            resolve('127.0.0.1');
           }
         }
       };
@@ -100,7 +97,7 @@ export class NetworkService {
         .then((offer) => pc.setLocalDescription(offer))
         .catch(() => {
           pc.close();
-          resolve("127.0.0.1");
+          resolve('127.0.0.1');
         });
 
       // Timeout after 3 seconds
@@ -109,7 +106,7 @@ export class NetworkService {
         if (ips.length > 0) {
           resolve(ips[0]);
         } else {
-          resolve("127.0.0.1");
+          resolve('127.0.0.1');
         }
       }, 3000);
     });
@@ -128,7 +125,7 @@ export class NetworkService {
    */
   static getPort(): number {
     // Try to get from window location if available
-    if (typeof window !== "undefined" && window.location.port) {
+    if (typeof window !== 'undefined' && window.location.port) {
       const port = parseInt(window.location.port, 10);
       if (!isNaN(port)) {
         return port;

@@ -1,5 +1,5 @@
 // Log parsing utilities to convert raw log strings to structured K8sLog[]
-import type { K8sLog } from "../types/k8s";
+import type { K8sLog } from '../types/k8s';
 
 /**
  * Parse raw log string into structured log entries
@@ -11,30 +11,26 @@ import type { K8sLog } from "../types/k8s";
 export function parseRawLogs(
   rawLogs: string,
   podName: string,
-  containerName: string = "app",
+  containerName: string = 'app'
 ): K8sLog[] {
   if (!rawLogs || !rawLogs.trim()) {
     return [];
   }
 
-  const lines = rawLogs.split("\n").filter((line) => line.trim());
+  const lines = rawLogs.split('\n').filter((line) => line.trim());
   const logs: K8sLog[] = [];
 
   for (const line of lines) {
     // Try to parse as JSON first
-    let parsed: K8sLog | null = null;
+    // Assigned on every path through the try/catch below.
+    let parsed: K8sLog | null;
 
     try {
       const jsonData = JSON.parse(line);
       // If it's a JSON log, extract fields
       parsed = {
-        timestamp:
-          jsonData.timestamp ||
-          jsonData.time ||
-          jsonData.ts ||
-          new Date().toISOString(),
-        level:
-          jsonData.level || jsonData.severity || jsonData.logLevel || "INFO",
+        timestamp: jsonData.timestamp || jsonData.time || jsonData.ts || new Date().toISOString(),
+        level: jsonData.level || jsonData.severity || jsonData.logLevel || 'INFO',
         message: jsonData.message || jsonData.msg || jsonData.text || line,
         pod: podName,
         container: jsonData.container || containerName,
@@ -47,15 +43,14 @@ export function parseRawLogs(
       // - "INFO message"
 
       const timestampMatch = line.match(
-        /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)/,
+        /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)/
       );
       const levelMatch = line.match(/\[?([A-Z]+)\]?/);
 
       if (timestampMatch && levelMatch) {
         const timestamp = timestampMatch[1];
         const level = levelMatch[1];
-        const messageStart =
-          timestampMatch[0].length + levelMatch[0].length + 1;
+        const messageStart = timestampMatch[0].length + levelMatch[0].length + 1;
         const message = line.substring(messageStart).trim();
 
         parsed = {
@@ -105,32 +100,29 @@ function extractLogLevel(message: string): string {
   const upperMessage = message.toUpperCase();
 
   if (
-    upperMessage.includes("ERROR") ||
-    upperMessage.includes("FATAL") ||
-    upperMessage.includes("CRITICAL")
+    upperMessage.includes('ERROR') ||
+    upperMessage.includes('FATAL') ||
+    upperMessage.includes('CRITICAL')
   ) {
-    return "ERROR";
+    return 'ERROR';
   }
-  if (upperMessage.includes("WARN") || upperMessage.includes("WARNING")) {
-    return "WARN";
+  if (upperMessage.includes('WARN') || upperMessage.includes('WARNING')) {
+    return 'WARN';
   }
-  if (upperMessage.includes("INFO") || upperMessage.includes("INFORMATION")) {
-    return "INFO";
+  if (upperMessage.includes('INFO') || upperMessage.includes('INFORMATION')) {
+    return 'INFO';
   }
-  if (upperMessage.includes("DEBUG") || upperMessage.includes("TRACE")) {
-    return "DEBUG";
+  if (upperMessage.includes('DEBUG') || upperMessage.includes('TRACE')) {
+    return 'DEBUG';
   }
 
-  return "INFO"; // Default
+  return 'INFO'; // Default
 }
 
 /**
  * Filter logs by severity (hierarchical)
  */
-export function filterLogsBySeverity(
-  logs: K8sLog[],
-  severity: string,
-): K8sLog[] {
+export function filterLogsBySeverity(logs: K8sLog[], severity: string): K8sLog[] {
   if (!severity) return logs;
 
   const severityLevels: Record<string, number> = {

@@ -1,7 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
-import { AI_PROVIDER_SETTINGS_PATH } from "$lib/config/ai-nav";
+import { invoke } from '@tauri-apps/api/core';
+import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
 
-export type ProviderType = "AgentPlatform";
+export type ProviderType = 'AgentPlatform';
 
 export interface GeneratedTask {
   title: string;
@@ -36,7 +36,7 @@ export interface GeneratedTaskStructure {
 }
 
 export interface ConversationMessage {
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
 }
 
@@ -73,12 +73,7 @@ export interface GenerateTasksFromStoryRequest {
 
 export interface AIErrorInfo {
   message: string;
-  type:
-    | "configuration"
-    | "network"
-    | "provider_unavailable"
-    | "model_not_found"
-    | "unknown";
+  type: 'configuration' | 'network' | 'provider_unavailable' | 'model_not_found' | 'unknown';
   actionable: boolean;
   settingsPath?: string;
 }
@@ -91,25 +86,24 @@ export function parseError(error: unknown): AIErrorInfo {
   const errorMessage =
     error instanceof Error
       ? error.message
-      : typeof error === "string"
+      : typeof error === 'string'
         ? error
-        : "Failed to generate tasks from story";
+        : 'Failed to generate tasks from story';
 
   // Check for configuration issues (including wrapped error messages)
   if (
-    errorMessage.includes("No default provider") ||
-    errorMessage.includes("No default provider set") ||
-    errorMessage.includes("Configuration incomplete") ||
-    errorMessage.includes("provider configuration") ||
-    errorMessage.includes("Missing fields") ||
-    errorMessage.includes("not configured") ||
-    errorMessage.includes("Provider not found") ||
-    errorMessage.includes("Provider not registered")
+    errorMessage.includes('No default provider') ||
+    errorMessage.includes('No default provider set') ||
+    errorMessage.includes('Configuration incomplete') ||
+    errorMessage.includes('provider configuration') ||
+    errorMessage.includes('Missing fields') ||
+    errorMessage.includes('not configured') ||
+    errorMessage.includes('Provider not found') ||
+    errorMessage.includes('Provider not registered')
   ) {
     return {
-      message:
-        "AI provider is not configured. Please set up Agent Platform in AI → Providers.",
-      type: "configuration",
+      message: 'AI provider is not configured. Please set up Agent Platform in AI → Providers.',
+      type: 'configuration',
       actionable: true,
       settingsPath: AI_PROVIDER_SETTINGS_PATH,
     };
@@ -117,10 +111,10 @@ export function parseError(error: unknown): AIErrorInfo {
 
   // Check for model not found errors
   if (
-    errorMessage.includes("model") &&
-    (errorMessage.includes("not found") ||
-      errorMessage.includes("404") ||
-      errorMessage.includes("does not exist"))
+    errorMessage.includes('model') &&
+    (errorMessage.includes('not found') ||
+      errorMessage.includes('404') ||
+      errorMessage.includes('does not exist'))
   ) {
     // Extract model name if possible - handle both JSON and plain text formats
     // Try multiple patterns to extract the model name
@@ -139,16 +133,14 @@ export function parseError(error: unknown): AIErrorInfo {
 
     if (!modelMatch) {
       // Try unescaped JSON format
-      modelMatch = errorMessage.match(
-        /\{"error":\s*"model\s+['"]([^'"]+?)['"]/,
-      );
+      modelMatch = errorMessage.match(/\{"error":\s*"model\s+['"]([^'"]+?)['"]/);
     }
 
-    const modelName = modelMatch ? modelMatch[1] : "the specified model";
+    const modelName = modelMatch ? modelMatch[1] : 'the specified model';
 
     return {
       message: `Model "${modelName}" is not available on agent-platform. Check the model alias in AI → Providers or configure it at /config on the platform.`,
-      type: "model_not_found",
+      type: 'model_not_found',
       actionable: true,
       settingsPath: AI_PROVIDER_SETTINGS_PATH,
     };
@@ -156,14 +148,14 @@ export function parseError(error: unknown): AIErrorInfo {
 
   // Check for provider unavailable
   if (
-    errorMessage.includes("Provider not available") ||
-    errorMessage.includes("service is not running") ||
-    errorMessage.includes("failed to connect")
+    errorMessage.includes('Provider not available') ||
+    errorMessage.includes('service is not running') ||
+    errorMessage.includes('failed to connect')
   ) {
     return {
       message:
-        "AI provider is not available. Please check that your AI service is running and properly configured.",
-      type: "provider_unavailable",
+        'AI provider is not available. Please check that your AI service is running and properly configured.',
+      type: 'provider_unavailable',
       actionable: true,
       settingsPath: AI_PROVIDER_SETTINGS_PATH,
     };
@@ -171,14 +163,14 @@ export function parseError(error: unknown): AIErrorInfo {
 
   // Check for network issues
   if (
-    errorMessage.includes("Network error") ||
-    errorMessage.includes("timeout") ||
-    errorMessage.includes("connection")
+    errorMessage.includes('Network error') ||
+    errorMessage.includes('timeout') ||
+    errorMessage.includes('connection')
   ) {
     return {
       message:
-        "Network error connecting to AI provider. Please check your connection and try again.",
-      type: "network",
+        'Network error connecting to AI provider. Please check your connection and try again.',
+      type: 'network',
       actionable: false,
     };
   }
@@ -186,7 +178,7 @@ export function parseError(error: unknown): AIErrorInfo {
   // Default unknown error
   return {
     message: errorMessage,
-    type: "unknown",
+    type: 'unknown',
     actionable: false,
   };
 }
@@ -198,7 +190,7 @@ export class AITaskService {
    * @returns Generated task structure with main task, subtasks, and suggestions
    */
   async generateTasksFromStory(
-    request: GenerateTasksFromStoryRequest,
+    request: GenerateTasksFromStoryRequest
   ): Promise<GeneratedTaskStructure> {
     try {
       const command = {
@@ -210,15 +202,14 @@ export class AITaskService {
         instruction: request.instruction || null,
       };
 
-      const response = await invoke<GeneratedTaskStructure>(
-        "generate_tasks_from_story",
-        { command },
-      );
+      const response = await invoke<GeneratedTaskStructure>('generate_tasks_from_story', {
+        command,
+      });
 
       return response;
     } catch (error) {
       const errorInfo = parseError(error);
-      console.error("AI task generation error:", error);
+      console.error('AI task generation error:', error);
 
       // Create a custom error with the parsed information
       const customError = new Error(errorInfo.message) as Error & {

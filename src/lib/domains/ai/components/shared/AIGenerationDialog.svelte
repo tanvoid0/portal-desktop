@@ -1,21 +1,16 @@
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
-  import { toastActions } from "$lib/utils/toast";
-  import { goto } from "$app/navigation";
-  import { AI_PROVIDER_SETTINGS_PATH } from "$lib/config/ai-nav";
-  import Icon from "@iconify/svelte";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
+  import { toastActions } from '$lib/utils/toast';
+  import { goto } from '$app/navigation';
+  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
+  import Icon from '@iconify/svelte';
 
   export interface AIErrorInfo {
     message: string;
-    type:
-      | "configuration"
-      | "provider_unavailable"
-      | "network"
-      | "model_not_found"
-      | "unknown";
+    type: 'configuration' | 'provider_unavailable' | 'network' | 'model_not_found' | 'unknown';
     actionable: boolean;
     settingsPath?: string;
   }
@@ -36,9 +31,9 @@
     /** Function to generate AI response */
     generateFn: (
       input: TInput,
-      history?: Array<{ role: "user" | "assistant"; content: string }>,
+      history?: Array<{ role: 'user' | 'assistant'; content: string }>,
       developerNote?: string,
-      instruction?: string,
+      instruction?: string
     ) => Promise<TOutput>;
     /** Function to serialize result for display in regenerate dialog */
     serializeResult?: (result: TOutput) => string;
@@ -65,41 +60,40 @@
     previousResult?: unknown;
   }
 
-  let { open, onOpenChange, onSuccess, config, previousResult }: Props =
-    $props();
+  let { open, onOpenChange, onSuccess, config, previousResult }: Props = $props();
 
-  let inputText = $state("");
-  let developerNote = $state("");
-  let instruction = $state("");
+  let inputText = $state('');
+  let developerNote = $state('');
+  let instruction = $state('');
   let isGenerating = $state(false);
   let error = $state<string | null>(null);
   let showRegenerateDialog = $state(false);
-  let regenerateInstructions = $state("");
+  let regenerateInstructions = $state('');
   let isRegenerating = $state(false);
 
   const defaultParseError = (err: unknown): AIErrorInfo => {
     const errorMessage =
       err instanceof Error
         ? err.message
-        : typeof err === "string"
+        : typeof err === 'string'
           ? err
-          : "An error occurred during AI generation";
+          : 'An error occurred during AI generation';
 
     // Check for configuration issues
     if (
-      errorMessage.includes("No default provider") ||
-      errorMessage.includes("No default provider set") ||
-      errorMessage.includes("Configuration incomplete") ||
-      errorMessage.includes("provider configuration") ||
-      errorMessage.includes("Missing fields") ||
-      errorMessage.includes("not configured") ||
-      errorMessage.includes("Provider not found") ||
-      errorMessage.includes("Provider not registered")
+      errorMessage.includes('No default provider') ||
+      errorMessage.includes('No default provider set') ||
+      errorMessage.includes('Configuration incomplete') ||
+      errorMessage.includes('provider configuration') ||
+      errorMessage.includes('Missing fields') ||
+      errorMessage.includes('not configured') ||
+      errorMessage.includes('Provider not found') ||
+      errorMessage.includes('Provider not registered')
     ) {
       return {
         message:
-          "AI provider is not configured. Please set up Agent Platform in Settings → AI Providers.",
-        type: "configuration",
+          'AI provider is not configured. Please set up Agent Platform in Settings → AI Providers.',
+        type: 'configuration',
         actionable: true,
         settingsPath: AI_PROVIDER_SETTINGS_PATH,
       };
@@ -107,32 +101,28 @@
 
     // Check for model not found errors
     if (
-      errorMessage.includes("model") &&
-      (errorMessage.includes("not found") ||
-        errorMessage.includes("404") ||
-        errorMessage.includes("does not exist") ||
-        errorMessage.includes("not installed"))
+      errorMessage.includes('model') &&
+      (errorMessage.includes('not found') ||
+        errorMessage.includes('404') ||
+        errorMessage.includes('does not exist') ||
+        errorMessage.includes('not installed'))
     ) {
       let modelMatch = errorMessage.match(/model\s+['"]([^'"]+)['"]/);
       if (!modelMatch) {
         modelMatch = errorMessage.match(/model\s+['"]([^'"]+?)['"]/);
       }
       if (!modelMatch) {
-        modelMatch = errorMessage.match(
-          /"error":\s*"model\s+['"]([^'"]+?)['"]/,
-        );
+        modelMatch = errorMessage.match(/"error":\s*"model\s+['"]([^'"]+?)['"]/);
       }
       if (!modelMatch) {
-        modelMatch = errorMessage.match(
-          /\{"error":\s*"model\s+['"]([^'"]+?)['"]/,
-        );
+        modelMatch = errorMessage.match(/\{"error":\s*"model\s+['"]([^'"]+?)['"]/);
       }
 
-      const modelName = modelMatch ? modelMatch[1] : "the specified model";
+      const modelName = modelMatch ? modelMatch[1] : 'the specified model';
 
       return {
         message: `Model "${modelName}" is not available on agent-platform. Check the model alias in Settings → AI Providers.`,
-        type: "model_not_found",
+        type: 'model_not_found',
         actionable: true,
         settingsPath: AI_PROVIDER_SETTINGS_PATH,
       };
@@ -140,14 +130,14 @@
 
     // Check for provider unavailable
     if (
-      errorMessage.includes("Provider not available") ||
-      errorMessage.includes("service is not running") ||
-      errorMessage.includes("failed to connect")
+      errorMessage.includes('Provider not available') ||
+      errorMessage.includes('service is not running') ||
+      errorMessage.includes('failed to connect')
     ) {
       return {
         message:
-          "AI provider is not available. Please check that your AI service is running and properly configured.",
-        type: "provider_unavailable",
+          'AI provider is not available. Please check that your AI service is running and properly configured.',
+        type: 'provider_unavailable',
         actionable: true,
         settingsPath: AI_PROVIDER_SETTINGS_PATH,
       };
@@ -155,14 +145,14 @@
 
     // Check for network issues
     if (
-      errorMessage.includes("Network error") ||
-      errorMessage.includes("timeout") ||
-      errorMessage.includes("connection")
+      errorMessage.includes('Network error') ||
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('connection')
     ) {
       return {
         message:
-          "Network error connecting to AI provider. Please check your connection and try again.",
-        type: "network",
+          'Network error connecting to AI provider. Please check your connection and try again.',
+        type: 'network',
         actionable: false,
       };
     }
@@ -170,16 +160,16 @@
     // Default unknown error
     return {
       message: errorMessage,
-      type: "unknown",
+      type: 'unknown',
       actionable: false,
     };
   };
 
   function showErrorToast(errorInfo: AIErrorInfo) {
     if (errorInfo.actionable && errorInfo.settingsPath) {
-      toastActions.error("AI Generation Failed", errorInfo.message, {
+      toastActions.error('AI Generation Failed', errorInfo.message, {
         action: {
-          label: "Open Settings",
+          label: 'Open Settings',
           onClick: () => {
             goto(errorInfo.settingsPath!);
             onOpenChange(false);
@@ -187,7 +177,7 @@
         },
       });
     } else {
-      toastActions.error("AI Generation Failed", errorInfo.message);
+      toastActions.error('AI Generation Failed', errorInfo.message);
     }
   }
 
@@ -196,7 +186,7 @@
     const validate = config.validateInput;
 
     if (!inputText.trim()) {
-      error = "Please enter input text";
+      error = 'Please enter input text';
       return;
     }
 
@@ -221,24 +211,24 @@
         inputText as any,
         undefined,
         developerNote.trim() || undefined,
-        instruction.trim() || undefined,
+        instruction.trim() || undefined
       );
 
-      toastActions.success("AI generation completed successfully!");
+      toastActions.success('AI generation completed successfully!');
       const textToPass = inputText;
       onSuccess(result, textToPass);
       onOpenChange(false);
-      inputText = "";
+      inputText = '';
     } catch (err) {
       const parseError = config.parseError || defaultParseError;
       const errorInfo: AIErrorInfo =
-        err instanceof Error && "errorInfo" in err
+        err instanceof Error && 'errorInfo' in err
           ? (err as Error & { errorInfo: AIErrorInfo }).errorInfo
           : parseError(err);
 
       error = errorInfo.message;
       showErrorToast(errorInfo);
-      console.error("AI generation error:", err);
+      console.error('AI generation error:', err);
     } finally {
       isGenerating = false;
     }
@@ -250,7 +240,7 @@
     }
 
     if (!regenerateInstructions.trim()) {
-      error = "Please provide instructions for regeneration";
+      error = 'Please provide instructions for regeneration';
       return;
     }
 
@@ -260,13 +250,13 @@
 
       const history = [
         {
-          role: "assistant" as const,
+          role: 'assistant' as const,
           content: config.serializeResult
             ? config.serializeResult(previousResult as any)
             : JSON.stringify(previousResult, null, 2),
         },
         {
-          role: "user" as const,
+          role: 'user' as const,
           content: `Please regenerate the above with the following changes: ${regenerateInstructions.trim()}`,
         },
       ];
@@ -275,34 +265,34 @@
         inputText as any,
         history,
         developerNote.trim() || undefined,
-        instruction.trim() || undefined,
+        instruction.trim() || undefined
       );
 
-      toastActions.success("Regeneration completed successfully!");
+      toastActions.success('Regeneration completed successfully!');
       const textToPass = inputText;
       showRegenerateDialog = false;
-      regenerateInstructions = "";
+      regenerateInstructions = '';
       onSuccess(result, textToPass);
       onOpenChange(false);
     } catch (err) {
       const parseError = config.parseError || defaultParseError;
       const errorInfo: AIErrorInfo =
-        err instanceof Error && "errorInfo" in err
+        err instanceof Error && 'errorInfo' in err
           ? (err as Error & { errorInfo: AIErrorInfo }).errorInfo
           : parseError(err);
 
       error = errorInfo.message;
       showErrorToast(errorInfo);
-      console.error("AI regeneration error:", err);
+      console.error('AI regeneration error:', err);
     } finally {
       isRegenerating = false;
     }
   }
 
   function handleCancel() {
-    inputText = "";
-    developerNote = "";
-    instruction = "";
+    inputText = '';
+    developerNote = '';
+    instruction = '';
     error = null;
     onOpenChange(false);
   }
@@ -313,7 +303,7 @@
   }
 
   function getResultPreview(): string {
-    if (!previousResult) return "";
+    if (!previousResult) return '';
     if (config.serializeResult) {
       return config.serializeResult(previousResult as any);
     }
@@ -322,13 +312,13 @@
 
   $effect(() => {
     if (!open) {
-      inputText = "";
-      developerNote = "";
-      instruction = "";
+      inputText = '';
+      developerNote = '';
+      instruction = '';
       error = null;
       isGenerating = false;
       showRegenerateDialog = false;
-      regenerateInstructions = "";
+      regenerateInstructions = '';
     }
   });
 </script>
@@ -348,7 +338,7 @@
           bind:value={inputText}
           placeholder={config.inputPlaceholder}
           rows={config.inputRows ?? 12}
-          class={error ? "border-destructive" : ""}
+          class={error ? 'border-destructive' : ''}
           disabled={isGenerating}
         />
         {#if error}
@@ -371,8 +361,8 @@
             class="font-mono text-sm"
           />
           <p class="text-xs text-muted-foreground">
-            This will be included in the task description to guide developers on
-            implementation approach.
+            This will be included in the task description to guide developers on implementation
+            approach.
           </p>
         </div>
       {/if}
@@ -391,8 +381,7 @@
             disabled={isGenerating}
           />
           <p class="text-xs text-muted-foreground">
-            Specify how you want the tasks to be generated (format, focus areas,
-            structure, etc.).
+            Specify how you want the tasks to be generated (format, focus areas, structure, etc.).
           </p>
         </div>
       {/if}
@@ -400,12 +389,9 @@
       {#if config.infoContent}
         <div class="rounded-lg border bg-muted/50 p-4">
           <div class="flex gap-2">
-            <Icon
-              icon="lucide:info"
-              class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground"
-            />
+            <Icon icon="lucide:info" class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
             <div class="space-y-1 text-sm text-muted-foreground">
-              {#if typeof config.infoContent === "string"}
+              {#if typeof config.infoContent === 'string'}
                 <p>{config.infoContent}</p>
               {:else}
                 <p class="font-medium">{config.infoContent.title}</p>
@@ -420,7 +406,7 @@
         </div>
       {/if}
 
-      {#if error && error.includes("not configured")}
+      {#if error && error.includes('not configured')}
         <div
           class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
         >
@@ -450,7 +436,7 @@
         </div>
       {/if}
 
-      {#if error && (error.includes("not installed") || (error.includes("model") && error.includes("not found")))}
+      {#if error && (error.includes('not installed') || (error.includes('model') && error.includes('not found')))}
         <div
           class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20"
         >
@@ -460,13 +446,11 @@
               class="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400"
             />
             <div class="flex-1 space-y-2 text-sm">
-              <p class="font-medium text-blue-900 dark:text-blue-100">
-                Model Not Installed
-              </p>
+              <p class="font-medium text-blue-900 dark:text-blue-100">Model Not Installed</p>
               <p class="text-blue-800 dark:text-amber-200">{error}</p>
               <p class="text-xs text-blue-700 dark:text-blue-300">
-                You can install the model in the terminal or use the "Load
-                Models" button in Settings to see available models.
+                You can install the model in the terminal or use the "Load Models" button in
+                Settings to see available models.
               </p>
               <Button
                 variant="outline"
@@ -494,13 +478,8 @@
           Regenerate
         </Button>
       {/if}
-      <Button variant="outline" onclick={handleCancel} disabled={isGenerating}>
-        Cancel
-      </Button>
-      <Button
-        onclick={handleGenerate}
-        disabled={isGenerating || !inputText.trim()}
-      >
+      <Button variant="outline" onclick={handleCancel} disabled={isGenerating}>Cancel</Button>
+      <Button onclick={handleGenerate} disabled={isGenerating || !inputText.trim()}>
         <Icon icon="lucide:sparkles" class="mr-2 h-4 w-4" />
         Generate
       </Button>
@@ -514,33 +493,27 @@
       <Dialog.Header>
         <Dialog.Title>Regenerate with Instructions</Dialog.Title>
         <Dialog.Description>
-          Provide instructions on how to modify the previous generation. The AI
-          will use the previous result and your instructions to create an
-          improved version.
+          Provide instructions on how to modify the previous generation. The AI will use the
+          previous result and your instructions to create an improved version.
         </Dialog.Description>
       </Dialog.Header>
 
       <div class="space-y-4 py-4">
         <div class="space-y-2">
           <Label>Previous Result (Reference)</Label>
-          <div
-            class="max-h-[300px] overflow-y-auto rounded-lg border bg-muted/50 p-4"
-          >
-            <pre
-              class="whitespace-pre-wrap font-mono text-xs">{getResultPreview()}</pre>
+          <div class="max-h-[300px] overflow-y-auto rounded-lg border bg-muted/50 p-4">
+            <pre class="whitespace-pre-wrap font-mono text-xs">{getResultPreview()}</pre>
           </div>
         </div>
 
         <div class="space-y-2">
-          <Label for="regenerate-instructions"
-            >Instructions for Regeneration</Label
-          >
+          <Label for="regenerate-instructions">Instructions for Regeneration</Label>
           <Textarea
             id="regenerate-instructions"
             bind:value={regenerateInstructions}
             placeholder="e.g., Make the titles more concise, add 2 more subtasks, change priority to high..."
             rows={6}
-            class={error ? "border-destructive" : ""}
+            class={error ? 'border-destructive' : ''}
             disabled={isRegenerating}
           />
           <p class="text-xs text-muted-foreground">
@@ -557,7 +530,7 @@
           variant="outline"
           onclick={() => {
             showRegenerateDialog = false;
-            regenerateInstructions = "";
+            regenerateInstructions = '';
             error = null;
           }}
           disabled={isRegenerating}

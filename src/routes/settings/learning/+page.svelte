@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import LearningSettings from "$lib/domains/settings/components/LearningSettings.svelte";
+  import LearningSettings from '$lib/domains/settings/components/LearningSettings.svelte';
 </script>
 
 <svelte:head>

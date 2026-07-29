@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
   import {
     AlertDialog,
     AlertDialogAction,
@@ -11,10 +11,10 @@
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-  } from "$lib/components/ui/alert-dialog";
-  import Icon from "@iconify/svelte";
-  import ProviderModelSelector from "../ProviderModelSelector.svelte";
-  import type { Conversation } from "../../types/index.js";
+  } from '$lib/components/ui/alert-dialog';
+  import Icon from '@iconify/svelte';
+  import ProviderModelSelector from '../ProviderModelSelector.svelte';
+  import type { Conversation } from '../../types/index.js';
 
   interface Props {
     conversation: Conversation;
@@ -73,8 +73,8 @@
           bind:value={editedTitle}
           class="flex-1"
           onkeydown={(e) => {
-            if (e.key === "Enter") handleSave();
-            if (e.key === "Escape") handleCancel();
+            if (e.key === 'Enter') handleSave();
+            if (e.key === 'Escape') handleCancel();
           }}
         />
         <Button variant="ghost" size="sm" onclick={handleSave}>
@@ -114,8 +114,7 @@
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete "{conversation.title}"? This action
-            cannot be undone.
+            Are you sure you want to delete "{conversation.title}"? This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

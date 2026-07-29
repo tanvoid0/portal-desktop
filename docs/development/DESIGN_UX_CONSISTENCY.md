@@ -12,14 +12,14 @@ Handoff doc for continuing optional polish or separate epics. Original plan: `.c
 
 Unified Portal Desktop around one page shell, one toast API, one theme system, and clearer navigation (automation hub, AI history, sidebar labels).
 
-| Area | Done |
-|------|------|
-| **Foundation** | Shell components (`PageHeader`, `PageLoading`, `PageError`, `PageEmpty`, `NavSectionList`); `$lib/utils/toast`; `@lucide/svelte` (non-terminal); theme tokens + custom hex via `customTheme.ts`; cursor rule |
-| **List & hub pages** | Home, projects, tasks, documents, credentials, automation (blocks/scripts/utilities), SDK manager/versions, deployments lists, AI hub |
-| **Detail & forms** | Project detail/create/edit; SDK sub-routes + manager detail; cloud detail (10 K8s routes); settings layout; task/document detail |
-| **Cloud lists** | `BaseResourceTable` empty/filtered states; `confirmAction()` on destructive actions |
-| **Hygiene** | `@/lib/` → `$lib/` (routes + domains, except terminal); `svelte-sonner` removed; raw `confirm()` → `confirmAction()` (non-terminal) |
-| **P9 long-tail** | See [P9 record](./DESIGN_UX_P9_REFACTOR.md) — cloud detail, workloads overview, settings layout, task/doc detail |
+| Area                 | Done                                                                                                                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Foundation**       | Shell components (`PageHeader`, `PageLoading`, `PageError`, `PageEmpty`, `NavSectionList`); `$lib/utils/toast`; `@lucide/svelte` (non-terminal); theme tokens + custom hex via `customTheme.ts`; cursor rule |
+| **List & hub pages** | Home, projects, tasks, documents, credentials, automation (blocks/scripts/utilities), SDK manager/versions, deployments lists, AI hub                                                                        |
+| **Detail & forms**   | Project detail/create/edit; SDK sub-routes + manager detail; cloud detail (10 K8s routes); settings layout; task/document detail                                                                             |
+| **Cloud lists**      | `BaseResourceTable` empty/filtered states; `confirmAction()` on destructive actions                                                                                                                          |
+| **Hygiene**          | `@/lib/` → `$lib/` (routes + domains, except terminal); `svelte-sonner` removed; raw `confirm()` → `confirmAction()` (non-terminal)                                                                          |
+| **P9 long-tail**     | See [P9 record](./DESIGN_UX_P9_REFACTOR.md) — cloud detail, workloads overview, settings layout, task/doc detail                                                                                             |
 
 ---
 
@@ -37,31 +37,31 @@ Unified Portal Desktop around one page shell, one toast API, one theme system, a
 
 Migrate opportunistically when touching a file — no blocking work remains for the consistency initiative.
 
-| Item | Priority | Notes |
-|------|----------|-------|
-| **Terminal domain rework** | Separate epic | Imports, confirm API, icons, UX — not shell polish |
-| **`sdk/+page.svelte`, `sdk/ai/ollama`** | Low | Large specialty pages |
-| **`tasks/[id]/generate`, `TaskGenerationPage`** | Low | Wizard; inline `LoadingSpinner` for step load |
-| **`documents/generate`** | Low | Check if page-level load/error needed |
-| **Cloud emoji nav → Lucide** | Skip | Cosmetic only |
-| **TanStack Query migration** | Architecture | [`SVELTE_MAINTAINABILITY_PLAN.md`](./SVELTE_MAINTAINABILITY_PLAN.md) |
-| **Automation folder naming** | Nice-to-have | Workflow automation vs hub pages share `domains/automation/` |
-| **shadcn component consistency** | Complete | [`SHADCN_COMPONENT_AUDIT.md`](./SHADCN_COMPONENT_AUDIT.md); [shadcn cursor rule](../../.cursor/rules/shadcn-component-conventions.md) |
+| Item                                            | Priority      | Notes                                                                                                                                 |
+| ----------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Terminal domain rework**                      | Separate epic | Imports, confirm API, icons, UX — not shell polish                                                                                    |
+| **`sdk/+page.svelte`, `sdk/ai/ollama`**         | Low           | Large specialty pages                                                                                                                 |
+| **`tasks/[id]/generate`, `TaskGenerationPage`** | Low           | Wizard; inline `LoadingSpinner` for step load                                                                                         |
+| **`documents/generate`**                        | Low           | Check if page-level load/error needed                                                                                                 |
+| **Cloud emoji nav → Lucide**                    | Skip          | Cosmetic only                                                                                                                         |
+| **TanStack Query migration**                    | Architecture  | [`SVELTE_MAINTAINABILITY_PLAN.md`](./SVELTE_MAINTAINABILITY_PLAN.md)                                                                  |
+| **Automation folder naming**                    | Nice-to-have  | Workflow automation vs hub pages share `domains/automation/`                                                                          |
+| **shadcn component consistency**                | Complete      | [`SHADCN_COMPONENT_AUDIT.md`](./SHADCN_COMPONENT_AUDIT.md); [shadcn cursor rule](../../.cursor/rules/shadcn-component-conventions.md) |
 
 ---
 
 ## Key files
 
-| Purpose | Path |
-|---------|------|
-| Page shell | `src/lib/components/shell/` |
-| Conventions rule | `.cursor/rules/page-shell-conventions.md` |
-| Main / AI nav | `src/lib/config/main-nav.ts`, `ai-nav.ts` |
-| Root layout | `src/routes/+layout.svelte` |
-| Toast API | `src/lib/utils/toast.ts` |
-| Theme | `themeStore.ts`, `customTheme.ts`, `app.css` |
-| Cloud table empty state | `BaseResourceTable.svelte` |
-| Settings shell | `src/routes/settings/+layout.svelte` |
+| Purpose                 | Path                                         |
+| ----------------------- | -------------------------------------------- |
+| Page shell              | `src/lib/components/shell/`                  |
+| Conventions rule        | `.cursor/rules/page-shell-conventions.md`    |
+| Main / AI nav           | `src/lib/config/main-nav.ts`, `ai-nav.ts`    |
+| Root layout             | `src/routes/+layout.svelte`                  |
+| Toast API               | `src/lib/utils/toast.ts`                     |
+| Theme                   | `themeStore.ts`, `customTheme.ts`, `app.css` |
+| Cloud table empty state | `BaseResourceTable.svelte`                   |
+| Settings shell          | `src/routes/settings/+layout.svelte`         |
 
 ---
 
@@ -69,8 +69,8 @@ Migrate opportunistically when touching a file — no blocking work remains for 
 
 ```svelte
 <script lang="ts">
-  import { PageHeader, PageLoading, PageError, PageEmpty } from "$lib/components/shell";
-  import { toast } from "$lib/utils/toast";
+  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import { toast } from '$lib/utils/toast';
 
   let loading = $state(false);
   let error = $state<string | null>(null);
@@ -81,8 +81,8 @@ Migrate opportunistically when touching a file — no blocking work remains for 
     try {
       /* fetch */
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to load";
-      toast.error("Failed to load", error);
+      error = e instanceof Error ? e.message : 'Failed to load';
+      toast.error('Failed to load', error);
     } finally {
       loading = false;
     }

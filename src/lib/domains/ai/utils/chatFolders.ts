@@ -1,4 +1,4 @@
-const STORAGE_KEY = "portal.ai.chatFolders";
+const STORAGE_KEY = 'portal.ai.chatFolders';
 
 /**
  * Folders are a local grouping aid, not thread data — `ai_conversations` has no
@@ -15,7 +15,7 @@ export interface ChatFolders {
 export const EMPTY_CHAT_FOLDERS: ChatFolders = { names: [], assignments: {} };
 
 export function loadChatFolders(): ChatFolders {
-  if (typeof localStorage === "undefined") return { ...EMPTY_CHAT_FOLDERS };
+  if (typeof localStorage === 'undefined') return { ...EMPTY_CHAT_FOLDERS };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...EMPTY_CHAT_FOLDERS };
@@ -23,9 +23,7 @@ export function loadChatFolders(): ChatFolders {
     return {
       names: Array.isArray(parsed.names) ? parsed.names : [],
       assignments:
-        parsed.assignments && typeof parsed.assignments === "object"
-          ? parsed.assignments
-          : {},
+        parsed.assignments && typeof parsed.assignments === 'object' ? parsed.assignments : {},
     };
   } catch {
     return { ...EMPTY_CHAT_FOLDERS };
@@ -33,7 +31,7 @@ export function loadChatFolders(): ChatFolders {
 }
 
 export function saveChatFolders(folders: ChatFolders): void {
-  if (typeof localStorage === "undefined") return;
+  if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(folders));
   } catch {
@@ -51,7 +49,7 @@ export function addFolder(folders: ChatFolders, name: string): ChatFolders {
 /** Drops a folder; its conversations fall back to the ungrouped list. */
 export function removeFolder(folders: ChatFolders, name: string): ChatFolders {
   const assignments = Object.fromEntries(
-    Object.entries(folders.assignments).filter(([, folder]) => folder !== name),
+    Object.entries(folders.assignments).filter(([, folder]) => folder !== name)
   );
   return { names: folders.names.filter((n) => n !== name), assignments };
 }
@@ -60,7 +58,7 @@ export function removeFolder(folders: ChatFolders, name: string): ChatFolders {
 export function assignFolder(
   folders: ChatFolders,
   conversationId: string,
-  name: string | null,
+  name: string | null
 ): ChatFolders {
   const assignments = { ...folders.assignments };
   if (name) {
@@ -83,7 +81,7 @@ export interface FolderGroup<T> {
  */
 export function groupByFolder<T extends { id: string }>(
   items: T[],
-  folders: ChatFolders,
+  folders: ChatFolders
 ): FolderGroup<T>[] {
   const groups: FolderGroup<T>[] = folders.names.map((name) => ({
     name,
@@ -93,7 +91,7 @@ export function groupByFolder<T extends { id: string }>(
   const ungrouped: T[] = [];
 
   for (const item of items) {
-    const group = byName.get(folders.assignments[item.id] ?? "");
+    const group = byName.get(folders.assignments[item.id] ?? '');
     if (group) group.items.push(item);
     else ungrouped.push(item);
   }

@@ -62,21 +62,21 @@ See the [agent-platform README](https://github.com/tanvoid0/agent-platform#quick
 
 For development or CI when AI settings are not saved yet:
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
+| Variable                                               | Default                  | Purpose               |
+| ------------------------------------------------------ | ------------------------ | --------------------- |
 | `AGENT_PLATFORM_BASE_URL` or `CODER_PLATFORM_BASE_URL` | `http://127.0.0.1:18410` | Platform API base URL |
-| `CODER_MODEL` | — | Default model alias |
+| `CODER_MODEL`                                          | —                        | Default model alias   |
 
 API tokens are **not** read from env vars — set them in **AI → Providers** in the app.
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---------|-----|
-| "Can't reach agent-platform" | Start agent-platform (`pnpm dev:server` or Docker). Confirm `http://127.0.0.1:18410/docs` loads. |
-| "Invalid catalog response" | Update agent-platform to the latest version; catalog format is defined in its `/v1/catalog` API. |
-| "Invalid or missing API token" | Add a workspace token in AI → Providers, or disable auth on the platform for local dev. |
-| Coder agent fails | Ensure agent-platform exposes `/api/v1/coder/chat/stream` and your model supports tools if required. |
+| Symptom                        | Fix                                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| "Can't reach agent-platform"   | Start agent-platform (`pnpm dev:server` or Docker). Confirm `http://127.0.0.1:18410/docs` loads.     |
+| "Invalid catalog response"     | Update agent-platform to the latest version; catalog format is defined in its `/v1/catalog` API.     |
+| "Invalid or missing API token" | Add a workspace token in AI → Providers, or disable auth on the platform for local dev.              |
+| Coder agent fails              | Ensure agent-platform exposes `/api/v1/coder/chat/stream` and your model supports tools if required. |
 
 ## Links
 

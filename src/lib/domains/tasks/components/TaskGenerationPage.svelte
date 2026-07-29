@@ -1,41 +1,41 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import { Button } from "$lib/components/ui/button";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Separator } from "$lib/components/ui/separator";
-  import Icon from "@iconify/svelte";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Separator } from '$lib/components/ui/separator';
+  import Icon from '@iconify/svelte';
   import {
     aiTaskService,
     type GeneratedTaskStructure,
     type ConversationMessage,
     type TaskContext,
-  } from "../services/aiTaskService";
-  import { taskActions } from "../stores/taskStore";
-  import { toastActions } from "$lib/utils/toast";
-  import { tauriTaskService } from "../services/tauriTaskService";
+  } from '../services/aiTaskService';
+  import { taskActions } from '../stores/taskStore';
+  import { toastActions } from '$lib/utils/toast';
+  import { tauriTaskService } from '../services/tauriTaskService';
   import type {
     Task,
     CreateTaskRequest,
     UpdateTaskRequest,
     TaskPriority,
     TaskStatus,
-  } from "../types";
-  import TaskPreviewCard from "./TaskPreviewCard.svelte";
-  import TaskPreviewList from "./TaskPreviewList.svelte";
-  import AIChatPanel from "$lib/domains/ai/components/chat/AIChatPanel.svelte";
-  import type { ChatMessage } from "$lib/domains/ai/types";
-  import InstructionTemplateManager from "./InstructionTemplateManager.svelte";
-  import LoadingSpinner from "$lib/components/ui/loading-spinner.svelte";
+  } from '../types';
+  import TaskPreviewCard from './TaskPreviewCard.svelte';
+  import TaskPreviewList from './TaskPreviewList.svelte';
+  import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
+  import type { ChatMessage } from '$lib/domains/ai/types';
+  import InstructionTemplateManager from './InstructionTemplateManager.svelte';
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
 
   interface Props {
     taskId?: string; // For updating existing task
@@ -43,8 +43,8 @@
 
   let { taskId }: Props = $props();
 
-  let storyText = $state("");
-  let customInstruction = $state("");
+  let storyText = $state('');
+  let customInstruction = $state('');
   let selectedTemplateId = $state<string | null>(null);
   let isGenerating = $state(false);
   let generatedData = $state<GeneratedTaskStructure | null>(null);
@@ -70,7 +70,7 @@
         existingTask = await tauriTaskService.getTask(taskId);
         if (existingTask) {
           // Pre-fill story text with task description
-          storyText = existingTask.description || "";
+          storyText = existingTask.description || '';
 
           // Preload existing task as preview
           await preloadExistingTaskAsPreview();
@@ -79,8 +79,8 @@
         taskContext = await buildTaskContext();
       } catch (error) {
         toastActions.error(
-          "Failed to load task",
-          error instanceof Error ? error.message : "Unknown error",
+          'Failed to load task',
+          error instanceof Error ? error.message : 'Unknown error'
         );
       } finally {
         isLoadingTask = false;
@@ -106,15 +106,15 @@
       generatedData = {
         main_task: {
           title: existingTask.title,
-          description: existingTask.description || "",
+          description: existingTask.description || '',
           priority: existingTask.priority,
-          type_: existingTask.type || "",
+          type_: existingTask.type || '',
           estimated_time: existingTask.estimatedTime || null,
           tags: existingTask.tags || [],
         },
         subtasks: subtasks.map((st, index) => ({
           title: st.title,
-          description: st.description || "",
+          description: st.description || '',
           estimated_time: st.estimatedTime || null,
           dependencies: [],
           order: index + 1,
@@ -122,7 +122,7 @@
         suggested_project: null,
         suggested_labels: existingTask.tags || [],
         confidence: 1.0,
-        model_used: "existing-task",
+        model_used: 'existing-task',
       };
 
       // Store original state for preservation
@@ -136,13 +136,13 @@
 
       chatMessages = [
         {
-          role: "assistant",
+          role: 'assistant',
           content: `I've loaded your existing task "${existingTask.title}" with ${subtasks.length} subtask(s). You can refine it using AI or edit manually.`,
           timestamp: new Date(),
         },
       ];
     } catch (error) {
-      console.error("Failed to preload task as preview:", error);
+      console.error('Failed to preload task as preview:', error);
     }
   }
 
@@ -178,7 +178,7 @@
         }
       }
     } catch (error) {
-      console.error("Failed to build task context:", error);
+      console.error('Failed to build task context:', error);
     }
 
     return Object.keys(context).length > 0 ? context : undefined;
@@ -186,7 +186,7 @@
 
   async function handleGenerate() {
     if (!storyText.trim()) {
-      toastActions.error("Please enter story text");
+      toastActions.error('Please enter story text');
       return;
     }
 
@@ -194,7 +194,7 @@
     try {
       const result = await aiTaskService.generateTasksFromStory({
         story_text: storyText,
-        provider_type: "AgentPlatform",
+        provider_type: 'AgentPlatform',
         instruction: customInstruction.trim() || undefined,
         context: taskContext,
       });
@@ -207,17 +207,12 @@
           main_task: {
             ...result.main_task,
             // Preserve original priority if not explicitly changed
-            priority:
-              result.main_task.priority ||
-              originalTaskState.priority ||
-              "medium",
+            priority: result.main_task.priority || originalTaskState.priority || 'medium',
             // Preserve original type if not explicitly changed
-            type_: result.main_task.type_ || originalTaskState.type || "",
+            type_: result.main_task.type_ || originalTaskState.type || '',
             // Preserve original estimated time if not explicitly changed
             estimated_time:
-              result.main_task.estimated_time ||
-              originalTaskState.estimatedTime ||
-              null,
+              result.main_task.estimated_time || originalTaskState.estimatedTime || null,
           },
           // Preserve original tags if AI didn't suggest new ones
           suggested_labels:
@@ -231,15 +226,15 @@
 
       chatMessages = [
         {
-          role: "assistant",
-          content: `I've ${taskId ? "refined" : "generated"} a task structure with ${result.subtasks.length} subtask(s). You can review and edit the preview, or chat with me to make adjustments.`,
+          role: 'assistant',
+          content: `I've ${taskId ? 'refined' : 'generated'} a task structure with ${result.subtasks.length} subtask(s). You can review and edit the preview, or chat with me to make adjustments.`,
           timestamp: new Date(),
         },
       ];
     } catch (error) {
       toastActions.error(
-        "Failed to generate tasks",
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        'Failed to generate tasks',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     } finally {
       isGenerating = false;
@@ -248,7 +243,7 @@
 
   async function handleChatMessage(message: string, history: ChatMessage[]) {
     if (!generatedData) {
-      toastActions.error("Please generate tasks first");
+      toastActions.error('Please generate tasks first');
       return;
     }
 
@@ -256,21 +251,19 @@
     // Include the original generation result in the history
     const conversationHistory: ConversationMessage[] = [
       {
-        role: "assistant",
+        role: 'assistant',
         content: JSON.stringify(generatedData, null, 2),
       },
       ...history
         .filter(
-          (m) =>
-            m.role === "user" ||
-            (m.role === "assistant" && !m.content.includes("generated")),
+          (m) => m.role === 'user' || (m.role === 'assistant' && !m.content.includes('generated'))
         )
         .map((m) => ({
           role: m.role,
           content: m.content,
         })),
       {
-        role: "user",
+        role: 'user',
         content: message,
       },
     ];
@@ -278,7 +271,7 @@
     try {
       const result = await aiTaskService.generateTasksFromStory({
         story_text: storyText,
-        provider_type: "AgentPlatform",
+        provider_type: 'AgentPlatform',
         history: conversationHistory,
         instruction: customInstruction.trim() || undefined,
         context: taskContext,
@@ -290,15 +283,10 @@
           ...result,
           main_task: {
             ...result.main_task,
-            priority:
-              result.main_task.priority ||
-              originalTaskState.priority ||
-              "medium",
-            type_: result.main_task.type_ || originalTaskState.type || "",
+            priority: result.main_task.priority || originalTaskState.priority || 'medium',
+            type_: result.main_task.type_ || originalTaskState.type || '',
             estimated_time:
-              result.main_task.estimated_time ||
-              originalTaskState.estimatedTime ||
-              null,
+              result.main_task.estimated_time || originalTaskState.estimatedTime || null,
           },
           suggested_labels:
             result.suggested_labels.length > 0
@@ -312,15 +300,15 @@
       chatMessages = [
         ...chatMessages,
         {
-          role: "assistant",
+          role: 'assistant',
           content: `I've updated the task structure based on your feedback. The preview has been refreshed.`,
           timestamp: new Date(),
         },
       ];
     } catch (error) {
       toastActions.error(
-        "Failed to update tasks",
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        'Failed to update tasks',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     }
   }
@@ -333,17 +321,12 @@
           title: task.title,
           description: task.description,
           // Preserve original status and other fields unless explicitly changed
-          status: (originalTaskState?.status ||
-            existingTask.status) as TaskStatus,
+          status: (originalTaskState?.status || existingTask.status) as TaskStatus,
           priority:
-            (task.priority as TaskPriority) ||
-            originalTaskState?.priority ||
-            existingTask.priority,
+            (task.priority as TaskPriority) || originalTaskState?.priority || existingTask.priority,
           type: task.type_ || originalTaskState?.type || existingTask.type,
           estimatedTime:
-            task.estimated_time ||
-            originalTaskState?.estimatedTime ||
-            existingTask.estimatedTime,
+            task.estimated_time || originalTaskState?.estimatedTime || existingTask.estimatedTime,
           tags:
             generatedData && generatedData.suggested_labels.length > 0
               ? generatedData.suggested_labels
@@ -358,7 +341,7 @@
         const taskData: CreateTaskRequest = {
           title: task.title,
           description: task.description,
-          status: "pending",
+          status: 'pending',
           priority: task.priority as TaskPriority,
           type: task.type_ || undefined,
           estimatedTime: task.estimated_time || undefined,
@@ -366,15 +349,13 @@
         };
 
         const createdTask = await taskActions.createTask(taskData);
-        toastActions.success(
-          `Task "${createdTask.title}" created successfully`,
-        );
+        toastActions.success(`Task "${createdTask.title}" created successfully`);
         createdMainTaskId = createdTask.id;
       }
     } catch (error) {
       toastActions.error(
-        `Failed to ${taskId ? "update" : "create"} task`,
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        `Failed to ${taskId ? 'update' : 'create'} task`,
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
       throw error;
     }
@@ -392,15 +373,15 @@
       }
 
       if (!parentTaskId) {
-        toastActions.error("Please create the main task first");
+        toastActions.error('Please create the main task first');
         return;
       }
 
       const subtaskData: CreateTaskRequest = {
         title: subtask.title,
         description: subtask.description || undefined,
-        status: "pending",
-        priority: "medium",
+        status: 'pending',
+        priority: 'medium',
         parentId: parentTaskId,
         estimatedTime: subtask.estimated_time || undefined,
       };
@@ -409,8 +390,8 @@
       toastActions.success(`Subtask "${subtask.title}" created successfully`);
     } catch (error) {
       toastActions.error(
-        "Failed to create subtask",
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        'Failed to create subtask',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     }
   }
@@ -424,7 +405,7 @@
       const mainTaskId = createdMainTaskId || taskId;
 
       if (!mainTaskId) {
-        toastActions.error("Failed to create main task");
+        toastActions.error('Failed to create main task');
         return;
       }
 
@@ -445,8 +426,7 @@
             description: subtask.description || undefined,
             status: existingSubtask.status, // Preserve status
             priority: existingSubtask.priority, // Preserve priority
-            estimatedTime:
-              subtask.estimated_time || existingSubtask.estimatedTime,
+            estimatedTime: subtask.estimated_time || existingSubtask.estimatedTime,
           };
           await taskActions.updateTask(existingSubtask.id, updateData);
           updatedCount++;
@@ -455,8 +435,8 @@
           const subtaskData: CreateTaskRequest = {
             title: subtask.title,
             description: subtask.description || undefined,
-            status: "pending",
-            priority: "medium",
+            status: 'pending',
+            priority: 'medium',
             parentId: mainTaskId,
             estimatedTime: subtask.estimated_time || undefined,
           };
@@ -465,7 +445,7 @@
         }
       }
 
-      const action = taskId ? "Updated" : "Created";
+      const action = taskId ? 'Updated' : 'Created';
       const message = taskId
         ? `Updated task with ${updatedCount} updated and ${createdCount} new subtask(s)`
         : `Created task with ${generatedData.subtasks.length} subtask(s)`;
@@ -476,8 +456,8 @@
       goto(`/tasks/${mainTaskId}`);
     } catch (error) {
       toastActions.error(
-        `Failed to ${taskId ? "update" : "create"} tasks`,
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        `Failed to ${taskId ? 'update' : 'create'} tasks`,
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     }
   }
@@ -500,9 +480,7 @@
     if (generatedData) {
       generatedData = {
         ...generatedData,
-        subtasks: generatedData.subtasks.map((s, i) =>
-          i === index ? subtask : s,
-        ),
+        subtasks: generatedData.subtasks.map((s, i) => (i === index ? subtask : s)),
       };
     }
   }
@@ -515,18 +493,15 @@
       <div class="mb-4 flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold">
-            {taskId ? "Update Task with AI" : "Generate Tasks with AI"}
+            {taskId ? 'Update Task with AI' : 'Generate Tasks with AI'}
           </h1>
           <p class="text-sm text-muted-foreground">
             {taskId
-              ? "Use AI to generate subtasks or update the current task"
-              : "Describe your work and let AI create structured tasks for you"}
+              ? 'Use AI to generate subtasks or update the current task'
+              : 'Describe your work and let AI create structured tasks for you'}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          onclick={() => goto(taskId ? `/tasks/${taskId}` : "/tasks")}
-        >
+        <Button variant="ghost" onclick={() => goto(taskId ? `/tasks/${taskId}` : '/tasks')}>
           <Icon icon="lucide:arrow-left" class="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -590,8 +565,7 @@
                   </p>
                 </div>
                 <Badge variant="outline" class="text-xs">
-                  Confidence: {Math.round(generatedData.confidence * 100)}% |
-                  Model:{" "}
+                  Confidence: {Math.round(generatedData.confidence * 100)}% | Model:{' '}
                   {generatedData.model_used}
                 </Badge>
               </div>

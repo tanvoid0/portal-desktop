@@ -3,8 +3,8 @@
  * Manages terminal session state and persistence
  */
 
-import { writable } from "svelte/store";
-import { invokeClient } from "$lib/utils/invokeClient";
+import { writable } from 'svelte/store';
+import { invokeClient } from '$lib/utils/invokeClient';
 
 export interface TerminalSession {
   tab_id: string;
@@ -31,21 +31,13 @@ const initialState: SessionState = {
 
 function fromInvokeSession(raw: Record<string, unknown>): TerminalSession {
   return {
-    tab_id: String(raw.tab_id ?? raw.tabId ?? ""),
-    working_directory: String(
-      raw.working_directory ?? raw.workingDirectory ?? "",
-    ),
+    tab_id: String(raw.tab_id ?? raw.tabId ?? ''),
+    working_directory: String(raw.working_directory ?? raw.workingDirectory ?? ''),
     environment: (raw.environment as Record<string, string>) ?? {},
-    scrollback_buffer: (raw.scrollback_buffer ??
-      raw.scrollbackBuffer ??
-      []) as string[],
-    cursor_position: (raw.cursor_position ??
-      raw.cursorPosition ??
-      [0, 0]) as [number, number],
-    terminal_size: (raw.terminal_size ??
-      raw.terminalSize ??
-      [80, 24]) as [number, number],
-    last_activity: String(raw.last_activity ?? raw.lastActivity ?? ""),
+    scrollback_buffer: (raw.scrollback_buffer ?? raw.scrollbackBuffer ?? []) as string[],
+    cursor_position: (raw.cursor_position ?? raw.cursorPosition ?? [0, 0]) as [number, number],
+    terminal_size: (raw.terminal_size ?? raw.terminalSize ?? [80, 24]) as [number, number],
+    last_activity: String(raw.last_activity ?? raw.lastActivity ?? ''),
     process_id: (raw.process_id ?? raw.processId) as string | undefined,
   };
 }
@@ -58,7 +50,7 @@ function createSessionStore() {
 
     saveSession: async (session: TerminalSession) => {
       try {
-        await invokeClient.request("save_terminal_session", {
+        await invokeClient.request('save_terminal_session', {
           data: { session },
         });
         update((state) => ({
@@ -68,17 +60,17 @@ function createSessionStore() {
             [session.tab_id]: session,
           },
         }));
-        console.log("Session saved for tab:", session.tab_id);
+        console.log('Session saved for tab:', session.tab_id);
       } catch (error) {
-        console.error("Failed to save session:", error);
+        console.error('Failed to save session:', error);
       }
     },
 
     loadSession: async (tabId: string): Promise<TerminalSession | null> => {
       try {
         const session = await invokeClient.request<Record<string, unknown> | null>(
-          "load_terminal_session",
-          { data: { tabId } },
+          'load_terminal_session',
+          { data: { tabId } }
         );
         if (session) {
           const normalized = fromInvokeSession(session);
@@ -90,19 +82,19 @@ function createSessionStore() {
             },
             activeSession: tabId,
           }));
-          console.log("Session loaded for tab:", tabId);
+          console.log('Session loaded for tab:', tabId);
           return normalized;
         }
         return null;
       } catch (error) {
-        console.error("Failed to load session:", error);
+        console.error('Failed to load session:', error);
         return null;
       }
     },
 
     deleteSession: async (tabId: string) => {
       try {
-        await invokeClient.request("delete_terminal_session", {
+        await invokeClient.request('delete_terminal_session', {
           data: { tabId },
         });
         update((state) => {
@@ -111,39 +103,36 @@ function createSessionStore() {
           return {
             ...state,
             sessions: newSessions,
-            activeSession:
-              state.activeSession === tabId ? null : state.activeSession,
+            activeSession: state.activeSession === tabId ? null : state.activeSession,
           };
         });
-        console.log("Session deleted for tab:", tabId);
+        console.log('Session deleted for tab:', tabId);
       } catch (error) {
-        console.error("Failed to delete session:", error);
+        console.error('Failed to delete session:', error);
       }
     },
 
     listSessions: async (): Promise<string[]> => {
       try {
-        const tabIds = await invokeClient.request<string[]>(
-          "list_terminal_sessions",
-        );
+        const tabIds = await invokeClient.request<string[]>('list_terminal_sessions');
         return tabIds;
       } catch (error) {
-        console.error("Failed to list sessions:", error);
+        console.error('Failed to list sessions:', error);
         return [];
       }
     },
 
     clearAllSessions: async () => {
       try {
-        await invokeClient.request("clear_all_sessions");
+        await invokeClient.request('clear_all_sessions');
         update((state) => ({
           ...state,
           sessions: {},
           activeSession: null,
         }));
-        console.log("All sessions cleared");
+        console.log('All sessions cleared');
       } catch (error) {
-        console.error("Failed to clear all sessions:", error);
+        console.error('Failed to clear all sessions:', error);
       }
     },
 

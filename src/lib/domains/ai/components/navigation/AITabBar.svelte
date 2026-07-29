@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { Tabs, TabsList, TabsTrigger } from "$lib/components/ui/tabs";
-  import NavIcon from "$lib/components/shell/nav-icon.svelte";
-  import { AI_TABS, getActiveAiTab } from "$lib/config/ai-tabs";
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import NavIcon from '$lib/components/shell/nav-icon.svelte';
+  import { AI_TABS, getActiveAiTab } from '$lib/config/ai-tabs';
 
   interface Props {
     class?: string;
   }
 
-  let { class: className = "" }: Props = $props();
+  let { class: className = '' }: Props = $props();
 
   const activeTab = $derived(getActiveAiTab($page.url.pathname));
 

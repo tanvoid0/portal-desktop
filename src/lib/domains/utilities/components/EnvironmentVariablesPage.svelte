@@ -1,23 +1,18 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount } from 'svelte';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Alert, AlertDescription, AlertTitle } from "$lib/components/ui/alert";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
+  } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import {
     Plus,
     Trash2,
@@ -30,10 +25,10 @@
     Variable,
     User,
     Monitor,
-  } from "@lucide/svelte";
-  import { toast } from "$lib/utils/toast";
-  import { isTauriEnvironment } from "$lib/utils/tauri";
-  import type { EnvPermissions, EnvRow, EnvVariable } from "../types";
+  } from '@lucide/svelte';
+  import { toast } from '$lib/utils/toast';
+  import { isTauriEnvironment } from '$lib/utils/tauri';
+  import type { EnvPermissions, EnvRow, EnvVariable } from '../types';
   import {
     applyEnvironmentChanges,
     buildChanges,
@@ -41,16 +36,16 @@
     hasSystemChanges,
     listEnvironmentVariables,
     refreshProcessEnvironment,
-  } from "../services/environmentService";
+  } from '../services/environmentService';
 
-  type EditableScope = "user" | "system";
+  type EditableScope = 'user' | 'system';
 
   let loading = $state(true);
   let saving = $state(false);
   let error = $state<string | null>(null);
-  let tab = $state<EditableScope>("user");
-  let userSearch = $state("");
-  let systemSearch = $state("");
+  let tab = $state<EditableScope>('user');
+  let userSearch = $state('');
+  let systemSearch = $state('');
   let permissions = $state<EnvPermissions | null>(null);
   let original = $state<EnvVariable[]>([]);
   let rows = $state<EnvRow[]>([]);
@@ -59,43 +54,35 @@
   function matchesSearch(row: EnvRow, query: string): boolean {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return (
-      row.name.toLowerCase().includes(q) ||
-      row.value.toLowerCase().includes(q)
-    );
+    return row.name.toLowerCase().includes(q) || row.value.toLowerCase().includes(q);
   }
 
   function rowsForScope(scope: EditableScope): EnvRow[] {
     return rows.filter((row) => {
       if (row.isDeleted) return false;
-      if (scope === "user") {
-        return row.scope === "user" || row.scope === "session";
+      if (scope === 'user') {
+        return row.scope === 'user' || row.scope === 'session';
       }
-      return row.scope === "system";
+      return row.scope === 'system';
     });
   }
 
-  const userRows = $derived(
-    rowsForScope("user").filter((row) => matchesSearch(row, userSearch)),
-  );
+  const userRows = $derived(rowsForScope('user').filter((row) => matchesSearch(row, userSearch)));
 
   const systemRows = $derived(
-    rowsForScope("system").filter((row) => matchesSearch(row, systemSearch)),
+    rowsForScope('system').filter((row) => matchesSearch(row, systemSearch))
   );
 
-  const dirtyCount = $derived(
-    rows.filter((r) => r.isDirty || r.isNew || r.isDeleted).length,
-  );
+  const dirtyCount = $derived(rows.filter((r) => r.isDirty || r.isNew || r.isDeleted).length);
 
   const userDirtyCount = $derived.by(() => {
     const changes = buildChanges(original, rows);
-    return changes.filter((c) => c.scope === "user" || c.scope === "session")
-      .length;
+    return changes.filter((c) => c.scope === 'user' || c.scope === 'session').length;
   });
 
   const systemDirtyCount = $derived.by(() => {
     const changes = buildChanges(original, rows);
-    return changes.filter((c) => c.scope === "system").length;
+    return changes.filter((c) => c.scope === 'system').length;
   });
 
   const needsElevation = $derived.by(() => {
@@ -111,7 +98,7 @@
   async function load() {
     if (!isTauriEnvironment()) {
       loading = false;
-      error = "Environment variable editing is only available in the desktop app.";
+      error = 'Environment variable editing is only available in the desktop app.';
       return;
     }
 
@@ -131,8 +118,7 @@
         scope: v.scope,
       }));
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to load environment variables";
+      error = err instanceof Error ? err.message : 'Failed to load environment variables';
     } finally {
       loading = false;
     }
@@ -144,8 +130,8 @@
       ...rows,
       {
         id: `row-${nextId++}`,
-        name: "",
-        value: "",
+        name: '',
+        value: '',
         scope,
         isNew: true,
         isDirty: true,
@@ -177,21 +163,19 @@
       value: v.value,
       scope: v.scope,
     }));
-    toast.info("Changes discarded");
+    toast.info('Changes discarded');
   }
 
   async function save() {
     const changes = buildChanges(original, rows);
     if (changes.length === 0) {
-      toast.info("No changes to save");
+      toast.info('No changes to save');
       return;
     }
 
-    const invalid = rows.some(
-      (r) => !r.isDeleted && (r.isNew || r.isDirty) && !r.name.trim(),
-    );
+    const invalid = rows.some((r) => !r.isDeleted && (r.isNew || r.isDirty) && !r.name.trim());
     if (invalid) {
-      toast.error("All variables need a name before saving");
+      toast.error('All variables need a name before saving');
       return;
     }
 
@@ -206,9 +190,7 @@
         toast.warning(result.message);
       }
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save environment variables",
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to save environment variables');
     } finally {
       saving = false;
     }
@@ -217,14 +199,10 @@
 
 {#snippet variableList(sectionRows: EnvRow[])}
   {#if sectionRows.length === 0}
-    <p class="py-8 text-center text-sm text-muted-foreground">
-      No variables in this section yet.
-    </p>
+    <p class="py-8 text-center text-sm text-muted-foreground">No variables in this section yet.</p>
   {:else}
     {#each sectionRows as row (row.id)}
-      <div
-        class="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_1.5fr_auto]"
-      >
+      <div class="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_1.5fr_auto]">
         <div>
           <Label for="name-{row.id}" class="mb-1.5 block text-xs">Name</Label>
           <Input
@@ -273,14 +251,11 @@
       >
         <Variable class="size-3.5" />
       </div>
-      <h1 class="text-lg font-semibold tracking-tight text-foreground">
-        Environment Variables
-      </h1>
+      <h1 class="text-lg font-semibold tracking-tight text-foreground">Environment Variables</h1>
     </div>
     <p class="max-w-2xl text-sm text-muted-foreground">
-      User variables apply to your account. System variables apply machine-wide
-      and may require administrator approval — Portal stays open and refreshes
-      values after you approve.
+      User variables apply to your account. System variables apply machine-wide and may require
+      administrator approval — Portal stays open and refreshes values after you approve.
     </p>
   </header>
 
@@ -315,14 +290,8 @@
       </div>
     {/if}
 
-    <Tabs
-      value={tab}
-      onValueChange={(v) => (tab = v as EditableScope)}
-      class="space-y-4"
-    >
-      <div
-        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-      >
+    <Tabs value={tab} onValueChange={(v) => (tab = v as EditableScope)} class="space-y-4">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <TabsList class="w-full sm:w-auto">
           <TabsTrigger value="user" class="gap-2">
             <User class="h-4 w-4" />
@@ -352,14 +321,12 @@
 
       <TabsContent value="user">
         <Card>
-          <CardHeader
-            class="gap-4 sm:flex-row sm:items-start sm:justify-between"
-          >
+          <CardHeader class="gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="space-y-1">
               <CardTitle>User variables</CardTitle>
               <CardDescription>
-                Persistent for your account / user profile. Changes apply
-                immediately without elevation.
+                Persistent for your account / user profile. Changes apply immediately without
+                elevation.
               </CardDescription>
             </div>
             <div class="flex w-full flex-wrap gap-2 sm:w-auto">
@@ -367,15 +334,11 @@
                 <Search
                   class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                 />
-                <Input
-                  bind:value={userSearch}
-                  placeholder="Search user variables…"
-                  class="pl-8"
-                />
+                <Input bind:value={userSearch} placeholder="Search user variables…" class="pl-8" />
               </div>
               <Button
                 variant="outline"
-                onclick={() => addRow("user")}
+                onclick={() => addRow('user')}
                 disabled={saving || permissions?.canEditUser === false}
               >
                 <Plus class="mr-2 h-4 w-4" />
@@ -391,9 +354,7 @@
 
       <TabsContent value="system">
         <Card>
-          <CardHeader
-            class="gap-4 sm:flex-row sm:items-start sm:justify-between"
-          >
+          <CardHeader class="gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="space-y-1">
               <CardTitle>System variables</CardTitle>
               <CardDescription>
@@ -411,11 +372,7 @@
                   class="pl-8"
                 />
               </div>
-              <Button
-                variant="outline"
-                onclick={() => addRow("system")}
-                disabled={saving}
-              >
+              <Button variant="outline" onclick={() => addRow('system')} disabled={saving}>
                 <Plus class="mr-2 h-4 w-4" />
                 Add variable
               </Button>
@@ -427,9 +384,8 @@
                 <ShieldAlert class="h-4 w-4" />
                 <AlertTitle>Administrator approval required</AlertTitle>
                 <AlertDescription>
-                  Saving changes in this tab will open a UAC / administrator
-                  prompt. Portal stays open and picks up the new values when you
-                  approve.
+                  Saving changes in this tab will open a UAC / administrator prompt. Portal stays
+                  open and picks up the new values when you approve.
                 </AlertDescription>
               </Alert>
             {/if}
@@ -446,13 +402,9 @@
         {:else}
           <Save class="mr-2 h-4 w-4" />
         {/if}
-        {needsElevation ? "Save with elevation" : "Save all changes"}
+        {needsElevation ? 'Save with elevation' : 'Save all changes'}
       </Button>
-      <Button
-        variant="outline"
-        onclick={discardChanges}
-        disabled={saving || dirtyCount === 0}
-      >
+      <Button variant="outline" onclick={discardChanges} disabled={saving || dirtyCount === 0}>
         Discard
       </Button>
     </div>

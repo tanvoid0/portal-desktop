@@ -2,10 +2,10 @@
  * Dependency Resolver - Resolve step dependencies and execution order
  */
 
-import type { PipelineStep } from "../types";
-import { logger } from "$lib/domains/shared";
+import type { PipelineStep } from '../types';
+import { logger } from '$lib/domains/shared';
 
-const log = logger.createScoped("DependencyResolver");
+const log = logger.createScoped('DependencyResolver');
 
 export interface ExecutionGroup {
   steps: PipelineStep[];
@@ -42,9 +42,7 @@ export function resolveDependencies(steps: PipelineStep[]): ExecutionGroup[] {
 
       // Check if all dependencies are satisfied
       const deps = dependencies.get(step.id) || new Set();
-      const allDepsSatisfied = Array.from(deps).every((depId) =>
-        executed.has(depId),
-      );
+      const allDepsSatisfied = Array.from(deps).every((depId) => executed.has(depId));
 
       if (allDepsSatisfied) {
         readySteps.push(step);
@@ -54,7 +52,7 @@ export function resolveDependencies(steps: PipelineStep[]): ExecutionGroup[] {
     if (readySteps.length === 0) {
       // Circular dependency or missing dependency
       const remaining = steps.filter((s) => !executed.has(s.id));
-      log.error("Circular or missing dependencies detected", {
+      log.error('Circular or missing dependencies detected', {
         remaining: remaining.map((s) => s.id),
       });
       break;
@@ -100,13 +98,9 @@ export function validateDependencies(steps: PipelineStep[]): {
   const stepIds = new Set(steps.map((s) => s.id));
 
   // Check for duplicate step IDs
-  const duplicates = steps.filter(
-    (s, index) => steps.findIndex((s2) => s2.id === s.id) !== index,
-  );
+  const duplicates = steps.filter((s, index) => steps.findIndex((s2) => s2.id === s.id) !== index);
   if (duplicates.length > 0) {
-    errors.push(
-      `Duplicate step IDs: ${duplicates.map((s) => s.id).join(", ")}`,
-    );
+    errors.push(`Duplicate step IDs: ${duplicates.map((s) => s.id).join(', ')}`);
   }
 
   // Check for missing dependencies

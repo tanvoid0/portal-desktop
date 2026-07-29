@@ -12,18 +12,15 @@
     - "display": read-only xterm buffer (no PTY).
 -->
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import "@xterm/xterm/css/xterm.css";
-  import type { ITheme } from "@xterm/xterm";
-  import type { TerminalConfig, TerminalProcess } from "../../types";
-  import {
-    XtermSession,
-    type XtermSessionMode,
-  } from "../../composables/useXtermSession";
-  import { isTauriEnvironment } from "$lib/utils/tauri";
-  import { logger } from "$lib/domains/shared";
+  import { onMount, onDestroy } from 'svelte';
+  import '@xterm/xterm/css/xterm.css';
+  import type { ITheme } from '@xterm/xterm';
+  import type { TerminalConfig, TerminalProcess } from '../../types';
+  import { XtermSession, type XtermSessionMode } from '../../composables/useXtermSession';
+  import { isTauriEnvironment } from '$lib/utils/tauri';
+  import { logger } from '$lib/domains/shared';
 
-  const log = logger.createScoped("Terminal");
+  const log = logger.createScoped('Terminal');
 
   interface Props {
     /** Terminal appearance/shell config. */
@@ -53,14 +50,14 @@
   let {
     settings,
     tabId,
-    mode = "interactive",
+    mode = 'interactive',
     command,
     displayContent,
     env,
     themeOverride,
     autoStart = true,
     killOnDestroy,
-    class: className = "",
+    class: className = '',
     onReady,
     onData,
     onExit,
@@ -98,7 +95,7 @@
       onReady?.(s.currentProcess);
     } catch (e) {
       started = false;
-      log.error("Terminal init failed", { e });
+      log.error('Terminal init failed', { e });
     }
   }
 
@@ -139,7 +136,7 @@
   }
 
   onMount(() => {
-    if (autoStart && (isTauriEnvironment() || mode === "display")) {
+    if (autoStart && (isTauriEnvironment() || mode === 'display')) {
       void start();
     }
   });

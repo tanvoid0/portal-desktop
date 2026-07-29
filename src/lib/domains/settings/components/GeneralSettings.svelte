@@ -9,14 +9,14 @@
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Switch } from "$lib/components/ui/switch";
-  import { Separator } from "$lib/components/ui/separator";
-  import { settingsService } from "../services/settingsService";
-  import type { AppSettings } from "../types";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Separator } from '$lib/components/ui/separator';
+  import { settingsService } from '../services/settingsService';
+  import type { AppSettings } from '../types';
 
   interface Props {
     settings: AppSettings | null;
@@ -27,11 +27,11 @@
 
   // Ensure settings has all required nested properties
   const defaultSettings: AppSettings = {
-    theme: "system",
-    language: "en",
+    theme: 'system',
+    language: 'en',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    dateFormat: "YYYY-MM-DD",
-    timeFormat: "24h",
+    dateFormat: 'YYYY-MM-DD',
+    timeFormat: '24h',
     windowState: {
       width: 1280,
       height: 720,
@@ -71,7 +71,7 @@
       autoDownload: false,
       autoInstall: false,
       checkInterval: 24,
-      channel: "stable",
+      channel: 'stable',
       notifyOnUpdate: true,
     },
   };
@@ -107,17 +107,17 @@
             ...(settingsProp.updates || {}),
           },
         }
-      : defaultSettings,
+      : defaultSettings
   );
 
   // Reactive local state for inputs
-  let timezone = $state("");
-  let dateFormat = $state("YYYY-MM-DD");
+  let timezone = $state('');
+  let dateFormat = $state('YYYY-MM-DD');
 
   // Update local state when settings change
   $effect(() => {
-    timezone = settings.timezone || "";
-    dateFormat = settings.dateFormat || "YYYY-MM-DD";
+    timezone = settings.timezone || '';
+    dateFormat = settings.dateFormat || 'YYYY-MM-DD';
   });
 
   const availableThemes = settingsService.getAvailableThemes();
@@ -129,9 +129,7 @@
   <Card>
     <CardHeader>
       <CardTitle>Appearance</CardTitle>
-      <CardDescription
-        >Configure the look and feel of the application</CardDescription
-      >
+      <CardDescription>Configure the look and feel of the application</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       <div class="space-y-2">
@@ -139,8 +137,7 @@
         <Select
           defaultValue={settings.theme}
           options={availableThemes.map((t) => ({ value: t.id, label: t.name }))}
-          onSelect={(value) =>
-            onUpdate({ theme: value as "light" | "dark" | "system" })}
+          onSelect={(value) => onUpdate({ theme: value as 'light' | 'dark' | 'system' })}
           placeholder="Select theme"
         />
       </div>
@@ -160,11 +157,7 @@
 
       <div class="space-y-2">
         <Label for="timezone">Timezone</Label>
-        <Input
-          id="timezone"
-          bind:value={timezone}
-          onchange={() => onUpdate({ timezone })}
-        />
+        <Input id="timezone" bind:value={timezone} onchange={() => onUpdate({ timezone })} />
       </div>
 
       <div class="grid grid-cols-2 gap-4">
@@ -182,9 +175,8 @@
           <Label for="timeFormat">Time Format</Label>
           <Select
             defaultValue={settings.timeFormat}
-            options={["12h", "24h"]}
-            onSelect={(value) =>
-              onUpdate({ timeFormat: value as "12h" | "24h" })}
+            options={['12h', '24h']}
+            onSelect={(value) => onUpdate({ timeFormat: value as '12h' | '24h' })}
             placeholder="Select format"
           />
         </div>
@@ -213,9 +205,7 @@
             onUpdate({
               startupBehavior: {
                 ...settings.startupBehavior,
-                openLastSession: !(
-                  settings.startupBehavior?.openLastSession ?? false
-                ),
+                openLastSession: !(settings.startupBehavior?.openLastSession ?? false),
               },
             })}
         />
@@ -224,9 +214,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="restoreWindows">Restore Windows</Label>
-          <p class="text-sm text-muted-foreground">
-            Restore window positions and sizes
-          </p>
+          <p class="text-sm text-muted-foreground">Restore window positions and sizes</p>
         </div>
         <Switch
           id="restoreWindows"
@@ -235,9 +223,7 @@
             onUpdate({
               startupBehavior: {
                 ...settings.startupBehavior,
-                restoreWindows: !(
-                  settings.startupBehavior?.restoreWindows ?? false
-                ),
+                restoreWindows: !(settings.startupBehavior?.restoreWindows ?? false),
               },
             })}
         />
@@ -246,9 +232,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="showWelcomeScreen">Show Welcome Screen</Label>
-          <p class="text-sm text-muted-foreground">
-            Display welcome screen on first launch
-          </p>
+          <p class="text-sm text-muted-foreground">Display welcome screen on first launch</p>
         </div>
         <Switch
           id="showWelcomeScreen"
@@ -257,9 +241,7 @@
             onUpdate({
               startupBehavior: {
                 ...settings.startupBehavior,
-                showWelcomeScreen: !(
-                  settings.startupBehavior?.showWelcomeScreen ?? false
-                ),
+                showWelcomeScreen: !(settings.startupBehavior?.showWelcomeScreen ?? false),
               },
             })}
         />
@@ -268,9 +250,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="minimizeToTray">Minimize to Tray</Label>
-          <p class="text-sm text-muted-foreground">
-            Minimize to system tray instead of taskbar
-          </p>
+          <p class="text-sm text-muted-foreground">Minimize to system tray instead of taskbar</p>
         </div>
         <Switch
           id="minimizeToTray"
@@ -279,9 +259,7 @@
             onUpdate({
               startupBehavior: {
                 ...settings.startupBehavior,
-                minimizeToTray: !(
-                  settings.startupBehavior?.minimizeToTray ?? false
-                ),
+                minimizeToTray: !(settings.startupBehavior?.minimizeToTray ?? false),
               },
             })}
         />
@@ -299,9 +277,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="notificationsEnabled">Enable Notifications</Label>
-          <p class="text-sm text-muted-foreground">
-            Receive notifications from the application
-          </p>
+          <p class="text-sm text-muted-foreground">Receive notifications from the application</p>
         </div>
         <Switch
           id="notificationsEnabled"
@@ -329,9 +305,7 @@
               onUpdate({
                 notifications: {
                   ...settings.notifications,
-                  desktopNotifications: !(
-                    settings.notifications?.desktopNotifications ?? false
-                  ),
+                  desktopNotifications: !(settings.notifications?.desktopNotifications ?? false),
                 },
               })}
           />
@@ -347,9 +321,7 @@
               onUpdate({
                 notifications: {
                   ...settings.notifications,
-                  soundEnabled: !(
-                    settings.notifications?.soundEnabled ?? false
-                  ),
+                  soundEnabled: !(settings.notifications?.soundEnabled ?? false),
                 },
               })}
           />
@@ -362,9 +334,7 @@
   <Card>
     <CardHeader>
       <CardTitle>Privacy</CardTitle>
-      <CardDescription
-        >Configure privacy and data collection settings</CardDescription
-      >
+      <CardDescription>Configure privacy and data collection settings</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       <div class="flex items-center justify-between">
@@ -390,9 +360,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="analytics">Analytics</Label>
-          <p class="text-sm text-muted-foreground">
-            Share usage analytics to improve features
-          </p>
+          <p class="text-sm text-muted-foreground">Share usage analytics to improve features</p>
         </div>
         <Switch
           id="analytics"
@@ -419,9 +387,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="autoCheck">Auto-check for Updates</Label>
-          <p class="text-sm text-muted-foreground">
-            Automatically check for updates
-          </p>
+          <p class="text-sm text-muted-foreground">Automatically check for updates</p>
         </div>
         <Switch
           id="autoCheck"
@@ -439,9 +405,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="notifyOnUpdate">Notify on Update</Label>
-          <p class="text-sm text-muted-foreground">
-            Show notification when updates are available
-          </p>
+          <p class="text-sm text-muted-foreground">Show notification when updates are available</p>
         </div>
         <Switch
           id="notifyOnUpdate"
@@ -460,13 +424,13 @@
       <div class="space-y-2">
         <Label for="updateChannel">Update Channel</Label>
         <Select
-          defaultValue={settings.updates?.channel || "stable"}
-          options={["stable", "beta", "alpha"]}
+          defaultValue={settings.updates?.channel || 'stable'}
+          options={['stable', 'beta', 'alpha']}
           onSelect={(value) =>
             onUpdate({
               updates: {
                 ...settings.updates,
-                channel: value as "stable" | "beta" | "alpha",
+                channel: value as 'stable' | 'beta' | 'alpha',
               },
             })}
           placeholder="Select channel"

@@ -1,17 +1,15 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { ArrowRight, Globe } from "@lucide/svelte";
-  import { coderWorkspaceStore } from "../state/coderWorkspaceStore.svelte.js";
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { ArrowRight, Globe } from '@lucide/svelte';
+  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
 
   let url = $state(coderWorkspaceStore.browserUrl);
 
   function navigate() {
     const trimmed = url.trim();
     if (!trimmed) return;
-    const withProtocol = /^https?:\/\//i.test(trimmed)
-      ? trimmed
-      : `https://${trimmed}`;
+    const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
     coderWorkspaceStore.browserUrl = withProtocol;
     url = withProtocol;
   }
@@ -24,7 +22,7 @@
       bind:value={url}
       class="h-8 font-mono text-xs"
       placeholder="https://localhost:1420"
-      onkeydown={(e) => e.key === "Enter" && navigate()}
+      onkeydown={(e) => e.key === 'Enter' && navigate()}
     />
     <Button size="icon" variant="ghost" class="h-8 w-8 shrink-0" onclick={navigate}>
       <ArrowRight class="h-4 w-4" />

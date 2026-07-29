@@ -1,6 +1,6 @@
-import { writable, derived, type Writable } from "svelte/store";
-import type { Document, DocumentFilters } from "../types";
-import { documentService } from "../services/documentService";
+import { writable, derived, type Writable } from 'svelte/store';
+import type { Document, DocumentFilters } from '../types';
+import { documentService } from '../services/documentService';
 
 // Core stores
 export const documents: Writable<Document[]> = writable([]);
@@ -12,32 +12,27 @@ export const error: Writable<string | null> = writable(null);
 export const documentFilters: Writable<DocumentFilters> = writable({});
 
 // Derived stores
-export const filteredDocuments = derived(
-  [documents, documentFilters],
-  ([$documents, $filters]) => {
-    let filtered = [...$documents];
+export const filteredDocuments = derived([documents, documentFilters], ([$documents, $filters]) => {
+  let filtered = [...$documents];
 
-    // Apply search filter
-    if ($filters.search?.trim()) {
-      const query = $filters.search.toLowerCase();
-      filtered = filtered.filter(
-        (doc) =>
-          doc.title.toLowerCase().includes(query) ||
-          doc.content.toLowerCase().includes(query),
-      );
-    }
+  // Apply search filter
+  if ($filters.search?.trim()) {
+    const query = $filters.search.toLowerCase();
+    filtered = filtered.filter(
+      (doc) => doc.title.toLowerCase().includes(query) || doc.content.toLowerCase().includes(query)
+    );
+  }
 
-    // Apply tag filter
-    if ($filters.tags && $filters.tags.length > 0) {
-      filtered = filtered.filter((doc) => {
-        if (!doc.tags || doc.tags.length === 0) return false;
-        return $filters.tags!.some((tag) => doc.tags!.includes(tag));
-      });
-    }
+  // Apply tag filter
+  if ($filters.tags && $filters.tags.length > 0) {
+    filtered = filtered.filter((doc) => {
+      if (!doc.tags || doc.tags.length === 0) return false;
+      return $filters.tags!.some((tag) => doc.tags!.includes(tag));
+    });
+  }
 
-    return filtered;
-  },
-);
+  return filtered;
+});
 
 // Document actions
 export const documentActions = {
@@ -48,10 +43,9 @@ export const documentActions = {
       const docs = await documentService.getDocuments();
       documents.set(docs);
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to load documents";
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load documents';
       error.set(errorMessage);
-      console.error("❌ Failed to load documents:", err);
+      console.error('❌ Failed to load documents:', err);
     } finally {
       isLoading.set(false);
     }
@@ -61,7 +55,7 @@ export const documentActions = {
     title: string,
     content: string,
     tags?: string[],
-    isArchived?: boolean,
+    isArchived?: boolean
   ): Promise<Document> {
     const newDoc = await documentService.createDocument({
       title,
@@ -80,12 +74,10 @@ export const documentActions = {
       content?: string;
       tags?: string[];
       isArchived?: boolean;
-    },
+    }
   ): Promise<Document> {
     const updatedDoc = await documentService.updateDocument(id, updates);
-    documents.update((docs) =>
-      docs.map((doc) => (doc.id === id ? updatedDoc : doc)),
-    );
+    documents.update((docs) => docs.map((doc) => (doc.id === id ? updatedDoc : doc)));
     if (selectedDocument) {
       selectedDocument.update((doc) => (doc?.id === id ? updatedDoc : doc));
     }
@@ -94,9 +86,7 @@ export const documentActions = {
 
   async updateDraft(id: number, contentDraft: string): Promise<Document> {
     const updatedDoc = await documentService.updateDraft(id, contentDraft);
-    documents.update((docs) =>
-      docs.map((doc) => (doc.id === id ? updatedDoc : doc)),
-    );
+    documents.update((docs) => docs.map((doc) => (doc.id === id ? updatedDoc : doc)));
     if (selectedDocument) {
       selectedDocument.update((doc) => (doc?.id === id ? updatedDoc : doc));
     }
@@ -108,18 +98,10 @@ export const documentActions = {
     title?: string,
     content?: string,
     tags?: string[],
-    isArchived?: boolean,
+    isArchived?: boolean
   ): Promise<Document> {
-    const savedDoc = await documentService.saveDocument(
-      id,
-      title,
-      content,
-      tags,
-      isArchived,
-    );
-    documents.update((docs) =>
-      docs.map((doc) => (doc.id === id ? savedDoc : doc)),
-    );
+    const savedDoc = await documentService.saveDocument(id, title, content, tags, isArchived);
+    documents.update((docs) => docs.map((doc) => (doc.id === id ? savedDoc : doc)));
     if (selectedDocument) {
       selectedDocument.update((doc) => (doc?.id === id ? savedDoc : doc));
     }

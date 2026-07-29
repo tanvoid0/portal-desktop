@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import TrainingDataViewer from "$lib/domains/ai/components/training/TrainingDataViewer.svelte";
-  import { toastActions } from "$lib/utils/toast";
-  import { invoke } from "@tauri-apps/api/core";
-  import type { TrainingData } from "$lib/domains/ai/types/index.js";
+  import { onMount } from 'svelte';
+  import TrainingDataViewer from '$lib/domains/ai/components/training/TrainingDataViewer.svelte';
+  import { toastActions } from '$lib/utils/toast';
+  import { invoke } from '@tauri-apps/api/core';
+  import type { TrainingData } from '$lib/domains/ai/types/index.js';
 
   let trainingData = $state<TrainingData[]>([]);
   let isLoading = $state(false);
@@ -15,10 +15,10 @@
   async function loadTrainingData() {
     isLoading = true;
     try {
-      trainingData = await invoke<TrainingData[]>("ai_list_training_data");
+      trainingData = await invoke<TrainingData[]>('ai_list_training_data');
     } catch (error) {
-      console.error("Failed to load training data:", error);
-      toastActions.error("Failed to load training data", error);
+      console.error('Failed to load training data:', error);
+      toastActions.error('Failed to load training data', error);
     } finally {
       isLoading = false;
     }
@@ -26,12 +26,12 @@
 
   async function handleDelete(data: TrainingData) {
     try {
-      await invoke("ai_delete_training_data", { id: data.id });
-      toastActions.success("Training data deleted");
+      await invoke('ai_delete_training_data', { id: data.id });
+      toastActions.success('Training data deleted');
       await loadTrainingData();
     } catch (error) {
-      console.error("Failed to delete training data:", error);
-      toastActions.error("Failed to delete training data", error);
+      console.error('Failed to delete training data:', error);
+      toastActions.error('Failed to delete training data', error);
     }
   }
 </script>

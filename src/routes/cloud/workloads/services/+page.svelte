@@ -1,28 +1,16 @@
 <!-- Services List Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    cloudStore,
-    loadResources,
-    refreshResources,
-  } from "$lib/domains/cloud/stores";
-  import { ResourceType } from "$lib/domains/cloud/core/types";
-  import BaseResourceTable from "$lib/domains/cloud/core/components/BaseResourceTable.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import { goto } from "$app/navigation";
-  import {
-    useTableNavigation,
-    useResourceActions,
-  } from "$lib/domains/k8s-navigation";
+  import { onMount } from 'svelte';
+  import { cloudStore, loadResources, refreshResources } from '$lib/domains/cloud/stores';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
+  import BaseResourceTable from '$lib/domains/cloud/core/components/BaseResourceTable.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import { goto } from '$app/navigation';
+  import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 
-  let searchQuery = $state("");
+  let searchQuery = $state('');
 
   onMount(async () => {
     if ($cloudStore.connection.isConnected) {
@@ -33,32 +21,31 @@
   const filteredServices = $derived(
     $cloudStore.resources[ResourceType.SERVICE].filter((service) => {
       const matchesSearch =
-        !searchQuery ||
-        service.name.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery || service.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
-    }),
+    })
   );
 
   const serviceStats = $derived({
     total: $cloudStore.resources[ResourceType.SERVICE].length,
     clusterIP: $cloudStore.resources[ResourceType.SERVICE].filter(
-      (s: any) => s.metadata?.type === "ClusterIP",
+      (s: any) => s.metadata?.type === 'ClusterIP'
     ).length,
     loadBalancer: $cloudStore.resources[ResourceType.SERVICE].filter(
-      (s: any) => s.metadata?.type === "LoadBalancer",
+      (s: any) => s.metadata?.type === 'LoadBalancer'
     ).length,
     nodePort: $cloudStore.resources[ResourceType.SERVICE].filter(
-      (s: any) => s.metadata?.type === "NodePort",
+      (s: any) => s.metadata?.type === 'NodePort'
     ).length,
   });
 
   const serviceColumns = [
-    { key: "name", label: "Name", width: "w-1/4" },
-    { key: "type", label: "Type", width: "w-1/8" },
-    { key: "clusterIP", label: "Cluster IP", width: "w-1/8" },
-    { key: "ports", label: "Ports", width: "w-1/4" },
-    { key: "age", label: "Age", width: "w-1/8" },
-    { key: "namespace", label: "Namespace", width: "w-1/6" },
+    { key: 'name', label: 'Name', width: 'w-1/4' },
+    { key: 'type', label: 'Type', width: 'w-1/8' },
+    { key: 'clusterIP', label: 'Cluster IP', width: 'w-1/8' },
+    { key: 'ports', label: 'Ports', width: 'w-1/4' },
+    { key: 'age', label: 'Age', width: 'w-1/8' },
+    { key: 'namespace', label: 'Namespace', width: 'w-1/6' },
   ];
 
   // Table navigation
@@ -68,9 +55,7 @@
     onActivate: (index) => {
       const service = filteredServices[index];
       if (service) {
-        goto(
-          `/cloud/workloads/services/${service.name}?namespace=${service.namespace}`,
-        );
+        goto(`/cloud/workloads/services/${service.name}?namespace=${service.namespace}`);
       }
     },
     enabled: $cloudStore.connection.isConnected,
@@ -82,14 +67,10 @@
     resources: filteredServices,
     handlers: {
       onDescribe: (resource) => {
-        goto(
-          `/cloud/workloads/services/${resource.name}?namespace=${resource.namespace}`,
-        );
+        goto(`/cloud/workloads/services/${resource.name}?namespace=${resource.namespace}`);
       },
       onYaml: (resource) => {
-        goto(
-          `/cloud/workloads/services/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/workloads/services/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onRefresh: () => {
         refreshResources();
@@ -116,7 +97,7 @@
       <div>
         <h1 class="text-2xl font-bold">Services</h1>
         <p class="text-muted-foreground">
-          Namespace: {$cloudStore.selectedNamespace || "All"}
+          Namespace: {$cloudStore.selectedNamespace || 'All'}
         </p>
       </div>
       <Button onclick={handleRefresh} variant="outline">Refresh</Button>
@@ -171,19 +152,14 @@
           class="max-w-sm"
         />
         {#if searchQuery}
-          <Button variant="ghost" size="sm" onclick={() => (searchQuery = "")}>
-            Clear
-          </Button>
+          <Button variant="ghost" size="sm" onclick={() => (searchQuery = '')}>Clear</Button>
         {/if}
       </div>
     </Card>
 
     <!-- Services Table -->
     <Card class="p-4">
-      <div
-        class="k8s-navigable-table"
-        data-selected-index={tableNav.selectedIndex}
-      >
+      <div class="k8s-navigable-table" data-selected-index={tableNav.selectedIndex}>
         <BaseResourceTable
           resources={filteredServices}
           resourceType={ResourceType.SERVICE}
@@ -192,9 +168,7 @@
           filteredEmptyMessage="No services match your search"
           isFiltered={Boolean(searchQuery)}
           onResourceClick={(resource) => {
-            goto(
-              `/cloud/workloads/services/${resource.name}?namespace=${resource.namespace}`,
-            );
+            goto(`/cloud/workloads/services/${resource.name}?namespace=${resource.namespace}`);
           }}
         />
       </div>

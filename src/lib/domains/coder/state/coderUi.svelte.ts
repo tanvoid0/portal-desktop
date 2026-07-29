@@ -3,10 +3,10 @@
  * Separate from session runtime state in coderSession.
  */
 
-import { projectUi } from "$lib/domains/projects/state/projectUi.svelte";
+import { projectUi } from '$lib/domains/projects/state/projectUi.svelte';
 
-const STORAGE_KEY = "portal-coder-last-workspace";
-const PROJECT_ID_STORAGE_KEY = "portal-coder-last-project-id";
+const STORAGE_KEY = 'portal-coder-last-workspace';
+const PROJECT_ID_STORAGE_KEY = 'portal-coder-last-project-id';
 
 class CoderUiState {
   /** Currently selected workspace path (portal project path). */
@@ -19,7 +19,7 @@ class CoderUiState {
   showAllWorkspaces = $state(false);
 
   initFromStorage(): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
     try {
       const cached = localStorage.getItem(STORAGE_KEY);
       const cachedId = localStorage.getItem(PROJECT_ID_STORAGE_KEY);
@@ -37,7 +37,7 @@ class CoderUiState {
   }
 
   persistProject(path: string, projectId?: string | null): void {
-    if (typeof window === "undefined" || !path) return;
+    if (typeof window === 'undefined' || !path) return;
     try {
       localStorage.setItem(STORAGE_KEY, path);
       if (projectId) {
@@ -60,9 +60,7 @@ class CoderUiState {
     }
   }
 
-  resolveProjectFromList(
-    projects: Array<{ id: string; path: string }>,
-  ): void {
+  resolveProjectFromList(projects: Array<{ id: string; path: string }>): void {
     if (!this.activeProjectPath) return;
     const match = projects.find((p) => p.path === this.activeProjectPath);
     if (match) {

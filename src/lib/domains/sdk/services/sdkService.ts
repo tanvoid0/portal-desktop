@@ -2,13 +2,9 @@
  * SDK Service - Frontend business logic for SDK management
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { logger } from "../../shared";
-import {
-  patternCollector,
-  suggestionEngine,
-  learningService,
-} from "$lib/domains/learning";
+import { invoke } from '@tauri-apps/api/core';
+import { logger } from '../../shared';
+import { patternCollector, suggestionEngine, learningService } from '$lib/domains/learning';
 import type {
   SDK,
   SDKManagerInfo,
@@ -18,7 +14,7 @@ import type {
   SDKSwitchRequest,
   SDKCommandResult,
   SDKVersionSource,
-} from "../types";
+} from '../types';
 
 export class SDKService {
   private static instance: SDKService;
@@ -35,19 +31,19 @@ export class SDKService {
    */
   async detectManagers(): Promise<SDKManagerInfo[]> {
     try {
-      logger.info("Detecting SDK managers", { context: "SDKService" });
+      logger.info('Detecting SDK managers', { context: 'SDKService' });
 
-      const managers = await invoke<SDKManagerInfo[]>("detect_sdk_managers");
+      const managers = await invoke<SDKManagerInfo[]>('detect_sdk_managers');
 
-      logger.info("SDK managers detected", {
-        context: "SDKService",
+      logger.info('SDK managers detected', {
+        context: 'SDKService',
         data: { count: managers.length },
       });
 
       return managers;
     } catch (error) {
-      logger.error("Failed to detect SDK managers", {
-        context: "SDKService",
+      logger.error('Failed to detect SDK managers', {
+        context: 'SDKService',
         error,
       });
       throw error;
@@ -59,12 +55,12 @@ export class SDKService {
    */
   async getAllAvailableSDKs(): Promise<SDKManagerInfo[]> {
     try {
-      logger.info("Getting all available SDKs", { context: "SDKService" });
+      logger.info('Getting all available SDKs', { context: 'SDKService' });
 
-      const sdks = await invoke<SDKManagerInfo[]>("get_all_available_sdks");
+      const sdks = await invoke<SDKManagerInfo[]>('get_all_available_sdks');
 
-      logger.info("All available SDKs retrieved", {
-        context: "SDKService",
+      logger.info('All available SDKs retrieved', {
+        context: 'SDKService',
         data: {
           count: sdks.length,
           firstFew: sdks.slice(0, 3),
@@ -74,8 +70,8 @@ export class SDKService {
 
       return sdks;
     } catch (error) {
-      logger.error("Failed to get all available SDKs", {
-        context: "SDKService",
+      logger.error('Failed to get all available SDKs', {
+        context: 'SDKService',
         error,
       });
       throw error;
@@ -87,22 +83,22 @@ export class SDKService {
    */
   async listVersions(sdkType: string): Promise<string[]> {
     try {
-      logger.info("Listing SDK versions", {
-        context: "SDKService",
+      logger.info('Listing SDK versions', {
+        context: 'SDKService',
         data: { sdkType },
       });
 
-      const versions = await invoke<string[]>("list_sdk_versions", { sdkType });
+      const versions = await invoke<string[]>('list_sdk_versions', { sdkType });
 
-      logger.info("SDK versions listed", {
-        context: "SDKService",
+      logger.info('SDK versions listed', {
+        context: 'SDKService',
         data: { sdkType, count: versions.length },
       });
 
       return versions;
     } catch (error) {
-      logger.error("Failed to list SDK versions", {
-        context: "SDKService",
+      logger.error('Failed to list SDK versions', {
+        context: 'SDKService',
         error,
         data: { sdkType },
       });
@@ -115,24 +111,24 @@ export class SDKService {
    */
   async getActiveVersion(sdkType: string): Promise<string | null> {
     try {
-      logger.info("Getting active SDK version", {
-        context: "SDKService",
+      logger.info('Getting active SDK version', {
+        context: 'SDKService',
         data: { sdkType },
       });
 
-      const version = await invoke<string | null>("get_active_sdk_version", {
+      const version = await invoke<string | null>('get_active_sdk_version', {
         sdkType,
       });
 
-      logger.info("Active SDK version retrieved", {
-        context: "SDKService",
+      logger.info('Active SDK version retrieved', {
+        context: 'SDKService',
         data: { sdkType, version },
       });
 
       return version;
     } catch (error) {
-      logger.error("Failed to get active SDK version", {
-        context: "SDKService",
+      logger.error('Failed to get active SDK version', {
+        context: 'SDKService',
         error,
         data: { sdkType },
       });
@@ -145,12 +141,12 @@ export class SDKService {
    */
   async switchVersion(request: SDKSwitchRequest): Promise<void> {
     try {
-      logger.info("Switching SDK version", {
-        context: "SDKService",
+      logger.info('Switching SDK version', {
+        context: 'SDKService',
         data: request,
       });
 
-      await invoke("switch_sdk_version", {
+      await invoke('switch_sdk_version', {
         sdkType: request.type,
         version: request.version,
         projectPath: request.projectPath,
@@ -161,23 +157,23 @@ export class SDKService {
         await patternCollector.collectSDKPreference(
           request.type,
           request.version,
-          request.projectPath ? `project_${request.projectPath}` : "global",
+          request.projectPath ? `project_${request.projectPath}` : 'global'
         );
       } catch (error) {
         // Don't fail version switch if learning fails
-        logger.warn("Failed to collect SDK preference", {
-          context: "SDKService",
+        logger.warn('Failed to collect SDK preference', {
+          context: 'SDKService',
           error,
         });
       }
 
-      logger.info("SDK version switched successfully", {
-        context: "SDKService",
+      logger.info('SDK version switched successfully', {
+        context: 'SDKService',
         data: request,
       });
     } catch (error) {
-      logger.error("Failed to switch SDK version", {
-        context: "SDKService",
+      logger.error('Failed to switch SDK version', {
+        context: 'SDKService',
         error,
         data: request,
       });
@@ -190,38 +186,34 @@ export class SDKService {
    */
   async installVersion(request: SDKInstallRequest): Promise<void> {
     try {
-      logger.info("Installing SDK version", {
-        context: "SDKService",
+      logger.info('Installing SDK version', {
+        context: 'SDKService',
         data: request,
       });
 
-      await invoke("install_sdk_version", {
+      await invoke('install_sdk_version', {
         sdkType: request.type,
         version: request.version,
       });
 
       // Learn from SDK installation preference
       try {
-        await patternCollector.collectSDKPreference(
-          request.type,
-          request.version,
-          "global",
-        );
+        await patternCollector.collectSDKPreference(request.type, request.version, 'global');
       } catch (error) {
         // Don't fail installation if learning fails
-        logger.warn("Failed to collect SDK preference", {
-          context: "SDKService",
+        logger.warn('Failed to collect SDK preference', {
+          context: 'SDKService',
           error,
         });
       }
 
-      logger.info("SDK version installed successfully", {
-        context: "SDKService",
+      logger.info('SDK version installed successfully', {
+        context: 'SDKService',
         data: request,
       });
     } catch (error) {
-      logger.error("Failed to install SDK version", {
-        context: "SDKService",
+      logger.error('Failed to install SDK version', {
+        context: 'SDKService',
         error,
         data: request,
       });
@@ -234,26 +226,21 @@ export class SDKService {
    */
   async getInstallations(): Promise<SDKInstallation[]> {
     try {
-      logger.info("Getting SDK installations", { context: "SDKService" });
+      logger.info('Getting SDK installations', { context: 'SDKService' });
 
-      const installations = await invoke<SDKInstallation[]>(
-        "get_sdk_installations",
-      );
+      const installations = await invoke<SDKInstallation[]>('get_sdk_installations');
 
-      logger.info("SDK installations retrieved", {
-        context: "SDKService",
+      logger.info('SDK installations retrieved', {
+        context: 'SDKService',
         data: { count: installations.length },
       });
 
       return installations;
     } catch (error) {
-      logger.warn(
-        "No SDK installations found in database, returning empty array",
-        {
-          context: "SDKService",
-          error,
-        },
-      );
+      logger.warn('No SDK installations found in database, returning empty array', {
+        context: 'SDKService',
+        error,
+      });
       // Return empty array instead of throwing error for initial setup
       return [];
     }
@@ -265,11 +252,11 @@ export class SDKService {
   async executeCommand(
     command: string,
     args: string[],
-    workingDirectory?: string,
+    workingDirectory?: string
   ): Promise<SDKCommandResult> {
     try {
-      logger.info("Executing SDK command", {
-        context: "SDKService",
+      logger.info('Executing SDK command', {
+        context: 'SDKService',
         data: { command, args, workingDirectory },
       });
 
@@ -277,20 +264,20 @@ export class SDKService {
       // For now, we'll use a placeholder
       const result: SDKCommandResult = {
         success: true,
-        output: `Command executed: ${command} ${args.join(" ")}`,
+        output: `Command executed: ${command} ${args.join(' ')}`,
         exitCode: 0,
         duration: 0,
       };
 
-      logger.info("SDK command executed", {
-        context: "SDKService",
+      logger.info('SDK command executed', {
+        context: 'SDKService',
         data: { command, success: result.success },
       });
 
       return result;
     } catch (error) {
-      logger.error("Failed to execute SDK command", {
-        context: "SDKService",
+      logger.error('Failed to execute SDK command', {
+        context: 'SDKService',
         error,
         data: { command, args },
       });
@@ -303,7 +290,7 @@ export class SDKService {
    */
   async detectAll(): Promise<SDKDetectionResult> {
     try {
-      logger.info("Detecting all SDKs and managers", { context: "SDKService" });
+      logger.info('Detecting all SDKs and managers', { context: 'SDKService' });
 
       const managers = await this.detectManagers();
       const installations = await this.getInstallations();
@@ -330,8 +317,8 @@ export class SDKService {
         errors: [],
       };
 
-      logger.info("SDK detection completed", {
-        context: "SDKService",
+      logger.info('SDK detection completed', {
+        context: 'SDKService',
         data: {
           managersCount: managers.length,
           sdksCount: sdks.length,
@@ -340,8 +327,8 @@ export class SDKService {
 
       return result;
     } catch (error) {
-      logger.error("Failed to detect all SDKs", {
-        context: "SDKService",
+      logger.error('Failed to detect all SDKs', {
+        context: 'SDKService',
         error,
       });
       throw error;
@@ -353,31 +340,31 @@ export class SDKService {
    */
   private getSDKName(type: string): string {
     const names: Record<string, string> = {
-      node: "Node.js",
-      rust: "Rust",
-      python: "Python",
-      java: "Java",
-      go: "Go",
-      php: "PHP",
-      ruby: "Ruby",
-      bun: "Bun",
-      deno: "Deno",
-      gradle: "Gradle",
-      kotlin: "Kotlin",
-      scala: "Scala",
-      nginx: "Nginx",
-      apache2: "Apache",
-      caddy: "Caddy",
-      tomcat: "Tomcat",
-      mysql: "MySQL",
-      postgres: "PostgreSQL",
-      mongodb: "MongoDB",
-      "redis-server": "Redis",
-      docker: "Docker",
-      composer: "Composer",
-      npm: "NPM",
-      pip: "Pip",
-      cargo: "Cargo",
+      node: 'Node.js',
+      rust: 'Rust',
+      python: 'Python',
+      java: 'Java',
+      go: 'Go',
+      php: 'PHP',
+      ruby: 'Ruby',
+      bun: 'Bun',
+      deno: 'Deno',
+      gradle: 'Gradle',
+      kotlin: 'Kotlin',
+      scala: 'Scala',
+      nginx: 'Nginx',
+      apache2: 'Apache',
+      caddy: 'Caddy',
+      tomcat: 'Tomcat',
+      mysql: 'MySQL',
+      postgres: 'PostgreSQL',
+      mongodb: 'MongoDB',
+      'redis-server': 'Redis',
+      docker: 'Docker',
+      composer: 'Composer',
+      npm: 'NPM',
+      pip: 'Pip',
+      cargo: 'Cargo',
     };
     return names[type] || type;
   }
@@ -388,34 +375,32 @@ export class SDKService {
   private getSDKDescription(type: string): string {
     const descriptions: Record<string, string> = {
       node: "JavaScript runtime built on Chrome's V8 JavaScript engine",
-      rust: "Systems programming language focused on safety and performance",
-      python: "High-level programming language with dynamic semantics",
-      java: "Object-oriented programming language and computing platform",
-      go: "Open source programming language that makes it easy to build software",
-      php: "Server-side scripting language designed for web development",
-      ruby: "Dynamic, open source programming language with a focus on simplicity",
-      bun: "Fast all-in-one JavaScript runtime, bundler, and package manager",
-      deno: "Modern runtime for JavaScript and TypeScript",
-      gradle: "Build automation tool for multi-language software development",
-      kotlin:
-        "Statically typed programming language for modern multiplatform applications",
-      scala:
-        "High-level language that combines object-oriented and functional programming",
-      nginx: "High-performance web server and reverse proxy",
-      apache2: "Popular open-source web server software",
-      caddy: "Modern web server with automatic HTTPS",
-      tomcat: "Apache Tomcat servlet container",
-      mysql: "Popular open-source relational database management system",
-      postgres: "Advanced open-source relational database",
-      mongodb: "NoSQL document database for modern applications",
-      "redis-server": "In-memory data structure store and cache",
-      docker: "Containerization platform for applications",
-      composer: "Dependency manager for PHP",
-      npm: "Package manager for Node.js",
-      pip: "Package installer for Python",
-      cargo: "Package manager for Rust",
+      rust: 'Systems programming language focused on safety and performance',
+      python: 'High-level programming language with dynamic semantics',
+      java: 'Object-oriented programming language and computing platform',
+      go: 'Open source programming language that makes it easy to build software',
+      php: 'Server-side scripting language designed for web development',
+      ruby: 'Dynamic, open source programming language with a focus on simplicity',
+      bun: 'Fast all-in-one JavaScript runtime, bundler, and package manager',
+      deno: 'Modern runtime for JavaScript and TypeScript',
+      gradle: 'Build automation tool for multi-language software development',
+      kotlin: 'Statically typed programming language for modern multiplatform applications',
+      scala: 'High-level language that combines object-oriented and functional programming',
+      nginx: 'High-performance web server and reverse proxy',
+      apache2: 'Popular open-source web server software',
+      caddy: 'Modern web server with automatic HTTPS',
+      tomcat: 'Apache Tomcat servlet container',
+      mysql: 'Popular open-source relational database management system',
+      postgres: 'Advanced open-source relational database',
+      mongodb: 'NoSQL document database for modern applications',
+      'redis-server': 'In-memory data structure store and cache',
+      docker: 'Containerization platform for applications',
+      composer: 'Dependency manager for PHP',
+      npm: 'Package manager for Node.js',
+      pip: 'Package installer for Python',
+      cargo: 'Package manager for Rust',
     };
-    return descriptions[type] || "Development tool and platform";
+    return descriptions[type] || 'Development tool and platform';
   }
 
   /**
@@ -423,17 +408,17 @@ export class SDKService {
    */
   private getSDKWebsite(type: string): string {
     const websites: Record<string, string> = {
-      node: "https://nodejs.org",
-      rust: "https://rust-lang.org",
-      python: "https://python.org",
-      java: "https://java.com",
-      go: "https://golang.org",
-      php: "https://php.net",
-      ruby: "https://ruby-lang.org",
-      kotlin: "https://kotlinlang.org",
-      scala: "https://scala-lang.org",
+      node: 'https://nodejs.org',
+      rust: 'https://rust-lang.org',
+      python: 'https://python.org',
+      java: 'https://java.com',
+      go: 'https://golang.org',
+      php: 'https://php.net',
+      ruby: 'https://ruby-lang.org',
+      kotlin: 'https://kotlinlang.org',
+      scala: 'https://scala-lang.org',
     };
-    return websites[type] || "";
+    return websites[type] || '';
   }
 
   /**
@@ -441,33 +426,33 @@ export class SDKService {
    */
   private getSDKIconClass(type: string): string {
     const iconClasses: Record<string, string> = {
-      node: "devicon-nodejs-plain",
-      rust: "devicon-rust-plain",
-      python: "devicon-python-plain",
-      java: "devicon-java-plain",
-      go: "devicon-go-plain",
-      php: "devicon-php-plain",
-      ruby: "devicon-ruby-plain",
-      bun: "devicon-bun-plain",
-      deno: "devicon-deno-plain",
-      gradle: "devicon-gradle-plain",
-      kotlin: "devicon-kotlin-plain",
-      scala: "devicon-scala-plain",
-      nginx: "devicon-nginx-original",
-      apache2: "devicon-apache-plain",
-      caddy: "devicon-caddy-plain",
-      tomcat: "devicon-tomcat-plain",
-      mysql: "devicon-mysql-plain",
-      postgres: "devicon-postgresql-plain",
-      mongodb: "devicon-mongodb-plain",
-      "redis-server": "devicon-redis-plain",
-      docker: "devicon-docker-plain",
-      composer: "devicon-composer-plain",
-      npm: "devicon-npm-original-wordmark",
-      pip: "devicon-python-plain",
-      cargo: "devicon-cargo-plain",
+      node: 'devicon-nodejs-plain',
+      rust: 'devicon-rust-plain',
+      python: 'devicon-python-plain',
+      java: 'devicon-java-plain',
+      go: 'devicon-go-plain',
+      php: 'devicon-php-plain',
+      ruby: 'devicon-ruby-plain',
+      bun: 'devicon-bun-plain',
+      deno: 'devicon-deno-plain',
+      gradle: 'devicon-gradle-plain',
+      kotlin: 'devicon-kotlin-plain',
+      scala: 'devicon-scala-plain',
+      nginx: 'devicon-nginx-original',
+      apache2: 'devicon-apache-plain',
+      caddy: 'devicon-caddy-plain',
+      tomcat: 'devicon-tomcat-plain',
+      mysql: 'devicon-mysql-plain',
+      postgres: 'devicon-postgresql-plain',
+      mongodb: 'devicon-mongodb-plain',
+      'redis-server': 'devicon-redis-plain',
+      docker: 'devicon-docker-plain',
+      composer: 'devicon-composer-plain',
+      npm: 'devicon-npm-original-wordmark',
+      pip: 'devicon-python-plain',
+      cargo: 'devicon-cargo-plain',
     };
-    return iconClasses[type] || "devicon-devicon-plain";
+    return iconClasses[type] || 'devicon-devicon-plain';
   }
 
   /**
@@ -475,20 +460,20 @@ export class SDKService {
    */
   async setupProjectEnvironment(projectPath: string): Promise<void> {
     try {
-      logger.info("Setting up project environment", {
-        context: "SDKService",
+      logger.info('Setting up project environment', {
+        context: 'SDKService',
         data: { projectPath },
       });
 
-      await invoke("setup_project_environment", { projectPath });
+      await invoke('setup_project_environment', { projectPath });
 
-      logger.info("Project environment setup completed", {
-        context: "SDKService",
+      logger.info('Project environment setup completed', {
+        context: 'SDKService',
         data: { projectPath },
       });
     } catch (error) {
-      logger.error("Failed to setup project environment", {
-        context: "SDKService",
+      logger.error('Failed to setup project environment', {
+        context: 'SDKService',
         error,
         data: { projectPath },
       });
@@ -499,30 +484,26 @@ export class SDKService {
   /**
    * Create project-specific SDK configuration
    */
-  async createProjectConfig(
-    projectPath: string,
-    sdkType: string,
-    version: string,
-  ): Promise<void> {
+  async createProjectConfig(projectPath: string, sdkType: string, version: string): Promise<void> {
     try {
-      logger.info("Creating project config", {
-        context: "SDKService",
+      logger.info('Creating project config', {
+        context: 'SDKService',
         data: { projectPath, sdkType, version },
       });
 
-      await invoke("create_project_config", {
+      await invoke('create_project_config', {
         projectPath,
         sdkType,
         version,
       });
 
-      logger.info("Project config created successfully", {
-        context: "SDKService",
+      logger.info('Project config created successfully', {
+        context: 'SDKService',
         data: { projectPath, sdkType, version },
       });
     } catch (error) {
-      logger.error("Failed to create project config", {
-        context: "SDKService",
+      logger.error('Failed to create project config', {
+        context: 'SDKService',
         error,
         data: { projectPath, sdkType, version },
       });
@@ -535,20 +516,20 @@ export class SDKService {
    */
   async setupTerminalIntegration(projectPath: string): Promise<void> {
     try {
-      logger.info("Setting up terminal integration", {
-        context: "SDKService",
+      logger.info('Setting up terminal integration', {
+        context: 'SDKService',
         data: { projectPath },
       });
 
-      await invoke("setup_terminal_integration", { projectPath });
+      await invoke('setup_terminal_integration', { projectPath });
 
-      logger.info("Terminal integration setup completed", {
-        context: "SDKService",
+      logger.info('Terminal integration setup completed', {
+        context: 'SDKService',
         data: { projectPath },
       });
     } catch (error) {
-      logger.error("Failed to setup terminal integration", {
-        context: "SDKService",
+      logger.error('Failed to setup terminal integration', {
+        context: 'SDKService',
         error,
         data: { projectPath },
       });
@@ -559,29 +540,26 @@ export class SDKService {
   /**
    * Get terminal integration status for a project
    */
-  async getTerminalIntegrationStatus(
-    projectPath: string,
-  ): Promise<Record<string, boolean>> {
+  async getTerminalIntegrationStatus(projectPath: string): Promise<Record<string, boolean>> {
     try {
-      logger.info("Getting terminal integration status", {
-        context: "SDKService",
+      logger.info('Getting terminal integration status', {
+        context: 'SDKService',
         data: { projectPath },
       });
 
-      const status = await invoke<Record<string, boolean>>(
-        "get_terminal_integration_status",
-        { projectPath },
-      );
+      const status = await invoke<Record<string, boolean>>('get_terminal_integration_status', {
+        projectPath,
+      });
 
-      logger.info("Terminal integration status retrieved", {
-        context: "SDKService",
+      logger.info('Terminal integration status retrieved', {
+        context: 'SDKService',
         data: { projectPath, status },
       });
 
       return status;
     } catch (error) {
-      logger.error("Failed to get terminal integration status", {
-        context: "SDKService",
+      logger.error('Failed to get terminal integration status', {
+        context: 'SDKService',
         error,
         data: { projectPath },
       });
@@ -594,20 +572,20 @@ export class SDKService {
    */
   async removeTerminalIntegration(projectPath: string): Promise<void> {
     try {
-      logger.info("Removing terminal integration", {
-        context: "SDKService",
+      logger.info('Removing terminal integration', {
+        context: 'SDKService',
         data: { projectPath },
       });
 
-      await invoke("remove_terminal_integration", { projectPath });
+      await invoke('remove_terminal_integration', { projectPath });
 
-      logger.info("Terminal integration removed", {
-        context: "SDKService",
+      logger.info('Terminal integration removed', {
+        context: 'SDKService',
         data: { projectPath },
       });
     } catch (error) {
-      logger.error("Failed to remove terminal integration", {
-        context: "SDKService",
+      logger.error('Failed to remove terminal integration', {
+        context: 'SDKService',
         error,
         data: { projectPath },
       });
@@ -620,28 +598,28 @@ export class SDKService {
    */
   async getVersionSources(sdkType: string): Promise<SDKVersionSource[]> {
     try {
-      logger.info("Getting version sources", {
-        context: "SDKService",
+      logger.info('Getting version sources', {
+        context: 'SDKService',
         data: { sdkType },
       });
 
-      const sources = await invoke<SDKVersionSource[]>("get_version_sources", {
+      const sources = await invoke<SDKVersionSource[]>('get_version_sources', {
         sdkType,
       });
 
-      logger.info("Version sources retrieved", {
-        context: "SDKService",
+      logger.info('Version sources retrieved', {
+        context: 'SDKService',
         data: { sdkType, count: sources.length },
       });
 
       return sources;
     } catch (error) {
       // Don't treat missing sources as an error - return empty array
-      logger.info("No version sources available", {
-        context: "SDKService",
+      logger.info('No version sources available', {
+        context: 'SDKService',
         data: {
           sdkType,
-          message: error instanceof Error ? error.message : "No sources",
+          message: error instanceof Error ? error.message : 'No sources',
         },
       });
       return [];
@@ -653,20 +631,20 @@ export class SDKService {
    */
   async refreshVersionStatus(sdkType: string): Promise<void> {
     try {
-      logger.info("Refreshing version status", {
-        context: "SDKService",
+      logger.info('Refreshing version status', {
+        context: 'SDKService',
         data: { sdkType },
       });
 
-      await invoke("refresh_version_status", { sdkType });
+      await invoke('refresh_version_status', { sdkType });
 
-      logger.info("Version status refreshed", {
-        context: "SDKService",
+      logger.info('Version status refreshed', {
+        context: 'SDKService',
         data: { sdkType },
       });
     } catch (error) {
-      logger.error("Failed to refresh version status", {
-        context: "SDKService",
+      logger.error('Failed to refresh version status', {
+        context: 'SDKService',
         error,
         data: { sdkType },
       });
@@ -679,25 +657,25 @@ export class SDKService {
    */
   async uninstallVersion(request: SDKInstallRequest): Promise<void> {
     try {
-      logger.info("Uninstalling SDK version", {
-        context: "SDKService",
+      logger.info('Uninstalling SDK version', {
+        context: 'SDKService',
         data: request,
       });
 
       // Backend param is `sdk_type` (Tauri maps camelCase `sdkType`).
-      await invoke("uninstall_sdk_version", {
+      await invoke('uninstall_sdk_version', {
         sdkType: request.type,
         version: request.version,
         manager: request.manager,
       });
 
-      logger.info("SDK version uninstalled successfully", {
-        context: "SDKService",
+      logger.info('SDK version uninstalled successfully', {
+        context: 'SDKService',
         data: request,
       });
     } catch (error) {
-      logger.error("Failed to uninstall SDK version", {
-        context: "SDKService",
+      logger.error('Failed to uninstall SDK version', {
+        context: 'SDKService',
         error,
         data: request,
       });
@@ -710,7 +688,7 @@ export class SDKService {
    */
   async checkManagerInstalled(managerName: string): Promise<boolean> {
     try {
-      return await invoke<boolean>("check_manager_installed", { managerName });
+      return await invoke<boolean>('check_manager_installed', { managerName });
     } catch {
       return false;
     }
@@ -720,7 +698,7 @@ export class SDKService {
    * Get running-service status for an SDK type.
    */
   async getServiceStatus(sdkType: string): Promise<unknown[]> {
-    const status = await invoke<unknown[]>("get_service_status", { sdkType });
+    const status = await invoke<unknown[]>('get_service_status', { sdkType });
     return Array.isArray(status) ? status : [];
   }
 
@@ -728,7 +706,7 @@ export class SDKService {
    * Fetch installable versions for an SDK type.
    */
   async fetchAvailableVersions(sdkType: string): Promise<unknown[]> {
-    const versions = await invoke<unknown[]>("fetch_available_versions", {
+    const versions = await invoke<unknown[]>('fetch_available_versions', {
       sdkType,
     });
     return Array.isArray(versions) ? versions : [];
@@ -740,16 +718,16 @@ export class SDKService {
   async startService(
     sdkType: string,
     version: string,
-    config: Record<string, unknown>,
+    config: Record<string, unknown>
   ): Promise<number> {
-    return invoke<number>("start_sdk_service", { sdkType, version, config });
+    return invoke<number>('start_sdk_service', { sdkType, version, config });
   }
 
   /**
    * Stop a running SDK service.
    */
   async stopService(sdkType: string, pid: number | null): Promise<void> {
-    await invoke("stop_sdk_service", { sdkType, pid });
+    await invoke('stop_sdk_service', { sdkType, pid });
   }
 
   /**
@@ -758,9 +736,9 @@ export class SDKService {
   async downloadAndInstallVersion(
     sdkType: string,
     version: string,
-    useManager = false,
+    useManager = false
   ): Promise<void> {
-    await invoke("download_and_install_version", {
+    await invoke('download_and_install_version', {
       sdkType,
       version,
       use_manager: useManager,
@@ -771,54 +749,45 @@ export class SDKService {
    * Uninstall an SDK manager by name.
    */
   async uninstallManager(managerName: string): Promise<void> {
-    await invoke("uninstall_manager", { managerName });
+    await invoke('uninstall_manager', { managerName });
   }
 
   /**
    * Run a shell command via the backend (used to install SDK managers).
    */
-  async runShellCommand(
-    command: string,
-    workingDirectory?: string,
-  ): Promise<string> {
-    return invoke<string>("execute_command", { command, workingDirectory });
+  async runShellCommand(command: string, workingDirectory?: string): Promise<string> {
+    return invoke<string>('execute_command', { command, workingDirectory });
   }
 
   /**
    * Get suggested SDK version based on learned preferences
    * Returns the most commonly used version for the given SDK type and context
    */
-  async getSuggestedVersion(
-    sdkType: string,
-    projectPath?: string,
-  ): Promise<string | null> {
+  async getSuggestedVersion(sdkType: string, projectPath?: string): Promise<string | null> {
     try {
-      const context = projectPath ? `project_${projectPath}` : "global";
+      const context = projectPath ? `project_${projectPath}` : 'global';
 
       // Get preference for this SDK type and context
-      const preference = await learningService.getPreference(
-        "sdk_version",
-        context,
-      );
+      const preference = await learningService.getPreference('sdk_version', context);
 
       if (preference && preference.sdk_type === sdkType && preference.version) {
-        logger.info("SDK version suggestion found", {
-          context: "SDKService",
+        logger.info('SDK version suggestion found', {
+          context: 'SDKService',
           data: { sdkType, version: preference.version, context },
         });
         return preference.version as string;
       }
 
       // Fallback: try global context
-      if (context !== "global") {
+      if (context !== 'global') {
         const globalPreference = await learningService.getPreference(
-          "sdk_version",
-          `sdk_${sdkType}`,
+          'sdk_version',
+          `sdk_${sdkType}`
         );
 
         if (globalPreference && globalPreference.version) {
-          logger.info("SDK version suggestion found (global)", {
-            context: "SDKService",
+          logger.info('SDK version suggestion found (global)', {
+            context: 'SDKService',
             data: { sdkType, version: globalPreference.version },
           });
           return globalPreference.version as string;
@@ -827,8 +796,8 @@ export class SDKService {
 
       return null;
     } catch (error) {
-      logger.warn("Failed to get SDK version suggestion", {
-        context: "SDKService",
+      logger.warn('Failed to get SDK version suggestion', {
+        context: 'SDKService',
         error,
         data: { sdkType, projectPath },
       });

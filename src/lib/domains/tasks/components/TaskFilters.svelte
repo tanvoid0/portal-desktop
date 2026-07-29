@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import Select from "$lib/components/ui/select.svelte";
-  import Icon from "@iconify/svelte";
-  import { taskActions } from "../stores/taskStore";
-  import { taskUi } from "../state/taskUi.svelte";
-  import type { TaskStatus, TaskPriority } from "../types";
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import Select from '$lib/components/ui/select.svelte';
+  import Icon from '@iconify/svelte';
+  import { taskActions } from '../stores/taskStore';
+  import { taskUi } from '../state/taskUi.svelte';
+  import type { TaskStatus, TaskPriority } from '../types';
 
   let statusFilters = $state<TaskStatus[]>([]);
   let priorityFilters = $state<TaskPriority[]>([]);
@@ -60,9 +60,7 @@
   }
 
   const hasActiveFilters = $derived(
-    statusFilters.length > 0 ||
-      priorityFilters.length > 0 ||
-      typeFilters.length > 0,
+    statusFilters.length > 0 || priorityFilters.length > 0 || typeFilters.length > 0
   );
 </script>
 
@@ -71,12 +69,7 @@
     <div class="mb-3 flex items-center justify-between">
       <h3 class="text-xs font-medium text-foreground">Filters</h3>
       {#if hasActiveFilters}
-        <Button
-          onclick={clearAllFilters}
-          variant="ghost"
-          size="sm"
-          class="text-xs"
-        >
+        <Button onclick={clearAllFilters} variant="ghost" size="sm" class="text-xs">
           <Icon icon="mdi:close" class="mr-1 h-3 w-3" />
           Clear All
         </Button>
@@ -87,26 +80,22 @@
       <!-- Status Filters -->
       <div>
         <fieldset>
-          <legend class="mb-1 block text-xs font-medium text-muted-foreground"
-            >Status</legend
-          >
+          <legend class="mb-1 block text-xs font-medium text-muted-foreground">Status</legend>
           <div class="flex flex-wrap gap-2">
-            {#each ["pending", "in-progress", "completed", "cancelled"] as status}
+            {#each ['pending', 'in-progress', 'completed', 'cancelled'] as status}
               <Button
                 onclick={() => toggleStatusFilter(status as TaskStatus)}
-                variant={statusFilters.includes(status as TaskStatus)
-                  ? "default"
-                  : "outline"}
+                variant={statusFilters.includes(status as TaskStatus) ? 'default' : 'outline'}
                 size="sm"
                 class="text-xs"
               >
-                {status === "pending"
-                  ? "To Do"
-                  : status === "in-progress"
-                    ? "In Progress"
-                    : status === "completed"
-                      ? "Completed"
-                      : "Cancelled"}
+                {status === 'pending'
+                  ? 'To Do'
+                  : status === 'in-progress'
+                    ? 'In Progress'
+                    : status === 'completed'
+                      ? 'Completed'
+                      : 'Cancelled'}
               </Button>
             {/each}
           </div>
@@ -116,16 +105,12 @@
       <!-- Priority Filters -->
       <div>
         <fieldset>
-          <legend class="mb-1 block text-xs font-medium text-muted-foreground"
-            >Priority</legend
-          >
+          <legend class="mb-1 block text-xs font-medium text-muted-foreground">Priority</legend>
           <div class="flex flex-wrap gap-2">
-            {#each ["low", "medium", "high"] as priority}
+            {#each ['low', 'medium', 'high'] as priority}
               <Button
                 onclick={() => togglePriorityFilter(priority as TaskPriority)}
-                variant={priorityFilters.includes(priority as TaskPriority)
-                  ? "default"
-                  : "outline"}
+                variant={priorityFilters.includes(priority as TaskPriority) ? 'default' : 'outline'}
                 size="sm"
                 class="text-xs"
               >
@@ -148,14 +133,12 @@
       <div>
         <div>
           <fieldset>
-            <legend class="mb-1 block text-xs font-medium text-muted-foreground"
-              >Types</legend
-            >
+            <legend class="mb-1 block text-xs font-medium text-muted-foreground">Types</legend>
             <div class="flex flex-wrap gap-2">
-              {#each ["Story", "Bug", "Feature", "Note", "Task", "Epic"] as type}
+              {#each ['Story', 'Bug', 'Feature', 'Note', 'Task', 'Epic'] as type}
                 <Button
                   onclick={() => toggleTypeFilter(type)}
-                  variant={typeFilters.includes(type) ? "default" : "outline"}
+                  variant={typeFilters.includes(type) ? 'default' : 'outline'}
                   size="sm"
                   class="text-xs"
                 >

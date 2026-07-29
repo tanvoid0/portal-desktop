@@ -3,46 +3,46 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import Select from "$lib/components/ui/select.svelte";
+  } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import Select from '$lib/components/ui/select.svelte';
   import {
     DeploymentType,
     ProjectType,
     type DeploymentCreateRequest,
-  } from "$lib/domains/deployments/types";
-  import { deploymentActions } from "$lib/domains/deployments/stores/deploymentStore";
-  import { toast } from "$lib/utils/toast";
-  import { logger } from "$lib/domains/shared";
-  import { ArrowLeft, Loader2 } from "@lucide/svelte";
-  import { PageHeader } from "$lib/components/shell";
+  } from '$lib/domains/deployments/types';
+  import { deploymentActions } from '$lib/domains/deployments/stores/deploymentStore';
+  import { toast } from '$lib/utils/toast';
+  import { logger } from '$lib/domains/shared';
+  import { ArrowLeft, Loader2 } from '@lucide/svelte';
+  import { PageHeader } from '$lib/components/shell';
 
   let deploymentType = $state<DeploymentType>(DeploymentType.DOCKER);
-  let name = $state("");
-  let description = $state("");
-  let projectPath = $state("");
+  let name = $state('');
+  let description = $state('');
+  let projectPath = $state('');
   let projectType = $state<ProjectType>(ProjectType.NODE);
-  let sdkVersion = $state("latest");
+  let sdkVersion = $state('latest');
 
   // Docker-specific fields
-  let dockerImageName = $state("");
-  let dockerfilePath = $state("");
+  let dockerImageName = $state('');
+  let dockerfilePath = $state('');
   let exposedPort = $state<number | undefined>(3000);
 
   // CLI-specific fields
-  let command = $state("");
-  let workingDirectory = $state("");
+  let command = $state('');
+  let workingDirectory = $state('');
 
   // Environment variables
   let envVars = $state<Record<string, string>>({});
@@ -50,13 +50,13 @@
 
   async function handleSubmit() {
     if (!name || !projectPath) {
-      toast.error("Name and project path are required");
+      toast.error('Name and project path are required');
       return;
     }
 
     // Validate type-specific fields
     if (deploymentType === DeploymentType.CLI && !command) {
-      toast.error("Command is required for CLI deployments");
+      toast.error('Command is required for CLI deployments');
       return;
     }
 
@@ -78,41 +78,32 @@
         },
         // Docker-specific
         dockerImageName:
-          deploymentType === DeploymentType.DOCKER
-            ? dockerImageName || undefined
-            : undefined,
+          deploymentType === DeploymentType.DOCKER ? dockerImageName || undefined : undefined,
         dockerfilePath:
-          deploymentType === DeploymentType.DOCKER
-            ? dockerfilePath || undefined
-            : undefined,
-        exposedPort:
-          deploymentType === DeploymentType.DOCKER ? exposedPort : undefined,
+          deploymentType === DeploymentType.DOCKER ? dockerfilePath || undefined : undefined,
+        exposedPort: deploymentType === DeploymentType.DOCKER ? exposedPort : undefined,
         // CLI-specific
         command: deploymentType === DeploymentType.CLI ? command : undefined,
         workingDirectory:
-          deploymentType === DeploymentType.CLI
-            ? workingDirectory || projectPath
-            : undefined,
+          deploymentType === DeploymentType.CLI ? workingDirectory || projectPath : undefined,
       };
 
       await deploymentActions.createDeployment(request);
-      toast.success("Deployment created successfully");
-      goto("/deployments");
+      toast.success('Deployment created successfully');
+      goto('/deployments');
     } catch (error) {
-      logger.error("Failed to create deployment", {
-        context: "CreateDeploymentPage",
+      logger.error('Failed to create deployment', {
+        context: 'CreateDeploymentPage',
         error,
       });
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create deployment",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to create deployment');
     } finally {
       isSubmitting = false;
     }
   }
 
   function addEnvVar() {
-    envVars = { ...envVars, "": "" };
+    envVars = { ...envVars, '': '' };
   }
 
   function removeEnvVar(key: string) {
@@ -136,7 +127,7 @@
 </svelte:head>
 
 <div class="container mx-auto max-w-4xl space-y-6 py-6">
-  <Button variant="ghost" onclick={() => goto("/deployments")}>
+  <Button variant="ghost" onclick={() => goto('/deployments')}>
     <ArrowLeft class="mr-2 h-4 w-4" />
     Back to Deployments
   </Button>
@@ -164,8 +155,8 @@
           <Label for="deploymentType">Deployment Type *</Label>
           <Select
             options={[
-              { value: DeploymentType.DOCKER, label: "Docker" },
-              { value: DeploymentType.CLI, label: "CLI Command" },
+              { value: DeploymentType.DOCKER, label: 'Docker' },
+              { value: DeploymentType.CLI, label: 'CLI Command' },
             ]}
             defaultValue={deploymentType}
             onSelect={(value) => {
@@ -178,12 +169,7 @@
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <Label for="name">Name *</Label>
-            <Input
-              id="name"
-              bind:value={name}
-              placeholder="My Deployment"
-              required
-            />
+            <Input id="name" bind:value={name} placeholder="My Deployment" required />
           </div>
 
           <div>
@@ -254,12 +240,7 @@
 
             <div>
               <Label for="exposedPort">Exposed Port</Label>
-              <Input
-                id="exposedPort"
-                type="number"
-                bind:value={exposedPort}
-                placeholder="3000"
-              />
+              <Input id="exposedPort" type="number" bind:value={exposedPort} placeholder="3000" />
             </div>
           </div>
         {/if}
@@ -271,15 +252,9 @@
 
             <div>
               <Label for="command">Command *</Label>
-              <Input
-                id="command"
-                bind:value={command}
-                placeholder="npm start"
-                required
-              />
+              <Input id="command" bind:value={command} placeholder="npm start" required />
               <p class="mt-1 text-xs text-muted-foreground">
-                Enter the command to run (e.g., "npm start", "python app.py",
-                "cargo run")
+                Enter the command to run (e.g., "npm start", "python app.py", "cargo run")
               </p>
             </div>
 
@@ -303,12 +278,7 @@
                 Optional environment variables for your deployment
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onclick={addEnvVar}
-            >
+            <Button type="button" variant="outline" size="sm" onclick={addEnvVar}>
               Add Variable
             </Button>
           </div>
@@ -333,12 +303,7 @@
                   }}
                   class="flex-1"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onclick={() => removeEnvVar(key)}
-                >
+                <Button type="button" variant="outline" size="sm" onclick={() => removeEnvVar(key)}>
                   Remove
                 </Button>
               </div>
@@ -370,7 +335,7 @@
           <Button
             type="button"
             variant="outline"
-            onclick={() => goto("/deployments")}
+            onclick={() => goto('/deployments')}
             disabled={isSubmitting}
           >
             Cancel

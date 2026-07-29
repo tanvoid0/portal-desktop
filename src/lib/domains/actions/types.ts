@@ -2,17 +2,17 @@
  * Unified Actions model — one catalog for local, GitHub, and n8n runners.
  */
 
-export type ActionSource = "local" | "github" | "n8n" | "file" | "custom";
-export type ActionRunner = "local" | "github" | "n8n";
+export type ActionSource = 'local' | 'github' | 'n8n' | 'file' | 'custom';
+export type ActionRunner = 'local' | 'github' | 'n8n';
 export type ActionCategory =
-  | "install"
-  | "dev"
-  | "build"
-  | "test"
-  | "lint"
-  | "utility"
-  | "ci"
-  | "deploy";
+  | 'install'
+  | 'dev'
+  | 'build'
+  | 'test'
+  | 'lint'
+  | 'utility'
+  | 'ci'
+  | 'deploy';
 
 export interface UnifiedAction {
   id: string;
@@ -62,7 +62,7 @@ export interface ActionStepResult {
   name: string;
   actionId: string;
   command?: string;
-  status: "success" | "failed" | "skipped";
+  status: 'success' | 'failed' | 'skipped';
   executionId?: string;
   exitCode?: number | null;
   output?: string;

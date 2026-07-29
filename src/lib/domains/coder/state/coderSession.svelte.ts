@@ -3,10 +3,14 @@
  * Event listeners register once and route updates per thread id.
  */
 
-import { aiProviderService } from "$lib/domains/ai/services/aiProviderService.js";
-import { coderService } from "../services/coderService.js";
-import { getToolCallDisplay, formatFailedResult, isToolResultFailure } from "../utils/toolCallDisplay.js";
-import { withMessageTimestamps } from "../utils/messageTimestamps.js";
+import { aiProviderService } from '$lib/domains/ai/services/aiProviderService.js';
+import { coderService } from '../services/coderService.js';
+import {
+  getToolCallDisplay,
+  formatFailedResult,
+  isToolResultFailure,
+} from '../utils/toolCallDisplay.js';
+import { withMessageTimestamps } from '../utils/messageTimestamps.js';
 import type {
   ChatMessage,
   CoderSubAgent,
@@ -19,42 +23,38 @@ import type {
   CoderAgentMode,
   PermissionMode,
   ThreadTitleEvent,
-} from "../types.js";
-import { summaryToThread } from "../types.js";
-import type {
-  ContextUsage,
-  LlmUsage,
-  ProviderType,
-} from "$lib/domains/ai/types/index.js";
+} from '../types.js';
+import { summaryToThread } from '../types.js';
+import type { ContextUsage, LlmUsage, ProviderType } from '$lib/domains/ai/types/index.js';
 import {
   fallbackTitleFromMessage,
   isPlaceholderTitle,
   reconcileThreadTitle,
-} from "$lib/domains/chat/title.js";
-import { loadChatCatalogPrefs } from "$lib/domains/ai/utils/chatCatalogPrefs.js";
+} from '$lib/domains/chat/title.js';
+import { loadChatCatalogPrefs } from '$lib/domains/ai/utils/chatCatalogPrefs.js';
 import {
   abortAgentCommands,
   executeAgentCommand,
   mirrorCommandOutput,
-} from "../services/coderTerminalCoordinator.js";
-import { coderTerminalStore } from "./coderTerminalStore.svelte.js";
-import { coderWorkspaceStore } from "./coderWorkspaceStore.svelte.js";
-import { inferEffectiveMode } from "../config/agentModes.js";
-import { coderUi } from "./coderUi.svelte.js";
+} from '../services/coderTerminalCoordinator.js';
+import { coderTerminalStore } from './coderTerminalStore.svelte.js';
+import { coderWorkspaceStore } from './coderWorkspaceStore.svelte.js';
+import { inferEffectiveMode } from '../config/agentModes.js';
+import { coderUi } from './coderUi.svelte.js';
 
 export type SubAgentNotificationEvent =
   | {
-      type: "finished";
+      type: 'finished';
       coordinatorId: string;
       subAgent: CoderSubAgent;
     }
   | {
-      type: "complete";
+      type: 'complete';
       coordinatorId: string;
       subAgents: CoderSubAgent[];
     }
   | {
-      type: "spawned";
+      type: 'spawned';
       coordinatorId: string;
       count: number;
     };
@@ -74,9 +74,9 @@ export interface ThreadRuntime {
   llmUsage: LlmUsage | null;
   lastRetry:
     | null
-    | { type: "send" }
+    | { type: 'send' }
     | {
-        type: "approve";
+        type: 'approve';
         callId: string;
         approve: boolean;
         remember: boolean;
@@ -96,7 +96,7 @@ export interface ThreadRuntime {
 function emptyRuntime(): ThreadRuntime {
   return {
     messages: [],
-    streamingText: "",
+    streamingText: '',
     waitingSeconds: 0,
     running: false,
     pending: null,
@@ -105,7 +105,7 @@ function emptyRuntime(): ThreadRuntime {
     contextUsage: null,
     llmUsage: null,
     lastRetry: null,
-    draftInput: "",
+    draftInput: '',
     messageQueue: [],
     subAgents: [],
     multitaskMode: false,
@@ -120,43 +120,40 @@ function summarizeTool(tool: string, args: Record<string, unknown>): string {
 
 function suggestedRule(tool: string, args: Record<string, unknown>): string {
   switch (tool) {
-    case "run_command": {
-      const cmd = String(args.command ?? "");
-      return cmd.split(/\s+/)[0] ?? "";
+    case 'run_command': {
+      const cmd = String(args.command ?? '');
+      return cmd.split(/\s+/)[0] ?? '';
     }
-    case "write_file":
-    case "edit_file": {
-      const p = String(args.path ?? "");
-      const parts = p.replace(/\\/g, "/").split("/");
+    case 'write_file':
+    case 'edit_file': {
+      const p = String(args.path ?? '');
+      const parts = p.replace(/\\/g, '/').split('/');
       if (parts.length > 1) {
         parts.pop();
-        return `${parts.join("/")}/*`;
+        return `${parts.join('/')}/*`;
       }
-      return "*";
+      return '*';
     }
     default:
-      return "";
+      return '';
   }
 }
 
 function parseToolArgs(raw: string): Record<string, unknown> {
   try {
-    return JSON.parse(raw || "{}") as Record<string, unknown>;
+    return JSON.parse(raw || '{}') as Record<string, unknown>;
   } catch {
     return {};
   }
 }
 
-function commandForToolCall(
-  messages: ChatMessage[],
-  toolCallId: string,
-): string | null {
+function commandForToolCall(messages: ChatMessage[], toolCallId: string): string | null {
   for (const m of messages) {
-    if (m.role !== "assistant" || !m.tool_calls?.length) continue;
+    if (m.role !== 'assistant' || !m.tool_calls?.length) continue;
     const call = m.tool_calls.find((c) => c.id === toolCallId);
-    if (!call || call.function.name !== "run_command") continue;
+    if (!call || call.function.name !== 'run_command') continue;
     const args = parseToolArgs(call.function.arguments);
-    return String(args.command ?? "");
+    return String(args.command ?? '');
   }
   return null;
 }
@@ -165,26 +162,24 @@ function appendRunCommandToTerminal(
   threadId: string,
   messages: ChatMessage[],
   toolCallId: string,
-  content: string,
+  content: string
 ) {
   const command = commandForToolCall(messages, toolCallId);
   if (!command) return;
-  const failed = isToolResultFailure("run_command", content);
-  const output = failed ? formatFailedResult("run_command", content) : content;
+  const failed = isToolResultFailure('run_command', content);
+  const output = failed ? formatFailedResult('run_command', content) : content;
   mirrorCommandOutput(threadId, null, command, output, failed);
 }
 
 /** Rebuild pending approval from open tool calls in persisted messages. */
 export function inferPending(messages: ChatMessage[]): PendingApproval | null {
   const answered = new Set(
-    messages
-      .filter((m) => m.role === "tool" && m.tool_call_id)
-      .map((m) => m.tool_call_id as string),
+    messages.filter((m) => m.role === 'tool' && m.tool_call_id).map((m) => m.tool_call_id as string)
   );
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (m.role !== "assistant" || !m.tool_calls?.length) continue;
+    if (m.role !== 'assistant' || !m.tool_calls?.length) continue;
     const open = m.tool_calls.find((c) => !answered.has(c.id));
     if (!open) return null;
     const args = parseToolArgs(open.function.arguments);
@@ -203,7 +198,7 @@ export function inferPending(messages: ChatMessage[]): PendingApproval | null {
 export function lastUserTurnNeedsReply(messages: ChatMessage[]): boolean {
   let lastUserIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "user") {
+    if (messages[i].role === 'user') {
       lastUserIdx = i;
       break;
     }
@@ -212,8 +207,8 @@ export function lastUserTurnNeedsReply(messages: ChatMessage[]): boolean {
 
   for (let i = lastUserIdx + 1; i < messages.length; i++) {
     const m = messages[i];
-    if (m.role !== "assistant") continue;
-    const content = (m.content ?? "").trim();
+    if (m.role !== 'assistant') continue;
+    const content = (m.content ?? '').trim();
     if (content || (m.tool_calls?.length ?? 0) > 0) return false;
   }
   return true;
@@ -230,13 +225,13 @@ class CoderSessionState {
   threadsRevision = $state(0);
   activeThreadId = $state<string | null>(null);
   thread = $state<CoderThread | null>(null);
-  workspaceRoot = $state("");
-  agentMode = $state<CoderAgentMode>("auto");
-  permissionMode = $state<PermissionMode>("review");
+  workspaceRoot = $state('');
+  agentMode = $state<CoderAgentMode>('auto');
+  permissionMode = $state<PermissionMode>('review');
   rules = $state<PermissionRule[]>([]);
   changes = $state<FileChange[]>([]);
   runningThreadIds = $state<Set<string>>(new Set());
-  selectedProvider = $state<ProviderType | null>("AgentPlatform");
+  selectedProvider = $state<ProviderType | null>('AgentPlatform');
   selectedBackendProvider = $state<string | null>(null);
   selectedModel = $state<string | null>(null);
   multitaskMode = $state(false);
@@ -282,7 +277,7 @@ class CoderSessionState {
   }
 
   isCoordinatorThread(thread?: CoderThread | null): boolean {
-    return thread?.thread_kind === "coordinator";
+    return thread?.thread_kind === 'coordinator';
   }
 
   /** Show retry when the run failed or the last user turn got no assistant reply. */
@@ -297,7 +292,7 @@ class CoderSessionState {
     if (rt.running || rt.pending) return;
     if (lastUserTurnNeedsReply(messages)) {
       rt.canRetry = true;
-      if (!rt.lastRetry) rt.lastRetry = { type: "send" };
+      if (!rt.lastRetry) rt.lastRetry = { type: 'send' };
     }
   }
 
@@ -315,19 +310,19 @@ class CoderSessionState {
     try {
       this.agentMode = await coderService.getMode();
     } catch (e) {
-      console.error("coder: getMode failed", e);
+      console.error('coder: getMode failed', e);
     }
 
     try {
       this.permissionMode = await coderService.getPermissionMode();
     } catch (e) {
-      console.error("coder: getPermissionMode failed", e);
+      console.error('coder: getPermissionMode failed', e);
     }
 
     try {
       this.rules = await coderService.listRules();
     } catch (e) {
-      console.error("coder: listRules failed", e);
+      console.error('coder: listRules failed', e);
     }
 
     // Load sessions first so the sidebar works even if provider config fails.
@@ -336,7 +331,7 @@ class CoderSessionState {
     try {
       await this.syncRunningThreads();
     } catch (e) {
-      console.error("coder: syncRunningThreads failed", e);
+      console.error('coder: syncRunningThreads failed', e);
     }
 
     void this.initProviderDefaults();
@@ -371,7 +366,7 @@ class CoderSessionState {
         ...message,
         timestamp: message.timestamp ?? new Date().toISOString(),
       };
-      if (stampedMessage.role === "assistant") rt.streamingText = "";
+      if (stampedMessage.role === 'assistant') rt.streamingText = '';
       rt.waitingSeconds = 0;
       const last = rt.messages[rt.messages.length - 1];
       const dup =
@@ -383,7 +378,7 @@ class CoderSessionState {
         rt.messages = [...rt.messages, stampedMessage];
       }
       if (
-        stampedMessage.role === "tool" &&
+        stampedMessage.role === 'tool' &&
         stampedMessage.tool_call_id &&
         stampedMessage.content != null
       ) {
@@ -394,12 +389,11 @@ class CoderSessionState {
             thread_id,
             rt.messages,
             stampedMessage.tool_call_id,
-            stampedMessage.content,
+            stampedMessage.content
           );
         }
         if (this.terminalOpen && thread_id) {
-          const root =
-            this.thread?.workspace_root ?? this.workspaceRoot;
+          const root = this.thread?.workspace_root ?? this.workspaceRoot;
           if (root) {
             const tab = coderTerminalStore.ensureDefault(thread_id, root);
             coderWorkspaceStore.openTerminal(thread_id, tab.id, tab.label);
@@ -416,7 +410,7 @@ class CoderSessionState {
       const rt = this.runtimeFor(thread_id);
       rt.pending = pending;
       rt.running = false;
-      rt.streamingText = "";
+      rt.streamingText = '';
       rt.waitingSeconds = 0;
       this.touchRuntime();
       this.setRunning(thread_id, false);
@@ -426,15 +420,15 @@ class CoderSessionState {
     await coderService.onDone(({ thread_id, exhausted, cancelled, title }) => {
       const rt = this.runtimeFor(thread_id);
       rt.running = false;
-      rt.streamingText = "";
+      rt.streamingText = '';
       rt.waitingSeconds = 0;
       rt.pending = null;
       rt.canRetry = false;
       rt.lastRetry = null;
       if (exhausted) {
-        rt.error = "Agent hit the max iteration limit.";
+        rt.error = 'Agent hit the max iteration limit.';
         rt.canRetry = true;
-        rt.lastRetry = { type: "send" };
+        rt.lastRetry = { type: 'send' };
       } else if (cancelled) {
         rt.error = null;
       }
@@ -470,7 +464,7 @@ class CoderSessionState {
       rt.running = false;
       rt.waitingSeconds = 0;
       rt.canRetry = true;
-      rt.lastRetry = { type: "send" };
+      rt.lastRetry = { type: 'send' };
       this.touchRuntime();
       this.setRunning(thread_id, false);
       void this.syncThreadFromBackend(thread_id);
@@ -484,10 +478,7 @@ class CoderSessionState {
 
     await coderService.onRunCommand(async (req) => {
       this.terminalOpen = true;
-      const tab = coderTerminalStore.ensureDefault(
-        req.thread_id,
-        req.workspace_root,
-      );
+      const tab = coderTerminalStore.ensureDefault(req.thread_id, req.workspace_root);
       coderWorkspaceStore.openTerminal(req.thread_id, tab.id, tab.label);
       this.delegatedCommandIds.add(req.call_id);
       try {
@@ -498,27 +489,15 @@ class CoderSessionState {
           workspaceRoot: req.workspace_root,
           terminalId: req.terminal_id,
         });
-        await coderService.submitCommandResult(
-          req.thread_id,
-          req.call_id,
-          result,
-        );
+        await coderService.submitCommandResult(req.thread_id, req.call_id, result);
       } catch (e) {
-        await coderService.submitCommandResult(
-          req.thread_id,
-          req.call_id,
-          `Error: ${e}`,
-        );
+        await coderService.submitCommandResult(req.thread_id, req.call_id, `Error: ${e}`);
       }
     });
 
     await coderService.onListTerminals(async (req) => {
       const list = coderTerminalStore.listForAgent(req.thread_id);
-      await coderService.submitTerminalList(
-        req.thread_id,
-        req.call_id,
-        JSON.stringify(list),
-      );
+      await coderService.submitTerminalList(req.thread_id, req.call_id, JSON.stringify(list));
     });
 
     await coderService.onSubAgentStarted(({ coordinator_id, subagent }) => {
@@ -539,7 +518,7 @@ class CoderSessionState {
       this.touchRuntime();
       if (this.shouldNotifyForCoordinator(coordinator_id)) {
         this.emitSubAgentNotification({
-          type: "complete",
+          type: 'complete',
           coordinatorId: coordinator_id,
           subAgents: subagents,
         });
@@ -554,8 +533,7 @@ class CoderSessionState {
     const saved = loadChatCatalogPrefs();
 
     if (!this.selectedProvider) {
-      this.selectedProvider =
-        (await aiProviderService.getDefaultProvider()) ?? "AgentPlatform";
+      this.selectedProvider = (await aiProviderService.getDefaultProvider()) ?? 'AgentPlatform';
     }
     if (!this.selectedBackendProvider && saved?.backendProvider) {
       this.selectedBackendProvider = saved.backendProvider;
@@ -565,9 +543,7 @@ class CoderSessionState {
     }
     if (!this.selectedModel && this.selectedProvider) {
       try {
-        const config = await aiProviderService.getProviderConfig(
-          this.selectedProvider,
-        );
+        const config = await aiProviderService.getProviderConfig(this.selectedProvider);
         this.selectedModel = config.model || null;
       } catch {
         /* provider config may be unavailable offline */
@@ -580,7 +556,7 @@ class CoderSessionState {
     await coderService.updateThreadModel(
       threadId,
       this.selectedModel,
-      this.selectedBackendProvider,
+      this.selectedBackendProvider
     );
     if (this.thread?.id === threadId) {
       this.thread = {
@@ -598,7 +574,7 @@ class CoderSessionState {
 
   private shouldNotifyForCoordinator(
     coordinatorId: string,
-    subAgent?: CoderSubAgent | null,
+    subAgent?: CoderSubAgent | null
   ): boolean {
     if (this.activeThreadId === coordinatorId) return false;
     if (subAgent && this.activeThreadId === subAgent.child_thread_id) return false;
@@ -622,16 +598,11 @@ class CoderSessionState {
     rt.multitaskMode = true;
     this.touchRuntime();
 
-    const wasActive =
-      previous?.status === "running" || previous?.status === "pending";
-    const isDone = ["completed", "failed", "cancelled"].includes(subAgent.status);
-    if (
-      wasActive &&
-      isDone &&
-      this.shouldNotifyForCoordinator(coordinatorId, subAgent)
-    ) {
+    const wasActive = previous?.status === 'running' || previous?.status === 'pending';
+    const isDone = ['completed', 'failed', 'cancelled'].includes(subAgent.status);
+    if (wasActive && isDone && this.shouldNotifyForCoordinator(coordinatorId, subAgent)) {
       this.emitSubAgentNotification({
-        type: "finished",
+        type: 'finished',
         coordinatorId,
         subAgent,
       });
@@ -648,7 +619,7 @@ class CoderSessionState {
   async setMultitaskMode(enabled: boolean) {
     this.multitaskMode = enabled;
     if (!this.thread) return;
-    const nextKind: CoderThreadKind = enabled ? "coordinator" : "session";
+    const nextKind: CoderThreadKind = enabled ? 'coordinator' : 'session';
     await coderService.setThreadKind(this.thread.id, nextKind);
     this.thread = { ...this.thread, thread_kind: nextKind };
     this.upsertThread(this.thread);
@@ -673,10 +644,10 @@ class CoderSessionState {
     const rt = this.runtimes[threadId];
     return {
       id: threadId,
-      title: "Running session",
+      title: 'Running session',
       workspace_root: this.workspaceRoot,
       messages: rt?.messages ?? [],
-      created_at: "",
+      created_at: '',
       updated_at: new Date().toISOString(),
     };
   }
@@ -831,11 +802,11 @@ class CoderSessionState {
       const summaries = await coderService.listThreadSummaries();
       this.threads = summaries.map(summaryToThread);
     } catch (summaryErr) {
-      console.warn("coder: list summaries failed, falling back to full threads", summaryErr);
+      console.warn('coder: list summaries failed, falling back to full threads', summaryErr);
       try {
         this.threads = await coderService.listThreads();
       } catch (err) {
-        console.error("coder: list threads failed", err);
+        console.error('coder: list threads failed', err);
       }
     } finally {
       this.threadsLoading = false;
@@ -845,20 +816,20 @@ class CoderSessionState {
   }
 
   private async refreshCoordinatorSubAgents() {
-    const coordinators = this.threads.filter((t) => t.thread_kind === "coordinator");
+    const coordinators = this.threads.filter((t) => t.thread_kind === 'coordinator');
     await Promise.all(
       coordinators.map((t) =>
         this.loadSubAgents(t.id).catch((err) => {
           console.warn(`coder: load sub-agents for ${t.id} failed`, err);
-        }),
-      ),
+        })
+      )
     );
   }
 
   subAgentSummaryFor(threadId: string): { running: number; total: number } {
     const rt = this.peekRuntime(threadId);
     const running = rt.subAgents.filter(
-      (s) => s.status === "running" || s.status === "pending",
+      (s) => s.status === 'running' || s.status === 'pending'
     ).length;
     return { running, total: rt.subAgents.length };
   }
@@ -881,7 +852,7 @@ class CoderSessionState {
     if (cached) return cached;
 
     for (const summary of this.threads) {
-      if (summary.thread_kind !== "coordinator") continue;
+      if (summary.thread_kind !== 'coordinator') continue;
       await this.loadSubAgents(summary.id);
       const coordId = this.findCoordinatorForSubAgent(childThreadId);
       if (coordId) return coordId;
@@ -910,9 +881,9 @@ class CoderSessionState {
     this.workspaceRoot = t.workspace_root;
     this.selectedModel = t.model ?? this.selectedModel;
     this.selectedBackendProvider = t.llm_provider ?? this.selectedBackendProvider;
-    this.multitaskMode = t.thread_kind === "coordinator";
+    this.multitaskMode = t.thread_kind === 'coordinator';
 
-    if (t.thread_kind === "sub-agent") {
+    if (t.thread_kind === 'sub-agent') {
       const rt = this.runtimeFor(id);
       this.parentCoordinatorId =
         rt.parentCoordinatorId ?? (await this.resolveCoordinatorForSubAgent(id));
@@ -947,7 +918,7 @@ class CoderSessionState {
   newSession() {
     this.activeThreadId = null;
     this.thread = null;
-    this.workspaceRoot = "";
+    this.workspaceRoot = '';
     this.changes = [];
     this.multitaskMode = false;
   }
@@ -957,8 +928,7 @@ class CoderSessionState {
       this.upsertThread(this.thread);
       if (
         (this.selectedModel && this.selectedModel !== this.thread.model) ||
-        (this.selectedBackendProvider &&
-          this.selectedBackendProvider !== this.thread.llm_provider)
+        (this.selectedBackendProvider && this.selectedBackendProvider !== this.thread.llm_provider)
       ) {
         await this.syncThreadLlmConfig(this.thread.id);
       }
@@ -968,15 +938,15 @@ class CoderSessionState {
       this.workspaceRoot.trim(),
       this.selectedModel || undefined,
       this.selectedBackendProvider || undefined,
-      this.agentMode === "multitask" ? "coordinator" : "session",
-      coderUi.activeProjectIdAsNumber(),
+      this.agentMode === 'multitask' ? 'coordinator' : 'session',
+      coderUi.activeProjectIdAsNumber()
     );
     this.thread = t;
     this.activeThreadId = t.id;
     this.upsertThread(t);
     const rt = this.runtimeFor(t.id);
     rt.messages = withMessageTimestamps(t.messages, rt.messages, t.updated_at);
-    rt.multitaskMode = t.thread_kind === "coordinator";
+    rt.multitaskMode = t.thread_kind === 'coordinator';
     this.touchRuntime();
     await this.refreshThreads();
     return t;
@@ -1015,11 +985,11 @@ class CoderSessionState {
   }
 
   private async ensureCoordinatorThread(t: CoderThread): Promise<CoderThread> {
-    if (t.thread_kind === "coordinator") return t;
-    if (t.thread_kind === "sub-agent") return t;
+    if (t.thread_kind === 'coordinator') return t;
+    if (t.thread_kind === 'sub-agent') return t;
 
-    await coderService.setThreadKind(t.id, "coordinator");
-    const updated: CoderThread = { ...t, thread_kind: "coordinator" };
+    await coderService.setThreadKind(t.id, 'coordinator');
+    const updated: CoderThread = { ...t, thread_kind: 'coordinator' };
     if (this.thread?.id === t.id) {
       this.thread = updated;
     }
@@ -1035,14 +1005,14 @@ class CoderSessionState {
 
   private async trySpawnMultitask(
     t: CoderThread,
-    text: string,
+    text: string
   ): Promise<{ count: number; coordinatorId: string } | null> {
-    if (t.thread_kind === "sub-agent" || !this.looksLikeMultitaskInput(text)) {
+    if (t.thread_kind === 'sub-agent' || !this.looksLikeMultitaskInput(text)) {
       return null;
     }
 
     const coord = await this.ensureCoordinatorThread(t);
-    if (coord.thread_kind !== "coordinator") return null;
+    if (coord.thread_kind !== 'coordinator') return null;
 
     const issueUrls = this.extractIssueUrls(text);
     if (issueUrls.length >= 2) {
@@ -1067,7 +1037,7 @@ class CoderSessionState {
     if (!this.workspaceRoot.trim()) {
       if (this.activeThreadId) {
         const rt = this.runtimeFor(this.activeThreadId);
-        rt.error = "Set a workspace folder first.";
+        rt.error = 'Set a workspace folder first.';
         this.touchRuntime();
       }
       return false;
@@ -1080,7 +1050,7 @@ class CoderSessionState {
     await this.syncThreadLlmConfig(t.id);
 
     const coord = await this.ensureCoordinatorThread(t);
-    if (coord.thread_kind !== "coordinator") return false;
+    if (coord.thread_kind !== 'coordinator') return false;
 
     const title = trimmed.length > 72 ? `${trimmed.slice(0, 69)}…` : trimmed;
     await this.spawnMultitask(coord.id, {
@@ -1088,11 +1058,11 @@ class CoderSessionState {
     });
 
     if (this.activeThreadId === coord.id) {
-      this.runtimeFor(coord.id).draftInput = "";
+      this.runtimeFor(coord.id).draftInput = '';
     }
 
     this.emitSubAgentNotification({
-      type: "spawned",
+      type: 'spawned',
       coordinatorId: coord.id,
       count: 1,
     });
@@ -1105,14 +1075,14 @@ class CoderSessionState {
   }
 
   private parseMultitaskTasks(text: string): SpawnSubAgentTask[] | null {
-    const stripped = text.replace(
-      /https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/\d+/g,
-      "",
-    );
-    const blocks = stripped.includes("\n---")
-      ? stripped.split(/\n---\n?/).map((line) => line.trim()).filter(Boolean)
+    const stripped = text.replace(/https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/\d+/g, '');
+    const blocks = stripped.includes('\n---')
+      ? stripped
+          .split(/\n---\n?/)
+          .map((line) => line.trim())
+          .filter(Boolean)
       : stripped
-          .split("\n")
+          .split('\n')
           .map((line) => line.trim())
           .filter(Boolean);
     if (blocks.length < 2) return null;
@@ -1125,7 +1095,7 @@ class CoderSessionState {
 
   private async spawnMultitask(
     threadId: string,
-    request: { tasks?: SpawnSubAgentTask[]; issueUrls?: string[] },
+    request: { tasks?: SpawnSubAgentTask[]; issueUrls?: string[] }
   ) {
     const rt = this.runtimeFor(threadId);
     rt.error = null;
@@ -1150,7 +1120,7 @@ class CoderSessionState {
       }
       const rt = this.runtimeFor(this.thread.id);
       rt.messageQueue = [...rt.messageQueue, trimmed];
-      rt.draftInput = "";
+      rt.draftInput = '';
       this.touchRuntime();
       return;
     }
@@ -1171,7 +1141,7 @@ class CoderSessionState {
       if (!this.workspaceRoot.trim()) {
         if (this.activeThreadId) {
           const rt = this.runtimeFor(this.activeThreadId);
-          rt.error = "Set a workspace folder first.";
+          rt.error = 'Set a workspace folder first.';
           this.touchRuntime();
         }
         return;
@@ -1188,10 +1158,10 @@ class CoderSessionState {
     const spawnResult = await this.trySpawnMultitask(t, trimmed);
     if (spawnResult) {
       if (this.activeThreadId === t.id) {
-        this.runtimeFor(t.id).draftInput = "";
+        this.runtimeFor(t.id).draftInput = '';
       }
       this.emitSubAgentNotification({
-        type: "spawned",
+        type: 'spawned',
         coordinatorId: spawnResult.coordinatorId,
         count: spawnResult.count,
       });
@@ -1202,23 +1172,22 @@ class CoderSessionState {
     rt.effectiveMode = inferEffectiveMode(trimmed, this.agentMode);
     rt.error = null;
     rt.canRetry = false;
-    rt.lastRetry = { type: "send" };
+    rt.lastRetry = { type: 'send' };
     rt.running = true;
-    rt.streamingText = "";
+    rt.streamingText = '';
     rt.waitingSeconds = 0;
     this.touchRuntime();
     this.setRunning(t.id, true);
 
     try {
       const isFirst =
-        t.messages.filter((m) => m.role === "user").length === 0 &&
-        isPlaceholderTitle(t.title);
+        t.messages.filter((m) => m.role === 'user').length === 0 && isPlaceholderTitle(t.title);
       if (isFirst) {
-        const fb = fallbackTitleFromMessage(trimmed, "New session");
+        const fb = fallbackTitleFromMessage(trimmed, 'New session');
         this.applyThreadTitle(t.id, fb);
       }
       if (this.activeThreadId === t.id) {
-        rt.draftInput = "";
+        rt.draftInput = '';
       }
       await coderService.send(t.id, trimmed);
     } catch (e) {
@@ -1240,7 +1209,7 @@ class CoderSessionState {
     abortAgentCommands(threadId);
     const rt = this.runtimeFor(threadId);
     rt.running = false;
-    rt.streamingText = "";
+    rt.streamingText = '';
     rt.waitingSeconds = 0;
     rt.error = null;
     rt.pending = null;
@@ -1255,21 +1224,15 @@ class CoderSessionState {
     const threadId = this.thread.id;
     rt.error = null;
     rt.running = true;
-    rt.streamingText = "";
+    rt.streamingText = '';
     rt.waitingSeconds = 0;
     rt.canRetry = false;
     this.touchRuntime();
     this.setRunning(threadId, true);
     try {
-      if (rt.lastRetry?.type === "approve") {
+      if (rt.lastRetry?.type === 'approve') {
         const { callId, approve, remember, editedPattern } = rt.lastRetry;
-        await coderService.approve(
-          threadId,
-          callId,
-          approve,
-          remember,
-          editedPattern,
-        );
+        await coderService.approve(threadId, callId, approve, remember, editedPattern);
         if (remember) this.rules = await coderService.listRules();
       } else {
         await coderService.retry(threadId);
@@ -1280,7 +1243,7 @@ class CoderSessionState {
     } catch (e) {
       rt.error = String(e);
       rt.canRetry = true;
-      rt.lastRetry = { type: "send" };
+      rt.lastRetry = { type: 'send' };
       rt.running = false;
       this.touchRuntime();
       this.setRunning(threadId, false);
@@ -1298,9 +1261,9 @@ class CoderSessionState {
 
     rt.error = null;
     rt.canRetry = false;
-    rt.lastRetry = { type: "send" };
+    rt.lastRetry = { type: 'send' };
     rt.running = true;
-    rt.streamingText = "";
+    rt.streamingText = '';
     rt.waitingSeconds = 0;
     rt.messageQueue = [];
     this.touchRuntime();
@@ -1312,18 +1275,14 @@ class CoderSessionState {
     } catch (e) {
       rt.error = String(e);
       rt.canRetry = true;
-      rt.lastRetry = { type: "send" };
+      rt.lastRetry = { type: 'send' };
       rt.running = false;
       this.touchRuntime();
       this.setRunning(threadId, false);
     }
   }
 
-  async decide(
-    approve: boolean,
-    remember: boolean,
-    editedPattern?: string,
-  ) {
+  async decide(approve: boolean, remember: boolean, editedPattern?: string) {
     if (!this.thread || !this.activeRuntime.pending) return;
     const rt = this.activeRuntime;
     const savedPending = rt.pending;
@@ -1332,12 +1291,12 @@ class CoderSessionState {
     const callId = savedPending.call_id;
 
     rt.running = true;
-    rt.streamingText = "";
+    rt.streamingText = '';
     rt.waitingSeconds = 0;
     rt.error = null;
     rt.canRetry = false;
     rt.lastRetry = {
-      type: "approve",
+      type: 'approve',
       callId,
       approve,
       remember,
@@ -1354,7 +1313,7 @@ class CoderSessionState {
         remember,
         editedPattern,
         savedPending?.tool,
-        savedPending?.arguments as Record<string, unknown> | undefined,
+        savedPending?.arguments as Record<string, unknown> | undefined
       );
       rt.canRetry = false;
       rt.lastRetry = null;
@@ -1405,9 +1364,9 @@ class CoderSessionState {
     this.agentMode = next;
     await coderService.setMode(next);
 
-    if (next === "multitask") {
+    if (next === 'multitask') {
       await this.setMultitaskMode(true);
-    } else if (this.thread?.thread_kind === "coordinator") {
+    } else if (this.thread?.thread_kind === 'coordinator') {
       await this.setMultitaskMode(false);
     }
   }
@@ -1428,7 +1387,7 @@ class CoderSessionState {
     try {
       await this.syncThreadLlmConfig(this.thread.id);
     } catch (e) {
-      console.error("Failed to update session model:", e);
+      console.error('Failed to update session model:', e);
     }
   }
 
@@ -1438,7 +1397,7 @@ class CoderSessionState {
     try {
       await this.syncThreadLlmConfig(this.thread.id);
     } catch (e) {
-      console.error("Failed to update session provider:", e);
+      console.error('Failed to update session provider:', e);
     }
   }
 }

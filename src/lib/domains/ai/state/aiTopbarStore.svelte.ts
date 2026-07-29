@@ -1,4 +1,4 @@
-import type { Snippet } from "svelte";
+import type { Snippet } from 'svelte';
 
 /**
  * Controls a page hands to the AI layout so they render beside the tab bar

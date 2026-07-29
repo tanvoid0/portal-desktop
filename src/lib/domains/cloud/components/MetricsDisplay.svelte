@@ -1,12 +1,7 @@
 <!-- Metrics Display Component -->
 <script lang="ts">
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import Progress from "$lib/components/ui/progress/progress.svelte";
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import Progress from '$lib/components/ui/progress/progress.svelte';
 
   export interface Metrics {
     cpu_usage?: number | null;
@@ -22,14 +17,10 @@
     showDetails?: boolean;
   }
 
-  let {
-    metrics,
-    title = "Resource Metrics",
-    showDetails = true,
-  }: Props = $props();
+  let { metrics, title = 'Resource Metrics', showDetails = true }: Props = $props();
 
   function formatCPU(cpu: number | null | undefined): string {
-    if (!cpu && cpu !== 0) return "N/A";
+    if (!cpu && cpu !== 0) return 'N/A';
     if (cpu < 0.001) {
       return `${(cpu * 1000).toFixed(0)}m`;
     }
@@ -37,7 +28,7 @@
   }
 
   function formatMemory(bytes: number | null | undefined): string {
-    if (!bytes && bytes !== 0) return "N/A";
+    if (!bytes && bytes !== 0) return 'N/A';
     const gb = bytes / (1024 * 1024 * 1024);
     if (gb >= 1) {
       return `${gb.toFixed(2)} Gi`;

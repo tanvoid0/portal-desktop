@@ -14,13 +14,13 @@ retire it as a separate binary.
 
 ## Compatibility assessment
 
-| Layer | disk utility | desktop | Portable? |
-|-------|--------------|---------|-----------|
-| Shell | Tauri 2 | Tauri 2 | ✅ same |
-| Backend | plain Rust modules | domain-per-feature (`src-tauri/src/domains/*`) | ✅ move under a domain |
-| Frontend | **React 18** + own Tailwind | **Svelte 5 / SvelteKit** + shadcn-svelte + bits-ui | ❌ must be rewritten |
-| Local DB | `rusqlite` (bundled), own `portal.db` | `sea-orm` / `sqlx` | ⚠️ keep rusqlite for the disk domain (MVP) or port to sea-orm entities |
-| AI verify | bespoke `reqwest::blocking` client → Agent Platform | full `ai` domain (async providers) | ⚠️ rewire later; keep as-is for MVP |
+| Layer     | disk utility                                        | desktop                                            | Portable?                                                              |
+| --------- | --------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| Shell     | Tauri 2                                             | Tauri 2                                            | ✅ same                                                                |
+| Backend   | plain Rust modules                                  | domain-per-feature (`src-tauri/src/domains/*`)     | ✅ move under a domain                                                 |
+| Frontend  | **React 18** + own Tailwind                         | **Svelte 5 / SvelteKit** + shadcn-svelte + bits-ui | ❌ must be rewritten                                                   |
+| Local DB  | `rusqlite` (bundled), own `portal.db`               | `sea-orm` / `sqlx`                                 | ⚠️ keep rusqlite for the disk domain (MVP) or port to sea-orm entities |
+| AI verify | bespoke `reqwest::blocking` client → Agent Platform | full `ai` domain (async providers)                 | ⚠️ rewire later; keep as-is for MVP                                    |
 
 **Verdict: worth doing.** Backend ports mechanically; the real work is a React→Svelte
 UI rewrite.
@@ -47,12 +47,14 @@ domains/disk/
 ```
 
 Wiring in `lib.rs`:
+
 - `app.manage(Arc::new(disk::db::Db::open(app_data_dir.join("disk_utility.db"))?))`
 - `app.manage(disk::commands::ScanControl::default())`
 - `app.manage(disk::commands::VerifyControl::default())`
 - register the 17 commands in `generate_handler!`.
 
 Cargo deps to add to `src-tauri/Cargo.toml`:
+
 - `jwalk = "0.8"`
 - `trash = "5"`
 - `rusqlite = { version = "0.32", features = ["bundled"] }`
@@ -60,6 +62,7 @@ Cargo deps to add to `src-tauri/Cargo.toml`:
 - `sysinfo` already present (0.30) — the `Disks` API is compatible.
 
 ### Commands surfaced
+
 `scan_directory`, `scan_projects`, `cancel_scan`, `get_cached_scan`,
 `remove_cached_scan`, `quarantine_paths`, `get_audit_log`, `list_protected`,
 `add_protected`, `remove_protected`, `list_locations`, `disk_usage`,
@@ -71,6 +74,7 @@ Emitted events: `scan://progress`, `quarantine://progress`, `verify://progress`.
 ## Frontend (follow-up — the bulk of the work)
 
 Rebuild the React UI as Svelte routes under `src/routes/utilities/disk/`:
+
 - Dashboard: `disk_usage` capacity bars.
 - Cleanup tab: location picker (`list_locations`), scan + progress, proposals table
   (`@tanstack/table-core` already a dep), quarantine confirm.

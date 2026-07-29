@@ -2,14 +2,9 @@
  * SDK Manager Store
  */
 
-import { writable, derived } from "svelte/store";
-import { logger } from "$lib/domains/shared";
-import type {
-  SDK,
-  SDKManagerInfo,
-  SDKInstallation,
-  SDKDetectionResult,
-} from "../types";
+import { writable, derived } from 'svelte/store';
+import { logger } from '$lib/domains/shared';
+import type { SDK, SDKManagerInfo, SDKInstallation, SDKDetectionResult } from '../types';
 
 // Core state
 export const sdkManagers = writable<SDKManagerInfo[]>([]);
@@ -21,10 +16,9 @@ export const detectionError = writable<string | null>(null);
 // Derived stores
 export const installedManagers = derived(sdkManagers, ($managers) => {
   const filtered = $managers.filter((manager) => {
-    const isInstalled =
-      manager.installed === true || manager.installed === "true";
-    logger.info("Filtering manager", {
-      context: "SDKStore",
+    const isInstalled = manager.installed === true || manager.installed === 'true';
+    logger.info('Filtering manager', {
+      context: 'SDKStore',
       data: {
         manager: manager,
         installed: manager.installed,
@@ -35,8 +29,8 @@ export const installedManagers = derived(sdkManagers, ($managers) => {
     return isInstalled;
   });
 
-  logger.info("Installed managers filtered", {
-    context: "SDKStore",
+  logger.info('Installed managers filtered', {
+    context: 'SDKStore',
     data: {
       originalCount: $managers.length,
       filteredCount: filtered.length,
@@ -48,7 +42,7 @@ export const installedManagers = derived(sdkManagers, ($managers) => {
 });
 
 export const availableSDKs = derived(installedSDKs, ($sdks) =>
-  $sdks.filter((sdk) => sdk.installation.installed),
+  $sdks.filter((sdk) => sdk.installation.installed)
 );
 
 export const sdkByType = derived(installedSDKs, ($sdks) => {
@@ -63,7 +57,7 @@ export const sdkByType = derived(installedSDKs, ($sdks) => {
 });
 
 export const activeSDKs = derived(installedSDKs, ($sdks) =>
-  $sdks.filter((sdk) => sdk.installation.activeVersion),
+  $sdks.filter((sdk) => sdk.installation.activeVersion)
 );
 
 // Store actions
@@ -72,8 +66,8 @@ export const sdkActions = {
    * Set SDK managers from detection result
    */
   setManagers(managers: SDKManagerInfo[]): void {
-    logger.info("Setting SDK managers", {
-      context: "SDKStore",
+    logger.info('Setting SDK managers', {
+      context: 'SDKStore',
       data: { count: managers.length },
     });
     sdkManagers.set(managers);
@@ -83,8 +77,8 @@ export const sdkActions = {
    * Set installed SDKs
    */
   setSDKs(sdks: SDK[]): void {
-    logger.info("Setting installed SDKs", {
-      context: "SDKStore",
+    logger.info('Setting installed SDKs', {
+      context: 'SDKStore',
       data: { count: sdks.length },
     });
     installedSDKs.set(sdks);
@@ -94,8 +88,8 @@ export const sdkActions = {
    * Set detection result
    */
   setDetectionResult(result: SDKDetectionResult): void {
-    logger.info("Setting SDK detection result", {
-      context: "SDKStore",
+    logger.info('Setting SDK detection result', {
+      context: 'SDKStore',
       data: {
         managersCount: result.managers.length,
         sdksCount: result.sdks.length,
@@ -109,8 +103,8 @@ export const sdkActions = {
     installedSDKs.set(result.sdks);
 
     // Debug: Log what was actually set
-    logger.info("SDK managers set in store", {
-      context: "SDKStore",
+    logger.info('SDK managers set in store', {
+      context: 'SDKStore',
       data: {
         managersSet: result.managers,
         managersLength: result.managers.length,
@@ -132,8 +126,8 @@ export const sdkActions = {
    * Set detection error
    */
   setDetectionError(error: string): void {
-    logger.error("SDK detection error", {
-      context: "SDKStore",
+    logger.error('SDK detection error', {
+      context: 'SDKStore',
       error: new Error(error),
     });
     detectionError.set(error);
@@ -143,16 +137,11 @@ export const sdkActions = {
   /**
    * Update SDK installation status
    */
-  updateSDKInstallation(
-    sdkId: string,
-    installation: Partial<SDKInstallation>,
-  ): void {
+  updateSDKInstallation(sdkId: string, installation: Partial<SDKInstallation>): void {
     installedSDKs.update((sdks) =>
       sdks.map((sdk) =>
-        sdk.id === sdkId
-          ? { ...sdk, installation: { ...sdk.installation, ...installation } }
-          : sdk,
-      ),
+        sdk.id === sdkId ? { ...sdk, installation: { ...sdk.installation, ...installation } } : sdk
+      )
     );
   },
 
@@ -160,8 +149,8 @@ export const sdkActions = {
    * Add new SDK
    */
   addSDK(sdk: SDK): void {
-    logger.info("Adding new SDK", {
-      context: "SDKStore",
+    logger.info('Adding new SDK', {
+      context: 'SDKStore',
       data: { sdkId: sdk.id, type: sdk.type },
     });
     installedSDKs.update((sdks) => [...sdks, sdk]);
@@ -171,8 +160,8 @@ export const sdkActions = {
    * Remove SDK
    */
   removeSDK(sdkId: string): void {
-    logger.info("Removing SDK", {
-      context: "SDKStore",
+    logger.info('Removing SDK', {
+      context: 'SDKStore',
       data: { sdkId },
     });
     installedSDKs.update((sdks) => sdks.filter((sdk) => sdk.id !== sdkId));
@@ -182,7 +171,7 @@ export const sdkActions = {
    * Clear all data
    */
   clear(): void {
-    logger.info("Clearing SDK store", { context: "SDKStore" });
+    logger.info('Clearing SDK store', { context: 'SDKStore' });
     sdkManagers.set([]);
     installedSDKs.set([]);
     detectionResult.set(null);
@@ -193,15 +182,11 @@ export const sdkActions = {
 
 // Utility functions
 export const getSDKByType = (type: string) => {
-  return derived(installedSDKs, ($sdks) =>
-    $sdks.find((sdk) => sdk.type === type),
-  );
+  return derived(installedSDKs, ($sdks) => $sdks.find((sdk) => sdk.type === type));
 };
 
 export const getManagerByType = (type: string) => {
   return derived(sdkManagers, ($managers) =>
-    $managers.find(
-      (manager) => manager.sdk_type === type || manager.type === type,
-    ),
+    $managers.find((manager) => manager.sdk_type === type || manager.type === type)
   );
 };

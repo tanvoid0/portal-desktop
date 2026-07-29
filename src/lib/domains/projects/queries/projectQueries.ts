@@ -1,6 +1,6 @@
-import { createQuery } from "@tanstack/svelte-query";
-import { queryKeys } from "$lib/domains/shared/query/keys";
-import { fetchAllProjects, fetchProjectById } from "../api/projectApi";
+import { createQuery } from '@tanstack/svelte-query';
+import { queryKeys } from '$lib/domains/shared/query/keys';
+import { fetchAllProjects, fetchProjectById } from '../api/projectApi';
 
 export function createProjectsQuery() {
   return createQuery(() => ({
@@ -9,16 +9,14 @@ export function createProjectsQuery() {
   }));
 }
 
-export function createProjectQuery(
-  projectId: () => string | null | undefined,
-) {
+export function createProjectQuery(projectId: () => string | null | undefined) {
   return createQuery(() => {
     const id = projectId();
     // `!!id` narrows away null/undefined; Boolean(id) does not.
     const enabled = !!id && !Number.isNaN(parseInt(id, 10));
 
     return {
-      queryKey: queryKeys.projects.detail(id ?? ""),
+      queryKey: queryKeys.projects.detail(id ?? ''),
       queryFn: () => fetchProjectById(id!),
       enabled,
     };

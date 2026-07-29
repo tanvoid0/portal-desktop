@@ -2,17 +2,17 @@
  * Pipeline Service - Frontend business logic for pipeline management
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { logger } from "$lib/domains/shared";
+import { invoke } from '@tauri-apps/api/core';
+import { logger } from '$lib/domains/shared';
 import type {
   Pipeline,
   CreatePipelineRequest,
   UpdatePipelineRequest,
   PipelineExecution,
   ExecutePipelineRequest,
-} from "../types";
+} from '../types';
 
-const log = logger.createScoped("PipelineService");
+const log = logger.createScoped('PipelineService');
 
 export class PipelineService {
   private static instance: PipelineService;
@@ -30,7 +30,7 @@ export class PipelineService {
   async getPipelines(projectId: string): Promise<Pipeline[]> {
     try {
       if (!projectId) {
-        throw new Error("Project ID is required");
+        throw new Error('Project ID is required');
       }
 
       const projectIdInt = parseInt(projectId, 10);
@@ -38,20 +38,19 @@ export class PipelineService {
         throw new Error(`Invalid project ID: ${projectId}`);
       }
 
-      log.info("Loading pipelines", { projectId: projectIdInt });
-      const pipelines = await invoke<Pipeline[]>("get_pipelines", {
+      log.info('Loading pipelines', { projectId: projectIdInt });
+      const pipelines = await invoke<Pipeline[]>('get_pipelines', {
         projectId: projectIdInt,
       });
-      log.info("Pipelines loaded", {
+      log.info('Pipelines loaded', {
         projectId: projectIdInt,
         count: pipelines.length,
       });
       return pipelines;
     } catch (error) {
       // Extract error message properly for logging
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      log.error("Failed to load pipelines", {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log.error('Failed to load pipelines', {
         error: errorMessage,
         projectId,
       });
@@ -64,14 +63,14 @@ export class PipelineService {
    */
   async getPipeline(pipelineId: string): Promise<Pipeline | null> {
     try {
-      log.info("Loading pipeline", { pipelineId });
-      const pipeline = await invoke<Pipeline | null>("get_pipeline", {
+      log.info('Loading pipeline', { pipelineId });
+      const pipeline = await invoke<Pipeline | null>('get_pipeline', {
         pipelineId,
       });
-      log.info("Pipeline loaded", { pipelineId, found: !!pipeline });
+      log.info('Pipeline loaded', { pipelineId, found: !!pipeline });
       return pipeline;
     } catch (error) {
-      log.error("Failed to load pipeline", { error });
+      log.error('Failed to load pipeline', { error });
       throw error;
     }
   }
@@ -81,15 +80,15 @@ export class PipelineService {
    */
   async createPipeline(request: CreatePipelineRequest): Promise<Pipeline> {
     try {
-      log.info("Creating pipeline", {
+      log.info('Creating pipeline', {
         name: request.name,
         projectId: request.projectId,
       });
-      const pipeline = await invoke<Pipeline>("create_pipeline", { request });
-      log.info("Pipeline created", { id: pipeline.id });
+      const pipeline = await invoke<Pipeline>('create_pipeline', { request });
+      log.info('Pipeline created', { id: pipeline.id });
       return pipeline;
     } catch (error) {
-      log.error("Failed to create pipeline", { error });
+      log.error('Failed to create pipeline', { error });
       throw error;
     }
   }
@@ -97,20 +96,17 @@ export class PipelineService {
   /**
    * Update an existing pipeline
    */
-  async updatePipeline(
-    pipelineId: string,
-    request: UpdatePipelineRequest,
-  ): Promise<Pipeline> {
+  async updatePipeline(pipelineId: string, request: UpdatePipelineRequest): Promise<Pipeline> {
     try {
-      log.info("Updating pipeline", { pipelineId });
-      const pipeline = await invoke<Pipeline>("update_pipeline", {
+      log.info('Updating pipeline', { pipelineId });
+      const pipeline = await invoke<Pipeline>('update_pipeline', {
         pipelineId,
         request,
       });
-      log.info("Pipeline updated", { pipelineId });
+      log.info('Pipeline updated', { pipelineId });
       return pipeline;
     } catch (error) {
-      log.error("Failed to update pipeline", { error });
+      log.error('Failed to update pipeline', { error });
       throw error;
     }
   }
@@ -120,11 +116,11 @@ export class PipelineService {
    */
   async deletePipeline(pipelineId: string): Promise<void> {
     try {
-      log.info("Deleting pipeline", { pipelineId });
-      await invoke("delete_pipeline", { pipelineId });
-      log.info("Pipeline deleted", { pipelineId });
+      log.info('Deleting pipeline', { pipelineId });
+      await invoke('delete_pipeline', { pipelineId });
+      log.info('Pipeline deleted', { pipelineId });
     } catch (error) {
-      log.error("Failed to delete pipeline", { error });
+      log.error('Failed to delete pipeline', { error });
       throw error;
     }
   }
@@ -132,18 +128,16 @@ export class PipelineService {
   /**
    * Execute a pipeline
    */
-  async executePipeline(
-    request: ExecutePipelineRequest,
-  ): Promise<PipelineExecution> {
+  async executePipeline(request: ExecutePipelineRequest): Promise<PipelineExecution> {
     try {
-      log.info("Executing pipeline", { pipelineId: request.pipelineId });
-      const execution = await invoke<PipelineExecution>("execute_pipeline", {
+      log.info('Executing pipeline', { pipelineId: request.pipelineId });
+      const execution = await invoke<PipelineExecution>('execute_pipeline', {
         request,
       });
-      log.info("Pipeline execution started", { executionId: execution.id });
+      log.info('Pipeline execution started', { executionId: execution.id });
       return execution;
     } catch (error) {
-      log.error("Failed to execute pipeline", { error });
+      log.error('Failed to execute pipeline', { error });
       throw error;
     }
   }
@@ -153,16 +147,13 @@ export class PipelineService {
    */
   async getExecution(executionId: string): Promise<PipelineExecution | null> {
     try {
-      log.info("Loading execution", { executionId });
-      const execution = await invoke<PipelineExecution | null>(
-        "get_pipeline_execution",
-        {
-          executionId,
-        },
-      );
+      log.info('Loading execution', { executionId });
+      const execution = await invoke<PipelineExecution | null>('get_pipeline_execution', {
+        executionId,
+      });
       return execution;
     } catch (error) {
-      log.error("Failed to load execution", { error });
+      log.error('Failed to load execution', { error });
       throw error;
     }
   }
@@ -170,22 +161,16 @@ export class PipelineService {
   /**
    * Get all executions for a pipeline
    */
-  async getExecutions(
-    pipelineId: string,
-    limit = 50,
-  ): Promise<PipelineExecution[]> {
+  async getExecutions(pipelineId: string, limit = 50): Promise<PipelineExecution[]> {
     try {
-      log.info("Loading executions", { pipelineId });
-      const executions = await invoke<PipelineExecution[]>(
-        "get_pipeline_executions",
-        {
-          pipelineId,
-          limit,
-        },
-      );
+      log.info('Loading executions', { pipelineId });
+      const executions = await invoke<PipelineExecution[]>('get_pipeline_executions', {
+        pipelineId,
+        limit,
+      });
       return executions;
     } catch (error) {
-      log.error("Failed to load executions", { error });
+      log.error('Failed to load executions', { error });
       throw error;
     }
   }
@@ -195,11 +180,11 @@ export class PipelineService {
    */
   async cancelExecution(executionId: string): Promise<void> {
     try {
-      log.info("Cancelling execution", { executionId });
-      await invoke("cancel_pipeline_execution", { executionId });
-      log.info("Execution cancelled", { executionId });
+      log.info('Cancelling execution', { executionId });
+      await invoke('cancel_pipeline_execution', { executionId });
+      log.info('Execution cancelled', { executionId });
     } catch (error) {
-      log.error("Failed to cancel execution", { error });
+      log.error('Failed to cancel execution', { error });
       throw error;
     }
   }
@@ -207,23 +192,20 @@ export class PipelineService {
   /**
    * Duplicate a pipeline
    */
-  async duplicatePipeline(
-    pipelineId: string,
-    newName: string,
-  ): Promise<Pipeline> {
+  async duplicatePipeline(pipelineId: string, newName: string): Promise<Pipeline> {
     try {
-      log.info("Duplicating pipeline", { pipelineId, newName });
-      const pipeline = await invoke<Pipeline>("duplicate_pipeline", {
+      log.info('Duplicating pipeline', { pipelineId, newName });
+      const pipeline = await invoke<Pipeline>('duplicate_pipeline', {
         pipelineId,
         newName,
       });
-      log.info("Pipeline duplicated", {
+      log.info('Pipeline duplicated', {
         originalId: pipelineId,
         newId: pipeline.id,
       });
       return pipeline;
     } catch (error) {
-      log.error("Failed to duplicate pipeline", { error });
+      log.error('Failed to duplicate pipeline', { error });
       throw error;
     }
   }
@@ -231,16 +213,13 @@ export class PipelineService {
   /**
    * Enable or disable a pipeline
    */
-  async setPipelineEnabled(
-    pipelineId: string,
-    enabled: boolean,
-  ): Promise<void> {
+  async setPipelineEnabled(pipelineId: string, enabled: boolean): Promise<void> {
     try {
-      log.info("Setting pipeline enabled state", { pipelineId, enabled });
-      await invoke("set_pipeline_enabled", { pipelineId, enabled });
-      log.info("Pipeline enabled state updated", { pipelineId, enabled });
+      log.info('Setting pipeline enabled state', { pipelineId, enabled });
+      await invoke('set_pipeline_enabled', { pipelineId, enabled });
+      log.info('Pipeline enabled state updated', { pipelineId, enabled });
     } catch (error) {
-      log.error("Failed to set pipeline enabled state", { error });
+      log.error('Failed to set pipeline enabled state', { error });
       throw error;
     }
   }

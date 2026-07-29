@@ -1,17 +1,15 @@
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
-  import type { ProviderType } from "../../types/index.js";
-  import { aiProviderService } from "../../services/aiProviderService.js";
+  import { Badge } from '$lib/components/ui/badge';
+  import type { ProviderType } from '../../types/index.js';
+  import { aiProviderService } from '../../services/aiProviderService.js';
 
   interface Props {
     selectedProvider?: ProviderType | null;
     onProviderChange?: (provider: ProviderType) => void;
   }
 
-  let {
-    selectedProvider = $bindable<ProviderType | null>(null),
-    onProviderChange,
-  }: Props = $props();
+  let { selectedProvider = $bindable<ProviderType | null>(null), onProviderChange }: Props =
+    $props();
 
   let defaultProvider = $state<ProviderType | null>(null);
   let isLoading = $state(false);
@@ -21,11 +19,11 @@
     try {
       defaultProvider = await aiProviderService.getDefaultProvider();
       if (!selectedProvider) {
-        selectedProvider = defaultProvider ?? "AgentPlatform";
+        selectedProvider = defaultProvider ?? 'AgentPlatform';
       }
-      onProviderChange?.(selectedProvider ?? "AgentPlatform");
+      onProviderChange?.(selectedProvider ?? 'AgentPlatform');
     } catch {
-      selectedProvider = "AgentPlatform";
+      selectedProvider = 'AgentPlatform';
     } finally {
       isLoading = false;
     }
@@ -41,7 +39,7 @@
     <span>Loading provider…</span>
   {:else}
     <span>Agent Platform</span>
-    {#if selectedProvider === defaultProvider || selectedProvider === "AgentPlatform"}
+    {#if selectedProvider === defaultProvider || selectedProvider === 'AgentPlatform'}
       <Badge variant="secondary" class="text-xs">Default</Badge>
     {/if}
   {/if}

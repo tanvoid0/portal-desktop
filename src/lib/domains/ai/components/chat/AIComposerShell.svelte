@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { ArrowUp, ListOrdered, Square } from "@lucide/svelte";
-  import { cn } from "$lib/utils.js";
+  import type { Snippet } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { ArrowUp, ListOrdered, Square } from '@lucide/svelte';
+  import { cn } from '$lib/utils.js';
 
   interface Props {
     value: string;
@@ -12,7 +12,7 @@
     placeholder?: string;
     disabled?: boolean;
     running?: boolean;
-    submitOn?: "enter" | "modifier-enter";
+    submitOn?: 'enter' | 'modifier-enter';
     rows?: number;
     /** Show queue icon on send when running with text */
     queueSend?: boolean;
@@ -28,17 +28,17 @@
   }
 
   let {
-    value = $bindable(""),
+    value = $bindable(''),
     onSend,
     onStop,
-    placeholder = "Type your message...",
+    placeholder = 'Type your message...',
     disabled = false,
     running = false,
-    submitOn = "modifier-enter",
+    submitOn = 'modifier-enter',
     rows = 2,
     queueSend = false,
     sendTitle,
-    class: className = "",
+    class: className = '',
     leading,
     trailing,
     above,
@@ -53,23 +53,23 @@
     sendTitle ??
       (running
         ? value.trim()
-          ? "Queue message (Ctrl/Cmd+Enter)"
-          : "Stop agent"
-        : submitOn === "modifier-enter"
-          ? "Send (Ctrl/Cmd+Enter)"
-          : "Send (Enter)"),
+          ? 'Queue message (Ctrl/Cmd+Enter)'
+          : 'Stop agent'
+        : submitOn === 'modifier-enter'
+          ? 'Send (Ctrl/Cmd+Enter)'
+          : 'Send (Enter)')
   );
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === "Tab" && event.shiftKey) {
+    if (event.key === 'Tab' && event.shiftKey) {
       event.preventDefault();
       onModeCycle?.();
       return;
     }
 
-    if (event.key !== "Enter") return;
+    if (event.key !== 'Enter') return;
 
-    if (submitOn === "modifier-enter") {
+    if (submitOn === 'modifier-enter') {
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
         onSend();
@@ -85,7 +85,7 @@
 
   function autoResize() {
     if (!textareaEl) return;
-    textareaEl.style.height = "auto";
+    textareaEl.style.height = 'auto';
     textareaEl.style.height = `${Math.min(textareaEl.scrollHeight, 160)}px`;
   }
 
@@ -95,7 +95,7 @@
   });
 </script>
 
-<div class={cn("px-4 pb-3 pt-2", className)}>
+<div class={cn('px-4 pb-3 pt-2', className)}>
   <div class="mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
     {#if above}
       {@render above()}

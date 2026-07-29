@@ -3,24 +3,21 @@
  * Highest priority wins for the same action/workflow id.
  */
 
-import type { Project } from "$lib/domains/projects/types";
-import { buildDefaultActions, buildDefaultWorkflows } from "./defaults";
-import {
-  loadPortalPipelineFile,
-  parsePortalPipelineFile,
-} from "./pipelineFile";
+import type { Project } from '$lib/domains/projects/types';
+import { buildDefaultActions, buildDefaultWorkflows } from './defaults';
+import { loadPortalPipelineFile, parsePortalPipelineFile } from './pipelineFile';
 import {
   profileFromDirectory,
   profileFromProject,
   profileVariables,
   substituteVars,
-} from "./profile";
+} from './profile';
 import type {
   PortalPipelineFile,
   ProjectAutomationProfile,
   UnifiedAction,
   UnifiedWorkflow,
-} from "./types";
+} from './types';
 
 export interface ResolveCatalogOptions {
   /** Custom actions from Portal UI / DB (mid priority) */
@@ -54,7 +51,7 @@ function mergeById<T extends { id: string }>(layers: T[][]): T[] {
 
 function fileActionsToUnified(
   file: PortalPipelineFile,
-  profile: ProjectAutomationProfile,
+  profile: ProjectAutomationProfile
 ): UnifiedAction[] {
   if (!file.actions) return [];
   const vars = profileVariables(profile);
@@ -62,8 +59,8 @@ function fileActionsToUnified(
     id,
     name: def.name ?? id,
     description: def.description,
-    source: "file" as const,
-    runner: "local" as const,
+    source: 'file' as const,
+    runner: 'local' as const,
     category: def.category,
     command: substituteVars(def.run, vars),
     longRunning: def.longRunning,
@@ -76,8 +73,8 @@ function fileWorkflowsToUnified(file: PortalPipelineFile): UnifiedWorkflow[] {
     id,
     name: def.name ?? id,
     description: def.description,
-    source: "file" as const,
-    runner: "local" as const,
+    source: 'file' as const,
+    runner: 'local' as const,
     steps: def.steps.map((s) => ({
       action: s.action,
       needs: s.needs,
@@ -87,12 +84,12 @@ function fileWorkflowsToUnified(file: PortalPipelineFile): UnifiedWorkflow[] {
 
 export function mergeCatalog(
   profile: ProjectAutomationProfile,
-  options: ResolveCatalogOptions = {},
+  options: ResolveCatalogOptions = {}
 ): ActionCatalog {
   const warnings: string[] = [];
   let defaults = buildDefaultActions(profile);
   if (options.includeLint === false) {
-    defaults = defaults.filter((a) => a.id !== "lint");
+    defaults = defaults.filter((a) => a.id !== 'lint');
   }
   const defaultWorkflows = buildDefaultWorkflows(defaults);
 
@@ -105,19 +102,13 @@ export function mergeCatalog(
 
   // Priority (last wins): defaults → custom → file
   const actions = mergeById([defaults, customActions, fromFileActions]);
-  const workflows = mergeById([
-    defaultWorkflows,
-    customWorkflows,
-    fromFileWorkflows,
-  ]);
+  const workflows = mergeById([defaultWorkflows, customWorkflows, fromFileWorkflows]);
 
   // Validate workflow steps reference known actions
   for (const wf of workflows) {
     for (const step of wf.steps) {
       if (!actions.find((a) => a.id === step.action)) {
-        warnings.push(
-          `Workflow "${wf.id}" references unknown action "${step.action}"`,
-        );
+        warnings.push(`Workflow "${wf.id}" references unknown action "${step.action}"`);
       }
     }
   }
@@ -128,10 +119,10 @@ export function mergeCatalog(
 /** Resolve catalog for a registered project (loads `.portal/pipeline.yml` when present). */
 export async function resolveProjectCatalog(
   project: Project,
-  options: ResolveCatalogOptions = {},
+  options: ResolveCatalogOptions = {}
 ): Promise<ActionCatalog> {
-  await import("$lib/domains/projects/utils/iconRegistry").then((m) =>
-    m.projectIconRegistry.ensureLoaded(),
+  await import('$lib/domains/projects/utils/iconRegistry').then((m) =>
+    m.projectIconRegistry.ensureLoaded()
   );
 
   const profile = profileFromProject(project);
@@ -153,9 +144,9 @@ export async function resolveProjectCatalog(
 /** Resolve catalog for an arbitrary directory (local defaults + optional file). */
 export async function resolveDirectoryCatalog(
   cwd: string,
-  options: ResolveCatalogOptions & { packageManager?: string } = {},
+  options: ResolveCatalogOptions & { packageManager?: string } = {}
 ): Promise<ActionCatalog> {
-  const profile = profileFromDirectory(cwd, options.packageManager ?? "npm");
+  const profile = profileFromDirectory(cwd, options.packageManager ?? 'npm');
   let file = options.file ?? null;
   let filePath: string | undefined;
 
@@ -175,8 +166,8 @@ export async function resolveDirectoryCatalog(
 export function resolveCatalogFromFileContent(
   profile: ProjectAutomationProfile,
   rawFile: string | null,
-  options: ResolveCatalogOptions = {},
+  options: ResolveCatalogOptions = {}
 ): ActionCatalog {
-  const file = rawFile ? parsePortalPipelineFile(rawFile) : options.file ?? null;
+  const file = rawFile ? parsePortalPipelineFile(rawFile) : (options.file ?? null);
   return mergeCatalog(profile, { ...options, file, skipFileLoad: true });
 }

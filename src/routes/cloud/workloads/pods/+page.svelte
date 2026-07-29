@@ -1,27 +1,23 @@
 <!-- Pods List Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import {
-    cloudStore,
-    loadResources,
-    refreshResources,
-  } from "$lib/domains/cloud/stores";
-  import { ResourceType } from "$lib/domains/cloud/core/types";
-  import PodsTable from "$lib/domains/cloud/components/workloads/PodsTable.svelte";
-  import PodsStatistics from "$lib/domains/cloud/components/workloads/PodsStatistics.svelte";
-  import PodsFilters from "$lib/domains/cloud/components/workloads/PodsFilters.svelte";
-  import WorkloadListShell from "$lib/domains/cloud/components/workloads/WorkloadListShell.svelte";
-  import { Card } from "$lib/components/ui/card";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { cloudStore, loadResources, refreshResources } from '$lib/domains/cloud/stores';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
+  import PodsTable from '$lib/domains/cloud/components/workloads/PodsTable.svelte';
+  import PodsStatistics from '$lib/domains/cloud/components/workloads/PodsStatistics.svelte';
+  import PodsFilters from '$lib/domains/cloud/components/workloads/PodsFilters.svelte';
+  import WorkloadListShell from '$lib/domains/cloud/components/workloads/WorkloadListShell.svelte';
+  import { Card } from '$lib/components/ui/card';
   import {
     useK8sKeyboard,
     KeyboardShortcutsPanel,
     useTableNavigation,
-  } from "$lib/domains/k8s-navigation";
-  import type { ICloudResource } from "$lib/domains/cloud/core/types";
+  } from '$lib/domains/k8s-navigation';
+  import type { ICloudResource } from '$lib/domains/cloud/core/types';
 
-  let searchQuery = $state("");
-  let statusFilter = $state("");
+  let searchQuery = $state('');
+  let statusFilter = $state('');
 
   onMount(async () => {
     if ($cloudStore.connection.isConnected) {
@@ -32,11 +28,10 @@
   const filteredPods = $derived(
     $cloudStore.resources[ResourceType.POD].filter((pod) => {
       const matchesSearch =
-        !searchQuery ||
-        pod.name.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery || pod.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = !statusFilter || pod.status === statusFilter;
       return matchesSearch && matchesStatus;
-    }),
+    })
   );
 
   const filteredPodsLength = $derived(filteredPods.length);
@@ -73,23 +68,17 @@
       resources: () => filteredPods,
       handlers: {
         onDescribe: (resource) => {
-          goto(
-            `/cloud/workloads/pods/${resource.name}?namespace=${resource.namespace}`,
-          );
+          goto(`/cloud/workloads/pods/${resource.name}?namespace=${resource.namespace}`);
         },
         onLogs: (resource) => {
-          goto(
-            `/cloud/workloads/pods/${resource.name}?namespace=${resource.namespace}&tab=logs`,
-          );
+          goto(`/cloud/workloads/pods/${resource.name}?namespace=${resource.namespace}&tab=logs`);
         },
         onYaml: (resource) => {
-          goto(
-            `/cloud/workloads/pods/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-          );
+          goto(`/cloud/workloads/pods/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
         },
         onPortForward: (resource) => {
           goto(
-            `/cloud/workloads/pods/${resource.name}?namespace=${resource.namespace}&tab=port-forward`,
+            `/cloud/workloads/pods/${resource.name}?namespace=${resource.namespace}&tab=port-forward`
           );
         },
         onRefresh: () => {
@@ -99,7 +88,7 @@
       enabled: $cloudStore.connection.isConnected,
     },
     enabled: $cloudStore.connection.isConnected,
-    context: "pods-page",
+    context: 'pods-page',
   });
 
   // Attach unified keyboard handler
@@ -138,23 +127,18 @@
         onSearchChange={(q) => (searchQuery = q)}
         onStatusFilterChange={(s) => (statusFilter = s)}
         onClear={() => {
-          searchQuery = "";
-          statusFilter = "";
+          searchQuery = '';
+          statusFilter = '';
         }}
       />
     </Card>
   {/snippet}
 
   <Card class="p-4">
-    <div
-      class="k8s-navigable-table"
-      data-selected-index={keyboard.tableNav?.selectedIndex ?? -1}
-    >
+    <div class="k8s-navigable-table" data-selected-index={keyboard.tableNav?.selectedIndex ?? -1}>
       <PodsTable
         pods={filteredPods}
-        emptyMessage={searchQuery || statusFilter
-          ? "No pods match your filters"
-          : "No pods found"}
+        emptyMessage={searchQuery || statusFilter ? 'No pods match your filters' : 'No pods found'}
       />
     </div>
   </Card>

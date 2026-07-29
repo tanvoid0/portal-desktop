@@ -26,7 +26,7 @@ export interface PaginatedResponse<T = unknown> extends ApiResponse<T[]> {
 
 export interface SortOptions {
   field: string;
-  direction: "asc" | "desc";
+  direction: 'asc' | 'desc';
 }
 
 export interface FilterOptions {
@@ -42,7 +42,7 @@ export interface QueryOptions {
 }
 
 export interface UserPreferences {
-  theme: "light" | "dark" | "system";
+  theme: 'light' | 'dark' | 'system';
   language: string;
   notifications: {
     enabled: boolean;
@@ -72,7 +72,7 @@ export interface SystemInfo {
 export interface NotificationOptions {
   title: string;
   message: string;
-  type?: "info" | "success" | "warning" | "error";
+  type?: 'info' | 'success' | 'warning' | 'error';
   duration?: number;
   actions?: Array<{
     label: string;
@@ -101,18 +101,18 @@ export interface TabItem {
 export interface DialogOptions {
   title: string;
   message: string;
-  type?: "info" | "warning" | "error" | "confirm";
+  type?: 'info' | 'warning' | 'error' | 'confirm';
   buttons?: Array<{
     label: string;
     action: () => void;
-    variant?: "primary" | "secondary" | "destructive";
+    variant?: 'primary' | 'secondary' | 'destructive';
   }>;
 }
 
 export interface ToastOptions {
   title: string;
   description?: string;
-  type?: "info" | "success" | "warning" | "error";
+  type?: 'info' | 'success' | 'warning' | 'error';
   duration?: number;
   action?: {
     label: string;

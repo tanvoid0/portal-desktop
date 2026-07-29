@@ -1,14 +1,9 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
   import {
     Dialog,
     DialogContent,
@@ -17,11 +12,11 @@
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from "$lib/components/ui/dialog";
-  import { taskActions } from "../stores/taskStore";
-  import { taskUi } from "../state/taskUi.svelte";
-  import type { TaskFilters, SavedView } from "../types";
-  import Icon from "@iconify/svelte";
+  } from '$lib/components/ui/dialog';
+  import { taskActions } from '../stores/taskStore';
+  import { taskUi } from '../state/taskUi.svelte';
+  import type { TaskFilters, SavedView } from '../types';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     onViewChange?: (filters: TaskFilters) => void;
@@ -30,8 +25,8 @@
   let { onViewChange }: Props = $props();
 
   let showSaveDialog = $state(false);
-  let newViewName = $state("");
-  let newViewDescription = $state("");
+  let newViewName = $state('');
+  let newViewDescription = $state('');
 
   function loadView(view: SavedView) {
     onViewChange?.(view.filters);
@@ -58,12 +53,12 @@
 
     taskActions.saveView(
       newView.name,
-      newView.description || "",
+      newView.description || '',
       newView.filters,
-      newView.isDefault,
+      newView.isDefault
     );
-    newViewName = "";
-    newViewDescription = "";
+    newViewName = '';
+    newViewDescription = '';
     showSaveDialog = false;
   }
 
@@ -93,11 +88,7 @@
           <div class="space-y-4">
             <div class="space-y-2">
               <Label for="viewName">View Name</Label>
-              <Input
-                id="viewName"
-                bind:value={newViewName}
-                placeholder="e.g., My Daily Tasks"
-              />
+              <Input id="viewName" bind:value={newViewName} placeholder="e.g., My Daily Tasks" />
             </div>
             <div class="space-y-2">
               <Label for="viewDescription">Description (optional)</Label>
@@ -109,12 +100,8 @@
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onclick={() => (showSaveDialog = false)}>
-              Cancel
-            </Button>
-            <Button onclick={saveCurrentView} disabled={!newViewName.trim()}>
-              Save View
-            </Button>
+            <Button variant="outline" onclick={() => (showSaveDialog = false)}>Cancel</Button>
+            <Button onclick={saveCurrentView} disabled={!newViewName.trim()}>Save View</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

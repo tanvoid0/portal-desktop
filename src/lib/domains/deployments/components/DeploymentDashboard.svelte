@@ -3,8 +3,8 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import {
     deploymentActions,
     deployments,
@@ -13,37 +13,28 @@
     deploymentError,
     containers,
     isDockerOffline,
-  } from "../stores/deploymentStore";
-  import { deploymentService } from "../services/deploymentService";
-  import { logger } from "$lib/domains/shared";
-  import { toast } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import DeploymentCard from "./DeploymentCard.svelte";
-  import ContainerOverview from "./ContainerOverview.svelte";
-  import DockerStatusBanner from "./DockerStatusBanner.svelte";
-  import WorkloadList from "./WorkloadList.svelte";
-  import { Button } from "$lib/components/ui/button";
+  } from '../stores/deploymentStore';
+  import { deploymentService } from '../services/deploymentService';
+  import { logger } from '$lib/domains/shared';
+  import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import DeploymentCard from './DeploymentCard.svelte';
+  import ContainerOverview from './ContainerOverview.svelte';
+  import DockerStatusBanner from './DockerStatusBanner.svelte';
+  import WorkloadList from './WorkloadList.svelte';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-  } from "$lib/components/ui/alert";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
+  } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import {
     Plus,
     Search,
@@ -55,21 +46,21 @@
     Loader2,
     RefreshCw,
     Box,
-  } from "@lucide/svelte";
-  import type { DeploymentStatus, DockerContainer } from "../types";
-  import type { GroupByMode } from "../utils/workloadGrouping";
-  import { groupWorkloads } from "../utils/workloadGrouping";
-  import { containerStatusGroup } from "../utils/format";
+  } from '@lucide/svelte';
+  import type { DeploymentStatus, DockerContainer } from '../types';
+  import type { GroupByMode } from '../utils/workloadGrouping';
+  import { groupWorkloads } from '../utils/workloadGrouping';
+  import { containerStatusGroup } from '../utils/format';
 
-  type TabValue = "deployments" | "containers";
-  type ContainerStatusTab = "running" | "stopped" | "other";
+  type TabValue = 'deployments' | 'containers';
+  type ContainerStatusTab = 'running' | 'stopped' | 'other';
 
-  let activeTab = $state<TabValue>("containers");
-  let containerStatusTab = $state<ContainerStatusTab>("running");
-  let searchQuery = $state("");
+  let activeTab = $state<TabValue>('containers');
+  let containerStatusTab = $state<ContainerStatusTab>('running');
+  let searchQuery = $state('');
   let selectedStatus = $state<DeploymentStatus | null>(null);
-  let containerSearchQuery = $state("");
-  let groupByMode = $state<GroupByMode>("stack");
+  let containerSearchQuery = $state('');
+  let groupByMode = $state<GroupByMode>('stack');
   let isLoadingContainers = $state(false);
 
   // Reactive stores
@@ -91,11 +82,11 @@
     try {
       await deploymentActions.loadDeployments();
     } catch (err) {
-      logger.error("Failed to load deployments", {
-        context: "DeploymentDashboard",
+      logger.error('Failed to load deployments', {
+        context: 'DeploymentDashboard',
         error: err,
       });
-      toast.error("Failed to load deployments");
+      toast.error('Failed to load deployments');
     }
   }
 
@@ -104,11 +95,11 @@
     try {
       await deploymentActions.loadContainers();
     } catch (err) {
-      logger.error("Failed to load containers", {
-        context: "DeploymentDashboard",
+      logger.error('Failed to load containers', {
+        context: 'DeploymentDashboard',
         error: err,
       });
-      toast.error("Failed to load containers");
+      toast.error('Failed to load containers');
     } finally {
       isLoadingContainers = false;
     }
@@ -117,8 +108,8 @@
   function handleSearch() {
     // Filter logic would be implemented here
     // For now, we'll just log the search
-    logger.info("Searching deployments", {
-      context: "DeploymentDashboard",
+    logger.info('Searching deployments', {
+      context: 'DeploymentDashboard',
       query: searchQuery,
     });
   }
@@ -126,30 +117,30 @@
   function handleStatusFilter(status: DeploymentStatus | null) {
     selectedStatus = status;
     // Filter logic would be implemented here
-    logger.info("Filtering by status", {
-      context: "DeploymentDashboard",
+    logger.info('Filtering by status', {
+      context: 'DeploymentDashboard',
       status,
     });
   }
 
   function handleCreateDeployment() {
-    goto("/deployments/new");
+    goto('/deployments/new');
   }
 
   async function handleRefresh() {
-    if (activeTab === "containers") {
+    if (activeTab === 'containers') {
       await loadContainers();
-      toast.success("Containers refreshed");
+      toast.success('Containers refreshed');
     } else {
       try {
         await deploymentActions.refreshDeploymentStatuses();
-        toast.success("Deployment statuses refreshed");
+        toast.success('Deployment statuses refreshed');
       } catch (err) {
-        logger.error("Failed to refresh deployment statuses", {
-          context: "DeploymentDashboard",
+        logger.error('Failed to refresh deployment statuses', {
+          context: 'DeploymentDashboard',
           error: err,
         });
-        toast.error("Failed to refresh deployment statuses");
+        toast.error('Failed to refresh deployment statuses');
       }
     }
   }
@@ -157,53 +148,47 @@
   async function handleContainerStart(containerId: string) {
     try {
       await deploymentService.startContainer(containerId);
-      toast.success("Container started");
+      toast.success('Container started');
       await loadContainers();
     } catch (err) {
-      logger.error("Failed to start container", {
-        context: "DeploymentDashboard",
+      logger.error('Failed to start container', {
+        context: 'DeploymentDashboard',
         error: err,
       });
-      toast.error(
-        err instanceof Error ? err.message : "Failed to start container",
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to start container');
     }
   }
 
   async function handleContainerStop(containerId: string) {
     try {
       await deploymentService.stopContainer(containerId);
-      toast.success("Container stopped");
+      toast.success('Container stopped');
       await loadContainers();
     } catch (err) {
-      logger.error("Failed to stop container", {
-        context: "DeploymentDashboard",
+      logger.error('Failed to stop container', {
+        context: 'DeploymentDashboard',
         error: err,
       });
-      toast.error(
-        err instanceof Error ? err.message : "Failed to stop container",
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to stop container');
     }
   }
 
   async function handleContainerRemove(containerId: string) {
     const confirmed = await confirmAction(
-      "Are you sure you want to remove this container? This action cannot be undone.",
-      "Remove container",
+      'Are you sure you want to remove this container? This action cannot be undone.',
+      'Remove container'
     );
     if (!confirmed) return;
     try {
       await deploymentService.removeContainer(containerId);
-      toast.success("Container removed");
+      toast.success('Container removed');
       await loadContainers();
     } catch (err) {
-      logger.error("Failed to remove container", {
-        context: "DeploymentDashboard",
+      logger.error('Failed to remove container', {
+        context: 'DeploymentDashboard',
         error: err,
       });
-      toast.error(
-        err instanceof Error ? err.message : "Failed to remove container",
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to remove container');
     }
   }
 
@@ -214,13 +199,13 @@
       (c) =>
         c.name?.toLowerCase().includes(query) ||
         c.image?.toLowerCase().includes(query) ||
-        c.id?.toLowerCase().includes(query),
+        c.id?.toLowerCase().includes(query)
     );
   }
 
   function containersForStatus(
     list: DockerContainer[],
-    status: ContainerStatusTab,
+    status: ContainerStatusTab
   ): DockerContainer[] {
     return filterContainers(list)
       .filter((c) => containerStatusGroup(c.status) === status)
@@ -228,63 +213,55 @@
   }
 
   let containerStatusCounts = $derived({
-    running: containersForStatus(containerList, "running").length,
-    stopped: containersForStatus(containerList, "stopped").length,
-    other: containersForStatus(containerList, "other").length,
+    running: containersForStatus(containerList, 'running').length,
+    stopped: containersForStatus(containerList, 'stopped').length,
+    other: containersForStatus(containerList, 'other').length,
   });
 
-  let visibleContainers = $derived(
-    containersForStatus(containerList, containerStatusTab),
-  );
+  let visibleContainers = $derived(containersForStatus(containerList, containerStatusTab));
 
   let visibleWorkloadGroups = $derived(
     groupWorkloads(containerList, deploymentList, groupByMode, {
       statusFilter: containerStatusTab,
       searchQuery: containerSearchQuery,
-    }),
+    })
   );
 
   let hasVisibleWorkloads = $derived(
-    groupByMode === "flat"
-      ? visibleContainers.length > 0
-      : visibleWorkloadGroups.length > 0,
+    groupByMode === 'flat' ? visibleContainers.length > 0 : visibleWorkloadGroups.length > 0
   );
 
   const containerStatusLabels: Record<ContainerStatusTab, string> = {
-    running: "Running",
-    stopped: "Stopped",
-    other: "Other",
+    running: 'Running',
+    stopped: 'Stopped',
+    other: 'Other',
   };
 
   async function handleDeploymentStart(deploymentId: string) {
     try {
       await deploymentActions.startDeployment(deploymentId);
-      toast.success("Deployment started");
+      toast.success('Deployment started');
       await loadContainers();
     } catch (err) {
-      logger.error("Failed to start deployment", {
-        context: "DeploymentDashboard",
+      logger.error('Failed to start deployment', {
+        context: 'DeploymentDashboard',
         error: err,
       });
-      toast.error(
-        err instanceof Error ? err.message : "Failed to start deployment",
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to start deployment');
     }
   }
 
   async function handleDeploymentStop(deploymentId: string) {
     try {
       await deploymentActions.stopDeployment(deploymentId);
-      toast.success("Deployment stopped");
+      toast.success('Deployment stopped');
       await loadContainers();
     } catch (err) {
-      logger.error("Failed to stop deployment", {
-        context: "DeploymentDashboard",
+      logger.error('Failed to stop deployment', {
+        context: 'DeploymentDashboard',
         error: err,
       });
-      toast.error(
-        err instanceof Error ? err.message : "Failed to stop deployment",
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to stop deployment');
     }
   }
 
@@ -310,11 +287,7 @@
       </p>
     </div>
     <div class="flex gap-2">
-      <Button
-        variant="outline"
-        onclick={handleRefresh}
-        disabled={loading || isLoadingContainers}
-      >
+      <Button variant="outline" onclick={handleRefresh} disabled={loading || isLoadingContainers}>
         {#if loading || isLoadingContainers}
           <Loader2 class="mr-2 h-4 w-4 animate-spin" />
         {:else}
@@ -322,7 +295,7 @@
         {/if}
         Refresh
       </Button>
-      {#if activeTab === "deployments"}
+      {#if activeTab === 'deployments'}
         <Button onclick={handleCreateDeployment}>
           <Plus class="mr-2 h-4 w-4" />
           New Deployment
@@ -446,7 +419,7 @@
           <CardContent class="flex flex-col items-center justify-center py-12">
             <ContainerIcon class="mb-4 h-12 w-12 text-muted-foreground" />
             <h3 class="mb-2 text-lg font-semibold">
-              {dockerOffline ? "Docker Is Offline" : "No Containers Found"}
+              {dockerOffline ? 'Docker Is Offline' : 'No Containers Found'}
             </h3>
             <p class="mb-4 text-center text-muted-foreground">
               {#if dockerOffline}
@@ -464,13 +437,9 @@
           <CardContent class="flex flex-col items-center justify-center py-8">
             <p class="text-muted-foreground">
               {#if containerSearchQuery}
-                No {containerStatusLabels[
-                  containerStatusTab
-                ].toLowerCase()} containers match "{containerSearchQuery}"
+                No {containerStatusLabels[containerStatusTab].toLowerCase()} containers match "{containerSearchQuery}"
               {:else}
-                No {containerStatusLabels[
-                  containerStatusTab
-                ].toLowerCase()} containers
+                No {containerStatusLabels[containerStatusTab].toLowerCase()} containers
               {/if}
             </p>
           </CardContent>
@@ -483,9 +452,7 @@
       <!-- Stats Cards -->
       <div class="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader
-            class="flex flex-row items-center justify-between space-y-0 pb-2"
-          >
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle class="text-sm font-medium">Total Deployments</CardTitle>
             <ContainerIcon class="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -494,9 +461,7 @@
           </CardContent>
         </Card>
         <Card>
-          <CardHeader
-            class="flex flex-row items-center justify-between space-y-0 pb-2"
-          >
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle class="text-sm font-medium">Running</CardTitle>
             <Badge variant="default" class="bg-green-100 text-green-800">
               <Play class="mr-1 h-3 w-3" />
@@ -508,9 +473,7 @@
           </CardContent>
         </Card>
         <Card>
-          <CardHeader
-            class="flex flex-row items-center justify-between space-y-0 pb-2"
-          >
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle class="text-sm font-medium">Stopped</CardTitle>
             <Badge variant="outline">
               <Square class="mr-1 h-3 w-3" />
@@ -522,9 +485,7 @@
           </CardContent>
         </Card>
         <Card>
-          <CardHeader
-            class="flex flex-row items-center justify-between space-y-0 pb-2"
-          >
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle class="text-sm font-medium">Building</CardTitle>
             <Badge variant="outline" class="bg-yellow-100 text-yellow-800">
               🔨 {stats.building}
@@ -555,16 +516,15 @@
         </div>
         <Select
           options={[
-            { value: "", label: "All Statuses" },
-            { value: "Running", label: "Running" },
-            { value: "Stopped", label: "Stopped" },
-            { value: "Building", label: "Building" },
-            { value: "Error", label: "Error" },
+            { value: '', label: 'All Statuses' },
+            { value: 'Running', label: 'Running' },
+            { value: 'Stopped', label: 'Stopped' },
+            { value: 'Building', label: 'Building' },
+            { value: 'Error', label: 'Error' },
           ]}
-          defaultValue={selectedStatus || ""}
+          defaultValue={selectedStatus || ''}
           placeholder="Filter by status"
-          onSelect={(value) =>
-            handleStatusFilter(value ? (value as DeploymentStatus) : null)}
+          onSelect={(value) => handleStatusFilter(value ? (value as DeploymentStatus) : null)}
           class="w-[200px]"
         />
       </div>
@@ -611,8 +571,8 @@
             <h3 class="mb-2 text-lg font-semibold">No Deployments Found</h3>
             <p class="mb-4 text-center text-muted-foreground">
               {searchQuery || selectedStatus
-                ? "Try adjusting your filters"
-                : "Create your first deployment to get started"}
+                ? 'Try adjusting your filters'
+                : 'Create your first deployment to get started'}
             </p>
             {#if !searchQuery && !selectedStatus}
               <Button onclick={handleCreateDeployment}>

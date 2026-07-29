@@ -2,46 +2,41 @@
   Global Action Runs Page
 -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import {
-    PageHeader,
-    PageLoading,
-    PageError,
-  } from "$lib/components/shell";
-  import PipelineRunHistoryList from "$lib/domains/projects/pipelines/components/PipelineRunHistoryList.svelte";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { PageHeader, PageLoading, PageError } from '$lib/components/shell';
+  import PipelineRunHistoryList from '$lib/domains/projects/pipelines/components/PipelineRunHistoryList.svelte';
   import {
     executionService,
     type PipelineExecutionListItem,
     type ExecutionStatus,
-  } from "$lib/domains/projects/pipelines";
-  import { logger } from "$lib/domains/shared";
-  import { RefreshCw } from "@lucide/svelte";
+  } from '$lib/domains/projects/pipelines';
+  import { logger } from '$lib/domains/shared';
+  import { RefreshCw } from '@lucide/svelte';
 
-  const log = logger.createScoped("ActionRunsPage");
+  const log = logger.createScoped('ActionRunsPage');
 
   let executions = $state<PipelineExecutionListItem[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let search = $state("");
-  let statusFilter = $state<string>("all");
+  let search = $state('');
+  let statusFilter = $state<string>('all');
 
   const statusOptions = [
-    { value: "all", label: "All statuses" },
-    { value: "running", label: "Running" },
-    { value: "success", label: "Success" },
-    { value: "failed", label: "Failed" },
-    { value: "cancelled", label: "Cancelled" },
-    { value: "pending", label: "Pending" },
+    { value: 'all', label: 'All statuses' },
+    { value: 'running', label: 'Running' },
+    { value: 'success', label: 'Success' },
+    { value: 'failed', label: 'Failed' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'pending', label: 'Pending' },
   ];
 
   const filteredExecutions = $derived(
     executions.filter((execution) => {
-      const matchesStatus =
-        statusFilter === "all" || execution.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || execution.status === statusFilter;
       const query = search.trim().toLowerCase();
       const matchesSearch =
         !query ||
@@ -49,7 +44,7 @@
         execution.projectName?.toLowerCase().includes(query) ||
         execution.status.toLowerCase().includes(query);
       return matchesStatus && matchesSearch;
-    }),
+    })
   );
 
   async function loadExecutions() {
@@ -58,8 +53,8 @@
     try {
       executions = await executionService.getAllExecutions(100);
     } catch (err) {
-      log.error("Failed to load pipeline runs", err);
-      error = err instanceof Error ? err.message : "Failed to load pipeline runs";
+      log.error('Failed to load pipeline runs', err);
+      error = err instanceof Error ? err.message : 'Failed to load pipeline runs';
     } finally {
       loading = false;
     }
@@ -107,11 +102,7 @@
   </div>
 
   {#if error}
-    <PageError
-      title="Failed to load pipeline runs"
-      message={error}
-      onRetry={loadExecutions}
-    />
+    <PageError title="Failed to load pipeline runs" message={error} onRetry={loadExecutions} />
   {:else if loading && executions.length === 0}
     <PageLoading message="Loading pipeline runs..." />
   {:else}

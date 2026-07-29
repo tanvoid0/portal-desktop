@@ -3,9 +3,9 @@
  * Manages command history with input/output tracking
  */
 
-import { writable } from "svelte/store";
-import { cleanTerminalOutput } from "../utils/textUtils";
-import { invokeClient } from "$lib/utils/invokeClient";
+import { writable } from 'svelte/store';
+import { cleanTerminalOutput } from '../utils/textUtils';
+import { invokeClient } from '$lib/utils/invokeClient';
 
 export interface CommandHistoryEntry {
   id: string;
@@ -28,21 +28,17 @@ export interface CommandHistoryState {
 const initialState: CommandHistoryState = {
   entries: {},
   maxEntries: 100,
-  searchQuery: "",
+  searchQuery: '',
   filteredEntries: {},
 };
 
 function createCommandHistoryStore() {
-  const { subscribe, set, update } =
-    writable<CommandHistoryState>(initialState);
+  const { subscribe, set, update } = writable<CommandHistoryState>(initialState);
 
   return {
     subscribe,
 
-    addEntry: (
-      tabId: string,
-      entry: Omit<CommandHistoryEntry, "id" | "timestamp" | "tabId">,
-    ) => {
+    addEntry: (tabId: string, entry: Omit<CommandHistoryEntry, 'id' | 'timestamp' | 'tabId'>) => {
       update((state) => {
         const newEntry: CommandHistoryEntry = {
           ...entry,
@@ -53,10 +49,7 @@ function createCommandHistoryStore() {
         };
 
         const tabEntries = state.entries[tabId] || [];
-        const newTabEntries = [newEntry, ...tabEntries].slice(
-          0,
-          state.maxEntries,
-        );
+        const newTabEntries = [newEntry, ...tabEntries].slice(0, state.maxEntries);
 
         return {
           ...state,
@@ -98,15 +91,11 @@ function createCommandHistoryStore() {
       return entry;
     },
 
-    updateEntry: (
-      tabId: string,
-      id: string,
-      updates: Partial<CommandHistoryEntry>,
-    ) => {
+    updateEntry: (tabId: string, id: string, updates: Partial<CommandHistoryEntry>) => {
       update((state) => {
         const tabEntries = state.entries[tabId] || [];
         const updatedTabEntries = tabEntries.map((entry) =>
-          entry.id === id ? { ...entry, ...updates } : entry,
+          entry.id === id ? { ...entry, ...updates } : entry
         );
 
         return {
@@ -149,14 +138,14 @@ function createCommandHistoryStore() {
         const filteredEntries: Record<string, CommandHistoryEntry[]> = {};
         Object.keys(state.entries).forEach((tabId) => {
           const entries = state.entries[tabId] || [];
-          if (query.trim() === "") {
+          if (query.trim() === '') {
             filteredEntries[tabId] = entries;
           } else {
             const searchLower = query.toLowerCase();
             filteredEntries[tabId] = entries.filter(
               (entry) =>
                 entry.command.toLowerCase().includes(searchLower) ||
-                entry.output.toLowerCase().includes(searchLower),
+                entry.output.toLowerCase().includes(searchLower)
             );
           }
         });
@@ -181,7 +170,7 @@ function createCommandHistoryStore() {
     saveToBackend: async (tabId: string) => {
       try {
         const entries = commandHistoryStore.getTabHistory(tabId);
-        await invokeClient.request("save_command_history", {
+        await invokeClient.request('save_command_history', {
           data: {
             tabId,
             entries: entries.map((entry) => {
@@ -207,18 +196,17 @@ function createCommandHistoryStore() {
             }),
           },
         });
-        console.log("Command history saved to backend for tab:", tabId);
+        console.log('Command history saved to backend for tab:', tabId);
       } catch (error) {
-        console.error("Failed to save command history:", error);
+        console.error('Failed to save command history:', error);
       }
     },
 
     loadFromBackend: async (tabId: string) => {
       try {
-        const rawEntries = await invokeClient.request<any[]>(
-          "load_command_history",
-          { data: { tabId } },
-        );
+        const rawEntries = await invokeClient.request<any[]>('load_command_history', {
+          data: { tabId },
+        });
 
         update((state) => ({
           ...state,
@@ -236,16 +224,16 @@ function createCommandHistoryStore() {
             })),
           },
         }));
-        console.log("Command history loaded from backend for tab:", tabId);
+        console.log('Command history loaded from backend for tab:', tabId);
       } catch (error) {
-        console.error("Failed to load command history:", error);
+        console.error('Failed to load command history:', error);
       }
     },
 
     // Auto-save when entries are added
     addEntryWithPersistence: async (
       tabId: string,
-      entry: Omit<CommandHistoryEntry, "id" | "timestamp" | "tabId">,
+      entry: Omit<CommandHistoryEntry, 'id' | 'timestamp' | 'tabId'>
     ) => {
       // Add entry to store
       commandHistoryStore.addEntry(tabId, entry);

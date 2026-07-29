@@ -1,32 +1,32 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Separator } from "$lib/components/ui/separator";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Separator } from '$lib/components/ui/separator';
   import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-  } from "$lib/components/ui/collapsible";
-  import Select from "$lib/components/ui/select.svelte";
-  import { toastActions } from "$lib/utils/toast";
-  import { taskActions } from "../stores/taskStore";
+  } from '$lib/components/ui/collapsible';
+  import Select from '$lib/components/ui/select.svelte';
+  import { toastActions } from '$lib/utils/toast';
+  import { taskActions } from '../stores/taskStore';
   import type {
     Task,
     CreateTaskRequest,
     UpdateTaskRequest,
     TaskStatus,
     TaskPriority,
-  } from "../types";
+  } from '../types';
   import {
     TASK_STATUS_OPTIONS,
     TASK_PRIORITY_OPTIONS,
@@ -34,13 +34,13 @@
     TaskStatusEnum,
     TaskPriorityEnum,
     RecurringPatternEnum,
-  } from "../types";
-  import { ResourceType } from "$lib/domains/shared/types/resourceType";
-  import { documentActions, documents } from "$lib/domains/documents";
-  import DocumentLinkSelector from "$lib/domains/documents/components/DocumentLinkSelector.svelte";
-  import type { Document } from "$lib/domains/documents/types";
-  import Icon from "@iconify/svelte";
-  import { goto } from "$app/navigation";
+  } from '../types';
+  import { ResourceType } from '$lib/domains/shared/types/resourceType';
+  import { documentActions, documents } from '$lib/domains/documents';
+  import DocumentLinkSelector from '$lib/domains/documents/components/DocumentLinkSelector.svelte';
+  import type { Document } from '$lib/domains/documents/types';
+  import Icon from '@iconify/svelte';
+  import { goto } from '$app/navigation';
 
   interface Props {
     task?: Task;
@@ -52,26 +52,22 @@
   let { task, onSave, onCancel, parentId }: Props = $props();
 
   // Form state
-  let title = $state(task?.title || "");
-  let description = $state(task?.description || "");
-  let status = $state<TaskStatus>(task?.status || "pending");
-  let priority = $state<TaskPriority>(task?.priority || "medium");
-  let type = $state(task?.type || "");
-  let dueDate = $state(
-    task?.dueDate ? task.dueDate.toISOString().split("T")[0] : "",
-  );
+  let title = $state(task?.title || '');
+  let description = $state(task?.description || '');
+  let status = $state<TaskStatus>(task?.status || 'pending');
+  let priority = $state<TaskPriority>(task?.priority || 'medium');
+  let type = $state(task?.type || '');
+  let dueDate = $state(task?.dueDate ? task.dueDate.toISOString().split('T')[0] : '');
 
   // New advanced fields
   let estimatedTime = $state(task?.estimatedTime || 0);
   let actualTime = $state(task?.actualTime || 0);
   let tags = $state<string[]>(task?.tags || []);
-  let assignee = $state(task?.assignee || "");
-  let recurringPattern = $state(task?.recurring?.pattern || "");
+  let assignee = $state(task?.assignee || '');
+  let recurringPattern = $state(task?.recurring?.pattern || '');
   let recurringInterval = $state(task?.recurring?.interval || 1);
   let recurringEndDate = $state(
-    task?.recurring?.endDate
-      ? task.recurring.endDate.toISOString().split("T")[0]
-      : "",
+    task?.recurring?.endDate ? task.recurring.endDate.toISOString().split('T')[0] : ''
   );
   let blockedBy = $state<string[]>(task?.blockedBy || []);
   let blocks = $state<string[]>(task?.blocks || []);
@@ -80,7 +76,7 @@
   let linkedDocumentId = $state<number | null>(
     task?.resourceType === ResourceType.DOCUMENT && task?.resourceId
       ? parseInt(task.resourceId)
-      : null,
+      : null
   );
 
   // Load documents when component mounts
@@ -92,7 +88,7 @@
   const RECURRING_PATTERNS = Object.values(RecurringPatternEnum);
 
   // UI state
-  let newTag = $state("");
+  let newTag = $state('');
   let showAdvanced = $state(false);
   let isSubmitting = $state(false);
   let errors = $state<Record<string, string>>({});
@@ -101,7 +97,7 @@
   function addTag() {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       tags = [...tags, newTag.trim()];
-      newTag = "";
+      newTag = '';
     }
   }
 
@@ -110,7 +106,7 @@
   }
 
   function handleTagKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter") {
+    if (event.key === 'Enter') {
       event.preventDefault();
       addTag();
     }
@@ -121,23 +117,23 @@
     errors = {};
 
     if (!title.trim()) {
-      errors.title = "Title is required";
+      errors.title = 'Title is required';
     }
 
     if (title.length > 100) {
-      errors.title = "Title must be less than 100 characters";
+      errors.title = 'Title must be less than 100 characters';
     }
 
     if (description && description.length > 500) {
-      errors.description = "Description must be less than 500 characters";
+      errors.description = 'Description must be less than 500 characters';
     }
 
     if (estimatedTime < 0) {
-      errors.estimatedTime = "Estimated time cannot be negative";
+      errors.estimatedTime = 'Estimated time cannot be negative';
     }
 
     if (actualTime < 0) {
-      errors.actualTime = "Actual time cannot be negative";
+      errors.actualTime = 'Actual time cannot be negative';
     }
 
     return Object.keys(errors).length === 0;
@@ -146,7 +142,7 @@
   // Form submission
   async function handleSubmit() {
     if (!validateForm()) {
-      toastActions.error("Please fix the errors below");
+      toastActions.error('Please fix the errors below');
       return;
     }
 
@@ -173,9 +169,7 @@
           ? {
               pattern: recurringPattern as any,
               interval: recurringInterval,
-              endDate: recurringEndDate
-                ? new Date(recurringEndDate)
-                : undefined,
+              endDate: recurringEndDate ? new Date(recurringEndDate) : undefined,
             }
           : undefined,
         blockedBy: blockedBy.length > 0 ? blockedBy : undefined,
@@ -184,21 +178,18 @@
 
       let savedTask: Task;
       if (task) {
-        savedTask = await taskActions.updateTask(
-          task.id,
-          taskData as UpdateTaskRequest,
-        );
-        toastActions.success("Task updated successfully");
+        savedTask = await taskActions.updateTask(task.id, taskData as UpdateTaskRequest);
+        toastActions.success('Task updated successfully');
       } else {
         savedTask = await taskActions.createTask(taskData as CreateTaskRequest);
-        toastActions.success("Task created successfully");
+        toastActions.success('Task created successfully');
       }
 
       onSave?.(savedTask);
     } catch (error) {
       toastActions.error(
-        "Failed to save task",
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        'Failed to save task',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     } finally {
       isSubmitting = false;
@@ -208,10 +199,10 @@
   // Keyboard shortcuts
   function handleKeydown(event: KeyboardEvent) {
     if (event.ctrlKey || event.metaKey) {
-      if (event.key === "Enter") {
+      if (event.key === 'Enter') {
         event.preventDefault();
         handleSubmit();
-      } else if (event.key === "Escape") {
+      } else if (event.key === 'Escape') {
         event.preventDefault();
         onCancel?.();
       }
@@ -223,19 +214,13 @@
   <CardHeader>
     <div class="flex items-center justify-between">
       <div>
-        <CardTitle>{task ? "Edit Task" : "Create New Task"}</CardTitle>
+        <CardTitle>{task ? 'Edit Task' : 'Create New Task'}</CardTitle>
         <CardDescription>
-          {task
-            ? "Update the task details below"
-            : "Fill in the details to create a new task"}
+          {task ? 'Update the task details below' : 'Fill in the details to create a new task'}
         </CardDescription>
       </div>
       {#if !task}
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={() => goto("/tasks/generate")}
-        >
+        <Button variant="outline" size="sm" onclick={() => goto('/tasks/generate')}>
           <Icon icon="lucide:sparkles" class="mr-2 h-4 w-4" />
           Generate Tasks with AI
         </Button>
@@ -250,7 +235,7 @@
         id="title"
         bind:value={title}
         placeholder="Enter task title..."
-        class={errors.title ? "border-destructive" : ""}
+        class={errors.title ? 'border-destructive' : ''}
       />
       {#if errors.title}
         <p class="text-sm text-destructive">{errors.title}</p>
@@ -265,7 +250,7 @@
         bind:value={description}
         placeholder="Enter task description..."
         rows={3}
-        class={errors.description ? "border-destructive" : ""}
+        class={errors.description ? 'border-destructive' : ''}
       />
       {#if errors.description}
         <p class="text-sm text-destructive">{errors.description}</p>
@@ -323,7 +308,7 @@
           min="0"
           bind:value={estimatedTime}
           placeholder="e.g., 120 for 2 hours"
-          class={errors.estimatedTime ? "border-destructive" : ""}
+          class={errors.estimatedTime ? 'border-destructive' : ''}
         />
         {#if errors.estimatedTime}
           <p class="text-sm text-destructive">{errors.estimatedTime}</p>
@@ -338,7 +323,7 @@
           min="0"
           bind:value={actualTime}
           placeholder="e.g., 90 for 1.5 hours"
-          class={errors.actualTime ? "border-destructive" : ""}
+          class={errors.actualTime ? 'border-destructive' : ''}
         />
         {#if errors.actualTime}
           <p class="text-sm text-destructive">{errors.actualTime}</p>
@@ -350,11 +335,7 @@
     <div class="space-y-2">
       <Label>Tags</Label>
       <div class="flex gap-2">
-        <Input
-          placeholder="Add a tag..."
-          bind:value={newTag}
-          onkeydown={handleTagKeydown}
-        />
+        <Input placeholder="Add a tag..." bind:value={newTag} onkeydown={handleTagKeydown} />
         <Button type="button" variant="outline" onclick={addTag}>
           <Icon icon="mdi:plus" class="h-4 w-4" />
         </Button>
@@ -382,11 +363,7 @@
     <!-- Assignee -->
     <div class="space-y-2">
       <Label for="assignee">Assignee</Label>
-      <Input
-        id="assignee"
-        bind:value={assignee}
-        placeholder="Enter assignee name or email..."
-      />
+      <Input id="assignee" bind:value={assignee} placeholder="Enter assignee name or email..." />
     </div>
 
     <!-- Document Link -->
@@ -399,7 +376,7 @@
         onCreateNew={() => {
           // Create new document and link it
           goto(
-            `/documents/create?taskId=${task?.id || ""}&taskTitle=${encodeURIComponent(title || "")}`,
+            `/documents/create?taskId=${task?.id || ''}&taskTitle=${encodeURIComponent(title || '')}`
           );
         }}
       />
@@ -424,7 +401,7 @@
             <div class="space-y-2">
               <Label for="recurringPattern">Pattern</Label>
               <Select
-                options={["", ...RECURRING_PATTERNS]}
+                options={['', ...RECURRING_PATTERNS]}
                 defaultValue={recurringPattern}
                 placeholder="Select pattern..."
                 onSelect={(value) => (recurringPattern = value)}
@@ -442,11 +419,7 @@
             </div>
             <div class="space-y-2">
               <Label for="recurringEndDate">End Date</Label>
-              <Input
-                id="recurringEndDate"
-                type="date"
-                bind:value={recurringEndDate}
-              />
+              <Input id="recurringEndDate" type="date" bind:value={recurringEndDate} />
             </div>
           </div>
         </div>
@@ -460,11 +433,11 @@
               <Textarea
                 placeholder="Enter task IDs separated by commas..."
                 rows={3}
-                value={blockedBy.join(", ")}
+                value={blockedBy.join(', ')}
                 oninput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   blockedBy = target.value
-                    .split(",")
+                    .split(',')
                     .map((id: string) => id.trim())
                     .filter((id: string) => id);
                 }}
@@ -475,11 +448,11 @@
               <Textarea
                 placeholder="Enter task IDs separated by commas..."
                 rows={3}
-                value={blocks.join(", ")}
+                value={blocks.join(', ')}
                 oninput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   blocks = target.value
-                    .split(",")
+                    .split(',')
                     .map((id: string) => id.trim())
                     .filter((id: string) => id);
                 }}
@@ -492,20 +465,16 @@
 
     <!-- Actions -->
     <div class="divider-edge-t divider-edge-full flex justify-end gap-3 pt-4">
-      <Button variant="outline" onclick={onCancel} disabled={isSubmitting}>
-        Cancel
-      </Button>
+      <Button variant="outline" onclick={onCancel} disabled={isSubmitting}>Cancel</Button>
       <Button onclick={handleSubmit} disabled={isSubmitting}>
-        {task ? "Update Task" : "Create Task"}
+        {task ? 'Update Task' : 'Create Task'}
       </Button>
     </div>
 
     <!-- Keyboard shortcuts hint -->
     <div class="text-xs text-muted-foreground">
-      <kbd class="rounded bg-muted px-1.5 py-0.5 text-xs">Ctrl+Enter</kbd> to
-      save,
-      <kbd class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs">Ctrl+Escape</kbd> to
-      cancel
+      <kbd class="rounded bg-muted px-1.5 py-0.5 text-xs">Ctrl+Enter</kbd> to save,
+      <kbd class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs">Ctrl+Escape</kbd> to cancel
     </div>
   </CardContent>
 </Card>

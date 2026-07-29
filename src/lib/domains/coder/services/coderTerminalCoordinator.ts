@@ -10,9 +10,9 @@ import {
   createTerminalProcess,
   getProcessExitCode,
   subscribeProcessOutput,
-} from "$lib/domains/terminal";
-import { coderTerminalStore } from "../state/coderTerminalStore.svelte.js";
-import { isTauriEnvironment } from "$lib/utils/tauri";
+} from '$lib/domains/terminal';
+import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
+import { isTauriEnvironment } from '$lib/utils/tauri';
 
 type TerminalRef = ReturnType<typeof Terminal>;
 
@@ -24,8 +24,8 @@ const REF_WAIT_MS = 1500;
 
 export class CommandAbortedError extends Error {
   constructor() {
-    super("cancelled");
-    this.name = "CommandAbortedError";
+    super('cancelled');
+    this.name = 'CommandAbortedError';
   }
 }
 
@@ -50,17 +50,14 @@ export function abortAgentCommands(threadId: string) {
 export function registerCoderTerminal(
   threadId: string,
   terminalId: string,
-  ref: TerminalRef | null,
+  ref: TerminalRef | null
 ) {
   const key = refKey(threadId, terminalId);
   if (ref) refs.set(key, ref);
   else refs.delete(key);
 }
 
-export function getCoderTerminalRef(
-  threadId: string,
-  terminalId: string,
-): TerminalRef | undefined {
+export function getCoderTerminalRef(threadId: string, terminalId: string): TerminalRef | undefined {
   return refs.get(refKey(threadId, terminalId));
 }
 
@@ -72,14 +69,14 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   throwIfAborted(signal);
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
+      signal.removeEventListener('abort', onAbort);
       resolve();
     }, ms);
     const onAbort = () => {
       clearTimeout(timer);
       reject(new CommandAbortedError());
     };
-    signal.addEventListener("abort", onAbort, { once: true });
+    signal.addEventListener('abort', onAbort, { once: true });
   });
 }
 
@@ -87,7 +84,7 @@ async function waitForRef(
   threadId: string,
   terminalId: string,
   signal: AbortSignal,
-  timeoutMs = REF_WAIT_MS,
+  timeoutMs = REF_WAIT_MS
 ): Promise<TerminalRef | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -106,12 +103,12 @@ async function runInInteractive(
   ref: TerminalRef,
   command: string,
   signal: AbortSignal,
-  timeoutMs = 120_000,
+  timeoutMs = 120_000
 ): Promise<{ output: string; exitCode: number | null }> {
   throwIfAborted(signal);
   const session = ref.getSession();
   if (!session) {
-    return { output: "Error: terminal session not ready", exitCode: 1 };
+    return { output: 'Error: terminal session not ready', exitCode: 1 };
   }
 
   const startLen = session.outputBuffer.length;
@@ -137,7 +134,7 @@ async function runInInteractive(
     }
 
     const output = session.outputBuffer.slice(startLen).trim();
-    return { output: output || "(no output)", exitCode: 0 };
+    return { output: output || '(no output)', exitCode: 0 };
   } catch (e) {
     if (e instanceof CommandAbortedError) throw e;
     return {
@@ -154,15 +151,15 @@ async function runOneshotPty(
   terminalId: string,
   workspaceRoot: string,
   command: string,
-  signal: AbortSignal,
+  signal: AbortSignal
 ): Promise<{ output: string; exitCode: number | null }> {
   throwIfAborted(signal);
   const tab = coderTerminalStore.getTab(threadId, terminalId);
   if (!tab) {
-    return { output: "Error: terminal tab not found", exitCode: 1 };
+    return { output: 'Error: terminal tab not found', exitCode: 1 };
   }
   if (!isTauriEnvironment()) {
-    return { output: "Error: terminal requires desktop app", exitCode: 1 };
+    return { output: 'Error: terminal requires desktop app', exitCode: 1 };
   }
 
   coderTerminalStore.setRunning(threadId, terminalId, true);
@@ -176,13 +173,13 @@ async function runOneshotPty(
       command,
     });
     if (!process) {
-      return { output: "Error: failed to spawn terminal process", exitCode: 1 };
+      return { output: 'Error: failed to spawn terminal process', exitCode: 1 };
     }
 
-    let buffer = "";
+    let buffer = '';
     return await new Promise((resolve, reject) => {
       const onAbort = () => reject(new CommandAbortedError());
-      signal.addEventListener("abort", onAbort, { once: true });
+      signal.addEventListener('abort', onAbort, { once: true });
 
       void subscribeProcessOutput(process.id, (output) => {
         if (signal.aborted) return;
@@ -190,10 +187,10 @@ async function runOneshotPty(
         const ref = getCoderTerminalRef(threadId, terminalId);
         ref?.write(output.content);
 
-        if (output.output_type === "exit") {
-          signal.removeEventListener("abort", onAbort);
+        if (output.output_type === 'exit') {
+          signal.removeEventListener('abort', onAbort);
           void getProcessExitCode(process.id).then((code) => {
-            const text = buffer.trim() || "(no output)";
+            const text = buffer.trim() || '(no output)';
             mirrorCommandOutput(threadId, terminalId, command, text, code !== 0);
             resolve({ output: text, exitCode: code });
           });
@@ -219,9 +216,7 @@ export interface AgentCommandRequest {
  * - "new" → new interactive tab
  * - existing id → reuse that tab when mounted
  */
-export async function executeAgentCommand(
-  req: AgentCommandRequest,
-): Promise<string> {
+export async function executeAgentCommand(req: AgentCommandRequest): Promise<string> {
   const key = commandKey(req.threadId, req.callId);
   abortAgentCommands(req.threadId);
   const ac = new AbortController();
@@ -232,11 +227,11 @@ export async function executeAgentCommand(
     const { threadId, command, workspaceRoot } = req;
     let terminalId = req.terminalId?.trim() || null;
 
-    if (terminalId === "new") {
+    if (terminalId === 'new') {
       const tab = coderTerminalStore.createTab(threadId, {
         workspaceRoot,
-        createdBy: "agent",
-        kind: "interactive",
+        createdBy: 'agent',
+        kind: 'interactive',
       });
       terminalId = tab.id;
     } else if (!terminalId) {
@@ -245,9 +240,9 @@ export async function executeAgentCommand(
     } else if (!coderTerminalStore.getTab(threadId, terminalId)) {
       coderTerminalStore.createTab(threadId, {
         workspaceRoot,
-        createdBy: "agent",
+        createdBy: 'agent',
         id: terminalId,
-        kind: "interactive",
+        kind: 'interactive',
       });
     }
 
@@ -256,32 +251,14 @@ export async function executeAgentCommand(
 
     let result: { output: string; exitCode: number | null };
 
-    if (tab.kind === "oneshot") {
-      result = await runOneshotPty(
-        threadId,
-        terminalId,
-        workspaceRoot,
-        command,
-        signal,
-      );
+    if (tab.kind === 'oneshot') {
+      result = await runOneshotPty(threadId, terminalId, workspaceRoot, command, signal);
     } else {
       const ref = await waitForRef(threadId, terminalId, signal);
       if (ref) {
-        result = await runInInteractive(
-          threadId,
-          terminalId,
-          ref,
-          command,
-          signal,
-        );
+        result = await runInInteractive(threadId, terminalId, ref, command, signal);
       } else {
-        result = await runOneshotPty(
-          threadId,
-          terminalId,
-          workspaceRoot,
-          command,
-          signal,
-        );
+        result = await runOneshotPty(threadId, terminalId, workspaceRoot, command, signal);
       }
     }
 
@@ -290,7 +267,7 @@ export async function executeAgentCommand(
     }
     return result.output;
   } catch (e) {
-    if (e instanceof CommandAbortedError) return "Error: cancelled";
+    if (e instanceof CommandAbortedError) return 'Error: cancelled';
     throw e;
   } finally {
     abortControllers.delete(key);
@@ -303,7 +280,7 @@ export function mirrorCommandOutput(
   terminalId: string | null,
   command: string,
   output: string,
-  failed = false,
+  failed = false
 ) {
   const id =
     terminalId && coderTerminalStore.getTab(threadId, terminalId)
@@ -314,11 +291,11 @@ export function mirrorCommandOutput(
   const ref = getCoderTerminalRef(threadId, id);
   if (!ref) return;
 
-  const prompt = failed ? "\x1b[31m" : "\x1b[90m";
-  const body = failed ? "\x1b[31m" : "";
-  const reset = "\x1b[0m";
+  const prompt = failed ? '\x1b[31m' : '\x1b[90m';
+  const body = failed ? '\x1b[31m' : '';
+  const reset = '\x1b[0m';
   const header = `${prompt}$ ${command}${reset}\r\n`;
-  const text = output.replace(/\n/g, "\r\n");
+  const text = output.replace(/\n/g, '\r\n');
   ref.write(`${header}${body}${text}${reset}\r\n\r\n`);
   ref.fit();
 }

@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import { projectTerminalHref } from "../../navigation";
-  import { createProjectsQuery } from "$lib/domains/projects/queries/projectQueries";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { projectTerminalHref } from '../../navigation';
+  import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
   import {
     containers,
     deploymentActions,
     isDockerOffline,
-  } from "$lib/domains/deployments/stores/deploymentStore";
-  import { terminalActions } from "../../stores/terminalStore";
-  import { defaultTerminalConfig } from "../../config/defaultTerminalConfig";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { FolderOpen, Container } from "@lucide/svelte";
-  import ShellIcon from "../ShellIcon.svelte";
-  import { TERMINAL_ICONS } from "../../utils/shellIcons";
-  import DockerStatusBanner from "$lib/domains/deployments/components/DockerStatusBanner.svelte";
+  } from '$lib/domains/deployments/stores/deploymentStore';
+  import { terminalActions } from '../../stores/terminalStore';
+  import { defaultTerminalConfig } from '../../config/defaultTerminalConfig';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { FolderOpen, Container } from '@lucide/svelte';
+  import ShellIcon from '../ShellIcon.svelte';
+  import { TERMINAL_ICONS } from '../../utils/shellIcons';
+  import DockerStatusBanner from '$lib/domains/deployments/components/DockerStatusBanner.svelte';
 
   interface Props {
     /** Called when a container tab is opened in the global terminal workspace. */
@@ -38,16 +38,14 @@
   }
 
   function openContainerTerminal(containerId: string, containerName: string) {
-    const shell = navigator.userAgent.includes("Windows")
-      ? "cmd.exe"
-      : "bash";
+    const shell = navigator.userAgent.includes('Windows') ? 'cmd.exe' : 'bash';
     const command = `docker exec -it ${containerId} ${shell}`;
     const tabId = terminalActions.createTabWithProcess({
       title: `Container: ${containerName}`,
       workingDirectory: defaultTerminalConfig.workingDirectory,
       shell: command,
       icon: TERMINAL_ICONS.container,
-      resourceName: "container",
+      resourceName: 'container',
       resourceId: containerId,
     });
     terminalActions.setActiveTab(tabId);
@@ -100,7 +98,7 @@
       />
       {#if containerList.length === 0}
         <p class="text-xs text-muted-foreground">
-          {dockerOffline ? "Docker is offline" : "No containers found"}
+          {dockerOffline ? 'Docker is offline' : 'No containers found'}
         </p>
       {:else}
         <div class="space-y-1">
@@ -110,9 +108,8 @@
                 variant="ghost"
                 size="sm"
                 class="h-auto flex-1 justify-start py-2 text-left"
-                disabled={container.status !== "running"}
-                onclick={() =>
-                  openContainerTerminal(container.id, container.name)}
+                disabled={container.status !== 'running'}
+                onclick={() => openContainerTerminal(container.id, container.name)}
               >
                 <ShellIcon icon={TERMINAL_ICONS.container} class="mr-2" />
               </Button>

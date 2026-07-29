@@ -48,13 +48,13 @@ export interface DocumentContext {
 }
 
 export interface ConversationMessage {
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
 }
 
 export interface GenerateDocumentRequest {
   prompt: string;
-  providerType?: "AgentPlatform";
+  providerType?: 'AgentPlatform';
   history?: ConversationMessage[];
   context?: DocumentContext;
   instruction?: string;

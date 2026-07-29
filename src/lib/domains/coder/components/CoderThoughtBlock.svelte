@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { ChevronRight } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import ChatMarkdown from "$lib/components/ui/chat-markdown/ChatMarkdown.svelte";
-  import type { ChatMessage } from "../types.js";
-  import { formatThoughtDuration } from "../utils/feedBlocks.js";
+  import { ChevronRight } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
+  import type { ChatMessage } from '../types.js';
+  import { formatThoughtDuration } from '../utils/feedBlocks.js';
 
   interface Props {
     message: ChatMessage;
@@ -24,9 +24,7 @@
     class="h-auto gap-1.5 px-0 py-0.5 text-[11px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
     onclick={() => (open = !open)}
   >
-    <ChevronRight
-      class="h-3 w-3 shrink-0 transition-transform {open ? 'rotate-90' : ''}"
-    />
+    <ChevronRight class="h-3 w-3 shrink-0 transition-transform {open ? 'rotate-90' : ''}" />
     <span>{label}</span>
   </Button>
 

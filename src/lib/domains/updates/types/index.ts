@@ -14,13 +14,13 @@ export interface UpdateStatus {
 }
 
 export type UpdateErrorCategory =
-  | "network"
-  | "manifest"
-  | "signature"
-  | "download"
-  | "install"
-  | "disabled"
-  | "unknown";
+  | 'network'
+  | 'manifest'
+  | 'signature'
+  | 'download'
+  | 'install'
+  | 'disabled'
+  | 'unknown';
 
 export interface UpdateErrorInfo {
   category: UpdateErrorCategory;
@@ -33,9 +33,8 @@ export interface UpdateErrorInfo {
 }
 
 export type UpdateCheckResult =
-  | { status: "available"; info: UpdateInfo }
-  | { status: "current"; info: UpdateInfo }
-  | { status: "error"; error: UpdateErrorInfo };
+  | { status: 'available'; info: UpdateInfo }
+  | { status: 'current'; info: UpdateInfo }
+  | { status: 'error'; error: UpdateErrorInfo };
 
-export type UpdateInstallResult =
-  | { status: "error"; error: UpdateErrorInfo };
+export type UpdateInstallResult = { status: 'error'; error: UpdateErrorInfo };

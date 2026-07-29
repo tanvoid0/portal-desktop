@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import CommandBlock from "../CommandBlock.svelte";
-  import { commandBlockStore, type CapturedCommand } from "../../stores/commandBlockStore";
+  import { onMount } from 'svelte';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import CommandBlock from '../CommandBlock.svelte';
+  import { commandBlockStore, type CapturedCommand } from '../../stores/commandBlockStore';
 
   interface Props {
     tabId: string;

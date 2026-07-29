@@ -2,16 +2,12 @@
 	Block Library - Block browser and selector
 -->
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import type { Block } from "../types";
-  import {
-    blockLibraryService,
-    blockLibraryStore,
-    filteredBlocks,
-  } from "../index";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import type { Block } from '../types';
+  import { blockLibraryService, blockLibraryStore, filteredBlocks } from '../index';
 
   interface Props {
     onSelect?: (blockId: string) => void;
@@ -20,8 +16,8 @@
 
   let { onSelect, onClose }: Props = $props();
 
-  let searchQuery = $state("");
-  let selectedCategory = $state<Block["category"] | null>(null);
+  let searchQuery = $state('');
+  let selectedCategory = $state<Block['category'] | null>(null);
   let blocks = $state<Block[]>([]);
   let loading = $state(false);
 
@@ -62,44 +58,40 @@
     <div class="flex flex-1 flex-col overflow-hidden px-6 pb-6">
       <!-- Search and Filters -->
       <div class="mb-4 space-y-2">
-        <Input
-          bind:value={searchQuery}
-          placeholder="Search blocks..."
-          class="w-full"
-        />
+        <Input bind:value={searchQuery} placeholder="Search blocks..." class="w-full" />
         <div class="flex flex-wrap gap-2">
           <Button
-            variant={selectedCategory === null ? "default" : "outline"}
+            variant={selectedCategory === null ? 'default' : 'outline'}
             size="sm"
             onclick={() => (selectedCategory = null)}
           >
             All
           </Button>
           <Button
-            variant={selectedCategory === "build" ? "default" : "outline"}
+            variant={selectedCategory === 'build' ? 'default' : 'outline'}
             size="sm"
-            onclick={() => (selectedCategory = "build")}
+            onclick={() => (selectedCategory = 'build')}
           >
             Build
           </Button>
           <Button
-            variant={selectedCategory === "test" ? "default" : "outline"}
+            variant={selectedCategory === 'test' ? 'default' : 'outline'}
             size="sm"
-            onclick={() => (selectedCategory = "test")}
+            onclick={() => (selectedCategory = 'test')}
           >
             Test
           </Button>
           <Button
-            variant={selectedCategory === "deploy" ? "default" : "outline"}
+            variant={selectedCategory === 'deploy' ? 'default' : 'outline'}
             size="sm"
-            onclick={() => (selectedCategory = "deploy")}
+            onclick={() => (selectedCategory = 'deploy')}
           >
             Deploy
           </Button>
           <Button
-            variant={selectedCategory === "utility" ? "default" : "outline"}
+            variant={selectedCategory === 'utility' ? 'default' : 'outline'}
             size="sm"
-            onclick={() => (selectedCategory = "utility")}
+            onclick={() => (selectedCategory = 'utility')}
           >
             Utility
           </Button>
@@ -109,9 +101,7 @@
       <!-- Block List -->
       <div class="flex-1 space-y-2 overflow-y-auto">
         {#if loading}
-          <p class="py-8 text-center text-muted-foreground">
-            Loading blocks...
-          </p>
+          <p class="py-8 text-center text-muted-foreground">Loading blocks...</p>
         {:else if blocks.length === 0}
           <p class="py-8 text-center text-muted-foreground">No blocks found</p>
         {:else}
@@ -127,23 +117,17 @@
                     {block.description}
                   </p>
                   <div class="mt-2 flex gap-2">
-                    <span
-                      class="rounded bg-primary/10 px-2 py-1 text-xs text-primary"
-                    >
+                    <span class="rounded bg-primary/10 px-2 py-1 text-xs text-primary">
                       {block.category}
                     </span>
                     {#each block.tags.slice(0, 3) as tag}
-                      <span
-                        class="rounded bg-muted px-2 py-1 text-xs text-muted-foreground"
-                      >
+                      <span class="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
                         {tag}
                       </span>
                     {/each}
                   </div>
                 </div>
-                <Button size="sm" onclick={() => onSelect?.(block.id)}>
-                  Add
-                </Button>
+                <Button size="sm" onclick={() => onSelect?.(block.id)}>Add</Button>
               </div>
             </div>
           {/each}

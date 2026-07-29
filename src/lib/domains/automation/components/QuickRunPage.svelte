@@ -2,20 +2,20 @@
 	Quick Run — pick a folder, queue blocks, run automation
 -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Label } from "$lib/components/ui/label";
-  import FilePicker from "$lib/components/ui/file-picker.svelte";
-  import Select from "$lib/components/ui/select.svelte";
+  } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Label } from '$lib/components/ui/label';
+  import FilePicker from '$lib/components/ui/file-picker.svelte';
+  import Select from '$lib/components/ui/select.svelte';
   import {
     Play,
     FolderOpen,
@@ -29,28 +29,25 @@
     Loader2,
     SkipForward,
     Zap,
-  } from "@lucide/svelte";
-  import type { Block } from "$lib/domains/projects/pipelines";
-  import {
-    blockLibraryStore,
-    blocks as blocksStore,
-  } from "$lib/domains/projects/pipelines";
+  } from '@lucide/svelte';
+  import type { Block } from '$lib/domains/projects/pipelines';
+  import { blockLibraryStore, blocks as blocksStore } from '$lib/domains/projects/pipelines';
   import {
     automation,
     type AutomationRunResult,
     type AutomationStepRef,
     type ResolvedExecutionStep,
-  } from "$lib/domains/automation";
-  import { projectService } from "$lib/domains/projects/services/projectService";
-  import type { Project } from "$lib/domains/projects/types";
-  import { getProjectPackageManager } from "$lib/domains/projects/utils/display";
-  import { toast } from "$lib/utils/toast";
-  import { setBreadcrumbs } from "$lib/domains/shared/stores/breadcrumbStore";
-  import { PageHeader, PageLoading } from "$lib/components/shell";
+  } from '$lib/domains/automation';
+  import { projectService } from '$lib/domains/projects/services/projectService';
+  import type { Project } from '$lib/domains/projects/types';
+  import { getProjectPackageManager } from '$lib/domains/projects/utils/display';
+  import { toast } from '$lib/utils/toast';
+  import { setBreadcrumbs } from '$lib/domains/shared/stores/breadcrumbStore';
+  import { PageHeader, PageLoading } from '$lib/components/shell';
 
   setBreadcrumbs([
-    { label: "Automation", href: "/automation" },
-    { label: "Quick Run", href: "/automation/run" },
+    { label: 'Automation', href: '/automation' },
+    { label: 'Quick Run', href: '/automation/run' },
   ]);
 
   interface QueuedBlock {
@@ -62,22 +59,22 @@
   let blocks = $state<Block[]>([]);
   let projects = $state<Project[]>([]);
   let loadingBlocks = $state(true);
-  let cwd = $state("");
-  let packageManager = $state("npm");
-  let blockSearch = $state("");
+  let cwd = $state('');
+  let packageManager = $state('npm');
+  let blockSearch = $state('');
   let queued = $state<QueuedBlock[]>([]);
   let previewSteps = $state<ResolvedExecutionStep[]>([]);
   let previewLoading = $state(false);
   let running = $state(false);
   let runResult = $state<AutomationRunResult | null>(null);
-  let selectedProjectId = $state<string>("");
+  let selectedProjectId = $state<string>('');
 
   onMount(async () => {
     try {
       await blockLibraryStore.loadBlocks();
       projects = await projectService.loadProjects();
     } catch (error) {
-      toast.error("Failed to load automation data");
+      toast.error('Failed to load automation data');
       console.error(error);
     } finally {
       loadingBlocks = false;
@@ -98,19 +95,17 @@
       (b) =>
         b.name.toLowerCase().includes(q) ||
         b.description.toLowerCase().includes(q) ||
-        b.tags.some((t) => t.toLowerCase().includes(q)),
+        b.tags.some((t) => t.toLowerCase().includes(q))
     );
   });
 
   const queuedBlockIds = $derived(new Set(queued.map((q) => q.blockId)));
 
-  const canRun = $derived(
-    cwd.trim().length > 0 && queued.length > 0 && !running,
-  );
+  const canRun = $derived(cwd.trim().length > 0 && queued.length > 0 && !running);
 
   function applyPreset(preset: AutomationStepRef[]) {
     queued = preset.map((ref) => {
-      const blockId = typeof ref === "string" ? ref : ref.blockId;
+      const blockId = typeof ref === 'string' ? ref : ref.blockId;
       const block = blocks.find((b) => b.id === blockId);
       return {
         id: crypto.randomUUID(),
@@ -124,10 +119,7 @@
 
   function addBlock(block: Block) {
     if (queuedBlockIds.has(block.id)) return;
-    queued = [
-      ...queued,
-      { id: crypto.randomUUID(), blockId: block.id, name: block.name },
-    ];
+    queued = [...queued, { id: crypto.randomUUID(), blockId: block.id, name: block.name }];
     previewSteps = [];
     runResult = null;
   }
@@ -161,10 +153,10 @@
 
   function buildBlockRefs(): AutomationStepRef[] {
     return queued.map((q) => {
-      if (q.blockId === "install-npm") {
+      if (q.blockId === 'install-npm') {
         return {
           blockId: q.blockId,
-          parameters: { packageManager, installCommand: "install" },
+          parameters: { packageManager, installCommand: 'install' },
         };
       }
       return q.blockId;
@@ -173,11 +165,11 @@
 
   async function handlePreview() {
     if (!cwd.trim()) {
-      toast.error("Select a working directory first");
+      toast.error('Select a working directory first');
       return;
     }
     if (queued.length === 0) {
-      toast.error("Add at least one block to the queue");
+      toast.error('Add at least one block to the queue');
       return;
     }
 
@@ -189,9 +181,7 @@
         variables: { PACKAGE_MANAGER: packageManager },
       });
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to preview plan",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to preview plan');
       previewSteps = [];
     } finally {
       previewLoading = false;
@@ -217,11 +207,11 @@
       if (result.success) {
         toast.success(`Completed ${result.steps.length} step(s)`);
       } else {
-        const failed = result.steps.find((s) => s.status === "failed");
-        toast.error(failed?.error ?? "Automation run failed");
+        const failed = result.steps.find((s) => s.status === 'failed');
+        toast.error(failed?.error ?? 'Automation run failed');
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Run failed");
+      toast.error(error instanceof Error ? error.message : 'Run failed');
     } finally {
       running = false;
     }
@@ -229,11 +219,11 @@
 
   function stepStatusIcon(status: string) {
     switch (status) {
-      case "success":
+      case 'success':
         return CheckCircle;
-      case "failed":
+      case 'failed':
         return XCircle;
-      case "skipped":
+      case 'skipped':
         return SkipForward;
       default:
         return Loader2;
@@ -276,9 +266,7 @@
             <FolderOpen class="h-5 w-5" />
             Working Directory
           </CardTitle>
-          <CardDescription>
-            Any project folder or directory on disk
-          </CardDescription>
+          <CardDescription>Any project folder or directory on disk</CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
           <FilePicker
@@ -288,7 +276,7 @@
             placeholder="D:/projects/my-app"
             onChange={(path) => {
               cwd = path;
-              selectedProjectId = "";
+              selectedProjectId = '';
               previewSteps = [];
               runResult = null;
             }}
@@ -299,7 +287,7 @@
               <Label>Or pick a registered project</Label>
               <Select
                 options={[
-                  { value: "", label: "— Custom path —" },
+                  { value: '', label: '— Custom path —' },
                   ...projects.map((p) => ({
                     value: p.id,
                     label: p.name,
@@ -317,10 +305,10 @@
             <Select
               id="package-manager"
               options={[
-                { value: "npm", label: "npm" },
-                { value: "pnpm", label: "pnpm" },
-                { value: "yarn", label: "yarn" },
-                { value: "bun", label: "bun" },
+                { value: 'npm', label: 'npm' },
+                { value: 'pnpm', label: 'pnpm' },
+                { value: 'yarn', label: 'yarn' },
+                { value: 'bun', label: 'bun' },
               ]}
               bind:value={packageManager}
             />
@@ -376,7 +364,7 @@
           <CardTitle class="text-lg">Run Queue</CardTitle>
           <CardDescription>
             {queued.length === 0
-              ? "Add blocks below — they run in order"
+              ? 'Add blocks below — they run in order'
               : `${queued.length} block(s) queued`}
           </CardDescription>
         </CardHeader>
@@ -388,9 +376,7 @@
           {:else}
             <div class="space-y-2">
               {#each queued as item, index (item.id)}
-                <div
-                  class="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2"
-                >
+                <div class="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
                   <span
                     class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary"
                   >
@@ -439,11 +425,7 @@
           <CardTitle class="text-lg">Block Library</CardTitle>
         </CardHeader>
         <CardContent class="space-y-3">
-          <Input
-            bind:value={blockSearch}
-            placeholder="Search blocks…"
-            class="w-full"
-          />
+          <Input bind:value={blockSearch} placeholder="Search blocks…" class="w-full" />
           {#if loadingBlocks}
             <PageLoading message="Loading blocks…" />
           {:else}
@@ -484,7 +466,7 @@
     <Card>
       <CardHeader>
         <CardTitle class="text-lg">Preview</CardTitle>
-        <CardDescription>Resolved commands for {cwd || "…"}</CardDescription>
+        <CardDescription>Resolved commands for {cwd || '…'}</CardDescription>
       </CardHeader>
       <CardContent>
         {#if previewLoading}
@@ -551,8 +533,7 @@
             </code>
             {#if step.output}
               <pre
-                class="max-h-40 overflow-auto rounded bg-muted p-2 text-xs whitespace-pre-wrap"
-              >{step.output}</pre>
+                class="max-h-40 overflow-auto rounded bg-muted p-2 text-xs whitespace-pre-wrap">{step.output}</pre>
             {/if}
             {#if step.error}
               <p class="mt-1 text-xs text-destructive">{step.error}</p>

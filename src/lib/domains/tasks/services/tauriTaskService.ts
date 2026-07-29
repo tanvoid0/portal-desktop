@@ -1,10 +1,5 @@
-import { invokeClient } from "$lib/utils/invokeClient";
-import type {
-  Task,
-  CreateTaskRequest,
-  UpdateTaskRequest,
-  TaskFilters,
-} from "../types";
+import { invokeClient } from '$lib/utils/invokeClient';
+import type { Task, CreateTaskRequest, UpdateTaskRequest, TaskFilters } from '../types';
 
 export interface TauriTaskResponse {
   id: number;
@@ -101,15 +96,9 @@ function convertTauriTaskToTask(tauriTask: TauriTaskResponse): Task {
     resourceId: tauriTask.resource_id || undefined,
     resourceType: tauriTask.resource_type || undefined,
     dueDate: tauriTask.due_date ? new Date(tauriTask.due_date) : undefined,
-    completedAt: tauriTask.completed_at
-      ? new Date(tauriTask.completed_at)
-      : undefined,
-    createdAt: tauriTask.created_at
-      ? new Date(tauriTask.created_at)
-      : new Date(),
-    updatedAt: tauriTask.updated_at
-      ? new Date(tauriTask.updated_at)
-      : new Date(),
+    completedAt: tauriTask.completed_at ? new Date(tauriTask.completed_at) : undefined,
+    createdAt: tauriTask.created_at ? new Date(tauriTask.created_at) : new Date(),
+    updatedAt: tauriTask.updated_at ? new Date(tauriTask.updated_at) : new Date(),
     // New advanced fields
     estimatedTime: tauriTask.estimated_time || undefined,
     actualTime: tauriTask.actual_time || undefined,
@@ -127,9 +116,7 @@ function convertTauriTaskToTask(tauriTask: TauriTaskResponse): Task {
             : undefined,
         }
       : undefined,
-    blockedBy: tauriTask.blocked_by
-      ? JSON.parse(tauriTask.blocked_by)
-      : undefined,
+    blockedBy: tauriTask.blocked_by ? JSON.parse(tauriTask.blocked_by) : undefined,
     blocks: tauriTask.blocks ? JSON.parse(tauriTask.blocks) : undefined,
     comments: [], // Will be loaded separately
     attachments: [], // Will be loaded separately
@@ -137,9 +124,7 @@ function convertTauriTaskToTask(tauriTask: TauriTaskResponse): Task {
 }
 
 // Convert frontend Task to Tauri command
-function convertTaskToTauriCreateCommand(
-  task: CreateTaskRequest,
-): TauriCreateTaskCommand {
+function convertTaskToTauriCreateCommand(task: CreateTaskRequest): TauriCreateTaskCommand {
   return {
     title: task.title,
     description: task.description || null,
@@ -157,9 +142,7 @@ function convertTaskToTauriCreateCommand(
     assignee: task.assignee || null,
     recurring_pattern: task.recurring?.pattern || null,
     recurring_interval: task.recurring?.interval || null,
-    recurring_end_date: task.recurring?.endDate
-      ? task.recurring.endDate.toISOString()
-      : null,
+    recurring_end_date: task.recurring?.endDate ? task.recurring.endDate.toISOString() : null,
     recurring_last_generated: task.recurring?.lastGenerated
       ? task.recurring.lastGenerated.toISOString()
       : null,
@@ -169,9 +152,7 @@ function convertTaskToTauriCreateCommand(
 }
 
 // Convert frontend Task to Tauri update command
-function convertTaskToTauriUpdateCommand(
-  task: UpdateTaskRequest,
-): TauriUpdateTaskCommand {
+function convertTaskToTauriUpdateCommand(task: UpdateTaskRequest): TauriUpdateTaskCommand {
   return {
     title: task.title || null,
     description: task.description || null,
@@ -189,9 +170,7 @@ function convertTaskToTauriUpdateCommand(
     assignee: task.assignee || null,
     recurring_pattern: task.recurring?.pattern || null,
     recurring_interval: task.recurring?.interval || null,
-    recurring_end_date: task.recurring?.endDate
-      ? task.recurring.endDate.toISOString()
-      : null,
+    recurring_end_date: task.recurring?.endDate ? task.recurring.endDate.toISOString() : null,
     recurring_last_generated: task.recurring?.lastGenerated
       ? task.recurring.lastGenerated.toISOString()
       : null,
@@ -201,13 +180,10 @@ function convertTaskToTauriUpdateCommand(
 }
 
 // Convert frontend filters to Tauri filters
-function convertFiltersToTauriFilters(
-  filters: TaskFilters,
-): TauriTaskFiltersCommand {
+function convertFiltersToTauriFilters(filters: TaskFilters): TauriTaskFiltersCommand {
   return {
     status: filters.status && filters.status.length > 0 ? filters.status : null,
-    priority:
-      filters.priority && filters.priority.length > 0 ? filters.priority : null,
+    priority: filters.priority && filters.priority.length > 0 ? filters.priority : null,
     type_: filters.type && filters.type.length > 0 ? filters.type : null,
     parent_id: filters.parentId ? parseInt(filters.parentId) : null,
     resource_id: filters.resourceId || null,
@@ -218,7 +194,7 @@ function convertFiltersToTauriFilters(
 export class TauriTaskService {
   async createTask(task: CreateTaskRequest): Promise<Task> {
     const command = convertTaskToTauriCreateCommand(task);
-    const response = await invokeClient.post<TauriTaskResponse>("create_task", {
+    const response = await invokeClient.post<TauriTaskResponse>('create_task', {
       command,
     });
     return convertTauriTaskToTask(response);
@@ -226,7 +202,7 @@ export class TauriTaskService {
 
   async updateTask(id: string, task: UpdateTaskRequest): Promise<Task> {
     const command = convertTaskToTauriUpdateCommand(task);
-    const response = await invokeClient.post<TauriTaskResponse>("update_task", {
+    const response = await invokeClient.post<TauriTaskResponse>('update_task', {
       id: parseInt(id),
       command,
     });
@@ -234,20 +210,19 @@ export class TauriTaskService {
   }
 
   async deleteTask(id: string): Promise<void> {
-    await invokeClient.post<void>("delete_task", { id: parseInt(id) });
+    await invokeClient.post<void>('delete_task', { id: parseInt(id) });
   }
 
   async getTask(id: string): Promise<Task | null> {
-    const response = await invokeClient.post<TauriTaskResponse | null>(
-      "get_task",
-      { id: parseInt(id) },
-    );
+    const response = await invokeClient.post<TauriTaskResponse | null>('get_task', {
+      id: parseInt(id),
+    });
     return response ? convertTauriTaskToTask(response) : null;
   }
 
   async getTasks(filters?: TaskFilters): Promise<Task[]> {
     const tauriFilters = filters ? convertFiltersToTauriFilters(filters) : null;
-    const response = await invokeClient.post<TauriTaskResponse[]>("get_tasks", {
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_tasks', {
       filters: tauriFilters,
     });
     // Handle null/undefined response (for localhost browser)
@@ -258,46 +233,39 @@ export class TauriTaskService {
   }
 
   async getSubtasks(parentId: string): Promise<Task[]> {
-    const response = await invokeClient.post<TauriTaskResponse[]>(
-      "get_subtasks",
-      { parent_id: parseInt(parentId) },
-    );
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_subtasks', {
+      parent_id: parseInt(parentId),
+    });
     if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 
   async getMainTasks(): Promise<Task[]> {
-    const response =
-      await invokeClient.post<TauriTaskResponse[]>("get_main_tasks");
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_main_tasks');
     if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 
   async getTaskCount(): Promise<number> {
-    const response = await invokeClient.post<number>("get_task_count");
+    const response = await invokeClient.post<number>('get_task_count');
     return response ?? 0;
   }
 
   // New advanced methods
   async getOverdueTasks(): Promise<Task[]> {
-    const response =
-      await invokeClient.post<TauriTaskResponse[]>("get_overdue_tasks");
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_overdue_tasks');
     if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 
   async getDueTodayTasks(): Promise<Task[]> {
-    const response = await invokeClient.post<TauriTaskResponse[]>(
-      "get_due_today_tasks",
-    );
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_due_today_tasks');
     if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }
 
   async getUnestimatedTasks(): Promise<Task[]> {
-    const response = await invokeClient.post<TauriTaskResponse[]>(
-      "get_unestimated_tasks",
-    );
+    const response = await invokeClient.post<TauriTaskResponse[]>('get_unestimated_tasks');
     if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);
   }

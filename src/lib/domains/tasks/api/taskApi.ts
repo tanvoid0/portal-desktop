@@ -1,5 +1,5 @@
-import { tauriTaskService } from "../services/tauriTaskService";
-import type { Task } from "../types";
+import { tauriTaskService } from '../services/tauriTaskService';
+import type { Task } from '../types';
 
 export async function fetchAllTasks(): Promise<Task[]> {
   return tauriTaskService.getTasks();

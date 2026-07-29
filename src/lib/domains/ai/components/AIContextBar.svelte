@@ -1,45 +1,41 @@
 <script lang="ts">
-  import * as Popover from "$lib/components/ui/popover/index.js";
-  import { cn } from "$lib/utils.js";
-  import type { ContextUsage, LlmUsage } from "../types/index.js";
+  import * as Popover from '$lib/components/ui/popover/index.js';
+  import { cn } from '$lib/utils.js';
+  import type { ContextUsage, LlmUsage } from '../types/index.js';
   import {
     contextBarColor,
     contextCategoriesForDisplay,
     formatTokenCount,
-  } from "../utils/contextUsage.js";
+  } from '../utils/contextUsage.js';
 
   interface Props {
     contextUsage?: ContextUsage | null;
     llmUsage?: LlmUsage | null;
-    variant?: "bar" | "ring";
+    variant?: 'bar' | 'ring';
     class?: string;
   }
 
   let {
     contextUsage = null,
     llmUsage = null,
-    variant = "bar",
-    class: className = "",
+    variant = 'bar',
+    class: className = '',
   }: Props = $props();
 
   const hasData = $derived(!!contextUsage && contextUsage.context_window > 0);
-  const percent = $derived(
-    hasData ? Math.min(100, Math.max(0, contextUsage!.percent_used)) : 0,
-  );
+  const percent = $derived(hasData ? Math.min(100, Math.max(0, contextUsage!.percent_used)) : 0);
   const barColor = $derived(contextBarColor(percent));
-  const categories = $derived(
-    contextUsage ? contextCategoriesForDisplay(contextUsage) : [],
-  );
+  const categories = $derived(contextUsage ? contextCategoriesForDisplay(contextUsage) : []);
   const summaryLabel = $derived(
     hasData
       ? `${formatTokenCount(contextUsage!.total_estimated)} / ${formatTokenCount(contextUsage!.context_window)}`
-      : "Context",
+      : 'Context'
   );
   const ringRadius = 7;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringOffset = $derived(ringCircumference * (1 - percent / 100));
   const ringStroke = $derived(
-    percent >= 90 ? "stroke-destructive" : percent >= 75 ? "stroke-amber-500" : "stroke-primary",
+    percent >= 90 ? 'stroke-destructive' : percent >= 75 ? 'stroke-amber-500' : 'stroke-primary'
   );
 </script>
 
@@ -48,14 +44,14 @@
     <Popover.Trigger
       type="button"
       class={cn(
-        variant === "ring"
-          ? "inline-flex shrink-0 items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:bg-muted/60"
-          : "flex min-w-0 max-w-[220px] flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/60",
-        className,
+        variant === 'ring'
+          ? 'inline-flex shrink-0 items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:bg-muted/60'
+          : 'flex min-w-0 max-w-[220px] flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/60',
+        className
       )}
       title="Context window usage"
     >
-      {#if variant === "ring"}
+      {#if variant === 'ring'}
         <svg viewBox="0 0 18 18" class="h-4 w-4 shrink-0" aria-hidden="true">
           <circle
             cx="9"
@@ -70,7 +66,7 @@
             cy="9"
             r={ringRadius}
             fill="none"
-            class={cn("transition-all", ringStroke)}
+            class={cn('transition-all', ringStroke)}
             stroke-width="2"
             stroke-linecap="round"
             stroke-dasharray={ringCircumference}
@@ -80,12 +76,14 @@
         </svg>
         <span class="text-[11px] tabular-nums">{percent.toFixed(0)}%</span>
       {:else}
-        <span class="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span
+          class="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+        >
           Context
         </span>
         <div class="relative h-1.5 min-w-[72px] flex-1 overflow-hidden rounded-full bg-primary/20">
           <div
-            class={cn("absolute inset-y-0 left-0 rounded-full transition-all", barColor)}
+            class={cn('absolute inset-y-0 left-0 rounded-full transition-all', barColor)}
             style="width: {percent}%"
           ></div>
         </div>

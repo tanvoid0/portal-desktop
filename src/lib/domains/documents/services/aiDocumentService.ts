@@ -1,17 +1,13 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 import type {
   GeneratedDocumentStructure,
   GenerateDocumentRequest,
   ConversationMessage,
   DocumentContext,
-} from "../types";
+} from '../types';
 
 // Re-export types for convenience
-export type {
-  GeneratedDocumentStructure,
-  ConversationMessage,
-  DocumentContext,
-} from "../types";
+export type { GeneratedDocumentStructure, ConversationMessage, DocumentContext } from '../types';
 
 export interface AIErrorInfo {
   message: string;
@@ -25,14 +21,14 @@ export function parseError(error: unknown): AIErrorInfo {
     const message = error.message;
     return {
       message,
-      code: "GENERATION_ERROR",
+      code: 'GENERATION_ERROR',
       details: message,
     };
   }
 
   return {
-    message: "An unexpected error occurred during document generation",
-    code: "UNKNOWN_ERROR",
+    message: 'An unexpected error occurred during document generation',
+    code: 'UNKNOWN_ERROR',
   };
 }
 
@@ -43,7 +39,7 @@ export class AIDocumentService {
    * @returns Generated document structure with title, content, and suggestions
    */
   async generateDocumentFromPrompt(
-    request: GenerateDocumentRequest,
+    request: GenerateDocumentRequest
   ): Promise<GeneratedDocumentStructure> {
     try {
       const command = {
@@ -54,15 +50,14 @@ export class AIDocumentService {
         instruction: request.instruction || null,
       };
 
-      const response = await invoke<GeneratedDocumentStructure>(
-        "generate_document_with_ai",
-        { command },
-      );
+      const response = await invoke<GeneratedDocumentStructure>('generate_document_with_ai', {
+        command,
+      });
 
       return response;
     } catch (error) {
       const errorInfo = parseError(error);
-      console.error("AI document generation error:", error);
+      console.error('AI document generation error:', error);
 
       // Create a custom error with the parsed information
       const customError = new Error(errorInfo.message) as Error & {

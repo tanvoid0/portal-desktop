@@ -1,20 +1,20 @@
-import { writable, derived } from "svelte/store";
-import { logger } from "../services/logger";
+import { writable, derived } from 'svelte/store';
+import { logger } from '../services/logger';
 
-const log = logger.createScoped("ThemeStore");
+const log = logger.createScoped('ThemeStore');
 
-export type Theme = "light" | "dark" | "system";
+export type Theme = 'light' | 'dark' | 'system';
 
 interface ThemeState {
   current: Theme;
-  resolvedTheme: "light" | "dark";
+  resolvedTheme: 'light' | 'dark';
 }
 
 // Create the theme store
 function createThemeStore() {
   const { subscribe, set, update } = writable<ThemeState>({
-    current: "system",
-    resolvedTheme: "dark",
+    current: 'system',
+    resolvedTheme: 'dark',
   });
 
   return {
@@ -24,7 +24,7 @@ function createThemeStore() {
     initialize() {
       try {
         // Get saved theme preference from localStorage
-        const savedTheme = (localStorage.getItem("theme") as Theme) || "system";
+        const savedTheme = (localStorage.getItem('theme') as Theme) || 'system';
 
         update((state) => {
           const newState = {
@@ -33,13 +33,11 @@ function createThemeStore() {
           };
 
           // Calculate resolved theme based on current preference
-          if (savedTheme === "system") {
+          if (savedTheme === 'system') {
             // Use system preference via CSS media query
-            newState.resolvedTheme = window.matchMedia(
-              "(prefers-color-scheme: dark)",
-            ).matches
-              ? "dark"
-              : "light";
+            newState.resolvedTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
           } else {
             newState.resolvedTheme = savedTheme;
           }
@@ -50,14 +48,14 @@ function createThemeStore() {
         // Apply theme to DOM
         this.applyTheme();
 
-        log.info("Theme initialized:", {
+        log.info('Theme initialized:', {
           current: savedTheme,
           resolved: this.getResolvedTheme(),
         });
       } catch (error) {
-        log.error("Failed to initialize theme:", { error });
+        log.error('Failed to initialize theme:', { error });
         // Fallback to system theme
-        this.setTheme("system");
+        this.setTheme('system');
       }
     },
 
@@ -70,12 +68,10 @@ function createThemeStore() {
         };
 
         // Calculate resolved theme
-        if (theme === "system") {
-          newState.resolvedTheme = window.matchMedia(
-            "(prefers-color-scheme: dark)",
-          ).matches
-            ? "dark"
-            : "light";
+        if (theme === 'system') {
+          newState.resolvedTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light';
         } else {
           newState.resolvedTheme = theme;
         }
@@ -84,27 +80,26 @@ function createThemeStore() {
       });
 
       // Save to localStorage
-      localStorage.setItem("theme", theme);
+      localStorage.setItem('theme', theme);
 
       // Apply theme to DOM
       this.applyTheme();
 
-      log.info("Theme changed to:", theme);
+      log.info('Theme changed to:', theme);
     },
 
     // Recalculate resolved theme from OS preference (system mode only)
     refreshSystemTheme() {
       update((state) => {
-        if (state.current !== "system") {
+        if (state.current !== 'system') {
           return state;
         }
 
         return {
           ...state,
-          resolvedTheme: window.matchMedia("(prefers-color-scheme: dark)")
-            .matches
-            ? "dark"
-            : "light",
+          resolvedTheme: window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light',
         };
       });
 
@@ -117,7 +112,7 @@ function createThemeStore() {
       const html = document.documentElement;
 
       // Remove existing theme classes
-      html.classList.remove("light", "dark");
+      html.classList.remove('light', 'dark');
 
       // Always apply resolved theme — dark tokens live under .dark in app.css
       html.classList.add(state.resolvedTheme);
@@ -126,15 +121,15 @@ function createThemeStore() {
       const metaThemeColor = document.querySelector('meta[name="theme-color"]');
       if (metaThemeColor) {
         metaThemeColor.setAttribute(
-          "content",
-          state.resolvedTheme === "dark" ? "#0a0a0a" : "#ffffff",
+          'content',
+          state.resolvedTheme === 'dark' ? '#0a0a0a' : '#ffffff'
         );
       }
 
       // Update CSS custom properties for better theming
-      html.style.setProperty("--color-scheme", state.resolvedTheme);
+      html.style.setProperty('--color-scheme', state.resolvedTheme);
 
-      log.debug("Applied theme to DOM:", state.resolvedTheme);
+      log.debug('Applied theme to DOM:', state.resolvedTheme);
     },
 
     // Get current state (for internal use)
@@ -145,21 +140,20 @@ function createThemeStore() {
     },
 
     // Get resolved theme
-    getResolvedTheme(): "light" | "dark" {
+    getResolvedTheme(): 'light' | 'dark' {
       return this.getCurrentState().resolvedTheme;
     },
 
     // Toggle between light and dark (ignores system)
     toggle() {
       const current = this.getCurrentState().current;
-      if (current === "system") {
+      if (current === 'system') {
         // If system, toggle to opposite of current resolved theme
-        const newTheme =
-          this.getCurrentState().resolvedTheme === "light" ? "dark" : "light";
+        const newTheme = this.getCurrentState().resolvedTheme === 'light' ? 'dark' : 'light';
         this.setTheme(newTheme);
       } else {
         // If not system, toggle between light and dark
-        const newTheme = current === "light" ? "dark" : "light";
+        const newTheme = current === 'light' ? 'dark' : 'light';
         this.setTheme(newTheme);
       }
     },
@@ -171,31 +165,28 @@ export const themeStore = createThemeStore();
 
 // Derived stores for convenience
 export const currentTheme = derived(themeStore, ($theme) => $theme.current);
-export const resolvedTheme = derived(
-  themeStore,
-  ($theme) => $theme.resolvedTheme,
-);
+export const resolvedTheme = derived(themeStore, ($theme) => $theme.resolvedTheme);
 
 // Listen for system theme changes (if supported)
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   // Listen for system theme changes
-  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
   const handleSystemThemeChange = () => {
     themeStore.subscribe((state) => {
-      if (state.current === "system") {
+      if (state.current === 'system') {
         themeStore.refreshSystemTheme();
       }
     })();
   };
 
   // Add listener
-  mediaQuery.addEventListener("change", handleSystemThemeChange);
+  mediaQuery.addEventListener('change', handleSystemThemeChange);
 
   // Also listen for storage changes (in case theme is changed in another tab)
-  window.addEventListener("storage", (e) => {
-    if (e.key === "theme") {
-      const newTheme = (e.newValue as Theme) || "system";
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'theme') {
+      const newTheme = (e.newValue as Theme) || 'system';
       themeStore.setTheme(newTheme);
     }
   });

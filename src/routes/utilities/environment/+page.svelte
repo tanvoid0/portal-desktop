@@ -1,5 +1,5 @@
 <script lang="ts">
-  import EnvironmentVariablesPage from "$lib/domains/utilities/components/EnvironmentVariablesPage.svelte";
+  import EnvironmentVariablesPage from '$lib/domains/utilities/components/EnvironmentVariablesPage.svelte';
 </script>
 
 <svelte:head>

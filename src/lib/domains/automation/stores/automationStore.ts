@@ -1,10 +1,6 @@
-import { writable } from "svelte/store";
-import { invoke } from "@tauri-apps/api/core";
-import type {
-  WorkflowExecution,
-  WorkflowResult,
-  AvailableWorkflow,
-} from "../types";
+import { writable } from 'svelte/store';
+import { invoke } from '@tauri-apps/api/core';
+import type { WorkflowExecution, WorkflowResult, AvailableWorkflow } from '../types';
 
 interface AutomationState {
   availableWorkflows: AvailableWorkflow[];
@@ -37,9 +33,7 @@ function createAutomationStore() {
       update((state) => ({ ...state, loading: true, error: null }));
 
       try {
-        const workflows = await invoke<AvailableWorkflow[]>(
-          "list_available_workflows",
-        );
+        const workflows = await invoke<AvailableWorkflow[]>('list_available_workflows');
         update((state) => ({
           ...state,
           availableWorkflows: workflows,
@@ -59,13 +53,10 @@ function createAutomationStore() {
       update((state) => ({ ...state, loading: true, error: null }));
 
       try {
-        const workflows = await invoke<AvailableWorkflow[]>(
-          "get_suggested_workflows",
-          {
-            framework,
-            packageManager,
-          },
-        );
+        const workflows = await invoke<AvailableWorkflow[]>('get_suggested_workflows', {
+          framework,
+          packageManager,
+        });
         update((state) => ({
           ...state,
           suggestedWorkflows: workflows,
@@ -95,12 +86,12 @@ function createAutomationStore() {
         output_directory?: string;
         dev_port?: number;
         prod_port?: number;
-      },
+      }
     ) {
       update((state) => ({ ...state, loading: true, error: null }));
 
       try {
-        const result = await invoke<WorkflowResult>("trigger_n8n_workflow", {
+        const result = await invoke<WorkflowResult>('trigger_n8n_workflow', {
           workflowId,
           projectData,
         });
@@ -129,12 +120,9 @@ function createAutomationStore() {
     // Check workflow status
     async checkWorkflowStatus(executionId: string) {
       try {
-        const execution = await invoke<WorkflowExecution>(
-          "get_workflow_status",
-          {
-            executionId,
-          },
-        );
+        const execution = await invoke<WorkflowExecution>('get_workflow_status', {
+          executionId,
+        });
 
         update((state) => {
           const newExecutions = new Map(state.activeExecutions);
@@ -158,7 +146,7 @@ function createAutomationStore() {
     // Check n8n health
     async checkHealth() {
       try {
-        const isHealthy = await invoke<boolean>("check_n8n_health");
+        const isHealthy = await invoke<boolean>('check_n8n_health');
         update((state) => ({ ...state, isN8nHealthy: isHealthy }));
         return isHealthy;
       } catch (error) {

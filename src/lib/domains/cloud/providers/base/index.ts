@@ -1,2 +1,2 @@
 // Base provider implementation
-export * from "./BaseProvider";
+export * from './BaseProvider';

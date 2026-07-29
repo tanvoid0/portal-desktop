@@ -1,8 +1,8 @@
 // Hook for registering and handling keyboard shortcuts
 
-import { derived, get, type Readable } from "svelte/store";
-import { matchShortcut, type ParsedShortcut } from "../utils/shortcutParser";
-import type { KeyboardShortcut } from "../types";
+import { derived, get, type Readable } from 'svelte/store';
+import { matchShortcut, type ParsedShortcut } from '../utils/shortcutParser';
+import type { KeyboardShortcut } from '../types';
 
 export interface UseKeyboardShortcutsOptions {
   enabled?: boolean;
@@ -11,23 +11,23 @@ export interface UseKeyboardShortcutsOptions {
 
 export function useKeyboardShortcuts(
   shortcuts: KeyboardShortcut[],
-  options: UseKeyboardShortcutsOptions = {},
+  options: UseKeyboardShortcutsOptions = {}
 ) {
   const { enabled = true, preventDefault = true } = options;
 
-  const parsedShortcuts: Readable<
-    Array<KeyboardShortcut & { parsed: ParsedShortcut }>
-  > = derived([], () =>
-    shortcuts.map((shortcut) => ({
-      ...shortcut,
-      parsed: {
-        key: shortcut.key,
-        ctrl: shortcut.modifiers?.ctrl,
-        alt: shortcut.modifiers?.alt,
-        shift: shortcut.modifiers?.shift,
-        meta: shortcut.modifiers?.meta,
-      } as ParsedShortcut,
-    })),
+  const parsedShortcuts: Readable<Array<KeyboardShortcut & { parsed: ParsedShortcut }>> = derived(
+    [],
+    () =>
+      shortcuts.map((shortcut) => ({
+        ...shortcut,
+        parsed: {
+          key: shortcut.key,
+          ctrl: shortcut.modifiers?.ctrl,
+          alt: shortcut.modifiers?.alt,
+          shift: shortcut.modifiers?.shift,
+          meta: shortcut.modifiers?.meta,
+        } as ParsedShortcut,
+      }))
   );
 
   function handleKeydown(event: KeyboardEvent): boolean {
@@ -35,11 +35,7 @@ export function useKeyboardShortcuts(
 
     // Ignore if typing in input/textarea/contenteditable
     const target = event.target as HTMLElement;
-    if (
-      target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.isContentEditable
-    ) {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
       // Allow shortcuts with modifiers even in inputs
       if (!event.ctrlKey && !event.metaKey && !event.altKey) {
         return false;

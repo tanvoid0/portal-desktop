@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import DocumentEditor from "$lib/domains/documents/components/DocumentEditor.svelte";
-  import type { Document } from "$lib/domains/documents";
-  import { toastActions } from "$lib/utils/toast";
-  import { taskActions } from "$lib/domains/tasks";
-  import { fetchTaskById } from "$lib/domains/tasks/api/taskApi";
-  import { ResourceType } from "$lib/domains/shared/types/resourceType";
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import DocumentEditor from '$lib/domains/documents/components/DocumentEditor.svelte';
+  import type { Document } from '$lib/domains/documents';
+  import { toastActions } from '$lib/utils/toast';
+  import { taskActions } from '$lib/domains/tasks';
+  import { fetchTaskById } from '$lib/domains/tasks/api/taskApi';
+  import { ResourceType } from '$lib/domains/shared/types/resourceType';
 
-  let taskId = $derived($page.url.searchParams.get("taskId"));
-  let taskTitle = $derived($page.url.searchParams.get("taskTitle"));
+  let taskId = $derived($page.url.searchParams.get('taskId'));
+  let taskTitle = $derived($page.url.searchParams.get('taskTitle'));
   let taskDescription = $state<string | undefined>(undefined);
 
   $effect(() => {
@@ -23,12 +23,12 @@
         taskDescription = task?.description;
       })
       .catch((err) => {
-        console.error("Failed to load task:", err);
+        console.error('Failed to load task:', err);
       });
   });
 
   async function handleSave(savedDoc: Document) {
-    toastActions.success("Document created successfully");
+    toastActions.success('Document created successfully');
 
     // If taskId is provided, link the document to the task
     if (taskId) {
@@ -37,14 +37,14 @@
           resourceId: savedDoc.id.toString(),
           resourceType: ResourceType.DOCUMENT,
         });
-        toastActions.success("Document linked to task");
+        toastActions.success('Document linked to task');
         goto(`/tasks/${taskId}`);
         return;
       } catch (err) {
-        console.error("Failed to link document to task:", err);
+        console.error('Failed to link document to task:', err);
         toastActions.error(
-          "Failed to link document to task",
-          err instanceof Error ? err.message : "Unknown error",
+          'Failed to link document to task',
+          err instanceof Error ? err.message : 'Unknown error'
         );
       }
     }
@@ -56,7 +56,7 @@
     if (taskId) {
       goto(`/tasks/${taskId}`);
     } else {
-      goto("/documents");
+      goto('/documents');
     }
   }
 </script>

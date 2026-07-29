@@ -29,17 +29,16 @@ transparently between environments:
 
 ```typescript
 // In a service — the ONLY place raw invoke lives.
-import { invokeClient } from "$lib/utils/invokeClient";
+import { invokeClient } from '$lib/utils/invokeClient';
 
-const process = await invokeClient.request<TerminalProcess>(
-  "create_terminal_process",
-  { data: { request } },
-);
+const process = await invokeClient.request<TerminalProcess>('create_terminal_process', {
+  data: { request },
+});
 ```
 
 ```typescript
 // In a route/component — go through the service.
-import { sdkService } from "$lib/domains/sdk/services/sdkService";
+import { sdkService } from '$lib/domains/sdk/services/sdkService';
 
 const managers = await sdkService.detectManagers();
 ```

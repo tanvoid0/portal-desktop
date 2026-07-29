@@ -3,20 +3,11 @@
   Ask AI action. Falls back to raw text when parsing yields nothing useful.
 -->
 <script lang="ts">
-  import * as Alert from "$lib/components/ui/alert";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    AlertCircle,
-    ChevronDown,
-    ChevronRight,
-    Lightbulb,
-    Sparkles,
-  } from "@lucide/svelte";
-  import {
-    parseTerminalError,
-    ERROR_CATEGORY_LABELS,
-  } from "../utils/parseTerminalError";
+  import * as Alert from '$lib/components/ui/alert';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { AlertCircle, ChevronDown, ChevronRight, Lightbulb, Sparkles } from '@lucide/svelte';
+  import { parseTerminalError, ERROR_CATEGORY_LABELS } from '../utils/parseTerminalError';
 
   interface Props {
     output: string;
@@ -91,18 +82,17 @@
         }}
       >
         {#if showRaw}<ChevronDown class="h-3 w-3" />{:else}<ChevronRight class="h-3 w-3" />{/if}
-        {showRaw ? "Hide" : "Show"} raw output
+        {showRaw ? 'Hide' : 'Show'} raw output
       </Button>
     </div>
 
     {#if showRaw}
       <pre
-        class="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-2 font-mono text-xs leading-relaxed text-foreground/80"
-      >{parsed.raw}</pre>
+        class="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-2 font-mono text-xs leading-relaxed text-foreground/80">{parsed.raw}</pre>
     {/if}
   </div>
 {:else}
   <pre
-    class="max-h-96 overflow-auto whitespace-pre-wrap break-words bg-muted/20 px-3 py-2 font-mono text-xs leading-relaxed text-foreground/90"
-  >{output || " "}</pre>
+    class="max-h-96 overflow-auto whitespace-pre-wrap break-words bg-muted/20 px-3 py-2 font-mono text-xs leading-relaxed text-foreground/90">{output ||
+      ' '}</pre>
 {/if}

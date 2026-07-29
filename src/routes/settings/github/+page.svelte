@@ -1,30 +1,30 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { get } from "svelte/store";
-  import { settings, settingsActions } from "$lib/domains/settings/stores/settingsStore";
-  import type { AppSettings } from "$lib/domains/settings/types";
-  import { createGitHubStatusQuery, githubService } from "$lib/domains/github";
-  import type { GitHubDeviceFlowStart } from "$lib/domains/github";
-  import { openExternalUrl } from "$lib/utils/tauri";
-  import { toast } from "$lib/utils/toast";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
+  import { goto } from '$app/navigation';
+  import { get } from 'svelte/store';
+  import { settings, settingsActions } from '$lib/domains/settings/stores/settingsStore';
+  import type { AppSettings } from '$lib/domains/settings/types';
+  import { createGitHubStatusQuery, githubService } from '$lib/domains/github';
+  import type { GitHubDeviceFlowStart } from '$lib/domains/github';
+  import { openExternalUrl } from '$lib/utils/tauri';
+  import { toast } from '$lib/utils/toast';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { Check, Copy, FolderGit2, Unplug, ExternalLink } from "@lucide/svelte";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { Check, Copy, FolderGit2, Unplug, ExternalLink } from '@lucide/svelte';
 
   const settingsData = $derived($settings);
   const statusQuery = createGitHubStatusQuery();
 
-  let clientId = $state("");
+  let clientId = $state('');
   let saving = $state(false);
   let connecting = $state(false);
   let disconnecting = $state(false);
@@ -33,7 +33,7 @@
   let codeCopied = $state(false);
 
   $effect(() => {
-    clientId = settingsData?.app.integrations?.github?.clientId ?? "";
+    clientId = settingsData?.app.integrations?.github?.clientId ?? '';
   });
 
   function updateAppSettings(updates: Partial<AppSettings>) {
@@ -67,11 +67,9 @@
       };
       await settingsActions.saveSettings(nextSettings);
       await statusQuery.refetch();
-      toast.success("GitHub settings saved");
+      toast.success('GitHub settings saved');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save GitHub settings",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to save GitHub settings');
     } finally {
       saving = false;
     }
@@ -80,7 +78,7 @@
   async function handleConnect() {
     try {
       if (!statusQuery.data?.clientIdConfigured) {
-        toast.error("Save a GitHub Client ID first");
+        toast.error('Save a GitHub Client ID first');
         return;
       }
       connecting = true;
@@ -89,19 +87,16 @@
       await githubService.connectWithDeviceFlow(undefined, {
         onStarted: (start) => {
           deviceFlow = start;
-          flowMessage =
-            "Copy the code below, open GitHub, paste it, then authorize.";
+          flowMessage = 'Copy the code below, open GitHub, paste it, then authorize.';
         },
         onPolling: () => {
-          flowMessage = "Waiting for you to authorize on GitHub...";
+          flowMessage = 'Waiting for you to authorize on GitHub...';
         },
       });
       await statusQuery.refetch();
-      toast.success("GitHub connected");
+      toast.success('GitHub connected');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to connect GitHub",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to connect GitHub');
     } finally {
       connecting = false;
       deviceFlow = null;
@@ -114,14 +109,12 @@
     try {
       await navigator.clipboard.writeText(deviceFlow.userCode);
       codeCopied = true;
-      toast.success("Code copied to clipboard");
+      toast.success('Code copied to clipboard');
       setTimeout(() => {
         codeCopied = false;
       }, 2000);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to copy code",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to copy code');
     }
   }
 
@@ -131,9 +124,7 @@
       await openExternalUrl(deviceFlow.verificationUri);
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to open GitHub authorization page",
+        error instanceof Error ? error.message : 'Failed to open GitHub authorization page'
       );
     }
   }
@@ -143,11 +134,9 @@
       disconnecting = true;
       await githubService.disconnect();
       await statusQuery.refetch();
-      toast.success("GitHub disconnected");
+      toast.success('GitHub disconnected');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to disconnect GitHub",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to disconnect GitHub');
     } finally {
       disconnecting = false;
     }
@@ -196,14 +185,9 @@
 
       <div class="flex flex-wrap gap-2">
         <Button onclick={handleSaveClientId} disabled={saving}>
-          {saving ? "Saving..." : "Save GitHub Settings"}
+          {saving ? 'Saving...' : 'Save GitHub Settings'}
         </Button>
-        <Button
-          variant="outline"
-          onclick={() => goto("/github")}
-        >
-          Open GitHub Workspace
-        </Button>
+        <Button variant="outline" onclick={() => goto('/github')}>Open GitHub Workspace</Button>
         <a
           href="https://github.com/settings/developers"
           target="_blank"
@@ -224,7 +208,7 @@
       title="GitHub unavailable"
       message={statusQuery.error instanceof Error
         ? statusQuery.error.message
-        : "Failed to load GitHub status"}
+        : 'Failed to load GitHub status'}
       onRetry={() => statusQuery.refetch()}
     />
   {:else}
@@ -237,13 +221,11 @@
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="flex flex-wrap gap-2">
-          <Badge variant={statusQuery.data?.clientIdConfigured ? "secondary" : "outline"}>
-            {statusQuery.data?.clientIdConfigured
-              ? "Client ID configured"
-              : "Client ID missing"}
+          <Badge variant={statusQuery.data?.clientIdConfigured ? 'secondary' : 'outline'}>
+            {statusQuery.data?.clientIdConfigured ? 'Client ID configured' : 'Client ID missing'}
           </Badge>
-          <Badge variant={statusQuery.data?.connected ? "secondary" : "outline"}>
-            {statusQuery.data?.connected ? "Account connected" : "Not connected"}
+          <Badge variant={statusQuery.data?.connected ? 'secondary' : 'outline'}>
+            {statusQuery.data?.connected ? 'Account connected' : 'Not connected'}
           </Badge>
         </div>
 
@@ -263,27 +245,22 @@
           </div>
         {:else}
           <p class="text-sm text-muted-foreground">
-            Save a client ID, then connect GitHub to enable repository browsing, cloning, and issue management.
+            Save a client ID, then connect GitHub to enable repository browsing, cloning, and issue
+            management.
           </p>
         {/if}
 
         <div class="flex flex-wrap gap-2">
           {#if statusQuery.data?.connected}
-            <Button
-              variant="outline"
-              onclick={handleDisconnect}
-              disabled={disconnecting}
-            >
+            <Button variant="outline" onclick={handleDisconnect} disabled={disconnecting}>
               <Unplug class="mr-2 h-4 w-4" />
-              {disconnecting ? "Disconnecting..." : "Disconnect GitHub"}
+              {disconnecting ? 'Disconnecting...' : 'Disconnect GitHub'}
             </Button>
           {:else if deviceFlow}
             <div class="w-full space-y-4 rounded-lg border bg-muted/30 p-4">
               <p class="text-sm text-muted-foreground">{flowMessage}</p>
               <div class="rounded-lg border bg-background px-4 py-3 text-center">
-                <div class="text-xs uppercase tracking-wide text-muted-foreground">
-                  Your code
-                </div>
+                <div class="text-xs uppercase tracking-wide text-muted-foreground">Your code</div>
                 <div class="mt-1 flex items-center justify-center gap-2">
                   <div class="font-mono text-2xl font-semibold tracking-widest">
                     {deviceFlow.userCode}
@@ -321,7 +298,7 @@
               disabled={connecting || !statusQuery.data?.clientIdConfigured}
             >
               <FolderGit2 class="mr-2 h-4 w-4" />
-              {connecting ? "Connecting..." : "Connect GitHub"}
+              {connecting ? 'Connecting...' : 'Connect GitHub'}
             </Button>
           {/if}
         </div>

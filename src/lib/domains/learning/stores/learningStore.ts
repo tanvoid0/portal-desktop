@@ -2,8 +2,8 @@
  * Learning store using Svelte 5 runes
  */
 
-import { writable, derived } from "svelte/store";
-import type { Suggestion, MLIntensity } from "$lib/domains/learning/types";
+import { writable, derived } from 'svelte/store';
+import type { Suggestion, MLIntensity } from '$lib/domains/learning/types';
 
 interface LearningState {
   suggestions: Suggestion[];
@@ -14,7 +14,7 @@ interface LearningState {
 
 const initialState: LearningState = {
   suggestions: [],
-  mlIntensity: "medium",
+  mlIntensity: 'medium',
   loading: false,
   error: null,
 };
@@ -48,9 +48,7 @@ function createLearningStore() {
     removeSuggestion: (patternId: number) => {
       update((state) => ({
         ...state,
-        suggestions: state.suggestions.filter(
-          (s) => s.pattern_id !== patternId,
-        ),
+        suggestions: state.suggestions.filter((s) => s.pattern_id !== patternId),
       }));
     },
 
@@ -67,14 +65,8 @@ function createLearningStore() {
 export const learningStore = createLearningStore();
 
 // Derived stores
-export const hasSuggestions = derived(
-  learningStore,
-  ($store) => $store.suggestions.length > 0,
-);
+export const hasSuggestions = derived(learningStore, ($store) => $store.suggestions.length > 0);
 
 export const isLoading = derived(learningStore, ($store) => $store.loading);
 
-export const hasError = derived(
-  learningStore,
-  ($store) => $store.error !== null,
-);
+export const hasError = derived(learningStore, ($store) => $store.error !== null);

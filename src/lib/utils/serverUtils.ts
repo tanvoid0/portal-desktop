@@ -9,15 +9,15 @@
  */
 export function isLocalhostRequest(url: URL, headers: Headers): boolean {
   const hostname = url.hostname;
-  const hostHeader = headers.get("host") || "";
+  const hostHeader = headers.get('host') || '';
 
   return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname === "[::1]" ||
-    hostHeader.includes("localhost") ||
-    hostHeader.includes("127.0.0.1")
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname === '[::1]' ||
+    hostHeader.includes('localhost') ||
+    hostHeader.includes('127.0.0.1')
   );
 }
 
@@ -31,23 +31,23 @@ export function isLocalhostRequest(url: URL, headers: Headers): boolean {
  */
 export function getClientIp(request: Request, headers: Headers): string {
   // Check X-Forwarded-For header (first IP in chain if proxied)
-  const forwardedFor = headers.get("x-forwarded-for");
+  const forwardedFor = headers.get('x-forwarded-for');
   if (forwardedFor) {
     // X-Forwarded-For can contain multiple IPs, take the first one
-    const firstIp = forwardedFor.split(",")[0].trim();
+    const firstIp = forwardedFor.split(',')[0].trim();
     if (firstIp) {
       return firstIp;
     }
   }
 
   // Check X-Real-IP header (set by some proxies)
-  const realIp = headers.get("x-real-ip");
+  const realIp = headers.get('x-real-ip');
   if (realIp) {
     return realIp.trim();
   }
 
   // Check CF-Connecting-IP (Cloudflare)
-  const cfIp = headers.get("cf-connecting-ip");
+  const cfIp = headers.get('cf-connecting-ip');
   if (cfIp) {
     return cfIp.trim();
   }
@@ -55,16 +55,12 @@ export function getClientIp(request: Request, headers: Headers): string {
   // Fallback: try to get from request URL (for localhost/dev scenarios)
   try {
     const url = new URL(request.url);
-    if (
-      url.hostname &&
-      url.hostname !== "localhost" &&
-      url.hostname !== "127.0.0.1"
-    ) {
+    if (url.hostname && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
       return url.hostname;
     }
   } catch {
     // Ignore URL parsing errors
   }
 
-  return "Unknown";
+  return 'Unknown';
 }

@@ -1,34 +1,19 @@
 <!-- StatefulSets List Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import {
-    cloudStore,
-    loadResources,
-    refreshResources,
-  } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import BaseResourceTable from "$lib/domains/cloud/core/components/BaseResourceTable.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { RefreshCw } from "@lucide/svelte";
-  import {
-    useTableNavigation,
-    useResourceActions,
-  } from "$lib/domains/k8s-navigation";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { cloudStore, loadResources, refreshResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import BaseResourceTable from '$lib/domains/cloud/core/components/BaseResourceTable.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { RefreshCw } from '@lucide/svelte';
+  import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 
-  let searchQuery = $state("");
-  let statusFilter = $state("");
+  let searchQuery = $state('');
+  let statusFilter = $state('');
 
   onMount(async () => {
     if ($cloudStore.connection.isConnected) {
@@ -39,43 +24,39 @@
   const filteredStatefulSets = $derived(
     $cloudStore.resources[ResourceType.STATEFULSET].filter((statefulset) => {
       const matchesSearch =
-        !searchQuery ||
-        statefulset.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus =
-        !statusFilter || statefulset.status === statusFilter;
+        !searchQuery || statefulset.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = !statusFilter || statefulset.status === statusFilter;
       return matchesSearch && matchesStatus;
-    }),
+    })
   );
 
   const statefulSetStats = $derived({
     total: $cloudStore.resources[ResourceType.STATEFULSET].length,
     running: $cloudStore.resources[ResourceType.STATEFULSET].filter(
-      (ss: any) => ss.status === "running",
+      (ss: any) => ss.status === 'running'
     ).length,
     pending: $cloudStore.resources[ResourceType.STATEFULSET].filter(
-      (ss: any) => ss.status === "pending",
+      (ss: any) => ss.status === 'pending'
     ).length,
     failed: $cloudStore.resources[ResourceType.STATEFULSET].filter(
-      (ss: any) => ss.status === "failed",
+      (ss: any) => ss.status === 'failed'
     ).length,
   });
 
   const statusOptions = $derived.by(() => {
     const statuses = new Set(
-      $cloudStore.resources[ResourceType.STATEFULSET].map(
-        (ss: any) => ss.status,
-      ),
+      $cloudStore.resources[ResourceType.STATEFULSET].map((ss: any) => ss.status)
     );
     return Array.from(statuses).sort();
   });
 
   const statefulSetColumns = [
-    { key: "name", label: "Name", width: "w-1/4" },
-    { key: "status", label: "Status", width: "w-1/8" },
-    { key: "replicas", label: "Replicas", width: "w-1/8" },
-    { key: "ready", label: "Ready", width: "w-1/8" },
-    { key: "age", label: "Age", width: "w-1/8" },
-    { key: "namespace", label: "Namespace", width: "w-1/6" },
+    { key: 'name', label: 'Name', width: 'w-1/4' },
+    { key: 'status', label: 'Status', width: 'w-1/8' },
+    { key: 'replicas', label: 'Replicas', width: 'w-1/8' },
+    { key: 'ready', label: 'Ready', width: 'w-1/8' },
+    { key: 'age', label: 'Age', width: 'w-1/8' },
+    { key: 'namespace', label: 'Namespace', width: 'w-1/6' },
   ];
 
   async function handleRefresh() {
@@ -90,7 +71,7 @@
       const statefulset = filteredStatefulSets[index];
       if (statefulset) {
         goto(
-          `/cloud/workloads/statefulsets/${statefulset.name}?namespace=${statefulset.namespace}`,
+          `/cloud/workloads/statefulsets/${statefulset.name}?namespace=${statefulset.namespace}`
         );
       }
     },
@@ -103,13 +84,11 @@
     resources: filteredStatefulSets,
     handlers: {
       onDescribe: (resource) => {
-        goto(
-          `/cloud/workloads/statefulsets/${resource.name}?namespace=${resource.namespace}`,
-        );
+        goto(`/cloud/workloads/statefulsets/${resource.name}?namespace=${resource.namespace}`);
       },
       onEdit: (resource) => {
         goto(
-          `/cloud/workloads/statefulsets/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
+          `/cloud/workloads/statefulsets/${resource.name}?namespace=${resource.namespace}&tab=yaml`
         );
       },
       onRestart: async (resource) => {
@@ -118,7 +97,7 @@
       },
       onYaml: (resource) => {
         goto(
-          `/cloud/workloads/statefulsets/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
+          `/cloud/workloads/statefulsets/${resource.name}?namespace=${resource.namespace}&tab=yaml`
         );
       },
       onRefresh: () => {
@@ -194,16 +173,12 @@
 
   <!-- Filters -->
   <div class="flex gap-4">
-    <Input
-      placeholder="Search StatefulSets..."
-      bind:value={searchQuery}
-      class="max-w-sm"
-    />
+    <Input placeholder="Search StatefulSets..." bind:value={searchQuery} class="max-w-sm" />
     {#if statusOptions.length > 0}
       <Select
         bind:value={statusFilter}
         options={[
-          { value: "", label: "All Statuses" },
+          { value: '', label: 'All Statuses' },
           ...statusOptions.map((status) => ({ value: status, label: status })),
         ]}
         class="w-[180px]"
@@ -221,9 +196,7 @@
       filteredEmptyMessage="No StatefulSets match your filters"
       isFiltered={Boolean(searchQuery || statusFilter)}
       onResourceClick={(resource) => {
-        goto(
-          `/cloud/workloads/statefulsets/${resource.name}?namespace=${resource.namespace}`,
-        );
+        goto(`/cloud/workloads/statefulsets/${resource.name}?namespace=${resource.namespace}`);
       }}
     />
   </div>

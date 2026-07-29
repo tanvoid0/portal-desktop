@@ -1,19 +1,11 @@
 <!-- Cloud Overview Dashboard -->
 <script lang="ts">
-  import {
-    cloudStore,
-    loadResources,
-  } from "$lib/domains/cloud/stores";
-  import { ResourceType } from "$lib/domains/cloud/core/types";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { goto } from "$app/navigation";
-  import { Badge } from "$lib/components/ui/badge";
+  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { goto } from '$app/navigation';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     Boxes,
     Network,
@@ -26,11 +18,11 @@
     Lock,
     Globe,
     Server,
-  } from "@lucide/svelte";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import MetricsDisplay from "$lib/domains/cloud/components/MetricsDisplay.svelte";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import { toast } from "$lib/utils/toast";
+  } from '@lucide/svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import MetricsDisplay from '$lib/domains/cloud/components/MetricsDisplay.svelte';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import { toast } from '$lib/utils/toast';
 
   let isLoadingData = $state(false);
   let loadError = $state<string | null>(null);
@@ -41,8 +33,7 @@
 
   // Load once when cluster connection becomes available (not on every store refresh)
   $effect(() => {
-    const connected =
-      $cloudStore.connection.isConnected && !!$cloudStore.currentCluster;
+    const connected = $cloudStore.connection.isConnected && !!$cloudStore.currentCluster;
     if (connected && !wasConnected) {
       void loadClusterData();
     }
@@ -73,12 +64,11 @@
       loadError = null;
       hasLoadedOnce = true;
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to load cluster data";
+      const message = error instanceof Error ? error.message : 'Failed to load cluster data';
       if (!hasLoadedOnce) {
         loadError = message;
       } else {
-        toast.error("Failed to refresh cluster data", message);
+        toast.error('Failed to refresh cluster data', message);
       }
     } finally {
       isLoadingData = false;
@@ -94,14 +84,14 @@
       const metrics = await k8sResourceService.getAllPodsMetrics(namespace || null);
       clusterMetrics = metrics;
     } catch (error) {
-      console.error("Failed to load metrics:", error);
+      console.error('Failed to load metrics:', error);
     } finally {
       metricsLoading = false;
     }
   }
 
   function formatCPU(millicores: number | null): string {
-    if (millicores === null || millicores === undefined) return "N/A";
+    if (millicores === null || millicores === undefined) return 'N/A';
     if (millicores >= 1000) {
       return `${(millicores / 1000).toFixed(2)} cores`;
     }
@@ -109,7 +99,7 @@
   }
 
   function formatMemory(bytes: number | null): string {
-    if (bytes === null || bytes === undefined) return "N/A";
+    if (bytes === null || bytes === undefined) return 'N/A';
     const gb = bytes / (1024 * 1024 * 1024);
     if (gb >= 1) {
       return `${gb.toFixed(2)} Gi`;
@@ -142,25 +132,24 @@
     return {
       pods: {
         total: pods.length,
-        running: pods.filter((p: any) => p.status === "running").length,
-        pending: pods.filter((p: any) => p.status === "pending").length,
-        failed: pods.filter((p: any) => p.status === "failed").length,
+        running: pods.filter((p: any) => p.status === 'running').length,
+        pending: pods.filter((p: any) => p.status === 'pending').length,
+        failed: pods.filter((p: any) => p.status === 'failed').length,
       },
       services: {
         total: services.length,
       },
       deployments: {
         total: deployments.length,
-        running: deployments.filter((d: any) => d.status === "running").length,
+        running: deployments.filter((d: any) => d.status === 'running').length,
       },
       statefulsets: {
         total: statefulsets.length,
-        running: statefulsets.filter((ss: any) => ss.status === "running")
-          .length,
+        running: statefulsets.filter((ss: any) => ss.status === 'running').length,
       },
       daemonsets: {
         total: daemonsets.length,
-        running: daemonsets.filter((ds: any) => ds.status === "running").length,
+        running: daemonsets.filter((ds: any) => ds.status === 'running').length,
       },
       jobs: {
         total: jobs.length,
@@ -192,7 +181,7 @@
     let podCount = 0;
 
     for (const [podName, metrics] of Object.entries(clusterMetrics)) {
-      if (!metrics || typeof metrics !== "object") continue;
+      if (!metrics || typeof metrics !== 'object') continue;
       if (metrics.cpu_usage !== null && metrics.cpu_usage !== undefined) {
         totalCPU += metrics.cpu_usage;
       }
@@ -222,17 +211,11 @@
         <CardTitle>Not Connected</CardTitle>
       </CardHeader>
       <CardContent>
-        <p class="text-muted-foreground">
-          Please connect to a cluster to view resources.
-        </p>
+        <p class="text-muted-foreground">Please connect to a cluster to view resources.</p>
       </CardContent>
     </Card>
   {:else if loadError && !hasLoadedOnce}
-    <PageError
-      title="Failed to load cluster data"
-      message={loadError}
-      onRetry={loadClusterData}
-    />
+    <PageError title="Failed to load cluster data" message={loadError} onRetry={loadClusterData} />
   {:else if isLoadingData && !hasLoadedOnce}
     <PageLoading message="Loading cluster data..." />
   {:else}
@@ -256,25 +239,25 @@
             <div>
               <p class="text-muted-foreground">Context</p>
               <p class="font-medium">
-                {$cloudStore.currentCluster.context || "N/A"}
+                {$cloudStore.currentCluster.context || 'N/A'}
               </p>
             </div>
             <div>
               <p class="text-muted-foreground">Namespace</p>
               <p class="font-medium">
-                {$cloudStore.selectedNamespace || "default"}
+                {$cloudStore.selectedNamespace || 'default'}
               </p>
             </div>
             <div>
               <p class="text-muted-foreground">Server</p>
               <p class="truncate font-medium">
-                {$cloudStore.currentCluster.server || "N/A"}
+                {$cloudStore.currentCluster.server || 'N/A'}
               </p>
             </div>
             <div>
               <p class="text-muted-foreground">Version</p>
               <p class="font-medium">
-                {$cloudStore.currentCluster.version || "N/A"}
+                {$cloudStore.currentCluster.version || 'N/A'}
               </p>
             </div>
           </div>
@@ -294,11 +277,7 @@
       <div>
         <div class="mb-3 flex items-center justify-between">
           <h2 class="text-lg font-semibold">Resource Statistics</h2>
-          <Button
-            variant="outline"
-            onclick={handleRefresh}
-            disabled={isLoadingData}
-          >
+          <Button variant="outline" onclick={handleRefresh} disabled={isLoadingData}>
             Refresh
           </Button>
         </div>
@@ -482,7 +461,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/workloads")}
+              onclick={() => goto('/cloud/workloads')}
             >
               <span class="mr-2 text-lg">☸️</span>
               View Workloads
@@ -490,7 +469,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/workloads/pods")}
+              onclick={() => goto('/cloud/workloads/pods')}
             >
               <span class="mr-2 text-lg">📦</span>
               View Pods
@@ -498,7 +477,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/workloads/services")}
+              onclick={() => goto('/cloud/workloads/services')}
             >
               <span class="mr-2 text-lg">🔗</span>
               View Services
@@ -506,7 +485,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/workloads/deployments")}
+              onclick={() => goto('/cloud/workloads/deployments')}
             >
               <span class="mr-2 text-lg">🚀</span>
               View Deployments
@@ -514,7 +493,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/workloads/statefulsets")}
+              onclick={() => goto('/cloud/workloads/statefulsets')}
             >
               <span class="mr-2 text-lg">🗄️</span>
               View StatefulSets
@@ -522,7 +501,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/workloads/daemonsets")}
+              onclick={() => goto('/cloud/workloads/daemonsets')}
             >
               <span class="mr-2 text-lg">👹</span>
               View DaemonSets
@@ -530,7 +509,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/workloads/jobs")}
+              onclick={() => goto('/cloud/workloads/jobs')}
             >
               <span class="mr-2 text-lg">⚙️</span>
               View Jobs
@@ -538,7 +517,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/workloads/cronjobs")}
+              onclick={() => goto('/cloud/workloads/cronjobs')}
             >
               <span class="mr-2 text-lg">⏰</span>
               View CronJobs
@@ -546,7 +525,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/configmaps")}
+              onclick={() => goto('/cloud/configmaps')}
             >
               <span class="mr-2 text-lg">⚙️</span>
               View ConfigMaps
@@ -554,7 +533,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto("/cloud/secrets")}
+              onclick={() => goto('/cloud/secrets')}
             >
               <span class="mr-2 text-lg">🔐</span>
               View Secrets

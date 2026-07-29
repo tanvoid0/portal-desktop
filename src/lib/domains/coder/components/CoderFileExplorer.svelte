@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { ChevronRight, ExternalLink, File, Folder, RefreshCw } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { coderWorkspaceStore } from "../state/coderWorkspaceStore.svelte.js";
+  import { invoke } from '@tauri-apps/api/core';
+  import { ChevronRight, ExternalLink, File, Folder, RefreshCw } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
 
   interface Props {
     workspaceRoot: string;
@@ -29,9 +29,9 @@
   let error = $state<string | null>(null);
 
   async function fetchEntries(path: string): Promise<DirEntry[]> {
-    return invoke<DirEntry[]>("coder_list_dir", {
+    return invoke<DirEntry[]>('coder_list_dir', {
       workspaceRoot,
-      path: path === "." ? null : path,
+      path: path === '.' ? null : path,
     });
   }
 
@@ -47,7 +47,7 @@
     loading = true;
     error = null;
     try {
-      root = toNodes(await fetchEntries("."), 0);
+      root = toNodes(await fetchEntries('.'), 0);
     } catch (e) {
       error = String(e);
       root = [];
@@ -83,7 +83,7 @@
   async function openInExplorer(path: string, e: MouseEvent) {
     e.stopPropagation();
     try {
-      await invoke("coder_open_in_explorer", { workspaceRoot, path });
+      await invoke('coder_open_in_explorer', { workspaceRoot, path });
     } catch (e) {
       error = String(e);
     }
@@ -140,7 +140,7 @@
               >
                 {#if node.is_dir}
                   <ChevronRight
-                    class={`h-3 w-3 shrink-0 opacity-40 transition-transform ${node.expanded ? "rotate-90" : ""}`}
+                    class={`h-3 w-3 shrink-0 opacity-40 transition-transform ${node.expanded ? 'rotate-90' : ''}`}
                   />
                   <Folder class="h-3.5 w-3.5 shrink-0 text-amber-600/80" />
                 {:else}

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { parseAndFormatSize } from "$lib/utils/fileSize";
-  import { Badge } from "./ui/badge";
-  import { Button } from "./ui/button";
+  import { parseAndFormatSize } from '$lib/utils/fileSize';
+  import { Badge } from './ui/badge';
+  import { Button } from './ui/button';
 
   export let model: any;
   export let isInstalled: boolean = false;
@@ -30,12 +30,7 @@
   <div class="flex items-center gap-4">
     <div class="flex items-center gap-2">
       {#if isInstalled}
-        <svg
-          class="h-5 w-5 text-green-600"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -44,12 +39,7 @@
           />
         </svg>
       {:else}
-        <svg
-          class="h-5 w-5 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -85,12 +75,7 @@
       </Badge>
       {#if onView}
         <Button size="sm" variant="outline" onclick={handleView}>
-          <svg
-            class="mr-1 h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -109,12 +94,7 @@
       {/if}
       {#if onRemove}
         <Button size="sm" variant="destructive" onclick={handleAction}>
-          <svg
-            class="mr-1 h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -126,17 +106,10 @@
         </Button>
       {/if}
     {:else}
-      <Badge variant="outline" class="text-gray-600">
-        Available in Ollama Library
-      </Badge>
+      <Badge variant="outline" class="text-gray-600">Available in Ollama Library</Badge>
       {#if onInstall}
         <Button size="sm" onclick={handleAction}>
-          <svg
-            class="mr-1 h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"

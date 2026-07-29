@@ -1,4 +1,4 @@
-import { invokeClient } from "$lib/utils/invokeClient";
+import { invokeClient } from '$lib/utils/invokeClient';
 
 export interface OllamaServiceStatus {
   running: boolean;
@@ -8,47 +8,45 @@ export interface OllamaServiceStatus {
 
 export const ollamaApi = {
   getServiceStatus() {
-    return invokeClient.post<OllamaServiceStatus>("get_service_status", {
-      sdkType: "ollama",
+    return invokeClient.post<OllamaServiceStatus>('get_service_status', {
+      sdkType: 'ollama',
     });
   },
 
   getVersions() {
-    return invokeClient.post<string[]>("get_ollama_versions");
+    return invokeClient.post<string[]>('get_ollama_versions');
   },
 
   getModels() {
-    return invokeClient.post<unknown[]>("get_ollama_models");
+    return invokeClient.post<unknown[]>('get_ollama_models');
   },
 
   /** Model families keyed by category — the Rust side returns a map, not a list. */
   getAvailableModels() {
-    return invokeClient.post<Record<string, unknown[]>>(
-      "get_available_ollama_models",
-    );
+    return invokeClient.post<Record<string, unknown[]>>('get_available_ollama_models');
   },
 
   installModel(modelName: string) {
-    return invokeClient.post("install_ollama_model", { modelName });
+    return invokeClient.post('install_ollama_model', { modelName });
   },
 
   removeModel(modelName: string) {
-    return invokeClient.post("remove_ollama_model", { modelName });
+    return invokeClient.post('remove_ollama_model', { modelName });
   },
 
   startService() {
-    return invokeClient.post("start_service", { sdkType: "ollama" });
+    return invokeClient.post('start_service', { sdkType: 'ollama' });
   },
 
   stopService() {
-    return invokeClient.post("stop_service", { sdkType: "ollama" });
+    return invokeClient.post('stop_service', { sdkType: 'ollama' });
   },
 
   checkUpdates() {
-    return invokeClient.post("check_ollama_updates");
+    return invokeClient.post('check_ollama_updates');
   },
 
   update() {
-    return invokeClient.post("update_ollama");
+    return invokeClient.post('update_ollama');
   },
 };

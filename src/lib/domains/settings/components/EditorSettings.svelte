@@ -9,14 +9,14 @@
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Switch } from "$lib/components/ui/switch";
-  import { Separator } from "$lib/components/ui/separator";
-  import { settingsService } from "../services/settingsService";
-  import type { EditorSettings } from "../types";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Separator } from '$lib/components/ui/separator';
+  import { settingsService } from '../services/settingsService';
+  import type { EditorSettings } from '../types';
 
   interface Props {
     settings: EditorSettings | null;
@@ -27,7 +27,7 @@
 
   if (!settings) {
     settings = {
-      fontFamily: "monaco",
+      fontFamily: 'monaco',
       fontSize: 14,
       lineHeight: 1.5,
       tabSize: 2,
@@ -42,8 +42,8 @@
       autoComplete: true,
       suggestions: true,
       parameterHints: true,
-      editorTheme: "default",
-      terminalTheme: "default",
+      editorTheme: 'default',
+      terminalTheme: 'default',
       keybindings: {},
     };
   }
@@ -56,9 +56,7 @@
   <Card>
     <CardHeader>
       <CardTitle>Font & Display</CardTitle>
-      <CardDescription
-        >Configure editor font and visual appearance</CardDescription
-      >
+      <CardDescription>Configure editor font and visual appearance</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       <div class="space-y-2">
@@ -83,8 +81,7 @@
             min="8"
             max="72"
             bind:value={settings.fontSize}
-            onchange={() =>
-              onUpdate({ fontSize: parseInt(String(settings.fontSize)) || 14 })}
+            onchange={() => onUpdate({ fontSize: parseInt(String(settings.fontSize)) || 14 })}
           />
         </div>
 
@@ -123,17 +120,14 @@
             min="1"
             max="8"
             bind:value={settings.tabSize}
-            onchange={() =>
-              onUpdate({ tabSize: parseInt(String(settings.tabSize)) || 2 })}
+            onchange={() => onUpdate({ tabSize: parseInt(String(settings.tabSize)) || 2 })}
           />
         </div>
 
         <div class="flex items-center justify-between">
           <div class="space-y-0.5">
             <Label for="insertSpaces">Insert Spaces</Label>
-            <p class="text-sm text-muted-foreground">
-              Use spaces instead of tabs
-            </p>
+            <p class="text-sm text-muted-foreground">Use spaces instead of tabs</p>
           </div>
           {#if settings}
             <Switch
@@ -205,9 +199,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="showWhitespace">Show Whitespace</Label>
-          <p class="text-sm text-muted-foreground">
-            Display whitespace characters
-          </p>
+          <p class="text-sm text-muted-foreground">Display whitespace characters</p>
         </div>
         <Switch
           id="showWhitespace"
@@ -233,17 +225,14 @@
         <Switch
           id="syntaxHighlighting"
           checked={settings.syntaxHighlighting}
-          onCheckedChange={(checked) =>
-            onUpdate({ syntaxHighlighting: checked })}
+          onCheckedChange={(checked) => onUpdate({ syntaxHighlighting: checked })}
         />
       </div>
 
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="bracketMatching">Bracket Matching</Label>
-          <p class="text-sm text-muted-foreground">
-            Highlight matching brackets
-          </p>
+          <p class="text-sm text-muted-foreground">Highlight matching brackets</p>
         </div>
         <Switch
           id="bracketMatching"
@@ -281,9 +270,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="parameterHints">Parameter Hints</Label>
-          <p class="text-sm text-muted-foreground">
-            Show function parameter hints
-          </p>
+          <p class="text-sm text-muted-foreground">Show function parameter hints</p>
         </div>
         <Switch
           id="parameterHints"

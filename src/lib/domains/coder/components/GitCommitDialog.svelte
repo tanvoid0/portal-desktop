@@ -1,10 +1,10 @@
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Label } from "$lib/components/ui/label";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Label } from '$lib/components/ui/label';
   import {
     ChevronRight,
     File,
@@ -14,14 +14,11 @@
     Loader2,
     RefreshCw,
     Sparkles,
-  } from "@lucide/svelte";
-  import { coderService } from "../services/coderService.js";
-  import type { GitCommitDraft } from "../types.js";
-  import {
-    buildChangeTree,
-    flattenChangeTree,
-  } from "../utils/changeTree.js";
-  import { toast } from "$lib/utils/toast";
+  } from '@lucide/svelte';
+  import { coderService } from '../services/coderService.js';
+  import type { GitCommitDraft } from '../types.js';
+  import { buildChangeTree, flattenChangeTree } from '../utils/changeTree.js';
+  import { toast } from '$lib/utils/toast';
 
   interface Props {
     open?: boolean;
@@ -29,18 +26,14 @@
     onCommitted?: () => void;
   }
 
-  let {
-    open = $bindable(false),
-    workspaceRoot,
-    onCommitted,
-  }: Props = $props();
+  let { open = $bindable(false), workspaceRoot, onCommitted }: Props = $props();
 
   let loading = $state(false);
   let committing = $state(false);
   let error = $state<string | null>(null);
   let draft = $state<GitCommitDraft | null>(null);
-  let title = $state("");
-  let summary = $state("");
+  let title = $state('');
+  let summary = $state('');
   let expanded = $state<Set<string>>(new Set());
 
   const tree = $derived(draft ? buildChangeTree(draft.changes) : []);
@@ -48,7 +41,7 @@
 
   async function prepare(useAi = true) {
     if (!workspaceRoot.trim()) {
-      error = "No workspace selected.";
+      error = 'No workspace selected.';
       return;
     }
     loading = true;
@@ -61,7 +54,7 @@
       expanded = new Set(
         buildChangeTree(result.changes)
           .filter((n) => !n.isFile)
-          .map((n) => n.path),
+          .map((n) => n.path)
       );
     } catch (e) {
       error = String(e);
@@ -73,7 +66,7 @@
 
   async function commit() {
     if (!title.trim()) {
-      toast.error("Commit title is required.");
+      toast.error('Commit title is required.');
       return;
     }
     committing = true;
@@ -82,7 +75,7 @@
       const hash = await coderService.gitCommit(
         workspaceRoot,
         title.trim(),
-        summary.trim() || null,
+        summary.trim() || null
       );
       toast.success(`Committed ${hash}`);
       open = false;
@@ -103,12 +96,10 @@
     expanded = next;
   }
 
-  function statusVariant(
-    status: string,
-  ): "secondary" | "destructive" | "outline" {
-    if (status === "deleted") return "destructive";
-    if (status === "untracked" || status === "added") return "secondary";
-    return "outline";
+  function statusVariant(status: string): 'secondary' | 'destructive' | 'outline' {
+    if (status === 'deleted') return 'destructive';
+    if (status === 'untracked' || status === 'added') return 'secondary';
+    return 'outline';
   }
 
   $effect(() => {
@@ -141,7 +132,9 @@
           Reviewing git changes…
         </div>
       {:else if error && !draft}
-        <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div
+          class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
           {error}
         </div>
       {:else if draft}
@@ -150,7 +143,7 @@
             <GitBranch class="h-4 w-4 text-muted-foreground" />
             <span class="text-muted-foreground">Branch</span>
             <code class="rounded bg-muted px-2 py-0.5 font-mono text-xs">
-              {draft.branch ?? "detached"}
+              {draft.branch ?? 'detached'}
             </code>
             {#if draft.aiGenerated}
               <Badge variant="secondary" class="gap-1 text-[10px]">
@@ -185,7 +178,7 @@
         <div class="space-y-2">
           <div class="flex items-center justify-between">
             <span class="text-xs font-medium text-muted-foreground">
-              Changelist ({draft.changes.length} file{draft.changes.length === 1 ? "" : "s"})
+              Changelist ({draft.changes.length} file{draft.changes.length === 1 ? '' : 's'})
             </span>
             <Button
               size="sm"
@@ -256,7 +249,9 @@
         </div>
 
         {#if error}
-          <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <div
+            class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          >
             {error}
           </div>
         {/if}
@@ -264,9 +259,7 @@
     </div>
 
     <Dialog.Footer class="divider-edge-t divider-edge-full px-6 py-4">
-      <Button variant="outline" onclick={() => (open = false)} disabled={committing}>
-        Cancel
-      </Button>
+      <Button variant="outline" onclick={() => (open = false)} disabled={committing}>Cancel</Button>
       <Button
         onclick={() => void commit()}
         disabled={!draft || !title.trim() || committing || loading}

@@ -4,33 +4,33 @@
 -->
 
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { onMount, onDestroy } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Switch } from "$lib/components/ui/switch";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { onMount, onDestroy } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Switch } from '$lib/components/ui/switch';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { X, Play, Square } from "@lucide/svelte";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { X, Play, Square } from '@lucide/svelte';
   import {
     CustomScriptService,
     type CustomScript,
     type ScriptParameter,
-  } from "$lib/domains/custom_scripts/services/customScriptService";
+  } from '$lib/domains/custom_scripts/services/customScriptService';
   import {
     TerminalService,
     type TerminalProcess,
     type TerminalOutput,
-  } from "$lib/domains/terminal";
-  import { useRunningScripts } from "$lib/domains/custom_scripts/hooks/useRunningScripts";
-  import FilePicker from "$lib/components/ui/file-picker.svelte";
+  } from '$lib/domains/terminal';
+  import { useRunningScripts } from '$lib/domains/custom_scripts/hooks/useRunningScripts';
+  import FilePicker from '$lib/components/ui/file-picker.svelte';
 
   interface Props {
     script: CustomScript;
@@ -52,15 +52,13 @@
   let runningInstanceId = $state<string | null>(providedInstanceId || null);
 
   // Parse parameters
-  const parameters = $derived(
-    CustomScriptService.parseParameters(script.parameters_json),
-  );
+  const parameters = $derived(CustomScriptService.parseParameters(script.parameters_json));
 
   // Parameter values
   let parameterValues = $state<Record<string, string>>({});
   let booleanValues = $state<Record<string, boolean>>({});
   let terminalProcess = $state<TerminalProcess | null>(null);
-  let terminalOutput = $state<string>("");
+  let terminalOutput = $state<string>('');
   let isRunning = $state(false);
   let error = $state<string | null>(null);
   let outputContainer = $state<HTMLDivElement | null>(null);
@@ -85,13 +83,10 @@
 
         // Subscribe to output updates if not already subscribed
         if (!instance.outputUnsubscribe) {
-          TerminalService.subscribeToOutput(
-            instance.processId,
-            (output: TerminalOutput) => {
-              terminalOutput += output.content;
-              runningScripts.appendOutput(instance.id, output.content);
-            },
-          )
+          TerminalService.subscribeToOutput(instance.processId, (output: TerminalOutput) => {
+            terminalOutput += output.content;
+            runningScripts.appendOutput(instance.id, output.content);
+          })
             .then((unsub) => {
               outputUnsubscribe = unsub;
               const updated = runningScripts.getById(instance.id);
@@ -110,11 +105,11 @@
     const defaults: Record<string, string> = {};
     const boolDefaults: Record<string, boolean> = {};
     for (const param of parameters) {
-      if (param.parameter_type === "boolean") {
-        boolDefaults[param.name] = param.default_value === "true";
+      if (param.parameter_type === 'boolean') {
+        boolDefaults[param.name] = param.default_value === 'true';
       } else {
         // Initialize all non-boolean parameters with default value or empty string
-        defaults[param.name] = param.default_value || "";
+        defaults[param.name] = param.default_value || '';
       }
     }
     parameterValues = defaults;
@@ -138,7 +133,7 @@
     // Validate required parameters
     for (const param of parameters) {
       if (param.required) {
-        if (param.parameter_type === "boolean") {
+        if (param.parameter_type === 'boolean') {
           // Boolean params are always valid
           continue;
         }
@@ -151,21 +146,21 @@
 
     error = null;
     isRunning = true;
-    terminalOutput = "";
+    terminalOutput = '';
 
     try {
       // Build the command with parameter values (include boolean values)
       const allValues = { ...parameterValues };
       for (const param of parameters) {
-        if (param.parameter_type === "boolean") {
-          allValues[param.name] = booleanValues[param.name] ? "true" : "false";
+        if (param.parameter_type === 'boolean') {
+          allValues[param.name] = booleanValues[param.name] ? 'true' : 'false';
         }
       }
       const command = CustomScriptService.buildCommand(
         script.command,
         parameters,
         allValues,
-        script.requires_sudo,
+        script.requires_sudo
       );
 
       // Record script run
@@ -174,17 +169,12 @@
       // Create terminal process
       const tabId = `script-${script.id}-${Date.now()}`;
       terminalProcess = await TerminalService.createProcess(tabId, {
-        shell: "bash",
-        working_directory: "/home/tan",
+        shell: 'bash',
+        working_directory: '/home/tan',
       });
 
       // Register this running instance first (before subscribing to output)
-      runningInstanceId = runningScripts.add(
-        script,
-        terminalProcess.id,
-        tabId,
-        handleStop,
-      );
+      runningInstanceId = runningScripts.add(script, terminalProcess.id, tabId, handleStop);
 
       // Subscribe to output
       outputUnsubscribe = await TerminalService.subscribeToOutput(
@@ -195,7 +185,7 @@
           if (runningInstanceId) {
             runningScripts.appendOutput(runningInstanceId, output.content);
           }
-        },
+        }
       );
 
       // Update the instance with output unsubscribe
@@ -212,8 +202,8 @@
 
       onRun?.();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to run script";
-      console.error("Failed to run script:", err);
+      error = err instanceof Error ? err.message : 'Failed to run script';
+      console.error('Failed to run script:', err);
       isRunning = false;
       if (runningInstanceId) {
         runningScripts.remove(runningInstanceId);
@@ -227,7 +217,7 @@
       try {
         await TerminalService.killProcess(terminalProcess.id);
       } catch (err) {
-        console.error("Failed to kill process:", err);
+        console.error('Failed to kill process:', err);
       }
     }
     if (outputUnsubscribe) {
@@ -253,7 +243,7 @@
       const checkExit = setInterval(async () => {
         if (terminalProcess) {
           const process = await TerminalService.getProcess(terminalProcess.id);
-          if (process && process.status === "completed") {
+          if (process && process.status === 'completed') {
             clearInterval(checkExit);
             isRunning = false;
             if (outputUnsubscribe) {
@@ -304,9 +294,7 @@
     if (isRunning) {
       // Small delay to ensure the input is rendered
       setTimeout(() => {
-        const input = document.getElementById(
-          "interactive-input",
-        ) as HTMLInputElement;
+        const input = document.getElementById('interactive-input') as HTMLInputElement;
         if (input) {
           input.focus();
         }
@@ -333,9 +321,7 @@
     if (!isOpen) onClose();
   }}
 >
-  <Dialog.Content
-    class="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden p-0"
-  >
+  <Dialog.Content class="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden p-0">
     <div class="divider-edge-b divider-edge-full flex items-center justify-between p-6">
       <div>
         <Dialog.Title class="flex items-center gap-2 text-2xl">
@@ -382,13 +368,13 @@
                   </p>
                 {/if}
 
-                {#if param.parameter_type === "file"}
+                {#if param.parameter_type === 'file'}
                   <FilePicker
-                    value={parameterValues[param.name] || ""}
+                    value={parameterValues[param.name] || ''}
                     label=""
                     description=""
                     filters={param.file_filters
-                      ? [{ name: "Files", extensions: param.file_filters }]
+                      ? [{ name: 'Files', extensions: param.file_filters }]
                       : []}
                     selectFolder={false}
                     required={param.required}
@@ -399,9 +385,9 @@
                       };
                     }}
                   />
-                {:else if param.parameter_type === "folder"}
+                {:else if param.parameter_type === 'folder'}
                   <FilePicker
-                    value={parameterValues[param.name] || ""}
+                    value={parameterValues[param.name] || ''}
                     label=""
                     description=""
                     selectFolder={true}
@@ -413,7 +399,7 @@
                       };
                     }}
                   />
-                {:else if param.parameter_type === "boolean"}
+                {:else if param.parameter_type === 'boolean'}
                   {@const boolKey = param.name}
                   <div class="flex items-center gap-2">
                     <Switch
@@ -426,49 +412,46 @@
                       }}
                     />
                     <span class="text-sm text-muted-foreground">
-                      {booleanValues[boolKey] ? "Enabled" : "Disabled"}
+                      {booleanValues[boolKey] ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
-                {:else if param.parameter_type === "password"}
+                {:else if param.parameter_type === 'password'}
                   <Input
                     type="password"
-                    value={parameterValues[param.name] || ""}
+                    value={parameterValues[param.name] || ''}
                     oninput={(e) => {
                       parameterValues = {
                         ...parameterValues,
                         [param.name]: (e.target as HTMLInputElement).value,
                       };
                     }}
-                    placeholder={param.default_value ||
-                      `Enter ${param.label.toLowerCase()}`}
+                    placeholder={param.default_value || `Enter ${param.label.toLowerCase()}`}
                     required={param.required}
                   />
-                {:else if param.parameter_type === "number"}
+                {:else if param.parameter_type === 'number'}
                   <Input
                     type="number"
-                    value={parameterValues[param.name] || ""}
+                    value={parameterValues[param.name] || ''}
                     oninput={(e) => {
                       parameterValues = {
                         ...parameterValues,
                         [param.name]: (e.target as HTMLInputElement).value,
                       };
                     }}
-                    placeholder={param.default_value ||
-                      `Enter ${param.label.toLowerCase()}`}
+                    placeholder={param.default_value || `Enter ${param.label.toLowerCase()}`}
                     required={param.required}
                   />
                 {:else}
                   <Input
                     type="text"
-                    value={parameterValues[param.name] || ""}
+                    value={parameterValues[param.name] || ''}
                     oninput={(e) => {
                       parameterValues = {
                         ...parameterValues,
                         [param.name]: (e.target as HTMLInputElement).value,
                       };
                     }}
-                    placeholder={param.default_value ||
-                      `Enter ${param.label.toLowerCase()}`}
+                    placeholder={param.default_value || `Enter ${param.label.toLowerCase()}`}
                     required={param.required}
                   />
                 {/if}
@@ -484,34 +467,30 @@
           <CardTitle>Command Preview</CardTitle>
         </CardHeader>
         <CardContent class="space-y-2">
-          <pre
-            class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-sm">
+          <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-sm">
 {(() => {
               const allValues = { ...parameterValues };
               for (const param of parameters) {
-                if (param.parameter_type === "boolean") {
-                  allValues[param.name] = booleanValues[param.name]
-                    ? "true"
-                    : "false";
+                if (param.parameter_type === 'boolean') {
+                  allValues[param.name] = booleanValues[param.name] ? 'true' : 'false';
                 }
               }
               return CustomScriptService.buildCommand(
                 script.command,
                 parameters,
                 allValues,
-                script.requires_sudo,
+                script.requires_sudo
               );
             })()}</pre>
           {#if script.requires_sudo}
-            {@const isWindows = navigator.userAgent.includes("Windows")}
+            {@const isWindows = navigator.userAgent.includes('Windows')}
             {#if isWindows}
               <div
                 class="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950"
               >
                 <p class="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Windows Admin Required:</strong> This command requires administrator
-                  privileges. Make sure the terminal is running as administrator,
-                  or the command may fail.
+                  <strong>Windows Admin Required:</strong> This command requires administrator privileges.
+                  Make sure the terminal is running as administrator, or the command may fail.
                 </p>
               </div>
             {:else}
@@ -519,8 +498,7 @@
                 class="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
               >
                 <p class="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Note:</strong> This command will prompt for your password
-                  to run with sudo privileges.
+                  <strong>Note:</strong> This command will prompt for your password to run with sudo privileges.
                 </p>
               </div>
             {/if}
@@ -535,9 +513,7 @@
             <div class="flex items-center justify-between">
               <CardTitle>Output</CardTitle>
               {#if isRunning}
-                <Badge variant="outline"
-                  >Interactive - Type below to send input</Badge
-                >
+                <Badge variant="outline">Interactive - Type below to send input</Badge>
               {/if}
             </div>
           </CardHeader>
@@ -546,7 +522,7 @@
               bind:this={outputContainer}
               class="h-64 overflow-y-auto rounded-md bg-black p-4 font-mono text-sm text-green-400"
             >
-              {terminalOutput || "Waiting for output..."}
+              {terminalOutput || 'Waiting for output...'}
             </div>
 
             {#if isRunning}
@@ -558,10 +534,10 @@
                   class="flex-1"
                   autofocus
                   onkeydown={(e) => {
-                    if (e.key === "Enter") {
-                      const input = (e.target as HTMLInputElement).value + "\n";
+                    if (e.key === 'Enter') {
+                      const input = (e.target as HTMLInputElement).value + '\n';
                       sendInput(input);
-                      (e.target as HTMLInputElement).value = "";
+                      (e.target as HTMLInputElement).value = '';
                     }
                   }}
                 />

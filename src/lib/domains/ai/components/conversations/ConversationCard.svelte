@@ -1,6 +1,6 @@
 <script lang="ts">
-  import AISessionCard from "$lib/domains/ai/components/shared/AISessionCard.svelte";
-  import type { Conversation } from "../../types/index.js";
+  import AISessionCard from '$lib/domains/ai/components/shared/AISessionCard.svelte';
+  import type { Conversation } from '../../types/index.js';
 
   interface Props {
     conversation: Conversation;

@@ -1,44 +1,33 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import { page } from "$app/state";
-  import { projectTerminalHref } from "../navigation";
-  import { terminalStore, terminalActions } from "../stores/terminalStore";
-  import { commandBlockStore } from "../stores/commandBlockStore";
-  import { defaultTerminalConfig } from "../config/defaultTerminalConfig";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
+  import { projectTerminalHref } from '../navigation';
+  import { terminalStore, terminalActions } from '../stores/terminalStore';
+  import { commandBlockStore } from '../stores/commandBlockStore';
+  import { defaultTerminalConfig } from '../config/defaultTerminalConfig';
   import {
     loadWidgetRailState,
     saveWidgetRailState,
     toggleWidget,
     type WidgetId,
     type WidgetRailState,
-  } from "../stores/widgetRailStore";
-  import TabContainer from "./TabContainer.svelte";
-  import TerminalSession from "./core/TerminalSession.svelte";
-  import CommandBlocksPanel from "./widgets/CommandBlocksPanel.svelte";
-  import AIAssistantPanel from "./widgets/AIAssistantPanel.svelte";
-  import NotesPanel from "./widgets/NotesPanel.svelte";
-  import SessionLauncher from "./widgets/SessionLauncher.svelte";
-  import CommandHistoryPanel from "./widgets/CommandHistoryPanel.svelte";
-  import CommandPalette from "./CommandPalette.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    ResizablePaneGroup,
-    ResizablePane,
-    ResizableHandle,
-  } from "$lib/components/ui/resizable";
-  import {
-    Blocks,
-    Bot,
-    StickyNote,
-    Rocket,
-    History,
-    PanelRight,
-  } from "@lucide/svelte";
-  import type { TerminalTab } from "../stores/terminalStore";
-  import type { TerminalConfig } from "../types";
-  import { resolveSessionSettings } from "../utils/resolveSessionSettings";
-  import { TERMINAL_ICONS } from "../utils/shellIcons";
+  } from '../stores/widgetRailStore';
+  import TabContainer from './TabContainer.svelte';
+  import TerminalSession from './core/TerminalSession.svelte';
+  import CommandBlocksPanel from './widgets/CommandBlocksPanel.svelte';
+  import AIAssistantPanel from './widgets/AIAssistantPanel.svelte';
+  import NotesPanel from './widgets/NotesPanel.svelte';
+  import SessionLauncher from './widgets/SessionLauncher.svelte';
+  import CommandHistoryPanel from './widgets/CommandHistoryPanel.svelte';
+  import CommandPalette from './CommandPalette.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
+  import { Blocks, Bot, StickyNote, Rocket, History, PanelRight } from '@lucide/svelte';
+  import type { TerminalTab } from '../stores/terminalStore';
+  import type { TerminalConfig } from '../types';
+  import { resolveSessionSettings } from '../utils/resolveSessionSettings';
+  import { TERMINAL_ICONS } from '../utils/shellIcons';
 
   interface Props {
     settings?: TerminalConfig;
@@ -65,18 +54,13 @@
   const tabs = $derived($terminalStore.tabs.filter(tabFilter));
   const activeTabId = $derived($terminalStore.activeTabId);
 
-  const widgetToggles: Array<{ id: WidgetId; label: string; icon: typeof Blocks }> =
-    [
-      { id: "blocks", label: "Blocks", icon: Blocks },
-      { id: "ai", label: "AI", icon: Bot },
-      { id: "notes", label: "Notes", icon: StickyNote },
-      ...(showLauncher
-        ? [{ id: "launcher" as WidgetId, label: "Launcher", icon: Rocket }]
-        : []),
-      ...(showHistory
-        ? [{ id: "history" as WidgetId, label: "History", icon: History }]
-        : []),
-    ];
+  const widgetToggles: Array<{ id: WidgetId; label: string; icon: typeof Blocks }> = [
+    { id: 'blocks', label: 'Blocks', icon: Blocks },
+    { id: 'ai', label: 'AI', icon: Bot },
+    { id: 'notes', label: 'Notes', icon: StickyNote },
+    ...(showLauncher ? [{ id: 'launcher' as WidgetId, label: 'Launcher', icon: Rocket }] : []),
+    ...(showHistory ? [{ id: 'history' as WidgetId, label: 'History', icon: History }] : []),
+  ];
 
   function createNewTerminalTab(shellCommand?: string) {
     if (onNewTabOverride) {
@@ -106,9 +90,9 @@
     deepLinkHandled = true;
 
     const params = page.url.searchParams;
-    const command = params.get("command");
-    const containerId = params.get("container");
-    const projectId = params.get("project");
+    const command = params.get('command');
+    const containerId = params.get('container');
+    const projectId = params.get('project');
 
     if (projectId) {
       goto(projectTerminalHref(projectId));
@@ -116,16 +100,14 @@
     }
 
     if (containerId) {
-      const shell = navigator.userAgent.includes("Windows")
-        ? "cmd.exe"
-        : "bash";
+      const shell = navigator.userAgent.includes('Windows') ? 'cmd.exe' : 'bash';
       const command = `docker exec -it ${containerId} ${shell}`;
       const tabId = terminalActions.createTabWithProcess({
         title: `Container ${containerId.slice(0, 8)}`,
         workingDirectory: settings.workingDirectory,
         shell: command,
         icon: TERMINAL_ICONS.container,
-        resourceName: "container",
+        resourceName: 'container',
         resourceId: containerId,
       });
       terminalActions.setActiveTab(tabId);
@@ -145,10 +127,7 @@
 
     if (autoCreateTab && tabs.length === 0) {
       createNewTerminalTab();
-    } else if (
-      tabs.length > 0 &&
-      (!activeTabId || !tabs.some((tab) => tab.id === activeTabId))
-    ) {
+    } else if (tabs.length > 0 && (!activeTabId || !tabs.some((tab) => tab.id === activeTabId))) {
       terminalActions.setActiveTab(tabs[0].id);
     }
 
@@ -160,10 +139,7 @@
   });
 
   $effect(() => {
-    if (
-      tabs.length > 0 &&
-      (!activeTabId || !tabs.some((tab) => tab.id === activeTabId))
-    ) {
+    if (tabs.length > 0 && (!activeTabId || !tabs.some((tab) => tab.id === activeTabId))) {
       terminalActions.setActiveTab(tabs[0].id);
     }
   });
@@ -181,17 +157,14 @@
   {:else}
     {#each tabs as tab (tab.id)}
       {@const sessionSettings = resolveSessionSettings(tab, settings)}
-      <div
-        class="h-full w-full"
-        style:display={tab.id === activeTabId ? "block" : "none"}
-      >
+      <div class="h-full w-full" style:display={tab.id === activeTabId ? 'block' : 'none'}>
         <div class="flex h-full flex-col">
-          <div class="divider-edge-b divider-edge-full flex items-center justify-end gap-1 bg-card px-2 py-1">
+          <div
+            class="divider-edge-b divider-edge-full flex items-center justify-end gap-1 bg-card px-2 py-1"
+          >
             {#each widgetToggles as toggle (toggle.id)}
               <Button
-                variant={widgetRail.activeWidgets.includes(toggle.id)
-                  ? "secondary"
-                  : "ghost"}
+                variant={widgetRail.activeWidgets.includes(toggle.id) ? 'secondary' : 'ghost'}
                 size="sm"
                 class="h-7 gap-1 px-2 text-xs"
                 onclick={() => handleWidgetToggle(toggle.id)}
@@ -222,29 +195,30 @@
                 <ResizablePane defaultSize={70} minSize={40} class="min-h-0">
                   <div class="h-full min-h-0">
                     {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}
-                    <TerminalSession
-                    bind:this={sessionRefs[tab.id]}
-                    tabId={tab.id}
-                    initialCommand={tab.id === activeTabId ? pendingCommand ?? undefined : undefined}
-                    settings={sessionSettings}
-                  />
+                      <TerminalSession
+                        bind:this={sessionRefs[tab.id]}
+                        tabId={tab.id}
+                        initialCommand={tab.id === activeTabId
+                          ? (pendingCommand ?? undefined)
+                          : undefined}
+                        settings={sessionSettings}
+                      />
                     {/key}
                   </div>
                 </ResizablePane>
                 <ResizableHandle withHandle />
                 <ResizablePane defaultSize={30} minSize={20}>
                   <div class="flex h-full flex-col divide-y divide-border overflow-hidden">
-                    {#if widgetRail.activeWidgets.includes("blocks")}
+                    {#if widgetRail.activeWidgets.includes('blocks')}
                       <div class="min-h-0 flex-1">
                         <CommandBlocksPanel
                           tabId={tab.id}
                           onRerun={(cmd) => handleRerun(tab.id, cmd)}
-                          onExplain={(block) =>
-                            sessionRefs[tab.id]?.explainError(block)}
+                          onExplain={(block) => sessionRefs[tab.id]?.explainError(block)}
                         />
                       </div>
                     {/if}
-                    {#if widgetRail.activeWidgets.includes("ai")}
+                    {#if widgetRail.activeWidgets.includes('ai')}
                       <div class="min-h-0 flex-1">
                         <AIAssistantPanel
                           tabId={tab.id}
@@ -254,20 +228,19 @@
                         />
                       </div>
                     {/if}
-                    {#if widgetRail.activeWidgets.includes("notes")}
+                    {#if widgetRail.activeWidgets.includes('notes')}
                       <div class="min-h-0 flex-1">
                         <NotesPanel tabId={tab.id} />
                       </div>
                     {/if}
-                    {#if showLauncher && widgetRail.activeWidgets.includes("launcher")}
+                    {#if showLauncher && widgetRail.activeWidgets.includes('launcher')}
                       <div class="min-h-0 flex-1">
                         <SessionLauncher
-                          onContainerOpened={(id) =>
-                            terminalActions.setActiveTab(id)}
+                          onContainerOpened={(id) => terminalActions.setActiveTab(id)}
                         />
                       </div>
                     {/if}
-                    {#if showHistory && widgetRail.activeWidgets.includes("history")}
+                    {#if showHistory && widgetRail.activeWidgets.includes('history')}
                       <div class="min-h-0 flex-1">
                         <CommandHistoryPanel tabId={tab.id} />
                       </div>
@@ -277,11 +250,11 @@
               </ResizablePaneGroup>
             {:else}
               {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}
-              <TerminalSession
-                bind:this={sessionRefs[tab.id]}
-                tabId={tab.id}
-                settings={sessionSettings}
-              />
+                <TerminalSession
+                  bind:this={sessionRefs[tab.id]}
+                  tabId={tab.id}
+                  settings={sessionSettings}
+                />
               {/key}
             {/if}
           </div>

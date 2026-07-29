@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { tick } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Check, X, FileEdit, Pencil, ChevronDown, ChevronUp } from "@lucide/svelte";
-  import { coderService } from "../services/coderService.js";
-  import type { FileChange, Hunk } from "../types.js";
+  import { tick } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Check, X, FileEdit, Pencil, ChevronDown, ChevronUp } from '@lucide/svelte';
+  import { coderService } from '../services/coderService.js';
+  import type { FileChange, Hunk } from '../types.js';
 
   interface Props {
     changes: FileChange[];
@@ -15,15 +15,15 @@
   let { changes, onRefresh }: Props = $props();
 
   let editing = $state<string | null>(null);
-  let draft = $state("");
+  let draft = $state('');
   let focusChangeId = $state<string | null>(null);
   let focusHunkIndex = $state<number | null>(null);
   let reviewedHunks = $state(new Set<string>());
 
-  const pendingChanges = $derived(changes.filter((c) => c.status === "pending"));
+  const pendingChanges = $derived(changes.filter((c) => c.status === 'pending'));
 
   const focusChange = $derived(
-    focusChangeId ? changes.find((c) => c.id === focusChangeId) ?? null : null,
+    focusChangeId ? (changes.find((c) => c.id === focusChangeId) ?? null) : null
   );
 
   const focusPosition = $derived.by(() => {
@@ -55,7 +55,7 @@
 
   function findNextUnreviewed(
     afterChangeId?: string,
-    afterHunkIndex?: number,
+    afterHunkIndex?: number
   ): { changeId: string; hunkIndex: number } | null {
     const list = pendingChanges;
     if (list.length === 0) return null;
@@ -89,7 +89,7 @@
     if (focusChangeId && focusHunkIndex !== null) {
       const change = changes.find((c) => c.id === focusChangeId);
       const hunkExists = change?.hunks.some((h) => h.index === focusHunkIndex);
-      if (change?.status === "pending" && hunkExists) return;
+      if (change?.status === 'pending' && hunkExists) return;
     }
 
     const first = findNextUnreviewed();
@@ -105,10 +105,8 @@
   async function scrollToFocus() {
     await tick();
     if (!focusChangeId || focusHunkIndex === null) return;
-    const el = document.querySelector(
-      `[data-hunk-id="${focusChangeId}:${focusHunkIndex}"]`,
-    );
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const el = document.querySelector(`[data-hunk-id="${focusChangeId}:${focusHunkIndex}"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   async function refresh() {
@@ -123,9 +121,9 @@
     const allAccepted = change.hunks.every((h) => h.accepted);
     const allRejected = change.hunks.every((h) => !h.accepted);
 
-    if (allAccepted && change.status !== "accepted") {
+    if (allAccepted && change.status !== 'accepted') {
       await coderService.acceptChange(change.id);
-    } else if (allRejected && change.status !== "rejected") {
+    } else if (allRejected && change.status !== 'rejected') {
       await coderService.rejectChange(change.id);
     }
   }
@@ -162,7 +160,7 @@
   }
 
   function display(lines: string[]): string {
-    return lines.map((l) => l.replace(/\n$/, "")).join("\n");
+    return lines.map((l) => l.replace(/\n$/, '')).join('\n');
   }
 
   async function acceptHunk(c: FileChange, h: Hunk) {
@@ -265,7 +263,9 @@
   {#if changes.length === 0}
     <div class="text-xs text-muted-foreground">No file changes yet.</div>
   {:else if pendingChanges.length === 0}
-    <div class="rounded-md border border-border px-3 py-4 text-center text-xs text-muted-foreground">
+    <div
+      class="rounded-md border border-border px-3 py-4 text-center text-xs text-muted-foreground"
+    >
       All changes reviewed.
     </div>
   {/if}
@@ -282,7 +282,7 @@
           <span class="mx-1">·</span>
           file {focusPosition.changeIdx + 1} of {focusPosition.totalChanges}
         {:else}
-          {pendingChanges.length} file{pendingChanges.length === 1 ? "" : "s"} to review
+          {pendingChanges.length} file{pendingChanges.length === 1 ? '' : 's'} to review
         {/if}
       </div>
       <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
@@ -321,7 +321,7 @@
   {/if}
 
   {#each pendingChanges as c (c.id)}
-    {@const isPending = c.status === "pending"}
+    {@const isPending = c.status === 'pending'}
     <div
       class="rounded-md border border-border transition-opacity {isPending
         ? ''
@@ -334,11 +334,11 @@
           <Badge variant="secondary" class="text-[10px]">new</Badge>
         {/if}
         <Badge
-          variant={c.status === "accepted"
-            ? "secondary"
-            : c.status === "rejected"
-              ? "destructive"
-              : "outline"}
+          variant={c.status === 'accepted'
+            ? 'secondary'
+            : c.status === 'rejected'
+              ? 'destructive'
+              : 'outline'}
           class="text-[10px]"
         >
           {c.status}
@@ -361,11 +361,7 @@
 
       {#if editing === c.id}
         <div class="space-y-2 p-3">
-          <Textarea
-            bind:value={draft}
-            rows={12}
-            class="font-mono text-xs"
-          />
+          <Textarea bind:value={draft} rows={12} class="font-mono text-xs" />
           <div class="flex gap-2">
             <Button size="sm" onclick={() => saveEdit(c)}>Save to disk</Button>
             <Button size="sm" variant="ghost" onclick={() => (editing = null)}>Cancel</Button>
@@ -392,7 +388,7 @@
                 }
               }}
               onkeydown={(e) => {
-                if (isPending && (e.key === "Enter" || e.key === " ")) {
+                if (isPending && (e.key === 'Enter' || e.key === ' ')) {
                   e.preventDefault();
                   focusChangeId = c.id;
                   focusHunkIndex = h.index;
@@ -405,11 +401,8 @@
                     hunk {h.index + 1} · line {h.before_start + 1}
                   </span>
                   {#if reviewed}
-                    <Badge
-                      variant={h.accepted ? "secondary" : "destructive"}
-                      class="text-[10px]"
-                    >
-                      {h.accepted ? "accepted" : "rejected"}
+                    <Badge variant={h.accepted ? 'secondary' : 'destructive'} class="text-[10px]">
+                      {h.accepted ? 'accepted' : 'rejected'}
                     </Badge>
                   {/if}
                 </div>
@@ -418,7 +411,7 @@
                   <div class="flex items-center gap-1">
                     <Button
                       size="sm"
-                      variant={focused && !reviewed ? "secondary" : "ghost"}
+                      variant={focused && !reviewed ? 'secondary' : 'ghost'}
                       class="h-6 text-[10px]"
                       onclick={(e) => {
                         e.stopPropagation();
@@ -426,7 +419,7 @@
                       }}
                     >
                       <Check class="mr-1 h-3 w-3" />
-                      {reviewed ? "Accept" : "Accept hunk"}
+                      {reviewed ? 'Accept' : 'Accept hunk'}
                     </Button>
                     <Button
                       size="sm"
@@ -438,7 +431,7 @@
                       }}
                     >
                       <X class="mr-1 h-3 w-3" />
-                      {reviewed ? "Reject" : "Reject hunk"}
+                      {reviewed ? 'Reject' : 'Reject hunk'}
                     </Button>
                   </div>
                 {/if}
@@ -447,14 +440,15 @@
                 <pre
                   class="overflow-auto rounded bg-red-500/10 px-2 py-1 text-xs {h.accepted
                     ? ''
-                    : 'opacity-50'}"><code>{display(h.before_lines).replace(/^/gm, "- ")}</code></pre>
+                    : 'opacity-50'}"><code>{display(h.before_lines).replace(/^/gm, '- ')}</code
+                  ></pre>
               {/if}
               {#if h.after_lines.length}
                 <pre
                   class="overflow-auto rounded bg-green-500/10 px-2 py-1 text-xs {h.accepted
                     ? ''
                     : 'opacity-50 line-through'}"><code
-                    >{display(h.after_lines).replace(/^/gm, "+ ")}</code
+                    >{display(h.after_lines).replace(/^/gm, '+ ')}</code
                   ></pre>
               {/if}
             </div>

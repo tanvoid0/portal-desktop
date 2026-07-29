@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Settings2, Sparkles, Trash2 } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import { AI_PROVIDER_SETTINGS_PATH } from "$lib/config/ai-nav";
-  import { coderSession } from "../state/coderSession.svelte.js";
-  import type { PermissionRule } from "../types.js";
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Settings2, Sparkles, Trash2 } from '@lucide/svelte';
+  import { goto } from '$app/navigation';
+  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
+  import { coderSession } from '../state/coderSession.svelte.js';
+  import type { PermissionRule } from '../types.js';
 
   interface Props {
     showRules?: boolean;
@@ -57,11 +57,11 @@
         <ul class="max-h-32 space-y-1 overflow-y-auto">
           {#each coderSession.rules as r}
             <li class="flex items-center gap-1.5">
-              <Badge variant={r.allow ? "secondary" : "destructive"} class="text-[10px]">
-                {r.allow ? "allow" : "deny"}
+              <Badge variant={r.allow ? 'secondary' : 'destructive'} class="text-[10px]">
+                {r.allow ? 'allow' : 'deny'}
               </Badge>
               <span class="truncate font-mono">{r.tool}</span>
-              <span class="truncate font-mono text-muted-foreground">{r.pattern || "*"}</span>
+              <span class="truncate font-mono text-muted-foreground">{r.pattern || '*'}</span>
               <Button
                 type="button"
                 variant="ghost"

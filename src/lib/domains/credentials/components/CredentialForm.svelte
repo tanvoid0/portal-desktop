@@ -3,31 +3,31 @@
 -->
 
 <script lang="ts">
-  import { credentialService } from "../services/credentialService";
-  import { logger } from "$lib/domains/shared";
-  import { toast } from "$lib/utils/toast";
+  import { credentialService } from '../services/credentialService';
+  import { logger } from '$lib/domains/shared';
+  import { toast } from '$lib/utils/toast';
   import type {
     Credential,
     CredentialCreateRequest,
     CredentialUpdateRequest,
     CredentialMetadata,
-  } from "../types";
-  import { CredentialType } from "../types";
+  } from '../types';
+  import { CredentialType } from '../types';
   import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-  } from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import { Loader2, AlertCircle, Plus, X } from "@lucide/svelte";
+  } from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { Loader2, AlertCircle, Plus, X } from '@lucide/svelte';
 
   interface Props {
     credential?: Credential | null;
@@ -42,13 +42,13 @@
   let validationErrors = $state<string[]>([]);
 
   // Form state
-  let name = $state(credential?.name || "");
+  let name = $state(credential?.name || '');
   let type = $state<CredentialType>(credential?.type || CredentialType.OTHER);
-  let description = $state(credential?.description || "");
-  let value = $state("");
+  let description = $state(credential?.description || '');
+  let value = $state('');
   let tags = $state<string[]>(credential?.tags || []);
-  let newTag = $state("");
-  let expiresAt = $state<string>("");
+  let newTag = $state('');
+  let expiresAt = $state<string>('');
   let metadata = $state<Partial<CredentialMetadata>>({});
 
   // Credential type options
@@ -57,21 +57,21 @@
     label: string;
     icon: string;
   }[] = [
-    { value: CredentialType.SSH_KEY, label: "SSH Key", icon: "🔑" },
-    { value: CredentialType.API_TOKEN, label: "API Token", icon: "🎫" },
+    { value: CredentialType.SSH_KEY, label: 'SSH Key', icon: '🔑' },
+    { value: CredentialType.API_TOKEN, label: 'API Token', icon: '🎫' },
     {
       value: CredentialType.ENV_VAR,
-      label: "Environment Variable",
-      icon: "🌍",
+      label: 'Environment Variable',
+      icon: '🌍',
     },
-    { value: CredentialType.DATABASE, label: "Database", icon: "🗄️" },
+    { value: CredentialType.DATABASE, label: 'Database', icon: '🗄️' },
     {
       value: CredentialType.CLOUD_PROVIDER,
-      label: "Cloud Provider",
-      icon: "☁️",
+      label: 'Cloud Provider',
+      icon: '☁️',
     },
-    { value: CredentialType.REGISTRY, label: "Registry", icon: "📦" },
-    { value: CredentialType.OTHER, label: "Other", icon: "🔐" },
+    { value: CredentialType.REGISTRY, label: 'Registry', icon: '📦' },
+    { value: CredentialType.OTHER, label: 'Other', icon: '🔐' },
   ];
 
   // Initialize form with credential data
@@ -79,11 +79,9 @@
     if (credential) {
       name = credential.name;
       type = credential.type;
-      description = credential.description || "";
+      description = credential.description || '';
       tags = [...credential.tags];
-      expiresAt = credential.expiresAt
-        ? credential.expiresAt.toISOString().split("T")[0]
-        : "";
+      expiresAt = credential.expiresAt ? credential.expiresAt.toISOString().split('T')[0] : '';
       metadata = { ...credential.metadata };
     }
   });
@@ -93,15 +91,15 @@
     validationErrors = [];
 
     if (!name.trim()) {
-      validationErrors.push("Name is required");
+      validationErrors.push('Name is required');
     }
 
     if (!value.trim()) {
-      validationErrors.push("Value is required");
+      validationErrors.push('Value is required');
     }
 
     if (expiresAt && new Date(expiresAt) < new Date()) {
-      validationErrors.push("Expiration date must be in the future");
+      validationErrors.push('Expiration date must be in the future');
     }
 
     if (validationErrors.length > 0) {
@@ -114,8 +112,8 @@
 
       if (credential) {
         // Update existing credential
-        logger.info("Updating credential", {
-          context: "CredentialForm",
+        logger.info('Updating credential', {
+          context: 'CredentialForm',
           data: { credentialId: credential.id },
         });
 
@@ -130,18 +128,18 @@
 
         const updatedCredential = await credentialService.updateCredential(
           credential.id,
-          updateRequest,
+          updateRequest
         );
         onSave?.(updatedCredential);
 
-        logger.info("Credential updated successfully", {
-          context: "CredentialForm",
+        logger.info('Credential updated successfully', {
+          context: 'CredentialForm',
           data: { credentialId: credential.id },
         });
       } else {
         // Create new credential
-        logger.info("Creating credential", {
-          context: "CredentialForm",
+        logger.info('Creating credential', {
+          context: 'CredentialForm',
           data: { name, type },
         });
 
@@ -155,24 +153,23 @@
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         };
 
-        const newCredential =
-          await credentialService.createCredential(createRequest);
+        const newCredential = await credentialService.createCredential(createRequest);
         onSave?.(newCredential);
 
-        logger.info("Credential created successfully", {
-          context: "CredentialForm",
+        logger.info('Credential created successfully', {
+          context: 'CredentialForm',
           data: { credentialId: newCredential.id },
         });
       }
 
-      toast.success(credential ? "Credential updated" : "Credential created");
+      toast.success(credential ? 'Credential updated' : 'Credential created');
     } catch (err) {
-      logger.error("Failed to save credential", {
-        context: "CredentialForm",
+      logger.error('Failed to save credential', {
+        context: 'CredentialForm',
         error: err,
         data: { name, type },
       });
-      error = err instanceof Error ? err.message : "Failed to save credential";
+      error = err instanceof Error ? err.message : 'Failed to save credential';
     } finally {
       loading = false;
     }
@@ -181,7 +178,7 @@
   function handleAddTag() {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       tags = [...tags, newTag.trim()];
-      newTag = "";
+      newTag = '';
     }
   }
 
@@ -190,7 +187,7 @@
   }
 
   function handleKeyPress(event: KeyboardEvent) {
-    if (event.key === "Enter") {
+    if (event.key === 'Enter') {
       event.preventDefault();
       handleAddTag();
     }
@@ -201,12 +198,10 @@
   <DialogContent class="sm:max-w-md">
     <DialogHeader>
       <DialogTitle>
-        {credential ? "Edit Credential" : "Add New Credential"}
+        {credential ? 'Edit Credential' : 'Add New Credential'}
       </DialogTitle>
       <DialogDescription>
-        {credential
-          ? "Update the credential details"
-          : "Add a new credential to your vault"}
+        {credential ? 'Update the credential details' : 'Add a new credential to your vault'}
       </DialogDescription>
     </DialogHeader>
 
@@ -286,10 +281,7 @@
             {#each tags as tag (tag)}
               <Badge variant="secondary" class="flex items-center gap-1">
                 {tag}
-                <X
-                  class="h-3 w-3 cursor-pointer"
-                  onclick={() => handleRemoveTag(tag)}
-                />
+                <X class="h-3 w-3 cursor-pointer" onclick={() => handleRemoveTag(tag)} />
               </Badge>
             {/each}
           </div>
@@ -299,12 +291,7 @@
       <!-- Expiration Date -->
       <div class="space-y-2">
         <Label for="expiresAt">Expiration Date</Label>
-        <Input
-          id="expiresAt"
-          type="date"
-          bind:value={expiresAt}
-          disabled={loading}
-        />
+        <Input id="expiresAt" type="date" bind:value={expiresAt} disabled={loading} />
       </div>
 
       <!-- Validation Errors -->
@@ -333,14 +320,12 @@
 
       <!-- Actions -->
       <div class="flex justify-end gap-2">
-        <Button variant="outline" onclick={onClose} disabled={loading}>
-          Cancel
-        </Button>
+        <Button variant="outline" onclick={onClose} disabled={loading}>Cancel</Button>
         <Button onclick={handleSubmit} disabled={loading}>
           {#if loading}
             <Loader2 class="mr-2 h-4 w-4 animate-spin" />
           {/if}
-          {credential ? "Update" : "Create"}
+          {credential ? 'Update' : 'Create'}
         </Button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-export type SDKSidebarVariant = "collapsed" | "expanded";
+export type SDKSidebarVariant = 'collapsed' | 'expanded';
 
 export interface SDKItem {
   id: string;
@@ -15,4 +15,3 @@ export interface SDKItem {
   serviceRunning?: boolean | null;
   port?: number | null;
 }
-

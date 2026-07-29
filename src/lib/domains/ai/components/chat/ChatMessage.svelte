@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { ChevronRight } from "@lucide/svelte";
-  import TypingIndicator from "$lib/components/ui/typing-indicator.svelte";
-  import ChatMarkdown from "$lib/components/ui/chat-markdown/ChatMarkdown.svelte";
-  import type { ChatMessage as ChatMessageType } from "../../types/index.js";
-  import { splitThinking } from "../../utils/thinking.js";
+  import type { Snippet } from 'svelte';
+  import { ChevronRight } from '@lucide/svelte';
+  import TypingIndicator from '$lib/components/ui/typing-indicator.svelte';
+  import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
+  import type { ChatMessage as ChatMessageType } from '../../types/index.js';
+  import { splitThinking } from '../../utils/thinking.js';
 
   interface Props {
     message: ChatMessageType;
@@ -24,13 +24,11 @@
     children,
   }: Props = $props();
 
-  const isAssistant = $derived(message.role === "assistant");
-  const isUser = $derived(message.role === "user");
+  const isAssistant = $derived(message.role === 'assistant');
+  const isUser = $derived(message.role === 'user');
   const parts = $derived(splitThinking(message.content));
   const stats = $derived(message.stats ?? null);
-  const showTypingBubble = $derived(
-    showLoader && isAssistant && !message.content,
-  );
+  const showTypingBubble = $derived(showLoader && isAssistant && !message.content);
   /** Open while the model is still inside the think block, collapsed after. */
   const thinkingOpen = $derived(parts.reasoning != null && !parts.closed);
 
@@ -39,12 +37,9 @@
   function buildChips(): string[] {
     if (!stats) return [];
     const chips: string[] = [];
-    if (stats.tokensPerSecond != null)
-      chips.push(`${stats.tokensPerSecond.toFixed(2)} tok/sec`);
-    if (stats.completionTokens != null)
-      chips.push(`${stats.completionTokens} tokens`);
-    if (stats.durationMs != null)
-      chips.push(`${(stats.durationMs / 1000).toFixed(2)}s`);
+    if (stats.tokensPerSecond != null) chips.push(`${stats.tokensPerSecond.toFixed(2)} tok/sec`);
+    if (stats.completionTokens != null) chips.push(`${stats.completionTokens} tokens`);
+    if (stats.durationMs != null) chips.push(`${(stats.durationMs / 1000).toFixed(2)}s`);
     if (stats.stopReason) chips.push(`Stop reason: ${stats.stopReason}`);
     return chips;
   }
@@ -81,9 +76,7 @@ turns get a bubble. Model id, stats and actions stay visible (LM Studio style).
           <summary
             class="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1.5 text-xs text-muted-foreground marker:content-none hover:text-foreground"
           >
-            <ChevronRight
-              class="h-3.5 w-3.5 transition-transform group-open/think:rotate-90"
-            />
+            <ChevronRight class="h-3.5 w-3.5 transition-transform group-open/think:rotate-90" />
             {#if !parts.closed}
               Thinking…
             {:else if stats?.thinkingMs != null}
@@ -93,21 +86,13 @@ turns get a bubble. Model id, stats and actions stay visible (LM Studio style).
             {/if}
           </summary>
           <div class="px-3 pb-2 text-muted-foreground/70">
-            <ChatMarkdown
-              content={parts.reasoning}
-              variant="assistant"
-              density="compact"
-            />
+            <ChatMarkdown content={parts.reasoning} variant="assistant" density="compact" />
           </div>
         </details>
       {/if}
 
       {#if parts.answer}
-        <ChatMarkdown
-          content={parts.answer}
-          variant="assistant"
-          {isStreaming}
-        />
+        <ChatMarkdown content={parts.answer} variant="assistant" {isStreaming} />
       {/if}
     {/if}
   {/if}

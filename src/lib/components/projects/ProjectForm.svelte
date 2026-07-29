@@ -4,37 +4,34 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invokeClient } from "$lib/utils/invokeClient";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
+  import { onMount } from 'svelte';
+  import { invokeClient } from '$lib/utils/invokeClient';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import FolderPicker from "$lib/components/ui/folder-picker.svelte";
-  import MultiSelect from "$lib/components/ui/multi-select.svelte";
+  } from '$lib/components/ui/card';
+  import FolderPicker from '$lib/components/ui/folder-picker.svelte';
+  import MultiSelect from '$lib/components/ui/multi-select.svelte';
   import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
     TooltipProvider,
-  } from "$lib/components/ui/tooltip";
-  import { RefreshCw, Info } from "@lucide/svelte";
-  import { logger } from "$lib/domains/shared/services/logger";
-  import { isTauriEnvironment } from "$lib/utils/tauri";
-  import type { CreateProjectRequest } from "$lib/domains/projects/types";
-  import { ideService, type Framework } from "$lib/domains/ide";
-  import {
-    packageManagerService,
-    type PackageManager,
-  } from "$lib/domains/package_managers";
-  import { languageService, type Language } from "$lib/domains/languages";
+  } from '$lib/components/ui/tooltip';
+  import { RefreshCw, Info } from '@lucide/svelte';
+  import { logger } from '$lib/domains/shared/services/logger';
+  import { isTauriEnvironment } from '$lib/utils/tauri';
+  import type { CreateProjectRequest } from '$lib/domains/projects/types';
+  import { ideService, type Framework } from '$lib/domains/ide';
+  import { packageManagerService, type PackageManager } from '$lib/domains/package_managers';
+  import { languageService, type Language } from '$lib/domains/languages';
 
   interface ProjectAnalysis {
     name: string;
@@ -57,46 +54,34 @@
     isLoading?: boolean;
   }
 
-  let {
-    projectId,
-    initialData = {},
-    onSubmit,
-    onCancel,
-    isLoading = false,
-  }: Props = $props();
+  let { projectId, initialData = {}, onSubmit, onCancel, isLoading = false }: Props = $props();
 
-  const log = logger.createScoped("ProjectForm");
+  const log = logger.createScoped('ProjectForm');
 
   // Check if running in Tauri environment (backend-dependent features require this)
   const isTauri = isTauriEnvironment();
 
   // Form state
-  let name = $state(initialData.name || "");
-  let description = $state(initialData.description || "");
-  let path = $state(initialData.path || "");
+  let name = $state(initialData.name || '');
+  let description = $state(initialData.description || '');
+  let path = $state(initialData.path || '');
   let frameworkValueStrings = $state<string[]>(
-    (initialData.framework_ids || []).map((id) => id.toString()),
+    (initialData.framework_ids || []).map((id) => id.toString())
   );
   let frameworkIds = $derived(
-    frameworkValueStrings
-      .map((v) => parseInt(v, 10))
-      .filter((id) => !isNaN(id)),
+    frameworkValueStrings.map((v) => parseInt(v, 10)).filter((id) => !isNaN(id))
   );
   let packageManagerValueStrings = $state<string[]>(
-    (initialData.package_manager_ids || []).map((id) => id.toString()),
+    (initialData.package_manager_ids || []).map((id) => id.toString())
   );
   let packageManagerIds = $derived(
-    packageManagerValueStrings
-      .map((v) => parseInt(v, 10))
-      .filter((id) => !isNaN(id)),
+    packageManagerValueStrings.map((v) => parseInt(v, 10)).filter((id) => !isNaN(id))
   );
   let languageValueStrings = $state<string[]>(
-    (initialData.language_ids || []).map((id) => id.toString()),
+    (initialData.language_ids || []).map((id) => id.toString())
   );
   let languageIds = $derived(
-    languageValueStrings
-      .map((v) => parseInt(v, 10))
-      .filter((id) => !isNaN(id)),
+    languageValueStrings.map((v) => parseInt(v, 10)).filter((id) => !isNaN(id))
   );
 
   // Entity lists
@@ -105,8 +90,8 @@
   let languages = $state<Language[]>([]);
   let isLoadingEntities = $state(false);
 
-  let error = $state("");
-  let success = $state("");
+  let error = $state('');
+  let success = $state('');
   let isAnalyzing = $state(false);
 
   let detectedCommands = $state({
@@ -122,10 +107,10 @@
   onMount(async () => {
     if (projectId) {
       // This is an update form
-      log.info("Initializing project update form", { projectId });
+      log.info('Initializing project update form', { projectId });
     } else {
       // This is a create form
-      log.info("Initializing project create form");
+      log.info('Initializing project create form');
     }
     await loadEntities();
   });
@@ -133,13 +118,9 @@
   async function loadEntities() {
     isLoadingEntities = true;
     try {
-      await Promise.all([
-        loadFrameworks(),
-        loadPackageManagers(),
-        loadLanguages(),
-      ]);
+      await Promise.all([loadFrameworks(), loadPackageManagers(), loadLanguages()]);
     } catch (error) {
-      log.warn("Failed to load entities", { error });
+      log.warn('Failed to load entities', { error });
     } finally {
       isLoadingEntities = false;
     }
@@ -149,7 +130,7 @@
     try {
       frameworks = await ideService.getAllFrameworks();
     } catch (error) {
-      log.warn("Failed to load frameworks", { error });
+      log.warn('Failed to load frameworks', { error });
     }
   }
 
@@ -157,7 +138,7 @@
     try {
       packageManagers = await packageManagerService.getAllPackageManagers();
     } catch (error) {
-      log.warn("Failed to load package managers", { error });
+      log.warn('Failed to load package managers', { error });
     }
   }
 
@@ -165,7 +146,7 @@
     try {
       languages = await languageService.getAllLanguages();
     } catch (error) {
-      log.warn("Failed to load languages", { error });
+      log.warn('Failed to load languages', { error });
     }
   }
 
@@ -180,16 +161,18 @@
   async function analyzeProject(projectPath: string, forceSync = false) {
     try {
       isAnalyzing = true;
-      error = "";
+      error = '';
 
-      log.info("Analyzing project directory", { path: projectPath, forceSync });
+      log.info('Analyzing project directory', { path: projectPath, forceSync });
 
-      const analysis: ProjectAnalysis =
-        await invokeClient.post<ProjectAnalysis>("analyze_project_directory", {
+      const analysis: ProjectAnalysis = await invokeClient.post<ProjectAnalysis>(
+        'analyze_project_directory',
+        {
           path: projectPath,
-        });
+        }
+      );
 
-      log.info("Project analysis completed", analysis);
+      log.info('Project analysis completed', analysis);
 
       // Auto-populate form fields
       if (forceSync || !name.trim()) {
@@ -202,7 +185,7 @@
         const matchedFrameworkIds: number[] = [];
         for (const frameworkName of analysis.frameworks) {
           const found = frameworks.find(
-            (f) => f.name.toLowerCase() === frameworkName.toLowerCase(),
+            (f) => f.name.toLowerCase() === frameworkName.toLowerCase()
           );
           if (found && !matchedFrameworkIds.includes(found.id)) {
             matchedFrameworkIds.push(found.id);
@@ -214,7 +197,7 @@
         const matchedPMIds: number[] = [];
         for (const pmName of analysis.package_managers) {
           const found = packageManagers.find(
-            (pm) => pm.name.toLowerCase() === pmName.toLowerCase(),
+            (pm) => pm.name.toLowerCase() === pmName.toLowerCase()
           );
           if (found && !matchedPMIds.includes(found.id)) {
             matchedPMIds.push(found.id);
@@ -225,9 +208,7 @@
         // Match all detected languages by name
         const matchedLanguageIds: number[] = [];
         for (const languageName of analysis.languages) {
-          const found = languages.find(
-            (l) => l.name.toLowerCase() === languageName.toLowerCase(),
-          );
+          const found = languages.find((l) => l.name.toLowerCase() === languageName.toLowerCase());
           if (found && !matchedLanguageIds.includes(found.id)) {
             matchedLanguageIds.push(found.id);
           }
@@ -239,7 +220,7 @@
           const matchedFrameworkIds: number[] = [];
           for (const frameworkName of analysis.frameworks) {
             const found = frameworks.find(
-              (f) => f.name.toLowerCase() === frameworkName.toLowerCase(),
+              (f) => f.name.toLowerCase() === frameworkName.toLowerCase()
             );
             if (found && !matchedFrameworkIds.includes(found.id)) {
               matchedFrameworkIds.push(found.id);
@@ -247,14 +228,11 @@
           }
           frameworkValueStrings = matchedFrameworkIds.map((id) => id.toString());
         }
-        if (
-          packageManagerValueStrings.length === 0 &&
-          analysis.package_managers.length > 0
-        ) {
+        if (packageManagerValueStrings.length === 0 && analysis.package_managers.length > 0) {
           const matchedPMIds: number[] = [];
           for (const pmName of analysis.package_managers) {
             const found = packageManagers.find(
-              (pm) => pm.name.toLowerCase() === pmName.toLowerCase(),
+              (pm) => pm.name.toLowerCase() === pmName.toLowerCase()
             );
             if (found && !matchedPMIds.includes(found.id)) {
               matchedPMIds.push(found.id);
@@ -266,7 +244,7 @@
           const matchedLanguageIds: number[] = [];
           for (const languageName of analysis.languages) {
             const found = languages.find(
-              (l) => l.name.toLowerCase() === languageName.toLowerCase(),
+              (l) => l.name.toLowerCase() === languageName.toLowerCase()
             );
             if (found && !matchedLanguageIds.includes(found.id)) {
               matchedLanguageIds.push(found.id);
@@ -286,17 +264,16 @@
       };
 
       success = forceSync
-        ? "Project properties synced successfully!"
-        : "Project properties auto-detected successfully!";
+        ? 'Project properties synced successfully!'
+        : 'Project properties auto-detected successfully!';
 
       // Clear success message after 3 seconds
       setTimeout(() => {
-        success = "";
+        success = '';
       }, 3000);
     } catch (err) {
-      log.error("Failed to analyze project", err);
-      error =
-        "Failed to analyze project directory. Please check the path and try again.";
+      log.error('Failed to analyze project', err);
+      error = 'Failed to analyze project directory. Please check the path and try again.';
     } finally {
       isAnalyzing = false;
     }
@@ -306,7 +283,7 @@
     if (path.trim()) {
       await analyzeProject(path, true);
     } else {
-      error = "Please select a project path first.";
+      error = 'Please select a project path first.';
     }
   }
 
@@ -314,13 +291,13 @@
     event.preventDefault();
 
     if (!name.trim() || !path.trim()) {
-      error = "Please fill in all required fields.";
+      error = 'Please fill in all required fields.';
       return;
     }
 
     try {
-      error = "";
-      success = "";
+      error = '';
+      success = '';
 
       const projectData: CreateProjectRequest = {
         name: name.trim(),
@@ -339,8 +316,8 @@
 
       await onSubmit(projectData);
     } catch (err) {
-      log.error("Failed to submit project form", err);
-      error = "Failed to save project. Please try again.";
+      log.error('Failed to submit project form', err);
+      error = 'Failed to save project. Please try again.';
     }
   }
 </script>
@@ -348,17 +325,10 @@
 <div class="space-y-6">
   <!-- Success Message -->
   {#if success}
-    <Card
-      class="mb-6 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
-    >
+    <Card class="mb-6 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
       <CardContent class="pt-6">
         <div class="flex items-center gap-2 text-green-800 dark:text-green-200">
-          <svg
-            class="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -375,17 +345,10 @@
 
   <!-- Error Message -->
   {#if error}
-    <Card
-      class="mb-6 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
-    >
+    <Card class="mb-6 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
       <CardContent class="pt-6">
         <div class="flex items-center gap-2 text-red-800 dark:text-red-200">
-          <svg
-            class="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -407,9 +370,7 @@
         <div class="flex items-center justify-between">
           <div>
             <CardTitle>Basic Information</CardTitle>
-            <CardDescription>
-              Essential details about your project
-            </CardDescription>
+            <CardDescription>Essential details about your project</CardDescription>
           </div>
           <TooltipProvider>
             <Tooltip>
@@ -421,15 +382,10 @@
                     variant="outline"
                     size="sm"
                     onclick={handleSync}
-                    disabled={isLoading ||
-                      isAnalyzing ||
-                      !path.trim() ||
-                      !isTauri}
+                    disabled={isLoading || isAnalyzing || !path.trim() || !isTauri}
                     class="flex items-center gap-2"
                   >
-                    <RefreshCw
-                      class="h-4 w-4 {isAnalyzing ? 'animate-spin' : ''}"
-                    />
+                    <RefreshCw class="h-4 w-4 {isAnalyzing ? 'animate-spin' : ''}" />
                     <span class="hidden sm:inline">Sync</span>
                   </Button>
                 {/snippet}
@@ -437,10 +393,9 @@
               {#if !isTauri}
                 <TooltipContent>
                   <p class="max-w-xs">
-                    This feature requires the desktop app. Project analysis and
-                    auto-detection need access to the file system. Please use
-                    the Tauri desktop application to create or update projects
-                    with automatic property detection.
+                    This feature requires the desktop app. Project analysis and auto-detection need
+                    access to the file system. Please use the Tauri desktop application to create or
+                    update projects with automatic property detection.
                   </p>
                 </TooltipContent>
               {:else}
@@ -459,8 +414,8 @@
             bind:value={path}
             label="Project Path"
             description={isTauri
-              ? "Select the directory where your project will be located"
-              : "Enter the project path manually. File browser is only available in the desktop app."}
+              ? 'Select the directory where your project will be located'
+              : 'Enter the project path manually. File browser is only available in the desktop app.'}
             placeholder="/path/to/your/project"
             disabled={isLoading || isAnalyzing}
             required
@@ -470,16 +425,13 @@
             <div
               class="flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-950"
             >
-              <Info
-                class="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400"
-              />
+              <Info class="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
               <div class="text-sm text-yellow-800 dark:text-yellow-200">
                 <p class="mb-1 font-medium">File browser unavailable</p>
                 <p>
-                  The folder picker requires the desktop app for file system
-                  access. You can still enter the project path manually, but
-                  automatic project analysis and property detection won't be
-                  available.
+                  The folder picker requires the desktop app for file system access. You can still
+                  enter the project path manually, but automatic project analysis and property
+                  detection won't be available.
                 </p>
               </div>
             </div>

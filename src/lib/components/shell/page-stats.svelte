@@ -1,11 +1,6 @@
 <script lang="ts">
-  import type { Component } from "svelte";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
+  import type { Component } from 'svelte';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 
   export interface PageStat {
     label: string;
@@ -22,11 +17,7 @@
   let { stats, columns = 4 }: Props = $props();
 
   const gridClass = $derived(
-    columns === 2
-      ? "md:grid-cols-2"
-      : columns === 3
-        ? "md:grid-cols-3"
-        : "md:grid-cols-4",
+    columns === 2 ? 'md:grid-cols-2' : columns === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4'
   );
 </script>
 

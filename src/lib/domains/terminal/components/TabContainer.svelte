@@ -1,12 +1,9 @@
 <script lang="ts">
-  import {
-    terminalStore,
-    terminalActions,
-  } from "../stores/terminalStore";
-  import TabBar from "./TabBar.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import type { Snippet } from "svelte";
-  import type { TerminalTab } from "../stores/terminalStore";
+  import { terminalStore, terminalActions } from '../stores/terminalStore';
+  import TabBar from './TabBar.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import type { Snippet } from 'svelte';
+  import type { TerminalTab } from '../stores/terminalStore';
 
   // Get children snippet from props for Svelte 5
   let {
@@ -14,7 +11,7 @@
     onNewTab = null,
     showNewTabButton = true,
     closable = true,
-    className = "",
+    className = '',
     tabFilter = (_tab: TerminalTab) => true,
   }: {
     children: Snippet<[]>;
@@ -28,9 +25,7 @@
   // Reactive stores
   let tabs = $derived($terminalStore.tabs.filter(tabFilter));
   let activeTabId = $derived($terminalStore.activeTabId);
-  let currentActiveTab = $derived(
-    tabs.find((tab) => tab.id === activeTabId) ?? null,
-  );
+  let currentActiveTab = $derived(tabs.find((tab) => tab.id === activeTabId) ?? null);
 
   // Handle new tab creation with profile
   function handleNewTabWithProfile(profileName?: string) {
@@ -42,7 +37,7 @@
   // Keyboard shortcuts
   function handleKeydown(event: KeyboardEvent) {
     // Ctrl+T: New tab
-    if (event.ctrlKey && event.key === "t") {
+    if (event.ctrlKey && event.key === 't') {
       event.preventDefault();
       if (onNewTab) {
         onNewTab(); // No profile for keyboard shortcut
@@ -50,7 +45,7 @@
     }
 
     // Ctrl+W: Close current tab
-    if (event.ctrlKey && event.key === "w") {
+    if (event.ctrlKey && event.key === 'w') {
       event.preventDefault();
       if (activeTabId && tabs.length > 1) {
         terminalActions.closeTab(activeTabId);
@@ -58,19 +53,19 @@
     }
 
     // Ctrl+Tab: Switch to next tab
-    if (event.ctrlKey && event.key === "Tab") {
+    if (event.ctrlKey && event.key === 'Tab') {
       event.preventDefault();
       switchToNextTab();
     }
 
     // Ctrl+Shift+Tab: Switch to previous tab
-    if (event.ctrlKey && event.shiftKey && event.key === "Tab") {
+    if (event.ctrlKey && event.shiftKey && event.key === 'Tab') {
       event.preventDefault();
       switchToPreviousTab();
     }
 
     // Ctrl+1-9: Switch to tab by number
-    if (event.ctrlKey && event.key >= "1" && event.key <= "9") {
+    if (event.ctrlKey && event.key >= '1' && event.key <= '9') {
       event.preventDefault();
       const tabIndex = parseInt(event.key) - 1;
       if (tabIndex < tabs.length) {
@@ -95,25 +90,20 @@
     terminalActions.setActiveTab(tabs[prevIndex].id);
   }
 
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy } from 'svelte';
 
   onMount(() => {
-    document.addEventListener("keydown", handleKeydown);
+    document.addEventListener('keydown', handleKeydown);
   });
 
   onDestroy(() => {
-    document.removeEventListener("keydown", handleKeydown);
+    document.removeEventListener('keydown', handleKeydown);
   });
 </script>
 
 <div class="tab-container flex h-full w-full flex-col {className}">
   <!-- Tab Bar -->
-  <TabBar
-    {tabs}
-    onNewTab={handleNewTabWithProfile}
-    {showNewTabButton}
-    {closable}
-  />
+  <TabBar {tabs} onNewTab={handleNewTabWithProfile} {showNewTabButton} {closable} />
 
   <!-- Tab Content -->
   <div class="min-h-0 flex-1">

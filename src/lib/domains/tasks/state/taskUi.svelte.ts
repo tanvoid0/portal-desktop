@@ -12,7 +12,7 @@ import type {
   TimeTrackingSession,
   ProductivityMetrics,
   CreateTaskRequest,
-} from "../types";
+} from '../types';
 
 function applyTaskFilters(tasks: Task[], filters: TaskFilters): Task[] {
   let filtered = tasks.filter((task) => !task.parentId);
@@ -22,33 +22,25 @@ function applyTaskFilters(tasks: Task[], filters: TaskFilters): Task[] {
     filtered = filtered.filter(
       (task) =>
         task.title.toLowerCase().includes(query) ||
-        (task.description && task.description.toLowerCase().includes(query)),
+        (task.description && task.description.toLowerCase().includes(query))
     );
   }
 
   if (filters.status && filters.status.length > 0) {
-    filtered = filtered.filter((task) =>
-      filters.status!.includes(task.status),
-    );
+    filtered = filtered.filter((task) => filters.status!.includes(task.status));
   }
 
   if (filters.priority && filters.priority.length > 0) {
-    filtered = filtered.filter((task) =>
-      filters.priority!.includes(task.priority),
-    );
+    filtered = filtered.filter((task) => filters.priority!.includes(task.priority));
   }
 
   if (filters.type && filters.type.length > 0) {
-    filtered = filtered.filter(
-      (task) => task.type && filters.type!.includes(task.type),
-    );
+    filtered = filtered.filter((task) => task.type && filters.type!.includes(task.type));
   }
 
   if (filters.resourceType && filters.resourceId) {
     filtered = filtered.filter(
-      (task) =>
-        task.resourceType === filters.resourceType &&
-        task.resourceId === filters.resourceId,
+      (task) => task.resourceType === filters.resourceType && task.resourceId === filters.resourceId
     );
   }
 
@@ -57,14 +49,11 @@ function applyTaskFilters(tasks: Task[], filters: TaskFilters): Task[] {
 
 function computeTaskStats(parentTasks: Task[]): TaskStats {
   const total = parentTasks.length;
-  const pending = parentTasks.filter((t) => t.status === "pending").length;
-  const inProgress = parentTasks.filter(
-    (t) => t.status === "in-progress",
-  ).length;
-  const completed = parentTasks.filter((t) => t.status === "completed").length;
-  const cancelled = parentTasks.filter((t) => t.status === "cancelled").length;
-  const completionPercentage =
-    total > 0 ? Math.round((completed / total) * 100) : 0;
+  const pending = parentTasks.filter((t) => t.status === 'pending').length;
+  const inProgress = parentTasks.filter((t) => t.status === 'in-progress').length;
+  const completed = parentTasks.filter((t) => t.status === 'completed').length;
+  const cancelled = parentTasks.filter((t) => t.status === 'cancelled').length;
+  const completionPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return {
     total,
@@ -78,7 +67,7 @@ function computeTaskStats(parentTasks: Task[]): TaskStats {
 
 function computeProductivityMetrics(tasks: Task[]): ProductivityMetrics {
   const total = tasks.length;
-  const completed = tasks.filter((t) => t.status === "completed").length;
+  const completed = tasks.filter((t) => t.status === 'completed').length;
   const completionRate = total > 0 ? (completed / total) * 100 : 0;
 
   const tasksWithTime = tasks.filter((t) => t.estimatedTime && t.actualTime);
@@ -86,9 +75,7 @@ function computeProductivityMetrics(tasks: Task[]): ProductivityMetrics {
     tasksWithTime.length > 0
       ? tasksWithTime.reduce((acc, task) => {
           const accuracy =
-            Math.abs(
-              (task.estimatedTime! - task.actualTime!) / task.estimatedTime!,
-            ) * 100;
+            Math.abs((task.estimatedTime! - task.actualTime!) / task.estimatedTime!) * 100;
           return acc + (100 - accuracy);
         }, 0) / tasksWithTime.length
       : 0;
@@ -96,29 +83,21 @@ function computeProductivityMetrics(tasks: Task[]): ProductivityMetrics {
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const recentCompleted = tasks.filter(
-    (t) =>
-      t.status === "completed" && t.completedAt && t.completedAt >= oneWeekAgo,
+    (t) => t.status === 'completed' && t.completedAt && t.completedAt >= oneWeekAgo
   ).length;
 
   const overdueCount = tasks.filter(
     (t) =>
-      t.dueDate &&
-      t.dueDate < new Date() &&
-      t.status !== "completed" &&
-      t.status !== "cancelled",
+      t.dueDate && t.dueDate < new Date() && t.status !== 'completed' && t.status !== 'cancelled'
   ).length;
 
   const unestimatedCount = tasks.filter(
-    (t) =>
-      !t.estimatedTime && t.status !== "completed" && t.status !== "cancelled",
+    (t) => !t.estimatedTime && t.status !== 'completed' && t.status !== 'cancelled'
   ).length;
 
   const blockedCount = tasks.filter(
     (t) =>
-      t.blockedBy &&
-      t.blockedBy.length > 0 &&
-      t.status !== "completed" &&
-      t.status !== "cancelled",
+      t.blockedBy && t.blockedBy.length > 0 && t.status !== 'completed' && t.status !== 'cancelled'
   ).length;
 
   return {
@@ -151,36 +130,34 @@ export class TaskUiState {
 
   parentTasks = $derived(this.tasks.filter((task) => !task.parentId));
 
-  filteredTasks = $derived(
-    applyTaskFilters(this.parentTasks, this.taskFilters),
-  );
+  filteredTasks = $derived(applyTaskFilters(this.parentTasks, this.taskFilters));
 
   taskStats = $derived(computeTaskStats(this.parentTasks));
 
   kanbanColumns = $derived([
     {
-      id: "pending",
-      title: "To Do",
-      color: "bg-gray-100 dark:bg-gray-800",
-      tasks: this.filteredTasks.filter((t) => t.status === "pending"),
+      id: 'pending',
+      title: 'To Do',
+      color: 'bg-gray-100 dark:bg-gray-800',
+      tasks: this.filteredTasks.filter((t) => t.status === 'pending'),
     },
     {
-      id: "in-progress",
-      title: "In Progress",
-      color: "bg-blue-100 dark:bg-blue-900/20",
-      tasks: this.filteredTasks.filter((t) => t.status === "in-progress"),
+      id: 'in-progress',
+      title: 'In Progress',
+      color: 'bg-blue-100 dark:bg-blue-900/20',
+      tasks: this.filteredTasks.filter((t) => t.status === 'in-progress'),
     },
     {
-      id: "completed",
-      title: "Done",
-      color: "bg-green-100 dark:bg-green-900/20",
-      tasks: this.filteredTasks.filter((t) => t.status === "completed"),
+      id: 'completed',
+      title: 'Done',
+      color: 'bg-green-100 dark:bg-green-900/20',
+      tasks: this.filteredTasks.filter((t) => t.status === 'completed'),
     },
     {
-      id: "cancelled",
-      title: "Cancelled",
-      color: "bg-red-100 dark:bg-red-900/20",
-      tasks: this.filteredTasks.filter((t) => t.status === "cancelled"),
+      id: 'cancelled',
+      title: 'Cancelled',
+      color: 'bg-red-100 dark:bg-red-900/20',
+      tasks: this.filteredTasks.filter((t) => t.status === 'cancelled'),
     },
   ]);
 
@@ -189,9 +166,9 @@ export class TaskUiState {
       (task) =>
         task.dueDate &&
         task.dueDate < new Date() &&
-        task.status !== "completed" &&
-        task.status !== "cancelled",
-    ),
+        task.status !== 'completed' &&
+        task.status !== 'cancelled'
+    )
   );
 
   dueTodayTasks = $derived.by(() => {
@@ -205,8 +182,8 @@ export class TaskUiState {
         task.dueDate &&
         task.dueDate >= today &&
         task.dueDate < tomorrow &&
-        task.status !== "completed" &&
-        task.status !== "cancelled",
+        task.status !== 'completed' &&
+        task.status !== 'cancelled'
     );
   });
 
@@ -220,8 +197,8 @@ export class TaskUiState {
         task.dueDate &&
         task.dueDate >= today &&
         task.dueDate <= weekFromNow &&
-        task.status !== "completed" &&
-        task.status !== "cancelled",
+        task.status !== 'completed' &&
+        task.status !== 'cancelled'
     );
   });
 
@@ -230,18 +207,15 @@ export class TaskUiState {
       (task) =>
         task.blockedBy &&
         task.blockedBy.length > 0 &&
-        task.status !== "completed" &&
-        task.status !== "cancelled",
-    ),
+        task.status !== 'completed' &&
+        task.status !== 'cancelled'
+    )
   );
 
   unestimatedTasks = $derived(
     this.tasks.filter(
-      (task) =>
-        !task.estimatedTime &&
-        task.status !== "completed" &&
-        task.status !== "cancelled",
-    ),
+      (task) => !task.estimatedTime && task.status !== 'completed' && task.status !== 'cancelled'
+    )
   );
 
   currentlyTracking = $derived(this.timeTrackingSession);
@@ -315,14 +289,12 @@ export class TaskUiState {
     const session = this.timeTrackingSession;
     if (session) {
       const endTime = new Date();
-      const duration = Math.round(
-        (endTime.getTime() - session.startTime.getTime()) / (1000 * 60),
-      );
+      const duration = Math.round((endTime.getTime() - session.startTime.getTime()) / (1000 * 60));
       const task = this.tasks.find((t) => t.id === session.taskId);
       if (task) {
         const newActualTime = (task.actualTime || 0) + duration;
         this.tasks = this.tasks.map((t) =>
-          t.id === session.taskId ? { ...t, actualTime: newActualTime } : t,
+          t.id === session.taskId ? { ...t, actualTime: newActualTime } : t
         );
       }
     }
@@ -334,9 +306,7 @@ export class TaskUiState {
   }
 
   updateTemplate(template: TaskTemplate): void {
-    this.taskTemplates = this.taskTemplates.map((t) =>
-      t.id === template.id ? template : t,
-    );
+    this.taskTemplates = this.taskTemplates.map((t) => (t.id === template.id ? template : t));
   }
 
   deleteTemplate(templateId: string): void {
@@ -347,7 +317,7 @@ export class TaskUiState {
     name: string,
     description: string,
     filters: TaskFilters,
-    isDefault: boolean = false,
+    isDefault: boolean = false
   ): void {
     const newView: SavedView = {
       id: Date.now().toString(),
@@ -379,9 +349,7 @@ export class TaskUiState {
     }));
   }
 
-  checkDependencies(
-    taskId: string,
-  ): { blocked: boolean; blockingTasks: string[] } {
+  checkDependencies(taskId: string): { blocked: boolean; blockingTasks: string[] } {
     const task = this.tasks.find((t) => t.id === taskId);
     if (!task || !task.blockedBy) {
       return { blocked: false, blockingTasks: [] };
@@ -389,7 +357,7 @@ export class TaskUiState {
 
     const blockingTasks = task.blockedBy.filter((blockingId) => {
       const blockingTask = this.tasks.find((t) => t.id === blockingId);
-      return blockingTask && blockingTask.status !== "completed";
+      return blockingTask && blockingTask.status !== 'completed';
     });
 
     return {
@@ -401,7 +369,7 @@ export class TaskUiState {
   async applyTemplate(
     templateId: string,
     taskData: Partial<CreateTaskRequest>,
-    createTask: (request: CreateTaskRequest) => Promise<Task>,
+    createTask: (request: CreateTaskRequest) => Promise<Task>
   ): Promise<Task> {
     return createTask(taskData as CreateTaskRequest);
   }

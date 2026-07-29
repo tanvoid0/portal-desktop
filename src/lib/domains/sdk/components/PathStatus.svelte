@@ -4,17 +4,12 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import {
     CheckCircle,
     XCircle,
@@ -26,12 +21,12 @@
     ShieldOff,
     Wifi,
     WifiOff,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface PathStatus {
     sdk_type: string;
     current_version?: string;
-    path_managed_by: "app" | "system" | "none";
+    path_managed_by: 'app' | 'system' | 'none';
     binaries_in_path: string[];
     environment_variables: EnvironmentVariable[];
     last_updated: string;
@@ -40,16 +35,13 @@
   interface EnvironmentVariable {
     name: string;
     value: string;
-    scope: "global" | "session" | "project" | "service";
+    scope: 'global' | 'session' | 'project' | 'service';
     is_exported: boolean;
     created_at: string;
     updated_at: string;
   }
 
-  let {
-    sdkType,
-    showDetails = false,
-  }: { sdkType: string; showDetails?: boolean } = $props();
+  let { sdkType, showDetails = false }: { sdkType: string; showDetails?: boolean } = $props();
 
   // State
   let status = $state<PathStatus | null>(null);
@@ -67,12 +59,12 @@
     error = null;
 
     try {
-      const result = await invoke("get_path_status", { sdkType });
+      const result = await invoke('get_path_status', { sdkType });
       status = result as PathStatus;
       lastUpdate = new Date().toISOString();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load PATH status";
-      console.error("Failed to load PATH status:", err);
+      error = err instanceof Error ? err.message : 'Failed to load PATH status';
+      console.error('Failed to load PATH status:', err);
     } finally {
       loading = false;
     }
@@ -85,16 +77,15 @@
     error = null;
 
     try {
-      await invoke("set_path_environment", {
+      await invoke('set_path_environment', {
         sdkType,
-        version: status.current_version || "latest",
-        scope: "session",
+        version: status.current_version || 'latest',
+        scope: 'session',
       });
       await loadPathStatus();
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to set PATH environment";
-      console.error("Failed to set PATH environment:", err);
+      error = err instanceof Error ? err.message : 'Failed to set PATH environment';
+      console.error('Failed to set PATH environment:', err);
     } finally {
       loading = false;
     }
@@ -102,11 +93,11 @@
 
   function getPathManagementIcon(managedBy: string) {
     switch (managedBy) {
-      case "app":
+      case 'app':
         return Shield;
-      case "system":
+      case 'system':
         return Settings;
-      case "none":
+      case 'none':
         return WifiOff;
       default:
         return AlertTriangle;
@@ -115,40 +106,40 @@
 
   function getPathManagementColor(managedBy: string) {
     switch (managedBy) {
-      case "app":
-        return "text-blue-600";
-      case "system":
-        return "text-yellow-600";
-      case "none":
-        return "text-gray-600";
+      case 'app':
+        return 'text-blue-600';
+      case 'system':
+        return 'text-yellow-600';
+      case 'none':
+        return 'text-gray-600';
       default:
-        return "text-red-600";
+        return 'text-red-600';
     }
   }
 
   function getPathManagementBadgeVariant(managedBy: string) {
     switch (managedBy) {
-      case "app":
-        return "default";
-      case "system":
-        return "secondary";
-      case "none":
-        return "outline";
+      case 'app':
+        return 'default';
+      case 'system':
+        return 'secondary';
+      case 'none':
+        return 'outline';
       default:
-        return "destructive";
+        return 'destructive';
     }
   }
 
   function getPathManagementText(managedBy: string) {
     switch (managedBy) {
-      case "app":
-        return "App Managed";
-      case "system":
-        return "System Managed";
-      case "none":
-        return "Not in PATH";
+      case 'app':
+        return 'App Managed';
+      case 'system':
+        return 'System Managed';
+      case 'none':
+        return 'Not in PATH';
       default:
-        return "Unknown";
+        return 'Unknown';
     }
   }
 
@@ -166,12 +157,7 @@
           <RefreshCw class="h-4 w-4 animate-spin" />
         {/if}
       </CardTitle>
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={loadPathStatus}
-        disabled={loading}
-      >
+      <Button variant="outline" size="sm" onclick={loadPathStatus} disabled={loading}>
         <RefreshCw class="h-4 w-4" />
       </Button>
     </div>
@@ -185,17 +171,13 @@
       </Alert>
     {:else if loading && !status}
       <div class="flex items-center justify-center py-4">
-        <div
-          class="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"
-        ></div>
-        <span class="ml-2 text-sm text-muted-foreground"
-          >Loading PATH status...</span
-        >
+        <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
+        <span class="ml-2 text-sm text-muted-foreground">Loading PATH status...</span>
       </div>
     {:else if status}
       <!-- Main Status -->
       <div class="flex items-center gap-3">
-        {#if status.path_managed_by === "none"}
+        {#if status.path_managed_by === 'none'}
           <XCircle class="h-6 w-6 text-red-500" />
         {:else}
           <CheckCircle class="h-6 w-6 text-green-500" />
@@ -203,12 +185,8 @@
 
         <div class="flex-1">
           <div class="flex items-center gap-2">
-            <Badge
-              variant={getPathManagementBadgeVariant(status.path_managed_by)}
-            >
-              {@const ManagementIcon = getPathManagementIcon(
-                status.path_managed_by,
-              )}
+            <Badge variant={getPathManagementBadgeVariant(status.path_managed_by)}>
+              {@const ManagementIcon = getPathManagementIcon(status.path_managed_by)}
               <ManagementIcon class="mr-1 h-3 w-3" />
               {getPathManagementText(status.path_managed_by)}
             </Badge>
@@ -229,7 +207,7 @@
       </div>
 
       <!-- Action Button -->
-      {#if status.path_managed_by === "none"}
+      {#if status.path_managed_by === 'none'}
         <Button onclick={setPathEnvironment} disabled={loading} class="w-full">
           <Shield class="mr-2 h-4 w-4" />
           Add to PATH
@@ -259,21 +237,15 @@
               <h4 class="mb-2 text-sm font-medium">Environment Variables</h4>
               <div class="space-y-2">
                 {#each status.environment_variables as envVar}
-                  <div
-                    class="flex items-center justify-between rounded bg-muted p-2"
-                  >
+                  <div class="flex items-center justify-between rounded bg-muted p-2">
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2">
                         <code class="font-mono text-sm">{envVar.name}</code>
                         {#if envVar.is_exported}
-                          <Badge variant="outline" class="text-xs"
-                            >exported</Badge
-                          >
+                          <Badge variant="outline" class="text-xs">exported</Badge>
                         {/if}
                       </div>
-                      <code
-                        class="block truncate text-xs text-muted-foreground"
-                      >
+                      <code class="block truncate text-xs text-muted-foreground">
                         {envVar.value}
                       </code>
                     </div>
@@ -289,10 +261,10 @@
           <!-- Management Info -->
           <div class="rounded bg-muted p-3">
             <div class="mb-2 flex items-center gap-2">
-              {#if status.path_managed_by === "app"}
+              {#if status.path_managed_by === 'app'}
                 <Shield class="h-4 w-4 text-blue-600" />
                 <span class="text-sm font-medium">App Managed</span>
-              {:else if status.path_managed_by === "system"}
+              {:else if status.path_managed_by === 'system'}
                 <Settings class="h-4 w-4 text-yellow-600" />
                 <span class="text-sm font-medium">System Managed</span>
               {:else}
@@ -302,15 +274,14 @@
             </div>
 
             <p class="text-xs text-muted-foreground">
-              {#if status.path_managed_by === "app"}
-                This SDK is managed by Portal Desktop. Changes will be applied
-                to your shell configuration.
-              {:else if status.path_managed_by === "system"}
-                This SDK is managed by your system. Portal Desktop cannot modify
-                the PATH for this SDK.
+              {#if status.path_managed_by === 'app'}
+                This SDK is managed by Portal Desktop. Changes will be applied to your shell
+                configuration.
+              {:else if status.path_managed_by === 'system'}
+                This SDK is managed by your system. Portal Desktop cannot modify the PATH for this
+                SDK.
               {:else}
-                This SDK is not currently in your PATH. Click "Add to PATH" to
-                enable it.
+                This SDK is not currently in your PATH. Click "Add to PATH" to enable it.
               {/if}
             </p>
           </div>

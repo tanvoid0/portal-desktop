@@ -1,12 +1,8 @@
 <script lang="ts">
-  import {
-    Terminal,
-    defaultTerminalConfig,
-    type TerminalConfig,
-  } from "$lib/domains/terminal";
-  import { Copy, Square, Maximize2, Minimize2 } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { toast } from "$lib/utils/toast";
+  import { Terminal, defaultTerminalConfig, type TerminalConfig } from '$lib/domains/terminal';
+  import { Copy, Square, Maximize2, Minimize2 } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { toast } from '$lib/utils/toast';
 
   interface Props {
     command: string;
@@ -20,7 +16,7 @@
   let terminal = $state<ReturnType<typeof Terminal> | null>(null);
   let isExpanded = $state(false);
   let isConnected = $state(true);
-  let outputBuffer = $state("");
+  let outputBuffer = $state('');
 
   const terminalId = `embedded-terminal-${Date.now()}`;
 
@@ -40,7 +36,7 @@
   function handleCopy() {
     if (outputBuffer) {
       navigator.clipboard.writeText(outputBuffer);
-      toast.success("Output copied to clipboard");
+      toast.success('Output copied to clipboard');
     }
   }
 
@@ -64,17 +60,11 @@
         class:bg-yellow-500={!isConnected}
       ></div>
       <span class="text-xs text-gray-400">
-        {isConnected ? "Running" : "Stopped"}
+        {isConnected ? 'Running' : 'Stopped'}
       </span>
     </div>
     <div class="flex items-center gap-1">
-      <Button
-        variant="ghost"
-        size="sm"
-        onclick={handleCopy}
-        class="h-7 px-2"
-        title="Copy output"
-      >
+      <Button variant="ghost" size="sm" onclick={handleCopy} class="h-7 px-2" title="Copy output">
         <Copy class="h-3.5 w-3.5" />
       </Button>
       <Button
@@ -82,7 +72,7 @@
         size="sm"
         onclick={toggleExpand}
         class="h-7 px-2"
-        title={isExpanded ? "Collapse" : "Expand"}
+        title={isExpanded ? 'Collapse' : 'Expand'}
       >
         {#if isExpanded}
           <Minimize2 class="h-3.5 w-3.5" />

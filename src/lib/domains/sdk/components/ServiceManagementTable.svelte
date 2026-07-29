@@ -4,21 +4,16 @@
 -->
 
 <script lang="ts">
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import Select from "$lib/components/ui/select.svelte";
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import { Progress } from "$lib/components/ui/progress";
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import Select from '$lib/components/ui/select.svelte';
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { Progress } from '$lib/components/ui/progress';
   import {
     Play,
     Square,
@@ -37,19 +32,19 @@
     Trash2,
     Eye,
     EyeOff,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface ServiceInfo {
     id: string;
     name: string;
     description: string;
-    status: "running" | "stopped" | "starting" | "stopping" | "error";
+    status: 'running' | 'stopped' | 'starting' | 'stopping' | 'error';
     version: string;
     available_versions: string[];
     pid?: number;
     port?: number;
     url?: string;
-    health_status: "healthy" | "unhealthy" | "unknown";
+    health_status: 'healthy' | 'unhealthy' | 'unknown';
     last_started?: string;
     uptime?: number;
     config: Record<string, any>;
@@ -61,8 +56,8 @@
   let services = $state<ServiceInfo[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
-  let searchTerm = $state("");
-  let statusFilter = $state<string>("all");
+  let searchTerm = $state('');
+  let statusFilter = $state<string>('all');
   let selectedServices = $state<Set<string>>(new Set());
   let showLogs = $state<Set<string>>(new Set());
 
@@ -79,11 +74,11 @@
     error = null;
 
     try {
-      const result = await invoke("get_services", { sdkType });
+      const result = await invoke('get_services', { sdkType });
       services = Array.isArray(result) ? result : [];
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load services";
-      console.error("Failed to load services:", err);
+      error = err instanceof Error ? err.message : 'Failed to load services';
+      console.error('Failed to load services:', err);
     } finally {
       loading = false;
     }
@@ -94,11 +89,11 @@
     error = null;
 
     try {
-      await invoke("start_service", { serviceId });
+      await invoke('start_service', { serviceId });
       await loadServices();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to start service";
-      console.error("Failed to start service:", err);
+      error = err instanceof Error ? err.message : 'Failed to start service';
+      console.error('Failed to start service:', err);
     } finally {
       loading = false;
     }
@@ -109,11 +104,11 @@
     error = null;
 
     try {
-      await invoke("stop_service", { serviceId });
+      await invoke('stop_service', { serviceId });
       await loadServices();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to stop service";
-      console.error("Failed to stop service:", err);
+      error = err instanceof Error ? err.message : 'Failed to stop service';
+      console.error('Failed to stop service:', err);
     } finally {
       loading = false;
     }
@@ -124,11 +119,11 @@
     error = null;
 
     try {
-      await invoke("restart_service", { serviceId });
+      await invoke('restart_service', { serviceId });
       await loadServices();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to restart service";
-      console.error("Failed to restart service:", err);
+      error = err instanceof Error ? err.message : 'Failed to restart service';
+      console.error('Failed to restart service:', err);
     } finally {
       loading = false;
     }
@@ -139,12 +134,11 @@
     error = null;
 
     try {
-      await invoke("change_service_version", { serviceId, version });
+      await invoke('change_service_version', { serviceId, version });
       await loadServices();
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to change service version";
-      console.error("Failed to change service version:", err);
+      error = err instanceof Error ? err.message : 'Failed to change service version';
+      console.error('Failed to change service version:', err);
     } finally {
       loading = false;
     }
@@ -152,15 +146,15 @@
 
   function getStatusIcon(status: string) {
     switch (status) {
-      case "running":
+      case 'running':
         return CheckCircle;
-      case "stopped":
+      case 'stopped':
         return XCircle;
-      case "starting":
+      case 'starting':
         return Clock;
-      case "stopping":
+      case 'stopping':
         return Clock;
-      case "error":
+      case 'error':
         return AlertTriangle;
       default:
         return XCircle;
@@ -169,45 +163,45 @@
 
   function getStatusColor(status: string) {
     switch (status) {
-      case "running":
-        return "text-green-600";
-      case "stopped":
-        return "text-gray-600";
-      case "starting":
-        return "text-blue-600";
-      case "stopping":
-        return "text-orange-600";
-      case "error":
-        return "text-red-600";
+      case 'running':
+        return 'text-green-600';
+      case 'stopped':
+        return 'text-gray-600';
+      case 'starting':
+        return 'text-blue-600';
+      case 'stopping':
+        return 'text-orange-600';
+      case 'error':
+        return 'text-red-600';
       default:
-        return "text-gray-600";
+        return 'text-gray-600';
     }
   }
 
   function getStatusBadgeVariant(status: string) {
     switch (status) {
-      case "running":
-        return "default";
-      case "stopped":
-        return "secondary";
-      case "starting":
-        return "outline";
-      case "stopping":
-        return "outline";
-      case "error":
-        return "destructive";
+      case 'running':
+        return 'default';
+      case 'stopped':
+        return 'secondary';
+      case 'starting':
+        return 'outline';
+      case 'stopping':
+        return 'outline';
+      case 'error':
+        return 'destructive';
       default:
-        return "secondary";
+        return 'secondary';
     }
   }
 
   function getHealthStatusIcon(health: string) {
     switch (health) {
-      case "healthy":
+      case 'healthy':
         return CheckCircle;
-      case "unhealthy":
+      case 'unhealthy':
         return XCircle;
-      case "unknown":
+      case 'unknown':
         return AlertTriangle;
       default:
         return AlertTriangle;
@@ -216,19 +210,19 @@
 
   function getHealthStatusColor(health: string) {
     switch (health) {
-      case "healthy":
-        return "text-green-600";
-      case "unhealthy":
-        return "text-red-600";
-      case "unknown":
-        return "text-yellow-600";
+      case 'healthy':
+        return 'text-green-600';
+      case 'unhealthy':
+        return 'text-red-600';
+      case 'unknown':
+        return 'text-yellow-600';
       default:
-        return "text-gray-600";
+        return 'text-gray-600';
     }
   }
 
   function formatUptime(seconds?: number) {
-    if (!seconds) return "Unknown";
+    if (!seconds) return 'Unknown';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
@@ -236,13 +230,13 @@
   }
 
   function formatDate(timestamp?: string) {
-    if (!timestamp) return "Never";
+    if (!timestamp) return 'Never';
     return new Date(timestamp).toLocaleString();
   }
 
   function openServiceUrl(url?: string) {
     if (url) {
-      window.open(url, "_blank");
+      window.open(url, '_blank');
     }
   }
 
@@ -285,12 +279,12 @@
         (service) =>
           service.name.toLowerCase().includes(term) ||
           service.description.toLowerCase().includes(term) ||
-          service.version.toLowerCase().includes(term),
+          service.version.toLowerCase().includes(term)
       );
     }
 
     // Status filter
-    if (statusFilter !== "all") {
+    if (statusFilter !== 'all') {
       filtered = filtered.filter((service) => service.status === statusFilter);
     }
 
@@ -303,12 +297,7 @@
     <div class="flex items-center justify-between">
       <CardTitle class="text-xl">Service Management</CardTitle>
       <div class="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={loadServices}
-          disabled={loading}
-        >
+        <Button variant="outline" size="sm" onclick={loadServices} disabled={loading}>
           <RefreshCw class="h-4 w-4" />
         </Button>
       </div>
@@ -322,22 +311,18 @@
         <Search
           class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
         />
-        <Input
-          placeholder="Search services..."
-          bind:value={searchTerm}
-          class="pl-10"
-        />
+        <Input placeholder="Search services..." bind:value={searchTerm} class="pl-10" />
       </div>
 
       <Select
         bind:value={statusFilter}
         options={[
-          { value: "all", label: "All Status" },
-          { value: "running", label: "Running" },
-          { value: "stopped", label: "Stopped" },
-          { value: "starting", label: "Starting" },
-          { value: "stopping", label: "Stopping" },
-          { value: "error", label: "Error" },
+          { value: 'all', label: 'All Status' },
+          { value: 'running', label: 'Running' },
+          { value: 'stopped', label: 'Stopped' },
+          { value: 'starting', label: 'Starting' },
+          { value: 'stopping', label: 'Stopping' },
+          { value: 'error', label: 'Error' },
         ]}
         class="min-w-[140px]"
       />
@@ -354,16 +339,14 @@
     <!-- Loading State -->
     {#if loading && services.length === 0}
       <div class="flex items-center justify-center py-8">
-        <div
-          class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
-        ></div>
+        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
         <span class="ml-2">Loading services...</span>
       </div>
     {:else if filteredServices.length === 0}
       <div class="py-8 text-center text-muted-foreground">
         <Activity class="mx-auto mb-4 h-12 w-12 opacity-50" />
         <p>No services found</p>
-        {#if searchTerm || statusFilter !== "all"}
+        {#if searchTerm || statusFilter !== 'all'}
           <p class="text-sm">Try adjusting your filters</p>
         {:else}
           <p class="text-sm">Start a service to get started</p>
@@ -435,7 +418,7 @@
                       <StatusIcon class="mr-1 h-3 w-3" />
                       {service.status}
                     </Badge>
-                    {#if service.status === "starting" || service.status === "stopping"}
+                    {#if service.status === 'starting' || service.status === 'stopping'}
                       <Progress value={50} class="h-2 w-16" />
                     {/if}
                   </div>
@@ -443,14 +426,8 @@
 
                 <td class="p-3">
                   <div class="flex items-center gap-2">
-                    <HealthIcon
-                      class="h-4 w-4 {getHealthStatusColor(
-                        service.health_status,
-                      )}"
-                    />
-                    <span class="text-sm capitalize"
-                      >{service.health_status}</span
-                    >
+                    <HealthIcon class="h-4 w-4 {getHealthStatusColor(service.health_status)}" />
+                    <span class="text-sm capitalize">{service.health_status}</span>
                   </div>
                 </td>
 
@@ -472,7 +449,7 @@
 
                 <td class="p-3">
                   <div class="flex items-center gap-1">
-                    {#if service.status === "running"}
+                    {#if service.status === 'running'}
                       <Button
                         variant="outline"
                         size="sm"
@@ -491,7 +468,7 @@
                         <RefreshCw class="mr-1 h-3 w-3" />
                         Restart
                       </Button>
-                    {:else if service.status === "stopped"}
+                    {:else if service.status === 'stopped'}
                       <Button
                         variant="default"
                         size="sm"
@@ -576,11 +553,7 @@
               <Square class="mr-2 h-4 w-4" />
               Stop Selected
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              class="text-red-500 hover:text-red-700"
-            >
+            <Button variant="outline" size="sm" class="text-red-500 hover:text-red-700">
               <Trash2 class="mr-2 h-4 w-4" />
               Remove Selected
             </Button>

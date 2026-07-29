@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { FileEdit, GitCommitHorizontal, RefreshCw } from "@lucide/svelte";
-  import { coderService } from "../services/coderService.js";
-  import type { GitFileChange } from "../types.js";
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { FileEdit, GitCommitHorizontal, RefreshCw } from '@lucide/svelte';
+  import { coderService } from '../services/coderService.js';
+  import type { GitFileChange } from '../types.js';
 
   interface Props {
     workspaceRoot: string;
@@ -45,12 +45,10 @@
     expanded = next;
   }
 
-  function statusVariant(
-    status: string,
-  ): "secondary" | "destructive" | "outline" {
-    if (status === "deleted") return "destructive";
-    if (status === "untracked" || status === "added") return "secondary";
-    return "outline";
+  function statusVariant(status: string): 'secondary' | 'destructive' | 'outline' {
+    if (status === 'deleted') return 'destructive';
+    if (status === 'untracked' || status === 'added') return 'secondary';
+    return 'outline';
   }
 
   onMount(() => {
@@ -65,17 +63,10 @@
 
 <div class="space-y-3">
   <div class="flex items-center justify-between gap-2">
-    <p class="text-xs text-muted-foreground">
-      Working tree changes vs last commit.
-    </p>
+    <p class="text-xs text-muted-foreground">Working tree changes vs last commit.</p>
     <div class="flex items-center gap-1">
       {#if onCommit && changes.length > 0}
-        <Button
-          size="sm"
-          variant="outline"
-          class="h-7 gap-1 text-xs"
-          onclick={onCommit}
-        >
+        <Button size="sm" variant="outline" class="h-7 gap-1 text-xs" onclick={onCommit}>
           <GitCommitHorizontal class="h-3.5 w-3.5" />
           Commit…
         </Button>
@@ -94,7 +85,9 @@
   </div>
 
   {#if error}
-    <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+    <div
+      class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+    >
       {error}
     </div>
   {:else if loading && changes.length === 0}
@@ -127,8 +120,9 @@
           {/if}
         </Button>
         {#if expanded.has(c.path) && c.diff}
-          <pre
-            class="max-h-80 overflow-auto p-2 font-mono text-[11px] leading-relaxed"><code>{c.diff}</code></pre>
+          <pre class="max-h-80 overflow-auto p-2 font-mono text-[11px] leading-relaxed"><code
+              >{c.diff}</code
+            ></pre>
         {/if}
       </div>
     {/each}

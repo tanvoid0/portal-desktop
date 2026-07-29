@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Input } from "$lib/components/ui/input";
-  import { Button } from "$lib/components/ui/button";
-  import Icon from "@iconify/svelte";
-  import { FileText } from "@lucide/svelte";
-  import { PageEmpty } from "$lib/components/shell";
-  import DocumentCard from "./DocumentCard.svelte";
-  import type { Document } from "../types";
+  import { Input } from '$lib/components/ui/input';
+  import { Button } from '$lib/components/ui/button';
+  import Icon from '@iconify/svelte';
+  import { FileText } from '@lucide/svelte';
+  import { PageEmpty } from '$lib/components/shell';
+  import DocumentCard from './DocumentCard.svelte';
+  import type { Document } from '../types';
 
   interface Props {
     documents: Document[];
@@ -14,18 +14,17 @@
     onCreateNew?: () => void;
   }
 
-  let { documents, onDocumentClick, onDocumentDelete, onCreateNew }: Props =
-    $props();
+  let { documents, onDocumentClick, onDocumentDelete, onCreateNew }: Props = $props();
 
-  let searchQuery = $state("");
+  let searchQuery = $state('');
   const filteredDocuments = $derived(
     searchQuery.trim()
       ? documents.filter(
           (doc) =>
             doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            doc.content.toLowerCase().includes(searchQuery.toLowerCase()),
+            doc.content.toLowerCase().includes(searchQuery.toLowerCase())
         )
-      : documents,
+      : documents
   );
 </script>
 
@@ -36,12 +35,7 @@
         icon="lucide:search"
         class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
       />
-      <Input
-        type="text"
-        placeholder="Search documents..."
-        bind:value={searchQuery}
-        class="pl-10"
-      />
+      <Input type="text" placeholder="Search documents..." bind:value={searchQuery} class="pl-10" />
     </div>
     {#if onCreateNew}
       <Button onclick={onCreateNew}>

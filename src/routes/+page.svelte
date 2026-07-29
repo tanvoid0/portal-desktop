@@ -360,10 +360,7 @@
         </CardContent>
       </Card>
 
-      <Card
-        class="cursor-pointer transition-shadow hover:shadow-sm"
-        onclick={() => goto('/tasks')}
-      >
+      <Card class="cursor-pointer transition-shadow hover:shadow-sm" onclick={() => goto('/tasks')}>
         <CardHeader>
           <div class="flex items-center justify-between">
             <CardTitle class="flex items-center gap-3">

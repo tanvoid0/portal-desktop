@@ -1,19 +1,8 @@
 <script lang="ts">
-  import type { WorkflowResult } from "../types";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    CheckCircle,
-    XCircle,
-    Clock,
-    FileText,
-    Terminal,
-  } from "@lucide/svelte";
+  import type { WorkflowResult } from '../types';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { CheckCircle, XCircle, Clock, FileText, Terminal } from '@lucide/svelte';
 
   export let result: WorkflowResult;
 
@@ -38,8 +27,8 @@
         {/if}
         Workflow Results
       </CardTitle>
-      <Badge variant={result.success ? "default" : "destructive"}>
-        {result.success ? "Success" : "Failed"}
+      <Badge variant={result.success ? 'default' : 'destructive'}>
+        {result.success ? 'Success' : 'Failed'}
       </Badge>
     </div>
     <p class="text-sm text-muted-foreground">
@@ -64,9 +53,7 @@
         <h4 class="mb-2 font-medium">Commands Executed</h4>
         <div class="space-y-1">
           {#each result.results.commands_executed as command (command)}
-            <div
-              class="flex items-center gap-2 rounded-md bg-muted p-2 font-mono text-sm"
-            >
+            <div class="flex items-center gap-2 rounded-md bg-muted p-2 font-mono text-sm">
               <Terminal class="h-4 w-4 text-muted-foreground" />
               <span>{command}</span>
             </div>
@@ -79,7 +66,8 @@
       <div>
         <h4 class="mb-2 font-medium">Output</h4>
         <pre
-          class="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-sm">{result.results.output}</pre>
+          class="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-sm">{result
+            .results.output}</pre>
       </div>
     {/if}
 

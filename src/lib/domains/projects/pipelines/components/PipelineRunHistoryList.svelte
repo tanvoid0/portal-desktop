@@ -1,22 +1,22 @@
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { PageEmpty, PageLoading } from "$lib/components/shell";
-  import type { PipelineExecutionListItem } from "../types";
+  } from '$lib/components/ui/card';
+  import { PageEmpty, PageLoading } from '$lib/components/shell';
+  import type { PipelineExecutionListItem } from '../types';
   import {
     formatExecutionDuration,
     getExecutionStatusBadgeVariant,
     getExecutionStatusColor,
     getExecutionStatusIcon,
-  } from "../utils/executionDisplay";
-  import { History, RefreshCw } from "@lucide/svelte";
+  } from '../utils/executionDisplay';
+  import { History, RefreshCw } from '@lucide/svelte';
 
   interface Props {
     executions: PipelineExecutionListItem[];
@@ -34,12 +34,12 @@
   let {
     executions,
     loading = false,
-    title = "Run history",
-    description = "Recent pipeline executions",
+    title = 'Run history',
+    description = 'Recent pipeline executions',
     showProject = false,
     showPipeline = true,
-    emptyTitle = "No pipeline runs yet",
-    emptyDescription = "Run a pipeline to see execution history here.",
+    emptyTitle = 'No pipeline runs yet',
+    emptyDescription = 'Run a pipeline to see execution history here.',
     onRefresh,
     onSelect,
   }: Props = $props();
@@ -57,9 +57,7 @@
       </div>
       {#if onRefresh}
         <Button variant="ghost" size="sm" onclick={onRefresh} disabled={loading}>
-          <RefreshCw
-            class="h-4 w-4 {loading ? 'animate-spin' : ''}"
-          />
+          <RefreshCw class="h-4 w-4 {loading ? 'animate-spin' : ''}" />
         </Button>
       {/if}
     </div>
@@ -68,11 +66,7 @@
     {#if loading && executions.length === 0}
       <PageLoading message="Loading run history..." />
     {:else if executions.length === 0}
-      <PageEmpty
-        title={emptyTitle}
-        description={emptyDescription}
-        icon={History}
-      />
+      <PageEmpty title={emptyTitle} description={emptyDescription} icon={History} />
     {:else}
       <div class="space-y-2">
         {#each executions as execution (execution.id)}
@@ -87,7 +81,9 @@
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-2">
                 <StatusIcon
-                  class="h-4 w-4 shrink-0 {getExecutionStatusColor(execution.status)}{execution.status === 'running' ? ' animate-spin' : ''}"
+                  class="h-4 w-4 shrink-0 {getExecutionStatusColor(
+                    execution.status
+                  )}{execution.status === 'running' ? ' animate-spin' : ''}"
                 />
                 <Badge variant={getExecutionStatusBadgeVariant(execution.status)}>
                   {execution.status}
@@ -110,10 +106,7 @@
                 <span>{execution.projectName}</span>
               {/if}
               <span>
-                Duration: {formatExecutionDuration(
-                  execution.startedAt,
-                  execution.finishedAt,
-                )}
+                Duration: {formatExecutionDuration(execution.startedAt, execution.finishedAt)}
               </span>
               {#if execution.error}
                 <span class="truncate text-destructive">{execution.error}</span>

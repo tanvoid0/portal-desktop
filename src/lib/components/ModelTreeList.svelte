@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Button } from "./ui/button";
-  import { Input } from "./ui/input";
-  import { Badge } from "./ui/badge";
-  import { parseAndFormatSize } from "$lib/utils/fileSize";
+  import { Button } from './ui/button';
+  import { Input } from './ui/input';
+  import { Badge } from './ui/badge';
+  import { parseAndFormatSize } from '$lib/utils/fileSize';
 
   let {
     models = {},
@@ -10,7 +10,7 @@
     error = null,
     installingModel = null,
     installationProgress = 0,
-    installationStatus = "",
+    installationStatus = '',
     onInstall = undefined,
     onRemove = undefined,
     onRetry = undefined,
@@ -31,7 +31,7 @@
   // Debug: Log props on mount and changes (removed for build compatibility)
 
   // Search functionality
-  let searchQuery = $state("");
+  let searchQuery = $state('');
   let expandedFamilies = $state<string[]>([]);
 
   // Filter models based on search
@@ -53,8 +53,7 @@
     for (const [family, modelList] of Object.entries(models)) {
       const matchingModels = modelList.filter(
         (model) =>
-          model.name.toLowerCase().includes(query) ||
-          model.family?.toLowerCase().includes(query),
+          model.name.toLowerCase().includes(query) || model.family?.toLowerCase().includes(query)
       );
 
       if (matchingModels.length > 0) {
@@ -90,9 +89,7 @@
 
 {#if loading}
   <div class="flex items-center justify-center p-8">
-    <div
-      class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
-    ></div>
+    <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
     <span class="ml-2">Loading models...</span>
   </div>
 {:else if error}
@@ -105,8 +102,7 @@
 {:else if Object.keys(filteredModels).length > 0 || installingModel}
   <!-- Debug info -->
   <div class="rounded bg-gray-100 p-2 text-xs text-muted-foreground">
-    Debug: filteredModels keys: {Object.keys(filteredModels).length},
-    installingModel: {installingModel}
+    Debug: filteredModels keys: {Object.keys(filteredModels).length}, installingModel: {installingModel}
   </div>
   <div class="space-y-4">
     <!-- Search -->
@@ -144,9 +140,7 @@
           >
             <div class="flex items-center gap-3">
               <svg
-                class="h-4 w-4 transition-transform {expandedFamilies.includes(
-                  family,
-                )
+                class="h-4 w-4 transition-transform {expandedFamilies.includes(family)
                   ? 'rotate-90'
                   : ''}"
                 fill="none"
@@ -223,9 +217,7 @@
                           <div
                             class="h-6 w-6 animate-spin rounded-full border-2 border-blue-200"
                           ></div>
-                          <div
-                            class="absolute inset-0 flex items-center justify-center"
-                          >
+                          <div class="absolute inset-0 flex items-center justify-center">
                             <Badge
                               variant="default"
                               class="bg-blue-600 px-1.5 py-0.5 text-xs text-white"
@@ -241,9 +233,7 @@
                           <div class="text-xs text-blue-600">
                             {installationStatus}
                           </div>
-                          <div
-                            class="mt-1 h-1.5 w-full rounded-full bg-blue-200"
-                          >
+                          <div class="mt-1 h-1.5 w-full rounded-full bg-blue-200">
                             <div
                               class="h-1.5 rounded-full bg-blue-600 transition-all duration-300"
                               style="width: {installationProgress}%"
@@ -275,15 +265,8 @@
                         {/if}
                       </div>
                     {:else if isInstalled(model.name)}
-                      <Badge
-                        variant="default"
-                        class="bg-green-100 text-green-800"
-                      >
-                        <svg
-                          class="mr-1 h-3 w-3"
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                      <Badge variant="default" class="bg-green-100 text-green-800">
+                        <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M5 13l4 4L19 7" />
                         </svg>
                         Installed
@@ -345,9 +328,8 @@
 {:else}
   <!-- Debug info -->
   <div class="rounded bg-yellow-100 p-2 text-xs text-muted-foreground">
-    Debug: No models condition - filteredModels keys: {Object.keys(
-      filteredModels,
-    ).length}, installingModel: {installingModel}
+    Debug: No models condition - filteredModels keys: {Object.keys(filteredModels).length},
+    installingModel: {installingModel}
   </div>
   <div class="p-8 text-center">
     <p class="text-muted-foreground">No models available.</p>

@@ -2,17 +2,17 @@
  * Deployment Store - State management for deployments
  */
 
-import { writable, derived, get } from "svelte/store";
-import { deploymentService } from "../services/deploymentService";
-import { logger, loadingState, loadingActions } from "$lib/domains/shared";
+import { writable, derived, get } from 'svelte/store';
+import { deploymentService } from '../services/deploymentService';
+import { logger, loadingState, loadingActions } from '$lib/domains/shared';
 import type {
   Deployment,
   DockerContainer,
   DockerStatus,
   DeploymentCreateRequest,
   DeploymentUpdateRequest,
-} from "../types/index";
-import { DeploymentStatus } from "../types/index";
+} from '../types/index';
+import { DeploymentStatus } from '../types/index';
 
 // Core stores
 export const deployments = writable<Deployment[]>([]);
@@ -22,44 +22,34 @@ export const isStartingDocker = writable(false);
 export const deploymentLoadingState = loadingState;
 
 // Derived stores
-export const isLoadingDeployments = derived(
-  deploymentLoadingState,
-  ($state) => $state.isLoading,
-);
-export const deploymentError = derived(
-  deploymentLoadingState,
-  ($state) => $state.error,
-);
+export const isLoadingDeployments = derived(deploymentLoadingState, ($state) => $state.isLoading);
+export const deploymentError = derived(deploymentLoadingState, ($state) => $state.error);
 
 export const isDockerOffline = derived(dockerStatus, ($status) =>
-  $status ? !$status.running : false,
+  $status ? !$status.running : false
 );
 
 // Deployment statistics
 export const deploymentStats = derived(deployments, ($deployments) => {
   const stats = {
     total: $deployments.length,
-    running: $deployments.filter((d) => d.status === "running").length,
-    stopped: $deployments.filter((d) => d.status === "stopped").length,
-    building: $deployments.filter((d) => d.status === "creating").length,
-    error: $deployments.filter((d) => d.status === "failed").length,
+    running: $deployments.filter((d) => d.status === 'running').length,
+    stopped: $deployments.filter((d) => d.status === 'stopped').length,
+    building: $deployments.filter((d) => d.status === 'creating').length,
+    error: $deployments.filter((d) => d.status === 'failed').length,
     byProject: {} as Record<string, number>,
   };
 
   // Count by project
   $deployments.forEach((deployment) => {
-    stats.byProject[deployment.projectPath] =
-      (stats.byProject[deployment.projectPath] || 0) + 1;
+    stats.byProject[deployment.projectPath] = (stats.byProject[deployment.projectPath] || 0) + 1;
   });
 
   return stats;
 });
 
 // Filtered deployments
-export const filteredDeployments = derived(
-  [deployments],
-  ([$deployments]) => $deployments,
-);
+export const filteredDeployments = derived([deployments], ([$deployments]) => $deployments);
 
 // Deployment actions
 export const deploymentActions = {
@@ -69,19 +59,18 @@ export const deploymentActions = {
   async loadDeployments() {
     loadingActions.setLoading(true);
     try {
-      logger.info("deploymentStore", "Loading deployments");
+      logger.info('deploymentStore', 'Loading deployments');
 
       const deploymentList = await deploymentService.getDeployments();
       deployments.set(deploymentList);
 
-      logger.info("Deployments loaded successfully", {
-        context: "deploymentStore",
+      logger.info('Deployments loaded successfully', {
+        context: 'deploymentStore',
         count: deploymentList.length,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load deployments";
-      logger.error(errorMessage, { context: "deploymentStore", error });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load deployments';
+      logger.error(errorMessage, { context: 'deploymentStore', error });
       loadingActions.setError(errorMessage);
     } finally {
       loadingActions.setLoading(false);
@@ -94,8 +83,8 @@ export const deploymentActions = {
   async createDeployment(request: DeploymentCreateRequest) {
     loadingActions.setLoading(true);
     try {
-      logger.info("Creating deployment", {
-        context: "deploymentStore",
+      logger.info('Creating deployment', {
+        context: 'deploymentStore',
         name: request.name,
         projectPath: request.projectPath,
       });
@@ -105,17 +94,16 @@ export const deploymentActions = {
       // Add to local store
       deployments.update((current) => [...current, deployment]);
 
-      logger.info("Deployment created successfully", {
-        context: "deploymentStore",
+      logger.info('Deployment created successfully', {
+        context: 'deploymentStore',
         deploymentId: deployment.id,
       });
 
       return deployment;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to create deployment";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create deployment';
       logger.error(errorMessage, {
-        context: "deploymentStore.createDeployment",
+        context: 'deploymentStore.createDeployment',
         error,
         name: request.name,
         projectPath: request.projectPath,
@@ -133,29 +121,26 @@ export const deploymentActions = {
   async startDeployment(deploymentId: string) {
     loadingActions.setLoading(true);
     try {
-      logger.info("Starting deployment", {
-        context: "deploymentStore",
+      logger.info('Starting deployment', {
+        context: 'deploymentStore',
         deploymentId,
       });
 
       const deployment = await deploymentService.startDeployment(deploymentId);
 
       // Update in local store
-      deployments.update((current) =>
-        current.map((d) => (d.id === deploymentId ? deployment : d)),
-      );
+      deployments.update((current) => current.map((d) => (d.id === deploymentId ? deployment : d)));
 
-      logger.info("Deployment started successfully", {
-        context: "deploymentStore",
+      logger.info('Deployment started successfully', {
+        context: 'deploymentStore',
         deploymentId,
       });
 
       return deployment;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to start deployment";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start deployment';
       logger.error(errorMessage, {
-        context: "deploymentStore.startDeployment",
+        context: 'deploymentStore.startDeployment',
         error,
         deploymentId,
       });
@@ -172,29 +157,26 @@ export const deploymentActions = {
   async stopDeployment(deploymentId: string) {
     loadingActions.setLoading(true);
     try {
-      logger.info("Stopping deployment", {
-        context: "deploymentStore",
+      logger.info('Stopping deployment', {
+        context: 'deploymentStore',
         data: { deploymentId },
       });
 
       const deployment = await deploymentService.stopDeployment(deploymentId);
 
       // Update in local store
-      deployments.update((current) =>
-        current.map((d) => (d.id === deploymentId ? deployment : d)),
-      );
+      deployments.update((current) => current.map((d) => (d.id === deploymentId ? deployment : d)));
 
-      logger.info("Deployment stopped successfully", {
-        context: "deploymentStore",
+      logger.info('Deployment stopped successfully', {
+        context: 'deploymentStore',
         data: { deploymentId },
       });
 
       return deployment;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to stop deployment";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to stop deployment';
       logger.error(errorMessage, {
-        context: "deploymentStore.stopDeployment",
+        context: 'deploymentStore.stopDeployment',
         error,
         data: { deploymentId },
       });
@@ -211,27 +193,24 @@ export const deploymentActions = {
   async deleteDeployment(deploymentId: string) {
     loadingActions.setLoading(true);
     try {
-      logger.info("Deleting deployment", {
-        context: "deploymentStore",
+      logger.info('Deleting deployment', {
+        context: 'deploymentStore',
         data: { deploymentId },
       });
 
       await deploymentService.deleteDeployment(deploymentId);
 
       // Remove from local store
-      deployments.update((current) =>
-        current.filter((d) => d.id !== deploymentId),
-      );
+      deployments.update((current) => current.filter((d) => d.id !== deploymentId));
 
-      logger.info("Deployment deleted successfully", {
-        context: "deploymentStore",
+      logger.info('Deployment deleted successfully', {
+        context: 'deploymentStore',
         data: { deploymentId },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete deployment";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete deployment';
       logger.error(errorMessage, {
-        context: "deploymentStore.deleteDeployment",
+        context: 'deploymentStore.deleteDeployment',
         error,
         data: { deploymentId },
       });
@@ -245,38 +224,29 @@ export const deploymentActions = {
   /**
    * Update a deployment
    */
-  async updateDeployment(
-    deploymentId: string,
-    request: DeploymentUpdateRequest,
-  ) {
+  async updateDeployment(deploymentId: string, request: DeploymentUpdateRequest) {
     loadingActions.setLoading(true);
     try {
-      logger.info("Updating deployment", {
-        context: "deploymentStore",
+      logger.info('Updating deployment', {
+        context: 'deploymentStore',
         data: { deploymentId },
       });
 
-      const deployment = await deploymentService.updateDeployment(
-        deploymentId,
-        request,
-      );
+      const deployment = await deploymentService.updateDeployment(deploymentId, request);
 
       // Update in local store
-      deployments.update((current) =>
-        current.map((d) => (d.id === deploymentId ? deployment : d)),
-      );
+      deployments.update((current) => current.map((d) => (d.id === deploymentId ? deployment : d)));
 
-      logger.info("Deployment updated successfully", {
-        context: "deploymentStore",
+      logger.info('Deployment updated successfully', {
+        context: 'deploymentStore',
         data: { deploymentId },
       });
 
       return deployment;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to update deployment";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update deployment';
       logger.error(errorMessage, {
-        context: "deploymentStore.updateDeployment",
+        context: 'deploymentStore.updateDeployment',
         error,
         data: { deploymentId },
       });
@@ -292,29 +262,23 @@ export const deploymentActions = {
    */
   async getDeploymentLogs(deploymentId: string, tail?: number) {
     try {
-      logger.info("Getting deployment logs", {
-        context: "deploymentStore",
+      logger.info('Getting deployment logs', {
+        context: 'deploymentStore',
         data: { deploymentId, tail },
       });
 
-      const logs = await deploymentService.getDeploymentLogs(
-        deploymentId,
-        tail,
-      );
+      const logs = await deploymentService.getDeploymentLogs(deploymentId, tail);
 
-      logger.info("Deployment logs retrieved", {
-        context: "deploymentStore",
+      logger.info('Deployment logs retrieved', {
+        context: 'deploymentStore',
         data: { deploymentId, logCount: logs.length },
       });
 
       return logs;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to get deployment logs";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get deployment logs';
       logger.error(errorMessage, {
-        context: "deploymentStore.getDeploymentLogs",
+        context: 'deploymentStore.getDeploymentLogs',
         error,
         data: { deploymentId },
       });
@@ -328,25 +292,22 @@ export const deploymentActions = {
   async refreshDeploymentStatuses() {
     loadingActions.setLoading(true);
     try {
-      logger.info("Refreshing deployment statuses", {
-        context: "deploymentStore",
+      logger.info('Refreshing deployment statuses', {
+        context: 'deploymentStore',
       });
 
-      const updatedDeployments =
-        await deploymentService.refreshDeploymentStatuses();
+      const updatedDeployments = await deploymentService.refreshDeploymentStatuses();
       deployments.set(updatedDeployments);
 
-      logger.info("Deployment statuses refreshed", {
-        context: "deploymentStore",
+      logger.info('Deployment statuses refreshed', {
+        context: 'deploymentStore',
         data: { count: updatedDeployments.length },
       });
     } catch (error) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to refresh deployment statuses";
+        error instanceof Error ? error.message : 'Failed to refresh deployment statuses';
       logger.error(errorMessage, {
-        context: "deploymentStore.refreshDeploymentStatuses",
+        context: 'deploymentStore.refreshDeploymentStatuses',
         error,
       });
       loadingActions.setError(errorMessage);
@@ -364,8 +325,8 @@ export const deploymentActions = {
       dockerStatus.set(status);
       return status;
     } catch (error) {
-      logger.error("Failed to check Docker status", {
-        context: "deploymentStore.checkDockerStatus",
+      logger.error('Failed to check Docker status', {
+        context: 'deploymentStore.checkDockerStatus',
         error,
       });
       throw error;
@@ -379,7 +340,7 @@ export const deploymentActions = {
     isStartingDocker.set(true);
     try {
       const message = await deploymentService.startDocker();
-      logger.info(message, { context: "deploymentStore.startDocker" });
+      logger.info(message, { context: 'deploymentStore.startDocker' });
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
@@ -390,9 +351,7 @@ export const deploymentActions = {
         }
       }
 
-      throw new Error(
-        "Docker is still starting. Wait a moment and click Retry.",
-      );
+      throw new Error('Docker is still starting. Wait a moment and click Retry.');
     } finally {
       isStartingDocker.set(false);
     }
@@ -404,15 +363,15 @@ export const deploymentActions = {
   async loadContainers() {
     loadingActions.setLoading(true);
     try {
-      logger.info("Loading containers", { context: "deploymentStore" });
+      logger.info('Loading containers', { context: 'deploymentStore' });
 
       const status = await deploymentService.getDockerStatus();
       dockerStatus.set(status);
 
       if (!status.running) {
         containers.set([]);
-        logger.warn("Docker is not running; skipping container list", {
-          context: "deploymentStore.loadContainers",
+        logger.warn('Docker is not running; skipping container list', {
+          context: 'deploymentStore.loadContainers',
         });
         return;
       }
@@ -420,8 +379,8 @@ export const deploymentActions = {
       const containerList = await deploymentService.listContainers();
       containers.set(containerList);
 
-      logger.info("Containers loaded", {
-        context: "deploymentStore",
+      logger.info('Containers loaded', {
+        context: 'deploymentStore',
         data: { count: containerList.length },
       });
     } catch (error) {
@@ -429,20 +388,19 @@ export const deploymentActions = {
         const status = await deploymentService.getDockerStatus().catch(() => ({
           running: false,
           installed: true,
-          message: "Docker is not running.",
+          message: 'Docker is not running.',
         }));
         dockerStatus.set(status);
         containers.set([]);
-        logger.warn("Docker is not running; skipping container list", {
-          context: "deploymentStore.loadContainers",
+        logger.warn('Docker is not running; skipping container list', {
+          context: 'deploymentStore.loadContainers',
         });
         return;
       }
 
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load containers";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load containers';
       logger.error(errorMessage, {
-        context: "deploymentStore.loadContainers",
+        context: 'deploymentStore.loadContainers',
         error,
       });
       loadingActions.setError(errorMessage);
@@ -469,9 +427,7 @@ export const deploymentActions = {
   getDeploymentsByProject(projectId: string): Deployment[] {
     let projectDeployments: Deployment[] = [];
     deployments.update((current) => {
-      projectDeployments = current.filter(
-        (d) => d.metadata.projectId === projectId,
-      );
+      projectDeployments = current.filter((d) => d.metadata.projectId === projectId);
       return current;
     });
     return projectDeployments;
@@ -490,27 +446,23 @@ export const deploymentActions = {
   async pollCliDeploymentStatuses(intervalMs: number = 5000) {
     const currentDeployments = get(deployments);
     const cliDeployments = currentDeployments.filter(
-      (d: Deployment) => d.type === "cli" && d.status === "running",
+      (d: Deployment) => d.type === 'cli' && d.status === 'running'
     );
 
     for (const deployment of cliDeployments) {
       try {
-        const isRunning = await deploymentService.getProcessStatus(
-          deployment.id,
-        );
-        if (!isRunning && deployment.status === "running") {
+        const isRunning = await deploymentService.getProcessStatus(deployment.id);
+        if (!isRunning && deployment.status === 'running') {
           // Process stopped, update status
           deployments.update((current: Deployment[]) =>
             current.map((d: Deployment) =>
-              d.id === deployment.id
-                ? { ...d, status: DeploymentStatus.STOPPED }
-                : d,
-            ),
+              d.id === deployment.id ? { ...d, status: DeploymentStatus.STOPPED } : d
+            )
           );
         }
       } catch (error) {
-        logger.error("Failed to poll CLI deployment status", {
-          context: "deploymentStore",
+        logger.error('Failed to poll CLI deployment status', {
+          context: 'deploymentStore',
           error,
           deploymentId: deployment.id,
         });

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { Button } from "$lib/components/ui/button";
+  import { invoke } from '@tauri-apps/api/core';
+  import { Button } from '$lib/components/ui/button';
+  import { Textarea } from '$lib/components/ui/textarea';
 
   interface Props {
     workspaceRoot: string;
@@ -10,7 +11,7 @@
   let { workspaceRoot, filePath }: Props = $props();
 
   let original = $state<string | null>(null);
-  let content = $state("");
+  let content = $state('');
   let loading = $state(false);
   let saving = $state(false);
   let error = $state<string | null>(null);
@@ -19,14 +20,14 @@
   let textarea = $state<HTMLTextAreaElement | null>(null);
 
   const dirty = $derived(original !== null && content !== original);
-  const lineCount = $derived(content.length ? content.split("\n").length : 1);
+  const lineCount = $derived(content.length ? content.split('\n').length : 1);
 
   async function load() {
     loading = true;
     error = null;
     original = null;
     try {
-      const text = await invoke<string>("coder_read_file", { workspaceRoot, path: filePath });
+      const text = await invoke<string>('coder_read_file', { workspaceRoot, path: filePath });
       original = text;
       content = text;
     } catch (e) {
@@ -41,7 +42,7 @@
     saving = true;
     error = null;
     try {
-      await invoke("coder_write_file", { workspaceRoot, path: filePath, content });
+      await invoke('coder_write_file', { workspaceRoot, path: filePath, content });
       original = content;
     } catch (e) {
       error = String(e);
@@ -51,7 +52,7 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
       void save();
     }
@@ -69,7 +70,7 @@
 <div class="flex h-full min-h-0 flex-col">
   <div class="divider-edge-b divider-edge-full flex items-center gap-2 px-3 py-2 text-xs">
     <span class="truncate font-mono text-muted-foreground">
-      {filePath}{dirty ? " •" : ""}
+      {filePath}{dirty ? ' •' : ''}
     </span>
     <Button
       type="button"
@@ -79,7 +80,7 @@
       disabled={!dirty || saving}
       onclick={save}
     >
-      {saving ? "Saving…" : "Save"}
+      {saving ? 'Saving…' : 'Save'}
     </Button>
   </div>
   <div class="min-h-0 flex-1 overflow-hidden">
@@ -97,14 +98,14 @@
             <div class="px-2 leading-relaxed">{i + 1}</div>
           {/each}
         </div>
-        <textarea
-          bind:this={textarea}
+        <Textarea
+          bind:ref={textarea}
           bind:value={content}
           onscroll={syncScroll}
           onkeydown={onKeydown}
           spellcheck="false"
-          class="h-full min-h-0 flex-1 resize-none overflow-auto bg-transparent p-2 font-mono text-xs leading-relaxed outline-none"
-        ></textarea>
+          class="h-full min-h-0 flex-1 resize-none overflow-auto rounded-none border-0 bg-transparent p-2 font-mono text-xs leading-relaxed shadow-none outline-none focus-visible:ring-0"
+        />
       </div>
     {/if}
   </div>

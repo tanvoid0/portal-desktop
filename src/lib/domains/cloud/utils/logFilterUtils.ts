@@ -1,7 +1,7 @@
 // Log filtering utilities for cloud domain
 // Provides search and filtering capabilities for Kubernetes pod logs
 
-import type { K8sLog } from "../types/k8s";
+import type { K8sLog } from '../types/k8s';
 
 export interface LogEntry {
   timestamp?: string;
@@ -15,17 +15,14 @@ export interface LogEntry {
 /**
  * Filter logs by search query (supports regex)
  */
-export function filterLogsBySearch(
-  logs: string[],
-  searchQuery: string,
-): string[] {
+export function filterLogsBySearch(logs: string[], searchQuery: string): string[] {
   if (!searchQuery.trim()) {
     return logs;
   }
 
   try {
     // Try regex first
-    const regex = new RegExp(searchQuery, "i");
+    const regex = new RegExp(searchQuery, 'i');
     return logs.filter((log) => regex.test(log));
   } catch {
     // If regex fails, fall back to simple string search
@@ -40,7 +37,7 @@ export function filterLogsBySearch(
 export function filterLogsByContainer(
   logs: string[],
   container: string,
-  logEntries?: LogEntry[],
+  logEntries?: LogEntry[]
 ): string[] {
   if (!container || !logEntries) {
     return logs;
@@ -60,7 +57,7 @@ export function applyLogFilters(
     searchQuery?: string;
     container?: string;
     tailLines?: number;
-  },
+  }
 ): string[] {
   let filtered = [...logs];
 
@@ -80,27 +77,21 @@ export function applyLogFilters(
 /**
  * Highlight search matches in log text
  */
-export function highlightSearchMatches(
-  text: string,
-  searchQuery: string,
-): string {
+export function highlightSearchMatches(text: string, searchQuery: string): string {
   if (!searchQuery.trim()) {
     return text;
   }
 
   try {
-    const regex = new RegExp(`(${escapeRegex(searchQuery)})`, "gi");
-    return text.replace(
-      regex,
-      '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>',
-    );
+    const regex = new RegExp(`(${escapeRegex(searchQuery)})`, 'gi');
+    return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>');
   } catch {
     // Fall back to simple string replacement
     const query = escapeHtml(searchQuery);
     const escapedText = escapeHtml(text);
     return escapedText.replace(
-      new RegExp(`(${query})`, "gi"),
-      '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>',
+      new RegExp(`(${query})`, 'gi'),
+      '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>'
     );
   }
 }
@@ -135,40 +126,32 @@ export function parseStructuredLog(log: string): {
 export function extractLogLevel(log: string): string {
   const upperLog = log.toUpperCase();
 
-  if (upperLog.includes("ERROR") || upperLog.includes("ERR")) {
-    return "error";
+  if (upperLog.includes('ERROR') || upperLog.includes('ERR')) {
+    return 'error';
   }
-  if (upperLog.includes("WARN") || upperLog.includes("WARNING")) {
-    return "warn";
+  if (upperLog.includes('WARN') || upperLog.includes('WARNING')) {
+    return 'warn';
   }
-  if (upperLog.includes("INFO")) {
-    return "info";
+  if (upperLog.includes('INFO')) {
+    return 'info';
   }
-  if (upperLog.includes("DEBUG")) {
-    return "debug";
+  if (upperLog.includes('DEBUG')) {
+    return 'debug';
   }
 
   // Try to parse from structured log
   try {
     const parsed = JSON.parse(log);
-    return (
-      parsed.level ||
-      parsed.severity ||
-      parsed.logLevel ||
-      "info"
-    ).toLowerCase();
+    return (parsed.level || parsed.severity || parsed.logLevel || 'info').toLowerCase();
   } catch {
-    return "info";
+    return 'info';
   }
 }
 
 /**
  * Filter logs by severity (hierarchical)
  */
-export function filterLogsBySeverity(
-  logs: K8sLog[],
-  severity: string,
-): K8sLog[] {
+export function filterLogsBySeverity(logs: K8sLog[], severity: string): K8sLog[] {
   if (!severity) return logs;
 
   const severityLevels: Record<string, number> = {
@@ -195,32 +178,32 @@ export function filterLogsBySeverity(
 export function getLogLevelColor(level: string): string {
   const levelLower = level.toLowerCase();
   switch (levelLower) {
-    case "error":
-    case "err":
-      return "text-red-600 dark:text-red-400";
-    case "warn":
-    case "warning":
-      return "text-yellow-600 dark:text-yellow-400";
-    case "info":
-      return "text-blue-600 dark:text-blue-400";
-    case "debug":
-      return "text-gray-600 dark:text-gray-400";
+    case 'error':
+    case 'err':
+      return 'text-red-600 dark:text-red-400';
+    case 'warn':
+    case 'warning':
+      return 'text-yellow-600 dark:text-yellow-400';
+    case 'info':
+      return 'text-blue-600 dark:text-blue-400';
+    case 'debug':
+      return 'text-gray-600 dark:text-gray-400';
     default:
-      return "text-foreground";
+      return 'text-foreground';
   }
 }
 
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function escapeHtml(str: string): string {
   const map: Record<string, string> = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
   };
   return str.replace(/[&<>"']/g, (m) => map[m]);
 }

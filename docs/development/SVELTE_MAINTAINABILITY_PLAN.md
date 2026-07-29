@@ -16,14 +16,14 @@ This document defines a phased plan to improve frontend maintainability **withou
 
 ## Current state (baseline)
 
-| Metric | Approx. value |
-|--------|---------------|
-| Svelte components | ~521 |
-| Route pages | ~88 |
-| shadcn-svelte UI primitives | ~264 |
-| Legacy `writable()` stores | 28 |
-| `.svelte.ts` state modules | 3 |
-| TanStack Query usage | None |
+| Metric                      | Approx. value |
+| --------------------------- | ------------- |
+| Svelte components           | ~521          |
+| Route pages                 | ~88           |
+| shadcn-svelte UI primitives | ~264          |
+| Legacy `writable()` stores  | 28            |
+| `.svelte.ts` state modules  | 3             |
+| TanStack Query usage        | None          |
 
 ### What works well
 
@@ -72,12 +72,12 @@ Every domain should converge on three layers:
 
 ### Layer responsibilities
 
-| Layer | Owns | Does not own |
-|-------|------|--------------|
-| `*Service.ts` / `*Api.ts` | Tauri calls, DTO mapping, logging, learning hooks | Loading spinners, `$state`, route params |
-| TanStack Query | Fetch, cache, stale time, retry, invalidation | Tab selection, form drafts, sidebar open |
-| `.svelte.ts` class | Ephemeral UI state (tabs, filters, selection) | Duplicating backend lists with fake optimistic IDs |
-| Components | Render + wire events | Direct `invokeClient` calls |
+| Layer                     | Owns                                              | Does not own                                       |
+| ------------------------- | ------------------------------------------------- | -------------------------------------------------- |
+| `*Service.ts` / `*Api.ts` | Tauri calls, DTO mapping, logging, learning hooks | Loading spinners, `$state`, route params           |
+| TanStack Query            | Fetch, cache, stale time, retry, invalidation     | Tab selection, form drafts, sidebar open           |
+| `.svelte.ts` class        | Ephemeral UI state (tabs, filters, selection)     | Duplicating backend lists with fake optimistic IDs |
+| Components                | Render + wire events                              | Direct `invokeClient` calls                        |
 
 ### Reference pattern: `.svelte.ts` state class
 
@@ -134,13 +134,13 @@ Theme, toasts, sidebar layout — migrate last; low churn.
 
 ### Anti-patterns to eliminate
 
-| Anti-pattern | Example | Fix |
-|--------------|---------|-----|
-| Service mutates store loading flags | `projectStore.setLoading(true)` in `loadProjects()` | Query handles `isPending` |
-| Manual list cache + store | `cache.set("projects", ...)` + `projectStore.setProjects()` | Query cache only |
-| Optimistic fake entities | `projectStore.addProject()` generating local IDs | Mutation returns backend entity |
-| Module-level auto-load | `loadTasks()` at bottom of store file | Page/component triggers load |
-| Direct invoke in components | `invokeClient.post(...)` in `+page.svelte` | Route through service/api layer |
+| Anti-pattern                        | Example                                                     | Fix                             |
+| ----------------------------------- | ----------------------------------------------------------- | ------------------------------- |
+| Service mutates store loading flags | `projectStore.setLoading(true)` in `loadProjects()`         | Query handles `isPending`       |
+| Manual list cache + store           | `cache.set("projects", ...)` + `projectStore.setProjects()` | Query cache only                |
+| Optimistic fake entities            | `projectStore.addProject()` generating local IDs            | Mutation returns backend entity |
+| Module-level auto-load              | `loadTasks()` at bottom of store file                       | Page/component triggers load    |
+| Direct invoke in components         | `invokeClient.post(...)` in `+page.svelte`                  | Route through service/api layer |
 
 ---
 
@@ -162,7 +162,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,  // align with existing 5min project cache
+      staleTime: 5 * 60 * 1000, // align with existing 5min project cache
       gcTime: 30 * 60 * 1000,
       retry: 1,
     },
@@ -190,8 +190,7 @@ export const queryKeys = {
     detail: (id: string) => ['tasks', id] as const,
   },
   cloud: {
-    resources: (type: string, namespace: string) =>
-      ['cloud', type, namespace] as const,
+    resources: (type: string, namespace: string) => ['cloud', type, namespace] as const,
   },
   sdk: {
     managers: ['sdk', 'managers'] as const,
@@ -283,14 +282,14 @@ Incremental PRs per route or domain. **Do not bulk-convert all 28 stores.**
 
 ### Phase 0 — Foundation (1–2 weeks)
 
-| Task | Files / area |
-|------|--------------|
-| Install `@tanstack/svelte-query` | `package.json`, `+layout.svelte` |
-| Add `queryKeys.ts`, `invalidateDashboard.ts` | `src/lib/domains/shared/query/` |
-| Extend data-loading conventions | `.cursor/rules/data-loading-conventions.md` |
-| Delete archived terminal components if unused | `terminal/components/archived/` |
-| Consolidate duplicate toast modules | `src/lib/stores/toast.ts` vs `toastStore.ts` |
-| Remove `projectStore.addProject()` fake-ID path | `projectStore.ts` |
+| Task                                            | Files / area                                 |
+| ----------------------------------------------- | -------------------------------------------- |
+| Install `@tanstack/svelte-query`                | `package.json`, `+layout.svelte`             |
+| Add `queryKeys.ts`, `invalidateDashboard.ts`    | `src/lib/domains/shared/query/`              |
+| Extend data-loading conventions                 | `.cursor/rules/data-loading-conventions.md`  |
+| Delete archived terminal components if unused   | `terminal/components/archived/`              |
+| Consolidate duplicate toast modules             | `src/lib/stores/toast.ts` vs `toastStore.ts` |
+| Remove `projectStore.addProject()` fake-ID path | `projectStore.ts`                            |
 
 **Exit criteria:** Query provider works; dashboard invalidation is centralized; no new `writable()` stores added.
 
@@ -300,14 +299,14 @@ Incremental PRs per route or domain. **Do not bulk-convert all 28 stores.**
 
 **Why first:** Small UI surface (~5 domain Svelte files), mature service layer, clear CRUD, already invalidates dashboard on mutations.
 
-| Step | Action |
-|------|--------|
-| 1 | Create `projectApi.ts` — invoke-only, no store writes |
-| 2 | Create `queries/projectQueries.ts` — list, detail, mutations |
-| 3 | Refactor `routes/projects/+page.svelte` to use queries |
-| 4 | Refactor create/edit routes |
-| 5 | Shrink or remove `projectStore.ts` — keep `activeProjectId` in `projectUi.svelte.ts` if needed |
-| 6 | Update `domains/projects/index.ts` exports |
+| Step | Action                                                                                         |
+| ---- | ---------------------------------------------------------------------------------------------- |
+| 1    | Create `projectApi.ts` — invoke-only, no store writes                                          |
+| 2    | Create `queries/projectQueries.ts` — list, detail, mutations                                   |
+| 3    | Refactor `routes/projects/+page.svelte` to use queries                                         |
+| 4    | Refactor create/edit routes                                                                    |
+| 5    | Shrink or remove `projectStore.ts` — keep `activeProjectId` in `projectUi.svelte.ts` if needed |
+| 6    | Update `domains/projects/index.ts` exports                                                     |
 
 **Reference files:**
 
@@ -333,15 +332,15 @@ Replace `dashboardStore` with a query hook. In `+layout.svelte`, use `enabled: !
 
 #### Tasks ✅
 
-| Module | Status |
-|--------|--------|
-| `queries/taskQueries.ts` | ✅ list + detail |
-| `queries/invalidateTasks.ts` | ✅ cache invalidation |
-| `api/taskApi.ts` | ✅ invoke-only fetch |
-| `state/taskUi.svelte.ts` | ✅ filters, selection, time tracking, templates, saved views |
-| `stores/taskStore.ts` | ✅ mutations only (`taskActions`) |
-| `TaskManager.svelte` | ✅ loads via `createTasksQuery()` |
-| Module-level auto-load | ✅ removed |
+| Module                       | Status                                                       |
+| ---------------------------- | ------------------------------------------------------------ |
+| `queries/taskQueries.ts`     | ✅ list + detail                                             |
+| `queries/invalidateTasks.ts` | ✅ cache invalidation                                        |
+| `api/taskApi.ts`             | ✅ invoke-only fetch                                         |
+| `state/taskUi.svelte.ts`     | ✅ filters, selection, time tracking, templates, saved views |
+| `stores/taskStore.ts`        | ✅ mutations only (`taskActions`)                            |
+| `TaskManager.svelte`         | ✅ loads via `createTasksQuery()`                            |
+| Module-level auto-load       | ✅ removed                                                   |
 
 **Exit criteria:** `TaskManager.svelte` loads via query; no module-level auto-load; UI state in `taskUi.svelte.ts`. ✅
 
@@ -361,12 +360,12 @@ Form-heavy, low real-time complexity. Good ROI for daily development friction.
 
 **Why later:** Many similar list/detail pages; namespace-scoped resources; connection state mixed with resource lists.
 
-| Step | Action |
-|------|--------|
-| 1 | Generic `createResourceQuery(type, namespace)` factory |
-| 2 | Migrate `cloudStore` connection fields to `cloudSession.svelte.ts` |
-| 3 | Consolidate workload list pages using shared table components |
-| 4 | Leave k8s keyboard hooks as plain TS — they are fine |
+| Step | Action                                                             |
+| ---- | ------------------------------------------------------------------ |
+| 1    | Generic `createResourceQuery(type, namespace)` factory             |
+| 2    | Migrate `cloudStore` connection fields to `cloudSession.svelte.ts` |
+| 3    | Consolidate workload list pages using shared table components      |
+| 4    | Leave k8s keyboard hooks as plain TS — they are fine               |
 
 **Reference:** `src/lib/domains/cloud/stores/cloudStore.ts`, `src/routes/cloud/workloads/`
 
@@ -386,12 +385,12 @@ Complex sidebar UI (`SDKSidebar.svelte`), version lists, install status.
 
 **Why last:** Real-time streaming, 7 stores, Tauri event listeners. Highest risk.
 
-| Step | Action |
-|------|--------|
-| 1 | Merge `tabStore` + `sessionStore` + parts of `aiTerminalStore` → `terminalSession.svelte.ts` |
-| 2 | Keep `commandHistoryStore` and `commandPaletteStore` separate (different lifecycles) |
-| 3 | Streaming: Tauri events → append to `$state` in session class (not Query) |
-| 4 | Remove archived V2 components once current path is confirmed |
+| Step | Action                                                                                       |
+| ---- | -------------------------------------------------------------------------------------------- |
+| 1    | Merge `tabStore` + `sessionStore` + parts of `aiTerminalStore` → `terminalSession.svelte.ts` |
+| 2    | Keep `commandHistoryStore` and `commandPaletteStore` separate (different lifecycles)         |
+| 3    | Streaming: Tauri events → append to `$state` in session class (not Query)                    |
+| 4    | Remove archived V2 components once current path is confirmed                                 |
 
 **Stores to consolidate:**
 
@@ -407,15 +406,15 @@ Complex sidebar UI (`SDKSidebar.svelte`), version lists, install status.
 
 ## Migration order summary
 
-| Phase | Domain | Effort | Risk | Payoff |
-|-------|--------|--------|------|--------|
-| 0 | Query setup + conventions | 1–2 wk | Low | Foundation |
-| 1 | **Projects** (pilot) | 2–3 wk | Low | Template for all domains |
-| 2 | Dashboard + **Tasks** | 2–3 wk | Medium | Removes largest store mess |
-| 3 | Settings, Credentials, Documents | 2 wk | Low | Daily friction ↓ |
-| 4 | Cloud / K8s | 3–4 wk | Medium | Dedupe similar pages |
-| 5 | SDK Manager | 3 wk | Medium | Sidebar complexity ↓ |
-| 6 | **Terminal** | 4–6 wk | High | Do last |
+| Phase | Domain                           | Effort | Risk   | Payoff                     |
+| ----- | -------------------------------- | ------ | ------ | -------------------------- |
+| 0     | Query setup + conventions        | 1–2 wk | Low    | Foundation                 |
+| 1     | **Projects** (pilot)             | 2–3 wk | Low    | Template for all domains   |
+| 2     | Dashboard + **Tasks**            | 2–3 wk | Medium | Removes largest store mess |
+| 3     | Settings, Credentials, Documents | 2 wk   | Low    | Daily friction ↓           |
+| 4     | Cloud / K8s                      | 3–4 wk | Medium | Dedupe similar pages       |
+| 5     | SDK Manager                      | 3 wk   | Medium | Sidebar complexity ↓       |
+| 6     | **Terminal**                     | 4–6 wk | High   | Do last                    |
 
 **Estimated total:** 4–6 months alongside feature work, not a feature freeze.
 
@@ -452,13 +451,13 @@ Do **not** rewrite UI primitives under `src/lib/components/ui/`. They already us
 
 Track monthly during migration:
 
-| Metric | Baseline | Target @ 6 mo |
-|--------|----------|---------------|
-| `writable()` store files | 28 | ≤ 5 (theme, toast, terminal session) |
-| Domains with Query layer | 0 | ≥ 8 |
-| Components calling `invokeClient` directly | TBD | 0 outside services/api |
-| Duplicate cache paths | several | 0 |
-| Archived/dead UI files | 2+ | 0 |
+| Metric                                     | Baseline | Target @ 6 mo                        |
+| ------------------------------------------ | -------- | ------------------------------------ |
+| `writable()` store files                   | 28       | ≤ 5 (theme, toast, terminal session) |
+| Domains with Query layer                   | 0        | ≥ 8                                  |
+| Components calling `invokeClient` directly | TBD      | 0 outside services/api               |
+| Duplicate cache paths                      | several  | 0                                    |
+| Archived/dead UI files                     | 2+       | 0                                    |
 
 ---
 
@@ -489,13 +488,13 @@ A focused PR to prove the pattern without touching terminal or cloud:
 
 ## Why not React?
 
-| Concern | Svelte (stay) | React (migrate) |
-|---------|---------------|-----------------|
-| Bundle / startup | Smaller, compile-time reactivity | Heavier typical bundle |
-| Existing investment | Svelte 5 runes done, 521 components, shadcn-svelte | Full rewrite of UI layer |
-| Tauri integration | Framework-agnostic; invoke layer unchanged | Same invoke, but ~6–12 mo rewrite |
-| Hiring / ecosystem | Smaller pool; adequate for desktop app | Larger pool; not worth rewrite cost |
-| Complexity source | Domain size + mixed state patterns | Complex apps are hard in any framework |
+| Concern             | Svelte (stay)                                      | React (migrate)                        |
+| ------------------- | -------------------------------------------------- | -------------------------------------- |
+| Bundle / startup    | Smaller, compile-time reactivity                   | Heavier typical bundle                 |
+| Existing investment | Svelte 5 runes done, 521 components, shadcn-svelte | Full rewrite of UI layer               |
+| Tauri integration   | Framework-agnostic; invoke layer unchanged         | Same invoke, but ~6–12 mo rewrite      |
+| Hiring / ecosystem  | Smaller pool; adequate for desktop app             | Larger pool; not worth rewrite cost    |
+| Complexity source   | Domain size + mixed state patterns                 | Complex apps are hard in any framework |
 
 React migration would rebuild the app without improving performance or addressing root causes (store sprawl, inconsistent data loading).
 
@@ -505,22 +504,22 @@ React migration would rebuild the app without improving performance or addressin
 
 Current frontend file counts by domain (approximate):
 
-| Domain | Svelte | TS | Notes |
-|--------|--------|-----|-------|
-| terminal | 22 | 16 | Phase 6 — last |
-| tasks | 21 | 6 | Phase 2 — high store complexity |
-| ai | 18 | 10 | After core domains |
-| sdk | 16 | 8 | Phase 5 |
-| settings | 14 | 6 | Phase 3 |
-| cloud | 13 | 20 | Phase 4 |
-| projects | 5 | 19 | Phase 1 — pilot |
-| dashboard | 0 | 2 | Phase 2 — quick win |
-| shared | 3 | 13 | Query infra lives here |
+| Domain    | Svelte | TS  | Notes                           |
+| --------- | ------ | --- | ------------------------------- |
+| terminal  | 22     | 16  | Phase 6 — last                  |
+| tasks     | 21     | 6   | Phase 2 — high store complexity |
+| ai        | 18     | 10  | After core domains              |
+| sdk       | 16     | 8   | Phase 5                         |
+| settings  | 14     | 6   | Phase 3                         |
+| cloud     | 13     | 20  | Phase 4                         |
+| projects  | 5      | 19  | Phase 1 — pilot                 |
+| dashboard | 0      | 2   | Phase 2 — quick win             |
+| shared    | 3      | 13  | Query infra lives here          |
 
 ---
 
 ## Changelog
 
-| Date | Change |
-|------|--------|
+| Date       | Change                                                                   |
+| ---------- | ------------------------------------------------------------------------ |
 | 2026-06-05 | Initial plan — phased Query migration, store consolidation, domain order |

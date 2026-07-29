@@ -7,12 +7,12 @@
     FileText,
     Plus,
     Bot,
-  } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { coderWorkspaceStore } from "../state/coderWorkspaceStore.svelte.js";
-  import { coderTerminalStore } from "../state/coderTerminalStore.svelte.js";
-  import { coderSession } from "../state/coderSession.svelte.js";
-  import type { GitDiffStats } from "../types.js";
+  } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
+  import { coderSession } from '../state/coderSession.svelte.js';
+  import type { GitDiffStats } from '../types.js';
 
   interface Props {
     threadId: string | null;
@@ -41,18 +41,18 @@
     return coderTerminalStore.tabsFor(threadId);
   });
 
-  const terminalExpanded = $derived(coderWorkspaceStore.isExpanded("terminal"));
-  const filesExpanded = $derived(coderWorkspaceStore.isExpanded("files"));
-  const browserExpanded = $derived(coderWorkspaceStore.isExpanded("browser"));
-  const changesExpanded = $derived(coderWorkspaceStore.isExpanded("changes"));
-  const gitChangesExpanded = $derived(coderWorkspaceStore.isExpanded("git-changes"));
+  const terminalExpanded = $derived(coderWorkspaceStore.isExpanded('terminal'));
+  const filesExpanded = $derived(coderWorkspaceStore.isExpanded('files'));
+  const browserExpanded = $derived(coderWorkspaceStore.isExpanded('browser'));
+  const changesExpanded = $derived(coderWorkspaceStore.isExpanded('changes'));
+  const gitChangesExpanded = $derived(coderWorkspaceStore.isExpanded('git-changes'));
 
   function createTerminal() {
     if (!threadId || !workspaceRoot) return;
     const tab = coderTerminalStore.createTab(threadId, {
       workspaceRoot,
-      createdBy: "user",
-      kind: "interactive",
+      createdBy: 'user',
+      kind: 'interactive',
     });
     coderWorkspaceStore.openTerminal(threadId, tab.id, tab.label);
   }
@@ -74,13 +74,11 @@
     const parts: string[] = [];
     if (gitStats.additions > 0) parts.push(`+${gitStats.additions}`);
     if (gitStats.deletions > 0) parts.push(`-${gitStats.deletions}`);
-    return parts.join(" ") || `${gitStats.changedFiles} files`;
+    return parts.join(' ') || `${gitStats.changedFiles} files`;
   });
 </script>
 
-<aside
-  class="divider-edge-l flex w-56 shrink-0 flex-col overflow-hidden bg-muted/20"
->
+<aside class="divider-edge-l flex w-56 shrink-0 flex-col overflow-hidden bg-muted/20">
   <div class="divider-edge-b divider-edge-full flex items-center px-2 py-1.5">
     <span class="text-[11px] font-medium text-muted-foreground">Workspace</span>
   </div>
@@ -88,7 +86,9 @@
   <div class="min-h-0 flex-1 overflow-y-auto text-sm">
     {#if openTabs.length > 0}
       <div class="divider-edge-b divider-edge-full px-2 py-2">
-        <div class="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div
+          class="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+        >
           Open tabs
         </div>
         <ul class="space-y-0.5">
@@ -103,13 +103,13 @@
                   : 'text-muted-foreground hover:bg-muted/60'}"
                 onclick={() => coderWorkspaceStore.selectTab(tab.id)}
               >
-                {#if tab.panel === "terminal"}
+                {#if tab.panel === 'terminal'}
                   <TerminalIcon class="h-3.5 w-3.5 shrink-0" />
-                {:else if tab.panel === "changes"}
+                {:else if tab.panel === 'changes'}
                   <Bot class="h-3.5 w-3.5 shrink-0" />
-                {:else if tab.panel === "git-changes"}
+                {:else if tab.panel === 'git-changes'}
                   <GitBranch class="h-3.5 w-3.5 shrink-0" />
-                {:else if tab.panel === "browser"}
+                {:else if tab.panel === 'browser'}
                   <Globe class="h-3.5 w-3.5 shrink-0" />
                 {:else}
                   <FileText class="h-3.5 w-3.5 shrink-0" />
@@ -124,7 +124,7 @@
 
     <div class="px-2 py-2">
       <div class="mb-1 px-1 text-[10px] font-medium text-muted-foreground">
-        On {workspaceName || "workspace"}
+        On {workspaceName || 'workspace'}
       </div>
 
       <!-- Agent changes -->
@@ -134,15 +134,13 @@
           variant="ghost"
           class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
-            coderWorkspaceStore.expandSection("changes");
+            coderWorkspaceStore.expandSection('changes');
             coderWorkspaceStore.openChanges();
             if (threadId) coderSession.refreshChanges(threadId);
           }}
         >
           <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {changesExpanded
-              ? 'rotate-90'
-              : ''}"
+            class="h-3.5 w-3.5 shrink-0 transition-transform {changesExpanded ? 'rotate-90' : ''}"
           />
           <Bot class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span class="flex-1">Agent changes</span>
@@ -161,7 +159,7 @@
           variant="ghost"
           class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
-            coderWorkspaceStore.expandSection("git-changes");
+            coderWorkspaceStore.expandSection('git-changes');
             coderWorkspaceStore.openGitChanges();
           }}
         >
@@ -187,14 +185,12 @@
           variant="ghost"
           class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
-            coderWorkspaceStore.expandSection("browser");
+            coderWorkspaceStore.expandSection('browser');
             coderWorkspaceStore.openBrowser();
           }}
         >
           <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {browserExpanded
-              ? 'rotate-90'
-              : ''}"
+            class="h-3.5 w-3.5 shrink-0 transition-transform {browserExpanded ? 'rotate-90' : ''}"
           />
           <Globe class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span>Browser</span>
@@ -208,11 +204,11 @@
           variant="ghost"
           class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
-            coderWorkspaceStore.toggleSection("terminal");
+            coderWorkspaceStore.toggleSection('terminal');
             if (terminalTabs.length > 0) {
-              const tab = terminalTabs.find(
-                (t) => t.id === coderWorkspaceStore.activeTerminalId(),
-              ) ?? terminalTabs[0];
+              const tab =
+                terminalTabs.find((t) => t.id === coderWorkspaceStore.activeTerminalId()) ??
+                terminalTabs[0];
               openTerminalTab(tab.id, tab.label);
             } else if (threadId) {
               createTerminal();
@@ -220,14 +216,12 @@
           }}
         >
           <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {terminalExpanded
-              ? 'rotate-90'
-              : ''}"
+            class="h-3.5 w-3.5 shrink-0 transition-transform {terminalExpanded ? 'rotate-90' : ''}"
           />
           <TerminalIcon class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span class="flex-1">
             {terminalTabs.length}
-            {terminalTabs.length === 1 ? "Terminal" : "Terminals"}
+            {terminalTabs.length === 1 ? 'Terminal' : 'Terminals'}
           </span>
           {#if threadId}
             <Button
@@ -259,9 +253,7 @@
                   onclick={() => openTerminalTab(tab.id, tab.label)}
                 >
                   {#if tab.running}
-                    <span
-                      class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary"
-                    ></span>
+                    <span class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary"></span>
                   {:else}
                     <TerminalIcon class="h-3 w-3 shrink-0 opacity-50" />
                   {/if}
@@ -295,14 +287,12 @@
           variant="ghost"
           class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
           onclick={() => {
-            coderWorkspaceStore.expandSection("files");
+            coderWorkspaceStore.expandSection('files');
             coderWorkspaceStore.openFiles();
           }}
         >
           <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {filesExpanded
-              ? 'rotate-90'
-              : ''}"
+            class="h-3.5 w-3.5 shrink-0 transition-transform {filesExpanded ? 'rotate-90' : ''}"
           />
           <FileText class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span>Files</span>

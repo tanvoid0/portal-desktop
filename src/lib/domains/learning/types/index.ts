@@ -2,24 +2,19 @@
  * Learning domain types
  */
 
-export type MLIntensity = "fast" | "light" | "medium" | "deep";
+export type MLIntensity = 'fast' | 'light' | 'medium' | 'deep';
 
-export type PatternType =
-  | "command"
-  | "workflow"
-  | "config"
-  | "framework"
-  | "code";
+export type PatternType = 'command' | 'workflow' | 'config' | 'framework' | 'code';
 
 export type EventType =
-  | "command_executed"
-  | "project_created"
-  | "suggestion_accepted"
-  | "suggestion_rejected"
-  | "preference_updated"
-  | "pattern_learned";
+  | 'command_executed'
+  | 'project_created'
+  | 'suggestion_accepted'
+  | 'suggestion_rejected'
+  | 'preference_updated'
+  | 'pattern_learned';
 
-export type EventOutcome = "success" | "failure" | "ignored";
+export type EventOutcome = 'success' | 'failure' | 'ignored';
 
 export interface LearnedPattern {
   id: number;

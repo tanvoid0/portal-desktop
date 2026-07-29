@@ -1,6 +1,6 @@
-import { redirect } from "@sveltejs/kit";
-import type { PageLoad } from "./$types";
+import { redirect } from '@sveltejs/kit';
+import type { PageLoad } from './$types';
 
 export const load: PageLoad = () => {
-  throw redirect(307, "/ai/chat");
+  throw redirect(307, '/ai/chat');
 };

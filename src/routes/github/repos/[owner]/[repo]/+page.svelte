@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import FolderPicker from "$lib/components/ui/folder-picker.svelte";
-  import { Input } from "$lib/components/ui/input";
-  import { Tabs, TabsContent, TabsList, TabsTrigger } from "$lib/components/ui/tabs";
-  import { PageHeader, PageLoading, PageError, PageEmpty } from "$lib/components/shell";
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import FolderPicker from '$lib/components/ui/folder-picker.svelte';
+  import { Input } from '$lib/components/ui/input';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
   import {
     createGitHubIssuesQuery,
     createGitHubRepositoryQuery,
@@ -16,9 +16,17 @@
     githubService,
     GitHubConnectPrompt,
     GitHubWorkflowRunsPanel,
-  } from "$lib/domains/github";
-  import { toast } from "$lib/utils/toast";
-  import { ExternalLink, FolderGit2, Link2, Bug, GitPullRequest, GitFork, Workflow } from "@lucide/svelte";
+  } from '$lib/domains/github';
+  import { toast } from '$lib/utils/toast';
+  import {
+    ExternalLink,
+    FolderGit2,
+    Link2,
+    Bug,
+    GitPullRequest,
+    GitFork,
+    Workflow,
+  } from '@lucide/svelte';
 
   const owner = $derived($page.params.owner);
   const repo = $derived($page.params.repo);
@@ -28,30 +36,28 @@
   const repoQuery = createGitHubRepositoryQuery(
     () => owner,
     () => repo,
-    () => isConnected,
+    () => isConnected
   );
   const repoIssuesQuery = createGitHubIssuesQuery(
     () => ({
       owner,
       repo,
-      state: "open",
+      state: 'open',
       page: 1,
       perPage: 20,
       includePullRequests: true,
     }),
-    () => isConnected,
+    () => isConnected
   );
-  const openIssues = $derived(
-    (repoIssuesQuery.data ?? []).filter((issue) => !issue.isPullRequest),
-  );
+  const openIssues = $derived((repoIssuesQuery.data ?? []).filter((issue) => !issue.isPullRequest));
   const openPullRequests = $derived(
-    (repoIssuesQuery.data ?? []).filter((issue) => issue.isPullRequest),
+    (repoIssuesQuery.data ?? []).filter((issue) => issue.isPullRequest)
   );
 
   let cloneDialogOpen = $state(false);
   let linkDialogOpen = $state(false);
-  let clonePath = $state("");
-  let linkPath = $state("");
+  let clonePath = $state('');
+  let linkPath = $state('');
   let cloning = $state(false);
   let linking = $state(false);
 
@@ -75,7 +81,7 @@
       await repoQuery.refetch();
       goto(`/projects/${result.project.id}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Clone failed");
+      toast.error(error instanceof Error ? error.message : 'Clone failed');
     } finally {
       cloning = false;
     }
@@ -94,7 +100,7 @@
       linkDialogOpen = false;
       await repoQuery.refetch();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Link failed");
+      toast.error(error instanceof Error ? error.message : 'Link failed');
     } finally {
       linking = false;
     }
@@ -125,10 +131,7 @@
   {#if statusQuery.isPending}
     <PageLoading message="Checking GitHub connection..." />
   {:else if !statusQuery.data?.connected}
-    <GitHubConnectPrompt
-      status={statusQuery.data}
-      onConnected={() => statusQuery.refetch()}
-    />
+    <GitHubConnectPrompt status={statusQuery.data} onConnected={() => statusQuery.refetch()} />
   {:else if repoQuery.isPending}
     <PageLoading message="Loading repository..." />
   {:else if repoQuery.isError}
@@ -136,7 +139,7 @@
       title="Failed to load repository"
       message={repoQuery.error instanceof Error
         ? repoQuery.error.message
-        : "Unable to load repository"}
+        : 'Unable to load repository'}
       onRetry={() => repoQuery.refetch()}
     />
   {:else if !repoQuery.data}
@@ -165,7 +168,7 @@
         </CardHeader>
         <CardContent class="space-y-4">
           <p class="text-sm text-muted-foreground">
-            {repoData.description || "No description"}
+            {repoData.description || 'No description'}
           </p>
           <div class="flex flex-wrap gap-2">
             <Badge variant="outline">Branch: {repoData.defaultBranch}</Badge>
@@ -173,8 +176,8 @@
             {#if repoData.language}
               <Badge variant="outline">Language: {repoData.language}</Badge>
             {/if}
-            <Badge variant={repoData.private ? "secondary" : "outline"}>
-              {repoData.private ? "Private" : "Public"}
+            <Badge variant={repoData.private ? 'secondary' : 'outline'}>
+              {repoData.private ? 'Private' : 'Public'}
             </Badge>
             {#if repoData.fork}
               <Badge variant="outline">
@@ -198,9 +201,7 @@
         </CardHeader>
         <CardContent class="space-y-3">
           {#if repoQuery.data.linkedProjects.length === 0}
-            <p class="text-sm text-muted-foreground">
-              No local projects linked yet.
-            </p>
+            <p class="text-sm text-muted-foreground">No local projects linked yet.</p>
           {:else}
             {#each repoQuery.data.linkedProjects as project}
               <Button
@@ -250,7 +251,7 @@
                 title="Failed to load issues"
                 message={repoIssuesQuery.error instanceof Error
                   ? repoIssuesQuery.error.message
-                  : "Unable to load issues"}
+                  : 'Unable to load issues'}
                 onRetry={() => repoIssuesQuery.refetch()}
               />
             {:else if openIssues.length === 0}
@@ -261,7 +262,8 @@
                   <div class="rounded border p-3">
                     <div class="flex items-center justify-between gap-3">
                       <div class="font-medium">
-                        #{issue.number} {issue.title}
+                        #{issue.number}
+                        {issue.title}
                       </div>
                       <a
                         href={issue.htmlUrl}
@@ -279,7 +281,7 @@
                         <span>by {issue.authorLogin}</span>
                       {/if}
                       {#if issue.labels.length > 0}
-                        <span>labels: {issue.labels.join(", ")}</span>
+                        <span>labels: {issue.labels.join(', ')}</span>
                       {/if}
                     </div>
                   </div>
@@ -296,7 +298,7 @@
                 title="Failed to load pull requests"
                 message={repoIssuesQuery.error instanceof Error
                   ? repoIssuesQuery.error.message
-                  : "Unable to load pull requests"}
+                  : 'Unable to load pull requests'}
                 onRetry={() => repoIssuesQuery.refetch()}
               />
             {:else if openPullRequests.length === 0}
@@ -307,7 +309,8 @@
                   <div class="rounded border p-3">
                     <div class="flex items-center justify-between gap-3">
                       <div class="font-medium">
-                        #{pr.number} {pr.title}
+                        #{pr.number}
+                        {pr.title}
                       </div>
                       <a
                         href={pr.htmlUrl}
@@ -325,7 +328,7 @@
                         <span>by {pr.authorLogin}</span>
                       {/if}
                       {#if pr.labels.length > 0}
-                        <span>labels: {pr.labels.join(", ")}</span>
+                        <span>labels: {pr.labels.join(', ')}</span>
                       {/if}
                     </div>
                   </div>
@@ -349,9 +352,7 @@
           label="Destination Path"
           description="Select the final local folder for the cloned repository."
         />
-        <Button onclick={handleClone} disabled={cloning || !clonePath.trim()}>
-          Clone
-        </Button>
+        <Button onclick={handleClone} disabled={cloning || !clonePath.trim()}>Clone</Button>
       </div>
     </Dialog.Content>
   </Dialog.Root>
@@ -368,9 +369,7 @@
           description="Choose an existing local git repository to link to this GitHub repo."
         />
         <Input bind:value={linkPath} placeholder="D:\\dev\\my-repo" />
-        <Button onclick={handleLink} disabled={linking || !linkPath.trim()}>
-          Link Repository
-        </Button>
+        <Button onclick={handleLink} disabled={linking || !linkPath.trim()}>Link Repository</Button>
       </div>
     </Dialog.Content>
   </Dialog.Root>

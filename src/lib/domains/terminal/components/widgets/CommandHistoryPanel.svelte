@@ -1,5 +1,5 @@
 <script lang="ts">
-  import CommandHistory from "../CommandHistory.svelte";
+  import CommandHistory from '../CommandHistory.svelte';
 
   interface Props {
     tabId: string;

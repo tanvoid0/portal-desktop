@@ -3,18 +3,15 @@
 -->
 
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { Button } from "$lib/components/ui/button";
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
   import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-  } from "$lib/components/ui/collapsible";
-  import {
-    useSidebar,
-    MenuButton as SidebarMenuButton,
-  } from "$lib/components/ui/sidebar";
+  } from '$lib/components/ui/collapsible';
+  import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
   import {
     Settings,
     Code,
@@ -31,55 +28,55 @@
     Languages,
     Sparkles,
     FolderGit2,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   type SettingsSectionType =
-    | "general"
-    | "editor"
-    | "terminal"
-    | "theme"
-    | "ides"
-    | "frameworks-languages"
-    | "frameworks"
-    | "package-managers"
-    | "languages"
-    | "learning"
-    | "ai"
-    | "github"
-    | "autonomy"
-    | "updates";
+    | 'general'
+    | 'editor'
+    | 'terminal'
+    | 'theme'
+    | 'ides'
+    | 'frameworks-languages'
+    | 'frameworks'
+    | 'package-managers'
+    | 'languages'
+    | 'learning'
+    | 'ai'
+    | 'github'
+    | 'autonomy'
+    | 'updates';
 
   interface Props {
-    currentSection?: SettingsSectionType | "framework-ides" | "updates";
+    currentSection?: SettingsSectionType | 'framework-ides' | 'updates';
     className?: string;
   }
 
-  let { currentSection, className = "" }: Props = $props();
+  let { currentSection, className = '' }: Props = $props();
 
   // Check if we're in the AI settings section or any of its sub-sections
   const isAiSection = $derived.by(() => {
     const path = $page.url.pathname;
-    return path.startsWith("/settings/ai");
+    return path.startsWith('/settings/ai');
   });
 
   // State for collapsible open/close per section
   let submenuExpanded = $state<Record<string, boolean>>({});
 
   function isSubmenuExpanded(sectionId: string): boolean {
-    if (sectionId === "frameworks-languages" && isFrameworksLanguagesSection) {
+    if (sectionId === 'frameworks-languages' && isFrameworksLanguagesSection) {
       return true;
     }
-    if (sectionId === "ai" && isAiSection) {
+    if (sectionId === 'ai' && isAiSection) {
       return true;
     }
     return submenuExpanded[sectionId] ?? false;
   }
 
   function handleSubmenuOpenChange(sectionId: string, open: boolean) {
-    if (sectionId === "frameworks-languages" && isFrameworksLanguagesSection && !open) {
+    if (sectionId === 'frameworks-languages' && isFrameworksLanguagesSection && !open) {
       return;
     }
-    if (sectionId === "ai" && isAiSection && !open) {
+    if (sectionId === 'ai' && isAiSection && !open) {
       return;
     }
     submenuExpanded = { ...submenuExpanded, [sectionId]: open };
@@ -89,10 +86,10 @@
   const isFrameworksLanguagesSection = $derived.by(() => {
     const path = $page.url.pathname;
     return (
-      path.startsWith("/settings/frameworks-languages") ||
-      path.startsWith("/settings/frameworks") ||
-      path.startsWith("/settings/package-managers") ||
-      path.startsWith("/settings/languages")
+      path.startsWith('/settings/frameworks-languages') ||
+      path.startsWith('/settings/frameworks') ||
+      path.startsWith('/settings/package-managers') ||
+      path.startsWith('/settings/languages')
     );
   });
 
@@ -100,110 +97,110 @@
 
   const sections = [
     {
-      id: "general" as const,
-      label: "General",
-      description: "Application preferences",
+      id: 'general' as const,
+      label: 'General',
+      description: 'Application preferences',
       icon: Settings,
-      path: "/settings/general",
+      path: '/settings/general',
     },
     {
-      id: "updates" as const,
-      label: "Updates",
-      description: "Check for updates",
+      id: 'updates' as const,
+      label: 'Updates',
+      description: 'Check for updates',
       icon: Download,
-      path: "/settings/updates",
+      path: '/settings/updates',
     },
     {
-      id: "editor" as const,
-      label: "Editor",
-      description: "Code editor settings",
+      id: 'editor' as const,
+      label: 'Editor',
+      description: 'Code editor settings',
       icon: Code,
-      path: "/settings/editor",
+      path: '/settings/editor',
     },
     {
-      id: "terminal" as const,
-      label: "Terminal",
-      description: "Terminal configuration",
+      id: 'terminal' as const,
+      label: 'Terminal',
+      description: 'Terminal configuration',
       icon: Terminal,
-      path: "/settings/terminal",
+      path: '/settings/terminal',
     },
     {
-      id: "ides" as const,
-      label: "IDEs",
-      description: "Configure IDEs & framework mappings",
+      id: 'ides' as const,
+      label: 'IDEs',
+      description: 'Configure IDEs & framework mappings',
       icon: Laptop,
-      path: "/settings/ides",
+      path: '/settings/ides',
     },
     {
-      id: "frameworks-languages" as const,
-      label: "Frameworks & Languages",
-      description: "Languages, frameworks & package managers",
+      id: 'frameworks-languages' as const,
+      label: 'Frameworks & Languages',
+      description: 'Languages, frameworks & package managers',
       icon: Languages,
-      path: "/settings/frameworks-languages",
+      path: '/settings/frameworks-languages',
       subSections: [
         {
-          id: "languages" as const,
-          label: "Languages",
-          path: "/settings/languages",
+          id: 'languages' as const,
+          label: 'Languages',
+          path: '/settings/languages',
         },
         {
-          id: "package-managers" as const,
-          label: "Package Managers",
-          path: "/settings/package-managers",
+          id: 'package-managers' as const,
+          label: 'Package Managers',
+          path: '/settings/package-managers',
         },
         {
-          id: "frameworks" as const,
-          label: "Frameworks",
-          path: "/settings/frameworks",
+          id: 'frameworks' as const,
+          label: 'Frameworks',
+          path: '/settings/frameworks',
         },
       ],
     },
     {
-      id: "github" as const,
-      label: "GitHub",
-      description: "OAuth app and account connection",
+      id: 'github' as const,
+      label: 'GitHub',
+      description: 'OAuth app and account connection',
       icon: FolderGit2,
-      path: "/settings/github",
+      path: '/settings/github',
     },
     {
-      id: "theme" as const,
-      label: "Theme",
-      description: "Appearance & colors",
+      id: 'theme' as const,
+      label: 'Theme',
+      description: 'Appearance & colors',
       icon: Palette,
-      path: "/settings/theme",
+      path: '/settings/theme',
     },
     {
-      id: "learning" as const,
-      label: "Learning",
-      description: "ML learning & AI settings",
+      id: 'learning' as const,
+      label: 'Learning',
+      description: 'ML learning & AI settings',
       icon: Brain,
-      path: "/settings/learning",
+      path: '/settings/learning',
     },
     {
-      id: "ai" as const,
-      label: "AI",
-      description: "Providers, models, and training data",
+      id: 'ai' as const,
+      label: 'AI',
+      description: 'Providers, models, and training data',
       icon: Sparkles,
-      path: "/settings/ai",
+      path: '/settings/ai',
       subSections: [
         {
-          id: "providers" as const,
-          label: "Providers",
-          path: "/settings/ai",
+          id: 'providers' as const,
+          label: 'Providers',
+          path: '/settings/ai',
         },
         {
-          id: "training" as const,
-          label: "Training Data",
-          path: "/settings/ai/training",
+          id: 'training' as const,
+          label: 'Training Data',
+          path: '/settings/ai/training',
         },
       ],
     },
     {
-      id: "autonomy" as const,
-      label: "Autonomy",
-      description: "Autonomous action settings",
+      id: 'autonomy' as const,
+      label: 'Autonomy',
+      description: 'Autonomous action settings',
       icon: Bot,
-      path: "/settings/autonomy",
+      path: '/settings/autonomy',
     },
   ];
 
@@ -211,63 +208,59 @@
   const activeSection = $derived.by((): SettingsSectionType => {
     if (currentSection) {
       // Map framework-ides to ides
-      return currentSection === "framework-ides" ? "ides" : currentSection;
+      return currentSection === 'framework-ides' ? 'ides' : currentSection;
     }
     const path = $page.url.pathname;
-    if (path === "/settings" || path === "/settings/") return "general";
-    const section = path.replace("/settings/", "").replace(/\/$/, "");
+    if (path === '/settings' || path === '/settings/') return 'general';
+    const section = path.replace('/settings/', '').replace(/\/$/, '');
     // Redirect framework-ides to ides
-    if (section === "framework-ides") return "ides";
-    if (section.startsWith("ai")) return "ai";
+    if (section === 'framework-ides') return 'ides';
+    if (section.startsWith('ai')) return 'ai';
     // Map old paths to new structure
-    if (
-      section === "frameworks" ||
-      section === "package-managers" ||
-      section === "languages"
-    ) {
-      return "frameworks-languages";
+    if (section === 'frameworks' || section === 'package-managers' || section === 'languages') {
+      return 'frameworks-languages';
     }
-    const normalizedSection = section || "general";
+    const normalizedSection = section || 'general';
     // Type guard to ensure we return a valid section
     if (
       [
-        "general",
-        "editor",
-        "terminal",
-        "theme",
-        "ides",
-        "frameworks-languages",
-        "frameworks",
-        "package-managers",
-        "languages",
-        "learning",
-        "ai",
-        "github",
-        "autonomy",
-        "updates",
+        'general',
+        'editor',
+        'terminal',
+        'theme',
+        'ides',
+        'frameworks-languages',
+        'frameworks',
+        'package-managers',
+        'languages',
+        'learning',
+        'ai',
+        'github',
+        'autonomy',
+        'updates',
       ].includes(normalizedSection)
     ) {
       return normalizedSection as SettingsSectionType;
     }
-    return "general";
+    return 'general';
   });
 
   // Get active sub-section for frameworks-languages
   const activeSubSection = $derived.by(() => {
     if (isAiSection) {
       const path = $page.url.pathname;
-      if (path.startsWith("/settings/ai/training")) return "training";
-      return "providers";
+      if (path.startsWith('/settings/ai/training')) return 'training';
+      return 'providers';
     }
     if (!isFrameworksLanguagesSection) return null;
     const path = $page.url.pathname;
-    if (path.includes("/languages")) return "languages";
-    if (path.includes("/package-managers")) return "package-managers";
-    if (path.includes("/frameworks") && !path.includes("/frameworks-languages"))
-      return "frameworks";
+    if (path.includes('/languages')) return 'languages';
+    if (path.includes('/package-managers')) return 'package-managers';
+    if (path.includes('/frameworks') && !path.includes('/frameworks-languages'))
+      return 'frameworks';
     // If on the main frameworks-languages page, check query param
-    if (path.includes("/frameworks-languages")) {
-      const tab = $page.url.searchParams.get("tab");
+    if (path.includes('/frameworks-languages')) {
+      const tab = $page.url.searchParams.get('tab');
       if (tab) return tab;
     }
     return null;
@@ -283,7 +276,7 @@
 
   function handleCollapsedSectionClick(sectionId: string, path: string) {
     // Preserve the "tab" query param when collapsing from a sub-section.
-    if (sectionId === "frameworks-languages") {
+    if (sectionId === 'frameworks-languages') {
       const tab = activeSubSection;
       if (tab) {
         goto(`${path}?tab=${tab}`);
@@ -291,10 +284,10 @@
       }
     }
 
-    if (sectionId === "ai") {
+    if (sectionId === 'ai') {
       const sub = activeSubSection;
-      if (sub === "training") {
-        goto("/settings/ai/training");
+      if (sub === 'training') {
+        goto('/settings/ai/training');
         return;
       }
     }
@@ -304,7 +297,7 @@
 </script>
 
 <nav class="space-y-2 {className}">
-  {#if sidebar.state === "collapsed"}
+  {#if sidebar.state === 'collapsed'}
     {#each sections as section}
       {@const isActive = activeSection === section.id}
       {@const Icon = section.icon}
@@ -338,9 +331,7 @@
               <div class="text-base font-semibold leading-tight">
                 {section.label}
               </div>
-              <p
-                class="mt-1 break-words text-sm leading-relaxed text-muted-foreground"
-              >
+              <p class="mt-1 break-words text-sm leading-relaxed text-muted-foreground">
                 {section.description}
               </p>
             </div>
@@ -383,9 +374,7 @@
             <div class="text-base font-semibold leading-tight">
               {section.label}
             </div>
-            <p
-              class="mt-1 break-words text-sm leading-relaxed text-muted-foreground"
-            >
+            <p class="mt-1 break-words text-sm leading-relaxed text-muted-foreground">
               {section.description}
             </p>
           </div>

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import Icon from "@iconify/svelte";
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     searchQuery?: string;
@@ -13,20 +13,20 @@
   }
 
   let {
-    searchQuery = $bindable(""),
+    searchQuery = $bindable(''),
     onSearchChange,
-    typeFilter = $bindable(""),
+    typeFilter = $bindable(''),
     onTypeChange,
     onClear,
   }: Props = $props();
 
   const typeOptions = [
-    { value: "", label: "All types" },
-    { value: "text", label: "Text" },
-    { value: "code", label: "Code" },
-    { value: "documentation", label: "Documentation" },
-    { value: "examples", label: "Examples" },
-    { value: "other", label: "Other" },
+    { value: '', label: 'All types' },
+    { value: 'text', label: 'Text' },
+    { value: 'code', label: 'Code' },
+    { value: 'documentation', label: 'Documentation' },
+    { value: 'examples', label: 'Examples' },
+    { value: 'other', label: 'Other' },
   ];
 </script>
 

@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import AIProviderSettings from "$lib/domains/ai/components/providers/AIProviderSettings.svelte";
+  import AIProviderSettings from '$lib/domains/ai/components/providers/AIProviderSettings.svelte';
 </script>
 
 <svelte:head>

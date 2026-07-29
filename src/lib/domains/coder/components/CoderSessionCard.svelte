@@ -1,6 +1,6 @@
 <script lang="ts">
-  import AISessionCard from "$lib/domains/ai/components/shared/AISessionCard.svelte";
-  import type { CoderThread } from "../types.js";
+  import AISessionCard from '$lib/domains/ai/components/shared/AISessionCard.svelte';
+  import type { CoderThread } from '../types.js';
 
   interface Props {
     thread: CoderThread;
@@ -26,35 +26,33 @@
 
   const messageCount = $derived(
     thread.message_count ??
-      thread.messages.filter((m) => m.role === "user" || m.role === "assistant")
-        .length,
+      thread.messages.filter((m) => m.role === 'user' || m.role === 'assistant').length
   );
 
-
   const inlineBadges = $derived(
-    thread.thread_kind === "coordinator"
-      ? [{ label: "Coordinator", variant: "secondary" as const }]
-      : [],
+    thread.thread_kind === 'coordinator'
+      ? [{ label: 'Coordinator', variant: 'secondary' as const }]
+      : []
   );
 
   const trailingBadges = $derived.by(() => {
     const badges: {
       label: string;
-      variant: "outline";
+      variant: 'outline';
       class?: string;
     }[] = [];
     if (subAgentRunning > 0) {
       badges.push({
-        label: `${subAgentRunning} agent${subAgentRunning === 1 ? "" : "s"}`,
-        variant: "outline",
-        class: "border-purple-500/30 text-purple-600 dark:text-purple-400",
+        label: `${subAgentRunning} agent${subAgentRunning === 1 ? '' : 's'}`,
+        variant: 'outline',
+        class: 'border-purple-500/30 text-purple-600 dark:text-purple-400',
       });
     }
     if (isRunning) {
       badges.push({
-        label: "Active",
-        variant: "outline",
-        class: "border-primary/30 text-primary",
+        label: 'Active',
+        variant: 'outline',
+        class: 'border-primary/30 text-primary',
       });
     }
     return badges;
@@ -67,7 +65,7 @@
   {isRunning}
   {queuedCount}
   updatedAt={thread.updated_at}
-  messageCount={messageCount}
+  {messageCount}
   subtitle={hideProject ? null : thread.workspace_root || null}
   {inlineBadges}
   {trailingBadges}

@@ -2,24 +2,19 @@
  * n8n workflow catalog + trigger adapter.
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import type { Project } from "$lib/domains/projects/types";
-import {
-  getProjectFramework,
-  getProjectPackageManager,
-} from "$lib/domains/projects/utils/display";
-import { resolvePackageManagerName } from "../profile";
-import type { AvailableWorkflow, WorkflowResult } from "$lib/domains/automation/types";
-import type { UnifiedAction, UnifiedWorkflow } from "../types";
-import type { AdapterCatalogSlice, RemoteRunResult } from "./githubAdapter";
+import { invoke } from '@tauri-apps/api/core';
+import type { Project } from '$lib/domains/projects/types';
+import { getProjectFramework, getProjectPackageManager } from '$lib/domains/projects/utils/display';
+import { resolvePackageManagerName } from '../profile';
+import type { AvailableWorkflow, WorkflowResult } from '$lib/domains/automation/types';
+import type { UnifiedAction, UnifiedWorkflow } from '../types';
+import type { AdapterCatalogSlice, RemoteRunResult } from './githubAdapter';
 
-export async function listN8nActions(
-  project: Project,
-): Promise<AdapterCatalogSlice> {
+export async function listN8nActions(project: Project): Promise<AdapterCatalogSlice> {
   const warnings: string[] = [];
 
   try {
-    const healthy = await invoke<boolean>("check_n8n_health");
+    const healthy = await invoke<boolean>('check_n8n_health');
     if (!healthy) {
       return { actions: [], workflows: [], warnings };
     }
@@ -29,25 +24,24 @@ export async function listN8nActions(
 
   try {
     const framework = getProjectFramework(project);
-    const packageManager =
-      resolvePackageManagerName(project) || getProjectPackageManager(project);
+    const packageManager = resolvePackageManagerName(project) || getProjectPackageManager(project);
 
     let workflows: AvailableWorkflow[] = [];
     try {
-      workflows = await invoke<AvailableWorkflow[]>("get_suggested_workflows", {
+      workflows = await invoke<AvailableWorkflow[]>('get_suggested_workflows', {
         framework,
         packageManager,
       });
     } catch {
-      workflows = await invoke<AvailableWorkflow[]>("list_available_workflows");
+      workflows = await invoke<AvailableWorkflow[]>('list_available_workflows');
     }
 
     const unifiedWorkflows: UnifiedWorkflow[] = workflows.map((w) => ({
       id: `n8n:${w.id}`,
       name: w.name,
       description: w.description,
-      source: "n8n" as const,
-      runner: "n8n" as const,
+      source: 'n8n' as const,
+      runner: 'n8n' as const,
       steps: [],
       remoteId: w.id,
     }));
@@ -56,34 +50,32 @@ export async function listN8nActions(
       id: w.id,
       name: w.name,
       description: w.description,
-      source: "n8n",
-      runner: "n8n",
-      category: "utility",
-      webhookId: String(w.remoteId ?? w.id.replace(/^n8n:/, "")),
+      source: 'n8n',
+      runner: 'n8n',
+      category: 'utility',
+      webhookId: String(w.remoteId ?? w.id.replace(/^n8n:/, '')),
       framework: workflows.find((x) => `n8n:${x.id}` === w.id)?.framework,
     }));
 
     return { actions, workflows: unifiedWorkflows, warnings };
   } catch (err) {
-    warnings.push(
-      `n8n workflows unavailable: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    warnings.push(`n8n workflows unavailable: ${err instanceof Error ? err.message : String(err)}`);
     return { actions: [], workflows: [], warnings };
   }
 }
 
 export async function runN8nAction(
   workflowIdOrPrefixed: string,
-  project?: Project,
+  project?: Project
 ): Promise<RemoteRunResult> {
   if (!project) {
-    return { success: false, error: "Project required to trigger n8n workflow" };
+    return { success: false, error: 'Project required to trigger n8n workflow' };
   }
 
-  const workflowId = workflowIdOrPrefixed.replace(/^n8n:/, "");
+  const workflowId = workflowIdOrPrefixed.replace(/^n8n:/, '');
 
   try {
-    const result = await invoke<WorkflowResult>("trigger_n8n_workflow", {
+    const result = await invoke<WorkflowResult>('trigger_n8n_workflow', {
       workflowId,
       projectData: {
         id: project.id,
@@ -100,9 +92,7 @@ export async function runN8nAction(
     return {
       success: result.success,
       remoteRunId: result.execution_id,
-      error: result.success
-        ? undefined
-        : result.errors?.join("; ") || "n8n workflow failed",
+      error: result.success ? undefined : result.errors?.join('; ') || 'n8n workflow failed',
     };
   } catch (err) {
     return {

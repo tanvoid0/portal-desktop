@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
-  import { Badge } from "$lib/components/ui/badge";
-  import type { GeneratedSubtask } from "../services/aiTaskService";
-  import Icon from "@iconify/svelte";
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
+  import { Badge } from '$lib/components/ui/badge';
+  import type { GeneratedSubtask } from '../services/aiTaskService';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     subtask: GeneratedSubtask;
@@ -65,12 +65,7 @@
         </Button>
       {/if}
       {#if onRemove}
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={onRemove}
-          class="text-destructive"
-        >
+        <Button variant="ghost" size="sm" onclick={onRemove} class="text-destructive">
           <Icon icon="lucide:trash-2" class="h-4 w-4" />
         </Button>
       {/if}
@@ -79,11 +74,7 @@
 
   <div class="space-y-2">
     <Label>Title</Label>
-    <Input
-      bind:value={subtask.title}
-      placeholder="Subtask title..."
-      oninput={handleFieldChange}
-    />
+    <Input bind:value={subtask.title} placeholder="Subtask title..." oninput={handleFieldChange} />
   </div>
 
   <div class="space-y-2">
@@ -108,12 +99,7 @@
     </div>
     <div class="space-y-2">
       <Label>Order</Label>
-      <Input
-        type="number"
-        bind:value={subtask.order}
-        placeholder="1"
-        oninput={handleFieldChange}
-      />
+      <Input type="number" bind:value={subtask.order} placeholder="1" oninput={handleFieldChange} />
     </div>
   </div>
 </div>

@@ -4,16 +4,16 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import ProjectForm from "$lib/components/projects/ProjectForm.svelte";
-  import { projectService } from "$lib/domains/projects/services/projectService";
-  import { logger } from "$lib/domains/shared/services/logger";
-  import type { CreateProjectRequest } from "$lib/domains/projects/types";
-  import { breadcrumbActions } from "$lib/domains/shared/stores/breadcrumbStore";
-  import { PageHeader } from "$lib/components/shell";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import ProjectForm from '$lib/components/projects/ProjectForm.svelte';
+  import { projectService } from '$lib/domains/projects/services/projectService';
+  import { logger } from '$lib/domains/shared/services/logger';
+  import type { CreateProjectRequest } from '$lib/domains/projects/types';
+  import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
+  import { PageHeader } from '$lib/components/shell';
 
-  const log = logger.createScoped("ProjectCreatePage");
+  const log = logger.createScoped('ProjectCreatePage');
 
   // Set up breadcrumbs on mount
   onMount(() => {
@@ -29,9 +29,9 @@
       await projectService.createProject(data);
 
       // Redirect to projects page after successful creation
-      goto("/projects");
+      goto('/projects');
     } catch (err) {
-      log.error("Failed to create project", err);
+      log.error('Failed to create project', err);
       throw err; // Let the form handle the error display
     } finally {
       isLoading = false;
@@ -39,7 +39,7 @@
   }
 
   function handleCancel() {
-    goto("/projects");
+    goto('/projects');
   }
 </script>
 

@@ -1,25 +1,21 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { ShieldQuestion } from "@lucide/svelte";
-  import type { PendingApproval } from "../types.js";
-  import { getToolCallDisplay } from "../utils/toolCallDisplay.js";
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { ShieldQuestion } from '@lucide/svelte';
+  import type { PendingApproval } from '../types.js';
+  import { getToolCallDisplay } from '../utils/toolCallDisplay.js';
 
   interface Props {
     pending: PendingApproval;
     busy?: boolean;
-    onDecision: (
-      approve: boolean,
-      remember: boolean,
-      editedPattern?: string,
-    ) => void;
+    onDecision: (approve: boolean, remember: boolean, editedPattern?: string) => void;
   }
 
   let { pending, busy = false, onDecision }: Props = $props();
 
   // Editable allowlist pattern for the "accept & remember" action.
   // Initialized/reset from the current approval via the effect below.
-  let rule = $state("");
+  let rule = $state('');
 
   $effect(() => {
     rule = pending.suggested_rule;
@@ -43,17 +39,11 @@
 
   <div class="mb-3 flex items-center gap-2">
     <span class="text-xs text-muted-foreground">remember rule</span>
-    <Input
-      bind:value={rule}
-      class="flex-1 font-mono text-xs"
-      placeholder="pattern to allow"
-    />
+    <Input bind:value={rule} class="flex-1 font-mono text-xs" placeholder="pattern to allow" />
   </div>
 
   <div class="flex flex-wrap gap-2">
-    <Button size="sm" disabled={busy} onclick={() => onDecision(true, false)}>
-      Accept once
-    </Button>
+    <Button size="sm" disabled={busy} onclick={() => onDecision(true, false)}>Accept once</Button>
     <Button
       size="sm"
       variant="secondary"

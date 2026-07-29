@@ -2,27 +2,19 @@
  * Settings Store - State management for application settings
  */
 
-import { writable, derived, get } from "svelte/store";
-import {
-  loadingState,
-  loadingActions,
-} from "$lib/domains/shared/stores/loadingState";
-import { resolvedTheme } from "$lib/domains/shared/stores/themeStore";
-import { settingsService } from "../services/settingsService";
-import { logger } from "$lib/domains/shared";
-import type {
-  AppSettings,
-  EditorSettings,
-  TerminalSettings,
-  ThemeSettings,
-} from "../types";
-import type { Settings, SettingsUpdate } from "../services/settingsService";
-import { applyCustomTheme } from "$lib/utils/customTheme";
+import { writable, derived, get } from 'svelte/store';
+import { loadingState, loadingActions } from '$lib/domains/shared/stores/loadingState';
+import { resolvedTheme } from '$lib/domains/shared/stores/themeStore';
+import { settingsService } from '../services/settingsService';
+import { logger } from '$lib/domains/shared';
+import type { AppSettings, EditorSettings, TerminalSettings, ThemeSettings } from '../types';
+import type { Settings, SettingsUpdate } from '../services/settingsService';
+import { applyCustomTheme } from '$lib/utils/customTheme';
 
 // Core stores
 export const settings = writable<Settings | null>(null);
 
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   settings.subscribe((settingsData) => {
     if (settingsData?.theme) {
       applyCustomTheme(settingsData.theme);
@@ -39,32 +31,14 @@ if (typeof window !== "undefined") {
 export const settingsLoadingState = loadingState;
 
 // Derived stores
-export const isLoadingSettings = derived(
-  settingsLoadingState,
-  ($state) => $state.isLoading,
-);
-export const settingsError = derived(
-  settingsLoadingState,
-  ($state) => $state.error,
-);
+export const isLoadingSettings = derived(settingsLoadingState, ($state) => $state.isLoading);
+export const settingsError = derived(settingsLoadingState, ($state) => $state.error);
 
 // Individual settings stores for easier access
-export const appSettings = derived(
-  settings,
-  ($settings) => $settings?.app || null,
-);
-export const editorSettings = derived(
-  settings,
-  ($settings) => $settings?.editor || null,
-);
-export const terminalSettings = derived(
-  settings,
-  ($settings) => $settings?.terminal || null,
-);
-export const themeSettings = derived(
-  settings,
-  ($settings) => $settings?.theme || null,
-);
+export const appSettings = derived(settings, ($settings) => $settings?.app || null);
+export const editorSettings = derived(settings, ($settings) => $settings?.editor || null);
+export const terminalSettings = derived(settings, ($settings) => $settings?.terminal || null);
+export const themeSettings = derived(settings, ($settings) => $settings?.theme || null);
 
 // Settings actions
 export const settingsActions = {
@@ -74,20 +48,19 @@ export const settingsActions = {
   async loadSettings() {
     loadingActions.setLoading(true);
     try {
-      logger.info("Loading settings", { context: "settingsStore" });
+      logger.info('Loading settings', { context: 'settingsStore' });
 
       const settingsData = await settingsService.getSettings();
       settings.set(settingsData);
 
-      logger.info("Settings loaded successfully", {
-        context: "settingsStore",
+      logger.info('Settings loaded successfully', {
+        context: 'settingsStore',
         settingsId: settingsData.id,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load settings";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load settings';
       logger.error(errorMessage, {
-        context: "settingsStore.loadSettings",
+        context: 'settingsStore.loadSettings',
         error,
       });
       loadingActions.setError(errorMessage);
@@ -102,23 +75,22 @@ export const settingsActions = {
   async saveSettings(settingsData: Settings) {
     loadingActions.setLoading(true);
     try {
-      logger.info("Saving settings", {
-        context: "settingsStore",
+      logger.info('Saving settings', {
+        context: 'settingsStore',
         settingsId: settingsData.id,
       });
 
       await settingsService.saveSettings(settingsData);
       settings.set(settingsData);
 
-      logger.info("Settings saved successfully", {
-        context: "settingsStore",
+      logger.info('Settings saved successfully', {
+        context: 'settingsStore',
         settingsId: settingsData.id,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to save settings";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save settings';
       logger.error(errorMessage, {
-        context: "settingsStore.saveSettings",
+        context: 'settingsStore.saveSettings',
         error,
         settingsId: settingsData.id,
       });
@@ -135,27 +107,23 @@ export const settingsActions = {
   async updateSettings(updates: SettingsUpdate) {
     loadingActions.setLoading(true);
     try {
-      logger.info("Updating settings", {
-        context: "settingsStore",
+      logger.info('Updating settings', {
+        context: 'settingsStore',
         updates,
       });
 
       const currentSettings = await settingsService.getSettings();
-      const updatedSettings = await settingsService.updateSettings(
-        currentSettings,
-        updates,
-      );
+      const updatedSettings = await settingsService.updateSettings(currentSettings, updates);
       settings.set(updatedSettings);
 
-      logger.info("Settings updated successfully", {
-        context: "settingsStore",
+      logger.info('Settings updated successfully', {
+        context: 'settingsStore',
         settingsId: updatedSettings.id,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to update settings";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update settings';
       logger.error(errorMessage, {
-        context: "settingsStore.updateSettings",
+        context: 'settingsStore.updateSettings',
         error,
         updates,
       });
@@ -172,20 +140,19 @@ export const settingsActions = {
   async resetSettings() {
     loadingActions.setLoading(true);
     try {
-      logger.info("Resetting settings", { context: "settingsStore" });
+      logger.info('Resetting settings', { context: 'settingsStore' });
 
       const defaultSettings = await settingsService.resetSettings();
       settings.set(defaultSettings);
 
-      logger.info("Settings reset successfully", {
-        context: "settingsStore",
+      logger.info('Settings reset successfully', {
+        context: 'settingsStore',
         settingsId: defaultSettings.id,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to reset settings";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reset settings';
       logger.error(errorMessage, {
-        context: "settingsStore.resetSettings",
+        context: 'settingsStore.resetSettings',
         error,
       });
       loadingActions.setError(errorMessage);
@@ -200,23 +167,21 @@ export const settingsActions = {
    */
   async exportSettings(): Promise<string> {
     try {
-      logger.info("Exporting settings", { context: "settingsStore" });
+      logger.info('Exporting settings', { context: 'settingsStore' });
 
       const currentSettings = await settingsService.getSettings();
-      const exportedSettings =
-        await settingsService.exportSettings(currentSettings);
+      const exportedSettings = await settingsService.exportSettings(currentSettings);
 
-      logger.info("Settings exported successfully", {
-        context: "settingsStore",
+      logger.info('Settings exported successfully', {
+        context: 'settingsStore',
         settingsId: currentSettings.id,
       });
 
       return exportedSettings;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to export settings";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export settings';
       logger.error(errorMessage, {
-        context: "settingsStore.exportSettings",
+        context: 'settingsStore.exportSettings',
         error,
       });
       throw error;
@@ -229,21 +194,19 @@ export const settingsActions = {
   async importSettings(settingsJson: string) {
     loadingActions.setLoading(true);
     try {
-      logger.info("Importing settings", { context: "settingsStore" });
+      logger.info('Importing settings', { context: 'settingsStore' });
 
-      const importedSettings =
-        await settingsService.importSettings(settingsJson);
+      const importedSettings = await settingsService.importSettings(settingsJson);
       settings.set(importedSettings);
 
-      logger.info("Settings imported successfully", {
-        context: "settingsStore",
+      logger.info('Settings imported successfully', {
+        context: 'settingsStore',
         settingsId: importedSettings.id,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to import settings";
+      const errorMessage = error instanceof Error ? error.message : 'Failed to import settings';
       logger.error(errorMessage, {
-        context: "settingsStore.importSettings",
+        context: 'settingsStore.importSettings',
         error,
       });
       loadingActions.setError(errorMessage);

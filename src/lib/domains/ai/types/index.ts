@@ -1,4 +1,4 @@
-export type ProviderType = "AgentPlatform";
+export type ProviderType = 'AgentPlatform';
 
 export interface ProviderConfig {
   provider_type: ProviderType;
@@ -35,7 +35,7 @@ export interface MessageStats {
 }
 
 export interface ChatMessage {
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   timestamp?: Date | string;
   stats?: MessageStats | null;
@@ -54,7 +54,7 @@ export interface Conversation {
 export interface ConversationMessage {
   id: string;
   conversation_id: string;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   timestamp: string;
   sequence: number;
@@ -73,7 +73,7 @@ export interface TrainingData {
 export interface AILog {
   id: string;
   provider: ProviderType;
-  log_type: "request" | "response" | "error";
+  log_type: 'request' | 'response' | 'error';
   request_data?: string;
   response_data?: string;
   error_message?: string;
@@ -83,7 +83,7 @@ export interface AILog {
 
 export interface LogFilters {
   provider?: ProviderType;
-  log_type?: "request" | "response" | "error";
+  log_type?: 'request' | 'response' | 'error';
   date_from?: string;
   date_to?: string;
   search_query?: string;
@@ -121,7 +121,7 @@ export interface CatalogModel {
   id: string;
   /** Parent provider id when present; v1 catalog omits this on model rows. */
   provider?: string | null;
-  source: "alias" | "live" | string;
+  source: 'alias' | 'live' | string;
   backend_id?: string | null;
   metadata?: Record<string, unknown>;
   capabilities?: CatalogModelCapabilities;

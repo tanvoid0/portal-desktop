@@ -1,8 +1,8 @@
 <script lang="ts">
-  import TypingIndicator from "$lib/components/ui/typing-indicator.svelte";
-  import ChatMarkdown from "$lib/components/ui/chat-markdown/ChatMarkdown.svelte";
-  import type { ChatMessage } from "../types.js";
-  import { formatWorkedDuration } from "../utils/feedBlocks.js";
+  import TypingIndicator from '$lib/components/ui/typing-indicator.svelte';
+  import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
+  import type { ChatMessage } from '../types.js';
+  import { formatWorkedDuration } from '../utils/feedBlocks.js';
 
   interface Props {
     message: ChatMessage;
@@ -24,7 +24,7 @@
   const workedLabel = $derived(formatWorkedDuration(responseLatencyMs));
   const showTyping = $derived(showLoader && !message.content);
   const typingLabel = $derived(
-    waitingSeconds >= 5 ? `Waiting on model… ${Math.round(waitingSeconds)}s` : "Thinking…",
+    waitingSeconds >= 5 ? `Waiting on model… ${Math.round(waitingSeconds)}s` : 'Thinking…'
   );
 </script>
 
@@ -36,11 +36,6 @@
   {#if showTyping}
     <TypingIndicator size="sm" label={typingLabel} />
   {:else if message.content}
-    <ChatMarkdown
-      content={message.content}
-      variant="assistant"
-      {isStreaming}
-      density="compact"
-    />
+    <ChatMarkdown content={message.content} variant="assistant" {isStreaming} density="compact" />
   {/if}
 </div>

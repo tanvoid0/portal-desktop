@@ -3,52 +3,49 @@
 -->
 
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import type { Snippet } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import ThemeToggle from "$lib/components/ui/theme-toggle.svelte";
-  import Breadcrumb from "$lib/components/ui/breadcrumb.svelte";
-  import { createDashboardOverviewQuery } from "$lib/domains/dashboard/queries/dashboardQueries";
-  import { logger, themeStore, resolvedTheme } from "$lib/domains/shared";
+  import { onMount, onDestroy } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import type { Snippet } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import ThemeToggle from '$lib/components/ui/theme-toggle.svelte';
+  import Breadcrumb from '$lib/components/ui/breadcrumb.svelte';
+  import { createDashboardOverviewQuery } from '$lib/domains/dashboard/queries/dashboardQueries';
+  import { logger, themeStore, resolvedTheme } from '$lib/domains/shared';
   import {
     breadcrumbItems,
     breadcrumbSettings,
     homeItem,
     showHome,
-  } from "$lib/domains/shared/stores/breadcrumbStore";
-  import { terminalActions } from "$lib/domains/terminal";
-  import { learningService } from "$lib/domains/learning";
-  import { settingsActions } from "$lib/domains/settings/stores/settingsStore";
-  import ToastContainer from "$lib/components/ui/toast-container.svelte";
-  import ConfirmDialog from "$lib/components/ui/confirm-dialog.svelte";
-  import QRCodeDialog from "$lib/components/QRCodeDialog.svelte";
-  import DeviceApprovalDialog from "$lib/components/DeviceApprovalDialog.svelte";
-  import DeviceAuthGuard from "$lib/components/DeviceAuthGuard.svelte";
-  import { isTauriEnvironment } from "$lib/utils/tauri";
-  import { InvokeClient } from "$lib/utils/invokeClient";
-  import {
-    ArrowLeft,
-    ArrowRight,
-    RefreshCw,
-    Home,
-    QrCode,
-    Shield,
-  } from "@lucide/svelte";
+  } from '$lib/domains/shared/stores/breadcrumbStore';
+  import { terminalActions } from '$lib/domains/terminal';
+  import { learningService } from '$lib/domains/learning';
+  import { settingsActions } from '$lib/domains/settings/stores/settingsStore';
+  import ToastContainer from '$lib/components/ui/toast-container.svelte';
+  import ConfirmDialog from '$lib/components/ui/confirm-dialog.svelte';
+  import QRCodeDialog from '$lib/components/QRCodeDialog.svelte';
+  import DeviceApprovalDialog from '$lib/components/DeviceApprovalDialog.svelte';
+  import DeviceAuthGuard from '$lib/components/DeviceAuthGuard.svelte';
+  import { isTauriEnvironment } from '$lib/utils/tauri';
+  import { InvokeClient } from '$lib/utils/invokeClient';
+  import { ArrowLeft, ArrowRight, RefreshCw, Home, QrCode, Shield } from '@lucide/svelte';
   import {
     Provider as SidebarProvider,
     Trigger as SidebarTrigger,
     Sidebar as SidebarRoot,
-  } from "$lib/components/ui/sidebar";
-  import { SIDEBAR_COOKIE_NAME } from "$lib/components/ui/sidebar/constants";
-  import type { NavSection } from "$lib/components/shell/nav-types";
-  import NavSectionList from "$lib/components/shell/nav-section-list.svelte";
-  import PageContainer from "$lib/components/shell/page-container.svelte";
-  import { buildMainNavSections } from "$lib/config/main-nav";
-  import { isViewportFillRoute, isShellSidebarRoute, isMainSidebarHidden as shouldHideMainSidebar } from "$lib/config/layout-breakpoints";
+  } from '$lib/components/ui/sidebar';
+  import { SIDEBAR_COOKIE_NAME } from '$lib/components/ui/sidebar/constants';
+  import type { NavSection } from '$lib/components/shell/nav-types';
+  import NavSectionList from '$lib/components/shell/nav-section-list.svelte';
+  import PageContainer from '$lib/components/shell/page-container.svelte';
+  import { buildMainNavSections } from '$lib/config/main-nav';
+  import {
+    isViewportFillRoute,
+    isShellSidebarRoute,
+    isMainSidebarHidden as shouldHideMainSidebar,
+  } from '$lib/config/layout-breakpoints';
 
-  const log = logger.createScoped("AppLayout");
+  const log = logger.createScoped('AppLayout');
 
   // Get children snippet from props for Svelte 5
   let { children }: { children: Snippet<[]> } = $props();
@@ -63,7 +60,7 @@
     isLocalhost = InvokeClient.isLocalhost();
   });
 
-  let isSdkPage = $derived($page.url.pathname.startsWith("/sdk"));
+  let isSdkPage = $derived($page.url.pathname.startsWith('/sdk'));
 
   const dashboardQuery = createDashboardOverviewQuery(() => ({
     enabled: !isSdkPage,
@@ -79,9 +76,7 @@
   let deviceApprovalDialogOpen = $state(false);
 
   // Main application navigation sections — derived from dashboard query cache.
-  const navigationSections = $derived<NavSection[]>(
-    buildMainNavSections(dashboardOverview),
-  );
+  const navigationSections = $derived<NavSection[]>(buildMainNavSections(dashboardOverview));
 
   let unsubscribe: (() => void) | undefined;
   let popStateHandler: (() => void) | undefined;
@@ -92,14 +87,14 @@
   let hasNavigatedBack = $state(false);
 
   function updateNavigationState() {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       // Check if we can go back (history has more than 1 entry)
       canGoBack = window.history.length > 1;
     }
   }
 
   function goBack() {
-    if (typeof window !== "undefined" && canGoBack) {
+    if (typeof window !== 'undefined' && canGoBack) {
       hasNavigatedBack = true;
       canGoForward = true;
       window.history.back();
@@ -107,7 +102,7 @@
   }
 
   function goForward() {
-    if (typeof window !== "undefined" && canGoForward) {
+    if (typeof window !== 'undefined' && canGoForward) {
       window.history.forward();
     }
   }
@@ -115,11 +110,11 @@
   function goHome() {
     hasNavigatedBack = false;
     canGoForward = false;
-    goto("/");
+    goto('/');
   }
 
   function refresh() {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       window.location.reload();
     }
   }
@@ -129,27 +124,25 @@
   }
 
   function readSidebarCookieOpen(): boolean | null {
-    if (typeof document === "undefined") return null;
-    const match = document.cookie.match(
-      new RegExp(`(?:^|; )${SIDEBAR_COOKIE_NAME}=([^;]*)`),
-    );
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(new RegExp(`(?:^|; )${SIDEBAR_COOKIE_NAME}=([^;]*)`));
     if (!match) return null;
     const raw = match[1];
-    if (raw === "true") return true;
-    if (raw === "false") return false;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
     return null;
   }
 
   onMount(async () => {
     try {
-      log.info("Initializing application");
+      log.info('Initializing application');
 
       // Initialize sidebar open/closed state from cookie.
       const cookieOpen = readSidebarCookieOpen();
       // Always show sidebar on the app root (`/`) regardless of persisted state.
       // This prevents the sidebar from appearing "missing" when users previously
       // closed it and then return to `/` (especially on mobile/offcanvas mode).
-      if ($page.url.pathname !== "/" && cookieOpen !== null) {
+      if ($page.url.pathname !== '/' && cookieOpen !== null) {
         sidebarOpen = cookieOpen;
       }
       // Initialize backend log listener to receive logs from Rust backend
@@ -159,7 +152,7 @@
       updateNavigationState();
 
       // Listen to popstate events to track forward/back navigation
-      if (typeof window !== "undefined") {
+      if (typeof window !== 'undefined') {
         popStateHandler = () => {
           updateNavigationState();
           // If we navigated to a new page (not via back/forward), disable forward
@@ -167,7 +160,7 @@
             canGoForward = false;
           }
         };
-        window.addEventListener("popstate", popStateHandler);
+        window.addEventListener('popstate', popStateHandler);
       }
 
       // Initialize theme first (now synchronous)
@@ -186,9 +179,9 @@
         terminalActions.updateSettings({ theme });
       });
 
-      log.info("Application initialized successfully");
+      log.info('Application initialized successfully');
     } catch (error) {
-      log.error("Failed to initialize application", error);
+      log.error('Failed to initialize application', error);
     }
   });
 
@@ -215,8 +208,8 @@
     if (unsubscribe) {
       unsubscribe();
     }
-    if (typeof window !== "undefined" && popStateHandler) {
-      window.removeEventListener("popstate", popStateHandler);
+    if (typeof window !== 'undefined' && popStateHandler) {
+      window.removeEventListener('popstate', popStateHandler);
     }
   });
 </script>
@@ -271,7 +264,7 @@
               variant="ghost"
               size="icon"
               class="h-8 w-8"
-              disabled={$page.url.pathname === "/"}
+              disabled={$page.url.pathname === '/'}
               onclick={goHome}
               title="Go to home"
               aria-label="Go to home"
@@ -299,18 +292,13 @@
                 type="button"
                 variant="ghost"
                 class="divider-edge-b divider-edge-full divider-edge-sidebar h-auto w-full justify-start gap-3 px-4 py-4 text-left transition-colors hover:bg-sidebar-accent/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
-                onclick={() => goto("/")}
+                onclick={() => goto('/')}
               >
                 <div
                   class="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary"
                 >
                   {#if isSdkPage}
-                    <svg
-                      class="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -319,12 +307,7 @@
                       />
                     </svg>
                   {:else}
-                    <svg
-                      class="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -334,18 +317,12 @@
                     </svg>
                   {/if}
                 </div>
-                <div
-                  class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"
-                >
-                  <h1
-                    class="truncate text-sm font-semibold text-sidebar-foreground"
-                  >
-                    {isSdkPage ? "SDK Manager" : "Portal Desktop"}
+                <div class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                  <h1 class="truncate text-sm font-semibold text-sidebar-foreground">
+                    {isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
                   </h1>
                   <p class="text-xs text-sidebar-foreground/60">
-                    {isSdkPage
-                      ? "Development Tools"
-                      : "Development Environment"}
+                    {isSdkPage ? 'Development Tools' : 'Development Environment'}
                   </p>
                 </div>
               </Button>
@@ -354,10 +331,7 @@
                    query only supplies badge counts, so there is nothing to
                    wait for. -->
               <div class="min-h-0 flex-1 overflow-y-auto">
-                <NavSectionList
-                  sections={navigationSections}
-                  currentPath={$page.url.pathname}
-                />
+                <NavSectionList sections={navigationSections} currentPath={$page.url.pathname} />
               </div>
 
               <!-- Sidebar Footer -->
@@ -386,15 +360,10 @@
                     <Button
                       variant="ghost"
                       size="sm"
-                      onclick={() => goto("/settings")}
+                      onclick={() => goto('/settings')}
                       title="Settings"
                     >
-                      <svg
-                        class="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
+                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           stroke-linecap="round"
                           stroke-linejoin="round"

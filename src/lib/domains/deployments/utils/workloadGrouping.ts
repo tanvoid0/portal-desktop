@@ -1,13 +1,9 @@
-import type { Deployment, DockerContainer } from "../types";
-import {
-  containerStatusGroup,
-  isContainerRunning,
-  shortImageName,
-} from "./format";
+import type { Deployment, DockerContainer } from '../types';
+import { containerStatusGroup, isContainerRunning, shortImageName } from './format';
 
-export type WorkloadGroupKind = "portal" | "compose" | "image" | "standalone";
-export type GroupByMode = "stack" | "image" | "network" | "flat";
-export type WorkloadSection = "portal" | "compose" | "standalone" | "image";
+export type WorkloadGroupKind = 'portal' | 'compose' | 'image' | 'standalone';
+export type GroupByMode = 'stack' | 'image' | 'network' | 'flat';
+export type WorkloadSection = 'portal' | 'compose' | 'standalone' | 'image';
 
 export interface WorkloadGroup {
   id: string;
@@ -30,7 +26,7 @@ export interface WorkloadGroupRollup {
 }
 
 function normalizeContainerName(name: string): string {
-  return name.replace(/^\//, "");
+  return name.replace(/^\//, '');
 }
 
 function containerMatchesId(container: DockerContainer, id?: string): boolean {
@@ -67,20 +63,12 @@ export function resolveComposeService(container: DockerContainer): string | unde
 }
 
 export function computeGroupRollup(containers: DockerContainer[]): WorkloadGroupRollup {
-  const runningContainers = containers.filter((c) =>
-    isContainerRunning(c.status),
-  );
+  const runningContainers = containers.filter((c) => isContainerRunning(c.status));
   return {
     total: containers.length,
     running: runningContainers.length,
-    totalCpu: runningContainers.reduce(
-      (sum, c) => sum + (c.resourceStats?.cpuPercent ?? 0),
-      0,
-    ),
-    totalMemory: runningContainers.reduce(
-      (sum, c) => sum + (c.resourceStats?.memoryBytes ?? 0),
-      0,
-    ),
+    totalCpu: runningContainers.reduce((sum, c) => sum + (c.resourceStats?.cpuPercent ?? 0), 0),
+    totalMemory: runningContainers.reduce((sum, c) => sum + (c.resourceStats?.memoryBytes ?? 0), 0),
   };
 }
 
@@ -112,7 +100,7 @@ function buildGroup(
   kind: WorkloadGroupKind,
   section: WorkloadSection,
   containers: DockerContainer[],
-  extras: Partial<WorkloadGroup> = {},
+  extras: Partial<WorkloadGroup> = {}
 ): WorkloadGroup {
   const sorted = sortContainers(containers);
   return {
@@ -129,17 +117,15 @@ function buildGroup(
 
 function filterByStatus(
   containers: DockerContainer[],
-  statusFilter?: "running" | "stopped" | "other",
+  statusFilter?: 'running' | 'stopped' | 'other'
 ): DockerContainer[] {
   if (!statusFilter) return containers;
-  return containers.filter(
-    (c) => containerStatusGroup(c.status) === statusFilter,
-  );
+  return containers.filter((c) => containerStatusGroup(c.status) === statusFilter);
 }
 
 function filterGroupsByStatus(
   groups: WorkloadGroup[],
-  statusFilter?: "running" | "stopped" | "other",
+  statusFilter?: 'running' | 'stopped' | 'other'
 ): WorkloadGroup[] {
   if (!statusFilter) return groups;
 
@@ -151,15 +137,12 @@ function filterGroupsByStatus(
     .filter((group) => {
       if (group.containers.length > 0) return true;
       // Portal deployments without a linked container appear under Stopped
-      if (group.deployment && statusFilter === "stopped") return true;
+      if (group.deployment && statusFilter === 'stopped') return true;
       return false;
     });
 }
 
-function filterBySearch(
-  groups: WorkloadGroup[],
-  query: string,
-): WorkloadGroup[] {
+function filterBySearch(groups: WorkloadGroup[], query: string): WorkloadGroup[] {
   if (!query.trim()) return groups;
   const normalized = query.toLowerCase();
 
@@ -176,7 +159,7 @@ function filterBySearch(
           c.name.toLowerCase().includes(normalized) ||
           c.image.toLowerCase().includes(normalized) ||
           c.id.toLowerCase().includes(normalized) ||
-          resolveComposeService(c)?.toLowerCase().includes(normalized),
+          resolveComposeService(c)?.toLowerCase().includes(normalized)
       );
 
       if (groupMatch) return group;
@@ -187,38 +170,28 @@ function filterBySearch(
     .filter((group): group is WorkloadGroup => group !== null);
 }
 
-function groupByStack(
-  containers: DockerContainer[],
-  deployments: Deployment[],
-): WorkloadGroup[] {
+function groupByStack(containers: DockerContainer[], deployments: Deployment[]): WorkloadGroup[] {
   const groups: WorkloadGroup[] = [];
   const assigned = new Set<string>();
 
-  const dockerDeployments = deployments.filter((d) => d.type === "docker");
+  const dockerDeployments = deployments.filter((d) => d.type === 'docker');
 
   for (const deployment of dockerDeployments) {
     const linked = containers.filter(
       (c) =>
         containerMatchesId(c, deployment.containerId) ||
-        containerMatchesId(c, deployment.container?.id),
+        containerMatchesId(c, deployment.container?.id)
     );
     for (const container of linked) {
       assigned.add(container.id);
     }
 
     groups.push(
-      buildGroup(
-        `portal-${deployment.id}`,
-        deployment.name,
-        "portal",
-        "portal",
-        linked,
-        {
-          deployment,
-          subtitle: deployment.dockerImageName ?? deployment.projectType,
-          projectPath: deployment.projectPath,
-        },
-      ),
+      buildGroup(`portal-${deployment.id}`, deployment.name, 'portal', 'portal', linked, {
+        deployment,
+        subtitle: deployment.dockerImageName ?? deployment.projectType,
+        projectPath: deployment.projectPath,
+      })
     );
   }
 
@@ -237,9 +210,9 @@ function groupByStack(
 
   for (const [project, projectContainers] of composeMap) {
     groups.push(
-      buildGroup(`compose-${project}`, project, "compose", "compose", projectContainers, {
+      buildGroup(`compose-${project}`, project, 'compose', 'compose', projectContainers, {
         subtitle: `${projectContainers.length} services`,
-      }),
+      })
     );
   }
 
@@ -249,11 +222,11 @@ function groupByStack(
       buildGroup(
         `standalone-${container.id}`,
         resolveComposeService(container) ?? normalizeContainerName(container.name),
-        "standalone",
-        "standalone",
+        'standalone',
+        'standalone',
         [container],
-        { subtitle: shortImageName(container.image) },
-      ),
+        { subtitle: shortImageName(container.image) }
+      )
     );
   }
 
@@ -273,9 +246,9 @@ function groupByImage(containers: DockerContainer[]): WorkloadGroup[] {
   return [...imageMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([image, imageContainers]) =>
-      buildGroup(`image-${image}`, image, "image", "image", imageContainers, {
-        subtitle: `${imageContainers.length} container${imageContainers.length === 1 ? "" : "s"}`,
-      }),
+      buildGroup(`image-${image}`, image, 'image', 'image', imageContainers, {
+        subtitle: `${imageContainers.length} container${imageContainers.length === 1 ? '' : 's'}`,
+      })
     );
 }
 
@@ -284,9 +257,7 @@ function groupByNetwork(containers: DockerContainer[]): WorkloadGroup[] {
 
   for (const container of containers) {
     const networks =
-      container.networks && container.networks.length > 0
-        ? container.networks
-        : ["(no network)"];
+      container.networks && container.networks.length > 0 ? container.networks : ['(no network)'];
 
     for (const network of networks) {
       const list = networkMap.get(network) ?? [];
@@ -298,16 +269,9 @@ function groupByNetwork(containers: DockerContainer[]): WorkloadGroup[] {
   return [...networkMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([network, networkContainers]) =>
-      buildGroup(
-        `network-${network}`,
-        network,
-        "compose",
-        "compose",
-        networkContainers,
-        {
-          subtitle: `${networkContainers.length} attached`,
-        },
-      ),
+      buildGroup(`network-${network}`, network, 'compose', 'compose', networkContainers, {
+        subtitle: `${networkContainers.length} attached`,
+      })
     );
 }
 
@@ -316,39 +280,39 @@ export function groupWorkloads(
   deployments: Deployment[],
   mode: GroupByMode,
   options: {
-    statusFilter?: "running" | "stopped" | "other";
+    statusFilter?: 'running' | 'stopped' | 'other';
     searchQuery?: string;
-  } = {},
+  } = {}
 ): WorkloadGroup[] {
   let groups: WorkloadGroup[];
 
   switch (mode) {
-    case "image":
+    case 'image':
       groups = groupByImage(containers);
       break;
-    case "network":
+    case 'network':
       groups = groupByNetwork(containers);
       break;
-    case "flat":
+    case 'flat':
       groups = containers.map((container) =>
         buildGroup(
           `flat-${container.id}`,
           normalizeContainerName(container.name),
-          "standalone",
-          "standalone",
+          'standalone',
+          'standalone',
           [container],
-          { subtitle: shortImageName(container.image) },
-        ),
+          { subtitle: shortImageName(container.image) }
+        )
       );
       break;
-    case "stack":
+    case 'stack':
     default:
       groups = groupByStack(containers, deployments);
       break;
   }
 
   groups = filterGroupsByStatus(groups, options.statusFilter);
-  groups = filterBySearch(groups, options.searchQuery ?? "");
+  groups = filterBySearch(groups, options.searchQuery ?? '');
 
   const sectionOrder: Record<WorkloadSection, number> = {
     portal: 0,
@@ -366,26 +330,26 @@ export function groupWorkloads(
 
 export function sectionLabel(section: WorkloadSection): string {
   switch (section) {
-    case "portal":
-      return "Portal Workloads";
-    case "compose":
-      return "Compose Stacks";
-    case "standalone":
-      return "Standalone Containers";
-    case "image":
-      return "By Image";
+    case 'portal':
+      return 'Portal Workloads';
+    case 'compose':
+      return 'Compose Stacks';
+    case 'standalone':
+      return 'Standalone Containers';
+    case 'image':
+      return 'By Image';
   }
 }
 
 export function kindBadgeLabel(kind: WorkloadGroupKind): string {
   switch (kind) {
-    case "portal":
-      return "Portal";
-    case "compose":
-      return "Compose";
-    case "image":
-      return "Image";
-    case "standalone":
-      return "Standalone";
+    case 'portal':
+      return 'Portal';
+    case 'compose':
+      return 'Compose';
+    case 'image':
+      return 'Image';
+    case 'standalone':
+      return 'Standalone';
   }
 }

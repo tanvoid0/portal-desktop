@@ -3,24 +3,24 @@
 	Shown to unauthorized devices accessing via browser
 -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import DeviceAuthService from "$lib/services/deviceAuthService";
-  import { Shield, Loader2, AlertCircle, CheckCircle } from "@lucide/svelte";
+  } from '$lib/components/ui/card';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import DeviceAuthService from '$lib/services/deviceAuthService';
+  import { Shield, Loader2, AlertCircle, CheckCircle } from '@lucide/svelte';
 
   let { onAuthSuccess = () => {} }: { onAuthSuccess?: () => void } = $props();
 
-  let passcode = $state("");
+  let passcode = $state('');
   let loading = $state(false);
   let error = $state<string | null>(null);
   let success = $state(false);
@@ -30,16 +30,14 @@
   onMount(async () => {
     // If a passcode was passed via the QR-code URL, auto-fill and verify it
     // so the user does not have to type anything.
-    const urlPasscode = new URLSearchParams(window.location.search).get(
-      "passcode",
-    );
+    const urlPasscode = new URLSearchParams(window.location.search).get('passcode');
     if (urlPasscode && /^\d{6}$/.test(urlPasscode)) {
       passcode = urlPasscode;
       // Strip the passcode from the address bar so it isn't left visible or
       // saved in history after use.
       const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete("passcode");
-      window.history.replaceState({}, "", cleanUrl.toString());
+      cleanUrl.searchParams.delete('passcode');
+      window.history.replaceState({}, '', cleanUrl.toString());
       await verifyPasscode();
       return;
     }
@@ -50,7 +48,7 @@
 
   async function verifyPasscode() {
     if (!passcode.trim() || passcode.length !== 6) {
-      error = "Please enter a 6-digit passcode";
+      error = 'Please enter a 6-digit passcode';
       return;
     }
 
@@ -59,14 +57,14 @@
     success = false;
 
     try {
-      await DeviceAuthService.verifyPasscode(passcode.trim(), "temporary");
+      await DeviceAuthService.verifyPasscode(passcode.trim(), 'temporary');
 
       // Poll for approval
       await pollForApproval();
     } catch (err) {
-      console.error("Failed to verify passcode:", err);
-      error = err instanceof Error ? err.message : "Failed to verify passcode";
-      passcode = "";
+      console.error('Failed to verify passcode:', err);
+      error = err instanceof Error ? err.message : 'Failed to verify passcode';
+      passcode = '';
     } finally {
       loading = false;
     }
@@ -76,10 +74,10 @@
     const deviceInfo = DeviceAuthService.getDeviceInfo();
 
     // Poll every 2 seconds for up to 2 minutes
-    const { invokeClient } = await import("$lib/utils/invokeClient");
+    const { invokeClient } = await import('$lib/utils/invokeClient');
 
     // Show polling status
-    pollingStatus = "Waiting for host approval...";
+    pollingStatus = 'Waiting for host approval...';
 
     for (let i = 0; i < maxAttempts; i++) {
       // Update status message
@@ -97,13 +95,13 @@
           expires_at: string | null;
           message: string;
         }>(
-          "get_device_status",
+          'get_device_status',
           {
             device_id: deviceInfo.device_id,
           },
           {
             requireAuth: false,
-          },
+          }
         );
 
         if (status?.approved && status.access_token) {
@@ -125,20 +123,19 @@
         // If status message indicates rejection or error, show it
         if (
           status?.message &&
-          (status.message.includes("rejected") ||
-            status.message.includes("denied"))
+          (status.message.includes('rejected') || status.message.includes('denied'))
         ) {
           pollingStatus = null;
-          error = status.message || "Device request was rejected by the host.";
+          error = status.message || 'Device request was rejected by the host.';
           loading = false;
           return;
         }
       } catch (err) {
-        console.error("Status check error:", err);
+        console.error('Status check error:', err);
         // If it's an authentication error, show it
-        if (err instanceof Error && err.message.includes("Authentication")) {
+        if (err instanceof Error && err.message.includes('Authentication')) {
           pollingStatus = null;
-          error = "Authentication failed. Please request a new passcode.";
+          error = 'Authentication failed. Please request a new passcode.';
           loading = false;
           return;
         }
@@ -147,12 +144,12 @@
 
     pollingStatus = null;
     error =
-      "Approval timeout. The host device may not have approved your request. Please request a new passcode.";
+      'Approval timeout. The host device may not have approved your request. Please request a new passcode.';
     loading = false;
   }
 
   function handleKeyPress(event: KeyboardEvent) {
-    if (event.key === "Enter") {
+    if (event.key === 'Enter') {
       verifyPasscode();
     }
   }
@@ -168,8 +165,8 @@
       </div>
       <CardTitle>Device Authentication Required</CardTitle>
       <CardDescription>
-        This application requires device approval for browser access. Please
-        enter the 6-digit passcode provided by the host device.
+        This application requires device approval for browser access. Please enter the 6-digit
+        passcode provided by the host device.
       </CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
@@ -195,9 +192,7 @@
           {/if}
 
           <div>
-            <Label for="passcode" class="mb-2 block">
-              Enter Passcode
-            </Label>
+            <Label for="passcode" class="mb-2 block">Enter Passcode</Label>
             <Input
               id="passcode"
               type="text"
@@ -224,11 +219,7 @@
             >
               Reload
             </Button>
-            <Button
-              onclick={verifyPasscode}
-              disabled={loading || !passcode.trim()}
-              class="flex-1"
-            >
+            <Button onclick={verifyPasscode} disabled={loading || !passcode.trim()} class="flex-1">
               {#if loading}
                 <Loader2 class="mr-2 h-4 w-4 animate-spin" />
                 Verifying...
@@ -238,7 +229,9 @@
             </Button>
           </div>
 
-          <div class="divider-edge-t divider-edge-full space-y-1 pt-2 text-xs text-muted-foreground">
+          <div
+            class="divider-edge-t divider-edge-full space-y-1 pt-2 text-xs text-muted-foreground"
+          >
             <p><strong>Device:</strong> {deviceInfo.device_name}</p>
             <p>
               <strong>Device ID:</strong>

@@ -1,7 +1,7 @@
 // Mirrors the Rust structs returned across the Tauri bridge by the `disk`
 // domain (src-tauri/src/domains/disk). Ported from portal_disk_utility.
 
-export type Risk = "Safe" | "Review" | "Danger";
+export type Risk = 'Safe' | 'Review' | 'Danger';
 
 export interface Proposal {
   id: string;
@@ -22,7 +22,7 @@ export interface ScanSummary {
 }
 
 export interface ScanProgress {
-  phase: "counting" | "scanning";
+  phase: 'counting' | 'scanning';
   scannedFiles: number;
   totalFiles: number;
   totalBytes: number;
@@ -102,7 +102,7 @@ export interface DevCleanerCleanResult {
 
 export interface CachedScan {
   ts: number;
-  status: "complete" | "partial";
+  status: 'complete' | 'partial';
   scannedFiles: number;
   totalFiles: number;
   summary: ScanSummary;
@@ -123,7 +123,7 @@ export interface QuarantineResult {
 export interface Location {
   path: string;
   label: string;
-  kind: "drive" | "folder";
+  kind: 'drive' | 'folder';
 }
 
 export interface DiskUsage {
@@ -154,7 +154,7 @@ export interface AgentNote {
 
 export interface ItemVerdict {
   path: string;
-  verdict: "safe" | "review" | "dangerous";
+  verdict: 'safe' | 'review' | 'dangerous';
   reason: string;
 }
 

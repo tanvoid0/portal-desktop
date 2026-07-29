@@ -15,8 +15,8 @@
 **Issue**: The `buildCommand` function directly inserts user input into command templates without sanitization:
 
 ```typescript
-command = command.replace(new RegExp(`\\$\\{${param.name}\\}`, "g"), value);
-command = command.replace(new RegExp(`\\$${param.name}\\b`, "g"), value);
+command = command.replace(new RegExp(`\\$\\{${param.name}\\}`, 'g'), value);
+command = command.replace(new RegExp(`\\$${param.name}\\b`, 'g'), value);
 ```
 
 **Risk**: An attacker could inject shell commands through parameter values:
@@ -31,17 +31,14 @@ command = command.replace(new RegExp(`\\$${param.name}\\b`, "g"), value);
 function sanitizeCommandValue(value: string): string {
   // Remove shell metacharacters
   return value
-    .replace(/[;&|`$(){}[\]<>]/g, "")
-    .replace(/\n/g, "")
-    .replace(/\r/g, "");
+    .replace(/[;&|`$(){}[\]<>]/g, '')
+    .replace(/\n/g, '')
+    .replace(/\r/g, '');
 }
 
 // Use in buildCommand:
 const sanitizedValue = sanitizeCommandValue(value);
-command = command.replace(
-  new RegExp(`\\$\\{${param.name}\\}`, "g"),
-  sanitizedValue,
-);
+command = command.replace(new RegExp(`\\$\\{${param.name}\\}`, 'g'), sanitizedValue);
 ```
 
 **Priority**: Fix immediately before production release

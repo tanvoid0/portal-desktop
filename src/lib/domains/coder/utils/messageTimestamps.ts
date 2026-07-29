@@ -1,9 +1,9 @@
-import type { ChatMessage } from "../types.js";
+import type { ChatMessage } from '../types.js';
 
 function sameContent(a: ChatMessage, b: ChatMessage): boolean {
   return (
-    (a.content ?? "") === (b.content ?? "") &&
-    (a.tool_call_id ?? "") === (b.tool_call_id ?? "") &&
+    (a.content ?? '') === (b.content ?? '') &&
+    (a.tool_call_id ?? '') === (b.tool_call_id ?? '') &&
     JSON.stringify(a.tool_calls ?? null) === JSON.stringify(b.tool_calls ?? null)
   );
 }
@@ -12,7 +12,7 @@ function sameContent(a: ChatMessage, b: ChatMessage): boolean {
 export function withMessageTimestamps(
   messages: ChatMessage[],
   previous: ChatMessage[] = [],
-  anchorIso?: string,
+  anchorIso?: string
 ): ChatMessage[] {
   const anchorMs = anchorIso ? Date.parse(anchorIso) : Date.now();
   const gapMs = 1500;
@@ -26,7 +26,7 @@ export function withMessageTimestamps(
     }
 
     const prevMatch = previous.find(
-      (p) => p.role === message.role && sameContent(p, message) && p.timestamp,
+      (p) => p.role === message.role && sameContent(p, message) && p.timestamp
     );
     if (prevMatch?.timestamp) {
       return { ...message, timestamp: prevMatch.timestamp };

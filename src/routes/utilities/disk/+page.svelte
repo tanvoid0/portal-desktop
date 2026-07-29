@@ -1,5 +1,5 @@
 <script lang="ts">
-  import DiskUtilityPage from "$lib/domains/disk/components/DiskUtilityPage.svelte";
+  import DiskUtilityPage from '$lib/domains/disk/components/DiskUtilityPage.svelte';
 </script>
 
 <svelte:head>

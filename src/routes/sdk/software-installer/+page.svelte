@@ -4,28 +4,18 @@
 -->
 
 <script lang="ts">
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-  } from "$lib/components/ui/dialog";
+  } from '$lib/components/ui/dialog';
   import {
     Search,
     RefreshCw,
@@ -37,8 +27,8 @@
     XCircle,
     Info,
     Loader2,
-  } from "@lucide/svelte";
-  import Select from "$lib/components/ui/select.svelte";
+  } from '@lucide/svelte';
+  import Select from '$lib/components/ui/select.svelte';
   import {
     getAvailablePackageManagers,
     searchPackages,
@@ -54,20 +44,18 @@
     type PackageDetails,
     type PackageUpdate,
     type PackageManagerInfo,
-  } from "$lib/domains/sdk/services/packageManagerService";
-  import { toast } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
+  } from '$lib/domains/sdk/services/packageManagerService';
+  import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
 
-  const INSTALLER_TABS = ["browse", "installed", "updates"] as const;
+  const INSTALLER_TABS = ['browse', 'installed', 'updates'] as const;
   type InstallerTab = (typeof INSTALLER_TABS)[number];
 
-  const activeTab = $derived(
-    resolveUrlTab($page.url.searchParams, INSTALLER_TABS, "browse"),
-  );
+  const activeTab = $derived(resolveUrlTab($page.url.searchParams, INSTALLER_TABS, 'browse'));
 
   function setActiveTab(tab: InstallerTab) {
     goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
@@ -80,11 +68,11 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
   let availableManagers = $state<string[]>([]);
-  let selectedManager = $state<string>("");
+  let selectedManager = $state<string>('');
   let managerInfo = $state<PackageManagerInfo | null>(null);
 
   // Search state
-  let searchQuery = $state("");
+  let searchQuery = $state('');
   let searchResults = $state<Package[]>([]);
   let searching = $state(false);
 
@@ -121,9 +109,9 @@
         await loadManagerInfo();
         // Load data for current tab when manager info is loaded
         if (managerInfo?.available) {
-          if (activeTab === "installed") {
+          if (activeTab === 'installed') {
             await loadInstalledPackages();
-          } else if (activeTab === "updates") {
+          } else if (activeTab === 'updates') {
             await loadUpdates();
           }
         }
@@ -137,20 +125,19 @@
 
     try {
       const managers = await getAvailablePackageManagers();
-      console.log("Available package managers:", managers);
+      console.log('Available package managers:', managers);
       availableManagers = managers;
 
       // Auto-select first available manager
       if (managers.length > 0 && !selectedManager) {
         selectedManager = managers[0];
-        console.log("Auto-selected manager:", selectedManager);
+        console.log('Auto-selected manager:', selectedManager);
       }
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to load package managers";
-      console.error("Failed to load package managers:", err);
-      toast.error("Failed to load package managers", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      error = err instanceof Error ? err.message : 'Failed to load package managers';
+      console.error('Failed to load package managers:', err);
+      toast.error('Failed to load package managers', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
     } finally {
       loading = false;
@@ -161,14 +148,14 @@
     if (!selectedManager) return;
 
     try {
-      console.log("Loading manager info for:", selectedManager);
+      console.log('Loading manager info for:', selectedManager);
       const info = await getPackageManagerInfo(selectedManager);
-      console.log("Manager info loaded:", info);
+      console.log('Manager info loaded:', info);
       managerInfo = info;
     } catch (err) {
-      console.error("Failed to load manager info:", err);
-      toast.error("Failed to load manager info", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      console.error('Failed to load manager info:', err);
+      toast.error('Failed to load manager info', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
     }
   }
@@ -184,8 +171,8 @@
       const results = await searchPackages(selectedManager, searchQuery);
       searchResults = results;
     } catch (err) {
-      toast.error("Search failed", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      toast.error('Search failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
       searchResults = [];
     } finally {
@@ -209,14 +196,14 @@
 
     loadingInstalled = true;
     try {
-      console.log("Loading installed packages for:", selectedManager);
+      console.log('Loading installed packages for:', selectedManager);
       const packages = await listInstalledPackages(selectedManager);
-      console.log("Installed packages loaded:", packages.length);
+      console.log('Installed packages loaded:', packages.length);
       installedPackages = packages;
     } catch (err) {
-      console.error("Failed to load installed packages:", err);
-      toast.error("Failed to load installed packages", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      console.error('Failed to load installed packages:', err);
+      toast.error('Failed to load installed packages', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
       installedPackages = [];
     } finally {
@@ -229,14 +216,14 @@
 
     loadingUpdates = true;
     try {
-      console.log("Loading updates for:", selectedManager);
+      console.log('Loading updates for:', selectedManager);
       const updates = await checkUpdates(selectedManager);
-      console.log("Updates loaded:", updates.length);
+      console.log('Updates loaded:', updates.length);
       availableUpdates = updates;
     } catch (err) {
-      console.error("Failed to check updates:", err);
-      toast.error("Failed to check updates", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      console.error('Failed to check updates:', err);
+      toast.error('Failed to check updates', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
       availableUpdates = [];
     } finally {
@@ -254,8 +241,8 @@
       const details = await getPackageDetails(selectedManager, pkg.id);
       selectedPackageDetails = details;
     } catch (err) {
-      toast.error("Failed to load package details", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      toast.error('Failed to load package details', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
       showDetailsDialog = false;
     } finally {
@@ -269,16 +256,16 @@
     installingPackage = pkg.id;
     try {
       await installPackage(selectedManager, pkg.id, pkg.version);
-      toast.success("Package installed", {
+      toast.success('Package installed', {
         description: `${pkg.name} has been installed successfully`,
       });
       // Refresh installed packages if on that tab
-      if (activeTab === "installed") {
+      if (activeTab === 'installed') {
         await loadInstalledPackages();
       }
     } catch (err) {
-      toast.error("Installation failed", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      toast.error('Installation failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
     } finally {
       installingPackage = null;
@@ -291,15 +278,15 @@
     upgradingPackage = pkg.id;
     try {
       await upgradePackage(selectedManager, pkg.id);
-      toast.success("Package upgraded", {
+      toast.success('Package upgraded', {
         description: `${pkg.name} has been upgraded successfully`,
       });
       // Refresh data
       await loadInstalledPackages();
       await loadUpdates();
     } catch (err) {
-      toast.error("Upgrade failed", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      toast.error('Upgrade failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
     } finally {
       upgradingPackage = null;
@@ -311,20 +298,20 @@
 
     const confirmed = await confirmAction(
       `Are you sure you want to uninstall ${pkg.name}?`,
-      "Uninstall package",
+      'Uninstall package'
     );
     if (!confirmed) return;
 
     uninstallingPackage = pkg.id;
     try {
       await uninstallPackage(selectedManager, pkg.id);
-      toast.success("Package uninstalled", {
+      toast.success('Package uninstalled', {
         description: `${pkg.name} has been uninstalled successfully`,
       });
       await loadInstalledPackages();
     } catch (err) {
-      toast.error("Uninstall failed", {
-        description: err instanceof Error ? err.message : "Unknown error",
+      toast.error('Uninstall failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
       });
     } finally {
       uninstallingPackage = null;
@@ -334,9 +321,9 @@
   // Load data when tab changes
   $effect(() => {
     if (selectedManager && managerInfo?.available) {
-      if (activeTab === "installed") {
+      if (activeTab === 'installed') {
         loadInstalledPackages();
-      } else if (activeTab === "updates") {
+      } else if (activeTab === 'updates') {
         loadUpdates();
       }
     }
@@ -344,13 +331,13 @@
 
   function getManagerDisplayName(name: string): string {
     const names: Record<string, string> = {
-      winget: "Windows Package Manager",
-      scoop: "Scoop",
-      chocolatey: "Chocolatey",
-      cargo: "Cargo",
-      homebrew: "Homebrew",
-      npm: "NPM",
-      pip: "Pip",
+      winget: 'Windows Package Manager',
+      scoop: 'Scoop',
+      chocolatey: 'Chocolatey',
+      cargo: 'Cargo',
+      homebrew: 'Homebrew',
+      npm: 'NPM',
+      pip: 'Pip',
     };
     return names[name] || name;
   }
@@ -364,382 +351,343 @@
   {#if loading && availableManagers.length === 0}
     <PageLoading message="Loading package managers..." />
   {:else}
-  <!-- Header -->
-  <div class="flex items-center justify-between">
-    <div class="flex-1">
-      <h1 class="text-3xl font-bold">Software Installer</h1>
-      <p class="text-muted-foreground">
-        Install and manage software via package managers
-      </p>
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div class="flex-1">
+        <h1 class="text-3xl font-bold">Software Installer</h1>
+        <p class="text-muted-foreground">Install and manage software via package managers</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" onclick={loadAvailableManagers} disabled={loading}>
+          <RefreshCw class="mr-2 h-4 w-4 {loading ? 'animate-spin' : ''}" />
+          Refresh
+        </Button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <Button
-        variant="outline"
-        onclick={loadAvailableManagers}
-        disabled={loading}
-      >
-        <RefreshCw class="mr-2 h-4 w-4 {loading ? 'animate-spin' : ''}" />
-        Refresh
-      </Button>
-    </div>
-  </div>
 
-  {#if error}
-    <PageError
-      title="Failed to load package managers"
-      message={error}
-      onRetry={loadAvailableManagers}
-    />
-  {/if}
+    {#if error}
+      <PageError
+        title="Failed to load package managers"
+        message={error}
+        onRetry={loadAvailableManagers}
+      />
+    {/if}
 
-  <!-- Manager Selection and Search -->
-  <Card>
-    <CardContent class="pt-6">
-      <div class="flex items-center gap-4">
-        <!-- Package Manager Selector -->
-        <div class="flex-shrink-0" style="width: 250px;">
-          <div class="mb-2 text-sm font-medium">Package Manager</div>
-          <Select
-            options={availableManagers.map((m) => ({
-              value: m,
-              label: getManagerDisplayName(m),
-            }))}
-            value={selectedManager}
-            placeholder="Select a package manager"
-            onSelect={(value) => {
-              selectedManager = value;
-              searchResults = [];
-              searchQuery = "";
-              installedPackages = [];
-              availableUpdates = [];
-              managerInfo = null;
-            }}
-            disabled={loading || availableManagers.length === 0}
-          />
-          {#if managerInfo}
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-              {#if managerInfo.available}
-                <Badge
-                  variant="default"
-                  class="bg-green-100 text-xs text-green-800"
-                >
-                  <CheckCircle class="mr-1 h-3 w-3" />
-                  Available
-                </Badge>
-              {:else}
-                <Badge variant="outline" class="text-xs text-gray-500">
-                  <XCircle class="mr-1 h-3 w-3" />
-                  Not Available
-                </Badge>
-              {/if}
-              {#if managerInfo.requires_elevation}
-                <Badge variant="secondary" class="text-xs">Requires Admin</Badge
-                >
-              {/if}
+    <!-- Manager Selection and Search -->
+    <Card>
+      <CardContent class="pt-6">
+        <div class="flex items-center gap-4">
+          <!-- Package Manager Selector -->
+          <div class="flex-shrink-0" style="width: 250px;">
+            <div class="mb-2 text-sm font-medium">Package Manager</div>
+            <Select
+              options={availableManagers.map((m) => ({
+                value: m,
+                label: getManagerDisplayName(m),
+              }))}
+              value={selectedManager}
+              placeholder="Select a package manager"
+              onSelect={(value) => {
+                selectedManager = value;
+                searchResults = [];
+                searchQuery = '';
+                installedPackages = [];
+                availableUpdates = [];
+                managerInfo = null;
+              }}
+              disabled={loading || availableManagers.length === 0}
+            />
+            {#if managerInfo}
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                {#if managerInfo.available}
+                  <Badge variant="default" class="bg-green-100 text-xs text-green-800">
+                    <CheckCircle class="mr-1 h-3 w-3" />
+                    Available
+                  </Badge>
+                {:else}
+                  <Badge variant="outline" class="text-xs text-gray-500">
+                    <XCircle class="mr-1 h-3 w-3" />
+                    Not Available
+                  </Badge>
+                {/if}
+                {#if managerInfo.requires_elevation}
+                  <Badge variant="secondary" class="text-xs">Requires Admin</Badge>
+                {/if}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Search Bar -->
+          {#if selectedManager && managerInfo?.available}
+            <div class="flex-1">
+              <div class="mb-2 text-sm font-medium">Search Packages</div>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <Search
+                    class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Search packages..."
+                    bind:value={searchQuery}
+                    oninput={onSearchInput}
+                    class="pl-10"
+                    disabled={!managerInfo.supports_search}
+                    aria-label="Search packages"
+                  />
+                </div>
+                {#if searching}
+                  <Loader2 class="h-5 w-5 animate-spin text-muted-foreground" />
+                {/if}
+              </div>
             </div>
           {/if}
         </div>
-
-        <!-- Search Bar -->
-        {#if selectedManager && managerInfo?.available}
-          <div class="flex-1">
-            <div class="mb-2 text-sm font-medium">Search Packages</div>
-            <div class="flex items-center gap-2">
-              <div class="relative flex-1">
-                <Search
-                  class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
-                />
-                <Input
-                  type="text"
-                  placeholder="Search packages..."
-                  bind:value={searchQuery}
-                  oninput={onSearchInput}
-                  class="pl-10"
-                  disabled={!managerInfo.supports_search}
-                  aria-label="Search packages"
-                />
-              </div>
-              {#if searching}
-                <Loader2 class="h-5 w-5 animate-spin text-muted-foreground" />
-              {/if}
-            </div>
+        {#if managerInfo}
+          <div class="mt-3 text-xs text-muted-foreground">
+            Version: {managerInfo.version} | Platform: {managerInfo.platform}
           </div>
         {/if}
-      </div>
-      {#if managerInfo}
-        <div class="mt-3 text-xs text-muted-foreground">
-          Version: {managerInfo.version} | Platform: {managerInfo.platform}
-        </div>
-      {/if}
-    </CardContent>
-  </Card>
-
-  {#if !selectedManager || !managerInfo?.available}
-    <Card>
-      <CardContent class="pt-6">
-        <div class="py-12 text-center">
-          <PackageIcon class="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <p class="text-muted-foreground">
-            {availableManagers.length === 0
-              ? "No package managers are available on your system."
-              : "Please select an available package manager to get started."}
-          </p>
-        </div>
       </CardContent>
     </Card>
-  {:else}
-    <!-- Tabs -->
-    <Tabs
-      value={activeTab}
-      onValueChange={(v) => setActiveTab(v as InstallerTab)}
-    >
-      <TabsList>
-        <TabsTrigger value="browse">
-          Browse ({searchResults.length})
-        </TabsTrigger>
-        <TabsTrigger value="installed">
-          Installed ({installedPackages.length})
-        </TabsTrigger>
-        <TabsTrigger value="updates">
-          Updates ({availableUpdates.length})
-        </TabsTrigger>
-      </TabsList>
 
-      <!-- Browse Tab -->
-      <TabsContent value="browse" class="space-y-4">
-        {#if searching}
-          <div class="flex items-center justify-center py-12">
-            <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        {:else if searchResults.length === 0 && searchQuery}
-          <div class="py-12 text-center">
-            <p class="text-muted-foreground">No packages found</p>
-          </div>
-        {:else if searchResults.length === 0 && !searchQuery}
-          <div class="py-12 text-center">
-            <Search class="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-            <p class="mb-2 text-muted-foreground">
-              Enter a search query to find packages
-            </p>
-            <p class="text-sm text-muted-foreground">
-              Try searching for popular packages like "chrome", "vscode", or
-              "git"
-            </p>
-          </div>
-        {:else}
-          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {#each searchResults as pkg}
-              <Card>
-                <CardHeader>
-                  <div class="flex items-start justify-between">
-                    <div class="flex-1">
-                      <CardTitle class="text-lg">{pkg.name}</CardTitle>
-                      {#if pkg.version}
-                        <p class="mt-1 text-xs text-muted-foreground">
-                          v{pkg.version}
-                        </p>
-                      {/if}
-                    </div>
-                    <Badge variant="secondary" class="text-xs">
-                      {pkg.source}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {#if pkg.description}
-                    <p class="mb-4 line-clamp-2 text-sm text-muted-foreground">
-                      {pkg.description}
-                    </p>
-                  {/if}
-                  <div class="flex items-center gap-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onclick={() => handleInstall(pkg)}
-                      disabled={installingPackage === pkg.id}
-                      class="flex-1"
-                    >
-                      {#if installingPackage === pkg.id}
-                        <Loader2 class="mr-1 h-4 w-4 animate-spin" />
-                        Installing...
-                      {:else}
-                        <Download class="mr-1 h-4 w-4" />
-                        Install
-                      {/if}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => showPackageDetails(pkg)}
-                    >
-                      <Info class="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            {/each}
-          </div>
-        {/if}
-      </TabsContent>
-
-      <!-- Installed Tab -->
-      <TabsContent value="installed" class="space-y-4">
-        <div class="flex items-center justify-between">
-          <CardTitle>Installed Packages</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onclick={loadInstalledPackages}
-            disabled={loadingInstalled}
-          >
-            <RefreshCw
-              class="mr-2 h-4 w-4 {loadingInstalled ? 'animate-spin' : ''}"
-            />
-            Refresh
-          </Button>
-        </div>
-        {#if loadingInstalled}
-          <div class="flex items-center justify-center py-12">
-            <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        {:else if installedPackages.length === 0}
+    {#if !selectedManager || !managerInfo?.available}
+      <Card>
+        <CardContent class="pt-6">
           <div class="py-12 text-center">
             <PackageIcon class="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-            <p class="mb-2 text-muted-foreground">No packages installed</p>
-            <p class="text-sm text-muted-foreground">
-              Click Refresh to load installed packages
+            <p class="text-muted-foreground">
+              {availableManagers.length === 0
+                ? 'No package managers are available on your system.'
+                : 'Please select an available package manager to get started.'}
             </p>
           </div>
-        {:else}
-          <div class="space-y-2">
-            {#each installedPackages as pkg}
-              <Card>
-                <CardContent class="pt-6">
-                  <div class="flex items-center justify-between">
-                    <div class="flex-1">
-                      <div class="flex items-center gap-2">
-                        <h3 class="font-semibold">{pkg.name}</h3>
-                        <Badge variant="secondary" class="text-xs">
-                          {pkg.source}
-                        </Badge>
+        </CardContent>
+      </Card>
+    {:else}
+      <!-- Tabs -->
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as InstallerTab)}>
+        <TabsList>
+          <TabsTrigger value="browse">
+            Browse ({searchResults.length})
+          </TabsTrigger>
+          <TabsTrigger value="installed">
+            Installed ({installedPackages.length})
+          </TabsTrigger>
+          <TabsTrigger value="updates">
+            Updates ({availableUpdates.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <!-- Browse Tab -->
+        <TabsContent value="browse" class="space-y-4">
+          {#if searching}
+            <div class="flex items-center justify-center py-12">
+              <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          {:else if searchResults.length === 0 && searchQuery}
+            <div class="py-12 text-center">
+              <p class="text-muted-foreground">No packages found</p>
+            </div>
+          {:else if searchResults.length === 0 && !searchQuery}
+            <div class="py-12 text-center">
+              <Search class="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <p class="mb-2 text-muted-foreground">Enter a search query to find packages</p>
+              <p class="text-sm text-muted-foreground">
+                Try searching for popular packages like "chrome", "vscode", or "git"
+              </p>
+            </div>
+          {:else}
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {#each searchResults as pkg}
+                <Card>
+                  <CardHeader>
+                    <div class="flex items-start justify-between">
+                      <div class="flex-1">
+                        <CardTitle class="text-lg">{pkg.name}</CardTitle>
+                        {#if pkg.version}
+                          <p class="mt-1 text-xs text-muted-foreground">
+                            v{pkg.version}
+                          </p>
+                        {/if}
                       </div>
-                      <p class="text-sm text-muted-foreground">
-                        Version: {pkg.version}
-                      </p>
+                      <Badge variant="secondary" class="text-xs">
+                        {pkg.source}
+                      </Badge>
                     </div>
+                  </CardHeader>
+                  <CardContent>
+                    {#if pkg.description}
+                      <p class="mb-4 line-clamp-2 text-sm text-muted-foreground">
+                        {pkg.description}
+                      </p>
+                    {/if}
                     <div class="flex items-center gap-2">
                       <Button
-                        variant="outline"
+                        variant="default"
                         size="sm"
-                        onclick={() => showPackageDetails(pkg)}
+                        onclick={() => handleInstall(pkg)}
+                        disabled={installingPackage === pkg.id}
+                        class="flex-1"
                       >
+                        {#if installingPackage === pkg.id}
+                          <Loader2 class="mr-1 h-4 w-4 animate-spin" />
+                          Installing...
+                        {:else}
+                          <Download class="mr-1 h-4 w-4" />
+                          Install
+                        {/if}
+                      </Button>
+                      <Button variant="outline" size="sm" onclick={() => showPackageDetails(pkg)}>
                         <Info class="h-4 w-4" />
                       </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              {/each}
+            </div>
+          {/if}
+        </TabsContent>
+
+        <!-- Installed Tab -->
+        <TabsContent value="installed" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <CardTitle>Installed Packages</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={loadInstalledPackages}
+              disabled={loadingInstalled}
+            >
+              <RefreshCw class="mr-2 h-4 w-4 {loadingInstalled ? 'animate-spin' : ''}" />
+              Refresh
+            </Button>
+          </div>
+          {#if loadingInstalled}
+            <div class="flex items-center justify-center py-12">
+              <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          {:else if installedPackages.length === 0}
+            <div class="py-12 text-center">
+              <PackageIcon class="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <p class="mb-2 text-muted-foreground">No packages installed</p>
+              <p class="text-sm text-muted-foreground">Click Refresh to load installed packages</p>
+            </div>
+          {:else}
+            <div class="space-y-2">
+              {#each installedPackages as pkg}
+                <Card>
+                  <CardContent class="pt-6">
+                    <div class="flex items-center justify-between">
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                          <h3 class="font-semibold">{pkg.name}</h3>
+                          <Badge variant="secondary" class="text-xs">
+                            {pkg.source}
+                          </Badge>
+                        </div>
+                        <p class="text-sm text-muted-foreground">
+                          Version: {pkg.version}
+                        </p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onclick={() => showPackageDetails(pkg)}>
+                          <Info class="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onclick={() => handleUpgrade(pkg)}
+                          disabled={upgradingPackage === pkg.id}
+                        >
+                          {#if upgradingPackage === pkg.id}
+                            <Loader2 class="mr-1 h-4 w-4 animate-spin" />
+                          {:else}
+                            <ArrowUp class="mr-1 h-4 w-4" />
+                          {/if}
+                          Upgrade
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onclick={() => handleUninstall(pkg)}
+                          disabled={uninstallingPackage === pkg.id}
+                        >
+                          {#if uninstallingPackage === pkg.id}
+                            <Loader2 class="mr-1 h-4 w-4 animate-spin" />
+                          {:else}
+                            <Trash2 class="mr-1 h-4 w-4" />
+                          {/if}
+                          Uninstall
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              {/each}
+            </div>
+          {/if}
+        </TabsContent>
+
+        <!-- Updates Tab -->
+        <TabsContent value="updates" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <CardTitle>Available Updates</CardTitle>
+            <Button variant="outline" size="sm" onclick={loadUpdates} disabled={loadingUpdates}>
+              <RefreshCw class="mr-2 h-4 w-4 {loadingUpdates ? 'animate-spin' : ''}" />
+              Check Updates
+            </Button>
+          </div>
+          {#if loadingUpdates}
+            <div class="flex items-center justify-center py-12">
+              <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          {:else if availableUpdates.length === 0}
+            <div class="py-12 text-center">
+              <CheckCircle class="mx-auto mb-4 h-12 w-12 text-green-500" />
+              <p class="mb-2 text-muted-foreground">All packages are up to date</p>
+              <p class="text-sm text-muted-foreground">Click "Check Updates" to refresh</p>
+            </div>
+          {:else}
+            <div class="space-y-2">
+              {#each availableUpdates as update}
+                <Card>
+                  <CardContent class="pt-6">
+                    <div class="flex items-center justify-between">
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                          <h3 class="font-semibold">{update.name}</h3>
+                          <Badge variant="secondary" class="text-xs">
+                            {update.source}
+                          </Badge>
+                        </div>
+                        <p class="text-sm text-muted-foreground">
+                          {update.current_version} → {update.available_version}
+                        </p>
+                      </div>
                       <Button
-                        variant="outline"
+                        variant="default"
                         size="sm"
-                        onclick={() => handleUpgrade(pkg)}
-                        disabled={upgradingPackage === pkg.id}
+                        onclick={() => handleUpgrade(update)}
+                        disabled={upgradingPackage === update.id}
                       >
-                        {#if upgradingPackage === pkg.id}
+                        {#if upgradingPackage === update.id}
                           <Loader2 class="mr-1 h-4 w-4 animate-spin" />
+                          Upgrading...
                         {:else}
                           <ArrowUp class="mr-1 h-4 w-4" />
+                          Upgrade
                         {/if}
-                        Upgrade
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => handleUninstall(pkg)}
-                        disabled={uninstallingPackage === pkg.id}
-                      >
-                        {#if uninstallingPackage === pkg.id}
-                          <Loader2 class="mr-1 h-4 w-4 animate-spin" />
-                        {:else}
-                          <Trash2 class="mr-1 h-4 w-4" />
-                        {/if}
-                        Uninstall
                       </Button>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            {/each}
-          </div>
-        {/if}
-      </TabsContent>
-
-      <!-- Updates Tab -->
-      <TabsContent value="updates" class="space-y-4">
-        <div class="flex items-center justify-between">
-          <CardTitle>Available Updates</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onclick={loadUpdates}
-            disabled={loadingUpdates}
-          >
-            <RefreshCw
-              class="mr-2 h-4 w-4 {loadingUpdates ? 'animate-spin' : ''}"
-            />
-            Check Updates
-          </Button>
-        </div>
-        {#if loadingUpdates}
-          <div class="flex items-center justify-center py-12">
-            <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        {:else if availableUpdates.length === 0}
-          <div class="py-12 text-center">
-            <CheckCircle class="mx-auto mb-4 h-12 w-12 text-green-500" />
-            <p class="mb-2 text-muted-foreground">
-              All packages are up to date
-            </p>
-            <p class="text-sm text-muted-foreground">
-              Click "Check Updates" to refresh
-            </p>
-          </div>
-        {:else}
-          <div class="space-y-2">
-            {#each availableUpdates as update}
-              <Card>
-                <CardContent class="pt-6">
-                  <div class="flex items-center justify-between">
-                    <div class="flex-1">
-                      <div class="flex items-center gap-2">
-                        <h3 class="font-semibold">{update.name}</h3>
-                        <Badge variant="secondary" class="text-xs">
-                          {update.source}
-                        </Badge>
-                      </div>
-                      <p class="text-sm text-muted-foreground">
-                        {update.current_version} → {update.available_version}
-                      </p>
-                    </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onclick={() => handleUpgrade(update)}
-                      disabled={upgradingPackage === update.id}
-                    >
-                      {#if upgradingPackage === update.id}
-                        <Loader2 class="mr-1 h-4 w-4 animate-spin" />
-                        Upgrading...
-                      {:else}
-                        <ArrowUp class="mr-1 h-4 w-4" />
-                        Upgrade
-                      {/if}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            {/each}
-          </div>
-        {/if}
-      </TabsContent>
-    </Tabs>
-  {/if}
+                  </CardContent>
+                </Card>
+              {/each}
+            </div>
+          {/if}
+        </TabsContent>
+      </Tabs>
+    {/if}
   {/if}
 </div>
 
@@ -748,11 +696,10 @@
   <DialogContent class="max-h-[80vh] max-w-2xl overflow-y-auto">
     <DialogHeader>
       <DialogTitle>
-        {selectedPackageDetails?.name || "Package Details"}
+        {selectedPackageDetails?.name || 'Package Details'}
       </DialogTitle>
       <DialogDescription>
-        Package information from {selectedPackageDetails?.source ||
-          "package manager"}
+        Package information from {selectedPackageDetails?.source || 'package manager'}
       </DialogDescription>
     </DialogHeader>
     {#if loadingDetails}

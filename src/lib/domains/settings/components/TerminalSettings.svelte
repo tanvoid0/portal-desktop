@@ -9,14 +9,14 @@
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Switch } from "$lib/components/ui/switch";
-  import { Separator } from "$lib/components/ui/separator";
-  import { settingsService } from "../services/settingsService";
-  import type { TerminalSettings } from "../types";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Separator } from '$lib/components/ui/separator';
+  import { settingsService } from '../services/settingsService';
+  import type { TerminalSettings } from '../types';
 
   interface Props {
     settings: TerminalSettings | null;
@@ -27,45 +27,45 @@
 
   if (!settings) {
     settings = {
-      fontFamily: "monaco",
+      fontFamily: 'monaco',
       fontSize: 14,
       lineHeight: 1.2,
-      cursorStyle: "block",
+      cursorStyle: 'block',
       cursorBlink: true,
       scrollback: 1000,
-      bellStyle: "none",
+      bellStyle: 'none',
       rightClickSelectsWord: false,
-      selectionMode: "normal",
+      selectionMode: 'normal',
       shellIntegration: true,
       commandHistory: true,
       commandSuggestions: true,
       theme: {
-        name: "default",
-        background: "#1e1e1e",
-        foreground: "#d4d4d4",
-        cursor: "#ffffff",
-        selection: "#264f78",
+        name: 'default',
+        background: '#1e1e1e',
+        foreground: '#d4d4d4',
+        cursor: '#ffffff',
+        selection: '#264f78',
         colors: {
-          black: "#000000",
-          red: "#cd3131",
-          green: "#0dbc79",
-          yellow: "#e5e510",
-          blue: "#2472c8",
-          magenta: "#bc3fbc",
-          cyan: "#11a8cd",
-          white: "#e5e5e5",
-          brightBlack: "#666666",
-          brightRed: "#f14c4c",
-          brightGreen: "#23d18b",
-          brightYellow: "#f5f543",
-          brightBlue: "#3b8eea",
-          brightMagenta: "#d670d6",
-          brightCyan: "#29b8db",
-          brightWhite: "#e5e5e5",
+          black: '#000000',
+          red: '#cd3131',
+          green: '#0dbc79',
+          yellow: '#e5e510',
+          blue: '#2472c8',
+          magenta: '#bc3fbc',
+          cyan: '#11a8cd',
+          white: '#e5e5e5',
+          brightBlack: '#666666',
+          brightRed: '#f14c4c',
+          brightGreen: '#23d18b',
+          brightYellow: '#f5f543',
+          brightBlue: '#3b8eea',
+          brightMagenta: '#d670d6',
+          brightCyan: '#29b8db',
+          brightWhite: '#e5e5e5',
         },
       },
-      encoding: "utf-8",
-      locale: "en_US.UTF-8",
+      encoding: 'utf-8',
+      locale: 'en_US.UTF-8',
     };
   }
 
@@ -103,8 +103,7 @@
             min="8"
             max="72"
             bind:value={settings.fontSize}
-            onchange={() =>
-              onUpdate({ fontSize: parseInt(String(settings.fontSize)) || 14 })}
+            onchange={() => onUpdate({ fontSize: parseInt(String(settings.fontSize)) || 14 })}
           />
         </div>
 
@@ -139,7 +138,7 @@
                   background: theme.colors.background,
                   foreground: theme.colors.foreground,
                   cursor: theme.colors.cursor,
-                  selection: theme.colors.selection || "#264f78",
+                  selection: theme.colors.selection || '#264f78',
                   colors: settings.theme.colors,
                 },
               });
@@ -163,12 +162,11 @@
         <Select
           defaultValue={settings.cursorStyle}
           options={[
-            { value: "block", label: "Block" },
-            { value: "underline", label: "Underline" },
-            { value: "line", label: "Line" },
+            { value: 'block', label: 'Block' },
+            { value: 'underline', label: 'Underline' },
+            { value: 'line', label: 'Line' },
           ]}
-          onSelect={(value) =>
-            onUpdate({ cursorStyle: value as "block" | "underline" | "line" })}
+          onSelect={(value) => onUpdate({ cursorStyle: value as 'block' | 'underline' | 'line' })}
         />
       </div>
 
@@ -190,9 +188,7 @@
   <Card>
     <CardHeader>
       <CardTitle>Behavior</CardTitle>
-      <CardDescription
-        >Configure terminal behavior and interactions</CardDescription
-      >
+      <CardDescription>Configure terminal behavior and interactions</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       <div class="space-y-2">
@@ -215,27 +211,23 @@
         <Select
           defaultValue={settings.bellStyle}
           options={[
-            { value: "none", label: "None" },
-            { value: "visual", label: "Visual" },
-            { value: "sound", label: "Sound" },
+            { value: 'none', label: 'None' },
+            { value: 'visual', label: 'Visual' },
+            { value: 'sound', label: 'Sound' },
           ]}
-          onSelect={(value) =>
-            onUpdate({ bellStyle: value as "none" | "visual" | "sound" })}
+          onSelect={(value) => onUpdate({ bellStyle: value as 'none' | 'visual' | 'sound' })}
         />
       </div>
 
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="rightClickSelectsWord">Right Click Selects Word</Label>
-          <p class="text-sm text-muted-foreground">
-            Right click to select word
-          </p>
+          <p class="text-sm text-muted-foreground">Right click to select word</p>
         </div>
         <Switch
           id="rightClickSelectsWord"
           checked={settings.rightClickSelectsWord}
-          onCheckedChange={(checked) =>
-            onUpdate({ rightClickSelectsWord: checked })}
+          onCheckedChange={(checked) => onUpdate({ rightClickSelectsWord: checked })}
         />
       </div>
 
@@ -243,9 +235,8 @@
         <Label for="selectionMode">Selection Mode</Label>
         <Select
           defaultValue={settings.selectionMode}
-          options={["normal", "column"]}
-          onSelect={(value) =>
-            onUpdate({ selectionMode: value as "normal" | "column" })}
+          options={['normal', 'column']}
+          onSelect={(value) => onUpdate({ selectionMode: value as 'normal' | 'column' })}
           placeholder="Select mode"
         />
       </div>
@@ -262,9 +253,7 @@
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="shellIntegration">Shell Integration</Label>
-          <p class="text-sm text-muted-foreground">
-            Enable shell integration features
-          </p>
+          <p class="text-sm text-muted-foreground">Enable shell integration features</p>
         </div>
         <Switch
           id="shellIntegration"
@@ -293,8 +282,7 @@
         <Switch
           id="commandSuggestions"
           checked={settings.commandSuggestions}
-          onCheckedChange={(checked) =>
-            onUpdate({ commandSuggestions: checked })}
+          onCheckedChange={(checked) => onUpdate({ commandSuggestions: checked })}
         />
       </div>
     </CardContent>

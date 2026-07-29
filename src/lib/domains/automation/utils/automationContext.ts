@@ -3,13 +3,10 @@
  * Prefer ProjectAutomationProfile when available (correct package manager).
  */
 
-import type { Project } from "$lib/domains/projects/types";
-import type { ResolveContext } from "./blockResolver";
-import type { ProjectAutomationProfile } from "$lib/domains/actions/types";
-import {
-  profileFromProject,
-  profileVariables,
-} from "$lib/domains/actions/profile";
+import type { Project } from '$lib/domains/projects/types';
+import type { ResolveContext } from './blockResolver';
+import type { ProjectAutomationProfile } from '$lib/domains/actions/types';
+import { profileFromProject, profileVariables } from '$lib/domains/actions/profile';
 
 /** Loose project fields accepted by the legacy automation API */
 export type AutomationProjectRef = {
@@ -20,9 +17,9 @@ export type AutomationProjectRef = {
   build_command?: string;
   start_command?: string;
   test_command?: string;
-  metadata?: Project["metadata"];
-  package_manager_ids?: Project["package_manager_ids"];
-  framework_ids?: Project["framework_ids"];
+  metadata?: Project['metadata'];
+  package_manager_ids?: Project['package_manager_ids'];
+  framework_ids?: Project['framework_ids'];
 };
 
 export interface AutomationContextOptions {
@@ -38,21 +35,19 @@ export interface AutomationContextOptions {
 }
 
 function toStringRecord(
-  vars: Record<string, string | number | boolean> = {},
+  vars: Record<string, string | number | boolean> = {}
 ): Record<string, string> {
   return Object.fromEntries(
     Object.entries(vars).map(([k, v]) => [
       k,
-      typeof v === "boolean" ? (v ? "true" : "false") : String(v),
-    ]),
+      typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v),
+    ])
   );
 }
 
-function resolveProfile(
-  options: AutomationContextOptions,
-): ProjectAutomationProfile | null {
+function resolveProfile(options: AutomationContextOptions): ProjectAutomationProfile | null {
   if (options.profile) return options.profile;
-  if (options.project && "status" in options.project) {
+  if (options.project && 'status' in options.project) {
     return profileFromProject(options.project as Project);
   }
   if (options.project) {
@@ -61,7 +56,7 @@ function resolveProfile(
       id: p.id,
       name: p.name,
       path: p.path,
-      packageManager: p.package_manager?.toLowerCase() ?? "npm",
+      packageManager: p.package_manager?.toLowerCase() ?? 'npm',
       frameworks: [],
       buildCommand: p.build_command,
       startCommand: p.start_command,
@@ -72,10 +67,8 @@ function resolveProfile(
 }
 
 /** Built-in variables available in every automation run */
-export function createAutomationContext(
-  options: AutomationContextOptions,
-): ResolveContext {
-  const cwd = options.cwd.replace(/\\/g, "/");
+export function createAutomationContext(options: AutomationContextOptions): ResolveContext {
+  const cwd = options.cwd.replace(/\\/g, '/');
   const profile = resolveProfile(options);
 
   const builtins: Record<string, string> = profile
@@ -84,8 +77,8 @@ export function createAutomationContext(
         CWD: cwd,
         PROJECT_PATH: cwd,
         WORKING_DIR: cwd,
-        PROJECT_NAME: "",
-        PACKAGE_MANAGER: "npm",
+        PROJECT_NAME: '',
+        PACKAGE_MANAGER: 'npm',
       };
 
   builtins.CWD = cwd;
@@ -103,7 +96,7 @@ export function createAutomationContext(
 
 export function contextFromProject(
   project: Project | AutomationProjectRef,
-  extra?: Record<string, string | number | boolean>,
+  extra?: Record<string, string | number | boolean>
 ): ResolveContext {
   return createAutomationContext({
     cwd: project.path,
@@ -114,14 +107,14 @@ export function contextFromProject(
 
 export function contextFromDirectory(
   cwd: string,
-  extra?: Record<string, string | number | boolean>,
+  extra?: Record<string, string | number | boolean>
 ): ResolveContext {
   return createAutomationContext({ cwd, variables: extra });
 }
 
 export function contextFromProfile(
   profile: ProjectAutomationProfile,
-  extra?: Record<string, string | number | boolean>,
+  extra?: Record<string, string | number | boolean>
 ): ResolveContext {
   return createAutomationContext({
     cwd: profile.path,

@@ -3,24 +3,24 @@
 	Dedicated page for viewing, editing and running scripts
 -->
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { onMount, onDestroy } from "svelte";
-  import { Button } from "$lib/components/ui/button";
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { onMount, onDestroy } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Label } from "$lib/components/ui/label";
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import { Switch } from "$lib/components/ui/switch";
-  import Select from "$lib/components/ui/select.svelte";
+  } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Label } from '$lib/components/ui/label';
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import { Switch } from '$lib/components/ui/switch';
+  import Select from '$lib/components/ui/select.svelte';
   import {
     ArrowLeft,
     Trash2,
@@ -39,25 +39,18 @@
     Loader2,
     Terminal,
     History,
-  } from "@lucide/svelte";
-  import type {
-    Block,
-    BlockParameter,
-    CreateBlockRequest,
-  } from "$lib/domains/projects/pipelines";
-  import {
-    blockLibraryService,
-    blockLibraryStore,
-  } from "$lib/domains/projects/pipelines";
-  import { automation } from "$lib/domains/automation";
+  } from '@lucide/svelte';
+  import type { Block, BlockParameter, CreateBlockRequest } from '$lib/domains/projects/pipelines';
+  import { blockLibraryService, blockLibraryStore } from '$lib/domains/projects/pipelines';
+  import { automation } from '$lib/domains/automation';
   import {
     scriptExecutionService,
     type ScriptExecutionInfo,
     EmbeddedTerminal,
-  } from "$lib/domains/scripts";
-  import { toast } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { setBreadcrumbs } from "$lib/domains/shared/stores/breadcrumbStore";
+  } from '$lib/domains/scripts';
+  import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { setBreadcrumbs } from '$lib/domains/shared/stores/breadcrumbStore';
 
   let script: Block | null = $state(null);
   let loading = $state(true);
@@ -71,21 +64,21 @@
   let showHistory = $state(false);
   let interactiveMode = $state(true); // Default to interactive mode
   let showInteractiveTerminal = $state(false);
-  let resolvedCommand = $state("");
+  let resolvedCommand = $state('');
   let unsubscribe: (() => void) | null = null;
 
   // Parameter values for execution
   let parameterValues = $state<Record<string, string>>({});
-  let workingDirectory = $state("");
+  let workingDirectory = $state('');
 
   // Form state for editing
   let formData = $state<CreateBlockRequest>({
-    name: "",
-    description: "",
-    category: "utility",
+    name: '',
+    description: '',
+    category: 'utility',
     parameters: [],
-    command: "",
-    executionType: "script",
+    command: '',
+    executionType: 'script',
     defaultConfig: {},
     tags: [],
   });
@@ -93,11 +86,11 @@
   // Parameter editor state
   let showAddParameter = $state(false);
   let newParameter = $state<BlockParameter>({
-    name: "",
-    type: "string",
-    description: "",
+    name: '',
+    type: 'string',
+    description: '',
     required: false,
-    defaultValue: "",
+    defaultValue: '',
   });
 
   const scriptId = $derived($page.params.id);
@@ -105,8 +98,8 @@
   onMount(async () => {
     await loadScript();
     // Check if we should auto-start in edit mode from URL query
-    const editParam = $page.url.searchParams.get("edit");
-    if (editParam === "true") {
+    const editParam = $page.url.searchParams.get('edit');
+    if (editParam === 'true') {
       isEditing = true;
     }
     // Load execution history
@@ -129,7 +122,7 @@
 
       if (script) {
         setBreadcrumbs([
-          { label: "Scripts", href: "/scripts" },
+          { label: 'Scripts', href: '/scripts' },
           { label: script.name, href: `/scripts/${scriptId}` },
         ]);
 
@@ -149,23 +142,21 @@
         parameterValues = {};
         const currentScript = script;
         currentScript.parameters.forEach((param) => {
-          if (param.defaultValue !== undefined && param.defaultValue !== "") {
+          if (param.defaultValue !== undefined && param.defaultValue !== '') {
             parameterValues[param.name] = String(param.defaultValue);
           } else if (currentScript.defaultConfig?.[param.name] !== undefined) {
-            parameterValues[param.name] = String(
-              currentScript.defaultConfig[param.name],
-            );
+            parameterValues[param.name] = String(currentScript.defaultConfig[param.name]);
           } else {
-            parameterValues[param.name] = "";
+            parameterValues[param.name] = '';
           }
         });
       } else {
-        toast.error("Script not found");
-        goto("/scripts");
+        toast.error('Script not found');
+        goto('/scripts');
       }
     } catch (error) {
-      console.error("Failed to load script", error);
-      toast.error("Failed to load script");
+      console.error('Failed to load script', error);
+      toast.error('Failed to load script');
     } finally {
       loading = false;
     }
@@ -173,15 +164,11 @@
 
   async function loadExecutionHistory() {
     try {
-      executionHistory = await scriptExecutionService.getExecutionsByBlock(
-        scriptId,
-        10,
-      );
+      executionHistory = await scriptExecutionService.getExecutionsByBlock(scriptId, 10);
     } catch (error) {
-      console.error("Failed to load execution history", error);
+      console.error('Failed to load execution history', error);
     }
   }
-
 
   async function handleRun() {
     if (!script) return;
@@ -189,27 +176,21 @@
     // Validate required parameters
     const missingParams = script.parameters
       .filter(
-        (p) =>
-          p.required &&
-          (!parameterValues[p.name] || parameterValues[p.name].trim() === ""),
+        (p) => p.required && (!parameterValues[p.name] || parameterValues[p.name].trim() === '')
       )
       .map((p) => p.name);
 
     if (missingParams.length > 0) {
-      toast.error(`Missing required parameters: ${missingParams.join(", ")}`);
+      toast.error(`Missing required parameters: ${missingParams.join(', ')}`);
       return;
     }
 
     // Resolve command with parameters via shared block resolver
     try {
-      const cwd = workingDirectory.trim() || ".";
-      resolvedCommand = await automation
-        .in(cwd)
-        .command(scriptId, parameterValues);
+      const cwd = workingDirectory.trim() || '.';
+      resolvedCommand = await automation.in(cwd).command(scriptId, parameterValues);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to resolve command",
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to resolve command');
       return;
     }
 
@@ -217,7 +198,7 @@
       // Interactive mode - use embedded terminal
       showInteractiveTerminal = true;
       executing = true;
-      toast.success("Starting interactive terminal...");
+      toast.success('Starting interactive terminal...');
       return;
     }
 
@@ -231,7 +212,7 @@
         workingDirectory: workingDirectory || undefined,
       });
 
-      toast.success("Script execution started");
+      toast.success('Script execution started');
 
       // Subscribe to execution updates
       unsubscribe = scriptExecutionService.subscribeToExecution(
@@ -240,28 +221,28 @@
           currentExecution = execution;
 
           // Show completion toast
-          if (execution.status === "success") {
-            toast.success("Script completed successfully");
+          if (execution.status === 'success') {
+            toast.success('Script completed successfully');
             executing = false;
             loadExecutionHistory();
-          } else if (execution.status === "failed") {
-            toast.error(`Script failed: ${execution.error || "Unknown error"}`);
+          } else if (execution.status === 'failed') {
+            toast.error(`Script failed: ${execution.error || 'Unknown error'}`);
             executing = false;
             loadExecutionHistory();
-          } else if (execution.status === "cancelled") {
-            toast.info("Script execution cancelled");
+          } else if (execution.status === 'cancelled') {
+            toast.info('Script execution cancelled');
             executing = false;
             loadExecutionHistory();
           }
         },
-        500,
+        500
       );
 
       // Get initial execution state
       currentExecution = await scriptExecutionService.getExecution(executionId);
     } catch (error) {
-      console.error("Failed to execute script", error);
-      toast.error("Failed to start script execution");
+      console.error('Failed to execute script', error);
+      toast.error('Failed to start script execution');
       executing = false;
     }
   }
@@ -269,7 +250,7 @@
   function handleInteractiveComplete(exitCode: number | null) {
     executing = false;
     if (exitCode === 0) {
-      toast.success("Script completed successfully");
+      toast.success('Script completed successfully');
     } else if (exitCode !== null) {
       toast.error(`Script exited with code ${exitCode}`);
     }
@@ -277,7 +258,7 @@
   }
 
   function handleInteractiveStart(processId: string) {
-    console.log("Interactive terminal started with process:", processId);
+    console.log('Interactive terminal started with process:', processId);
   }
 
   function closeInteractiveTerminal() {
@@ -290,10 +271,10 @@
 
     try {
       await scriptExecutionService.cancelExecution(currentExecution.id);
-      toast.info("Cancelling execution...");
+      toast.info('Cancelling execution...');
     } catch (error) {
-      console.error("Failed to cancel execution", error);
-      toast.error("Failed to cancel execution");
+      console.error('Failed to cancel execution', error);
+      toast.error('Failed to cancel execution');
     }
   }
 
@@ -304,15 +285,15 @@
 
   function getStatusIcon(status: string) {
     switch (status) {
-      case "pending":
+      case 'pending':
         return Clock;
-      case "running":
+      case 'running':
         return Loader2;
-      case "success":
+      case 'success':
         return CheckCircle;
-      case "failed":
+      case 'failed':
         return XCircle;
-      case "cancelled":
+      case 'cancelled':
         return Square;
       default:
         return Clock;
@@ -321,18 +302,18 @@
 
   function getStatusColor(status: string) {
     switch (status) {
-      case "pending":
-        return "text-yellow-500";
-      case "running":
-        return "text-blue-500 animate-spin";
-      case "success":
-        return "text-green-500";
-      case "failed":
-        return "text-red-500";
-      case "cancelled":
-        return "text-gray-500";
+      case 'pending':
+        return 'text-yellow-500';
+      case 'running':
+        return 'text-blue-500 animate-spin';
+      case 'success':
+        return 'text-green-500';
+      case 'failed':
+        return 'text-red-500';
+      case 'cancelled':
+        return 'text-gray-500';
       default:
-        return "text-muted-foreground";
+        return 'text-muted-foreground';
     }
   }
 
@@ -369,7 +350,7 @@
 
   async function handleSave() {
     if (!formData.name || !formData.description || !formData.command) {
-      toast.error("Please fill in all required fields");
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -378,19 +359,19 @@
       // Build defaultConfig from parameters with defaultValue
       const defaultConfig: Record<string, any> = {};
       formData.parameters.forEach((p) => {
-        if (p.defaultValue !== undefined && p.defaultValue !== "") {
+        if (p.defaultValue !== undefined && p.defaultValue !== '') {
           defaultConfig[p.name] = p.defaultValue;
         }
       });
       formData.defaultConfig = defaultConfig;
 
       await blockLibraryService.updateBlock(scriptId, formData);
-      toast.success("Script updated successfully");
+      toast.success('Script updated successfully');
       isEditing = false;
       await loadScript();
     } catch (error) {
-      console.error("Failed to update script", error);
-      toast.error("Failed to update script");
+      console.error('Failed to update script', error);
+      toast.error('Failed to update script');
     } finally {
       saving = false;
     }
@@ -398,18 +379,18 @@
 
   async function handleDelete() {
     const confirmed = await confirmAction(
-      "Are you sure you want to delete this script?",
-      "Delete script",
+      'Are you sure you want to delete this script?',
+      'Delete script'
     );
     if (!confirmed) return;
 
     try {
       await blockLibraryService.deleteBlock(scriptId);
-      toast.success("Script deleted successfully");
-      goto("/scripts");
+      toast.success('Script deleted successfully');
+      goto('/scripts');
     } catch (error) {
-      console.error("Failed to delete script", error);
-      toast.error("Failed to delete script");
+      console.error('Failed to delete script', error);
+      toast.error('Failed to delete script');
     }
   }
 
@@ -417,48 +398,48 @@
     if (!script) return;
     try {
       const dataStr = JSON.stringify(script, null, 2);
-      const dataBlob = new Blob([dataStr], { type: "application/json" });
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
-      link.download = `${script.name.toLowerCase().replace(/\s+/g, "-")}.block.json`;
+      link.download = `${script.name.toLowerCase().replace(/\s+/g, '-')}.block.json`;
       link.click();
       URL.revokeObjectURL(url);
-      toast.success("Script exported successfully");
+      toast.success('Script exported successfully');
     } catch (error) {
-      console.error("Failed to export script", error);
-      toast.error("Failed to export script");
+      console.error('Failed to export script', error);
+      toast.error('Failed to export script');
     }
   }
 
   function handleCopyCommand() {
     if (!script) return;
     navigator.clipboard.writeText(script.command);
-    toast.success("Command copied to clipboard");
+    toast.success('Command copied to clipboard');
   }
 
   function handleCopyOutput() {
     if (!currentExecution?.output) return;
     navigator.clipboard.writeText(currentExecution.output);
-    toast.success("Output copied to clipboard");
+    toast.success('Output copied to clipboard');
   }
 
   function addParameter() {
     if (!newParameter.name.trim()) {
-      toast.error("Parameter name is required");
+      toast.error('Parameter name is required');
       return;
     }
     if (formData.parameters.some((p) => p.name === newParameter.name)) {
-      toast.error("Parameter name already exists");
+      toast.error('Parameter name already exists');
       return;
     }
     formData.parameters = [...formData.parameters, { ...newParameter }];
     newParameter = {
-      name: "",
-      type: "string",
-      description: "",
+      name: '',
+      type: 'string',
+      description: '',
       required: false,
-      defaultValue: "",
+      defaultValue: '',
     };
     showAddParameter = false;
   }
@@ -467,13 +448,11 @@
     formData.parameters = formData.parameters.filter((_, i) => i !== index);
   }
 
-  const isValid = $derived(
-    formData.name && formData.description && formData.command,
-  );
+  const isValid = $derived(formData.name && formData.description && formData.command);
 </script>
 
 <svelte:head>
-  <title>{script?.name || "Script"} - Portal Desktop</title>
+  <title>{script?.name || 'Script'} - Portal Desktop</title>
 </svelte:head>
 
 <div class="container mx-auto max-w-4xl p-6">
@@ -484,16 +463,16 @@
   {:else if script}
     <!-- Header -->
     <div class="mb-6 flex items-center gap-4">
-      <Button variant="ghost" size="icon" onclick={() => goto("/scripts")}>
+      <Button variant="ghost" size="icon" onclick={() => goto('/scripts')}>
         <ArrowLeft class="h-5 w-5" />
       </Button>
       <div class="flex-1">
         <h1 class="flex items-center gap-2 text-2xl font-bold">
           <FileCode class="h-6 w-6" />
-          {isEditing ? "Edit Script" : script.name}
+          {isEditing ? 'Edit Script' : script.name}
         </h1>
         <p class="text-muted-foreground">
-          {isEditing ? "Modify script configuration" : script.description}
+          {isEditing ? 'Modify script configuration' : script.description}
         </p>
       </div>
       <div class="flex gap-2">
@@ -501,13 +480,10 @@
           <Button variant="outline" onclick={cancelEditing}>Cancel</Button>
           <Button onclick={handleSave} disabled={!isValid || saving}>
             <Save class="mr-2 h-4 w-4" />
-            {saving ? "Saving..." : "Save"}
+            {saving ? 'Saving...' : 'Save'}
           </Button>
         {:else}
-          <Button
-            variant="outline"
-            onclick={() => (showHistory = !showHistory)}
-          >
+          <Button variant="outline" onclick={() => (showHistory = !showHistory)}>
             <History class="mr-2 h-4 w-4" />
             History
           </Button>
@@ -545,11 +521,11 @@
                 <Label for="category">Category *</Label>
                 <Select
                   options={[
-                    { value: "utility", label: "Utility" },
-                    { value: "build", label: "Build" },
-                    { value: "test", label: "Test" },
-                    { value: "deploy", label: "Deploy" },
-                    { value: "custom", label: "Custom" },
+                    { value: 'utility', label: 'Utility' },
+                    { value: 'build', label: 'Build' },
+                    { value: 'test', label: 'Test' },
+                    { value: 'deploy', label: 'Deploy' },
+                    { value: 'custom', label: 'Custom' },
                   ]}
                   bind:value={formData.category}
                   class="mt-1"
@@ -558,21 +534,16 @@
             </div>
             <div>
               <Label for="description">Description *</Label>
-              <Textarea
-                id="description"
-                bind:value={formData.description}
-                rows={3}
-                class="mt-1"
-              />
+              <Textarea id="description" bind:value={formData.description} rows={3} class="mt-1" />
             </div>
             <div>
               <Label for="tags">Tags</Label>
               <Input
                 id="tags"
-                value={(formData.tags || []).join(", ")}
+                value={(formData.tags || []).join(', ')}
                 oninput={(e) => {
                   formData.tags = (e.target as HTMLInputElement).value
-                    .split(",")
+                    .split(',')
                     .map((t) => t.trim())
                     .filter((t) => t.length > 0);
                 }}
@@ -602,9 +573,9 @@
               <Label for="executionType">Execution Type</Label>
               <Select
                 options={[
-                  { value: "script", label: "Script" },
-                  { value: "command", label: "Command" },
-                  { value: "docker", label: "Docker" },
+                  { value: 'script', label: 'Script' },
+                  { value: 'command', label: 'Command' },
+                  { value: 'docker', label: 'Docker' },
                 ]}
                 bind:value={formData.executionType}
                 class="mt-1"
@@ -640,12 +611,12 @@
                     <Label class="text-sm">Type</Label>
                     <Select
                       options={[
-                        { value: "string", label: "String" },
-                        { value: "number", label: "Number" },
-                        { value: "boolean", label: "Boolean" },
-                        { value: "select", label: "Select" },
-                        { value: "file", label: "File" },
-                        { value: "directory", label: "Directory" },
+                        { value: 'string', label: 'String' },
+                        { value: 'number', label: 'Number' },
+                        { value: 'boolean', label: 'Boolean' },
+                        { value: 'select', label: 'Select' },
+                        { value: 'file', label: 'File' },
+                        { value: 'directory', label: 'Directory' },
                       ]}
                       bind:value={newParameter.type}
                       class="mt-1"
@@ -659,10 +630,7 @@
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <Label class="text-sm">Default Value</Label>
-                    <Input
-                      bind:value={newParameter.defaultValue}
-                      class="mt-1"
-                    />
+                    <Input bind:value={newParameter.defaultValue} class="mt-1" />
                   </div>
                   <div class="flex items-end gap-2 pb-2">
                     <Checkbox bind:checked={newParameter.required} id="edit-param-required" />
@@ -671,10 +639,8 @@
                 </div>
                 <div class="flex gap-2">
                   <Button size="sm" onclick={addParameter}>Add</Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onclick={() => (showAddParameter = false)}>Cancel</Button
+                  <Button size="sm" variant="outline" onclick={() => (showAddParameter = false)}
+                    >Cancel</Button
                   >
                 </div>
               </div>
@@ -685,31 +651,22 @@
                 {#each formData.parameters as param, i}
                   <div class="flex items-center justify-between p-3">
                     <div class="flex items-center gap-2">
-                      <code
-                        class="rounded bg-muted px-2 py-0.5 font-mono text-sm"
+                      <code class="rounded bg-muted px-2 py-0.5 font-mono text-sm"
                         >{param.name}</code
                       >
                       <Badge variant="outline">{param.type}</Badge>
                       {#if param.required}
-                        <Badge variant="destructive" class="text-xs"
-                          >required</Badge
-                        >
+                        <Badge variant="destructive" class="text-xs">required</Badge>
                       {/if}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onclick={() => removeParameter(i)}
-                    >
+                    <Button variant="ghost" size="icon" onclick={() => removeParameter(i)}>
                       <Trash2 class="h-4 w-4" />
                     </Button>
                   </div>
                 {/each}
               </div>
             {:else}
-              <p class="py-4 text-center text-muted-foreground">
-                No parameters
-              </p>
+              <p class="py-4 text-center text-muted-foreground">No parameters</p>
             {/if}
           </CardContent>
         </Card>
@@ -722,11 +679,7 @@
             <CardHeader>
               <div class="flex items-center justify-between">
                 <CardTitle>Execution History</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onclick={() => loadExecutionHistory()}
-                >
+                <Button variant="ghost" size="sm" onclick={() => loadExecutionHistory()}>
                   <RefreshCw class="h-4 w-4" />
                 </Button>
               </div>
@@ -746,12 +699,8 @@
                     >
                       <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                          <StatusIcon
-                            class="h-4 w-4 {getStatusColor(execution.status)}"
-                          />
-                          <span class="text-sm font-medium"
-                            >{execution.status}</span
-                          >
+                          <StatusIcon class="h-4 w-4 {getStatusColor(execution.status)}" />
+                          <span class="text-sm font-medium">{execution.status}</span>
                         </div>
                         <span class="text-xs text-muted-foreground">
                           {new Date(execution.startedAt).toLocaleString()}
@@ -759,19 +708,14 @@
                       </div>
                       {#if execution.finishedAt}
                         <p class="mt-1 text-xs text-muted-foreground">
-                          Duration: {formatDuration(
-                            execution.startedAt,
-                            execution.finishedAt,
-                          )}
+                          Duration: {formatDuration(execution.startedAt, execution.finishedAt)}
                         </p>
                       {/if}
                     </Button>
                   {/each}
                 </div>
               {:else}
-                <p class="py-4 text-center text-muted-foreground">
-                  No executions yet
-                </p>
+                <p class="py-4 text-center text-muted-foreground">No executions yet</p>
               {/if}
             </CardContent>
           </Card>
@@ -786,9 +730,7 @@
                   <Play class="h-5 w-5" />
                   Run Script
                 </CardTitle>
-                <CardDescription
-                  >Configure parameters and execute</CardDescription
-                >
+                <CardDescription>Configure parameters and execute</CardDescription>
               </div>
               {#if executing}
                 <Button variant="destructive" onclick={handleCancel}>
@@ -816,14 +758,11 @@
             </div>
 
             <!-- Interactive Mode Toggle -->
-            <div
-              class="flex items-center justify-between rounded-lg bg-muted/50 p-3"
-            >
+            <div class="flex items-center justify-between rounded-lg bg-muted/50 p-3">
               <div>
                 <Label class="text-sm font-medium">Interactive Mode</Label>
                 <p class="mt-0.5 text-xs text-muted-foreground">
-                  Enable for scripts that require user input (passwords,
-                  confirmations, etc.)
+                  Enable for scripts that require user input (passwords, confirmations, etc.)
                 </p>
               </div>
               <Switch bind:checked={interactiveMode} />
@@ -842,23 +781,21 @@
                       {/if}
                     </div>
                     <div class="col-span-2">
-                      {#if param.type === "select" && param.options}
+                      {#if param.type === 'select' && param.options}
                         <Select
                           options={param.options.map((o) => ({
                             value: o,
                             label: o,
                           }))}
                           bind:value={parameterValues[param.name]}
-                          placeholder={param.description ||
-                            `Select ${param.name}`}
+                          placeholder={param.description || `Select ${param.name}`}
                         />
-                      {:else if param.type === "boolean"}
+                      {:else if param.type === 'boolean'}
                         <div class="flex items-center gap-2">
                           <Checkbox
-                            checked={parameterValues[param.name] === "true"}
+                            checked={parameterValues[param.name] === 'true'}
                             onCheckedChange={(checked) => {
-                              parameterValues[param.name] =
-                                checked === true ? "true" : "false";
+                              parameterValues[param.name] = checked === true ? 'true' : 'false';
                             }}
                             id={`param-${param.name}`}
                           />
@@ -886,11 +823,7 @@
                     <Terminal class="h-4 w-4" />
                     <span class="font-medium">Interactive Terminal</span>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onclick={closeInteractiveTerminal}
-                  >
+                  <Button variant="outline" size="sm" onclick={closeInteractiveTerminal}>
                     Close Terminal
                   </Button>
                 </div>
@@ -912,36 +845,26 @@
                     <Terminal class="h-4 w-4" />
                     <span class="font-medium">Output</span>
                     {#if currentExecution.output}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={handleCopyOutput}
-                        class="h-6 px-2"
-                      >
+                      <Button variant="ghost" size="sm" onclick={handleCopyOutput} class="h-6 px-2">
                         <Copy class="mr-1 h-3 w-3" />
                         Copy
                       </Button>
                     {/if}
                   </div>
                   <div class="flex items-center gap-2">
-                    <StatusIcon
-                      class="h-4 w-4 {getStatusColor(currentExecution.status)}"
-                    />
+                    <StatusIcon class="h-4 w-4 {getStatusColor(currentExecution.status)}" />
                     <Badge
-                      variant={currentExecution.status === "success"
-                        ? "default"
-                        : currentExecution.status === "failed"
-                          ? "destructive"
-                          : "secondary"}
+                      variant={currentExecution.status === 'success'
+                        ? 'default'
+                        : currentExecution.status === 'failed'
+                          ? 'destructive'
+                          : 'secondary'}
                     >
                       {currentExecution.status}
                     </Badge>
                     {#if currentExecution.finishedAt}
                       <span class="text-xs text-muted-foreground">
-                        {formatDuration(
-                          currentExecution.startedAt,
-                          currentExecution.finishedAt,
-                        )}
+                        {formatDuration(currentExecution.startedAt, currentExecution.finishedAt)}
                       </span>
                     {/if}
                   </div>
@@ -950,18 +873,15 @@
                   class="max-h-80 overflow-auto rounded-lg bg-black p-4 font-mono text-sm text-green-400"
                 >
                   {#if currentExecution.output}
-                    <pre
-                      class="whitespace-pre-wrap">{currentExecution.output}</pre>
-                  {:else if currentExecution.status === "running"}
+                    <pre class="whitespace-pre-wrap">{currentExecution.output}</pre>
+                  {:else if currentExecution.status === 'running'}
                     <span class="animate-pulse">Waiting for output...</span>
                   {:else}
                     <span class="text-gray-500">No output</span>
                   {/if}
                 </div>
                 {#if currentExecution.error}
-                  <div
-                    class="rounded-lg border border-red-500/30 bg-red-500/10 p-4"
-                  >
+                  <div class="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
                     <p class="text-sm font-medium text-red-500">Error</p>
                     <p class="mt-1 text-sm text-red-400">
                       {currentExecution.error}
@@ -970,8 +890,7 @@
                 {/if}
                 {#if currentExecution.exitCode !== null}
                   <p class="text-sm text-muted-foreground">
-                    Exit code: <code class="rounded bg-muted px-1"
-                      >{currentExecution.exitCode}</code
+                    Exit code: <code class="rounded bg-muted px-1">{currentExecution.exitCode}</code
                     >
                   </p>
                 {/if}
@@ -987,8 +906,7 @@
           </CardHeader>
           <CardContent>
             <div class="group relative rounded-lg bg-muted p-4">
-              <pre
-                class="whitespace-pre-wrap font-mono text-sm">{script.command}</pre>
+              <pre class="whitespace-pre-wrap font-mono text-sm">{script.command}</pre>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1014,9 +932,7 @@
                 <p class="mt-1 font-medium">{script.category}</p>
               </div>
               <div>
-                <Label class="text-xs text-muted-foreground"
-                  >Execution Type</Label
-                >
+                <Label class="text-xs text-muted-foreground">Execution Type</Label>
                 <p class="mt-1 font-medium">{script.executionType}</p>
               </div>
               <div>
@@ -1041,9 +957,7 @@
         {#if script.parameters.length > 0}
           <Card>
             <CardHeader>
-              <CardTitle
-                >Parameters Reference ({script.parameters.length})</CardTitle
-              >
+              <CardTitle>Parameters Reference ({script.parameters.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div class="divide-y rounded-lg border">
@@ -1053,9 +967,7 @@
                       <code class="font-mono font-medium">{param.name}</code>
                       <Badge variant="outline">{param.type}</Badge>
                       {#if param.required}
-                        <Badge variant="destructive" class="text-xs"
-                          >required</Badge
-                        >
+                        <Badge variant="destructive" class="text-xs">required</Badge>
                       {/if}
                     </div>
                     {#if param.description}
@@ -1063,16 +975,14 @@
                         {param.description}
                       </p>
                     {/if}
-                    {#if param.defaultValue !== undefined && param.defaultValue !== ""}
+                    {#if param.defaultValue !== undefined && param.defaultValue !== ''}
                       <p class="mt-1 text-xs text-muted-foreground">
-                        Default: <code class="rounded bg-muted px-1"
-                          >{param.defaultValue}</code
-                        >
+                        Default: <code class="rounded bg-muted px-1">{param.defaultValue}</code>
                       </p>
                     {/if}
                     {#if param.options && param.options.length > 0}
                       <p class="mt-1 text-xs text-muted-foreground">
-                        Options: {param.options.join(", ")}
+                        Options: {param.options.join(', ')}
                       </p>
                     {/if}
                   </div>
@@ -1093,7 +1003,7 @@
               class="max-h-80 overflow-x-auto rounded-lg bg-muted p-4 font-mono text-xs">{JSON.stringify(
                 script,
                 null,
-                2,
+                2
               )}</pre>
           </CardContent>
         </Card>

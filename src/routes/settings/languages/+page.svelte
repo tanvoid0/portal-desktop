@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import LanguagesSettings from "$lib/domains/settings/components/LanguagesSettings.svelte";
+  import LanguagesSettings from '$lib/domains/settings/components/LanguagesSettings.svelte';
 </script>
 
 <svelte:head>
@@ -14,8 +14,7 @@
   <div>
     <h2 class="text-2xl font-bold tracking-tight">Language Management</h2>
     <p class="text-muted-foreground">
-      Manage your languages and view intelligent recommendations based on your
-      usage
+      Manage your languages and view intelligent recommendations based on your usage
     </p>
   </div>
 

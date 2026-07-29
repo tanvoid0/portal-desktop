@@ -2,11 +2,7 @@
  * Pipeline Execution Types
  */
 
-import type {
-  PipelineExecution,
-  StepExecution,
-  ExecutionStatus,
-} from "./index";
+import type { PipelineExecution, StepExecution, ExecutionStatus } from './index';
 
 export interface ExecutionProgress {
   executionId: string;
@@ -24,7 +20,7 @@ export interface ExecutionLog {
   executionId: string;
   stepId?: string;
   timestamp: Date;
-  level: "info" | "warn" | "error" | "debug";
+  level: 'info' | 'warn' | 'error' | 'debug';
   message: string;
   data?: Record<string, any>;
 }

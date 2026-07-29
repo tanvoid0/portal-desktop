@@ -1,8 +1,8 @@
 // Hook for namespace switching shortcuts
 
-import { readable, get, type Readable } from "svelte/store";
-import { NAVIGATION_SHORTCUTS } from "../utils/keyboardConstants";
-import type { NamespaceOption } from "../types";
+import { readable, get, type Readable } from 'svelte/store';
+import { NAVIGATION_SHORTCUTS } from '../utils/keyboardConstants';
+import type { NamespaceOption } from '../types';
 
 export interface UseNamespaceShortcutsOptions {
   namespaces: NamespaceOption[] | (() => NamespaceOption[]);
@@ -16,9 +16,7 @@ export function useNamespaceShortcuts(options: UseNamespaceShortcutsOptions) {
 
   // Get namespaces reactively - support both array and getter function
   const getNamespaces =
-    typeof options.namespaces === "function"
-      ? options.namespaces
-      : () => options.namespaces;
+    typeof options.namespaces === 'function' ? options.namespaces : () => options.namespaces;
 
   // Map namespaces to number shortcuts (0-9)
   const namespaceShortcuts: Readable<Map<number, NamespaceOption>> = readable(
@@ -30,7 +28,7 @@ export function useNamespaceShortcuts(options: UseNamespaceShortcutsOptions) {
         ? namespacesResult
         : namespacesResult();
       const shortcuts = new Map<number, NamespaceOption>();
-      const allOption: NamespaceOption = { value: "", label: "All Namespaces" };
+      const allOption: NamespaceOption = { value: '', label: 'All Namespaces' };
       shortcuts.set(0, allOption);
 
       namespaces.slice(0, 9).forEach((ns: NamespaceOption, index: number) => {
@@ -38,7 +36,7 @@ export function useNamespaceShortcuts(options: UseNamespaceShortcutsOptions) {
       });
 
       set(shortcuts);
-    },
+    }
   );
 
   function selectByNumber(number: number) {
@@ -54,15 +52,13 @@ export function useNamespaceShortcuts(options: UseNamespaceShortcutsOptions) {
 
     // Ignore if typing in input/textarea
     const target = event.target as HTMLElement;
-    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
       return false;
     }
 
     // Handle namespace switch shortcut (n or :)
     if (
-      (NAVIGATION_SHORTCUTS.NAMESPACE_SWITCH as readonly string[]).includes(
-        event.key,
-      ) &&
+      (NAVIGATION_SHORTCUTS.NAMESPACE_SWITCH as readonly string[]).includes(event.key) &&
       !event.ctrlKey &&
       !event.metaKey
     ) {

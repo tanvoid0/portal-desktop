@@ -1,5 +1,5 @@
-import { redirect } from "@sveltejs/kit";
-import type { PageLoad } from "./$types";
+import { redirect } from '@sveltejs/kit';
+import type { PageLoad } from './$types';
 
 export const load: PageLoad = ({ url }) => {
   throw redirect(307, `/automation/blocks${url.search}`);

@@ -7,12 +7,7 @@ export interface WorkflowExecution {
   data?: Record<string, unknown>;
 }
 
-export type WorkflowStatus =
-  | "running"
-  | "success"
-  | "error"
-  | "waiting"
-  | "canceled";
+export type WorkflowStatus = 'running' | 'success' | 'error' | 'waiting' | 'canceled';
 
 export interface WorkflowResult {
   success: boolean;
@@ -48,7 +43,7 @@ export type {
   AutomationStepInput,
   ResolvedExecutionStep,
   ResolvePlanResult,
-} from "./utils/blockResolver";
+} from './utils/blockResolver';
 export type {
   RunAutomationOptions,
   ResolveAutomationOptions,
@@ -56,5 +51,5 @@ export type {
   AutomationStepResult,
   AutomationRunner,
   AutomationPlanPreview,
-} from "./services/automationExecutionService";
-export type { AutomationStepRef } from "./utils/stepRefs";
+} from './services/automationExecutionService';
+export type { AutomationStepRef } from './utils/stepRefs';

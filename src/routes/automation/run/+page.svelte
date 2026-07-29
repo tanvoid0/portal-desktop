@@ -1,5 +1,5 @@
 <script lang="ts">
-  import QuickRunPage from "$lib/domains/automation/components/QuickRunPage.svelte";
+  import QuickRunPage from '$lib/domains/automation/components/QuickRunPage.svelte';
 </script>
 
 <svelte:head>

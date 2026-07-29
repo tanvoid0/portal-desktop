@@ -1,22 +1,19 @@
 <!-- AI Layout - Home/Code tabs; session lists live in each page -->
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { afterNavigate } from "$app/navigation";
-  import AITabBar from "$lib/domains/ai/components/navigation/AITabBar.svelte";
-  import { setBreadcrumbs, clearBreadcrumbs } from "$lib/domains/shared/stores/breadcrumbStore";
-  import { getAiTabBreadcrumb, isAiSectionRoute } from "$lib/config/ai-tabs";
-  import { AI_CHAT_PATH } from "$lib/config/ai-nav";
-  import { aiTopbar } from "$lib/domains/ai/state/aiTopbarStore.svelte.js";
+  import type { Snippet } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
+  import AITabBar from '$lib/domains/ai/components/navigation/AITabBar.svelte';
+  import { setBreadcrumbs, clearBreadcrumbs } from '$lib/domains/shared/stores/breadcrumbStore';
+  import { getAiTabBreadcrumb, isAiSectionRoute } from '$lib/config/ai-tabs';
+  import { AI_CHAT_PATH } from '$lib/config/ai-nav';
+  import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
 
   let { children }: { children: Snippet<[]> } = $props();
 
   function syncAiBreadcrumbs(pathname: string) {
     if (!isAiSectionRoute(pathname)) return;
     const tabCrumb = getAiTabBreadcrumb(pathname);
-    setBreadcrumbs([
-      { label: "AI", href: AI_CHAT_PATH, icon: "sparkles" },
-      tabCrumb,
-    ]);
+    setBreadcrumbs([{ label: 'AI', href: AI_CHAT_PATH, icon: 'sparkles' }, tabCrumb]);
   }
 
   afterNavigate(({ to, from }) => {

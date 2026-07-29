@@ -17,7 +17,7 @@ class={cn(buttonVariants({ variant, size }), className)}
 <!-- After -->
 const buttonClasses = $derived(buttonVariants({(variant, size)})); class={cn(
   buttonClasses,
-  className,
+  className
 )}
 ```
 
@@ -50,10 +50,7 @@ const buttonClasses = $derived(buttonVariants({(variant, size)})); class={cn(
 
 ```svelte
 <!-- Input Component -->
-<input
-  aria-invalid={!!error}
-  aria-describedby={error ? `${id}-error` : undefined}
-/>
+<input aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} />
 {#if error}
   <p id={`${id}-error`} role="alert">{error}</p>
 {/if}
@@ -72,7 +69,7 @@ const buttonClasses = $derived(buttonVariants({(variant, size)})); class={cn(
 #### Validation System
 
 ```typescript
-import { validateValue, commonRules } from "$lib/utils/validation";
+import { validateValue, commonRules } from '$lib/utils/validation';
 
 const result = validateValue(value, {
   required: true,
@@ -87,7 +84,7 @@ const result = validateValue(value, {
 
 ```svelte
 <Button loading={isLoading}>
-  {isLoading ? "Saving..." : "Save"}
+  {isLoading ? 'Saving...' : 'Save'}
 </Button>
 ```
 
@@ -102,19 +99,19 @@ const result = validateValue(value, {
 #### Toast Store
 
 ```typescript
-import { toast } from "$lib/stores/toast";
+import { toast } from '$lib/stores/toast';
 
 // Success notification
-toast.success("Success!", "Your changes have been saved.");
+toast.success('Success!', 'Your changes have been saved.');
 
 // Error notification
-toast.error("Error!", "Something went wrong.");
+toast.error('Error!', 'Something went wrong.');
 
 // Promise-based notifications
 toast.promise(saveData(), {
-  loading: "Saving...",
-  success: "Saved successfully!",
-  error: "Failed to save",
+  loading: 'Saving...',
+  success: 'Saved successfully!',
+  error: 'Failed to save',
 });
 ```
 
@@ -123,9 +120,9 @@ toast.promise(saveData(), {
 #### Component Performance Tracking
 
 ```typescript
-import { trackComponentPerformance } from "$lib/utils/performance";
+import { trackComponentPerformance } from '$lib/utils/performance';
 
-const tracker = trackComponentPerformance("MyComponent");
+const tracker = trackComponentPerformance('MyComponent');
 tracker.start();
 // ... component logic
 tracker.end();
@@ -134,9 +131,9 @@ tracker.end();
 #### Performance Decorators
 
 ```typescript
-import { measurePerformance } from "$lib/utils/performance";
+import { measurePerformance } from '$lib/utils/performance';
 
-const optimizedFunction = measurePerformance(myFunction, "MyFunction");
+const optimizedFunction = measurePerformance(myFunction, 'MyFunction');
 ```
 
 ## 🧪 Testing
@@ -145,16 +142,16 @@ const optimizedFunction = measurePerformance(myFunction, "MyFunction");
 
 ```typescript
 // Example test structure
-describe("Button Component", () => {
-  test("renders with default props", () => {
-    render(Button, { props: { children: () => "Click me" } });
-    expect(screen.getByRole("button")).toBeInTheDocument();
+describe('Button Component', () => {
+  test('renders with default props', () => {
+    render(Button, { props: { children: () => 'Click me' } });
+    expect(screen.getByRole('button')).toBeInTheDocument();
   });
 
-  test("handles click events", async () => {
+  test('handles click events', async () => {
     const handleClick = vi.fn();
     render(Button, { props: { onclick: handleClick } });
-    await fireEvent.click(screen.getByRole("button"));
+    await fireEvent.click(screen.getByRole('button'));
     expect(handleClick).toHaveBeenCalled();
   });
 });
@@ -229,30 +226,30 @@ VITE_DEBUG=false
 
 ```svelte
 <script>
-  import { createValidation, commonRules } from "$lib/utils/validation";
-  import { Input } from "$lib/components/ui/input";
-  import { Button } from "$lib/components/ui/button";
-  import { toast } from "$lib/stores/toast";
+  import { createValidation, commonRules } from '$lib/utils/validation';
+  import { Input } from '$lib/components/ui/input';
+  import { Button } from '$lib/components/ui/button';
+  import { toast } from '$lib/stores/toast';
 
   const validation = createValidation(
-    { email: "", password: "" },
+    { email: '', password: '' },
     {
       email: { ...commonRules.required, ...commonRules.email },
       password: { ...commonRules.required, ...commonRules.password },
-    },
+    }
   );
 
   async function handleSubmit() {
     if (!validation.isValid) {
-      toast.error("Please fix the errors below");
+      toast.error('Please fix the errors below');
       return;
     }
 
     try {
       await saveUser(validation.data);
-      toast.success("User saved successfully!");
+      toast.success('User saved successfully!');
     } catch (error) {
-      toast.error("Failed to save user");
+      toast.error('Failed to save user');
     }
   }
 </script>
@@ -279,9 +276,9 @@ VITE_DEBUG=false
 
 ```svelte
 <script>
-  import { Button } from "$lib/components/ui/button";
-  import { Loading } from "$lib/components/ui/loading";
-  import { toast } from "$lib/stores/toast";
+  import { Button } from '$lib/components/ui/button';
+  import { Loading } from '$lib/components/ui/loading';
+  import { toast } from '$lib/stores/toast';
 
   let isLoading = false;
   let data = null;
@@ -290,9 +287,9 @@ VITE_DEBUG=false
     isLoading = true;
     try {
       data = await fetchData();
-      toast.success("Data loaded successfully!");
+      toast.success('Data loaded successfully!');
     } catch (error) {
-      toast.error("Failed to load data");
+      toast.error('Failed to load data');
     } finally {
       isLoading = false;
     }

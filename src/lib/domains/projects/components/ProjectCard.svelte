@@ -4,19 +4,19 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import type { Project } from "$lib/domains/projects/types";
-  import { formatRelativeTime, formatBytes } from "$lib/domains/shared/utils";
-  import { Button } from "$lib/components/ui/button";
+  import { onMount } from 'svelte';
+  import type { Project } from '$lib/domains/projects/types';
+  import { formatRelativeTime, formatBytes } from '$lib/domains/shared/utils';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import TechIcon from "$lib/components/ui/tech-icon.svelte";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import TechIcon from '$lib/components/ui/tech-icon.svelte';
   import {
     Edit,
     Trash2,
@@ -33,7 +33,7 @@
     Globe,
     Archive,
     CheckCircle2,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
   import {
     getProjectGitBranch,
     getProjectGitCommit,
@@ -44,11 +44,11 @@
     getStatusColor,
     truncatePath,
     shortCommitHash,
-  } from "$lib/domains/projects/utils/display";
+  } from '$lib/domains/projects/utils/display';
   import {
     projectIconRegistry,
     type ResolvedTechIcon,
-  } from "$lib/domains/projects/utils/iconRegistry";
+  } from '$lib/domains/projects/utils/iconRegistry';
 
   interface Props {
     project: Project;
@@ -73,34 +73,22 @@
     registryReady = true;
   });
 
-  const primaryFramework = $derived(
-    projectIconRegistry.resolvePrimaryFramework(project),
-  );
+  const primaryFramework = $derived(projectIconRegistry.resolvePrimaryFramework(project));
   const frameworks = $derived(projectIconRegistry.resolveFrameworks(project));
-  const packageManagers = $derived(
-    projectIconRegistry.resolvePackageManagers(project),
-  );
+  const packageManagers = $derived(projectIconRegistry.resolvePackageManagers(project));
   const languages = $derived(projectIconRegistry.resolveLanguages(project));
   const showTechStack = $derived(
-    registryReady &&
-      (frameworks.length > 0 ||
-        packageManagers.length > 0 ||
-        languages.length > 0),
+    registryReady && (frameworks.length > 0 || packageManagers.length > 0 || languages.length > 0)
   );
   const gitBranch = $derived(getProjectGitBranch(project));
   const gitCommit = $derived(shortCommitHash(getProjectGitCommit(project)));
   const fileCount = $derived(getProjectFileCount(project));
   const projectSize = $derived(getProjectSize(project));
   const hasUncommittedChanges = $derived(
-    project.metadata?.gitInfo?.hasUncommittedChanges ??
-      project.has_uncommitted_changes,
+    project.metadata?.gitInfo?.hasUncommittedChanges ?? project.has_uncommitted_changes
   );
-  const outdatedCount = $derived(
-    project.metadata?.dependencies?.outdated?.length ?? 0,
-  );
-  const vulnerabilityCount = $derived(
-    project.metadata?.dependencies?.vulnerabilities?.length ?? 0,
-  );
+  const outdatedCount = $derived(project.metadata?.dependencies?.outdated?.length ?? 0);
+  const vulnerabilityCount = $derived(project.metadata?.dependencies?.vulnerabilities?.length ?? 0);
 
   const handleClick = () => {
     onClick(project);
@@ -117,11 +105,7 @@
   };
 
   const statusIcon = $derived(
-    project.status === "active"
-      ? CheckCircle2
-      : project.status === "archived"
-        ? Archive
-        : null,
+    project.status === 'active' ? CheckCircle2 : project.status === 'archived' ? Archive : null
   );
 
   function techBadgeClass(item: ResolvedTechIcon): string {
@@ -134,14 +118,14 @@
   onclick={handleClick}
   role="button"
   tabindex={0}
-  onkeydown={(e) => e.key === "Enter" && handleClick()}
+  onkeydown={(e) => e.key === 'Enter' && handleClick()}
 >
   <CardHeader class="pb-3">
     <div class="flex w-full items-start justify-between gap-3">
       <div class="flex min-w-0 flex-1 items-start gap-3">
         <div
           class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg {getFrameworkIconBackground(
-            primaryFramework?.name,
+            primaryFramework?.name
           )}"
         >
           {#if primaryFramework}
@@ -173,10 +157,7 @@
         </div>
       </div>
 
-      <Badge
-        variant="outline"
-        class="shrink-0 gap-1 capitalize {getStatusColor(project.status)}"
-      >
+      <Badge variant="outline" class="shrink-0 gap-1 capitalize {getStatusColor(project.status)}">
         {#if statusIcon}
           {@const StatusIcon = statusIcon}
           <StatusIcon class="h-3 w-3" />
@@ -192,36 +173,21 @@
         <div class="flex flex-wrap items-center gap-1.5">
           {#each frameworks as item (item.name)}
             <Badge variant="outline" class="gap-1.5 {techBadgeClass(item)}">
-              <TechIcon
-                icon={item.icon}
-                iconType={item.icon_type}
-                size="xs"
-                alt={item.name}
-              />
+              <TechIcon icon={item.icon} iconType={item.icon_type} size="xs" alt={item.name} />
               {item.name}
             </Badge>
           {/each}
 
           {#each packageManagers as item (item.name)}
             <Badge variant="outline" class="gap-1.5">
-              <TechIcon
-                icon={item.icon}
-                iconType={item.icon_type}
-                size="xs"
-                alt={item.name}
-              />
+              <TechIcon icon={item.icon} iconType={item.icon_type} size="xs" alt={item.name} />
               {item.name}
             </Badge>
           {/each}
 
           {#each languages as item (item.name)}
             <Badge variant="secondary" class="gap-1.5">
-              <TechIcon
-                icon={item.icon}
-                iconType={item.icon_type}
-                size="xs"
-                alt={item.name}
-              />
+              <TechIcon icon={item.icon} iconType={item.icon_type} size="xs" alt={item.name} />
               {item.name}
             </Badge>
           {/each}
@@ -251,10 +217,7 @@
         {/if}
       </div>
 
-      <div
-        class="flex items-center gap-1.5 text-xs text-muted-foreground"
-        title={project.path}
-      >
+      <div class="flex items-center gap-1.5 text-xs text-muted-foreground" title={project.path}>
         <FolderOpen class="h-3.5 w-3.5 shrink-0" />
         <span class="truncate font-mono">{truncatePath(project.path)}</span>
       </div>

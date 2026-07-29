@@ -1,16 +1,11 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Progress } from "$lib/components/ui/progress";
-  import { taskUi } from "../state/taskUi.svelte";
-  import type { Task } from "../types";
-  import Icon from "@iconify/svelte";
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Progress } from '$lib/components/ui/progress';
+  import { taskUi } from '../state/taskUi.svelte';
+  import type { Task } from '../types';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     onStartTracking?: (taskId: string) => void;
@@ -46,15 +41,15 @@
     const secs = seconds % 60;
 
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 
   function handleStartTracking() {
     // This would typically open a task selector
     // For now, we'll use a placeholder
-    onStartTracking?.("task-id");
+    onStartTracking?.('task-id');
   }
 
   function handleStopTracking() {
@@ -63,7 +58,7 @@
 
   function handlePauseTracking() {
     // Pause functionality would be implemented here
-    console.log("Pause tracking");
+    console.log('Pause tracking');
   }
 </script>
 
@@ -83,7 +78,7 @@
             {formatTime(elapsedTime)}
           </div>
           <div class="mt-1 text-sm text-muted-foreground">
-            Tracking: Task {currentlyTrackingId || "Unknown"}
+            Tracking: Task {currentlyTrackingId || 'Unknown'}
           </div>
         </div>
 
@@ -91,19 +86,11 @@
 
         <!-- Action Buttons -->
         <div class="flex gap-2">
-          <Button
-            variant="destructive"
-            onclick={handleStopTracking}
-            class="flex-1"
-          >
+          <Button variant="destructive" onclick={handleStopTracking} class="flex-1">
             <Icon icon="mdi:stop" class="mr-2 h-4 w-4" />
             Stop
           </Button>
-          <Button
-            variant="outline"
-            onclick={handlePauseTracking}
-            class="flex-1"
-          >
+          <Button variant="outline" onclick={handlePauseTracking} class="flex-1">
             <Icon icon="mdi:pause" class="mr-2 h-4 w-4" />
             Pause
           </Button>
@@ -113,13 +100,8 @@
       <!-- No Active Tracking -->
       <div class="space-y-4">
         <div class="text-center">
-          <Icon
-            icon="mdi:timer-outline"
-            class="mx-auto mb-2 h-12 w-12 text-muted-foreground"
-          />
-          <div class="text-sm text-muted-foreground">
-            No active time tracking
-          </div>
+          <Icon icon="mdi:timer-outline" class="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
+          <div class="text-sm text-muted-foreground">No active time tracking</div>
         </div>
 
         <Button variant="default" onclick={handleStartTracking} class="w-full">

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Separator } from "$lib/components/ui/separator";
-  import { taskUi } from "../state/taskUi.svelte";
-  import Icon from "@iconify/svelte";
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Separator } from '$lib/components/ui/separator';
+  import { taskUi } from '../state/taskUi.svelte';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     onQuickAdd?: () => void;
@@ -32,12 +32,12 @@
   function handleQuickComplete() {
     // Find a quick task to complete
     // This would be implemented based on your business logic
-    console.log("Quick complete task");
+    console.log('Quick complete task');
   }
 
   function handleQuickTemplate() {
     // Apply a common template
-    console.log("Apply quick template");
+    console.log('Apply quick template');
   }
 </script>
 
@@ -113,9 +113,7 @@
       <!-- Productivity Metrics -->
       {#if taskUi.productivityMetrics}
         <div class="space-y-2">
-          <h4 class="text-sm font-medium text-muted-foreground">
-            Today's Progress
-          </h4>
+          <h4 class="text-sm font-medium text-muted-foreground">Today's Progress</h4>
           <div class="grid grid-cols-2 gap-2 text-xs">
             <div class="flex justify-between">
               <span>Completion Rate:</span>
@@ -131,9 +129,7 @@
             </div>
             <div class="flex justify-between">
               <span>Velocity:</span>
-              <span class="font-medium"
-                >{taskUi.productivityMetrics.velocity} tasks</span
-              >
+              <span class="font-medium">{taskUi.productivityMetrics.velocity} tasks</span>
             </div>
             <div class="flex justify-between">
               <span>Overdue:</span>

@@ -1,28 +1,25 @@
 // Utility functions for keyboard shortcuts
 
-import { parseShortcut, formatShortcut, normalizeKey } from "./shortcutParser";
-import type { KeyboardShortcut } from "../types";
+import { parseShortcut, formatShortcut, normalizeKey } from './shortcutParser';
+import type { KeyboardShortcut } from '../types';
 
 /**
  * Convert a KeyboardEvent to a string representation for comparison
  */
 function eventToShortcutString(event: KeyboardEvent): string {
   const parts: string[] = [];
-  if (event.ctrlKey) parts.push("Ctrl");
-  if (event.altKey) parts.push("Alt");
-  if (event.shiftKey) parts.push("Shift");
-  if (event.metaKey) parts.push("Cmd");
+  if (event.ctrlKey) parts.push('Ctrl');
+  if (event.altKey) parts.push('Alt');
+  if (event.shiftKey) parts.push('Shift');
+  if (event.metaKey) parts.push('Cmd');
   parts.push(normalizeKey(event.key));
-  return parts.join("+");
+  return parts.join('+');
 }
 
 /**
  * Check if a keyboard event matches a shortcut
  */
-export function matchesShortcut(
-  event: KeyboardEvent,
-  shortcut: KeyboardShortcut,
-): boolean {
+export function matchesShortcut(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
   const eventKey = eventToShortcutString(event);
   const shortcutKey = shortcut.key;
 
@@ -49,11 +46,7 @@ export function matchesShortcut(
  */
 export function isTypingInInput(event: KeyboardEvent): boolean {
   const target = event.target as HTMLElement;
-  return (
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.isContentEditable
-  );
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 }
 
 /**
@@ -62,7 +55,7 @@ export function isTypingInInput(event: KeyboardEvent): boolean {
 export function preventKeyboardEvent(
   event: KeyboardEvent,
   preventDefault = true,
-  stopPropagation = true,
+  stopPropagation = true
 ) {
   if (preventDefault) {
     event.preventDefault();
@@ -79,7 +72,7 @@ export function createShortcut(
   key: string,
   description: string,
   action: () => void | Promise<void>,
-  modifiers?: KeyboardShortcut["modifiers"],
+  modifiers?: KeyboardShortcut['modifiers']
 ): KeyboardShortcut {
   return {
     key,
@@ -93,18 +86,16 @@ export function createShortcut(
  * Group shortcuts by category
  */
 export function groupShortcutsByCategory(
-  shortcuts: Array<{ key: string; description: string; category?: string }>,
+  shortcuts: Array<{ key: string; description: string; category?: string }>
 ): Map<string, Array<{ key: string; description: string }>> {
   const groups = new Map<string, Array<{ key: string; description: string }>>();
 
   shortcuts.forEach((shortcut) => {
-    const category = shortcut.category || "Other";
+    const category = shortcut.category || 'Other';
     if (!groups.has(category)) {
       groups.set(category, []);
     }
-    groups
-      .get(category)!
-      .push({ key: shortcut.key, description: shortcut.description });
+    groups.get(category)!.push({ key: shortcut.key, description: shortcut.description });
   });
 
   return groups;
@@ -115,7 +106,7 @@ export function groupShortcutsByCategory(
  */
 export function filterShortcutsByContext(
   shortcuts: KeyboardShortcut[],
-  context?: string,
+  context?: string
 ): KeyboardShortcut[] {
   if (!context) return shortcuts;
 

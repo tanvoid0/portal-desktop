@@ -1,14 +1,8 @@
 // Generic keyboard hook - reusable anywhere
 // This is the base hook that can be customized for different domains
 
-import {
-  writable,
-  derived,
-  get,
-  type Readable,
-  type Writable,
-} from "svelte/store";
-import { onMount, onDestroy } from "svelte";
+import { writable, derived, get, type Readable, type Writable } from 'svelte/store';
+import { onMount, onDestroy } from 'svelte';
 
 export interface KeyboardShortcut {
   key: string;
@@ -47,19 +41,11 @@ export interface KeyboardReturn {
  * Generic keyboard hook that can be used anywhere
  */
 export function useKeyboard(config: KeyboardConfig): KeyboardReturn {
-  const {
-    shortcuts,
-    enabled: initialEnabled = true,
-    context,
-    ignoreInputs = true,
-  } = config;
+  const { shortcuts, enabled: initialEnabled = true, context, ignoreInputs = true } = config;
 
   const enabled = writable(initialEnabled);
 
-  function matchesShortcut(
-    event: KeyboardEvent,
-    shortcut: KeyboardShortcut,
-  ): boolean {
+  function matchesShortcut(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
     // Check context
     if (shortcut.context && shortcut.context !== context) {
       return false;
@@ -68,11 +54,7 @@ export function useKeyboard(config: KeyboardConfig): KeyboardReturn {
     // Check if typing in input
     if (ignoreInputs) {
       const target = event.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return false;
       }
     }
@@ -105,31 +87,31 @@ export function useKeyboard(config: KeyboardConfig): KeyboardReturn {
 
   function parseEventKey(event: KeyboardEvent): string {
     const parts: string[] = [];
-    if (event.ctrlKey) parts.push("Ctrl");
-    if (event.shiftKey) parts.push("Shift");
-    if (event.altKey) parts.push("Alt");
-    if (event.metaKey) parts.push("Meta");
+    if (event.ctrlKey) parts.push('Ctrl');
+    if (event.shiftKey) parts.push('Shift');
+    if (event.altKey) parts.push('Alt');
+    if (event.metaKey) parts.push('Meta');
 
     // Handle special keys
     const keyMap: Record<string, string> = {
-      " ": "Space",
-      ArrowUp: "ArrowUp",
-      ArrowDown: "ArrowDown",
-      ArrowLeft: "ArrowLeft",
-      ArrowRight: "ArrowRight",
-      Escape: "Escape",
-      Enter: "Enter",
-      Tab: "Tab",
-      Delete: "Delete",
-      Backspace: "Backspace",
+      ' ': 'Space',
+      ArrowUp: 'ArrowUp',
+      ArrowDown: 'ArrowDown',
+      ArrowLeft: 'ArrowLeft',
+      ArrowRight: 'ArrowRight',
+      Escape: 'Escape',
+      Enter: 'Enter',
+      Tab: 'Tab',
+      Delete: 'Delete',
+      Backspace: 'Backspace',
     };
 
     const key = keyMap[event.key] || event.key;
-    if (key.length === 1 || key.startsWith("Arrow") || keyMap[event.key]) {
+    if (key.length === 1 || key.startsWith('Arrow') || keyMap[event.key]) {
       parts.push(key);
     }
 
-    return parts.join("+");
+    return parts.join('+');
   }
 
   function handleKeydown(event: KeyboardEvent): boolean {
@@ -162,7 +144,7 @@ export function useKeyboard(config: KeyboardConfig): KeyboardReturn {
       .map((s) => ({
         key: s.key,
         description: s.description,
-        category: s.context || "General",
+        category: s.context || 'General',
       }));
   }
 
@@ -174,21 +156,21 @@ export function useKeyboard(config: KeyboardConfig): KeyboardReturn {
   onMount(() => {
     const $enabled = get(enabled);
     if ($enabled) {
-      window.addEventListener("keydown", handleKeydown);
+      window.addEventListener('keydown', handleKeydown);
     }
 
     // Subscribe to enabled changes
     const unsubscribe = enabled.subscribe(($enabled) => {
       if ($enabled) {
-        window.addEventListener("keydown", handleKeydown);
+        window.addEventListener('keydown', handleKeydown);
       } else {
-        window.removeEventListener("keydown", handleKeydown);
+        window.removeEventListener('keydown', handleKeydown);
       }
     });
 
     return () => {
       unsubscribe();
-      window.removeEventListener("keydown", handleKeydown);
+      window.removeEventListener('keydown', handleKeydown);
     };
   });
 

@@ -1,17 +1,10 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
-  import { automationStore } from "../stores/automationStore";
-  import type { WorkflowExecution } from "../types";
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Play,
-    Pause,
-    CheckCircle,
-    XCircle,
-    Clock,
-    Loader2,
-  } from "@lucide/svelte";
+  import { onDestroy } from 'svelte';
+  import { automationStore } from '../stores/automationStore';
+  import type { WorkflowExecution } from '../types';
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Play, Pause, CheckCircle, XCircle, Clock, Loader2 } from '@lucide/svelte';
 
   export let executionId: string;
   export let onStatusChange: (execution: WorkflowExecution) => void = () => {};
@@ -26,9 +19,7 @@
   async function startPolling() {
     if (!executionId) return;
     await checkStatus();
-    pollingInterval = setInterval(checkStatus, 2000) as ReturnType<
-      typeof setInterval
-    >;
+    pollingInterval = setInterval(checkStatus, 2000) as ReturnType<typeof setInterval>;
   }
 
   async function checkStatus() {
@@ -39,15 +30,11 @@
       execution = exec;
       onStatusChange(exec);
 
-      if (
-        exec.status === "success" ||
-        exec.status === "error" ||
-        exec.status === "canceled"
-      ) {
+      if (exec.status === 'success' || exec.status === 'error' || exec.status === 'canceled') {
         stopPolling();
       }
     } catch (error) {
-      console.error("Failed to check workflow status:", error);
+      console.error('Failed to check workflow status:', error);
     }
   }
 
@@ -64,48 +51,46 @@
 
   function getStatusIcon(status: string) {
     switch (status) {
-      case "running":
+      case 'running':
         return Loader2;
-      case "success":
+      case 'success':
         return CheckCircle;
-      case "error":
+      case 'error':
         return XCircle;
-      case "waiting":
+      case 'waiting':
         return Clock;
-      case "canceled":
+      case 'canceled':
         return Pause;
       default:
         return Play;
     }
   }
 
-  function getStatusVariant(
-    status: string,
-  ): "default" | "secondary" | "destructive" | "outline" {
+  function getStatusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (status) {
-      case "success":
-        return "default";
-      case "error":
-        return "destructive";
+      case 'success':
+        return 'default';
+      case 'error':
+        return 'destructive';
       default:
-        return "secondary";
+        return 'secondary';
     }
   }
 
   function getStatusText(status: string) {
     switch (status) {
-      case "running":
-        return "Running";
-      case "success":
-        return "Completed";
-      case "error":
-        return "Failed";
-      case "waiting":
-        return "Waiting";
-      case "canceled":
-        return "Canceled";
+      case 'running':
+        return 'Running';
+      case 'success':
+        return 'Completed';
+      case 'error':
+        return 'Failed';
+      case 'waiting':
+        return 'Waiting';
+      case 'canceled':
+        return 'Canceled';
       default:
-        return "Unknown";
+        return 'Unknown';
     }
   }
 </script>
@@ -114,7 +99,7 @@
   <Card>
     <CardContent class="p-4">
       <div class="flex items-center space-x-3">
-        {#if execution.status === "running"}
+        {#if execution.status === 'running'}
           <Loader2 class="h-5 w-5 animate-spin text-primary" />
         {:else}
           {@const StatusIcon = getStatusIcon(execution.status)}
@@ -124,9 +109,7 @@
         <div class="flex-1">
           <div class="flex items-center gap-2">
             <span class="font-medium">{getStatusText(execution.status)}</span>
-            <Badge variant={getStatusVariant(execution.status)}
-              >{execution.status}</Badge
-            >
+            <Badge variant={getStatusVariant(execution.status)}>{execution.status}</Badge>
           </div>
           <div class="text-sm text-muted-foreground">
             Execution ID: {execution.id}

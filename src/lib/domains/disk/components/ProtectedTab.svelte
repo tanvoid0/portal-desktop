@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { open } from "@tauri-apps/plugin-dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Card } from "$lib/components/ui/card";
+  import { invoke } from '@tauri-apps/api/core';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Card } from '$lib/components/ui/card';
   import {
     Table,
     TableBody,
@@ -11,17 +11,17 @@
     TableHead,
     TableHeader,
     TableRow,
-  } from "$lib/components/ui/table";
+  } from '$lib/components/ui/table';
 
   let { active }: { active: boolean } = $props();
 
   let paths = $state<string[]>([]);
-  let input = $state("");
-  let status = $state("");
+  let input = $state('');
+  let status = $state('');
 
   async function load() {
     try {
-      paths = await invoke<string[]>("list_protected");
+      paths = await invoke<string[]>('list_protected');
     } catch (e) {
       status = `Failed to load: ${String(e)}`;
     }
@@ -37,8 +37,8 @@
     const p = path.trim();
     if (!p) return;
     try {
-      await invoke("add_protected", { path: p });
-      input = "";
+      await invoke('add_protected', { path: p });
+      input = '';
       status = `Protected: ${p}`;
       load();
     } catch (e) {
@@ -48,12 +48,12 @@
 
   async function pickFolder() {
     const dir = await open({ directory: true, multiple: false });
-    if (typeof dir === "string") add(dir);
+    if (typeof dir === 'string') add(dir);
   }
 
   async function remove(path: string) {
     try {
-      await invoke("remove_protected", { path });
+      await invoke('remove_protected', { path });
       status = `Removed: ${path}`;
       load();
     } catch (e) {
@@ -71,7 +71,7 @@
   <Button variant="outline" onclick={pickFolder}>Add folder…</Button>
   <Input
     bind:value={input}
-    onkeydown={(e) => e.key === "Enter" && add(input)}
+    onkeydown={(e) => e.key === 'Enter' && add(input)}
     placeholder="C:\Users\you\Projects"
     class="flex-1"
   />
@@ -93,7 +93,12 @@
         <TableRow>
           <TableCell class="break-all font-mono text-xs">{p}</TableCell>
           <TableCell class="text-right">
-            <Button variant="outline" size="sm" onclick={() => remove(p)} class="text-destructive hover:text-destructive">
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={() => remove(p)}
+              class="text-destructive hover:text-destructive"
+            >
               Remove
             </Button>
           </TableCell>

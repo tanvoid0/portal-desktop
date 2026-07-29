@@ -3,22 +3,18 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-  } from "$lib/components/ui/alert";
-  import { Progress } from "$lib/components/ui/progress";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
+  import { Progress } from '$lib/components/ui/progress';
   import {
     RefreshCw,
     Download,
@@ -27,16 +23,16 @@
     Loader2,
     Info,
     WifiOff,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
   import {
     checkForUpdates,
     installUpdateAndRelaunch,
     getCurrentVersion,
     type UpdateErrorInfo,
     type UpdateInfo,
-  } from "../services/updateService";
-  import { toast } from "$lib/utils/toast";
-  import { logger } from "$lib/domains/shared";
+  } from '../services/updateService';
+  import { toast } from '$lib/utils/toast';
+  import { logger } from '$lib/domains/shared';
 
   let currentVersion = $state<string | null>(null);
   let updateInfo = $state<UpdateInfo | null>(null);
@@ -52,7 +48,7 @@
       currentVersion = version;
     } else {
       versionLoadFailed = true;
-      logger.warn("Current version unavailable in update settings");
+      logger.warn('Current version unavailable in update settings');
     }
   });
 
@@ -71,12 +67,12 @@
 
     const result = await checkForUpdates();
 
-    if (result.status === "available") {
+    if (result.status === 'available') {
       updateInfo = result.info;
       toast.success(`Update available: ${result.info.version}`);
-    } else if (result.status === "current") {
+    } else if (result.status === 'current') {
       updateInfo = result.info;
-      toast.info("You are running the latest version");
+      toast.info('You are running the latest version');
     } else {
       checkError = result.error;
       notifyCheckError(result.error);
@@ -93,11 +89,11 @@
     isInstalling = true;
     installError = null;
 
-    toast.info("Installing update... The app will restart automatically.");
+    toast.info('Installing update... The app will restart automatically.');
 
     const result = await installUpdateAndRelaunch();
 
-    if (result?.status === "error") {
+    if (result?.status === 'error') {
       installError = result.error;
       notifyInstallError(result.error);
       isInstalling = false;
@@ -130,8 +126,7 @@
           <AlertCircle class="h-4 w-4" />
           <AlertTitle>Version unavailable</AlertTitle>
           <AlertDescription>
-            The installed version could not be read, but you can still check
-            for updates.
+            The installed version could not be read, but you can still check for updates.
           </AlertDescription>
         </Alert>
       {/if}
@@ -146,8 +141,8 @@
     </CardHeader>
     <CardContent class="space-y-4">
       {#if checkError}
-        <Alert variant={checkError.recoverable ? "default" : "destructive"}>
-          {#if checkError.category === "network"}
+        <Alert variant={checkError.recoverable ? 'default' : 'destructive'}>
+          {#if checkError.category === 'network'}
             <WifiOff class="h-4 w-4" />
           {:else}
             <AlertCircle class="h-4 w-4" />
@@ -165,7 +160,7 @@
       {/if}
 
       {#if installError}
-        <Alert variant={installError.recoverable ? "default" : "destructive"}>
+        <Alert variant={installError.recoverable ? 'default' : 'destructive'}>
           <AlertCircle class="h-4 w-4" />
           <AlertTitle>{installError.title}</AlertTitle>
           <AlertDescription>
@@ -205,9 +200,7 @@
 
           {#if isInstalling}
             <div class="space-y-2">
-              <div
-                class="flex items-center gap-2 text-sm text-muted-foreground"
-              >
+              <div class="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 class="h-4 w-4 animate-spin" />
                 Installing update...
               </div>

@@ -24,7 +24,7 @@ todos:
     content: Add `terminalNotesStore.ts` (or local state + invoke wrappers) and wire it into `TerminalAiV2.svelte` with debounced saving.
     status: completed
   - id: fix-sessionstore-args
-    content: "Fix TS/Rust argument mismatch in `sessionStore.ts`: ensure `load_terminal_session` and `delete_terminal_session` send `tab_id` rather than `tabId` to match Rust function parameters."
+    content: 'Fix TS/Rust argument mismatch in `sessionStore.ts`: ensure `load_terminal_session` and `delete_terminal_session` send `tab_id` rather than `tabId` to match Rust function parameters.'
     status: completed
   - id: osc133-injection
     content: Implement OSC 133 injection for zsh/bash during PTY startup in `src-tauri/src/domains/terminal/manager.rs` by starting zsh with a temporary ZDOTDIR containing hooks, and starting bash with a temporary --rcfile containing DEBUG+PROMPT_COMMAND hooks (emitting OSC 133 A/B terminated with `ESC \\`).
@@ -33,7 +33,7 @@ todos:
     content: Adjust or add TS types/helpers so `shell-integration-event` payload parsing works reliably with the actual Rust serialized field names.
     status: completed
   - id: smoke-tests
-    content: "Run Tauri dev/build to validate: command blocks populate correctly, scrollback persists across restarts, notes persist per tab, and file hyperlinks render as OSC 8."
+    content: 'Run Tauri dev/build to validate: command blocks populate correctly, scrollback persists across restarts, notes persist per tab, and file hyperlinks render as OSC 8.'
     status: completed
 isProject: false
 ---
@@ -59,34 +59,45 @@ This plan creates a new terminal component that:
 ## Implementation outline
 
 1. **Archive old terminal code**
-  - Keep `src/lib/domains/terminal/components/Terminal.svelte` untouched for reference.
-  - Keep old AI wrapper `AITerminalContainer.svelte` untouched.
+
+- Keep `src/lib/domains/terminal/components/Terminal.svelte` untouched for reference.
+- Keep old AI wrapper `AITerminalContainer.svelte` untouched.
+
 2. **Add new terminal UI component(s)**
-  - Create a new terminal component file (e.g. `TerminalAiV2.svelte`) that contains the xterm mount, IO wiring, sidebar layout, and notes panel.
-  - Create new versions of any terminal subcomponents needed for the new command tracking UX (especially command blocks), so we don’t have to mutate the old terminal’s behavior.
-  - Update `TerminalTabContainer.svelte` and `ProjectTerminal.svelte` to render the new component instead of `Terminal.svelte`.
+
+- Create a new terminal component file (e.g. `TerminalAiV2.svelte`) that contains the xterm mount, IO wiring, sidebar layout, and notes panel.
+- Create new versions of any terminal subcomponents needed for the new command tracking UX (especially command blocks), so we don’t have to mutate the old terminal’s behavior.
+- Update `TerminalTabContainer.svelte` and `ProjectTerminal.svelte` to render the new component instead of `Terminal.svelte`.
+
 3. **Backend: DB-backed persistent scrollback + notes**
-  - Add SeaORM entities + migrations for:
-    - `terminal_sessions` (tab_id, working_directory, environment_json, scrollback_text, cursor_position, terminal_size, last_activity)
-    - `terminal_notes` (tab_id, markdown, updated_at)
-  - Change backend commands:
-    - `save_terminal_session` / `load_terminal_session` / `delete_terminal_session` to use DB instead of the current in-memory `OnceLock` map.
-    - Add `save_terminal_note` / `load_terminal_note` commands.
-  - Fix the current TS/Rust arg mismatch for `load_terminal_session`/`delete_terminal_session` (TS currently sends `{ tabId }` while Rust expects `tab_id`).
+
+- Add SeaORM entities + migrations for:
+  - `terminal_sessions` (tab_id, working_directory, environment_json, scrollback_text, cursor_position, terminal_size, last_activity)
+  - `terminal_notes` (tab_id, markdown, updated_at)
+- Change backend commands:
+  - `save_terminal_session` / `load_terminal_session` / `delete_terminal_session` to use DB instead of the current in-memory `OnceLock` map.
+  - Add `save_terminal_note` / `load_terminal_note` commands.
+- Fix the current TS/Rust arg mismatch for `load_terminal_session`/`delete_terminal_session` (TS currently sends `{ tabId }` while Rust expects `tab_id`).
+
 4. **Backend: inject OSC 133 markers**
-  - Update `src-tauri/src/domains/terminal/manager.rs` in `create_process` so that when the requested shell is zsh or bash, the spawned shell is started with temporary hooks that emit OSC 133 A/B markers using `ESC ]133;A ESC \\` and `ESC ]133;B ESC \\`.
-  - Rust `shell_integration.rs` will then produce `shell-integration-event` payloads which the new command-block UI will consume.
+
+- Update `src-tauri/src/domains/terminal/manager.rs` in `create_process` so that when the requested shell is zsh or bash, the spawned shell is started with temporary hooks that emit OSC 133 A/B markers using `ESC ]133;A ESC \\` and `ESC ]133;B ESC \\`.
+- Rust `shell_integration.rs` will then produce `shell-integration-event` payloads which the new command-block UI will consume.
+
 5. **Frontend: OSC 8 rendering**
-  - In the new terminal component’s `handleOutput`, inject OSC 8 sequences into `output.content` before calling `terminal.write(...)`.
-  - Maintain a small tail buffer so file paths split across chunks are still linkified.
-  - Note: for now we will only render OSC 8 links (no editor-open handler yet), because you chose to avoid OS/in-app editor opening until an in-app file editor exists.
+
+- In the new terminal component’s `handleOutput`, inject OSC 8 sequences into `output.content` before calling `terminal.write(...)`.
+- Maintain a small tail buffer so file paths split across chunks are still linkified.
+- Note: for now we will only render OSC 8 links (no editor-open handler yet), because you chose to avoid OS/in-app editor opening until an in-app file editor exists.
+
 6. **Verification**
-  - Build + run Tauri dev.
-  - Validate:
-    - Opening a terminal, running commands populates command blocks with exit code/duration.
-    - Closing/restarting the app reloads terminal scrollback from DB.
-    - Notes persist per tab.
-    - Terminal shows clickable file links (even if clicking doesn’t open anything yet).
+
+- Build + run Tauri dev.
+- Validate:
+  - Opening a terminal, running commands populates command blocks with exit code/duration.
+  - Closing/restarting the app reloads terminal scrollback from DB.
+  - Notes persist per tab.
+  - Terminal shows clickable file links (even if clicking doesn’t open anything yet).
 
 ## Mermaid: data flow
 
@@ -108,8 +119,6 @@ flowchart LR
   I --> (terminal_notes SQLite)
 ```
 
-
-
 ## Key files to change/add
 
 - Add: `src/lib/domains/terminal/components/TerminalAiV2.svelte`
@@ -123,4 +132,3 @@ flowchart LR
 - Update: `src-tauri/src/domains/terminal/commands.rs` (DB persistence + note commands)
 - Update: `src-tauri/src/domains/terminal/manager.rs` (OSC 133 injection for zsh/bash)
 - Update: `src-tauri/src/lib.rs` (register new Tauri commands)
-

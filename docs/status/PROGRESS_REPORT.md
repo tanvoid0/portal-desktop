@@ -7,12 +7,12 @@
 
 Portal Desktop is **feature-complete for development use** but **not yet production-grade**. Core UX consistency (page shell, toasts, navigation) is done. Remaining work focuses on automated quality gates, backend persistence, and frontend data-layer consolidation.
 
-| Pillar | Status | Notes |
-|--------|--------|-------|
-| Consistency | In progress | TanStack Query on projects, dashboard, tasks (list); shell on cloud workload lists |
-| Stability | In progress | SeaORM Migrator, app-data SQLite path, deployment DB persistence |
-| Deprecation-free | In progress | Removed `lucide-svelte`, `@/lib/` in terminal; stub APIs return explicit errors |
-| Modularity | In progress | Domain barrel exports, `*Api.ts` layers, network service extraction |
+| Pillar           | Status      | Notes                                                                              |
+| ---------------- | ----------- | ---------------------------------------------------------------------------------- |
+| Consistency      | In progress | TanStack Query on projects, dashboard, tasks (list); shell on cloud workload lists |
+| Stability        | In progress | SeaORM Migrator, app-data SQLite path, deployment DB persistence                   |
+| Deprecation-free | In progress | Removed `lucide-svelte`, `@/lib/` in terminal; stub APIs return explicit errors    |
+| Modularity       | In progress | Domain barrel exports, `*Api.ts` layers, network service extraction                |
 
 ## Completed (this initiative)
 
@@ -39,11 +39,11 @@ UI session state extracted to `state/taskUi.svelte.ts` (filters, selection, mult
 
 Apply the **projects Query template** to form-heavy domains:
 
-| Domain | Approach |
-|--------|----------|
-| Settings | Single-record read/write via Query + mutation |
+| Domain      | Approach                                                       |
+| ----------- | -------------------------------------------------------------- |
+| Settings    | Single-record read/write via Query + mutation                  |
 | Credentials | Explicit mutations only; no optimistic UI (security-sensitive) |
-| Documents | `*Api.ts` + `queries/` + shrink `documentStore.ts` |
+| Documents   | `*Api.ts` + `queries/` + shrink `documentStore.ts`             |
 
 Reference: `src/lib/domains/projects/queries/projectQueries.ts`, `state/projectUi.svelte.ts`.
 

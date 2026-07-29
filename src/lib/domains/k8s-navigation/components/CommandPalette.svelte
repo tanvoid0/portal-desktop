@@ -1,13 +1,13 @@
 <!-- Command Palette - Overlay for quick commands -->
 <script lang="ts">
-  import { useCommandPalette } from "../hooks/useCommandPalette";
-  import type { Command } from "../types";
-  import { Dialog, DialogContent } from "$lib/components/ui/dialog";
-  import { Input } from "$lib/components/ui/input";
-  import { Button } from "$lib/components/ui/button";
-  import { ScrollArea } from "$lib/components/ui/scroll-area";
-  import { onMount } from "svelte";
-  import { get } from "svelte/store";
+  import { useCommandPalette } from '../hooks/useCommandPalette';
+  import type { Command } from '../types';
+  import { Dialog, DialogContent } from '$lib/components/ui/dialog';
+  import { Input } from '$lib/components/ui/input';
+  import { Button } from '$lib/components/ui/button';
+  import { ScrollArea } from '$lib/components/ui/scroll-area';
+  import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
 
   interface Props {
     commands: Command[];
@@ -34,9 +34,9 @@
   }
 
   onMount(() => {
-    window.addEventListener("keydown", handleKeydown);
+    window.addEventListener('keydown', handleKeydown);
     return () => {
-      window.removeEventListener("keydown", handleKeydown);
+      window.removeEventListener('keydown', handleKeydown);
     };
   });
 
@@ -80,9 +80,7 @@
       <ScrollArea class="max-h-[400px]">
         <div class="p-2">
           {#if $filteredCommandsStore.length === 0}
-            <div class="p-4 text-center text-sm text-muted-foreground">
-              No commands found
-            </div>
+            <div class="p-4 text-center text-sm text-muted-foreground">No commands found</div>
           {:else}
             <div class="space-y-1">
               {#each $filteredCommandsStore as command, index}

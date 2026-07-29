@@ -1,25 +1,13 @@
 <!-- Deployments List Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    cloudStore,
-    loadResources,
-    refreshResources,
-  } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import BaseResourceTable from "$lib/domains/cloud/core/components/BaseResourceTable.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
+  import { onMount } from 'svelte';
+  import { cloudStore, loadResources, refreshResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import BaseResourceTable from '$lib/domains/cloud/core/components/BaseResourceTable.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
   import {
     Dialog,
     DialogContent,
@@ -28,19 +16,16 @@
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from "$lib/components/ui/dialog";
-  import { Label } from "$lib/components/ui/label";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import { toastActions } from "$lib/utils/toast";
-  import { goto } from "$app/navigation";
-  import { get } from "svelte/store";
-  import {
-    useTableNavigation,
-    useResourceActions,
-  } from "$lib/domains/k8s-navigation";
+  } from '$lib/components/ui/dialog';
+  import { Label } from '$lib/components/ui/label';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import { toastActions } from '$lib/utils/toast';
+  import { goto } from '$app/navigation';
+  import { get } from 'svelte/store';
+  import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 
-  let searchQuery = $state("");
-  let statusFilter = $state("");
+  let searchQuery = $state('');
+  let statusFilter = $state('');
   let scalingDeployment = $state<ICloudResource | null>(null);
   let scaleReplicas = $state(1);
   let isScaling = $state(false);
@@ -55,11 +40,10 @@
   const filteredDeployments = $derived(
     $cloudStore.resources[ResourceType.DEPLOYMENT].filter((deployment) => {
       const matchesSearch =
-        !searchQuery ||
-        deployment.name.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery || deployment.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = !statusFilter || deployment.status === statusFilter;
       return matchesSearch && matchesStatus;
-    }),
+    })
   );
 
   const filteredDeploymentsLength = $derived(filteredDeployments.length);
@@ -67,30 +51,29 @@
   const deploymentStats = $derived({
     total: $cloudStore.resources[ResourceType.DEPLOYMENT].length,
     running: $cloudStore.resources[ResourceType.DEPLOYMENT].filter(
-      (d: any) => d.status === "running",
+      (d: any) => d.status === 'running'
     ).length,
     pending: $cloudStore.resources[ResourceType.DEPLOYMENT].filter(
-      (d: any) => d.status === "pending",
+      (d: any) => d.status === 'pending'
     ).length,
-    failed: $cloudStore.resources[ResourceType.DEPLOYMENT].filter(
-      (d: any) => d.status === "failed",
-    ).length,
+    failed: $cloudStore.resources[ResourceType.DEPLOYMENT].filter((d: any) => d.status === 'failed')
+      .length,
   });
 
   const statusOptions = $derived.by(() => {
     const statuses = new Set(
-      $cloudStore.resources[ResourceType.DEPLOYMENT].map((d: any) => d.status),
+      $cloudStore.resources[ResourceType.DEPLOYMENT].map((d: any) => d.status)
     );
     return Array.from(statuses).sort();
   });
 
   const deploymentColumns = [
-    { key: "name", label: "Name", width: "w-1/4" },
-    { key: "status", label: "Status", width: "w-1/8" },
-    { key: "replicas", label: "Replicas", width: "w-1/8" },
-    { key: "ready", label: "Ready", width: "w-1/8" },
-    { key: "age", label: "Age", width: "w-1/8" },
-    { key: "namespace", label: "Namespace", width: "w-1/6" },
+    { key: 'name', label: 'Name', width: 'w-1/4' },
+    { key: 'status', label: 'Status', width: 'w-1/8' },
+    { key: 'replicas', label: 'Replicas', width: 'w-1/8' },
+    { key: 'ready', label: 'Ready', width: 'w-1/8' },
+    { key: 'age', label: 'Age', width: 'w-1/8' },
+    { key: 'namespace', label: 'Namespace', width: 'w-1/6' },
   ];
 
   async function handleRefresh() {
@@ -108,11 +91,13 @@
 
     try {
       isScaling = true;
-      await k8sResourceService.scaleDeployment(scalingDeployment.namespace, scalingDeployment.name, scaleReplicas);
-
-      toastActions.success(
-        `Scaled ${scalingDeployment.name} to ${scaleReplicas} replicas`,
+      await k8sResourceService.scaleDeployment(
+        scalingDeployment.namespace,
+        scalingDeployment.name,
+        scaleReplicas
       );
+
+      toastActions.success(`Scaled ${scalingDeployment.name} to ${scaleReplicas} replicas`);
       showScaleDialog = false;
       scalingDeployment = null;
 
@@ -120,7 +105,7 @@
       await loadResources(ResourceType.DEPLOYMENT);
     } catch (error) {
       toastActions.error(
-        `Failed to scale deployment: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to scale deployment: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     } finally {
       isScaling = false;
@@ -137,9 +122,7 @@
       const deployments = filteredDeployments;
       const deployment = deployments[index];
       if (deployment) {
-        goto(
-          `/cloud/workloads/deployments/${deployment.name}?namespace=${deployment.namespace}`,
-        );
+        goto(`/cloud/workloads/deployments/${deployment.name}?namespace=${deployment.namespace}`);
       }
     },
     enabled: $cloudStore.connection.isConnected,
@@ -151,13 +134,11 @@
     resources: () => filteredDeployments,
     handlers: {
       onDescribe: (resource) => {
-        goto(
-          `/cloud/workloads/deployments/${resource.name}?namespace=${resource.namespace}`,
-        );
+        goto(`/cloud/workloads/deployments/${resource.name}?namespace=${resource.namespace}`);
       },
       onEdit: (resource) => {
         goto(
-          `/cloud/workloads/deployments/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
+          `/cloud/workloads/deployments/${resource.name}?namespace=${resource.namespace}&tab=yaml`
         );
       },
       onRestart: async (resource) => {
@@ -167,7 +148,7 @@
           await loadResources(ResourceType.DEPLOYMENT);
         } catch (error) {
           toastActions.error(
-            `Failed to restart: ${error instanceof Error ? error.message : "Unknown error"}`,
+            `Failed to restart: ${error instanceof Error ? error.message : 'Unknown error'}`
           );
         }
       },
@@ -176,7 +157,7 @@
       },
       onYaml: (resource) => {
         goto(
-          `/cloud/workloads/deployments/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
+          `/cloud/workloads/deployments/${resource.name}?namespace=${resource.namespace}&tab=yaml`
         );
       },
       onRefresh: () => {
@@ -200,7 +181,7 @@
       <div>
         <h1 class="text-2xl font-bold">Deployments</h1>
         <p class="text-muted-foreground">
-          Kubernetes deployments in {$cloudStore.selectedNamespace || "all namespaces"}
+          Kubernetes deployments in {$cloudStore.selectedNamespace || 'all namespaces'}
         </p>
       </div>
       <Button onclick={handleRefresh} variant="outline">Refresh</Button>
@@ -262,7 +243,7 @@
         />
         <Select
           options={[
-            { value: "", label: "All Statuses" },
+            { value: '', label: 'All Statuses' },
             ...statusOptions.map((s) => ({ value: s, label: s })),
           ]}
           bind:value={statusFilter}
@@ -273,8 +254,8 @@
             variant="ghost"
             size="sm"
             onclick={() => {
-              searchQuery = "";
-              statusFilter = "";
+              searchQuery = '';
+              statusFilter = '';
             }}
           >
             Clear
@@ -288,8 +269,8 @@
       {#if filteredDeployments.length === 0}
         <div class="py-8 text-center text-muted-foreground">
           {searchQuery || statusFilter
-            ? "No deployments match your filters"
-            : "No deployments found"}
+            ? 'No deployments match your filters'
+            : 'No deployments found'}
         </div>
       {:else}
         <div
@@ -310,17 +291,14 @@
                 {@const selectedIdx = get(tableNav.selectedIndex)}
                 {@const isSelected = index === selectedIdx}
                 <tr
-                  class="border-b hover:bg-muted/50 {isSelected
-                    ? 'bg-accent'
-                    : ''}"
+                  class="border-b hover:bg-muted/50 {isSelected ? 'bg-accent' : ''}"
                   data-selected={isSelected}
                   data-index={index}
                 >
                   <td class="p-2">
                     <div class="flex items-center space-x-2">
                       <div
-                        class="h-2 w-2 rounded-full {deployment.status ===
-                        'running'
+                        class="h-2 w-2 rounded-full {deployment.status === 'running'
                           ? 'bg-green-500'
                           : deployment.status === 'pending'
                             ? 'bg-yellow-500'
@@ -331,7 +309,7 @@
                         class="h-auto p-0 font-medium"
                         onclick={() =>
                           goto(
-                            `/cloud/workloads/deployments/${deployment.name}?namespace=${deployment.namespace}`,
+                            `/cloud/workloads/deployments/${deployment.name}?namespace=${deployment.namespace}`
                           )}
                       >
                         {deployment.name}
@@ -345,23 +323,15 @@
                       {deployment.status}
                     </span>
                   </td>
+                  <td class="p-2 text-sm">{deployment.metadata?.replicas || 'N/A'}</td>
                   <td class="p-2 text-sm"
-                    >{deployment.metadata?.replicas || "N/A"}</td
+                    >{deployment.metadata?.readyReplicas || 0}/{deployment.metadata?.replicas ||
+                      0}</td
                   >
-                  <td class="p-2 text-sm"
-                    >{deployment.metadata?.readyReplicas || 0}/{deployment
-                      .metadata?.replicas || 0}</td
-                  >
-                  <td class="p-2 text-sm"
-                    >{deployment.metadata?.age || "N/A"}</td
-                  >
+                  <td class="p-2 text-sm">{deployment.metadata?.age || 'N/A'}</td>
                   <td class="p-2 text-sm">{deployment.namespace}</td>
                   <td class="p-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => handleScale(deployment)}
-                    >
+                    <Button variant="outline" size="sm" onclick={() => handleScale(deployment)}>
                       Scale
                     </Button>
                   </td>
@@ -405,7 +375,7 @@
             Cancel
           </Button>
           <Button onclick={confirmScale} disabled={isScaling}>
-            {isScaling ? "Scaling..." : "Scale"}
+            {isScaling ? 'Scaling...' : 'Scale'}
           </Button>
         </DialogFooter>
       </DialogContent>

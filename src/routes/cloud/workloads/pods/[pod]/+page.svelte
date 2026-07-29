@@ -1,29 +1,16 @@
 <!-- Pod Detail Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { goto, replaceState } from "$app/navigation";
-  import { cloudStore, loadResources } from "$lib/domains/cloud/stores";
-  import { get } from "svelte/store";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Separator } from "$lib/components/ui/separator";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto, replaceState } from '$app/navigation';
+  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
+  import { get } from 'svelte/store';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Separator } from '$lib/components/ui/separator';
   import {
     Dialog,
     DialogContent,
@@ -31,41 +18,32 @@
     DialogFooter,
     DialogHeader,
     DialogTitle,
-  } from "$lib/components/ui/dialog";
-  import { Label } from "$lib/components/ui/label";
-  import { Input } from "$lib/components/ui/input";
-  import {
-    ArrowLeft,
-    RefreshCw,
-    Download,
-    Terminal,
-    FileCode,
-    Network,
-  } from "@lucide/svelte";
-  import { podApi } from "$lib/domains/cloud/api/podApi";
-  import Loading from "$lib/components/ui/loading.svelte";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { toastActions } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import type { PortForwardInfo } from "$lib/domains/cloud/providers/gcp/GCPTypes";
-  import LogSearchPanel from "$lib/domains/cloud/components/logs/LogSearchPanel.svelte";
-  import LogsDisplay from "$lib/domains/cloud/components/logs/LogsDisplay.svelte";
-  import { parseRawLogs } from "$lib/domains/cloud/utils/logParser";
-  import type { K8sLog } from "$lib/domains/cloud/types/k8s";
-  import MetricsDisplay from "$lib/domains/cloud/components/MetricsDisplay.svelte";
+  } from '$lib/components/ui/dialog';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
+  import { ArrowLeft, RefreshCw, Download, Terminal, FileCode, Network } from '@lucide/svelte';
+  import { podApi } from '$lib/domains/cloud/api/podApi';
+  import Loading from '$lib/components/ui/loading.svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { toastActions } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import type { PortForwardInfo } from '$lib/domains/cloud/providers/gcp/GCPTypes';
+  import LogSearchPanel from '$lib/domains/cloud/components/logs/LogSearchPanel.svelte';
+  import LogsDisplay from '$lib/domains/cloud/components/logs/LogsDisplay.svelte';
+  import { parseRawLogs } from '$lib/domains/cloud/utils/logParser';
+  import type { K8sLog } from '$lib/domains/cloud/types/k8s';
+  import MetricsDisplay from '$lib/domains/cloud/components/MetricsDisplay.svelte';
 
   const podName = $derived($page.params.pod);
   const namespace = $derived(
-    $page.url.searchParams.get("namespace") ||
-      $cloudStore.selectedNamespace ||
-      "default",
+    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get("tab") || "overview");
+  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
 
   let pod = $state<ICloudResource | null>(null);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
-  let activeTab = $state("overview");
+  let activeTab = $state('overview');
 
   // Sync activeTab with tabParam when it changes
   $effect(() => {
@@ -73,17 +51,17 @@
   });
 
   // Logs state
-  let logs = $state("");
+  let logs = $state('');
   let logsLoading = $state(false);
   let logsError = $state<string | null>(null);
   let logsFollowing = $state(false);
 
   // Log search/filter state
-  let logSearchQuery = $state("");
-  let selectedLogContainer = $state("");
-  let selectedLogSeverity = $state("");
+  let logSearchQuery = $state('');
+  let selectedLogContainer = $state('');
+  let selectedLogSeverity = $state('');
   let logTailLines = $state(1000);
-  let logViewMode = $state<"detailed" | "compact" | "raw">("detailed");
+  let logViewMode = $state<'detailed' | 'compact' | 'raw'>('detailed');
   let logContainers = $derived.by(() => {
     if (!pod?.metadata?.containers) return [];
     const containers = pod.metadata.containers;
@@ -96,12 +74,12 @@
   // Parse logs into structured format
   const parsedLogs = $derived.by(() => {
     if (!logs || !pod) return [];
-    const containerName = selectedLogContainer || logContainers[0] || "app";
+    const containerName = selectedLogContainer || logContainers[0] || 'app';
     return parseRawLogs(logs, pod.name, containerName);
   });
 
   // YAML state
-  let yaml = $state("");
+  let yaml = $state('');
   let yamlLoading = $state(false);
   let yamlError = $state<string | null>(null);
 
@@ -121,9 +99,9 @@
 
   onMount(async () => {
     await loadPod();
-    if (activeTab === "logs") {
+    if (activeTab === 'logs') {
       await loadLogs();
-    } else if (activeTab === "yaml") {
+    } else if (activeTab === 'yaml') {
       await loadYAML();
     }
     await loadPortForwards();
@@ -135,13 +113,13 @@
 
     loadingPortForwards = true;
     try {
-      const forwards = await podApi.listPortForwards() as PortForwardInfo[];
+      const forwards = (await podApi.listPortForwards()) as PortForwardInfo[];
       // Filter to only show forwards for this pod
       activePortForwards = forwards.filter(
-        (f) => pod && f.pod_name === pod.name && f.namespace === pod.namespace,
+        (f) => pod && f.pod_name === pod.name && f.namespace === pod.namespace
       );
     } catch (error) {
-      console.error("Failed to load port forwards:", error);
+      console.error('Failed to load port forwards:', error);
     } finally {
       loadingPortForwards = false;
     }
@@ -150,31 +128,26 @@
   async function stopPortForward(id: string) {
     try {
       await podApi.stopPortForward(id);
-      toastActions.success("Port forward stopped");
+      toastActions.success('Port forward stopped');
       await loadPortForwards();
     } catch (error) {
       toastActions.error(
-        `Failed to stop port forward: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to stop port forward: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
 
   $effect(() => {
-    if (
-      activeTab === "logs" &&
-      !logs &&
-      !logsLoading &&
-      !logsError?.includes("waiting to start")
-    ) {
+    if (activeTab === 'logs' && !logs && !logsLoading && !logsError?.includes('waiting to start')) {
       loadLogs();
-    } else if (activeTab === "yaml" && !yaml && !yamlLoading) {
+    } else if (activeTab === 'yaml' && !yaml && !yamlLoading) {
       loadYAML();
     }
   });
 
   async function loadPod() {
     if (!podName || !$cloudStore.connection.isConnected) {
-      error = "Pod name or connection required";
+      error = 'Pod name or connection required';
       isLoading = false;
       return;
     }
@@ -204,8 +177,8 @@
 
       pod = foundPod;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load pod";
-      console.error("Failed to load pod:", err);
+      error = err instanceof Error ? err.message : 'Failed to load pod';
+      console.error('Failed to load pod:', err);
     } finally {
       isLoading = false;
     }
@@ -226,12 +199,9 @@
         // Type assertion needed because type definition doesn't match implementation
         const getLogsFn = pod.getLogs as (
           container?: string,
-          tailLines?: number,
+          tailLines?: number
         ) => Promise<string>;
-        logs = await getLogsFn(
-          containerToUse || undefined,
-          tailLinesToUse || undefined,
-        );
+        logs = await getLogsFn(containerToUse || undefined, tailLinesToUse || undefined);
       } else {
         // Fallback to invokeClient
         logs = await podApi.getLogs({
@@ -245,20 +215,19 @@
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       const isPodInitializing =
-        errorMessage.includes("PodInitializing") ||
-        errorMessage.includes("waiting to start") ||
-        errorMessage.includes("is waiting to start");
+        errorMessage.includes('PodInitializing') ||
+        errorMessage.includes('waiting to start') ||
+        errorMessage.includes('is waiting to start');
 
       if (isPodInitializing) {
         // Pod is still initializing - show user-friendly message, don't spam error toasts
-        logsError =
-          "Container is waiting to start. Logs will be available once the pod is ready.";
-        logs = ""; // Keep logs empty so we can retry later
+        logsError = 'Container is waiting to start. Logs will be available once the pod is ready.';
+        logs = ''; // Keep logs empty so we can retry later
         // Don't show error toast for PodInitializing - it's expected behavior
       } else {
         // Other errors - show error toast
         logsError = errorMessage;
-        console.error("Failed to load logs:", err);
+        console.error('Failed to load logs:', err);
         toastActions.error(`Failed to load logs: ${logsError}`);
       }
     } finally {
@@ -289,9 +258,9 @@
   }
 
   function handleClearLogFilters() {
-    logSearchQuery = "";
-    selectedLogContainer = "";
-    selectedLogSeverity = "";
+    logSearchQuery = '';
+    selectedLogContainer = '';
+    selectedLogSeverity = '';
     logTailLines = 1000;
     // Reload logs with default filters
     loadLogs();
@@ -306,8 +275,8 @@
 
       yaml = await podApi.getYaml(pod.namespace, pod.name);
     } catch (err) {
-      yamlError = err instanceof Error ? err.message : "Failed to load YAML";
-      console.error("Failed to load YAML:", err);
+      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
+      console.error('Failed to load YAML:', err);
     } finally {
       yamlLoading = false;
     }
@@ -323,14 +292,14 @@ metadata:
   labels:
     ${Object.entries(pod.metadata || {})
       .map(([k, v]) => `    ${k}: ${v}`)
-      .join("\n")}
+      .join('\n')}
 spec:
   containers:
     - name: ${pod.name}
-      image: ${pod.metadata?.image || "unknown"}
+      image: ${pod.metadata?.image || 'unknown'}
 status:
   phase: ${pod.status}
-  podIP: ${pod.metadata?.ip || "N/A"}
+  podIP: ${pod.metadata?.ip || 'N/A'}
 `;
   }
 
@@ -338,13 +307,13 @@ status:
     activeTab = tab;
     // Update URL without navigation
     const url = new URL($page.url);
-    url.searchParams.set("tab", tab);
+    url.searchParams.set('tab', tab);
     replaceState(url, {});
   }
 
   function handleExec() {
     // Navigate to exec tab or open terminal
-    handleTabChange("exec");
+    handleTabChange('exec');
   }
 
   async function handleDelete() {
@@ -352,17 +321,17 @@ status:
 
     const confirmed = await confirmAction(
       `Are you sure you want to delete pod "${pod.name}"?`,
-      "Delete pod",
+      'Delete pod'
     );
     if (!confirmed) return;
 
     try {
       await podApi.deletePod(pod.namespace, pod.name);
-      goto("/cloud/workloads/pods");
+      goto('/cloud/workloads/pods');
     } catch (err) {
       toastActions.error(
-        "Failed to delete pod",
-        err instanceof Error ? err.message : "Unknown error",
+        'Failed to delete pod',
+        err instanceof Error ? err.message : 'Unknown error'
       );
     }
   }
@@ -376,9 +345,8 @@ status:
       const metrics = await podApi.getMetrics(pod.namespace, pod.name);
       podMetrics = metrics;
     } catch (err) {
-      metricsError =
-        err instanceof Error ? err.message : "Failed to load metrics";
-      console.error("Failed to load metrics:", err);
+      metricsError = err instanceof Error ? err.message : 'Failed to load metrics';
+      console.error('Failed to load metrics:', err);
       podMetrics = null;
     } finally {
       metricsLoading = false;
@@ -402,11 +370,7 @@ status:
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={() => goto("/cloud/workloads/pods")}
-        >
+        <Button variant="ghost" size="sm" onclick={() => goto('/cloud/workloads/pods')}>
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -414,10 +378,7 @@ status:
           <h1 class="text-3xl font-bold">{pod.name}</h1>
           <p class="text-muted-foreground">
             Namespace: {pod.namespace} • Status:
-            <Badge
-              variant={pod.status === "running" ? "default" : "secondary"}
-              class="ml-2"
-            >
+            <Badge variant={pod.status === 'running' ? 'default' : 'secondary'} class="ml-2">
               {pod.status}
             </Badge>
           </p>
@@ -435,26 +396,18 @@ status:
           <RefreshCw class="mr-2 h-4 w-4" />
           Refresh
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={() => (showPortForwardDialog = true)}
-        >
+        <Button variant="outline" size="sm" onclick={() => (showPortForwardDialog = true)}>
           <Network class="mr-2 h-4 w-4" />
           Port Forward
           {#if activePortForwards.length > 0}
-            <Badge variant="secondary" class="ml-2"
-              >{activePortForwards.length}</Badge
-            >
+            <Badge variant="secondary" class="ml-2">{activePortForwards.length}</Badge>
           {/if}
         </Button>
         <Button variant="outline" size="sm" onclick={handleExec}>
           <Terminal class="mr-2 h-4 w-4" />
           Exec
         </Button>
-        <Button variant="destructive" size="sm" onclick={handleDelete}>
-          Delete
-        </Button>
+        <Button variant="destructive" size="sm" onclick={handleDelete}>Delete</Button>
       </div>
     </div>
 
@@ -467,9 +420,7 @@ status:
         <TabsTrigger value="port-forwards">
           Port Forwards
           {#if activePortForwards.length > 0}
-            <Badge variant="secondary" class="ml-2"
-              >{activePortForwards.length}</Badge
-            >
+            <Badge variant="secondary" class="ml-2">{activePortForwards.length}</Badge>
           {/if}
         </TabsTrigger>
         <TabsTrigger value="exec">Exec</TabsTrigger>
@@ -479,11 +430,7 @@ status:
       <TabsContent value="overview" class="space-y-4">
         <!-- Metrics -->
         {#if podMetrics || metricsLoading}
-          <MetricsDisplay
-            metrics={podMetrics}
-            title="Pod Resource Usage"
-            showDetails={true}
-          />
+          <MetricsDisplay metrics={podMetrics} title="Pod Resource Usage" showDetails={true} />
         {/if}
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -502,15 +449,13 @@ status:
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Status:</span>
-                <Badge
-                  variant={pod.status === "running" ? "default" : "secondary"}
-                >
+                <Badge variant={pod.status === 'running' ? 'default' : 'secondary'}>
                   {pod.status}
                 </Badge>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Age:</span>
-                <span class="font-medium">{pod.metadata?.age || "N/A"}</span>
+                <span class="font-medium">{pod.metadata?.age || 'N/A'}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Restarts:</span>
@@ -541,14 +486,10 @@ status:
                   {#each containers as container}
                     <div class="rounded-lg border p-3">
                       <div class="mb-2 flex items-center justify-between">
-                        <span class="font-medium"
-                          >{container.name || container}</span
-                        >
+                        <span class="font-medium">{container.name || container}</span>
                         {#if container.ready !== undefined}
-                          <Badge
-                            variant={container.ready ? "default" : "secondary"}
-                          >
-                            {container.ready ? "Ready" : "Not Ready"}
+                          <Badge variant={container.ready ? 'default' : 'secondary'}>
+                            {container.ready ? 'Ready' : 'Not Ready'}
                           </Badge>
                         {/if}
                       </div>
@@ -566,9 +507,7 @@ status:
                   {/each}
                 </div>
               {:else}
-                <p class="text-muted-foreground">
-                  No container information available
-                </p>
+                <p class="text-muted-foreground">No container information available</p>
               {/if}
             </CardContent>
           </Card>
@@ -580,11 +519,10 @@ status:
               <CardTitle>Metadata</CardTitle>
             </CardHeader>
             <CardContent>
-              <pre
-                class="overflow-auto rounded-lg bg-muted p-4 text-xs">{JSON.stringify(
+              <pre class="overflow-auto rounded-lg bg-muted p-4 text-xs">{JSON.stringify(
                   pod.metadata,
                   null,
-                  2,
+                  2
                 )}</pre>
             </CardContent>
           </Card>
@@ -623,37 +561,37 @@ status:
                 <!-- View Mode Toggle -->
                 <div class="flex items-center gap-1 rounded-md border p-1">
                   <Button
-                    variant={logViewMode === "detailed" ? "default" : "ghost"}
+                    variant={logViewMode === 'detailed' ? 'default' : 'ghost'}
                     size="sm"
                     class="h-7 px-2 text-xs"
                     onclick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      logViewMode = "detailed";
+                      logViewMode = 'detailed';
                     }}
                   >
                     Detailed
                   </Button>
                   <Button
-                    variant={logViewMode === "compact" ? "default" : "ghost"}
+                    variant={logViewMode === 'compact' ? 'default' : 'ghost'}
                     size="sm"
                     class="h-7 px-2 text-xs"
                     onclick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      logViewMode = "compact";
+                      logViewMode = 'compact';
                     }}
                   >
                     Compact
                   </Button>
                   <Button
-                    variant={logViewMode === "raw" ? "default" : "ghost"}
+                    variant={logViewMode === 'raw' ? 'default' : 'ghost'}
                     size="sm"
                     class="h-7 px-2 text-xs"
                     onclick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      logViewMode = "raw";
+                      logViewMode = 'raw';
                     }}
                   >
                     Raw
@@ -665,9 +603,7 @@ status:
                   onclick={() => loadLogs()}
                   disabled={logsLoading}
                 >
-                  <RefreshCw
-                    class="mr-2 h-4 w-4 {logsLoading ? 'animate-spin' : ''}"
-                  />
+                  <RefreshCw class="mr-2 h-4 w-4 {logsLoading ? 'animate-spin' : ''}" />
                   Refresh
                 </Button>
                 {#if logs && pod}
@@ -676,9 +612,9 @@ status:
                     size="sm"
                     onclick={() => {
                       if (!pod) return;
-                      const blob = new Blob([logs], { type: "text/plain" });
+                      const blob = new Blob([logs], { type: 'text/plain' });
                       const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
+                      const a = document.createElement('a');
                       a.href = url;
                       a.download = `${pod.name}-logs.txt`;
                       a.click();
@@ -698,11 +634,9 @@ status:
                 <Loading text="Loading logs..." />
               </div>
             {:else if logsError}
-              <div
-                class="flex flex-col items-center justify-center space-y-4 py-8"
-              >
+              <div class="flex flex-col items-center justify-center space-y-4 py-8">
                 <div class="text-center text-muted-foreground">{logsError}</div>
-                {#if logsError.includes("waiting to start")}
+                {#if logsError.includes('waiting to start')}
                   <Button
                     variant="outline"
                     size="sm"
@@ -728,7 +662,7 @@ status:
               <div class="py-8 text-center text-muted-foreground">
                 <p>No logs available to parse</p>
                 <p class="mt-2 text-xs">
-                  Raw logs: {logs.split("\n").length} lines
+                  Raw logs: {logs.split('\n').length} lines
                 </p>
               </div>
             {:else}
@@ -745,15 +679,8 @@ status:
             <div class="flex items-center justify-between">
               <CardTitle>Pod YAML</CardTitle>
               <div class="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onclick={loadYAML}
-                  disabled={yamlLoading}
-                >
-                  <RefreshCw
-                    class="mr-2 h-4 w-4 {yamlLoading ? 'animate-spin' : ''}"
-                  />
+                <Button variant="outline" size="sm" onclick={loadYAML} disabled={yamlLoading}>
+                  <RefreshCw class="mr-2 h-4 w-4 {yamlLoading ? 'animate-spin' : ''}" />
                   Refresh
                 </Button>
                 {#if yaml && pod}
@@ -762,9 +689,9 @@ status:
                     size="sm"
                     onclick={() => {
                       if (!pod) return;
-                      const blob = new Blob([yaml], { type: "text/yaml" });
+                      const blob = new Blob([yaml], { type: 'text/yaml' });
                       const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
+                      const a = document.createElement('a');
                       a.href = url;
                       a.download = `${pod.name}.yaml`;
                       a.click();
@@ -801,11 +728,7 @@ status:
           <CardHeader>
             <div class="flex items-center justify-between">
               <CardTitle>Active Port Forwards</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={() => (showPortForwardDialog = true)}
-              >
+              <Button variant="outline" size="sm" onclick={() => (showPortForwardDialog = true)}>
                 <Network class="mr-2 h-4 w-4" />
                 New Port Forward
               </Button>
@@ -823,9 +746,7 @@ status:
             {:else}
               <div class="space-y-3">
                 {#each activePortForwards as forward (forward.id)}
-                  <div
-                    class="flex items-center justify-between rounded-lg border p-4"
-                  >
+                  <div class="flex items-center justify-between rounded-lg border p-4">
                     <div class="flex-1">
                       <div class="mb-1 flex items-center gap-2">
                         <Badge variant="default">Active</Badge>
@@ -861,8 +782,7 @@ status:
           </CardHeader>
           <CardContent>
             <p class="mb-4 text-muted-foreground">
-              Execute commands in a container within this pod. This will open a
-              terminal session.
+              Execute commands in a container within this pod. This will open a terminal session.
             </p>
             {#if containers.length > 0}
               <div class="space-y-4">
@@ -881,13 +801,9 @@ status:
                         onclick={() => {
                           if (!pod) return;
                           // Navigate to terminal with kubectl exec command
-                          const containerFlag = container.name
-                            ? `-c ${container.name}`
-                            : "";
+                          const containerFlag = container.name ? `-c ${container.name}` : '';
                           const execCommand = `kubectl exec -it ${pod.name} ${containerFlag} -n ${pod.namespace} -- sh`;
-                          goto(
-                            `/terminal?command=${encodeURIComponent(execCommand)}`,
-                          );
+                          goto(`/terminal?command=${encodeURIComponent(execCommand)}`);
                         }}
                       >
                         <Terminal class="mr-2 h-4 w-4" />
@@ -972,9 +888,7 @@ status:
                 await loadPortForwards();
               } catch (error) {
                 portForwardMessage =
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to start port forward";
+                  error instanceof Error ? error.message : 'Failed to start port forward';
                 toastActions.error(portForwardMessage);
               } finally {
                 isPortForwarding = false;
@@ -982,7 +896,7 @@ status:
             }}
             disabled={isPortForwarding}
           >
-            {isPortForwarding ? "Starting..." : "Start Port Forward"}
+            {isPortForwarding ? 'Starting...' : 'Start Port Forward'}
           </Button>
         </DialogFooter>
       </DialogContent>

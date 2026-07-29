@@ -1,24 +1,18 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import type { TerminalConfig, TerminalProcess } from "../../types";
-  import Terminal from "./Terminal.svelte";
-  import BlocksView from "./BlocksView.svelte";
-  import CommandInputBar from "../widgets/CommandInputBar.svelte";
-  import { TerminalService } from "../../services/terminalService";
-  import {
-    commandBlockStore,
-    type CapturedCommand,
-  } from "../../stores/commandBlockStore";
-  import { commandHistoryStore } from "../../stores/commandHistoryStore";
-  import { aiChatService } from "$lib/domains/ai/services/aiChatService";
-  import {
-    buildTerminalContext,
-    buildExplainPrompt,
-  } from "../../services/terminalAiContext";
-  import { shellSupportsIntegration } from "../../utils/resolveSessionSettings";
-  import { isTauriEnvironment } from "$lib/utils/tauri";
+  import type { Snippet } from 'svelte';
+  import type { TerminalConfig, TerminalProcess } from '../../types';
+  import Terminal from './Terminal.svelte';
+  import BlocksView from './BlocksView.svelte';
+  import CommandInputBar from '../widgets/CommandInputBar.svelte';
+  import { TerminalService } from '../../services/terminalService';
+  import { commandBlockStore, type CapturedCommand } from '../../stores/commandBlockStore';
+  import { commandHistoryStore } from '../../stores/commandHistoryStore';
+  import { aiChatService } from '$lib/domains/ai/services/aiChatService';
+  import { buildTerminalContext, buildExplainPrompt } from '../../services/terminalAiContext';
+  import { shellSupportsIntegration } from '../../utils/resolveSessionSettings';
+  import { isTauriEnvironment } from '$lib/utils/tauri';
 
-  export type SessionView = "blocks" | "terminal";
+  export type SessionView = 'blocks' | 'terminal';
 
   interface Props {
     tabId: string;
@@ -41,8 +35,7 @@
   }: Props = $props();
 
   let view = $state<SessionView>(
-    defaultView ??
-      (shellSupportsIntegration(settings.defaultShell) ? "blocks" : "terminal"),
+    defaultView ?? (shellSupportsIntegration(settings.defaultShell) ? 'blocks' : 'terminal')
   );
 
   let terminal = $state<ReturnType<typeof Terminal> | null>(null);
@@ -65,24 +58,24 @@
       ? null
       : commandBlockStore.addBlock(tabId, {
           command,
-          output: "",
-          source: "pty",
-          status: "running",
+          output: '',
+          source: 'pty',
+          status: 'running',
           processId: currentProcess.id,
         });
 
     TerminalService.startCommandTracking(command, tabId);
     commandHistoryStore.addEntry(tabId, {
       command,
-      output: "",
+      output: '',
       duration: 0,
     });
 
     // Multi-line commands (AI-suggested scripts) via bracketed paste, so the
     // shell (PSReadLine, zsh, …) takes the block as one unit instead of
     // stalling at continuation prompts line by line.
-    const lineEnding = navigator.userAgent.includes("Windows") ? "\r\n" : "\n";
-    const payload = command.includes("\n")
+    const lineEnding = navigator.userAgent.includes('Windows') ? '\r\n' : '\n';
+    const payload = command.includes('\n')
       ? `\x1b[200~${command}\x1b[201~\r`
       : `${command}${lineEnding}`;
 
@@ -96,15 +89,14 @@
   async function handleAIQuery(query: string, blockLabel?: string) {
     const blockId = commandBlockStore.addBlock(tabId, {
       command: blockLabel ?? `/ai ${query}`,
-      output: "",
-      source: "ai",
-      status: "running",
+      output: '',
+      source: 'ai',
+      status: 'running',
     });
 
     const context = buildTerminalContext(tabId, {
       shell: settings.defaultShell,
-      workingDirectory:
-        currentProcess?.working_directory || settings.workingDirectory,
+      workingDirectory: currentProcess?.working_directory || settings.workingDirectory,
     });
     const message = `${context}\n\n---\nUser request: ${query}`;
 
@@ -129,7 +121,7 @@
         onError: (error) => fail(error.message),
       });
     } catch (error) {
-      fail(error instanceof Error ? error.message : "Unknown error");
+      fail(error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -138,11 +130,9 @@
       buildExplainPrompt(block, tabId, {
         shell: settings.defaultShell,
         workingDirectory:
-          block.workingDirectory ||
-          currentProcess?.working_directory ||
-          settings.workingDirectory,
+          block.workingDirectory || currentProcess?.working_directory || settings.workingDirectory,
       }),
-      `/ai explain: ${block.command}`.slice(0, 120),
+      `/ai explain: ${block.command}`.slice(0, 120)
     );
   }
 
@@ -152,9 +142,7 @@
 
   function handleStop() {
     if (currentProcess) {
-      TerminalService.sendInput(currentProcess.id, "\x03", tabId).catch(
-        () => {},
-      );
+      TerminalService.sendInput(currentProcess.id, '\x03', tabId).catch(() => {});
     }
   }
 
@@ -180,7 +168,7 @@
            cols/rows and the PTY wraps output at a few characters. -->
       <div
         class="absolute inset-0 bg-[var(--terminal-background)] p-2"
-        style:visibility={view === "terminal" ? "visible" : "hidden"}
+        style:visibility={view === 'terminal' ? 'visible' : 'hidden'}
       >
         <Terminal
           bind:this={terminal}
@@ -194,7 +182,7 @@
           }}
         />
       </div>
-      {#if view === "blocks"}
+      {#if view === 'blocks'}
         <div class="absolute inset-0 z-10">
           <BlocksView {tabId} onRerun={handleRerun} onExplain={handleExplain} />
         </div>

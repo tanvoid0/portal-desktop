@@ -2,13 +2,13 @@
  * Language Service - Frontend service for language configuration
  */
 
-import { invokeClient } from "$lib/utils/invokeClient";
-import { logger } from "$lib/domains/shared";
-import type { Language, LanguageGroup, SuggestedLanguage } from "../types";
+import { invokeClient } from '$lib/utils/invokeClient';
+import { logger } from '$lib/domains/shared';
+import type { Language, LanguageGroup, SuggestedLanguage } from '../types';
 
 export class LanguageService {
   private static instance: LanguageService;
-  private log = logger.createScoped("LanguageService");
+  private log = logger.createScoped('LanguageService');
 
   private constructor() {}
 
@@ -24,14 +24,13 @@ export class LanguageService {
    */
   async getAllLanguages(): Promise<Language[]> {
     try {
-      this.log.info("Getting all languages");
-      const languages =
-        await invokeClient.post<Language[]>("get_all_languages");
+      this.log.info('Getting all languages');
+      const languages = await invokeClient.post<Language[]>('get_all_languages');
       const safeLanguages = languages ?? [];
-      this.log.info("Languages retrieved", { count: safeLanguages.length });
+      this.log.info('Languages retrieved', { count: safeLanguages.length });
       return safeLanguages;
     } catch (error) {
-      this.log.error("Failed to get languages", { error });
+      this.log.error('Failed to get languages', { error });
       throw error;
     }
   }
@@ -41,17 +40,15 @@ export class LanguageService {
    */
   async getSuggestedLanguages(): Promise<LanguageGroup[]> {
     try {
-      this.log.info("Getting suggested languages");
-      const groups = await invokeClient.post<LanguageGroup[]>(
-        "get_suggested_languages",
-      );
+      this.log.info('Getting suggested languages');
+      const groups = await invokeClient.post<LanguageGroup[]>('get_suggested_languages');
       const safeGroups = groups ?? [];
-      this.log.info("Suggested languages retrieved", {
+      this.log.info('Suggested languages retrieved', {
         count: safeGroups.length,
       });
       return safeGroups;
     } catch (error) {
-      this.log.error("Failed to get suggested languages", { error });
+      this.log.error('Failed to get suggested languages', { error });
       throw error;
     }
   }
@@ -62,24 +59,24 @@ export class LanguageService {
   async createLanguage(
     name: string,
     icon: string,
-    iconType: "devicon" | "file",
-    category: string,
+    iconType: 'devicon' | 'file',
+    category: string
   ): Promise<Language> {
     try {
-      this.log.info("Creating language", { name });
-      const language = await invokeClient.post<Language>("create_language", {
+      this.log.info('Creating language', { name });
+      const language = await invokeClient.post<Language>('create_language', {
         name,
         icon,
         iconType, // Tauri v2 converts camelCase to snake_case automatically
         category,
       });
       if (!language) {
-        throw new Error("Failed to create language: no response");
+        throw new Error('Failed to create language: no response');
       }
-      this.log.info("Language created successfully", { id: language.id });
+      this.log.info('Language created successfully', { id: language.id });
       return language;
     } catch (error) {
-      this.log.error("Failed to create language", { error });
+      this.log.error('Failed to create language', { error });
       throw error;
     }
   }
@@ -91,12 +88,12 @@ export class LanguageService {
     id: number,
     name?: string,
     icon?: string,
-    iconType?: "devicon" | "file",
-    category?: string,
+    iconType?: 'devicon' | 'file',
+    category?: string
   ): Promise<Language> {
     try {
-      this.log.info("Updating language", { id });
-      const language = await invokeClient.post<Language>("update_language", {
+      this.log.info('Updating language', { id });
+      const language = await invokeClient.post<Language>('update_language', {
         id,
         name,
         icon,
@@ -104,12 +101,12 @@ export class LanguageService {
         category,
       });
       if (!language) {
-        throw new Error("Failed to update language: no response");
+        throw new Error('Failed to update language: no response');
       }
-      this.log.info("Language updated successfully", { id });
+      this.log.info('Language updated successfully', { id });
       return language;
     } catch (error) {
-      this.log.error("Failed to update language", { error });
+      this.log.error('Failed to update language', { error });
       throw error;
     }
   }
@@ -129,15 +126,14 @@ export class LanguageService {
         const created = await this.createLanguage(
           lang.name,
           lang.icon,
-          "devicon", // Suggested languages always use devicon
-          lang.category,
+          'devicon', // Suggested languages always use devicon
+          lang.category
         );
         success.push(created);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         failed.push({ language: lang, error: errorMessage });
-        this.log.warn("Failed to create language in batch", {
+        this.log.warn('Failed to create language in batch', {
           name: lang.name,
           error,
         });
@@ -152,11 +148,11 @@ export class LanguageService {
    */
   async deleteLanguage(id: number): Promise<void> {
     try {
-      this.log.info("Deleting language", { id });
-      await invokeClient.post("delete_language", { id });
-      this.log.info("Language deleted successfully", { id });
+      this.log.info('Deleting language', { id });
+      await invokeClient.post('delete_language', { id });
+      this.log.info('Language deleted successfully', { id });
     } catch (error) {
-      this.log.error("Failed to delete language", { error });
+      this.log.error('Failed to delete language', { error });
       throw error;
     }
   }

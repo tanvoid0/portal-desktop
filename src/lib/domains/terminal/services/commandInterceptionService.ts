@@ -4,7 +4,7 @@
  */
 
 export interface InputPrompt {
-  type: "password" | "text" | "confirm";
+  type: 'password' | 'text' | 'confirm';
   prompt: string;
   pattern: RegExp;
 }
@@ -19,62 +19,62 @@ export interface InterceptionResult {
 const INPUT_PROMPTS: InputPrompt[] = [
   // Sudo password prompts (MOST SPECIFIC FIRST)
   {
-    type: "password",
-    prompt: "Password required for sudo",
+    type: 'password',
+    prompt: 'Password required for sudo',
     pattern: /\[sudo\]\s*password\s+for\s+\w+\s*:/i,
   },
   {
-    type: "password",
-    prompt: "Password required",
+    type: 'password',
+    prompt: 'Password required',
     pattern: /password\s+for\s+\w+\s*:/i,
   },
   {
-    type: "password",
-    prompt: "Password required",
+    type: 'password',
+    prompt: 'Password required',
     pattern: /password\s*[:\?]\s*$/im,
   },
   {
-    type: "password",
-    prompt: "Enter password",
+    type: 'password',
+    prompt: 'Enter password',
     pattern: /enter.*?password/i,
   },
   {
-    type: "password",
-    prompt: "Password",
+    type: 'password',
+    prompt: 'Password',
     pattern: /password:/i,
   },
 
   // Confirmation prompts
   {
-    type: "confirm",
-    prompt: "Confirm action",
+    type: 'confirm',
+    prompt: 'Confirm action',
     pattern: /\(y\/n\)/i,
   },
   {
-    type: "confirm",
-    prompt: "Confirm action",
+    type: 'confirm',
+    prompt: 'Confirm action',
     pattern: /\[y\/N\]/i,
   },
   {
-    type: "confirm",
-    prompt: "Confirm action",
+    type: 'confirm',
+    prompt: 'Confirm action',
     pattern: /continue\?/i,
   },
   {
-    type: "confirm",
-    prompt: "Confirm action",
+    type: 'confirm',
+    prompt: 'Confirm action',
     pattern: /are you sure/i,
   },
 
   // Text input prompts
   {
-    type: "text",
-    prompt: "Input required",
+    type: 'text',
+    prompt: 'Input required',
     pattern: /enter\s+(?:your\s+)?(?:.*?):\s*$/i,
   },
   {
-    type: "text",
-    prompt: "Input required",
+    type: 'text',
+    prompt: 'Input required',
     pattern: /please\s+enter/i,
   },
 ];
@@ -98,7 +98,7 @@ export class CommandInterceptionService {
     // to keep pausing the block forever on future chunks.
     //
     // Using a tail window keeps detection transient and avoids false pauses.
-    const tail = output.split("\n").slice(-30).join("\n");
+    const tail = output.split('\n').slice(-30).join('\n');
     for (const prompt of INPUT_PROMPTS) {
       if (prompt.pattern.test(tail)) {
         return {
@@ -119,7 +119,7 @@ export class CommandInterceptionService {
    * Extract the prompt text from output
    */
   static extractPromptText(output: string, prompt: InputPrompt): string {
-    const lines = output.split("\n");
+    const lines = output.split('\n');
     const lastLines = lines.slice(-5);
 
     for (const line of lastLines.reverse()) {
@@ -153,13 +153,13 @@ export class CommandInterceptionService {
    */
   static getInterceptionReason(command: string): string | null {
     if (/^rm\s+-rf/i.test(command)) {
-      return "This command will permanently delete files. Are you sure?";
+      return 'This command will permanently delete files. Are you sure?';
     }
     if (/^sudo\s+rm\s+-rf/i.test(command)) {
-      return "This command will permanently delete files with sudo privileges. Are you sure?";
+      return 'This command will permanently delete files with sudo privileges. Are you sure?';
     }
     if (/^dd\s+if=/i.test(command)) {
-      return "This command can overwrite disk data. Are you sure?";
+      return 'This command can overwrite disk data. Are you sure?';
     }
 
     return null;
@@ -175,21 +175,18 @@ export class CommandInterceptionService {
   /**
    * Normalize input for sending to terminal
    */
-  static normalizeInput(
-    input: string,
-    type: "password" | "text" | "confirm",
-  ): string {
-    if (type === "confirm") {
+  static normalizeInput(input: string, type: 'password' | 'text' | 'confirm'): string {
+    if (type === 'confirm') {
       const normalized = input.trim().toLowerCase();
-      if (normalized === "y" || normalized === "yes") {
-        return "y\n";
+      if (normalized === 'y' || normalized === 'yes') {
+        return 'y\n';
       }
-      if (normalized === "n" || normalized === "no") {
-        return "n\n";
+      if (normalized === 'n' || normalized === 'no') {
+        return 'n\n';
       }
-      return input + "\n";
+      return input + '\n';
     }
 
-    return input + "\n";
+    return input + '\n';
   }
 }

@@ -2,8 +2,8 @@
  * Credential Service - Frontend business logic for credential management
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { logger } from "$lib/domains/shared";
+import { invoke } from '@tauri-apps/api/core';
+import { logger } from '$lib/domains/shared';
 import type {
   Credential,
   CredentialCreateRequest,
@@ -12,7 +12,7 @@ import type {
   VaultCreateRequest,
   VaultUnlockRequest,
   VaultUnlockResult,
-} from "../types";
+} from '../types';
 
 export class CredentialService {
   private static instance: CredentialService;
@@ -27,16 +27,11 @@ export class CredentialService {
   /**
    * Create a new credential
    */
-  async createCredential(
-    request: CredentialCreateRequest,
-  ): Promise<Credential> {
+  async createCredential(request: CredentialCreateRequest): Promise<Credential> {
     try {
-      logger.info(
-        "CredentialService",
-        `Creating credential: ${request.name} (${request.type})`,
-      );
+      logger.info('CredentialService', `Creating credential: ${request.name} (${request.type})`);
 
-      const credential = await invoke<Credential>("create_credential", {
+      const credential = await invoke<Credential>('create_credential', {
         name: request.name,
         credential_type: request.type,
         description: request.description,
@@ -47,15 +42,12 @@ export class CredentialService {
         expires_at: request.expiresAt,
       });
 
-      logger.info(
-        "CredentialService",
-        `Credential created successfully: ${credential.id}`,
-      );
+      logger.info('CredentialService', `Credential created successfully: ${credential.id}`);
 
       return credential;
     } catch (error) {
-      logger.error("Failed to create credential", {
-        context: "CredentialService",
+      logger.error('Failed to create credential', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -67,19 +59,16 @@ export class CredentialService {
    */
   async getCredentials(): Promise<Credential[]> {
     try {
-      logger.info("CredentialService", "Getting credentials");
+      logger.info('CredentialService', 'Getting credentials');
 
-      const credentials = await invoke<Credential[]>("get_credentials");
+      const credentials = await invoke<Credential[]>('get_credentials');
 
-      logger.info(
-        "CredentialService",
-        `Credentials retrieved: ${credentials.length} items`,
-      );
+      logger.info('CredentialService', `Credentials retrieved: ${credentials.length} items`);
 
       return credentials;
     } catch (error) {
-      logger.error("Failed to get credentials", {
-        context: "CredentialService",
+      logger.error('Failed to get credentials', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -91,16 +80,16 @@ export class CredentialService {
    */
   async getCredential(id: string): Promise<Credential> {
     try {
-      logger.info("CredentialService", `Getting credential: ${id}`);
+      logger.info('CredentialService', `Getting credential: ${id}`);
 
-      const credential = await invoke<Credential>("get_credential", { id });
+      const credential = await invoke<Credential>('get_credential', { id });
 
-      logger.info("CredentialService", `Credential retrieved: ${id}`);
+      logger.info('CredentialService', `Credential retrieved: ${id}`);
 
       return credential;
     } catch (error) {
-      logger.error("Failed to get credential", {
-        context: "CredentialService",
+      logger.error('Failed to get credential', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -110,14 +99,11 @@ export class CredentialService {
   /**
    * Update credential
    */
-  async updateCredential(
-    id: string,
-    request: CredentialUpdateRequest,
-  ): Promise<Credential> {
+  async updateCredential(id: string, request: CredentialUpdateRequest): Promise<Credential> {
     try {
-      logger.info("CredentialService", `Updating credential: ${id}`);
+      logger.info('CredentialService', `Updating credential: ${id}`);
 
-      const credential = await invoke<Credential>("update_credential", {
+      const credential = await invoke<Credential>('update_credential', {
         id,
         name: request.name,
         description: request.description,
@@ -129,15 +115,12 @@ export class CredentialService {
         expires_at: request.expiresAt,
       });
 
-      logger.info(
-        "CredentialService",
-        `Credential updated successfully: ${id}`,
-      );
+      logger.info('CredentialService', `Credential updated successfully: ${id}`);
 
       return credential;
     } catch (error) {
-      logger.error("Failed to update credential", {
-        context: "CredentialService",
+      logger.error('Failed to update credential', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -149,17 +132,14 @@ export class CredentialService {
    */
   async deleteCredential(id: string): Promise<void> {
     try {
-      logger.info("CredentialService", `Deleting credential: ${id}`);
+      logger.info('CredentialService', `Deleting credential: ${id}`);
 
-      await invoke("delete_credential", { id });
+      await invoke('delete_credential', { id });
 
-      logger.info(
-        "CredentialService",
-        `Credential deleted successfully: ${id}`,
-      );
+      logger.info('CredentialService', `Credential deleted successfully: ${id}`);
     } catch (error) {
-      logger.error("Failed to delete credential", {
-        context: "CredentialService",
+      logger.error('Failed to delete credential', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -171,19 +151,16 @@ export class CredentialService {
    */
   async decryptCredential(id: string): Promise<string> {
     try {
-      logger.info("CredentialService", `Decrypting credential: ${id}`);
+      logger.info('CredentialService', `Decrypting credential: ${id}`);
 
-      const decryptedValue = await invoke<string>("decrypt_credential", { id });
+      const decryptedValue = await invoke<string>('decrypt_credential', { id });
 
-      logger.info(
-        "CredentialService",
-        `Credential decrypted successfully: ${id}`,
-      );
+      logger.info('CredentialService', `Credential decrypted successfully: ${id}`);
 
       return decryptedValue;
     } catch (error) {
-      logger.error("Failed to decrypt credential", {
-        context: "CredentialService",
+      logger.error('Failed to decrypt credential', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -195,21 +172,21 @@ export class CredentialService {
    */
   async searchCredentials(query: string): Promise<Credential[]> {
     try {
-      logger.info("CredentialService", `Searching credentials: ${query}`);
+      logger.info('CredentialService', `Searching credentials: ${query}`);
 
-      const credentials = await invoke<Credential[]>("search_credentials", {
+      const credentials = await invoke<Credential[]>('search_credentials', {
         query,
       });
 
       logger.info(
-        "CredentialService",
-        `Credentials search completed: ${query} (${credentials.length} results)`,
+        'CredentialService',
+        `Credentials search completed: ${query} (${credentials.length} results)`
       );
 
       return credentials;
     } catch (error) {
-      logger.error("Failed to search credentials", {
-        context: "CredentialService",
+      logger.error('Failed to search credentials', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -221,10 +198,7 @@ export class CredentialService {
    */
   async createVault(request: VaultCreateRequest): Promise<SecureVault> {
     try {
-      logger.info(
-        "CredentialService",
-        `Creating secure vault: ${request.name}`,
-      );
+      logger.info('CredentialService', `Creating secure vault: ${request.name}`);
 
       // This would need to be implemented in the backend
       const vault: SecureVault = {
@@ -234,21 +208,21 @@ export class CredentialService {
         credentials: [],
         createdAt: new Date(),
         updatedAt: new Date(),
-        encryptionKey: "", // Would be derived from master password
+        encryptionKey: '', // Would be derived from master password
         keyDerivation: {
-          algorithm: "pbkdf2",
+          algorithm: 'pbkdf2',
           iterations: 100000,
           salt: crypto.randomUUID(),
           keyLength: 32,
         },
       };
 
-      logger.info("CredentialService", `Secure vault created: ${vault.id}`);
+      logger.info('CredentialService', `Secure vault created: ${vault.id}`);
 
       return vault;
     } catch (error) {
-      logger.error("Failed to create secure vault", {
-        context: "CredentialService",
+      logger.error('Failed to create secure vault', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -260,26 +234,21 @@ export class CredentialService {
    */
   async unlockVault(request: VaultUnlockRequest): Promise<VaultUnlockResult> {
     try {
-      logger.info("CredentialService", `Unlocking vault: ${request.vaultId}`);
+      logger.info('CredentialService', `Unlocking vault: ${request.vaultId}`);
 
       // This would need to be implemented in the backend
       const result: VaultUnlockResult = {
         success: true,
         sessionToken: crypto.randomUUID(),
-        expiresAt: new Date(
-          Date.now() + (request.sessionDuration || 30) * 60 * 1000,
-        ),
+        expiresAt: new Date(Date.now() + (request.sessionDuration || 30) * 60 * 1000),
       };
 
-      logger.info(
-        "CredentialService",
-        `Vault unlocked successfully: ${request.vaultId}`,
-      );
+      logger.info('CredentialService', `Vault unlocked successfully: ${request.vaultId}`);
 
       return result;
     } catch (error) {
-      logger.error("Failed to unlock vault", {
-        context: "CredentialService",
+      logger.error('Failed to unlock vault', {
+        context: 'CredentialService',
         error,
       });
       throw error;
@@ -291,15 +260,15 @@ export class CredentialService {
    */
   getCredentialTypeIcon(type: string): string {
     const icons: Record<string, string> = {
-      ssh_key: "🔑",
-      api_token: "🎫",
-      env_var: "🌍",
-      database: "🗄️",
-      cloud_provider: "☁️",
-      registry: "📦",
-      other: "🔐",
+      ssh_key: '🔑',
+      api_token: '🎫',
+      env_var: '🌍',
+      database: '🗄️',
+      cloud_provider: '☁️',
+      registry: '📦',
+      other: '🔐',
     };
-    return icons[type] || "🔐";
+    return icons[type] || '🔐';
   }
 
   /**
@@ -307,22 +276,22 @@ export class CredentialService {
    */
   getCredentialTypeColor(type: string): string {
     const colors: Record<string, string> = {
-      ssh_key: "text-orange-500",
-      api_token: "text-blue-500",
-      env_var: "text-green-500",
-      database: "text-purple-500",
-      cloud_provider: "text-cyan-500",
-      registry: "text-pink-500",
-      other: "text-gray-500",
+      ssh_key: 'text-orange-500',
+      api_token: 'text-blue-500',
+      env_var: 'text-green-500',
+      database: 'text-purple-500',
+      cloud_provider: 'text-cyan-500',
+      registry: 'text-pink-500',
+      other: 'text-gray-500',
     };
-    return colors[type] || "text-gray-500";
+    return colors[type] || 'text-gray-500';
   }
 
   /**
    * Mask sensitive value for display
    */
   maskValue(value: string, type: string): string {
-    if (type === "ssh_key") {
+    if (type === 'ssh_key') {
       // Show first and last few characters for SSH keys
       if (value.length > 20) {
         return `${value.substring(0, 10)}...${value.substring(value.length - 10)}`;
@@ -334,7 +303,7 @@ export class CredentialService {
     if (value.length > 8) {
       return `${value.substring(0, 4)}****`;
     }
-    return "****";
+    return '****';
   }
 
   /**
@@ -344,19 +313,19 @@ export class CredentialService {
     const errors: string[] = [];
 
     if (!data.name?.trim()) {
-      errors.push("Name is required");
+      errors.push('Name is required');
     }
 
     if (!data.type) {
-      errors.push("Type is required");
+      errors.push('Type is required');
     }
 
     if (!data.value?.trim()) {
-      errors.push("Value is required");
+      errors.push('Value is required');
     }
 
     if (data.expiresAt && data.expiresAt < new Date()) {
-      errors.push("Expiration date must be in the future");
+      errors.push('Expiration date must be in the future');
     }
 
     return errors;

@@ -23,18 +23,12 @@ export interface ValidationResult {
 /**
  * Validate a single value against rules
  */
-export function validateValue(
-  value: unknown,
-  rules: ValidationRule,
-): ValidationResult {
+export function validateValue(value: unknown, rules: ValidationRule): ValidationResult {
   const errors: string[] = [];
 
   // Required validation
-  if (
-    rules.required &&
-    (!value || (typeof value === "string" && value.trim() === ""))
-  ) {
-    errors.push("This field is required");
+  if (rules.required && (!value || (typeof value === 'string' && value.trim() === ''))) {
+    errors.push('This field is required');
   }
 
   // Skip other validations if value is empty and not required
@@ -43,7 +37,7 @@ export function validateValue(
   }
 
   // String length validations
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     if (rules.minLength && value.length < rules.minLength) {
       errors.push(`Must be at least ${rules.minLength} characters`);
     }
@@ -53,32 +47,28 @@ export function validateValue(
   }
 
   // Pattern validation
-  if (
-    rules.pattern &&
-    typeof value === "string" &&
-    !rules.pattern.test(value)
-  ) {
-    errors.push("Invalid format");
+  if (rules.pattern && typeof value === 'string' && !rules.pattern.test(value)) {
+    errors.push('Invalid format');
   }
 
   // Email validation
-  if (rules.email && typeof value === "string" && !isValidEmail(value)) {
-    errors.push("Must be a valid email address");
+  if (rules.email && typeof value === 'string' && !isValidEmail(value)) {
+    errors.push('Must be a valid email address');
   }
 
   // URL validation
-  if (rules.url && typeof value === "string" && !isValidUrl(value)) {
-    errors.push("Must be a valid URL");
+  if (rules.url && typeof value === 'string' && !isValidUrl(value)) {
+    errors.push('Must be a valid URL');
   }
 
   // Numeric validation
   if (rules.numeric && !isNumeric(value)) {
-    errors.push("Must be a number");
+    errors.push('Must be a number');
   }
 
   // Positive number validation
   if (rules.positive && (isNaN(Number(value)) || Number(value) <= 0)) {
-    errors.push("Must be a positive number");
+    errors.push('Must be a positive number');
   }
 
   // Custom validation
@@ -101,7 +91,7 @@ export function validateValue(
  */
 export function validateForm<T extends Record<string, unknown>>(
   data: T,
-  rules: Record<keyof T, ValidationRule>,
+  rules: Record<keyof T, ValidationRule>
 ): Record<keyof T, ValidationResult> {
   const results = {} as Record<keyof T, ValidationResult>;
 
@@ -116,7 +106,7 @@ export function validateForm<T extends Record<string, unknown>>(
  * Check if form is valid
  */
 export function isFormValid<T extends Record<string, any>>(
-  validationResults: Record<keyof T, ValidationResult>,
+  validationResults: Record<keyof T, ValidationResult>
 ): boolean {
   return Object.values(validationResults).every((result) => result.isValid);
 }
@@ -125,7 +115,7 @@ export function isFormValid<T extends Record<string, any>>(
  * Get all form errors
  */
 export function getFormErrors<T extends Record<string, any>>(
-  validationResults: Record<keyof T, ValidationResult>,
+  validationResults: Record<keyof T, ValidationResult>
 ): Record<keyof T, string[]> {
   const errors = {} as Record<keyof T, string[]>;
 
@@ -185,7 +175,7 @@ function isNumeric(value: unknown): boolean {
  */
 export function createValidation<T extends Record<string, unknown>>(
   initialData: T,
-  rules: Record<keyof T, ValidationRule>,
+  rules: Record<keyof T, ValidationRule>
 ) {
   let data = $state(initialData);
   let validationResults = $state({} as Record<keyof T, ValidationResult>);

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { Input } from "$lib/components/ui/input";
+  import type { Snippet } from 'svelte';
+  import { Input } from '$lib/components/ui/input';
 
   interface Props {
     searchQuery?: string;
@@ -11,8 +11,8 @@
   }
 
   let {
-    searchQuery = $bindable(""),
-    searchPlaceholder = "Search...",
+    searchQuery = $bindable(''),
+    searchPlaceholder = 'Search...',
     onSearchChange,
     filters,
     actions,

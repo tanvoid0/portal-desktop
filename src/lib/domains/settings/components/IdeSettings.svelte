@@ -3,18 +3,18 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Badge } from "$lib/components/ui/badge";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     Laptop,
     Plus,
@@ -25,28 +25,24 @@
     Loader2,
     Code2,
     Code,
-  } from "@lucide/svelte";
-  import { toast } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { logger } from "$lib/domains/shared";
-  import {
-    ideService,
-    type IdeConfig,
-    type FrameworkIdeMapping,
-  } from "$lib/domains/ide";
-  import { Separator } from "$lib/components/ui/separator";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Link2, ArrowRight, Upload, X } from "@lucide/svelte";
-  import Select from "$lib/components/ui/select.svelte";
-  import Icon from "@iconify/svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
-  import type { Framework } from "$lib/domains/ide";
+  } from '@lucide/svelte';
+  import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { logger } from '$lib/domains/shared';
+  import { ideService, type IdeConfig, type FrameworkIdeMapping } from '$lib/domains/ide';
+  import { Separator } from '$lib/components/ui/separator';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Link2, ArrowRight, Upload, X } from '@lucide/svelte';
+  import Select from '$lib/components/ui/select.svelte';
+  import Icon from '@iconify/svelte';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import type { Framework } from '$lib/domains/ide';
 
   /**
    * Normalize Windows paths by removing the extended-length path prefix (\\?\)
    */
   function normalizePath(path: string): string {
-    if (path.startsWith("\\\\?\\")) {
+    if (path.startsWith('\\\\?\\')) {
       return path.slice(4);
     }
     return path;
@@ -56,20 +52,20 @@
     const name = ideName.toLowerCase();
     const exe = executable.toLowerCase();
 
-    if (name.includes("code") || exe.includes("code")) return Code2;
-    if (name.includes("idea") || exe.includes("idea")) return Code;
-    if (name.includes("pycharm") || exe.includes("pycharm")) return Code;
-    if (name.includes("webstorm") || exe.includes("webstorm")) return Code;
-    if (name.includes("clion") || exe.includes("clion")) return Code;
-    if (name.includes("goland") || exe.includes("goland")) return Code;
-    if (name.includes("phpstorm") || exe.includes("phpstorm")) return Code;
-    if (name.includes("rubymine") || exe.includes("rubymine")) return Code;
-    if (name.includes("rider") || exe.includes("rider")) return Code;
-    if (name.includes("studio") || exe.includes("studio")) return Code;
-    if (name.includes("sublime") || exe.includes("sublime")) return Code;
-    if (name.includes("vim") || exe.includes("vim")) return Code;
-    if (name.includes("neovim") || exe.includes("nvim")) return Code;
-    if (name.includes("emacs") || exe.includes("emacs")) return Code;
+    if (name.includes('code') || exe.includes('code')) return Code2;
+    if (name.includes('idea') || exe.includes('idea')) return Code;
+    if (name.includes('pycharm') || exe.includes('pycharm')) return Code;
+    if (name.includes('webstorm') || exe.includes('webstorm')) return Code;
+    if (name.includes('clion') || exe.includes('clion')) return Code;
+    if (name.includes('goland') || exe.includes('goland')) return Code;
+    if (name.includes('phpstorm') || exe.includes('phpstorm')) return Code;
+    if (name.includes('rubymine') || exe.includes('rubymine')) return Code;
+    if (name.includes('rider') || exe.includes('rider')) return Code;
+    if (name.includes('studio') || exe.includes('studio')) return Code;
+    if (name.includes('sublime') || exe.includes('sublime')) return Code;
+    if (name.includes('vim') || exe.includes('vim')) return Code;
+    if (name.includes('neovim') || exe.includes('nvim')) return Code;
+    if (name.includes('emacs') || exe.includes('emacs')) return Code;
 
     return Laptop;
   }
@@ -79,8 +75,8 @@
   let isDetectingIdes = $state(false);
   let showModal = $state(false);
   let editingIde = $state<IdeConfig | null>(null);
-  let ideName = $state("");
-  let ideExecutable = $state("");
+  let ideName = $state('');
+  let ideExecutable = $state('');
   let detectedIdes = $state<string[]>([]);
 
   // Framework IDE Mappings state
@@ -88,50 +84,45 @@
   let isLoadingMappings = $state(false);
   let showMappingModal = $state(false);
   let editingMapping = $state<FrameworkIdeMapping | null>(null);
-  let mappingFramework = $state("");
-  let mappingIdeId = $state<string>("");
+  let mappingFramework = $state('');
+  let mappingIdeId = $state<string>('');
 
   // Framework groups loaded from backend (suggested)
-  let frameworkGroups = $state<import("$lib/domains/ide").FrameworkGroup[]>([]);
+  let frameworkGroups = $state<import('$lib/domains/ide').FrameworkGroup[]>([]);
   // User-defined frameworks from database
   let frameworks = $state<Framework[]>([]);
   let isLoadingFrameworks = $state(false);
   let showFrameworkModal = $state(false);
   let editingFramework = $state<Framework | null>(null);
-  let frameworkName = $state("");
-  let frameworkIcon = $state("");
-  let frameworkIconType = $state<"devicon" | "file">("devicon");
-  let frameworkCategory = $state("Custom");
-  let iconSearchQuery = $state("");
+  let frameworkName = $state('');
+  let frameworkIcon = $state('');
+  let frameworkIconType = $state<'devicon' | 'file'>('devicon');
+  let frameworkCategory = $state('Custom');
+  let iconSearchQuery = $state('');
   let iconSearchResults = $state<string[]>([]);
 
   function quickAddFramework(framework: string) {
     mappingFramework = framework;
-    mappingIdeId = "";
+    mappingIdeId = '';
     editingMapping = null;
     showMappingModal = true;
   }
 
   onMount(async () => {
-    await Promise.all([
-      loadIdes(),
-      loadMappings(),
-      loadSuggestedFrameworks(),
-      loadFrameworks(),
-    ]);
+    await Promise.all([loadIdes(), loadMappings(), loadSuggestedFrameworks(), loadFrameworks()]);
   });
 
   async function loadSuggestedFrameworks() {
     try {
       isLoadingFrameworks = true;
       frameworkGroups = await ideService.getSuggestedFrameworks();
-      logger.info("Suggested frameworks loaded", {
-        context: "IdeSettings",
+      logger.info('Suggested frameworks loaded', {
+        context: 'IdeSettings',
         count: frameworkGroups.length,
       });
     } catch (error) {
-      logger.error("Failed to load suggested frameworks", {
-        context: "IdeSettings",
+      logger.error('Failed to load suggested frameworks', {
+        context: 'IdeSettings',
         error,
       });
       // Don't show error toast as this is not critical
@@ -143,21 +134,21 @@
   async function loadFrameworks() {
     try {
       frameworks = await ideService.getAllFrameworks();
-      logger.info("Frameworks loaded", {
-        context: "IdeSettings",
+      logger.info('Frameworks loaded', {
+        context: 'IdeSettings',
         count: frameworks.length,
       });
     } catch (error) {
-      toast.error("Failed to load frameworks", error);
+      toast.error('Failed to load frameworks', error);
     }
   }
 
   function startAddingFramework() {
-    frameworkName = "";
-    frameworkIcon = "";
-    frameworkIconType = "devicon";
-    frameworkCategory = "Custom";
-    iconSearchQuery = "";
+    frameworkName = '';
+    frameworkIcon = '';
+    frameworkIconType = 'devicon';
+    frameworkCategory = 'Custom';
+    iconSearchQuery = '';
     iconSearchResults = [];
     editingFramework = null;
     showFrameworkModal = true;
@@ -168,7 +159,7 @@
     frameworkIcon = framework.icon;
     frameworkIconType = framework.icon_type;
     frameworkCategory = framework.category;
-    iconSearchQuery = "";
+    iconSearchQuery = '';
     iconSearchResults = [];
     editingFramework = framework;
     showFrameworkModal = true;
@@ -176,11 +167,11 @@
 
   function closeFrameworkModal() {
     showFrameworkModal = false;
-    frameworkName = "";
-    frameworkIcon = "";
-    frameworkIconType = "devicon";
-    frameworkCategory = "Custom";
-    iconSearchQuery = "";
+    frameworkName = '';
+    frameworkIcon = '';
+    frameworkIconType = 'devicon';
+    frameworkCategory = 'Custom';
+    iconSearchQuery = '';
     iconSearchResults = [];
     editingFramework = null;
   }
@@ -193,43 +184,40 @@
 
     // Simple search - you can enhance this with actual DevIcon API or icon set
     const commonIcons = [
-      "logos:react",
-      "logos:vue",
-      "logos:angular-icon",
-      "logos:svelte-icon",
-      "logos:nextjs-icon",
-      "logos:nodejs-icon",
-      "logos:python",
-      "logos:java",
-      "logos:go",
-      "logos:rust",
-      "logos:php",
-      "logos:ruby",
-      "logos:django-icon",
-      "logos:flask",
-      "logos:laravel",
-      "logos:rails",
-      "logos:spring-icon",
-      "logos:express",
-      "logos:fastify-icon",
-      "logos:nestjs",
-      "logos:nuxt-icon",
-      "logos:remix-icon",
-      "logos:gatsby",
-      "logos:quarkus-icon",
-      "logos:phoenix",
-      "logos:elixir",
-      "logos:sinatra",
-      "logos:symfony",
-      "logos:fastapi-icon",
+      'logos:react',
+      'logos:vue',
+      'logos:angular-icon',
+      'logos:svelte-icon',
+      'logos:nextjs-icon',
+      'logos:nodejs-icon',
+      'logos:python',
+      'logos:java',
+      'logos:go',
+      'logos:rust',
+      'logos:php',
+      'logos:ruby',
+      'logos:django-icon',
+      'logos:flask',
+      'logos:laravel',
+      'logos:rails',
+      'logos:spring-icon',
+      'logos:express',
+      'logos:fastify-icon',
+      'logos:nestjs',
+      'logos:nuxt-icon',
+      'logos:remix-icon',
+      'logos:gatsby',
+      'logos:quarkus-icon',
+      'logos:phoenix',
+      'logos:elixir',
+      'logos:sinatra',
+      'logos:symfony',
+      'logos:fastapi-icon',
     ];
 
     const query = iconSearchQuery.toLowerCase();
     iconSearchResults = commonIcons
-      .filter(
-        (icon) =>
-          icon.includes(query) || icon.replace("logos:", "").includes(query),
-      )
+      .filter((icon) => icon.includes(query) || icon.replace('logos:', '').includes(query))
       .slice(0, 12);
   }
 
@@ -239,29 +227,29 @@
         multiple: false,
         filters: [
           {
-            name: "Images",
-            extensions: ["png", "jpg", "jpeg", "svg", "ico", "webp"],
+            name: 'Images',
+            extensions: ['png', 'jpg', 'jpeg', 'svg', 'ico', 'webp'],
           },
         ],
       });
 
-      if (file && typeof file === "string") {
+      if (file && typeof file === 'string') {
         frameworkIcon = file;
-        frameworkIconType = "file";
+        frameworkIconType = 'file';
       }
     } catch (error) {
-      toast.error("Failed to select icon file", error);
+      toast.error('Failed to select icon file', error);
     }
   }
 
   async function saveFramework() {
     if (!frameworkName.trim()) {
-      toast.error("Framework name is required");
+      toast.error('Framework name is required');
       return;
     }
 
     if (!frameworkIcon.trim()) {
-      toast.error("Framework icon is required");
+      toast.error('Framework icon is required');
       return;
     }
 
@@ -272,39 +260,39 @@
           frameworkName,
           frameworkIcon,
           frameworkIconType,
-          frameworkCategory,
+          frameworkCategory
         );
-        toast.success("Framework updated successfully");
+        toast.success('Framework updated successfully');
       } else {
         await ideService.createFramework(
           frameworkName,
           frameworkIcon,
           frameworkIconType,
-          frameworkCategory,
+          frameworkCategory
         );
-        toast.success("Framework created successfully");
+        toast.success('Framework created successfully');
       }
 
       await loadFrameworks();
       closeFrameworkModal();
     } catch (error: any) {
-      toast.error("Failed to save framework", error);
+      toast.error('Failed to save framework', error);
     }
   }
 
   async function deleteFramework(framework: Framework) {
     const confirmed = await confirmAction(
       `Are you sure you want to delete "${framework.name}"?`,
-      "Delete framework",
+      'Delete framework'
     );
     if (!confirmed) return;
 
     try {
       await ideService.deleteFramework(framework.id);
-      toast.success("Framework deleted successfully");
+      toast.success('Framework deleted successfully');
       await loadFrameworks();
     } catch (error: any) {
-      toast.error("Failed to delete framework", error);
+      toast.error('Failed to delete framework', error);
     }
   }
 
@@ -341,12 +329,12 @@
     try {
       isLoadingIdes = true;
       ides = await ideService.getAllIdes();
-      logger.info("IDEs loaded", {
-        context: "IdeSettings",
+      logger.info('IDEs loaded', {
+        context: 'IdeSettings',
         count: ides.length,
       });
     } catch (error) {
-      toast.error("Failed to load IDEs", error);
+      toast.error('Failed to load IDEs', error);
     } finally {
       isLoadingIdes = false;
     }
@@ -356,24 +344,24 @@
     try {
       isDetectingIdes = true;
       detectedIdes = await ideService.detectInstalledIdes();
-      logger.info("IDEs detected", {
-        context: "IdeSettings",
+      logger.info('IDEs detected', {
+        context: 'IdeSettings',
         count: detectedIdes.length,
       });
 
       if (detectedIdes.length === 0) {
-        toast.info("No IDEs detected automatically");
+        toast.info('No IDEs detected automatically');
       }
     } catch (error) {
-      toast.error("Failed to detect IDEs", error);
+      toast.error('Failed to detect IDEs', error);
     } finally {
       isDetectingIdes = false;
     }
   }
 
   function startAddingIde() {
-    ideName = "";
-    ideExecutable = "";
+    ideName = '';
+    ideExecutable = '';
     editingIde = null;
     showModal = true;
   }
@@ -387,49 +375,49 @@
 
   function closeModal() {
     showModal = false;
-    ideName = "";
-    ideExecutable = "";
+    ideName = '';
+    ideExecutable = '';
     editingIde = null;
   }
 
   async function saveIde() {
     if (!ideName.trim() || !ideExecutable.trim()) {
-      toast.error("IDE name and executable path are required");
+      toast.error('IDE name and executable path are required');
       return;
     }
 
     try {
       if (editingIde && editingIde.id) {
         await ideService.updateIde(editingIde.id, ideName, ideExecutable);
-        toast.success("IDE updated successfully");
+        toast.success('IDE updated successfully');
       } else {
         await ideService.addIde(ideName, ideExecutable);
-        toast.success("IDE added successfully");
+        toast.success('IDE added successfully');
       }
 
       await loadIdes();
       closeModal();
     } catch (error: any) {
-      toast.error("Failed to save IDE", error);
+      toast.error('Failed to save IDE', error);
     }
   }
 
   async function deleteIde(ide: IdeConfig) {
     const confirmed = await confirmAction(
       `Are you sure you want to delete "${ide.name}"?`,
-      "Delete IDE",
+      'Delete IDE'
     );
     if (!confirmed) return;
 
     try {
       if (ide.id) {
         await ideService.deleteIde(ide.id);
-        toast.success("IDE deleted successfully");
+        toast.success('IDE deleted successfully');
         await loadIdes();
         await loadMappings(); // Reload mappings in case any were deleted
       }
     } catch (error: any) {
-      toast.error("Failed to delete IDE", error);
+      toast.error('Failed to delete IDE', error);
     }
   }
 
@@ -437,11 +425,11 @@
     try {
       if (ide.id) {
         await ideService.setDefaultIde(ide.id);
-        toast.success("Default IDE updated");
+        toast.success('Default IDE updated');
         await loadIdes();
       }
     } catch (error: any) {
-      toast.error("Failed to set default IDE", error);
+      toast.error('Failed to set default IDE', error);
     }
   }
 
@@ -449,20 +437,20 @@
     try {
       isLoadingMappings = true;
       mappings = await ideService.getAllFrameworkIdeMappings();
-      logger.info("Framework IDE mappings loaded", {
-        context: "IdeSettings",
+      logger.info('Framework IDE mappings loaded', {
+        context: 'IdeSettings',
         count: mappings.length,
       });
     } catch (error) {
-      toast.error("Failed to load framework IDE mappings", error);
+      toast.error('Failed to load framework IDE mappings', error);
     } finally {
       isLoadingMappings = false;
     }
   }
 
   function startAddingMapping() {
-    mappingFramework = "";
-    mappingIdeId = "";
+    mappingFramework = '';
+    mappingIdeId = '';
     editingMapping = null;
     showMappingModal = true;
   }
@@ -476,14 +464,14 @@
 
   function closeMappingModal() {
     showMappingModal = false;
-    mappingFramework = "";
-    mappingIdeId = "";
+    mappingFramework = '';
+    mappingIdeId = '';
     editingMapping = null;
   }
 
   async function saveMapping() {
     if (!mappingFramework.trim() || !mappingIdeId) {
-      toast.error("Framework and IDE are required");
+      toast.error('Framework and IDE are required');
       return;
     }
 
@@ -495,30 +483,28 @@
       }
       await ideService.setFrameworkIdeMapping(mappingFramework, ideId);
       toast.success(
-        editingMapping
-          ? "Mapping updated successfully"
-          : "Mapping created successfully",
+        editingMapping ? 'Mapping updated successfully' : 'Mapping created successfully'
       );
       await loadMappings();
       closeMappingModal();
     } catch (error: any) {
-      toast.error("Failed to save mapping", error);
+      toast.error('Failed to save mapping', error);
     }
   }
 
   async function deleteMapping(mapping: FrameworkIdeMapping) {
     const confirmed = await confirmAction(
       `Are you sure you want to delete the mapping for "${mapping.framework}"?`,
-      "Delete mapping",
+      'Delete mapping'
     );
     if (!confirmed) return;
 
     try {
       await ideService.deleteFrameworkIdeMapping(mapping.framework);
-      toast.success("Mapping deleted successfully");
+      toast.success('Mapping deleted successfully');
       await loadMappings();
     } catch (error: any) {
-      toast.error("Failed to delete mapping", error);
+      toast.error('Failed to delete mapping', error);
     }
   }
 
@@ -541,12 +527,7 @@
       </p>
     </div>
     <div class="flex gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={detectIdes}
-        disabled={isDetectingIdes}
-      >
+      <Button variant="outline" size="sm" onclick={detectIdes} disabled={isDetectingIdes}>
         {#if isDetectingIdes}
           <Loader2 class="mr-2 h-4 w-4 animate-spin" />
         {:else}
@@ -554,12 +535,7 @@
         {/if}
         Detect IDEs
       </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={loadIdes}
-        disabled={isLoadingIdes}
-      >
+      <Button variant="outline" size="sm" onclick={loadIdes} disabled={isLoadingIdes}>
         <RefreshCw class="mr-2 h-4 w-4" />
         Refresh
       </Button>
@@ -578,9 +554,7 @@
         Configured IDEs
         <Badge variant="outline">{ides.length}</Badge>
       </CardTitle>
-      <CardDescription>
-        Manage your integrated development environments
-      </CardDescription>
+      <CardDescription>Manage your integrated development environments</CardDescription>
     </CardHeader>
     <CardContent>
       {#if isLoadingIdes}
@@ -631,19 +605,11 @@
 
               <div class="flex items-center gap-2">
                 {#if !ide.is_default}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={() => setDefaultIde(ide)}
-                  >
+                  <Button variant="ghost" size="sm" onclick={() => setDefaultIde(ide)}>
                     Set Default
                   </Button>
                 {/if}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onclick={() => startEditingIde(ide)}
-                >
+                <Button variant="ghost" size="sm" onclick={() => startEditingIde(ide)}>
                   <Edit class="h-4 w-4" />
                 </Button>
                 <Button
@@ -666,20 +632,17 @@
           <p class="mb-2 text-sm font-medium">Detected IDEs</p>
           <div class="flex flex-wrap gap-2">
             {#each detectedIdes as executablePath}
-              {@const executableName =
-                executablePath.split(/[/\\]/).pop() || executablePath}
+              {@const executableName = executablePath.split(/[/\\]/).pop() || executablePath}
               {@const normalizedPath = normalizePath(executablePath)}
               {@const alreadyAdded = ides.some(
-                (ide) => normalizePath(ide.executable) === normalizedPath,
+                (ide) => normalizePath(ide.executable) === normalizedPath
               )}
               {#if !alreadyAdded}
                 <Button
                   variant="outline"
                   size="sm"
                   onclick={async () => {
-                    const name = executableName
-                      .replace(/\.exe$/i, "")
-                      .replace(/\.app$/i, "");
+                    const name = executableName.replace(/\.exe$/i, '').replace(/\.app$/i, '');
                     ideName = name;
                     ideExecutable = normalizedPath;
                     showModal = true;
@@ -714,21 +677,11 @@
         <Plus class="mr-2 h-4 w-4" />
         Create Framework
       </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={loadMappings}
-        disabled={isLoadingMappings}
-      >
+      <Button variant="outline" size="sm" onclick={loadMappings} disabled={isLoadingMappings}>
         <RefreshCw class="mr-2 h-4 w-4" />
         Refresh
       </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={startAddingMapping}
-        disabled={ides.length === 0}
-      >
+      <Button variant="outline" size="sm" onclick={startAddingMapping} disabled={ides.length === 0}>
         <Plus class="mr-2 h-4 w-4" />
         Add Mapping
       </Button>
@@ -743,9 +696,7 @@
         Framework IDE Mappings
         <Badge variant="outline">{mappings.length}</Badge>
       </CardTitle>
-      <CardDescription>
-        Configure which IDE should open for each framework
-      </CardDescription>
+      <CardDescription>Configure which IDE should open for each framework</CardDescription>
     </CardHeader>
     <CardContent>
       {#if isLoadingMappings}
@@ -776,26 +727,22 @@
           <!-- All Frameworks (Suggested + User-defined) -->
           {#if isLoadingFrameworks}
             <div class="py-4 text-center">
-              <Loader2
-                class="mx-auto h-4 w-4 animate-spin text-muted-foreground"
-              />
+              <Loader2 class="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           {:else if frameworkGroups.length > 0 || frameworks.length > 0}
             <div class="space-y-4">
-              <p class="text-sm font-medium text-muted-foreground">
-                Frameworks
-              </p>
+              <p class="text-sm font-medium text-muted-foreground">Frameworks</p>
 
               <!-- Frameworks -->
               {#if frameworks.length > 0}
                 {@const frameworksByCategory = frameworks.reduce(
                   (acc, fw) => {
-                    const cat = fw.category || "Other";
+                    const cat = fw.category || 'Other';
                     if (!acc[cat]) acc[cat] = [];
                     acc[cat].push(fw);
                     return acc;
                   },
-                  {} as Record<string, typeof frameworks>,
+                  {} as Record<string, typeof frameworks>
                 )}
                 {#each Object.entries(frameworksByCategory) as [category, categoryFrameworks]}
                   <div>
@@ -807,9 +754,7 @@
                     <div class="flex flex-wrap gap-2">
                       {#each categoryFrameworks as framework}
                         {@const isMapped = mappings.some(
-                          (m) =>
-                            m.framework.toLowerCase() ===
-                            framework.name.toLowerCase(),
+                          (m) => m.framework.toLowerCase() === framework.name.toLowerCase()
                         )}
                         <div class="group relative">
                           <Button
@@ -820,28 +765,21 @@
                             class="h-8 pr-8"
                           >
                             {#if isMapped}
-                              <svg
-                                class="mr-1.5 h-3 w-3"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
+                              <svg class="mr-1.5 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
                                 <path
                                   fill-rule="evenodd"
                                   d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                                   clip-rule="evenodd"
                                 />
                               </svg>
-                            {:else if framework.icon_type === "file"}
+                            {:else if framework.icon_type === 'file'}
                               <img
                                 src={framework.icon}
                                 alt={framework.name}
                                 class="mr-1.5 h-3 w-3"
                               />
                             {:else}
-                              <Icon
-                                icon={framework.icon}
-                                class="mr-1.5 h-3 w-3"
-                              />
+                              <Icon icon={framework.icon} class="mr-1.5 h-3 w-3" />
                             {/if}
                             {framework.name}
                           </Button>
@@ -875,11 +813,7 @@
               <!-- Suggested Frameworks -->
               {#each frameworkGroups as group}
                 {@const unmappedInGroup = group.frameworks.filter(
-                  (fw) =>
-                    !mappings.some(
-                      (m) =>
-                        m.framework.toLowerCase() === fw.name.toLowerCase(),
-                    ),
+                  (fw) => !mappings.some((m) => m.framework.toLowerCase() === fw.name.toLowerCase())
                 )}
                 {#if unmappedInGroup.length > 0}
                   <div>
@@ -891,9 +825,7 @@
                     <div class="flex flex-wrap gap-2">
                       {#each group.frameworks as framework}
                         {@const isMapped = mappings.some(
-                          (m) =>
-                            m.framework.toLowerCase() ===
-                            framework.name.toLowerCase(),
+                          (m) => m.framework.toLowerCase() === framework.name.toLowerCase()
                         )}
                         <Button
                           variant="outline"
@@ -903,11 +835,7 @@
                           class="h-8"
                         >
                           {#if isMapped}
-                            <svg
-                              class="mr-1.5 h-3 w-3"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
+                            <svg class="mr-1.5 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
                               <path
                                 fill-rule="evenodd"
                                 d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -915,10 +843,7 @@
                               />
                             </svg>
                           {:else}
-                            <Icon
-                              icon={framework.icon}
-                              class="mr-1.5 h-3 w-3"
-                            />
+                            <Icon icon={framework.icon} class="mr-1.5 h-3 w-3" />
                           {/if}
                           {framework.name}
                         </Button>
@@ -943,7 +868,7 @@
             {#each mappings as mapping}
               {@const allFrameworks = getAllFrameworks()}
               {@const frameworkInfo = allFrameworks.find(
-                (f) => f.name.toLowerCase() === mapping.framework.toLowerCase(),
+                (f) => f.name.toLowerCase() === mapping.framework.toLowerCase()
               )}
               <div
                 class="flex items-center justify-between rounded-md border p-4 transition-colors hover:bg-accent"
@@ -951,34 +876,22 @@
                 <div class="flex items-center gap-4">
                   {#if frameworkInfo}
                     {#if frameworkInfo.isCustom && frameworkInfo.icon}
-                      {#if frameworkInfo.icon.startsWith("logos:") || frameworkInfo.icon.includes(":")}
+                      {#if frameworkInfo.icon.startsWith('logos:') || frameworkInfo.icon.includes(':')}
                         <Icon icon={frameworkInfo.icon} class="h-5 w-5" />
                       {:else}
-                        <img
-                          src={frameworkInfo.icon}
-                          alt={mapping.framework}
-                          class="h-5 w-5"
-                        />
+                        <img src={frameworkInfo.icon} alt={mapping.framework} class="h-5 w-5" />
                       {/if}
                     {:else if frameworkInfo.icon}
                       <Icon icon={frameworkInfo.icon} class="h-5 w-5" />
                     {/if}
                   {/if}
-                  <Badge variant="secondary" class="font-medium"
-                    >{mapping.framework}</Badge
-                  >
+                  <Badge variant="secondary" class="font-medium">{mapping.framework}</Badge>
                   <ArrowRight class="h-4 w-4 text-muted-foreground" />
-                  <span class="text-sm font-medium"
-                    >{getIdeName(mapping.ide_id)}</span
-                  >
+                  <span class="text-sm font-medium">{getIdeName(mapping.ide_id)}</span>
                 </div>
 
                 <div class="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={() => startEditingMapping(mapping)}
-                  >
+                  <Button variant="ghost" size="sm" onclick={() => startEditingMapping(mapping)}>
                     <Edit class="h-4 w-4" />
                   </Button>
                   <Button
@@ -1002,10 +915,7 @@
           })()}
             {@const allFrameworksList = getAllFrameworks()}
             {@const unmappedFrameworks = allFrameworksList.filter(
-              (fw) =>
-                !mappings.some(
-                  (m) => m.framework.toLowerCase() === fw.name.toLowerCase(),
-                ),
+              (fw) => !mappings.some((m) => m.framework.toLowerCase() === fw.name.toLowerCase())
             )}
             {@const groupedByCategory = unmappedFrameworks.reduce(
               (acc, fw) => {
@@ -1013,17 +923,13 @@
                 acc[fw.category].push(fw);
                 return acc;
               },
-              {} as Record<string, typeof unmappedFrameworks>,
+              {} as Record<string, typeof unmappedFrameworks>
             )}
             <div class="divider-edge-t divider-edge-full space-y-4 pt-4">
-              <p class="mb-3 text-sm font-medium text-muted-foreground">
-                Add More Frameworks
-              </p>
+              <p class="mb-3 text-sm font-medium text-muted-foreground">Add More Frameworks</p>
               {#each Object.entries(groupedByCategory) as [category, frameworks]}
                 <div>
-                  <p
-                    class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                  >
+                  <p class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {category}
                   </p>
                   <div class="flex flex-wrap gap-2">
@@ -1034,12 +940,8 @@
                         onclick={() => quickAddFramework(framework.name)}
                         class="h-8"
                       >
-                        {#if framework.icon && !framework.icon.startsWith("http") && !framework.icon.startsWith("/") && !framework.icon.includes(":")}
-                          <img
-                            src={framework.icon}
-                            alt={framework.name}
-                            class="mr-1.5 h-3 w-3"
-                          />
+                        {#if framework.icon && !framework.icon.startsWith('http') && !framework.icon.startsWith('/') && !framework.icon.includes(':')}
+                          <img src={framework.icon} alt={framework.name} class="mr-1.5 h-3 w-3" />
                         {:else if framework.icon}
                           <Icon icon={framework.icon} class="mr-1.5 h-3 w-3" />
                         {/if}
@@ -1061,18 +963,13 @@
 <Dialog.Root bind:open={showModal}>
   <Dialog.Content class="max-w-md">
     <Dialog.Header>
-      <Dialog.Title>{editingIde ? "Edit IDE" : "Add IDE"}</Dialog.Title>
+      <Dialog.Title>{editingIde ? 'Edit IDE' : 'Add IDE'}</Dialog.Title>
     </Dialog.Header>
 
     <div class="space-y-4">
       <div class="space-y-2">
         <Label for="ide-name">IDE Name</Label>
-        <Input
-          id="ide-name"
-          bind:value={ideName}
-          placeholder="e.g., Visual Studio Code"
-          required
-        />
+        <Input id="ide-name" bind:value={ideName} placeholder="e.g., Visual Studio Code" required />
       </div>
 
       <div class="space-y-2">
@@ -1083,14 +980,12 @@
           placeholder="e.g., /usr/bin/code or C:\Program Files\Code\code.exe"
           required
         />
-        <p class="text-xs text-muted-foreground">
-          Full path to the IDE executable
-        </p>
+        <p class="text-xs text-muted-foreground">Full path to the IDE executable</p>
       </div>
 
       <Dialog.Footer>
         <Button variant="outline" onclick={closeModal}>Cancel</Button>
-        <Button onclick={saveIde}>{editingIde ? "Update" : "Add"} IDE</Button>
+        <Button onclick={saveIde}>{editingIde ? 'Update' : 'Add'} IDE</Button>
       </Dialog.Footer>
     </div>
   </Dialog.Content>
@@ -1101,9 +996,7 @@
   <Dialog.Content class="max-w-md">
     <Dialog.Header>
       <Dialog.Title
-        >{editingMapping
-          ? "Edit Framework IDE Mapping"
-          : "Add Framework IDE Mapping"}</Dialog.Title
+        >{editingMapping ? 'Edit Framework IDE Mapping' : 'Add Framework IDE Mapping'}</Dialog.Title
       >
     </Dialog.Header>
 
@@ -1116,32 +1009,26 @@
           placeholder="e.g., React, Vue, Angular, Node.js"
           required
         />
-        <p class="text-xs text-muted-foreground">
-          The framework name that will trigger this IDE
-        </p>
+        <p class="text-xs text-muted-foreground">The framework name that will trigger this IDE</p>
       </div>
 
       <div class="space-y-2">
         <Label for="mapping-ide">IDE</Label>
         <Select
-          defaultValue={mappingIdeId || ""}
+          defaultValue={mappingIdeId || ''}
           options={ides.map((ide) => ({
-            value: String(ide.id || ""),
+            value: String(ide.id || ''),
             label: ide.name,
           }))}
-          onSelect={(value) => (mappingIdeId = value || "")}
+          onSelect={(value) => (mappingIdeId = value || '')}
           placeholder="Select an IDE..."
         />
-        <p class="text-xs text-muted-foreground">
-          The IDE that will open for this framework
-        </p>
+        <p class="text-xs text-muted-foreground">The IDE that will open for this framework</p>
       </div>
 
       <Dialog.Footer>
         <Button variant="outline" onclick={closeMappingModal}>Cancel</Button>
-        <Button onclick={saveMapping}
-          >{editingMapping ? "Update" : "Create"} Mapping</Button
-        >
+        <Button onclick={saveMapping}>{editingMapping ? 'Update' : 'Create'} Mapping</Button>
       </Dialog.Footer>
     </div>
   </Dialog.Content>
@@ -1151,11 +1038,7 @@
 <Dialog.Root bind:open={showFrameworkModal}>
   <Dialog.Content class="max-h-[90vh] max-w-2xl overflow-y-auto">
     <Dialog.Header>
-      <Dialog.Title
-        >{editingFramework
-          ? "Edit Framework"
-          : "Create Framework"}</Dialog.Title
-      >
+      <Dialog.Title>{editingFramework ? 'Edit Framework' : 'Create Framework'}</Dialog.Title>
     </Dialog.Header>
 
     <div class="space-y-4">
@@ -1183,11 +1066,11 @@
         <div class="mb-2 flex gap-2">
           <Button
             type="button"
-            variant={frameworkIconType === "devicon" ? "default" : "outline"}
+            variant={frameworkIconType === 'devicon' ? 'default' : 'outline'}
             size="sm"
             onclick={() => {
-              frameworkIconType = "devicon";
-              iconSearchQuery = "";
+              frameworkIconType = 'devicon';
+              iconSearchQuery = '';
               iconSearchResults = [];
             }}
           >
@@ -1195,11 +1078,11 @@
           </Button>
           <Button
             type="button"
-            variant={frameworkIconType === "file" ? "default" : "outline"}
+            variant={frameworkIconType === 'file' ? 'default' : 'outline'}
             size="sm"
             onclick={() => {
-              frameworkIconType = "file";
-              iconSearchQuery = "";
+              frameworkIconType = 'file';
+              iconSearchQuery = '';
               iconSearchResults = [];
             }}
           >
@@ -1208,7 +1091,7 @@
           </Button>
         </div>
 
-        {#if frameworkIconType === "devicon"}
+        {#if frameworkIconType === 'devicon'}
           <div class="space-y-2">
             <div class="flex gap-2">
               <Input
@@ -1216,35 +1099,28 @@
                 placeholder="Search for icon (e.g., react, vue, python)"
                 oninput={searchIcons}
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onclick={searchIcons}
-              >
+              <Button type="button" variant="outline" size="sm" onclick={searchIcons}>
                 <Search class="h-4 w-4" />
               </Button>
             </div>
 
             {#if iconSearchResults.length > 0}
-              <div
-                class="grid max-h-48 grid-cols-4 gap-2 overflow-y-auto rounded-md border p-2"
-              >
+              <div class="grid max-h-48 grid-cols-4 gap-2 overflow-y-auto rounded-md border p-2">
                 {#each iconSearchResults as iconName}
                   <Button
                     type="button"
-                    variant={frameworkIcon === iconName ? "default" : "outline"}
+                    variant={frameworkIcon === iconName ? 'default' : 'outline'}
                     size="sm"
                     onclick={() => {
                       frameworkIcon = iconName;
-                      iconSearchQuery = "";
+                      iconSearchQuery = '';
                       iconSearchResults = [];
                     }}
                     class="flex h-auto flex-col items-center gap-1 p-2"
                   >
                     <Icon icon={iconName} class="h-6 w-6" />
                     <span class="w-full truncate text-center text-xs"
-                      >{iconName.replace("logos:", "")}</span
+                      >{iconName.replace('logos:', '')}</span
                     >
                   </Button>
                 {/each}
@@ -1260,7 +1136,7 @@
                     variant="ghost"
                     size="sm"
                     class="mt-1 h-6"
-                    onclick={() => (frameworkIcon = "")}
+                    onclick={() => (frameworkIcon = '')}
                   >
                     <X class="mr-1 h-3 w-3" />
                     Remove
@@ -1269,13 +1145,9 @@
               </div>
             {:else}
               <p class="text-xs text-muted-foreground">
-                Search for an icon or enter icon name (e.g., logos:react,
-                logos:vue)
+                Search for an icon or enter icon name (e.g., logos:react, logos:vue)
               </p>
-              <Input
-                bind:value={frameworkIcon}
-                placeholder="e.g., logos:react, logos:vue"
-              />
+              <Input bind:value={frameworkIcon} placeholder="e.g., logos:react, logos:vue" />
             {/if}
           </div>
         {:else}
@@ -1293,7 +1165,7 @@
                     variant="ghost"
                     size="sm"
                     class="mt-1 h-6"
-                    onclick={() => (frameworkIcon = "")}
+                    onclick={() => (frameworkIcon = '')}
                   >
                     <X class="mr-1 h-3 w-3" />
                     Remove
@@ -1307,9 +1179,7 @@
 
       <Dialog.Footer>
         <Button variant="outline" onclick={closeFrameworkModal}>Cancel</Button>
-        <Button onclick={saveFramework}
-          >{editingFramework ? "Update" : "Create"} Framework</Button
-        >
+        <Button onclick={saveFramework}>{editingFramework ? 'Update' : 'Create'} Framework</Button>
       </Dialog.Footer>
     </div>
   </Dialog.Content>

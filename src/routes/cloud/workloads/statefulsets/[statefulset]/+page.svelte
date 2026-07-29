@@ -1,43 +1,28 @@
 <!-- StatefulSet Detail Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { cloudStore, loadResources } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { ArrowLeft, RefreshCw, FileCode } from "@lucide/svelte";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import Loading from "$lib/components/ui/loading.svelte";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { toastActions } from "$lib/utils/toast";
-  import YamlEditor from "$lib/domains/cloud/components/YamlEditor.svelte";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { ArrowLeft, RefreshCw, FileCode } from '@lucide/svelte';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import Loading from '$lib/components/ui/loading.svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { toastActions } from '$lib/utils/toast';
+  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
 
   const statefulSetName = $derived($page.params.statefulset);
   const namespace = $derived(
-    $page.url.searchParams.get("namespace") ||
-      $cloudStore.selectedNamespace ||
-      "default",
+    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get("tab") || "overview");
+  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
 
-  let activeTab = $state("overview");
+  let activeTab = $state('overview');
 
   // Sync activeTab with tabParam when it changes
   $effect(() => {
@@ -48,26 +33,26 @@
   let error = $state<string | null>(null);
 
   // YAML state
-  let yaml = $state("");
+  let yaml = $state('');
   let yamlLoading = $state(false);
   let yamlError = $state<string | null>(null);
 
   onMount(async () => {
     await loadStatefulSet();
-    if (activeTab === "yaml") {
+    if (activeTab === 'yaml') {
       await loadYAML();
     }
   });
 
   $effect(() => {
-    if (activeTab === "yaml" && !yaml && !yamlLoading) {
+    if (activeTab === 'yaml' && !yaml && !yamlLoading) {
       loadYAML();
     }
   });
 
   async function loadStatefulSet() {
     if (!statefulSetName || !$cloudStore.connection.isConnected) {
-      error = "StatefulSet name or connection required";
+      error = 'StatefulSet name or connection required';
       isLoading = false;
       return;
     }
@@ -84,8 +69,8 @@
         error = `StatefulSet "${statefulSetName}" not found in namespace "${namespace}".`;
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load StatefulSet";
-      console.error("Failed to load StatefulSet:", err);
+      error = err instanceof Error ? err.message : 'Failed to load StatefulSet';
+      console.error('Failed to load StatefulSet:', err);
     } finally {
       isLoading = false;
     }
@@ -98,12 +83,16 @@
       yamlLoading = true;
       yamlError = null;
 
-      const yamlContent = await k8sResourceService.getResourceYaml("StatefulSet", statefulSet.namespace, statefulSet.name);
+      const yamlContent = await k8sResourceService.getResourceYaml(
+        'StatefulSet',
+        statefulSet.namespace,
+        statefulSet.name
+      );
 
       yaml = yamlContent;
     } catch (err) {
-      yamlError = err instanceof Error ? err.message : "Failed to load YAML";
-      console.error("Failed to load YAML:", err);
+      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
+      console.error('Failed to load YAML:', err);
     } finally {
       yamlLoading = false;
     }
@@ -115,12 +104,11 @@
     try {
       await k8sResourceService.applyResourceYaml(statefulSet.namespace, yamlContent);
 
-      toastActions.success("StatefulSet updated successfully");
+      toastActions.success('StatefulSet updated successfully');
       await loadStatefulSet();
       await loadYAML();
     } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to update StatefulSet";
+      const errorMsg = err instanceof Error ? err.message : 'Failed to update StatefulSet';
       toastActions.error(errorMsg);
       throw err;
     }
@@ -128,19 +116,13 @@
 
   function handleTabChange(newTab: string) {
     activeTab = newTab;
-    goto(
-      `/cloud/workloads/statefulsets/${statefulSetName}?namespace=${namespace}&tab=${newTab}`,
-    );
+    goto(`/cloud/workloads/statefulsets/${statefulSetName}?namespace=${namespace}&tab=${newTab}`);
   }
 </script>
 
 <div class="space-y-6">
   <div class="flex items-center gap-4">
-    <Button
-      variant="ghost"
-      size="sm"
-      onclick={() => goto("/cloud/workloads/statefulsets")}
-    >
+    <Button variant="ghost" size="sm" onclick={() => goto('/cloud/workloads/statefulsets')}>
       <ArrowLeft class="mr-2 h-4 w-4" />
       Back
     </Button>
@@ -153,11 +135,7 @@
   {#if isLoading}
     <PageLoading message="Loading statefulset..." />
   {:else if error}
-    <PageError
-      title="Failed to load statefulset"
-      message={error}
-      onRetry={loadStatefulSet}
-    />
+    <PageError title="Failed to load statefulset" message={error} onRetry={loadStatefulSet} />
   {:else if statefulSet}
     <div class="space-y-6">
       <div class="flex items-center justify-between">
@@ -167,9 +145,7 @@
             Namespace: {statefulSet.namespace}
           </p>
         </div>
-        <Badge
-          variant={statefulSet.status === "running" ? "default" : "secondary"}
-        >
+        <Badge variant={statefulSet.status === 'running' ? 'default' : 'secondary'}>
           {statefulSet.status}
         </Badge>
       </div>
@@ -208,7 +184,7 @@
                 <div>
                   <p class="text-sm text-muted-foreground">Age</p>
                   <p class="text-lg font-semibold">
-                    {statefulSet.metadata?.age || "N/A"}
+                    {statefulSet.metadata?.age || 'N/A'}
                   </p>
                 </div>
               </CardContent>

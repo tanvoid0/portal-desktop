@@ -2,9 +2,9 @@
  * Execution Store - Svelte store for pipeline execution state
  */
 
-import { writable, derived } from "svelte/store";
-import type { PipelineExecution, StepExecution } from "../types";
-import { executionService } from "../services/executionService";
+import { writable, derived } from 'svelte/store';
+import type { PipelineExecution, StepExecution } from '../types';
+import { executionService } from '../services/executionService';
 
 interface ExecutionState {
   executions: Map<string, PipelineExecution>; // executionId -> execution
@@ -37,9 +37,7 @@ function createExecutionStore() {
           ...state,
           executions: newExecutions,
           currentExecution:
-            state.currentExecution?.id === execution.id
-              ? execution
-              : state.currentExecution,
+            state.currentExecution?.id === execution.id ? execution : state.currentExecution,
         };
       });
     },
@@ -82,12 +80,6 @@ function createExecutionStore() {
 export const executionStore = createExecutionStore();
 
 // Derived stores
-export const currentExecution = derived(
-  executionStore,
-  ($store) => $store.currentExecution,
-);
-export const executionLoading = derived(
-  executionStore,
-  ($store) => $store.loading,
-);
+export const currentExecution = derived(executionStore, ($store) => $store.currentExecution);
+export const executionLoading = derived(executionStore, ($store) => $store.loading);
 export const executionError = derived(executionStore, ($store) => $store.error);

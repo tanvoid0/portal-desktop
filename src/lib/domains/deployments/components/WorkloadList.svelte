@@ -1,15 +1,12 @@
 <script lang="ts">
-  import type { Deployment, DockerContainer } from "../types";
-  import type { GroupByMode, WorkloadGroup, WorkloadSection } from "../utils/workloadGrouping";
-  import {
-    groupWorkloads,
-    sectionLabel,
-  } from "../utils/workloadGrouping";
-  import WorkloadGroupCard from "./WorkloadGroupCard.svelte";
-  import ContainerCard from "./ContainerCard.svelte";
-  import Select from "$lib/components/ui/select.svelte";
+  import type { Deployment, DockerContainer } from '../types';
+  import type { GroupByMode, WorkloadGroup, WorkloadSection } from '../utils/workloadGrouping';
+  import { groupWorkloads, sectionLabel } from '../utils/workloadGrouping';
+  import WorkloadGroupCard from './WorkloadGroupCard.svelte';
+  import ContainerCard from './ContainerCard.svelte';
+  import Select from '$lib/components/ui/select.svelte';
 
-  type ContainerStatusTab = "running" | "stopped" | "other";
+  type ContainerStatusTab = 'running' | 'stopped' | 'other';
 
   interface Props {
     containers: DockerContainer[];
@@ -40,25 +37,25 @@
   }: Props = $props();
 
   const groupByOptions = [
-    { value: "stack", label: "Stack / Workload" },
-    { value: "image", label: "Image" },
-    { value: "network", label: "Network" },
-    { value: "flat", label: "Flat list" },
+    { value: 'stack', label: 'Stack / Workload' },
+    { value: 'image', label: 'Image' },
+    { value: 'network', label: 'Network' },
+    { value: 'flat', label: 'Flat list' },
   ];
 
   let groups = $derived(
     groupWorkloads(containers, deployments, groupBy, {
       statusFilter,
       searchQuery,
-    }),
+    })
   );
 
   let sections = $derived.by(() => {
-    if (groupBy !== "stack") {
+    if (groupBy !== 'stack') {
       return [{ section: null as WorkloadSection | null, groups }];
     }
 
-    const sectionMap = new Map<WorkloadSection | "other", WorkloadGroup[]>();
+    const sectionMap = new Map<WorkloadSection | 'other', WorkloadGroup[]>();
     for (const group of groups) {
       const key = group.section;
       const list = sectionMap.get(key) ?? [];
@@ -66,7 +63,7 @@
       sectionMap.set(key, list);
     }
 
-    const order: WorkloadSection[] = ["portal", "compose", "standalone"];
+    const order: WorkloadSection[] = ['portal', 'compose', 'standalone'];
     return order
       .filter((section) => sectionMap.has(section))
       .map((section) => ({
@@ -78,8 +75,8 @@
 
 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
   <p class="text-sm text-muted-foreground">
-    {groups.length} group{groups.length === 1 ? "" : "s"}
-    · {containers.length} container{containers.length === 1 ? "" : "s"} total
+    {groups.length} group{groups.length === 1 ? '' : 's'}
+    · {containers.length} container{containers.length === 1 ? '' : 's'} total
   </p>
   <Select
     options={groupByOptions}
@@ -92,16 +89,11 @@
 
 {#if groups.length === 0}
   <!-- empty state handled by parent -->
-{:else if groupBy === "flat"}
+{:else if groupBy === 'flat'}
   <div class="grid gap-4 md:grid-cols-2">
     {#each groups as group (group.id)}
       {#each group.containers as container (container.id)}
-        <ContainerCard
-          {container}
-          {onStart}
-          {onStop}
-          {onRemove}
-        />
+        <ContainerCard {container} {onStart} {onStop} {onRemove} />
       {/each}
     {/each}
   </div>

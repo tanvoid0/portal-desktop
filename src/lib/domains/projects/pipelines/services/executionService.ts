@@ -2,22 +2,19 @@
  * Execution Service - Pipeline execution management
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { logger } from "$lib/domains/shared";
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { logger } from '$lib/domains/shared';
 import type {
   PipelineExecution,
   PipelineExecutionListItem,
   ExecutePipelineRequest,
   StepExecution,
   ExecutionStatus,
-} from "../types";
-import {
-  resolveDependencies,
-  validateDependencies,
-} from "../utils/dependencyResolver";
+} from '../types';
+import { resolveDependencies, validateDependencies } from '../utils/dependencyResolver';
 
-const log = logger.createScoped("ExecutionService");
+const log = logger.createScoped('ExecutionService');
 
 function normalizeExecution(raw: PipelineExecution): PipelineExecution {
   return {
@@ -33,18 +30,13 @@ function normalizeExecution(raw: PipelineExecution): PipelineExecution {
   };
 }
 
-function normalizeExecutionListItem(
-  raw: PipelineExecutionListItem,
-): PipelineExecutionListItem {
+function normalizeExecutionListItem(raw: PipelineExecutionListItem): PipelineExecutionListItem {
   return normalizeExecution(raw) as PipelineExecutionListItem;
 }
 
 export class ExecutionService {
   private static instance: ExecutionService;
-  private executionListeners = new Map<
-    string,
-    (execution: PipelineExecution) => void
-  >();
+  private executionListeners = new Map<string, (execution: PipelineExecution) => void>();
 
   static getInstance(): ExecutionService {
     if (!ExecutionService.instance) {
@@ -59,7 +51,7 @@ export class ExecutionService {
    */
   private async setupEventListeners(): Promise<void> {
     try {
-      await listen<PipelineExecution>("pipeline-execution-update", (event) => {
+      await listen<PipelineExecution>('pipeline-execution-update', (event) => {
         const execution = event.payload;
         const listener = this.executionListeners.get(execution.id);
         if (listener) {
@@ -72,45 +64,41 @@ export class ExecutionService {
         stepId: string;
         line: string;
         stream: string;
-      }>("pipeline-step-log", () => {
+      }>('pipeline-step-log', () => {
         // Step log events are handled directly by ExecutionMonitor
       });
     } catch (error) {
-      log.error("Failed to setup execution event listeners", { error });
+      log.error('Failed to setup execution event listeners', { error });
     }
   }
 
   /**
    * Execute a pipeline
    */
-  async executePipeline(
-    request: ExecutePipelineRequest,
-  ): Promise<PipelineExecution> {
+  async executePipeline(request: ExecutePipelineRequest): Promise<PipelineExecution> {
     try {
-      log.info("Executing pipeline", { pipelineId: request.pipelineId });
+      log.info('Executing pipeline', { pipelineId: request.pipelineId });
 
       // Validate pipeline before execution
-      const pipeline = await invoke<any>("get_pipeline", {
+      const pipeline = await invoke<any>('get_pipeline', {
         pipelineId: request.pipelineId,
       });
       if (!pipeline) {
-        throw new Error("Pipeline not found");
+        throw new Error('Pipeline not found');
       }
 
       const validation = validateDependencies(pipeline.steps);
       if (!validation.valid) {
-        throw new Error(
-          `Pipeline validation failed: ${validation.errors.join(", ")}`,
-        );
+        throw new Error(`Pipeline validation failed: ${validation.errors.join(', ')}`);
       }
 
-      const execution = await invoke<PipelineExecution>("execute_pipeline", {
+      const execution = await invoke<PipelineExecution>('execute_pipeline', {
         request,
       });
-      log.info("Pipeline execution started", { executionId: execution.id });
+      log.info('Pipeline execution started', { executionId: execution.id });
       return normalizeExecution(execution);
     } catch (error) {
-      log.error("Failed to execute pipeline", { error });
+      log.error('Failed to execute pipeline', { error });
       throw error;
     }
   }
@@ -120,15 +108,12 @@ export class ExecutionService {
    */
   async getExecution(executionId: string): Promise<PipelineExecution | null> {
     try {
-      const execution = await invoke<PipelineExecution | null>(
-        "get_pipeline_execution",
-        {
-          executionId,
-        },
-      );
+      const execution = await invoke<PipelineExecution | null>('get_pipeline_execution', {
+        executionId,
+      });
       return execution ? normalizeExecution(execution) : null;
     } catch (error) {
-      log.error("Failed to get execution", { error });
+      log.error('Failed to get execution', { error });
       throw error;
     }
   }
@@ -138,19 +123,19 @@ export class ExecutionService {
    */
   async getExecutionsByProject(
     projectId: string | number,
-    limit = 50,
+    limit = 50
   ): Promise<PipelineExecutionListItem[]> {
     try {
       const executions = await invoke<PipelineExecutionListItem[]>(
-        "get_project_pipeline_executions",
+        'get_project_pipeline_executions',
         {
           projectId: Number(projectId),
           limit,
-        },
+        }
       );
       return executions.map(normalizeExecutionListItem);
     } catch (error) {
-      log.error("Failed to get project executions", { error });
+      log.error('Failed to get project executions', { error });
       throw error;
     }
   }
@@ -160,15 +145,12 @@ export class ExecutionService {
    */
   async getAllExecutions(limit = 100): Promise<PipelineExecutionListItem[]> {
     try {
-      const executions = await invoke<PipelineExecutionListItem[]>(
-        "get_all_pipeline_executions",
-        {
-          limit,
-        },
-      );
+      const executions = await invoke<PipelineExecutionListItem[]>('get_all_pipeline_executions', {
+        limit,
+      });
       return executions.map(normalizeExecutionListItem);
     } catch (error) {
-      log.error("Failed to get all executions", { error });
+      log.error('Failed to get all executions', { error });
       throw error;
     }
   }
@@ -178,11 +160,11 @@ export class ExecutionService {
    */
   async cancelExecution(executionId: string): Promise<void> {
     try {
-      log.info("Cancelling execution", { executionId });
-      await invoke("cancel_pipeline_execution", { executionId });
-      log.info("Execution cancelled", { executionId });
+      log.info('Cancelling execution', { executionId });
+      await invoke('cancel_pipeline_execution', { executionId });
+      log.info('Execution cancelled', { executionId });
     } catch (error) {
-      log.error("Failed to cancel execution", { error });
+      log.error('Failed to cancel execution', { error });
       throw error;
     }
   }
@@ -192,7 +174,7 @@ export class ExecutionService {
    */
   subscribeToExecution(
     executionId: string,
-    callback: (execution: PipelineExecution) => void,
+    callback: (execution: PipelineExecution) => void
   ): () => void {
     this.executionListeners.set(executionId, callback);
     return () => {
@@ -205,13 +187,13 @@ export class ExecutionService {
    */
   async getStepLogs(executionId: string, stepId: string): Promise<string[]> {
     try {
-      const logs = await invoke<string[]>("get_step_execution_logs", {
+      const logs = await invoke<string[]>('get_step_execution_logs', {
         executionId,
         stepId,
       });
       return logs;
     } catch (error) {
-      log.error("Failed to get step logs", { error });
+      log.error('Failed to get step logs', { error });
       return [];
     }
   }
@@ -221,11 +203,11 @@ export class ExecutionService {
    */
   async retryStep(executionId: string, stepId: string): Promise<void> {
     try {
-      log.info("Retrying step", { executionId, stepId });
-      await invoke("retry_step_execution", { executionId, stepId });
-      log.info("Step retry initiated", { executionId, stepId });
+      log.info('Retrying step', { executionId, stepId });
+      await invoke('retry_step_execution', { executionId, stepId });
+      log.info('Step retry initiated', { executionId, stepId });
     } catch (error) {
-      log.error("Failed to retry step", { error });
+      log.error('Failed to retry step', { error });
       throw error;
     }
   }

@@ -1,12 +1,12 @@
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import Select from "$lib/components/ui/select.svelte";
-  import Icon from "@iconify/svelte";
-  import type { TaskStatus, TaskPriority } from "../types";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import Select from '$lib/components/ui/select.svelte';
+  import Icon from '@iconify/svelte';
+  import type { TaskStatus, TaskPriority } from '../types';
 
   interface Props {
     open: boolean;
@@ -41,10 +41,10 @@
 
   // Available filter options
   const statusOptions: { value: TaskStatus; label: string; icon: string }[] = [
-    { value: "pending", label: "To Do", icon: "mdi:clock-outline" },
-    { value: "in-progress", label: "In Progress", icon: "mdi:progress-clock" },
-    { value: "completed", label: "Completed", icon: "mdi:check-circle" },
-    { value: "cancelled", label: "Cancelled", icon: "mdi:cancel" },
+    { value: 'pending', label: 'To Do', icon: 'mdi:clock-outline' },
+    { value: 'in-progress', label: 'In Progress', icon: 'mdi:progress-clock' },
+    { value: 'completed', label: 'Completed', icon: 'mdi:check-circle' },
+    { value: 'cancelled', label: 'Cancelled', icon: 'mdi:cancel' },
   ];
 
   const priorityOptions: {
@@ -53,23 +53,23 @@
     icon: string;
     color: string;
   }[] = [
-    { value: "low", label: "Low", icon: "mdi:flag", color: "text-green-500" },
+    { value: 'low', label: 'Low', icon: 'mdi:flag', color: 'text-green-500' },
     {
-      value: "medium",
-      label: "Medium",
-      icon: "mdi:flag",
-      color: "text-yellow-500",
+      value: 'medium',
+      label: 'Medium',
+      icon: 'mdi:flag',
+      color: 'text-yellow-500',
     },
-    { value: "high", label: "High", icon: "mdi:flag", color: "text-red-500" },
+    { value: 'high', label: 'High', icon: 'mdi:flag', color: 'text-red-500' },
   ];
 
   const typeOptions: { value: string; label: string }[] = [
-    { value: "Story", label: "Story" },
-    { value: "Bug", label: "Bug" },
-    { value: "Feature", label: "Feature" },
-    { value: "Note", label: "Note" },
-    { value: "Task", label: "Task" },
-    { value: "Epic", label: "Epic" },
+    { value: 'Story', label: 'Story' },
+    { value: 'Bug', label: 'Bug' },
+    { value: 'Feature', label: 'Feature' },
+    { value: 'Note', label: 'Note' },
+    { value: 'Task', label: 'Task' },
+    { value: 'Epic', label: 'Epic' },
   ];
 
   function toggleStatusFilter(status: TaskStatus) {
@@ -107,7 +107,7 @@
   }
 
   function clearAllFilters() {
-    localSearchQuery = "";
+    localSearchQuery = '';
     localStatusFilters = [];
     localPriorityFilters = [];
     localTypeFilters = [];
@@ -132,100 +132,91 @@
     </Dialog.Header>
 
     <div class="space-y-6 overflow-y-auto px-6 pb-6">
-        <!-- Search -->
-        <div>
-          <p class="mb-2 block text-sm font-medium text-foreground">Search</p>
-          <div class="relative">
-            <Icon
-              icon="mdi:magnify"
-              class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
-            />
-            <Input
-              type="text"
-              placeholder="Search tasks..."
-              bind:value={localSearchQuery}
-              class="pl-10"
-            />
-          </div>
+      <!-- Search -->
+      <div>
+        <p class="mb-2 block text-sm font-medium text-foreground">Search</p>
+        <div class="relative">
+          <Icon
+            icon="mdi:magnify"
+            class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+          />
+          <Input
+            type="text"
+            placeholder="Search tasks..."
+            bind:value={localSearchQuery}
+            class="pl-10"
+          />
         </div>
+      </div>
 
-        <!-- Status Filters -->
-        <div>
-          <p class="mb-3 block text-sm font-medium text-foreground">Status</p>
-          <div class="grid grid-cols-2 gap-2">
-            {#each statusOptions as option}
-              <label
-                class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
-              >
-                <Checkbox
-                  checked={localStatusFilters.includes(option.value)}
-                  onCheckedChange={() => toggleStatusFilter(option.value)}
-                />
-                <Icon
-                  icon={option.icon}
-                  class="h-4 w-4 text-muted-foreground"
-                />
-                <span class="text-sm">{option.label}</span>
-              </label>
-            {/each}
-          </div>
+      <!-- Status Filters -->
+      <div>
+        <p class="mb-3 block text-sm font-medium text-foreground">Status</p>
+        <div class="grid grid-cols-2 gap-2">
+          {#each statusOptions as option}
+            <label
+              class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
+            >
+              <Checkbox
+                checked={localStatusFilters.includes(option.value)}
+                onCheckedChange={() => toggleStatusFilter(option.value)}
+              />
+              <Icon icon={option.icon} class="h-4 w-4 text-muted-foreground" />
+              <span class="text-sm">{option.label}</span>
+            </label>
+          {/each}
         </div>
+      </div>
 
-        <!-- Priority Filters -->
-        <div>
-          <p class="mb-3 block text-sm font-medium text-foreground">Priority</p>
-          <div class="grid grid-cols-3 gap-2">
-            {#each priorityOptions as option}
-              <label
-                class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
-              >
-                <Checkbox
-                  checked={localPriorityFilters.includes(option.value)}
-                  onCheckedChange={() => togglePriorityFilter(option.value)}
-                />
-                <Icon icon={option.icon} class="h-4 w-4 {option.color}" />
-                <span class="text-sm">{option.label}</span>
-              </label>
-            {/each}
-          </div>
+      <!-- Priority Filters -->
+      <div>
+        <p class="mb-3 block text-sm font-medium text-foreground">Priority</p>
+        <div class="grid grid-cols-3 gap-2">
+          {#each priorityOptions as option}
+            <label
+              class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
+            >
+              <Checkbox
+                checked={localPriorityFilters.includes(option.value)}
+                onCheckedChange={() => togglePriorityFilter(option.value)}
+              />
+              <Icon icon={option.icon} class="h-4 w-4 {option.color}" />
+              <span class="text-sm">{option.label}</span>
+            </label>
+          {/each}
         </div>
+      </div>
 
-        <!-- Type Filters -->
-        <div>
-          <p class="mb-3 block text-sm font-medium text-foreground">Types</p>
-          <div class="grid grid-cols-2 gap-2">
-            {#each typeOptions as typeOption}
-              <label
-                class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
-              >
-                <Checkbox
-                  checked={localTypeFilters.includes(typeOption.value)}
-                  onCheckedChange={() => toggleTypeFilter(typeOption.value)}
-                />
-                <span class="text-sm">{typeOption.label}</span>
-              </label>
-            {/each}
-          </div>
+      <!-- Type Filters -->
+      <div>
+        <p class="mb-3 block text-sm font-medium text-foreground">Types</p>
+        <div class="grid grid-cols-2 gap-2">
+          {#each typeOptions as typeOption}
+            <label
+              class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
+            >
+              <Checkbox
+                checked={localTypeFilters.includes(typeOption.value)}
+                onCheckedChange={() => toggleTypeFilter(typeOption.value)}
+              />
+              <span class="text-sm">{typeOption.label}</span>
+            </label>
+          {/each}
         </div>
+      </div>
 
-        <!-- Action Buttons -->
-        <div
-          class="divider-edge-t divider-edge-full flex items-center justify-between pt-4"
-        >
-          <Button
-            variant="outline"
-            onclick={clearAllFilters}
-            class="text-red-600 hover:text-red-700"
-          >
-            <Icon icon="mdi:filter-remove" class="mr-2 h-4 w-4" />
-            Clear All
-          </Button>
+      <!-- Action Buttons -->
+      <div class="divider-edge-t divider-edge-full flex items-center justify-between pt-4">
+        <Button variant="outline" onclick={clearAllFilters} class="text-red-600 hover:text-red-700">
+          <Icon icon="mdi:filter-remove" class="mr-2 h-4 w-4" />
+          Clear All
+        </Button>
 
-          <div class="flex items-center gap-2">
-            <Button variant="outline" onclick={handleClose}>Cancel</Button>
-            <Button onclick={applyFilters}>Apply Filters</Button>
-          </div>
+        <div class="flex items-center gap-2">
+          <Button variant="outline" onclick={handleClose}>Cancel</Button>
+          <Button onclick={applyFilters}>Apply Filters</Button>
         </div>
+      </div>
     </div>
   </Dialog.Content>
 </Dialog.Root>

@@ -1,17 +1,17 @@
 <script lang="ts">
-  import type { ChatMessage, CoderSubAgent } from "../types.js";
-  import { buildFeedBlocks } from "../utils/feedBlocks.js";
-  import CoderUserBlock from "./CoderUserBlock.svelte";
-  import CoderAssistantBlock from "./CoderAssistantBlock.svelte";
-  import CoderThoughtBlock from "./CoderThoughtBlock.svelte";
-  import CoderActivitySummary from "./CoderActivitySummary.svelte";
-  import ToolCallCard from "./ToolCallCard.svelte";
-  import CoderSubAgentInline from "./CoderSubAgentInline.svelte";
-  import ApprovalBanner from "./ApprovalBanner.svelte";
-  import type { PendingApproval } from "../types.js";
-  import { stripLeakedToolSyntax } from "../utils/leakedToolCall.js";
-  import { Button } from "$lib/components/ui/button";
-  import { RotateCcw } from "@lucide/svelte";
+  import type { ChatMessage, CoderSubAgent } from '../types.js';
+  import { buildFeedBlocks } from '../utils/feedBlocks.js';
+  import CoderUserBlock from './CoderUserBlock.svelte';
+  import CoderAssistantBlock from './CoderAssistantBlock.svelte';
+  import CoderThoughtBlock from './CoderThoughtBlock.svelte';
+  import CoderActivitySummary from './CoderActivitySummary.svelte';
+  import ToolCallCard from './ToolCallCard.svelte';
+  import CoderSubAgentInline from './CoderSubAgentInline.svelte';
+  import ApprovalBanner from './ApprovalBanner.svelte';
+  import type { PendingApproval } from '../types.js';
+  import { stripLeakedToolSyntax } from '../utils/leakedToolCall.js';
+  import { Button } from '$lib/components/ui/button';
+  import { RotateCcw } from '@lucide/svelte';
 
   interface Props {
     messages: ChatMessage[];
@@ -33,16 +33,12 @@
     onOpenSubAgent?: (childId: string, coordId: string) => void;
     onCancelSubAgent?: (id: string) => void;
     onCleanupSubAgent?: (id: string) => void;
-    onDecision?: (
-      approve: boolean,
-      remember: boolean,
-      editedPattern?: string,
-    ) => void;
+    onDecision?: (approve: boolean, remember: boolean, editedPattern?: string) => void;
   }
 
   let {
     messages,
-    streamingText = "",
+    streamingText = '',
     waitingSeconds = 0,
     running = false,
     pending = null,
@@ -50,8 +46,8 @@
     showRetry = false,
     showSubAgentInline = false,
     subAgents = [],
-    coordinatorId = "",
-    workspaceRoot = "",
+    coordinatorId = '',
+    workspaceRoot = '',
     threadId,
     canEdit = false,
     onEditMessage,
@@ -65,8 +61,8 @@
   const resultsById = $derived.by(() => {
     const map = new Map<string, string>();
     for (const m of messages) {
-      if (m.role === "tool" && m.tool_call_id) {
-        map.set(m.tool_call_id, m.content ?? "");
+      if (m.role === 'tool' && m.tool_call_id) {
+        map.set(m.tool_call_id, m.content ?? '');
       }
     }
     return map;
@@ -76,9 +72,9 @@
   const displayStreamingText = $derived(stripLeakedToolSyntax(streamingText));
 
   function blockKey(block: (typeof blocks)[number]): string {
-    if (block.kind === "tool") return block.call.id;
-    if (block.kind === "activity") {
-      return `activity-${block.tools.map((t) => t.call.id).join("-")}`;
+    if (block.kind === 'tool') return block.call.id;
+    if (block.kind === 'activity') {
+      return `activity-${block.tools.map((t) => t.call.id).join('-')}`;
     }
     return `${block.kind}-${block.messageIndex}`;
   }
@@ -86,47 +82,39 @@
 
 <div class="space-y-3">
   {#each blocks as block (blockKey(block))}
-    {#if block.kind === "user"}
+    {#if block.kind === 'user'}
       <CoderUserBlock
         message={block.message}
         messageIndex={block.messageIndex}
         {canEdit}
         onEdit={onEditMessage}
       />
-    {:else if block.kind === "thought"}
-      <CoderThoughtBlock
-        message={block.message}
-        durationMs={block.durationMs}
-      />
-    {:else if block.kind === "assistant"}
-      <CoderAssistantBlock
-        message={block.message}
-        responseLatencyMs={block.responseLatencyMs}
-      />
-    {:else if block.kind === "activity"}
+    {:else if block.kind === 'thought'}
+      <CoderThoughtBlock message={block.message} durationMs={block.durationMs} />
+    {:else if block.kind === 'assistant'}
+      <CoderAssistantBlock message={block.message} responseLatencyMs={block.responseLatencyMs} />
+    {:else if block.kind === 'activity'}
       <CoderActivitySummary
         parts={block.parts}
         isRunning={block.isRunning}
         hasFailed={block.hasFailed}
       >
-        {#snippet children()}
-          {#each block.tools as tool (tool.call.id)}
-            <ToolCallCard
-              call={tool.call}
-              result={tool.result}
-              {workspaceRoot}
-              {threadId}
-              {subAgents}
-              {coordinatorId}
-              onOpenSubAgent={onOpenSubAgent}
-              onCancelSubAgent={onCancelSubAgent}
-              onCleanupSubAgent={onCleanupSubAgent}
-              nested={true}
-            />
-          {/each}
-        {/snippet}
+        {#each block.tools as tool (tool.call.id)}
+          <ToolCallCard
+            call={tool.call}
+            result={tool.result}
+            {workspaceRoot}
+            {threadId}
+            {subAgents}
+            {coordinatorId}
+            {onOpenSubAgent}
+            {onCancelSubAgent}
+            {onCleanupSubAgent}
+            nested={true}
+          />
+        {/each}
       </CoderActivitySummary>
-    {:else if block.kind === "tool"}
+    {:else if block.kind === 'tool'}
       <ToolCallCard
         call={block.call}
         result={block.result}
@@ -134,23 +122,23 @@
         {threadId}
         {subAgents}
         {coordinatorId}
-        onOpenSubAgent={onOpenSubAgent}
-        onCancelSubAgent={onCancelSubAgent}
-        onCleanupSubAgent={onCleanupSubAgent}
+        {onOpenSubAgent}
+        {onCancelSubAgent}
+        {onCleanupSubAgent}
       />
     {/if}
   {/each}
 
   {#if displayStreamingText}
     <CoderAssistantBlock
-      message={{ role: "assistant", content: displayStreamingText }}
+      message={{ role: 'assistant', content: displayStreamingText }}
       isStreaming={true}
     />
   {/if}
 
   {#if running && !pending && !displayStreamingText}
     <CoderAssistantBlock
-      message={{ role: "assistant", content: "" }}
+      message={{ role: 'assistant', content: '' }}
       showLoader={true}
       {waitingSeconds}
     />
@@ -167,11 +155,7 @@
   {/if}
 
   {#if pending && onDecision}
-    <ApprovalBanner
-      {pending}
-      busy={running}
-      onDecision={onDecision}
-    />
+    <ApprovalBanner {pending} busy={running} {onDecision} />
   {/if}
 
   {#if showRetry && !running}
@@ -200,12 +184,7 @@
           The agent didn't reply. Retry to run the turn again.
         </p>
         {#if onRetry}
-          <Button
-            size="sm"
-            variant="outline"
-            class="h-7 gap-1"
-            onclick={onRetry}
-          >
+          <Button size="sm" variant="outline" class="h-7 gap-1" onclick={onRetry}>
             <RotateCcw class="h-3.5 w-3.5" />
             Retry
           </Button>

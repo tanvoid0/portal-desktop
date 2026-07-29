@@ -1,2 +1,2 @@
-export * from "./types";
-export * from "./services/packageManagerService";
+export * from './types';
+export * from './services/packageManagerService';

@@ -1,44 +1,29 @@
 <!-- Secret Detail Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { goto, replaceState } from "$app/navigation";
-  import { cloudStore, loadResources } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { ArrowLeft, RefreshCw, Trash2, Eye, EyeOff } from "@lucide/svelte";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import Loading from "$lib/components/ui/loading.svelte";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { toastActions } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import YamlEditor from "$lib/domains/cloud/components/YamlEditor.svelte";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto, replaceState } from '$app/navigation';
+  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { ArrowLeft, RefreshCw, Trash2, Eye, EyeOff } from '@lucide/svelte';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import Loading from '$lib/components/ui/loading.svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { toastActions } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
 
   const secretName = $derived($page.params.secret);
   const namespace = $derived(
-    $page.url.searchParams.get("namespace") ||
-      $cloudStore.selectedNamespace ||
-      "default",
+    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get("tab") || "overview");
+  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
 
-  let activeTab = $state("overview");
+  let activeTab = $state('overview');
 
   // Sync activeTab with tabParam when it changes
   $effect(() => {
@@ -50,26 +35,26 @@
   let showSecretValues = $state<Record<string, boolean>>({});
 
   // YAML state
-  let yaml = $state("");
+  let yaml = $state('');
   let yamlLoading = $state(false);
   let yamlError = $state<string | null>(null);
 
   onMount(async () => {
     await loadSecret();
-    if (activeTab === "yaml") {
+    if (activeTab === 'yaml') {
       await loadYAML();
     }
   });
 
   $effect(() => {
-    if (activeTab === "yaml" && !yaml && !yamlLoading && secret) {
+    if (activeTab === 'yaml' && !yaml && !yamlLoading && secret) {
       loadYAML();
     }
   });
 
   async function loadSecret() {
     if (!secretName || !$cloudStore.connection.isConnected) {
-      error = "Secret name or connection required";
+      error = 'Secret name or connection required';
       isLoading = false;
       return;
     }
@@ -86,8 +71,8 @@
         error = `Secret "${secretName}" not found in namespace "${namespace}".`;
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load Secret";
-      console.error("Failed to load Secret:", err);
+      error = err instanceof Error ? err.message : 'Failed to load Secret';
+      console.error('Failed to load Secret:', err);
     } finally {
       isLoading = false;
     }
@@ -100,12 +85,16 @@
       yamlLoading = true;
       yamlError = null;
 
-      const yamlContent = await k8sResourceService.getResourceYaml("Secret", secret.namespace, secret.name);
+      const yamlContent = await k8sResourceService.getResourceYaml(
+        'Secret',
+        secret.namespace,
+        secret.name
+      );
 
       yaml = yamlContent;
     } catch (err) {
-      yamlError = err instanceof Error ? err.message : "Failed to load YAML";
-      console.error("Failed to load YAML:", err);
+      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
+      console.error('Failed to load YAML:', err);
     } finally {
       yamlLoading = false;
     }
@@ -123,8 +112,7 @@
       await loadSecret();
       await loadYAML();
     } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to apply YAML";
+      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
       toastActions.error(errorMsg);
       throw err;
     }
@@ -135,7 +123,7 @@
 
     const confirmed = await confirmAction(
       `Are you sure you want to delete Secret "${secret.name}"? This action cannot be undone.`,
-      "Delete secret",
+      'Delete secret'
     );
     if (!confirmed) return;
 
@@ -143,18 +131,16 @@
       await k8sResourceService.deleteSecret(secret.namespace, secret.name);
 
       toastActions.success(`Secret "${secret.name}" deleted successfully`);
-      goto("/cloud/secrets");
+      goto('/cloud/secrets');
     } catch (err) {
-      toastActions.error(
-        err instanceof Error ? err.message : "Failed to delete Secret",
-      );
+      toastActions.error(err instanceof Error ? err.message : 'Failed to delete Secret');
     }
   }
 
   function handleTabChange(tab: string) {
     activeTab = tab;
     const url = new URL($page.url);
-    url.searchParams.set("tab", tab);
+    url.searchParams.set('tab', tab);
     replaceState(url, {});
   }
 
@@ -170,7 +156,7 @@
       const decoded = atob(base64);
       return decoded;
     } catch (error) {
-      return "[Decode Error]";
+      return '[Decode Error]';
     }
   }
 
@@ -181,7 +167,7 @@
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
-    toastActions.success("Copied to clipboard");
+    toastActions.success('Copied to clipboard');
   }
 </script>
 
@@ -189,11 +175,7 @@
   {#if isLoading}
     <PageLoading message="Loading secret..." />
   {:else if error}
-    <PageError
-      title="Failed to load secret"
-      message={error}
-      onRetry={loadSecret}
-    />
+    <PageError title="Failed to load secret" message={error} onRetry={loadSecret} />
   {:else if secret}
     <div class="flex items-center justify-between">
       <div>
@@ -209,11 +191,7 @@
           <Trash2 class="mr-2 h-4 w-4" />
           Delete
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={() => goto("/cloud/secrets")}
-        >
+        <Button variant="outline" size="sm" onclick={() => goto('/cloud/secrets')}>
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back to Secrets
         </Button>
@@ -225,8 +203,8 @@
       class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20"
     >
       <p class="text-sm text-yellow-800 dark:text-yellow-200">
-        <strong>Security Warning:</strong> Secret values contain sensitive information.
-        Be careful when viewing or editing.
+        <strong>Security Warning:</strong> Secret values contain sensitive information. Be careful when
+        viewing or editing.
       </p>
     </div>
 
@@ -256,9 +234,7 @@
               </div>
               <div>
                 <p class="text-sm text-muted-foreground">Type</p>
-                <Badge variant="outline"
-                  >{secret.metadata?.type || "Opaque"}</Badge
-                >
+                <Badge variant="outline">{secret.metadata?.type || 'Opaque'}</Badge>
               </div>
               <div>
                 <p class="text-sm text-muted-foreground">Data Keys</p>
@@ -266,7 +242,7 @@
               </div>
               <div>
                 <p class="text-sm text-muted-foreground">Age</p>
-                <p class="font-medium">{secret.metadata?.age || "N/A"}</p>
+                <p class="font-medium">{secret.metadata?.age || 'N/A'}</p>
               </div>
             </CardContent>
           </Card>
@@ -306,17 +282,13 @@
                     <div class="mb-2 flex items-center justify-between">
                       <span class="font-medium">{key}</span>
                       <div class="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onclick={() => toggleSecretValue(key)}
-                        >
+                        <Button variant="ghost" size="sm" onclick={() => toggleSecretValue(key)}>
                           {#if showSecretValues[key]}
                             <EyeOff class="mr-1 h-4 w-4" />
                           {:else}
                             <Eye class="mr-1 h-4 w-4" />
                           {/if}
-                          {showSecretValues[key] ? "Hide" : "Show"}
+                          {showSecretValues[key] ? 'Hide' : 'Show'}
                         </Button>
                         <Button
                           variant="ghost"
@@ -337,7 +309,7 @@
 											{#if showSecretValues[key]}
                         {decodeBase64(String(base64Value))}
                       {:else}
-                        {"*".repeat(20)} (hidden)
+                        {'*'.repeat(20)} (hidden)
                       {/if}
 										</pre>
                   </div>
@@ -355,9 +327,7 @@
             <Loading text="Loading YAML..." />
           </div>
         {:else if yamlError}
-          <div
-            class="flex h-[600px] items-center justify-center text-center text-destructive"
-          >
+          <div class="flex h-[600px] items-center justify-center text-center text-destructive">
             <p>{yamlError}</p>
           </div>
         {:else if yaml}
@@ -369,9 +339,7 @@
             namespace={secret.namespace}
           />
         {:else}
-          <div
-            class="flex h-[600px] items-center justify-center text-center text-muted-foreground"
-          >
+          <div class="flex h-[600px] items-center justify-center text-center text-muted-foreground">
             <p>No YAML available.</p>
           </div>
         {/if}

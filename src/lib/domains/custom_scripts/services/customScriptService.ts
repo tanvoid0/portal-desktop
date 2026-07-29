@@ -3,18 +3,12 @@
  * Frontend service for managing custom scripts
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 
 export interface ScriptParameter {
   name: string;
   label: string;
-  parameter_type:
-    | "file"
-    | "folder"
-    | "string"
-    | "number"
-    | "boolean"
-    | "password";
+  parameter_type: 'file' | 'folder' | 'string' | 'number' | 'boolean' | 'password';
   required: boolean;
   default_value?: string;
   description?: string;
@@ -62,28 +56,26 @@ export interface UpdateScriptRequest {
 export class CustomScriptService {
   static async getAllScripts(): Promise<CustomScript[]> {
     try {
-      return await invoke<CustomScript[]>("get_all_custom_scripts");
+      return await invoke<CustomScript[]>('get_all_custom_scripts');
     } catch (error) {
-      console.error("Failed to get all scripts:", error);
+      console.error('Failed to get all scripts:', error);
       throw error;
     }
   }
 
   static async getScript(id: number): Promise<CustomScript | null> {
     try {
-      return await invoke<CustomScript | null>("get_custom_script", { id });
+      return await invoke<CustomScript | null>('get_custom_script', { id });
     } catch (error) {
-      console.error("Failed to get script:", error);
+      console.error('Failed to get script:', error);
       throw error;
     }
   }
 
-  static async createScript(
-    request: CreateScriptRequest,
-  ): Promise<CustomScript> {
+  static async createScript(request: CreateScriptRequest): Promise<CustomScript> {
     try {
       const parametersJson = JSON.stringify(request.parameters || []);
-      return await invoke<CustomScript>("create_custom_script", {
+      return await invoke<CustomScript>('create_custom_script', {
         name: request.name,
         description: request.description,
         command: request.command,
@@ -94,20 +86,15 @@ export class CustomScriptService {
         isInteractive: request.is_interactive ?? false, // Tauri v2 expects camelCase
       });
     } catch (error) {
-      console.error("Failed to create script:", error);
+      console.error('Failed to create script:', error);
       throw error;
     }
   }
 
-  static async updateScript(
-    id: number,
-    request: UpdateScriptRequest,
-  ): Promise<CustomScript> {
+  static async updateScript(id: number, request: UpdateScriptRequest): Promise<CustomScript> {
     try {
-      const parametersJson = request.parameters
-        ? JSON.stringify(request.parameters)
-        : undefined;
-      return await invoke<CustomScript>("update_custom_script", {
+      const parametersJson = request.parameters ? JSON.stringify(request.parameters) : undefined;
+      return await invoke<CustomScript>('update_custom_script', {
         id,
         name: request.name,
         description: request.description,
@@ -119,25 +106,25 @@ export class CustomScriptService {
         isInteractive: request.is_interactive,
       });
     } catch (error) {
-      console.error("Failed to update script:", error);
+      console.error('Failed to update script:', error);
       throw error;
     }
   }
 
   static async deleteScript(id: number): Promise<void> {
     try {
-      await invoke("delete_custom_script", { id });
+      await invoke('delete_custom_script', { id });
     } catch (error) {
-      console.error("Failed to delete script:", error);
+      console.error('Failed to delete script:', error);
       throw error;
     }
   }
 
   static async recordScriptRun(id: number): Promise<CustomScript> {
     try {
-      return await invoke<CustomScript>("record_script_run", { id });
+      return await invoke<CustomScript>('record_script_run', { id });
     } catch (error) {
-      console.error("Failed to record script run:", error);
+      console.error('Failed to record script run:', error);
       throw error;
     }
   }
@@ -146,7 +133,7 @@ export class CustomScriptService {
     try {
       return JSON.parse(parametersJson);
     } catch (error) {
-      console.error("Failed to parse parameters:", error);
+      console.error('Failed to parse parameters:', error);
       return [];
     }
   }
@@ -156,15 +143,15 @@ export class CustomScriptService {
    * Removes shell metacharacters and control characters
    */
   private static sanitizeCommandValue(value: string): string {
-    if (!value) return "";
+    if (!value) return '';
 
     // Remove shell metacharacters that could be used for injection
     // This includes: ; & | ` $ ( ) { } [ ] < > \n \r
     return value
-      .replace(/[;&|`$(){}[\]<>]/g, "")
-      .replace(/\n/g, "")
-      .replace(/\r/g, "")
-      .replace(/\0/g, "") // Null bytes
+      .replace(/[;&|`$(){}[\]<>]/g, '')
+      .replace(/\n/g, '')
+      .replace(/\r/g, '')
+      .replace(/\0/g, '') // Null bytes
       .trim();
   }
 
@@ -172,7 +159,7 @@ export class CustomScriptService {
     commandTemplate: string,
     parameters: ScriptParameter[],
     values: Record<string, string>,
-    requiresSudo: boolean = false,
+    requiresSudo: boolean = false
   ): string {
     let command = commandTemplate;
 
@@ -184,20 +171,14 @@ export class CustomScriptService {
         const sanitizedValue = CustomScriptService.sanitizeCommandValue(value);
 
         // Replace ${param_name} or $param_name
-        command = command.replace(
-          new RegExp(`\\$\\{${param.name}\\}`, "g"),
-          sanitizedValue,
-        );
-        command = command.replace(
-          new RegExp(`\\$${param.name}\\b`, "g"),
-          sanitizedValue,
-        );
+        command = command.replace(new RegExp(`\\$\\{${param.name}\\}`, 'g'), sanitizedValue);
+        command = command.replace(new RegExp(`\\$${param.name}\\b`, 'g'), sanitizedValue);
       }
     }
 
     // If requires_sudo is true, prepend appropriate privilege escalation command
     if (requiresSudo) {
-      const isWindows = navigator.userAgent.includes("Windows");
+      const isWindows = navigator.userAgent.includes('Windows');
       if (isWindows) {
         // Windows: Note that admin elevation typically requires UAC prompt
         // For terminal execution, we'll prepend a note and let the user handle elevation

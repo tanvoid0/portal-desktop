@@ -1,8 +1,5 @@
-import { MediaQuery } from "svelte/reactivity";
-import {
-  LAYOUT_BREAKPOINTS,
-  type ViewportTier,
-} from "$lib/config/layout-breakpoints.js";
+import { MediaQuery } from 'svelte/reactivity';
+import { LAYOUT_BREAKPOINTS, type ViewportTier } from '$lib/config/layout-breakpoints.js';
 
 /**
  * Reactive viewport tier for layout decisions.
@@ -15,18 +12,14 @@ export class ViewportTierQuery {
   readonly #ultrawide: MediaQuery;
 
   constructor() {
-    this.#compact = new MediaQuery(
-      `max-width: ${LAYOUT_BREAKPOINTS.md - 1}px`,
-    );
-    this.#ultrawide = new MediaQuery(
-      `(min-width: ${LAYOUT_BREAKPOINTS.ultrawide}px)`,
-    );
+    this.#compact = new MediaQuery(`max-width: ${LAYOUT_BREAKPOINTS.md - 1}px`);
+    this.#ultrawide = new MediaQuery(`(min-width: ${LAYOUT_BREAKPOINTS.ultrawide}px)`);
   }
 
   get tier(): ViewportTier {
-    if (this.#compact.current) return "compact";
-    if (this.#ultrawide.current) return "ultrawide";
-    return "standard";
+    if (this.#compact.current) return 'compact';
+    if (this.#ultrawide.current) return 'ultrawide';
+    return 'standard';
   }
 
   get isCompact(): boolean {

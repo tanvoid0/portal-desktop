@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
-  import { Skeleton } from "$lib/components/ui/skeleton/index.js";
-  import { Plus, Search, Loader2 } from "@lucide/svelte";
-  import AISidebarStatus from "./AISidebarStatus.svelte";
+  import type { Snippet } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+  import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+  import { Plus, Search, Loader2 } from '@lucide/svelte';
+  import AISidebarStatus from './AISidebarStatus.svelte';
 
   interface Props {
     /** Sidebar name, shown on its own row above the search box. */
@@ -32,16 +32,16 @@
 
   let {
     title,
-    searchPlaceholder = "Search…",
-    searchValue = $bindable(""),
+    searchPlaceholder = 'Search…',
+    searchValue = $bindable(''),
     onCreateNew,
     createLabel,
-    createTitle = "New",
+    createTitle = 'New',
     loading = false,
     showLoadingSkeleton = false,
     isEmpty = false,
     internalScroll = true,
-    listClass = "space-y-2 p-2",
+    listClass = 'space-y-2 p-2',
     filters,
     toolbar,
     meta,
@@ -83,11 +83,7 @@
         <Search
           class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
         />
-        <Input
-          placeholder={searchPlaceholder}
-          bind:value={searchValue}
-          class="h-8 pl-8 text-sm"
-        />
+        <Input placeholder={searchPlaceholder} bind:value={searchValue} class="h-8 pl-8 text-sm" />
       </div>
       {#if !title}
         {#if toolbar}

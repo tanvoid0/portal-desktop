@@ -4,20 +4,20 @@
 -->
 
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import { onMount, onDestroy } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
   import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { ScrollArea } from "$lib/components/ui/scroll-area";
+  } from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { ScrollArea } from '$lib/components/ui/scroll-area';
   import {
     Download,
     Trash2,
@@ -29,11 +29,11 @@
     Info,
     AlertTriangle,
     X,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface LogEntry {
     timestamp: string;
-    level: "INFO" | "WARN" | "ERROR" | "DEBUG";
+    level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
     message: string;
   }
 
@@ -52,8 +52,8 @@
   let loading = $state(false);
   let error = $state<string | null>(null);
   let autoScroll = $state(true);
-  let searchTerm = $state("");
-  let selectedLevel = $state<string>("all");
+  let searchTerm = $state('');
+  let selectedLevel = $state<string>('all');
   let isStreaming = $state(false);
 
   // Derived state
@@ -84,15 +84,15 @@
     error = null;
 
     try {
-      const logData = await invoke("get_service_logs", {
+      const logData = await invoke('get_service_logs', {
         serviceId,
         lines: 1000,
       });
       logs = Array.isArray(logData) ? logData : [];
       applyFilters();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load logs";
-      console.error("Failed to load service logs:", err);
+      error = err instanceof Error ? err.message : 'Failed to load logs';
+      console.error('Failed to load service logs:', err);
     } finally {
       loading = false;
     }
@@ -101,15 +101,12 @@
   function applyFilters() {
     filteredLogs = logs.filter((log) => {
       // Level filter
-      if (selectedLevel !== "all" && log.level !== selectedLevel) {
+      if (selectedLevel !== 'all' && log.level !== selectedLevel) {
         return false;
       }
 
       // Search filter
-      if (
-        searchTerm &&
-        !log.message.toLowerCase().includes(searchTerm.toLowerCase())
-      ) {
+      if (searchTerm && !log.message.toLowerCase().includes(searchTerm.toLowerCase())) {
         return false;
       }
 
@@ -135,29 +132,29 @@
     try {
       const logText = filteredLogs
         .map((log) => `[${log.timestamp}] ${log.level}: ${log.message}`)
-        .join("\n");
+        .join('\n');
 
-      const blob = new Blob([logText], { type: "text/plain" });
+      const blob = new Blob([logText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `${serviceName}-logs-${new Date().toISOString().split("T")[0]}.txt`;
+      a.download = `${serviceName}-logs-${new Date().toISOString().split('T')[0]}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to download logs";
+      error = err instanceof Error ? err.message : 'Failed to download logs';
     }
   }
 
   function getLevelIcon(level: string) {
     switch (level) {
-      case "ERROR":
+      case 'ERROR':
         return AlertCircle;
-      case "WARN":
+      case 'WARN':
         return AlertTriangle;
-      case "INFO":
+      case 'INFO':
         return Info;
       default:
         return Info;
@@ -166,31 +163,31 @@
 
   function getLevelColor(level: string) {
     switch (level) {
-      case "ERROR":
-        return "text-red-600";
-      case "WARN":
-        return "text-yellow-600";
-      case "INFO":
-        return "text-blue-600";
-      case "DEBUG":
-        return "text-gray-600";
+      case 'ERROR':
+        return 'text-red-600';
+      case 'WARN':
+        return 'text-yellow-600';
+      case 'INFO':
+        return 'text-blue-600';
+      case 'DEBUG':
+        return 'text-gray-600';
       default:
-        return "text-gray-600";
+        return 'text-gray-600';
     }
   }
 
   function getLevelBadgeVariant(level: string) {
     switch (level) {
-      case "ERROR":
-        return "destructive";
-      case "WARN":
-        return "secondary";
-      case "INFO":
-        return "default";
-      case "DEBUG":
-        return "outline";
+      case 'ERROR':
+        return 'destructive';
+      case 'WARN':
+        return 'secondary';
+      case 'INFO':
+        return 'default';
+      case 'DEBUG':
+        return 'outline';
       default:
-        return "outline";
+        return 'outline';
     }
   }
 </script>
@@ -218,7 +215,7 @@
 
       <Select
         options={[
-          { value: "all", label: "All Levels" },
+          { value: 'all', label: 'All Levels' },
           ...logLevels.map((level) => ({ value: level, label: level })),
         ]}
         defaultValue={selectedLevel}
@@ -235,12 +232,7 @@
           <Trash2 class="mr-2 h-4 w-4" />
           Clear
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={loadLogs}
-          disabled={loading}
-        >
+        <Button variant="outline" size="sm" onclick={loadLogs} disabled={loading}>
           <Play class="mr-2 h-4 w-4" />
           Refresh
         </Button>
@@ -252,7 +244,7 @@
       <Badge variant="outline">
         {filteredLogsCount} / {totalLogsCount} logs
       </Badge>
-      {#if selectedLevel !== "all"}
+      {#if selectedLevel !== 'all'}
         <Badge variant="secondary">
           Filtered by: {selectedLevel}
         </Badge>
@@ -275,16 +267,14 @@
     <ScrollArea class="flex-1 p-4">
       {#if loading}
         <div class="flex items-center justify-center py-8">
-          <div
-            class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
-          ></div>
+          <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
           <span class="ml-2">Loading logs...</span>
         </div>
       {:else if filteredLogs.length === 0}
         <div class="py-8 text-center text-muted-foreground">
           <Filter class="mx-auto mb-4 h-12 w-12 opacity-50" />
           <p>No logs found</p>
-          {#if searchTerm || selectedLevel !== "all"}
+          {#if searchTerm || selectedLevel !== 'all'}
             <p class="text-sm">Try adjusting your filters</p>
           {/if}
         </div>
@@ -293,19 +283,16 @@
           {#each filteredLogs as log}
             <div class="flex items-start gap-3 rounded p-2 hover:bg-muted/50">
               <div class="flex min-w-0 flex-shrink-0 items-center gap-2">
-                {#if log.level === "ERROR"}
+                {#if log.level === 'ERROR'}
                   <AlertCircle class="h-4 w-4 {getLevelColor(log.level)}" />
-                {:else if log.level === "WARN"}
+                {:else if log.level === 'WARN'}
                   <AlertTriangle class="h-4 w-4 {getLevelColor(log.level)}" />
-                {:else if log.level === "INFO"}
+                {:else if log.level === 'INFO'}
                   <Info class="h-4 w-4 {getLevelColor(log.level)}" />
                 {:else}
                   <Info class="h-4 w-4 {getLevelColor(log.level)}" />
                 {/if}
-                <Badge
-                  variant={getLevelBadgeVariant(log.level)}
-                  class="text-xs"
-                >
+                <Badge variant={getLevelBadgeVariant(log.level)} class="text-xs">
                   {log.level}
                 </Badge>
               </div>

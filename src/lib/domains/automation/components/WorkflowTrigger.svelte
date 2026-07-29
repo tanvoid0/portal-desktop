@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { automationStore } from "../stores/automationStore";
-  import type { AvailableWorkflow, WorkflowResult } from "../types";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import { Play, Loader2, CheckCircle, XCircle } from "@lucide/svelte";
+  import { onMount } from 'svelte';
+  import { automationStore } from '../stores/automationStore';
+  import type { AvailableWorkflow, WorkflowResult } from '../types';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { Play, Loader2, CheckCircle, XCircle } from '@lucide/svelte';
 
   export let project: {
     id: string;
@@ -35,10 +35,7 @@
   async function loadSuggestedWorkflows() {
     if (!project) return;
 
-    await automationStore.getSuggestedWorkflows(
-      project.metadata?.framework,
-      undefined,
-    );
+    await automationStore.getSuggestedWorkflows(project.metadata?.framework, undefined);
 
     suggestedWorkflows = $automationStore.suggestedWorkflows;
   }
@@ -68,7 +65,7 @@
       lastResult = result;
       onWorkflowComplete(result);
     } catch (error) {
-      console.error("Failed to trigger workflow:", error);
+      console.error('Failed to trigger workflow:', error);
     } finally {
       isTriggering = false;
     }
@@ -83,9 +80,7 @@
   <div class="space-y-1">
     <h3 class="text-lg font-semibold">Automate Project</h3>
     {#if !$automationStore.isN8nHealthy}
-      <p class="text-sm text-destructive">
-        n8n is not running. Start it with: npm run n8n:start
-      </p>
+      <p class="text-sm text-destructive">n8n is not running. Start it with: npm run n8n:start</p>
     {/if}
   </div>
 

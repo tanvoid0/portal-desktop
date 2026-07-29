@@ -1,32 +1,17 @@
 <!-- Ingress List Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    cloudStore,
-    loadResources,
-    refreshResources,
-  } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import BaseResourceTable from "$lib/domains/cloud/core/components/BaseResourceTable.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import { RefreshCw, Search } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import {
-    useTableNavigation,
-    useResourceActions,
-  } from "$lib/domains/k8s-navigation";
+  import { onMount } from 'svelte';
+  import { cloudStore, loadResources, refreshResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import BaseResourceTable from '$lib/domains/cloud/core/components/BaseResourceTable.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import { RefreshCw, Search } from '@lucide/svelte';
+  import { goto } from '$app/navigation';
+  import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 
-  let searchQuery = $state("");
+  let searchQuery = $state('');
 
   onMount(async () => {
     if ($cloudStore.connection.isConnected) {
@@ -37,26 +22,25 @@
   const filteredIngresses = $derived(
     $cloudStore.resources[ResourceType.INGRESS].filter((ingress) => {
       const matchesSearch =
-        !searchQuery ||
-        ingress.name.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery || ingress.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
-    }),
+    })
   );
 
   const ingressStats = $derived({
     total: $cloudStore.resources[ResourceType.INGRESS].length,
     withAddresses: $cloudStore.resources[ResourceType.INGRESS].filter(
-      (i: any) => (i.metadata?.addresses || []).length > 0,
+      (i: any) => (i.metadata?.addresses || []).length > 0
     ).length,
   });
 
   const ingressColumns = [
-    { key: "name", label: "Name", width: "w-1/4" },
-    { key: "class", label: "Class", width: "w-1/6" },
-    { key: "addresses", label: "Addresses", width: "w-1/4" },
-    { key: "ports", label: "Hosts", width: "w-1/4" },
-    { key: "age", label: "Age", width: "w-1/8" },
-    { key: "namespace", label: "Namespace", width: "w-1/6" },
+    { key: 'name', label: 'Name', width: 'w-1/4' },
+    { key: 'class', label: 'Class', width: 'w-1/6' },
+    { key: 'addresses', label: 'Addresses', width: 'w-1/4' },
+    { key: 'ports', label: 'Hosts', width: 'w-1/4' },
+    { key: 'age', label: 'Age', width: 'w-1/8' },
+    { key: 'namespace', label: 'Namespace', width: 'w-1/6' },
   ];
 
   async function handleRefresh() {
@@ -89,14 +73,10 @@
         goto(`/cloud/ingress/${resource.name}?namespace=${resource.namespace}`);
       },
       onEdit: (resource) => {
-        goto(
-          `/cloud/ingress/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/ingress/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onYaml: (resource) => {
-        goto(
-          `/cloud/ingress/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/ingress/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onRefresh: () => {
         refreshResources();
@@ -170,10 +150,7 @@
       <CardTitle>Ingress ({filteredIngresses.length})</CardTitle>
     </CardHeader>
     <CardContent>
-      <div
-        class="k8s-navigable-table"
-        data-selected-index={tableNav.selectedIndex}
-      >
+      <div class="k8s-navigable-table" data-selected-index={tableNav.selectedIndex}>
         <BaseResourceTable
           resources={filteredIngresses}
           resourceType={ResourceType.INGRESS}

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import ResizablePane from "./ResizablePane.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Maximize2, Minimize2, Split, X } from "@lucide/svelte";
+  import { onMount, onDestroy } from 'svelte';
+  import ResizablePane from './ResizablePane.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Maximize2, Minimize2, Split, X } from '@lucide/svelte';
 
-  export let direction: "horizontal" | "vertical" = "horizontal";
+  export let direction: 'horizontal' | 'vertical' = 'horizontal';
   export let panes: Array<{
     id: string;
     component: any;
@@ -28,10 +28,7 @@
     });
   }
 
-  function splitPane(
-    paneId: string,
-    splitDirection: "horizontal" | "vertical",
-  ) {
+  function splitPane(paneId: string, splitDirection: 'horizontal' | 'vertical') {
     const paneIndex = panes.findIndex((p) => p.id === paneId);
     if (paneIndex === -1) return;
 
@@ -43,11 +40,7 @@
     };
 
     // Insert new pane after current pane
-    panes = [
-      ...panes.slice(0, paneIndex + 1),
-      newPane,
-      ...panes.slice(paneIndex + 1),
-    ];
+    panes = [...panes.slice(0, paneIndex + 1), newPane, ...panes.slice(paneIndex + 1)];
   }
 
   function closePane(paneId: string) {
@@ -92,12 +85,7 @@
     <!-- Maximized view -->
     <div class="relative flex-1">
       <div class="absolute right-2 top-2 z-10">
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={minimizePane}
-          class="h-8 w-8 p-0"
-        >
+        <Button variant="ghost" size="sm" onclick={minimizePane} class="h-8 w-8 p-0">
           <Minimize2 class="h-4 w-4" />
         </Button>
       </div>
@@ -128,10 +116,7 @@
               variant="ghost"
               size="sm"
               onclick={() =>
-                splitPane(
-                  pane.id,
-                  direction === "horizontal" ? "vertical" : "horizontal",
-                )}
+                splitPane(pane.id, direction === 'horizontal' ? 'vertical' : 'horizontal')}
               class="h-6 w-6 p-0"
               title="Split pane"
             >

@@ -22,16 +22,16 @@ Unified interactive terminal for Portal Desktop — Warp-style command blocks as
 
 ### Shared core
 
-| Module | Purpose |
-|--------|---------|
-| `composables/useXtermSession.ts` | xterm lifecycle, OSC8 links, session persistence, live block streaming |
-| `composables/useTerminalProcess.ts` | PTY create/input/resize/kill |
-| `components/core/Terminal.svelte` | xterm canvas (interactive / one-shot / display) |
-| `components/core/BlocksView.svelte` | Warp-style block list (primary surface) |
-| `components/core/TerminalSession.svelte` | blocks + xterm + command input + optional widget slot |
-| `components/CommandBlock.svelte` | one command block: status, actions, live output |
-| `stores/commandBlockStore.ts` | Unified command output capture |
-| `services/terminalAiContext.ts` | AI context building + response parsing (runnable suggestions) |
+| Module                                   | Purpose                                                                |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| `composables/useXtermSession.ts`         | xterm lifecycle, OSC8 links, session persistence, live block streaming |
+| `composables/useTerminalProcess.ts`      | PTY create/input/resize/kill                                           |
+| `components/core/Terminal.svelte`        | xterm canvas (interactive / one-shot / display)                        |
+| `components/core/BlocksView.svelte`      | Warp-style block list (primary surface)                                |
+| `components/core/TerminalSession.svelte` | blocks + xterm + command input + optional widget slot                  |
+| `components/CommandBlock.svelte`         | one command block: status, actions, live output                        |
+| `stores/commandBlockStore.ts`            | Unified command output capture                                         |
+| `services/terminalAiContext.ts`          | AI context building + response parsing (runnable suggestions)          |
 
 ### Shell integration (OSC 133)
 
@@ -72,22 +72,22 @@ the session. Failed blocks get an **Explain** action.
 
 ## Deep links
 
-| URL param | Behavior |
-|-----------|----------|
-| `?command=` | Pre-fill and run command in active tab |
+| URL param         | Behavior                                           |
+| ----------------- | -------------------------------------------------- |
+| `?command=`       | Pre-fill and run command in active tab             |
 | `?container={id}` | Open Docker exec terminal tab (global `/terminal`) |
-| `?project={id}` | Redirect to `/projects/{id}?tab=terminal` |
+| `?project={id}`   | Redirect to `/projects/{id}?tab=terminal`          |
 
 ## Readonly command capture
 
 For cross-domain readonly execution:
 
 ```typescript
-import { TerminalService, commandBlockStore } from "$lib/domains/terminal";
+import { TerminalService, commandBlockStore } from '$lib/domains/terminal';
 
 const result = await TerminalService.executeInContext(
   { tabId, workingDirectory: cwd, environment: {} },
-  "kubectl get pods",
+  'kubectl get pods'
 );
 // Results are automatically captured in commandBlockStore for the tab
 ```

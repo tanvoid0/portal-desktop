@@ -3,22 +3,22 @@
 -->
 
 <script lang="ts">
-  import { settings } from "$lib/domains/settings/stores/settingsStore";
-  import ThemeCustomizer from "$lib/domains/settings/components/ThemeCustomizer.svelte";
-  import ThemeDisplay from "$lib/components/ThemeDisplay.svelte";
+  import { settings } from '$lib/domains/settings/stores/settingsStore';
+  import ThemeCustomizer from '$lib/domains/settings/components/ThemeCustomizer.svelte';
+  import ThemeDisplay from '$lib/components/ThemeDisplay.svelte';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { get } from "svelte/store";
+  } from '$lib/components/ui/card';
+  import { get } from 'svelte/store';
 
   const settingsData = $derived($settings);
 
   function handleThemeUpdate(
-    updates: Partial<import("$lib/domains/settings/types").ThemeSettings>,
+    updates: Partial<import('$lib/domains/settings/types').ThemeSettings>
   ) {
     const current = get(settings);
     if (!current) return;
@@ -41,17 +41,13 @@
   </div>
 
   {#if settingsData}
-    <ThemeCustomizer
-      settings={settingsData.theme}
-      onUpdate={handleThemeUpdate}
-    />
+    <ThemeCustomizer settings={settingsData.theme} onUpdate={handleThemeUpdate} />
 
     <Card>
       <CardHeader>
         <CardTitle>Component Gallery</CardTitle>
         <CardDescription>
-          Preview buttons, forms, alerts, and theme tokens with your current
-          theme
+          Preview buttons, forms, alerts, and theme tokens with your current theme
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { suggestionEngine, learningStore } from "$lib/domains/learning";
-  import type { PatternType, Suggestion } from "$lib/domains/learning/types";
-  import { logger } from "$lib/domains/shared/services/logger";
-  import { Button } from "$lib/components/ui/button";
+  import { onMount } from 'svelte';
+  import { suggestionEngine, learningStore } from '$lib/domains/learning';
+  import type { PatternType, Suggestion } from '$lib/domains/learning/types';
+  import { logger } from '$lib/domains/shared/services/logger';
+  import { Button } from '$lib/components/ui/button';
 
   interface Props {
     patternType: PatternType;
@@ -21,7 +21,7 @@
     onSuggestionRejected,
   }: Props = $props();
 
-  const log = logger.createScoped("SuggestionPanel");
+  const log = logger.createScoped('SuggestionPanel');
 
   let suggestions: Suggestion[] = $state([]);
   let loading = $state(false);
@@ -32,16 +32,13 @@
     error = null;
 
     try {
-      const fetched = await suggestionEngine.getContextualSuggestions(
-        patternType,
-        context,
-      );
+      const fetched = await suggestionEngine.getContextualSuggestions(patternType, context);
       suggestions = fetched.slice(0, maxSuggestions);
       learningStore.setSuggestions(suggestions);
-      log.info("Suggestions loaded", { count: suggestions.length });
+      log.info('Suggestions loaded', { count: suggestions.length });
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load suggestions";
-      log.error("Failed to load suggestions", err);
+      error = err instanceof Error ? err.message : 'Failed to load suggestions';
+      log.error('Failed to load suggestions', err);
     } finally {
       loading = false;
     }
@@ -51,9 +48,9 @@
     try {
       await suggestionEngine.recordSuggestionAccepted(suggestion.pattern_id);
       onSuggestionAccepted?.(suggestion);
-      log.info("Suggestion accepted", { pattern_id: suggestion.pattern_id });
+      log.info('Suggestion accepted', { pattern_id: suggestion.pattern_id });
     } catch (err) {
-      log.error("Failed to record acceptance", err);
+      log.error('Failed to record acceptance', err);
     }
   };
 
@@ -62,12 +59,10 @@
       await suggestionEngine.recordSuggestionRejected(suggestion.pattern_id);
       onSuggestionRejected?.(suggestion);
       // Remove from local list
-      suggestions = suggestions.filter(
-        (s) => s.pattern_id !== suggestion.pattern_id,
-      );
-      log.info("Suggestion rejected", { pattern_id: suggestion.pattern_id });
+      suggestions = suggestions.filter((s) => s.pattern_id !== suggestion.pattern_id);
+      log.info('Suggestion rejected', { pattern_id: suggestion.pattern_id });
     } catch (err) {
-      log.error("Failed to record rejection", err);
+      log.error('Failed to record rejection', err);
     }
   };
 
@@ -93,8 +88,7 @@
                 {JSON.stringify(suggestion.pattern_data)}
               </span>
               <span class="suggestion-meta">
-                Success rate: {(suggestion.success_rate * 100).toFixed(0)}% |
-                Used: {suggestion.frequency}x
+                Success rate: {(suggestion.success_rate * 100).toFixed(0)}% | Used: {suggestion.frequency}x
               </span>
             </div>
             {#if suggestion.context}
@@ -104,18 +98,10 @@
             {/if}
           </div>
           <div class="suggestion-actions">
-            <Button
-              variant="default"
-              size="sm"
-              onclick={() => handleAccept(suggestion)}
-            >
+            <Button variant="default" size="sm" onclick={() => handleAccept(suggestion)}>
               Accept
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onclick={() => handleReject(suggestion)}
-            >
+            <Button variant="outline" size="sm" onclick={() => handleReject(suggestion)}>
               Reject
             </Button>
           </div>

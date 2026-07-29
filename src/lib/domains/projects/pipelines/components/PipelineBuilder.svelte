@@ -2,24 +2,19 @@
 	Pipeline Builder - Visual pipeline builder with drag-and-drop
 -->
 <script lang="ts">
-  import Select from "$lib/components/ui/select.svelte";
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
-  import type { Pipeline, PipelineStep, ExecutionContext } from "../types";
-  import { pipelineService } from "../services/pipelineService";
-  import { blockLibraryService } from "../services/blockLibraryService";
-  import { createStepFromBlock } from "$lib/domains/automation/utils/blockResolver";
-  import { validateDependencies } from "../utils/dependencyResolver";
-  import BlockLibrary from "./BlockLibrary.svelte";
+  import Select from '$lib/components/ui/select.svelte';
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
+  import type { Pipeline, PipelineStep, ExecutionContext } from '../types';
+  import { pipelineService } from '../services/pipelineService';
+  import { blockLibraryService } from '../services/blockLibraryService';
+  import { createStepFromBlock } from '$lib/domains/automation/utils/blockResolver';
+  import { validateDependencies } from '../utils/dependencyResolver';
+  import BlockLibrary from './BlockLibrary.svelte';
 
   interface Props {
     pipeline?: Pipeline;
@@ -30,15 +25,15 @@
 
   let { pipeline, projectId, onSave, onCancel }: Props = $props();
 
-  let name = $state(pipeline?.name || "");
-  let description = $state(pipeline?.description || "");
+  let name = $state(pipeline?.name || '');
+  let description = $state(pipeline?.description || '');
   let steps = $state<PipelineStep[]>(pipeline?.steps || []);
   let executionContext = $state<ExecutionContext>(
     pipeline?.executionContext || {
-      type: "sdk",
-      sdkType: "node",
-      workingDirectory: ".",
-    },
+      type: 'sdk',
+      sdkType: 'node',
+      workingDirectory: '.',
+    }
   );
   let enabled = $state(pipeline?.enabled ?? true);
   let showBlockLibrary = $state(false);
@@ -118,7 +113,7 @@
         onSave?.(newPipeline);
       }
     } catch (error) {
-      console.error("Failed to save pipeline", error);
+      console.error('Failed to save pipeline', error);
     }
   }
 
@@ -134,7 +129,7 @@
 <div class="pipeline-builder">
   <Card>
     <CardHeader>
-      <CardTitle>{pipeline ? "Edit Pipeline" : "Create Pipeline"}</CardTitle>
+      <CardTitle>{pipeline ? 'Edit Pipeline' : 'Create Pipeline'}</CardTitle>
     </CardHeader>
     <CardContent class="space-y-4">
       <!-- Pipeline Info -->
@@ -159,21 +154,14 @@
           <Select
             bind:value={executionContext.type}
             options={[
-              { value: "sdk", label: "SDK" },
-              { value: "docker", label: "Docker" },
+              { value: 'sdk', label: 'SDK' },
+              { value: 'docker', label: 'Docker' },
             ]}
             class="min-w-[120px]"
           />
-          {#if executionContext.type === "sdk"}
-            <Input
-              bind:value={executionContext.sdkType}
-              placeholder="node"
-              class="flex-1"
-            />
-            <Input
-              bind:value={executionContext.sdkVersion}
-              placeholder="version (optional)"
-            />
+          {#if executionContext.type === 'sdk'}
+            <Input bind:value={executionContext.sdkType} placeholder="node" class="flex-1" />
+            <Input bind:value={executionContext.sdkVersion} placeholder="version (optional)" />
           {:else}
             <Input
               bind:value={executionContext.dockerImage}
@@ -181,10 +169,7 @@
               class="flex-1"
             />
           {/if}
-          <Input
-            bind:value={executionContext.workingDirectory}
-            placeholder="working directory"
-          />
+          <Input bind:value={executionContext.workingDirectory} placeholder="working directory" />
         </div>
       </div>
 
@@ -199,12 +184,8 @@
           <div
             class="rounded border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20"
           >
-            <p class="text-sm font-medium text-red-800 dark:text-red-200">
-              Validation Errors:
-            </p>
-            <ul
-              class="list-inside list-disc text-sm text-red-700 dark:text-red-300"
-            >
+            <p class="text-sm font-medium text-red-800 dark:text-red-200">Validation Errors:</p>
+            <ul class="list-inside list-disc text-sm text-red-700 dark:text-red-300">
               {#each validationErrors as error}
                 <li>{error}</li>
               {/each}
@@ -229,7 +210,7 @@
                   </p>
                   {#if step.dependsOn && step.dependsOn.length > 0}
                     <p class="text-xs text-muted-foreground">
-                      Depends on: {step.dependsOn.join(", ")}
+                      Depends on: {step.dependsOn.join(', ')}
                     </p>
                   {/if}
                 </div>
@@ -256,9 +237,7 @@
       <!-- Actions -->
       <div class="divider-edge-t divider-edge-full flex justify-end gap-2 pt-4">
         <Button variant="outline" onclick={handleCancel}>Cancel</Button>
-        <Button onclick={handleSave} disabled={validationErrors.length > 0}>
-          Save Pipeline
-        </Button>
+        <Button onclick={handleSave} disabled={validationErrors.length > 0}>Save Pipeline</Button>
       </div>
     </CardContent>
   </Card>

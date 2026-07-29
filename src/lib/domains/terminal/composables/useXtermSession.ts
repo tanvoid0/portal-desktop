@@ -1,12 +1,12 @@
-import { Terminal as XTerminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import type { ITheme } from "@xterm/xterm";
-import { logger } from "$lib/domains/shared";
-import { isTauriEnvironment } from "$lib/utils/tauri";
-import type { TerminalConfig, TerminalOutput, TerminalProcess } from "../types";
-import { sessionStore } from "../stores/sessionStore";
-import { injectOsc8Links } from "../utils/osc8";
-import { resolveXtermTheme } from "../theme";
+import { Terminal as XTerminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import type { ITheme } from '@xterm/xterm';
+import { logger } from '$lib/domains/shared';
+import { isTauriEnvironment } from '$lib/utils/tauri';
+import type { TerminalConfig, TerminalOutput, TerminalProcess } from '../types';
+import { sessionStore } from '../stores/sessionStore';
+import { injectOsc8Links } from '../utils/osc8';
+import { resolveXtermTheme } from '../theme';
 import {
   createTerminalProcess,
   getProcessExitCode,
@@ -14,10 +14,10 @@ import {
   resizeTerminalProcess,
   sendProcessInput,
   subscribeProcessOutput,
-} from "./useTerminalProcess";
-import { commandBlockStore } from "../stores/commandBlockStore";
+} from './useTerminalProcess';
+import { commandBlockStore } from '../stores/commandBlockStore';
 
-export type XtermSessionMode = "interactive" | "oneshot" | "display";
+export type XtermSessionMode = 'interactive' | 'oneshot' | 'display';
 
 export interface XtermSessionOptions {
   tabId: string;
@@ -44,14 +44,14 @@ export class XtermSession {
   fitAddon: FitAddon | null = null;
   currentProcess: TerminalProcess | null = null;
   isConnected = false;
-  outputBuffer = "";
+  outputBuffer = '';
 
-  private osc8Tail = "";
+  private osc8Tail = '';
   private sessionSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private resizeHandler: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private outputUnsubscribe: (() => void) | null = null;
-  private readonly log = logger.createScoped("XtermSession");
+  private readonly log = logger.createScoped('XtermSession');
   private readonly isTauri = isTauriEnvironment();
   private mounted = false;
   private disposed = false;
@@ -65,7 +65,7 @@ export class XtermSession {
     this.mounted = true;
     this.disposed = false;
 
-    const isDisplay = this.opts.mode === "display";
+    const isDisplay = this.opts.mode === 'display';
     const t = new XTerminal({
       theme: resolveXtermTheme(this.opts.settings, this.opts.themeOverride),
       fontSize: this.opts.settings.fontSize,
@@ -88,33 +88,33 @@ export class XtermSession {
 
     t.onData((data) => {
       if (!this.isConnected || !this.currentProcess) return;
-      sendProcessInput(this.currentProcess.id, data, this.opts.tabId).catch(
-        (err) => this.log.warn("Failed to send input", { err }),
+      sendProcessInput(this.currentProcess.id, data, this.opts.tabId).catch((err) =>
+        this.log.warn('Failed to send input', { err })
       );
     });
 
     t.onKey((e) => {
-      if (e.domEvent.ctrlKey && e.key === "c" && this.currentProcess) {
+      if (e.domEvent.ctrlKey && e.key === 'c' && this.currentProcess) {
         e.domEvent.preventDefault();
-        sendProcessInput(this.currentProcess.id, "\x03", this.opts.tabId).catch(
-          (err) => this.log.warn("Failed to interrupt process", { err }),
+        sendProcessInput(this.currentProcess.id, '\x03', this.opts.tabId).catch((err) =>
+          this.log.warn('Failed to interrupt process', { err })
         );
-      } else if (e.domEvent.ctrlKey && e.key === "l") {
+      } else if (e.domEvent.ctrlKey && e.key === 'l') {
         e.domEvent.preventDefault();
         t.clear();
       }
     });
 
-    if (this.opts.mode === "display") {
+    if (this.opts.mode === 'display') {
       await this.startDisplay();
-    } else if (this.opts.mode === "oneshot" && this.opts.oneshotCommand) {
+    } else if (this.opts.mode === 'oneshot' && this.opts.oneshotCommand) {
       await this.startOneshot(this.opts.oneshotCommand);
     } else {
       await this.startInteractive();
     }
 
     this.resizeHandler = () => this.fit();
-    window.addEventListener("resize", this.resizeHandler);
+    window.addEventListener('resize', this.resizeHandler);
 
     this.resizeObserver = new ResizeObserver(() => {
       this.fit();
@@ -128,26 +128,24 @@ export class XtermSession {
     requestAnimationFrame(() => this.fit());
   }
 
-  private restoreSession(
-    session: Awaited<ReturnType<typeof sessionStore.loadSession>>,
-  ) {
+  private restoreSession(session: Awaited<ReturnType<typeof sessionStore.loadSession>>) {
     if (!this.terminal || !session) return;
     this.terminal.clear();
     if (session.scrollback_buffer?.length) {
       for (const line of session.scrollback_buffer) {
-        this.terminal.write(line + "\r\n");
+        this.terminal.write(line + '\r\n');
       }
     }
     const [x, y] = session.cursor_position;
-    this.terminal.write("\x1b[" + y + ";" + x + "H");
+    this.terminal.write('\x1b[' + y + ';' + x + 'H');
   }
 
   private async startDisplay(): Promise<void> {
     if (!this.terminal) return;
-    const content = this.opts.displayContent ?? "";
+    const content = this.opts.displayContent ?? '';
     if (content) {
       this.outputBuffer = content;
-      this.terminal.write(content.replace(/\n/g, "\r\n"));
+      this.terminal.write(content.replace(/\n/g, '\r\n'));
     }
   }
 
@@ -165,16 +163,12 @@ export class XtermSession {
 
     if (!this.currentProcess) return;
 
-    this.outputUnsubscribe = await subscribeProcessOutput(
-      this.currentProcess.id,
-      (output) => this.handleOutput(output),
+    this.outputUnsubscribe = await subscribeProcessOutput(this.currentProcess.id, (output) =>
+      this.handleOutput(output)
     );
 
     this.isConnected = true;
-    commandBlockStore.registerProcessTab(
-      this.currentProcess.id,
-      this.opts.tabId,
-    );
+    commandBlockStore.registerProcessTab(this.currentProcess.id, this.opts.tabId);
 
     this.fit();
   }
@@ -200,9 +194,8 @@ export class XtermSession {
     if (!this.currentProcess) return;
 
     this.isConnected = true;
-    this.outputUnsubscribe = await subscribeProcessOutput(
-      this.currentProcess.id,
-      (output) => this.handleOutput(output),
+    this.outputUnsubscribe = await subscribeProcessOutput(this.currentProcess.id, (output) =>
+      this.handleOutput(output)
     );
   }
 
@@ -214,15 +207,8 @@ export class XtermSession {
 
     // Live-stream output into the running command block (Warp-style blocks
     // view). The block itself is created by shell-integration events.
-    if (
-      this.opts.mode !== "oneshot" &&
-      output.output_type === "stdout" &&
-      this.currentProcess
-    ) {
-      commandBlockStore.appendToRunningBlock(
-        this.currentProcess.id,
-        output.content,
-      );
+    if (this.opts.mode !== 'oneshot' && output.output_type === 'stdout' && this.currentProcess) {
+      commandBlockStore.appendToRunningBlock(this.currentProcess.id, output.content);
     }
 
     const injected = injectOsc8Links(output.content, this.osc8Tail, {
@@ -233,12 +219,12 @@ export class XtermSession {
       this.terminal.write(injected.transformed);
     }
 
-    if (output.output_type === "exit") {
-      const flushed = injectOsc8Links("", this.osc8Tail, {
+    if (output.output_type === 'exit') {
+      const flushed = injectOsc8Links('', this.osc8Tail, {
         maxTailChars: 256,
         flush: true,
       });
-      this.osc8Tail = "";
+      this.osc8Tail = '';
       if (flushed.transformed) this.terminal.write(flushed.transformed);
 
       // Report the real exit code from the backend rather than always null.
@@ -261,7 +247,7 @@ export class XtermSession {
       try {
         await this.saveSession();
       } catch (e) {
-        this.log.warn("Failed to save terminal session", { e });
+        this.log.warn('Failed to save terminal session', { e });
       }
     }, 2000);
   }
@@ -284,10 +270,7 @@ export class XtermSession {
       working_directory: this.opts.settings.workingDirectory,
       environment: this.currentProcess?.environment || {},
       scrollback_buffer: scrollbackLines,
-      cursor_position: [
-        this.terminal.buffer.active.cursorX,
-        this.terminal.buffer.active.cursorY,
-      ],
+      cursor_position: [this.terminal.buffer.active.cursorX, this.terminal.buffer.active.cursorY],
       terminal_size: [this.terminal.cols, this.terminal.rows],
       last_activity: new Date().toISOString(),
       process_id: this.currentProcess?.id,
@@ -302,11 +285,9 @@ export class XtermSession {
     try {
       this.fitAddon.fit();
       if (this.currentProcess) {
-        resizeTerminalProcess(
-          this.currentProcess.id,
-          this.terminal.cols,
-          this.terminal.rows,
-        ).catch((err) => this.log.warn("Resize failed", { err }));
+        resizeTerminalProcess(this.currentProcess.id, this.terminal.cols, this.terminal.rows).catch(
+          (err) => this.log.warn('Resize failed', { err })
+        );
       }
     } catch {
       // ignore
@@ -315,7 +296,7 @@ export class XtermSession {
 
   clear(): void {
     this.terminal?.clear();
-    this.outputBuffer = "";
+    this.outputBuffer = '';
   }
 
   write(data: string): void {
@@ -324,11 +305,11 @@ export class XtermSession {
 
   async sendCommand(command: string): Promise<void> {
     if (!this.currentProcess) return;
-    const trimmed = command.replace(/\r?\n$/, "");
-    const lineEnding = navigator.userAgent.includes("Windows") ? "\r\n" : "\n";
+    const trimmed = command.replace(/\r?\n$/, '');
+    const lineEnding = navigator.userAgent.includes('Windows') ? '\r\n' : '\n';
     // Bracketed paste for multi-line commands so the shell takes the block
     // as one unit instead of stalling at continuation prompts.
-    const payload = trimmed.includes("\n")
+    const payload = trimmed.includes('\n')
       ? `\x1b[200~${trimmed}\x1b[201~\r`
       : `${trimmed}${lineEnding}`;
     await sendProcessInput(this.currentProcess.id, payload, this.opts.tabId);
@@ -337,7 +318,7 @@ export class XtermSession {
   async destroy(): Promise<void> {
     this.disposed = true;
     if (this.resizeHandler) {
-      window.removeEventListener("resize", this.resizeHandler);
+      window.removeEventListener('resize', this.resizeHandler);
     }
     this.resizeObserver?.disconnect();
     if (this.sessionSaveTimer) clearTimeout(this.sessionSaveTimer);
@@ -345,13 +326,12 @@ export class XtermSession {
     try {
       if (this.terminal && this.isTauri) await this.saveSession();
     } catch (e) {
-      this.log.warn("Failed to save session on destroy", { e });
+      this.log.warn('Failed to save session on destroy', { e });
     }
 
     this.outputUnsubscribe?.();
 
-    const shouldKill =
-      this.opts.killOnDestroy ?? this.opts.mode === "interactive";
+    const shouldKill = this.opts.killOnDestroy ?? this.opts.mode === 'interactive';
     if (this.currentProcess && shouldKill) {
       await killTerminalProcess(this.currentProcess.id).catch(() => {});
     }

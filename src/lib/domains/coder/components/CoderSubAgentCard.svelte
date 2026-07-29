@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import { ChevronRight, FolderGit2, Square, Trash2 } from "@lucide/svelte";
-  import type { CoderSubAgent } from "../types.js";
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { ChevronRight, FolderGit2, Square, Trash2 } from '@lucide/svelte';
+  import type { CoderSubAgent } from '../types.js';
 
   interface Props {
     subAgent: CoderSubAgent;
@@ -12,35 +12,26 @@
     coordinatorId?: string;
   }
 
-  let {
-    subAgent,
-    onOpen,
-    onCancel,
-    onCleanup,
-    coordinatorId = "",
-  }: Props = $props();
+  let { subAgent, onOpen, onCancel, onCleanup, coordinatorId = '' }: Props = $props();
 
   const tone = $derived.by(() => {
     switch (subAgent.status) {
-      case "running":
-        return "bg-primary/15 text-primary";
-      case "completed":
-        return "bg-emerald-500/15 text-emerald-600";
-      case "failed":
-        return "bg-destructive/10 text-destructive";
-      case "cancelled":
-        return "bg-muted text-muted-foreground";
+      case 'running':
+        return 'bg-primary/15 text-primary';
+      case 'completed':
+        return 'bg-emerald-500/15 text-emerald-600';
+      case 'failed':
+        return 'bg-destructive/10 text-destructive';
+      case 'cancelled':
+        return 'bg-muted text-muted-foreground';
       default:
-        return "bg-muted text-muted-foreground";
+        return 'bg-muted text-muted-foreground';
     }
   });
 
   function openSession() {
     if (!onOpen) return;
-    onOpen(
-      subAgent.child_thread_id,
-      coordinatorId || subAgent.coordinator_thread_id,
-    );
+    onOpen(subAgent.child_thread_id, coordinatorId || subAgent.coordinator_thread_id);
   }
 </script>
 
@@ -50,9 +41,13 @@
     : ''}"
 >
   <div class="flex items-start gap-3">
-    <button
+    <!-- Button, reset to a block: the card body is multi-line, not a label. -->
+    <Button
       type="button"
-      class="min-w-0 flex-1 text-left {onOpen ? 'cursor-pointer' : 'cursor-default'}"
+      variant="ghost"
+      class="h-auto min-w-0 flex-1 flex-col items-start justify-start whitespace-normal p-0 text-left hover:bg-transparent disabled:opacity-100 {onOpen
+        ? 'cursor-pointer'
+        : 'cursor-default'}"
       disabled={!onOpen}
       onclick={openSession}
     >
@@ -77,7 +72,7 @@
       {:else if onOpen}
         <p class="mt-1 text-xs text-muted-foreground">Open session</p>
       {/if}
-    </button>
+    </Button>
     <div class="flex shrink-0 items-center gap-1">
       {#if onOpen}
         <Button
@@ -90,7 +85,7 @@
           <ChevronRight class="h-3.5 w-3.5" />
         </Button>
       {/if}
-      {#if subAgent.status === "running" || subAgent.status === "pending"}
+      {#if subAgent.status === 'running' || subAgent.status === 'pending'}
         <Button
           size="icon"
           variant="ghost"

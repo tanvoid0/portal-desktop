@@ -4,27 +4,23 @@
 -->
 
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from '$app/stores';
   import {
     sdkConfigService,
     type ProcessedSDKConfig,
-  } from "$lib/domains/sdk/services/sdkConfigService";
+  } from '$lib/domains/sdk/services/sdkConfigService';
   import {
     Card,
     CardContent,
     CardHeader,
     CardTitle,
     CardDescription,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    ArrowLeft,
-    FolderOpen,
-    ExternalLink,
-  } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import { PageLoading, PageError } from "$lib/components/shell";
+  } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { ArrowLeft, FolderOpen, ExternalLink } from '@lucide/svelte';
+  import { goto } from '$app/navigation';
+  import { PageLoading, PageError } from '$lib/components/shell';
 
   // Get SDK ID from URL
   let sdkId = $derived($page.params.sdk);
@@ -45,7 +41,7 @@
 
     try {
       if (!sdkId) {
-        error = "SDK ID is required";
+        error = 'SDK ID is required';
         return;
       }
 
@@ -57,9 +53,8 @@
 
       sdkConfig = config;
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to load SDK configuration";
-      console.error("Failed to load SDK config:", err);
+      error = err instanceof Error ? err.message : 'Failed to load SDK configuration';
+      console.error('Failed to load SDK config:', err);
     } finally {
       loading = false;
     }
@@ -68,7 +63,7 @@
   function navigateToProjects() {
     // Navigate to main projects page
     // The user can filter by framework/package manager there
-    goto("/projects");
+    goto('/projects');
   }
 </script>
 
@@ -82,11 +77,7 @@
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onclick={() => goto(`/sdk/${sdkId}`)}
-          >
+          <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
             <ArrowLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -112,8 +103,8 @@
         </CardHeader>
         <CardContent class="space-y-4">
           <p class="text-muted-foreground">
-            To view projects for {sdkConfig.display_name}, navigate to the main
-            Projects page where you can filter by framework or package manager.
+            To view projects for {sdkConfig.display_name}, navigate to the main Projects page where
+            you can filter by framework or package manager.
           </p>
 
           {#if sdkConfig.package_managers.length > 0}

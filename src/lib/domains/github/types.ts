@@ -1,4 +1,4 @@
-import type { Project } from "$lib/domains/projects/types";
+import type { Project } from '$lib/domains/projects/types';
 
 export interface GitHubAccount {
   id: number;
@@ -25,7 +25,7 @@ export interface GitHubDeviceFlowStart {
 }
 
 export interface GitHubDeviceFlowPollResult {
-  status: "pending" | "connected" | "expired" | "denied" | "error";
+  status: 'pending' | 'connected' | 'expired' | 'denied' | 'error';
   message?: string | null;
   retryAfterSeconds?: number | null;
   account?: GitHubAccount | null;

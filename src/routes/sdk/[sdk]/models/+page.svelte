@@ -4,10 +4,10 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { invoke } from "@tauri-apps/api/core";
-  import { goto } from "$app/navigation";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { invoke } from '@tauri-apps/api/core';
+  import { goto } from '$app/navigation';
 
   import {
     Card,
@@ -15,36 +15,29 @@
     CardHeader,
     CardTitle,
     CardDescription,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
+  } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 
-  import { AlertCircle, ArrowLeft, Play, Square } from "@lucide/svelte";
+  import { AlertCircle, ArrowLeft, Play, Square } from '@lucide/svelte';
 
   import {
     sdkConfigService,
     type ProcessedSDKConfig,
-  } from "$lib/domains/sdk/services/sdkConfigService";
+  } from '$lib/domains/sdk/services/sdkConfigService';
 
-  import { invokeClient } from "$lib/utils/invokeClient";
-  import ModelList from "$lib/components/ModelList.svelte";
-  import ModelTreeList from "$lib/components/ModelTreeList.svelte";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
+  import { invokeClient } from '$lib/utils/invokeClient';
+  import ModelList from '$lib/components/ModelList.svelte';
+  import ModelTreeList from '$lib/components/ModelTreeList.svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
 
-  const MODEL_TABS = ["local", "library"] as const;
+  const MODEL_TABS = ['local', 'library'] as const;
   type ModelTab = (typeof MODEL_TABS)[number];
 
-  const modelTab = $derived(
-    resolveUrlTab($page.url.searchParams, MODEL_TABS, "local"),
-  );
+  const modelTab = $derived(resolveUrlTab($page.url.searchParams, MODEL_TABS, 'local'));
 
   function setModelTab(tab: ModelTab) {
     goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
@@ -81,7 +74,7 @@
   // Install progress (UI-side simulation)
   let installingModel = $state<string | null>(null);
   let installationProgress = $state(0);
-  let installationStatus = $state("");
+  let installationStatus = $state('');
 
   onMount(async () => {
     await load();
@@ -97,17 +90,16 @@
       if (
         !sdkConfig ||
         !sdkConfig.category_features?.modelManagement ||
-        !sdkConfig.tabs.some((t) => t.id === "models")
+        !sdkConfig.tabs.some((t) => t.id === 'models')
       ) {
-        serviceError = "Model management is not available for this SDK.";
+        serviceError = 'Model management is not available for this SDK.';
         return;
       }
 
       await loadServiceStatus();
       await loadModelsIfAllowed();
     } catch (err) {
-      serviceError =
-        err instanceof Error ? err.message : "Failed to load SDK models";
+      serviceError = err instanceof Error ? err.message : 'Failed to load SDK models';
     } finally {
       serviceLoading = false;
     }
@@ -119,7 +111,7 @@
       pid?: number;
       port?: number;
       status: string;
-    }>("get_service_status", { sdkType: sdkId });
+    }>('get_service_status', { sdkType: sdkId });
 
     serviceInfo = status;
   }
@@ -129,18 +121,16 @@
     modelsError = null;
     try {
       if (!serviceInfo?.running) {
-        modelsError =
-          "Service is not running. Start the service to view and manage models.";
+        modelsError = 'Service is not running. Start the service to view and manage models.';
         return;
       }
 
-      const result = await invokeClient.post<any[]>("get_runtime_models", {
+      const result = await invokeClient.post<any[]>('get_runtime_models', {
         sdkType: sdkId,
       });
       models = result || [];
     } catch (err) {
-      modelsError =
-        err instanceof Error ? err.message : "Failed to load models";
+      modelsError = err instanceof Error ? err.message : 'Failed to load models';
     } finally {
       modelsLoading = false;
     }
@@ -151,13 +141,12 @@
     availableModelsError = null;
     try {
       const result = await invokeClient.post<Record<string, any[]>>(
-        "get_runtime_available_models",
-        { sdkType: sdkId },
+        'get_runtime_available_models',
+        { sdkType: sdkId }
       );
       availableModels = result || {};
     } catch (err) {
-      availableModelsError =
-        err instanceof Error ? err.message : "Failed to load available models";
+      availableModelsError = err instanceof Error ? err.message : 'Failed to load available models';
     } finally {
       availableModelsLoading = false;
     }
@@ -166,27 +155,26 @@
   async function startService() {
     if (!sdkId) return;
     try {
-      await invokeClient.post<string>("start_service", { sdkType: sdkId });
+      await invokeClient.post<string>('start_service', { sdkType: sdkId });
       // Give backend a moment to transition
       await new Promise((r) => setTimeout(r, 500));
       await loadServiceStatus();
       await loadModelsIfAllowed();
     } catch (err) {
-      serviceError =
-        err instanceof Error ? err.message : "Failed to start service";
+      serviceError = err instanceof Error ? err.message : 'Failed to start service';
     }
   }
 
   function cancelInstallation() {
     installingModel = null;
     installationProgress = 0;
-    installationStatus = "";
+    installationStatus = '';
   }
 
   async function installModel(modelName: string) {
     if (!serviceInfo?.running) {
       // Model install requires the runtime to be up for this current implementation.
-      modelsError = "Start the service before installing models.";
+      modelsError = 'Start the service before installing models.';
       return;
     }
 
@@ -195,10 +183,10 @@
     installationStatus = `Starting download of ${modelName}...`;
 
     try {
-      toastHard("Download started", modelName);
+      toastHard('Download started', modelName);
 
       // Kick off install (backend returns quickly)
-      await invokeClient.post<string>("install_runtime_model", {
+      await invokeClient.post<string>('install_runtime_model', {
         sdkType: sdkId,
         modelName,
       });
@@ -208,13 +196,12 @@
       installationStatus = `Downloading ${modelName}...`;
       await new Promise((r) => setTimeout(r, 2000));
       installationProgress = 100;
-      installationStatus = "Installation complete (refreshing models...)";
+      installationStatus = 'Installation complete (refreshing models...)';
 
       await loadModelsIfAllowed();
-      toastHard("Model installed", modelName);
+      toastHard('Model installed', modelName);
     } catch (err) {
-      modelsError =
-        err instanceof Error ? err.message : "Failed to install model";
+      modelsError = err instanceof Error ? err.message : 'Failed to install model';
     } finally {
       setTimeout(() => {
         cancelInstallation();
@@ -224,19 +211,18 @@
 
   async function removeModel(modelName: string) {
     if (!serviceInfo?.running) {
-      modelsError = "Start the service before removing models.";
+      modelsError = 'Start the service before removing models.';
       return;
     }
 
     try {
-      await invokeClient.post<string>("remove_runtime_model", {
+      await invokeClient.post<string>('remove_runtime_model', {
         sdkType: sdkId,
         modelName,
       });
       await loadModelsIfAllowed();
     } catch (err) {
-      modelsError =
-        err instanceof Error ? err.message : "Failed to remove model";
+      modelsError = err instanceof Error ? err.message : 'Failed to remove model';
     }
   }
 
@@ -250,21 +236,13 @@
   {#if serviceLoading}
     <PageLoading message="Loading models..." />
   {:else if serviceError}
-    <PageError
-      title="Failed to load models"
-      message={serviceError}
-      onRetry={load}
-    />
+    <PageError title="Failed to load models" message={serviceError} onRetry={load} />
   {:else if sdkConfig}
     <div class="space-y-6">
       <!-- Header -->
       <div class="flex items-center justify-between gap-4">
         <div class="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onclick={() => goto(`/sdk/${sdkId}`)}
-          >
+          <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
             <ArrowLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -276,13 +254,9 @@
 
         <div class="flex items-center gap-2">
           {#if serviceInfo?.running}
-            <Badge variant="default" class="bg-green-500 text-white">
-              Running
-            </Badge>
+            <Badge variant="default" class="bg-green-500 text-white">Running</Badge>
           {:else}
-            <Badge variant="outline" class="text-muted-foreground">
-              Stopped
-            </Badge>
+            <Badge variant="outline" class="text-muted-foreground">Stopped</Badge>
           {/if}
         </div>
       </div>
@@ -294,8 +268,7 @@
             <Alert>
               <AlertCircle class="h-4 w-4" />
               <AlertDescription>
-                Start the service to view installed models and manage model
-                libraries.
+                Start the service to view installed models and manage model libraries.
               </AlertDescription>
             </Alert>
             <div class="mt-4">
@@ -312,7 +285,7 @@
         value={modelTab}
         onValueChange={(v) => {
           setModelTab(v as ModelTab);
-          if (v === "library") void loadAvailableModels();
+          if (v === 'library') void loadAvailableModels();
         }}
         class="w-full"
       >
@@ -325,9 +298,7 @@
           <Card>
             <CardHeader>
               <CardTitle>Installed Models</CardTitle>
-              <CardDescription
-                >Manage models available inside the runtime.</CardDescription
-              >
+              <CardDescription>Manage models available inside the runtime.</CardDescription>
             </CardHeader>
             <CardContent>
               <ModelList
@@ -342,7 +313,7 @@
                 onRemove={removeModel}
                 onRetry={loadModelsIfAllowed}
                 onBrowseAvailable={() => {
-                  setModelTab("library");
+                  setModelTab('library');
                   loadAvailableModels();
                 }}
               />

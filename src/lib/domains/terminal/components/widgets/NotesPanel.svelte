@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { terminalNotesStore } from "../../stores/terminalNotesStore";
-  import { isTauriEnvironment } from "$lib/utils/tauri";
-  import { logger } from "$lib/domains/shared";
+  import { onMount } from 'svelte';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { terminalNotesStore } from '../../stores/terminalNotesStore';
+  import { isTauriEnvironment } from '$lib/utils/tauri';
+  import { logger } from '$lib/domains/shared';
 
-  const log = logger.createScoped("NotesPanel");
+  const log = logger.createScoped('NotesPanel');
 
   interface Props {
     tabId: string;
@@ -13,7 +13,7 @@
 
   let { tabId }: Props = $props();
 
-  let noteMarkdown = $state("");
+  let noteMarkdown = $state('');
   let notesSaveTimer = $state<ReturnType<typeof setTimeout> | null>(null);
   const isTauri = isTauriEnvironment();
 
@@ -30,7 +30,7 @@
       try {
         await terminalNotesStore.saveNote(tabId, markdown);
       } catch (e) {
-        log.warn("Failed to save notes", { e });
+        log.warn('Failed to save notes', { e });
       }
     }, 800);
   }
@@ -55,7 +55,7 @@
       }}
     />
     <div class="mt-2 text-xs text-muted-foreground">
-      {isTauri ? "Saved automatically (debounced)." : "Notes are disabled in browser mode."}
+      {isTauri ? 'Saved automatically (debounced).' : 'Notes are disabled in browser mode.'}
     </div>
   </div>
 </div>

@@ -1,34 +1,29 @@
 <!-- Create Secret Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import { cloudStore } from "$lib/domains/cloud/stores";
-  import { ResourceType } from "$lib/domains/cloud/core/types";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import Select from "$lib/components/ui/select.svelte";
-  import { ArrowLeft, Save, Plus, X, Eye, EyeOff } from "@lucide/svelte";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import { toastActions } from "$lib/utils/toast";
-  import YamlEditor from "$lib/domains/cloud/components/YamlEditor.svelte";
-  import { PageHeader } from "$lib/components/shell";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { cloudStore } from '$lib/domains/cloud/stores';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import Select from '$lib/components/ui/select.svelte';
+  import { ArrowLeft, Save, Plus, X, Eye, EyeOff } from '@lucide/svelte';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import { toastActions } from '$lib/utils/toast';
+  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
+  import { PageHeader } from '$lib/components/shell';
 
-  let secretName = $state("");
-  let namespace = $state($cloudStore.selectedNamespace || "default");
-  let secretType = $state("Opaque");
+  let secretName = $state('');
+  let namespace = $state($cloudStore.selectedNamespace || 'default');
+  let secretType = $state('Opaque');
   let yamlMode = $state(false);
-  let yamlContent = $state("");
-  let dataEntries = $state<
-    Array<{ key: string; value: string; visible: boolean }>
-  >([{ key: "", value: "", visible: false }]);
+  let yamlContent = $state('');
+  let dataEntries = $state<Array<{ key: string; value: string; visible: boolean }>>([
+    { key: '', value: '', visible: false },
+  ]);
   let isLoading = $state(false);
 
   onMount(async () => {
@@ -44,25 +39,21 @@
   });
 
   const secretTypes = [
-    "Opaque",
-    "kubernetes.io/dockerconfigjson",
-    "kubernetes.io/tls",
-    "kubernetes.io/basic-auth",
+    'Opaque',
+    'kubernetes.io/dockerconfigjson',
+    'kubernetes.io/tls',
+    'kubernetes.io/basic-auth',
   ];
 
   function addDataEntry() {
-    dataEntries = [...dataEntries, { key: "", value: "", visible: false }];
+    dataEntries = [...dataEntries, { key: '', value: '', visible: false }];
   }
 
   function removeDataEntry(index: number) {
     dataEntries = dataEntries.filter((_, i) => i !== index);
   }
 
-  function updateDataEntry(
-    index: number,
-    field: "key" | "value",
-    value: string,
-  ) {
+  function updateDataEntry(index: number, field: 'key' | 'value', value: string) {
     dataEntries[index] = { ...dataEntries[index], [field]: value };
     dataEntries = [...dataEntries];
   }
@@ -77,15 +68,13 @@
   }
 
   function generateYAML(): string {
-    const validEntries = dataEntries.filter(
-      (e) => e.key.trim() && e.value.trim(),
-    );
+    const validEntries = dataEntries.filter((e) => e.key.trim() && e.value.trim());
     const dataSection = validEntries
       .map((e) => {
         const encoded = encodeBase64(e.value);
         return `  ${e.key}: ${encoded}`;
       })
-      .join("\n");
+      .join('\n');
 
     return `apiVersion: v1
 kind: Secret
@@ -100,12 +89,12 @@ ${dataSection}
 
   async function handleCreate() {
     if (!secretName.trim()) {
-      toastActions.error("Secret name is required");
+      toastActions.error('Secret name is required');
       return;
     }
 
     if (!namespace.trim()) {
-      toastActions.error("Namespace is required");
+      toastActions.error('Namespace is required');
       return;
     }
 
@@ -124,9 +113,7 @@ ${dataSection}
       toastActions.success(result);
       goto(`/cloud/secrets/${secretName}?namespace=${namespace}`);
     } catch (error) {
-      toastActions.error(
-        error instanceof Error ? error.message : "Failed to create Secret",
-      );
+      toastActions.error(error instanceof Error ? error.message : 'Failed to create Secret');
     } finally {
       isLoading = false;
     }
@@ -136,7 +123,7 @@ ${dataSection}
     if (yamlMode) {
       // Switching from YAML to form - parse YAML if possible
       // For now, just clear and let user use form
-      yamlContent = "";
+      yamlContent = '';
     } else {
       // Switching from form to YAML - generate YAML
       yamlContent = generateYAML();
@@ -144,18 +131,13 @@ ${dataSection}
     yamlMode = !yamlMode;
   }
 
-  const validEntries = $derived(
-    dataEntries.filter((e) => e.key.trim() && e.value.trim()),
-  );
+  const validEntries = $derived(dataEntries.filter((e) => e.key.trim() && e.value.trim()));
 </script>
 
 <div class="space-y-6">
-  <PageHeader
-    title="Create Secret"
-    description="Create a new Kubernetes Secret"
-  >
+  <PageHeader title="Create Secret" description="Create a new Kubernetes Secret">
     {#snippet actions()}
-      <Button variant="outline" onclick={() => goto("/cloud/secrets")}>
+      <Button variant="outline" onclick={() => goto('/cloud/secrets')}>
         <ArrowLeft class="mr-2 h-4 w-4" />
         Back to Secrets
       </Button>
@@ -167,8 +149,8 @@ ${dataSection}
     class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20"
   >
     <p class="text-sm text-yellow-800 dark:text-yellow-200">
-      <strong>Security Warning:</strong> Secret values will be base64-encoded. Be
-      careful when entering sensitive information.
+      <strong>Security Warning:</strong> Secret values will be base64-encoded. Be careful when entering
+      sensitive information.
     </p>
   </div>
 
@@ -180,9 +162,7 @@ ${dataSection}
         <Card>
           <CardHeader>
             <CardTitle>YAML Editor</CardTitle>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Edit the Secret YAML directly
-            </p>
+            <p class="mt-1 text-sm text-muted-foreground">Edit the Secret YAML directly</p>
           </CardHeader>
           <CardContent>
             <YamlEditor value={yamlContent} resourceKind="Secret" {namespace} />
@@ -193,9 +173,7 @@ ${dataSection}
         <Card>
           <CardHeader>
             <CardTitle>Secret Details</CardTitle>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Configure your Secret
-            </p>
+            <p class="mt-1 text-sm text-muted-foreground">Configure your Secret</p>
           </CardHeader>
           <CardContent class="space-y-4">
             <div class="space-y-2">
@@ -203,8 +181,7 @@ ${dataSection}
               <Input
                 id="name"
                 value={secretName}
-                oninput={(e) =>
-                  (secretName = (e.target as HTMLInputElement).value)}
+                oninput={(e) => (secretName = (e.target as HTMLInputElement).value)}
                 placeholder="my-secret"
               />
             </div>
@@ -238,11 +215,7 @@ ${dataSection}
                     <Input
                       value={entry.key}
                       oninput={(e) =>
-                        updateDataEntry(
-                          index,
-                          "key",
-                          (e.target as HTMLInputElement).value,
-                        )}
+                        updateDataEntry(index, 'key', (e.target as HTMLInputElement).value)}
                       placeholder="Key"
                       class="flex-1"
                     />
@@ -253,23 +226,20 @@ ${dataSection}
                           oninput={(e) =>
                             updateDataEntry(
                               index,
-                              "value",
-                              (e.target as HTMLTextAreaElement).value,
+                              'value',
+                              (e.target as HTMLTextAreaElement).value
                             )}
                           placeholder="Value"
                           class="min-h-[60px] pr-10"
                         />
                       {:else}
                         <Textarea
-                          value={entry.value
-                            ? "*".repeat(Math.min(entry.value.length, 20))
-                            : ""}
+                          value={entry.value ? '*'.repeat(Math.min(entry.value.length, 20)) : ''}
                           oninput={(e) => {
-                            const newValue = (e.target as HTMLTextAreaElement)
-                              .value;
+                            const newValue = (e.target as HTMLTextAreaElement).value;
                             // Only update if not all asterisks
                             if (!newValue.match(/^\*+$/)) {
-                              updateDataEntry(index, "value", newValue);
+                              updateDataEntry(index, 'value', newValue);
                             }
                           }}
                           placeholder="Value (hidden)"
@@ -307,14 +277,14 @@ ${dataSection}
 
       <div class="flex items-center justify-end gap-2">
         <Button variant="outline" onclick={toggleMode}>
-          {yamlMode ? "Switch to Form" : "Switch to YAML"}
+          {yamlMode ? 'Switch to Form' : 'Switch to YAML'}
         </Button>
         <Button
           onclick={handleCreate}
           disabled={isLoading || !secretName.trim() || !namespace.trim()}
         >
           <Save class="mr-2 h-4 w-4" />
-          {isLoading ? "Creating..." : "Create Secret"}
+          {isLoading ? 'Creating...' : 'Create Secret'}
         </Button>
       </div>
     </div>
@@ -326,8 +296,7 @@ ${dataSection}
           <CardTitle>Preview</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre
-            class="overflow-auto rounded bg-muted p-4 text-xs">{generateYAML()}</pre>
+          <pre class="overflow-auto rounded bg-muted p-4 text-xs">{generateYAML()}</pre>
         </CardContent>
       </Card>
     </div>

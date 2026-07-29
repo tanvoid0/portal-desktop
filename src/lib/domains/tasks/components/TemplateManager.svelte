@@ -1,15 +1,10 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
   import {
     Dialog,
     DialogContent,
@@ -18,17 +13,13 @@
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from "$lib/components/ui/dialog";
-  import Select from "$lib/components/ui/select.svelte";
-  import { taskActions } from "../stores/taskStore";
-  import { taskUi } from "../state/taskUi.svelte";
-  import type { TaskTemplate, TaskStatus, TaskPriority } from "../types";
-  import {
-    TASK_TYPE_OPTIONS,
-    TASK_STATUS_OPTIONS,
-    TASK_PRIORITY_OPTIONS,
-  } from "../types";
-  import Icon from "@iconify/svelte";
+  } from '$lib/components/ui/dialog';
+  import Select from '$lib/components/ui/select.svelte';
+  import { taskActions } from '../stores/taskStore';
+  import { taskUi } from '../state/taskUi.svelte';
+  import type { TaskTemplate, TaskStatus, TaskPriority } from '../types';
+  import { TASK_TYPE_OPTIONS, TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from '../types';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     onApplyTemplate?: (template: TaskTemplate) => void;
@@ -41,22 +32,22 @@
   let editingTemplate: TaskTemplate | null = $state(null);
 
   // Template form state
-  let templateName = $state("");
-  let templateDescription = $state("");
-  let templateStatus: TaskStatus = $state("pending");
-  let templatePriority: TaskPriority = $state("medium");
-  let templateType = $state("");
+  let templateName = $state('');
+  let templateDescription = $state('');
+  let templateStatus: TaskStatus = $state('pending');
+  let templatePriority: TaskPriority = $state('medium');
+  let templateType = $state('');
   let templateTags = $state<string[]>([]);
   let templateEstimatedTime = $state(0);
-  let templateAssignee = $state("");
+  let templateAssignee = $state('');
 
   // Tag management
-  let newTag = $state("");
+  let newTag = $state('');
 
   function addTag() {
     if (newTag.trim() && !templateTags.includes(newTag.trim())) {
       templateTags = [...templateTags, newTag.trim()];
-      newTag = "";
+      newTag = '';
     }
   }
 
@@ -65,7 +56,7 @@
   }
 
   function handleTagKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter") {
+    if (event.key === 'Enter') {
       event.preventDefault();
       addTag();
     }
@@ -99,13 +90,13 @@
   function editTemplate(template: TaskTemplate) {
     editingTemplate = template;
     templateName = template.name;
-    templateDescription = template.description || "";
+    templateDescription = template.description || '';
     templateStatus = template.defaultStatus;
     templatePriority = template.defaultPriority;
-    templateType = template.defaultType || "";
+    templateType = template.defaultType || '';
     templateTags = template.defaultTags || [];
     templateEstimatedTime = template.defaultEstimatedTime || 0;
-    templateAssignee = "";
+    templateAssignee = '';
     showEditDialog = true;
   }
 
@@ -135,15 +126,15 @@
   }
 
   function resetForm() {
-    templateName = "";
-    templateDescription = "";
-    templateStatus = "pending";
-    templatePriority = "medium";
-    templateType = "";
+    templateName = '';
+    templateDescription = '';
+    templateStatus = 'pending';
+    templatePriority = 'medium';
+    templateType = '';
     templateTags = [];
     templateEstimatedTime = 0;
-    templateAssignee = "";
-    newTag = "";
+    templateAssignee = '';
+    newTag = '';
   }
 </script>
 
@@ -161,9 +152,7 @@
         <DialogContent class="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Create Task Template</DialogTitle>
-            <DialogDescription>
-              Create a reusable template for common task types.
-            </DialogDescription>
+            <DialogDescription>Create a reusable template for common task types.</DialogDescription>
           </DialogHeader>
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
@@ -210,8 +199,7 @@
                 <Select
                   options={TASK_PRIORITY_OPTIONS}
                   defaultValue={templatePriority}
-                  onSelect={(value) =>
-                    (templatePriority = value as TaskPriority)}
+                  onSelect={(value) => (templatePriority = value as TaskPriority)}
                 />
               </div>
             </div>
@@ -249,9 +237,7 @@
             </div>
 
             <div class="space-y-2">
-              <Label for="templateEstimatedTime"
-                >Default Estimated Time (minutes)</Label
-              >
+              <Label for="templateEstimatedTime">Default Estimated Time (minutes)</Label>
               <Input
                 id="templateEstimatedTime"
                 type="number"
@@ -262,12 +248,7 @@
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onclick={() => (showCreateDialog = false)}
-            >
-              Cancel
-            </Button>
+            <Button variant="outline" onclick={() => (showCreateDialog = false)}>Cancel</Button>
             <Button onclick={createTemplate} disabled={!templateName.trim()}>
               Create Template
             </Button>
@@ -305,16 +286,10 @@
                       </div>
                     {/if}
                     <div class="mt-1 flex items-center gap-2">
-                      <Badge variant="outline" class="text-xs"
-                        >{template.defaultStatus}</Badge
-                      >
-                      <Badge variant="outline" class="text-xs"
-                        >{template.defaultPriority}</Badge
-                      >
+                      <Badge variant="outline" class="text-xs">{template.defaultStatus}</Badge>
+                      <Badge variant="outline" class="text-xs">{template.defaultPriority}</Badge>
                       {#if template.defaultType}
-                        <Badge variant="outline" class="text-xs"
-                          >{template.defaultType}</Badge
-                        >
+                        <Badge variant="outline" class="text-xs">{template.defaultType}</Badge>
                       {/if}
                       {#if template.defaultEstimatedTime}
                         <Badge variant="outline" class="text-xs"

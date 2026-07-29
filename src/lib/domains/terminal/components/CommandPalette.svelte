@@ -1,22 +1,12 @@
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { onMount, onDestroy } from "svelte";
-  import { commandPaletteStore } from "../stores/commandPaletteStore";
-  import { commandHistoryStore } from "../stores/commandHistoryStore";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Search,
-    X,
-    Play,
-    Square,
-    Trash2,
-    Copy,
-    Clock,
-    Terminal,
-    Zap,
-  } from "@lucide/svelte";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { onMount, onDestroy } from 'svelte';
+  import { commandPaletteStore } from '../stores/commandPaletteStore';
+  import { commandHistoryStore } from '../stores/commandHistoryStore';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Search, X, Play, Square, Trash2, Copy, Clock, Terminal, Zap } from '@lucide/svelte';
 
   export let tabId: string;
   export let onKillProcess: () => void;
@@ -36,17 +26,17 @@
     // Set up keyboard shortcuts
     const handleKeydown = (event: KeyboardEvent) => {
       // Cmd/Ctrl + K to open palette
-      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
         event.preventDefault();
         commandPaletteStore.open();
       }
     };
 
-    document.addEventListener("keydown", handleKeydown);
+    document.addEventListener('keydown', handleKeydown);
 
     // Cleanup
     unsubscribe = () => {
-      document.removeEventListener("keydown", handleKeydown);
+      document.removeEventListener('keydown', handleKeydown);
     };
 
     // Initialize actions
@@ -62,32 +52,32 @@
   function initializeActions() {
     const actions = [
       {
-        id: "kill-process",
-        label: "Kill Current Process",
-        description: "Terminate the currently running process",
-        icon: "Square",
+        id: 'kill-process',
+        label: 'Kill Current Process',
+        description: 'Terminate the currently running process',
+        icon: 'Square',
         action: () => {
           onKillProcess();
           commandPaletteStore.close();
         },
-        keywords: ["kill", "stop", "terminate", "process"],
+        keywords: ['kill', 'stop', 'terminate', 'process'],
       },
       {
-        id: "clear-terminal",
-        label: "Clear Terminal",
-        description: "Clear the terminal screen",
-        icon: "Trash2",
+        id: 'clear-terminal',
+        label: 'Clear Terminal',
+        description: 'Clear the terminal screen',
+        icon: 'Trash2',
         action: () => {
           onClearTerminal();
           commandPaletteStore.close();
         },
-        keywords: ["clear", "terminal", "screen"],
+        keywords: ['clear', 'terminal', 'screen'],
       },
       {
-        id: "rerun-last",
-        label: "Rerun Last Command",
-        description: "Execute the most recent command again",
-        icon: "Play",
+        id: 'rerun-last',
+        label: 'Rerun Last Command',
+        description: 'Execute the most recent command again',
+        icon: 'Play',
         action: () => {
           const history = commandHistoryStore.getTabHistory(tabId);
           if (history.length > 0) {
@@ -95,7 +85,7 @@
           }
           commandPaletteStore.close();
         },
-        keywords: ["rerun", "repeat", "last", "command"],
+        keywords: ['rerun', 'repeat', 'last', 'command'],
       },
     ];
 
@@ -106,12 +96,12 @@
         id: `rerun-${entry.id}`,
         label: `Rerun: ${entry.command}`,
         description: `Execute: ${entry.command}`,
-        icon: "Clock",
+        icon: 'Clock',
         action: () => {
           onRerunCommand(entry.command);
           commandPaletteStore.close();
         },
-        keywords: ["rerun", "repeat", entry.command.toLowerCase()],
+        keywords: ['rerun', 'repeat', entry.command.toLowerCase()],
       });
     });
 
@@ -122,19 +112,19 @@
     if (!isOpen) return;
 
     switch (event.key) {
-      case "Escape":
+      case 'Escape':
         event.preventDefault();
         commandPaletteStore.close();
         break;
-      case "ArrowDown":
+      case 'ArrowDown':
         event.preventDefault();
         commandPaletteStore.selectNext();
         break;
-      case "ArrowUp":
+      case 'ArrowUp':
         event.preventDefault();
         commandPaletteStore.selectPrevious();
         break;
-      case "Enter":
+      case 'Enter':
         event.preventDefault();
         commandPaletteStore.executeSelected();
         break;
@@ -168,100 +158,94 @@
     onkeydown={handleKeydown}
   >
     <div class="divider-edge-b divider-edge-full flex items-center p-4">
-        <Search class="mr-3 h-5 w-5 text-muted-foreground" />
-        <Input
-          bind:ref={searchInput}
-          bind:value={query}
-          placeholder="Search commands and actions..."
-          class="flex-1 border-0 bg-transparent text-foreground placeholder:text-muted-foreground focus:ring-0"
-          oninput={handleQueryChange}
-          onkeydown={handleKeydown}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={() => commandPaletteStore.close()}
-          class="ml-2"
-        >
-          <X class="h-4 w-4" />
-        </Button>
-      </div>
+      <Search class="mr-3 h-5 w-5 text-muted-foreground" />
+      <Input
+        bind:ref={searchInput}
+        bind:value={query}
+        placeholder="Search commands and actions..."
+        class="flex-1 border-0 bg-transparent text-foreground placeholder:text-muted-foreground focus:ring-0"
+        oninput={handleQueryChange}
+        onkeydown={handleKeydown}
+      />
+      <Button variant="ghost" size="sm" onclick={() => commandPaletteStore.close()} class="ml-2">
+        <X class="h-4 w-4" />
+      </Button>
+    </div>
 
-      <!-- Actions List -->
-      <div class="flex-1 overflow-y-auto">
-        {#if filteredActions.length > 0}
-          {#each filteredActions as action, index (action.id)}
-            <Button
-              variant="ghost"
-              class="flex h-auto w-full items-center space-x-3 p-3 text-left {selectedIndex ===
-              index
-                ? 'bg-accent'
-                : ''}"
-              onclick={() => handleActionClick(action)}
-              onkeydown={(e) => e.key === "Enter" && handleActionClick(action)}
-            >
-              <div class="flex-shrink-0">
-                {#if action.icon === "Square"}
-                  <Square class="h-5 w-5 text-status-error" />
-                {:else if action.icon === "Trash2"}
-                  <Trash2 class="h-5 w-5 text-status-warning" />
-                {:else if action.icon === "Play"}
-                  <Play class="h-5 w-5 text-status-success" />
-                {:else if action.icon === "Clock"}
-                  <Clock class="h-5 w-5 text-status-info" />
-                {:else}
-                  <Terminal class="h-5 w-5 text-muted-foreground" />
-                {/if}
+    <!-- Actions List -->
+    <div class="flex-1 overflow-y-auto">
+      {#if filteredActions.length > 0}
+        {#each filteredActions as action, index (action.id)}
+          <Button
+            variant="ghost"
+            class="flex h-auto w-full items-center space-x-3 p-3 text-left {selectedIndex === index
+              ? 'bg-accent'
+              : ''}"
+            onclick={() => handleActionClick(action)}
+            onkeydown={(e) => e.key === 'Enter' && handleActionClick(action)}
+          >
+            <div class="flex-shrink-0">
+              {#if action.icon === 'Square'}
+                <Square class="h-5 w-5 text-status-error" />
+              {:else if action.icon === 'Trash2'}
+                <Trash2 class="h-5 w-5 text-status-warning" />
+              {:else if action.icon === 'Play'}
+                <Play class="h-5 w-5 text-status-success" />
+              {:else if action.icon === 'Clock'}
+                <Clock class="h-5 w-5 text-status-info" />
+              {:else}
+                <Terminal class="h-5 w-5 text-muted-foreground" />
+              {/if}
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-sm font-medium text-foreground">
+                {action.label}
               </div>
-
-              <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium text-foreground">
-                  {action.label}
-                </div>
-                <div class="truncate text-xs text-muted-foreground">
-                  {action.description}
-                </div>
+              <div class="truncate text-xs text-muted-foreground">
+                {action.description}
               </div>
+            </div>
 
-              <div class="flex flex-shrink-0 items-center space-x-2">
-                {#if action.id.startsWith("rerun-")}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(action.label.replace("Rerun: ", ""));
-                    }}
-                    class="h-6 w-6 p-0"
-                  >
-                    <Copy class="h-3 w-3" />
-                  </Button>
-                {/if}
-                {#if selectedIndex === index}
-                  <Badge variant="outline" class="text-xs">Enter</Badge>
-                {/if}
-              </div>
-            </Button>
-          {/each}
-        {:else}
-          <div class="p-6 text-center text-muted-foreground">
-            <Zap class="mx-auto mb-2 h-8 w-8 text-muted-foreground/60" />
-            <div class="text-sm">No actions found</div>
-            <div class="mt-1 text-xs">Try a different search term</div>
-          </div>
-        {/if}
-      </div>
-
-      <div class="divider-edge-t divider-edge-full p-3 text-xs text-muted-foreground">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-4">
-            <span>↑↓ Navigate</span>
-            <span>Enter Execute</span>
-            <span>Esc Close</span>
-          </div>
-          <div>Cmd+K to open</div>
+            <div class="flex flex-shrink-0 items-center space-x-2">
+              {#if action.id.startsWith('rerun-')}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard(action.label.replace('Rerun: ', ''));
+                  }}
+                  class="h-6 w-6 p-0"
+                >
+                  <Copy class="h-3 w-3" />
+                </Button>
+              {/if}
+              {#if selectedIndex === index}
+                <Badge variant="outline" class="text-xs">Enter</Badge>
+              {/if}
+            </div>
+          </Button>
+        {/each}
+      {:else}
+        <div class="p-6 text-center text-muted-foreground">
+          <Zap class="mx-auto mb-2 h-8 w-8 text-muted-foreground/60" />
+          <div class="text-sm">No actions found</div>
+          <div class="mt-1 text-xs">Try a different search term</div>
         </div>
+      {/if}
+    </div>
+
+    <div class="divider-edge-t divider-edge-full p-3 text-xs text-muted-foreground">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+          <span>↑↓ Navigate</span>
+          <span>Enter Execute</span>
+          <span>Esc Close</span>
+        </div>
+        <div>Cmd+K to open</div>
       </div>
+    </div>
   </Dialog.Content>
 </Dialog.Root>
 

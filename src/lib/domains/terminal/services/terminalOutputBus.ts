@@ -2,8 +2,8 @@
  * Singleton terminal output event bus — survives Vite HMR without duplicate listeners.
  */
 
-import { isTauriEnvironment } from "$lib/utils/tauri";
-import type { TerminalOutput } from "../types";
+import { isTauriEnvironment } from '$lib/utils/tauri';
+import type { TerminalOutput } from '../types';
 
 type OutputHandler = (output: TerminalOutput) => void;
 
@@ -16,13 +16,10 @@ interface TerminalOutputBusGlobal {
   setupPromise?: Promise<void>;
 }
 
-const GLOBAL_KEY = "__portal_terminal_output_bus__";
+const GLOBAL_KEY = '__portal_terminal_output_bus__';
 
 function getGlobal(): TerminalOutputBusGlobal {
-  const g = globalThis as unknown as Record<
-    string,
-    TerminalOutputBusGlobal | undefined
-  >;
+  const g = globalThis as unknown as Record<string, TerminalOutputBusGlobal | undefined>;
   if (!g[GLOBAL_KEY]) {
     g[GLOBAL_KEY] = {};
   }
@@ -46,12 +43,9 @@ function emit(output: TerminalOutput): void {
 function normalizeOutput(raw: TerminalOutput & { processId?: string }): TerminalOutput {
   return {
     ...raw,
-    process_id: raw.process_id ?? raw.processId ?? "",
-    output_type:
-      raw.output_type ??
-      (raw as { outputType?: string }).outputType ??
-      "stdout",
-    content: raw.content ?? "",
+    process_id: raw.process_id ?? raw.processId ?? '',
+    output_type: raw.output_type ?? (raw as { outputType?: string }).outputType ?? 'stdout',
+    content: raw.content ?? '',
     timestamp: raw.timestamp ?? new Date().toISOString(),
   };
 }
@@ -69,11 +63,9 @@ async function ensureListener(): Promise<void> {
     global.unsubscribe?.();
     global.unsubscribe = undefined;
 
-    const { listen } = await import("@tauri-apps/api/event");
-    global.unsubscribe = await listen<TerminalOutput>("terminal-output", (event) => {
-      emit(
-        normalizeOutput(event.payload as TerminalOutput & { processId?: string }),
-      );
+    const { listen } = await import('@tauri-apps/api/event');
+    global.unsubscribe = await listen<TerminalOutput>('terminal-output', (event) => {
+      emit(normalizeOutput(event.payload as TerminalOutput & { processId?: string }));
     });
   })();
 
@@ -82,7 +74,7 @@ async function ensureListener(): Promise<void> {
 
 export async function subscribeTerminalOutput(
   processId: string,
-  handler: OutputHandler,
+  handler: OutputHandler
 ): Promise<() => void> {
   await ensureListener();
   const callbacks = getCallbacks();

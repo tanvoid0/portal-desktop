@@ -1,4 +1,4 @@
-import type { PermissionMode } from "../types.js";
+import type { PermissionMode } from '../types.js';
 
 export interface PermissionModeConfig {
   value: PermissionMode;
@@ -8,14 +8,14 @@ export interface PermissionModeConfig {
 
 export const PERMISSION_MODES: PermissionModeConfig[] = [
   {
-    value: "review",
-    label: "Review",
-    hint: "Prompt before mutating actions",
+    value: 'review',
+    label: 'Review',
+    hint: 'Prompt before mutating actions',
   },
   {
-    value: "auto-accept-all",
-    label: "Auto",
-    hint: "Run allowed actions automatically",
+    value: 'auto-accept-all',
+    label: 'Auto',
+    hint: 'Run allowed actions automatically',
   },
 ];
 
@@ -24,5 +24,5 @@ export function getPermissionModeConfig(mode: PermissionMode): PermissionModeCon
 }
 
 export function nextPermissionMode(current: PermissionMode): PermissionMode {
-  return current === "review" ? "auto-accept-all" : "review";
+  return current === 'review' ? 'auto-accept-all' : 'review';
 }

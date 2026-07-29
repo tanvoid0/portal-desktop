@@ -3,9 +3,9 @@
   command suggestions (Run inserts + executes, Copy copies).
 -->
 <script lang="ts">
-  import { Check, Copy, Play } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { parseAiResponse } from "../../services/terminalAiContext";
+  import { Check, Copy, Play } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { parseAiResponse } from '../../services/terminalAiContext';
 
   interface Props {
     content: string;
@@ -30,7 +30,7 @@
 
 <div class="space-y-2">
   {#each segments as seg, i}
-    {#if seg.type === "text"}
+    {#if seg.type === 'text'}
       <p class="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
         {seg.content}
       </p>
@@ -38,7 +38,7 @@
       <div class="chat-code-block">
         <div class="chat-code-header">
           <span class="chat-code-lang">
-            {seg.language || "command"}
+            {seg.language || 'command'}
           </span>
           <div class="flex items-center gap-0.5">
             <Button
@@ -48,7 +48,9 @@
               title="Copy"
               onclick={() => copy(seg.content, i)}
             >
-              {#if copiedIdx === i}<Check class="h-3 w-3 text-status-success" />{:else}<Copy class="h-3 w-3" />{/if}
+              {#if copiedIdx === i}<Check class="h-3 w-3 text-status-success" />{:else}<Copy
+                  class="h-3 w-3"
+                />{/if}
             </Button>
             {#if onRunCommand}
               <Button

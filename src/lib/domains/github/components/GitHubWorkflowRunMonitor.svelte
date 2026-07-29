@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
-  import { PageError, PageLoading } from "$lib/components/shell";
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { PageError, PageLoading } from '$lib/components/shell';
   import {
     createGitHubWorkflowJobLogsQuery,
     createGitHubWorkflowRunQuery,
     type GitHubWorkflowJob,
-  } from "$lib/domains/github";
+  } from '$lib/domains/github';
   import {
     formatWorkflowDuration,
     getWorkflowDisplayStatus,
@@ -18,10 +18,10 @@
     isWorkflowJobLogsFetchable,
     isWorkflowLogsUnavailableMessage,
     isWorkflowRunActive,
-  } from "$lib/domains/github/utils/workflowDisplay";
+  } from '$lib/domains/github/utils/workflowDisplay';
 
   const WORKFLOW_POLL_INTERVAL_MS = 3_000;
-  import { ChevronDown, ChevronRight, ExternalLink, RefreshCw } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, ExternalLink, RefreshCw } from '@lucide/svelte';
 
   interface Props {
     owner: string;
@@ -38,19 +38,18 @@
     () => owner,
     () => repo,
     () => runId,
-    () => enabled,
+    () => enabled
   );
 
   const detail = $derived(runQuery.data);
   const run = $derived(detail?.run);
   const jobs = $derived(detail?.jobs ?? []);
   const isActive = $derived(
-    (run && isWorkflowRunActive(run)) ||
-      jobs.some((job) => isWorkflowJobActive(job.status)),
+    (run && isWorkflowRunActive(run)) || jobs.some((job) => isWorkflowJobActive(job.status))
   );
 
   const expandedJob = $derived(
-    expandedJobId != null ? jobs.find((job) => job.id === expandedJobId) : null,
+    expandedJobId != null ? jobs.find((job) => job.id === expandedJobId) : null
   );
 
   const logsQuery = createGitHubWorkflowJobLogsQuery(
@@ -61,7 +60,7 @@
       enabled &&
       expandedJobId != null &&
       expandedJob != null &&
-      isWorkflowJobLogsFetchable(expandedJob.status),
+      isWorkflowJobLogsFetchable(expandedJob.status)
   );
 
   $effect(() => {
@@ -85,7 +84,7 @@
     title="Failed to load workflow run"
     message={runQuery.error instanceof Error
       ? runQuery.error.message
-      : "Unable to load workflow run details"}
+      : 'Unable to load workflow run details'}
     onRetry={() => runQuery.refetch()}
   />
 {:else if run}
@@ -98,7 +97,9 @@
         <div class="space-y-2">
           <CardTitle class="flex flex-wrap items-center gap-2">
             <StatusIcon
-              class="h-5 w-5 {getWorkflowStatusColor(displayStatus)}{displayStatus === 'running' ? ' animate-spin' : ''}"
+              class="h-5 w-5 {getWorkflowStatusColor(displayStatus)}{displayStatus === 'running'
+                ? ' animate-spin'
+                : ''}"
             />
             <span>{run.displayTitle || run.name}</span>
             <Badge variant={getWorkflowStatusBadgeVariant(displayStatus)}>
@@ -127,9 +128,7 @@
             onclick={() => runQuery.refetch()}
             disabled={runQuery.isFetching}
           >
-            <RefreshCw
-              class="h-4 w-4 {runQuery.isFetching ? 'animate-spin' : ''}"
-            />
+            <RefreshCw class="h-4 w-4 {runQuery.isFetching ? 'animate-spin' : ''}" />
           </Button>
           <a
             href={run.htmlUrl}
@@ -165,7 +164,10 @@
                     <ChevronRight class="h-4 w-4 shrink-0" />
                   {/if}
                   <JobStatusIcon
-                    class="h-4 w-4 shrink-0 {getWorkflowStatusColor(jobStatus)}{jobStatus === 'running' ? ' animate-spin' : ''}"
+                    class="h-4 w-4 shrink-0 {getWorkflowStatusColor(jobStatus)}{jobStatus ===
+                    'running'
+                      ? ' animate-spin'
+                      : ''}"
                   />
                   <span class="truncate font-medium">{job.name}</span>
                   <Badge variant={getWorkflowStatusBadgeVariant(jobStatus)}>
@@ -183,17 +185,16 @@
                 {#if job.steps.length > 0}
                   <div class="space-y-1">
                     {#each job.steps as step (step.number)}
-                      {@const stepStatus = getWorkflowDisplayStatus(
-                        step.status,
-                        step.conclusion,
-                      )}
+                      {@const stepStatus = getWorkflowDisplayStatus(step.status, step.conclusion)}
                       {@const StepIcon = getWorkflowStatusIcon(stepStatus)}
                       <div
                         class="flex items-center justify-between gap-2 rounded px-2 py-1 text-sm"
                       >
                         <div class="flex min-w-0 items-center gap-2">
                           <StepIcon
-                            class="h-3.5 w-3.5 shrink-0 {getWorkflowStatusColor(stepStatus)}{stepStatus === 'running' ? ' animate-spin' : ''}"
+                            class="h-3.5 w-3.5 shrink-0 {getWorkflowStatusColor(
+                              stepStatus
+                            )}{stepStatus === 'running' ? ' animate-spin' : ''}"
                           />
                           <span class="truncate">{step.name}</span>
                         </div>
@@ -228,14 +229,13 @@
                     <p class="text-sm text-destructive">
                       {logsQuery.error instanceof Error
                         ? logsQuery.error.message
-                        : "Failed to load job logs"}
+                        : 'Failed to load job logs'}
                     </p>
                   {:else if logsQuery.data && isWorkflowLogsUnavailableMessage(logsQuery.data)}
                     <p class="text-sm text-muted-foreground">{logsQuery.data}</p>
                   {:else if logsQuery.data}
                     <pre
-                      class="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed"
-                    >{logsQuery.data}</pre>
+                      class="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">{logsQuery.data}</pre>
                   {/if}
                 </div>
               </div>

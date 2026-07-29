@@ -3,39 +3,35 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import {
     settingsActions,
     settings,
     isLoadingSettings,
     settingsError,
-  } from "../stores/settingsStore";
-  import { settingsService } from "../services/settingsService";
-  import { logger } from "$lib/domains/shared";
-  import { toast } from "$lib/utils/toast";
-  import GeneralSettings from "./GeneralSettings.svelte";
-  import EditorSettings from "./EditorSettings.svelte";
-  import TerminalSettings from "./TerminalSettings.svelte";
-  import ThemeCustomizer from "./ThemeCustomizer.svelte";
-  import IdeSettings from "./IdeSettings.svelte";
-  import FrameworkIdeSettings from "./FrameworkIdeSettings.svelte";
-  import LearningSettings from "./LearningSettings.svelte";
-  import SettingsNavigation from "./SettingsNavigation.svelte";
-  import { Button } from "$lib/components/ui/button";
+  } from '../stores/settingsStore';
+  import { settingsService } from '../services/settingsService';
+  import { logger } from '$lib/domains/shared';
+  import { toast } from '$lib/utils/toast';
+  import GeneralSettings from './GeneralSettings.svelte';
+  import EditorSettings from './EditorSettings.svelte';
+  import TerminalSettings from './TerminalSettings.svelte';
+  import ThemeCustomizer from './ThemeCustomizer.svelte';
+  import IdeSettings from './IdeSettings.svelte';
+  import FrameworkIdeSettings from './FrameworkIdeSettings.svelte';
+  import LearningSettings from './LearningSettings.svelte';
+  import SettingsNavigation from './SettingsNavigation.svelte';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-  } from "$lib/components/ui/alert";
-  import { Badge } from "$lib/components/ui/badge";
+  } from '$lib/components/ui/card';
+  import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     Settings,
     Download,
@@ -44,37 +40,31 @@
     Loader2,
     Save,
     RefreshCw,
-  } from "@lucide/svelte";
-  import type { SettingsCategory } from "../types";
+  } from '@lucide/svelte';
+  import type { SettingsCategory } from '../types';
 
   type SettingsSection =
-    | "general"
-    | "editor"
-    | "terminal"
-    | "theme"
-    | "ides"
-    | "framework-ides"
-    | "learning";
+    | 'general'
+    | 'editor'
+    | 'terminal'
+    | 'theme'
+    | 'ides'
+    | 'framework-ides'
+    | 'learning';
 
   // Derive active section from URL
   const activeSection = $derived.by((): SettingsSection => {
     const path = $page.url.pathname;
-    if (path === "/settings" || path === "/settings/") return "general";
-    const section = path.replace("/settings/", "").replace(/\/$/, "");
+    if (path === '/settings' || path === '/settings/') return 'general';
+    const section = path.replace('/settings/', '').replace(/\/$/, '');
     if (
-      [
-        "general",
-        "editor",
-        "terminal",
-        "theme",
-        "ides",
-        "framework-ides",
-        "learning",
-      ].includes(section)
+      ['general', 'editor', 'terminal', 'theme', 'ides', 'framework-ides', 'learning'].includes(
+        section
+      )
     ) {
       return section as SettingsSection;
     }
-    return "general";
+    return 'general';
   });
   let isSaving = $state(false);
   let isExporting = $state(false);
@@ -93,11 +83,11 @@
     try {
       await settingsActions.loadSettings();
     } catch (err) {
-      logger.error("Failed to load settings", {
-        context: "SettingsPanel",
+      logger.error('Failed to load settings', {
+        context: 'SettingsPanel',
         error: err,
       });
-      toast.error("Failed to load settings");
+      toast.error('Failed to load settings');
     }
   }
 
@@ -107,13 +97,13 @@
     isSaving = true;
     try {
       await settingsActions.saveSettings(settingsData);
-      toast.success("Settings saved successfully");
+      toast.success('Settings saved successfully');
     } catch (err) {
-      logger.error("Failed to save settings", {
-        context: "SettingsPanel",
+      logger.error('Failed to save settings', {
+        context: 'SettingsPanel',
         error: err,
       });
-      toast.error("Failed to save settings");
+      toast.error('Failed to save settings');
     } finally {
       isSaving = false;
     }
@@ -127,23 +117,23 @@
       const exportedSettings = await settingsActions.exportSettings();
 
       // Create download link
-      const blob = new Blob([exportedSettings], { type: "application/json" });
+      const blob = new Blob([exportedSettings], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `portal-desktop-settings-${new Date().toISOString().split("T")[0]}.json`;
+      a.download = `portal-desktop-settings-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("Settings exported successfully");
+      toast.success('Settings exported successfully');
     } catch (err) {
-      logger.error("Failed to export settings", {
-        context: "SettingsPanel",
+      logger.error('Failed to export settings', {
+        context: 'SettingsPanel',
         error: err,
       });
-      toast.error("Failed to export settings");
+      toast.error('Failed to export settings');
     } finally {
       isExporting = false;
     }
@@ -153,21 +143,19 @@
     isResetting = true;
     try {
       await settingsActions.resetSettings();
-      toast.success("Settings reset to defaults");
+      toast.success('Settings reset to defaults');
     } catch (err) {
-      logger.error("Failed to reset settings", {
-        context: "SettingsPanel",
+      logger.error('Failed to reset settings', {
+        context: 'SettingsPanel',
         error: err,
       });
-      toast.error("Failed to reset settings");
+      toast.error('Failed to reset settings');
     } finally {
       isResetting = false;
     }
   }
 
-  function handleGeneralUpdate(
-    updates: Partial<import("../types").AppSettings>,
-  ) {
+  function handleGeneralUpdate(updates: Partial<import('../types').AppSettings>) {
     if (!settingsData) return;
     const newSettings = {
       ...settingsData,
@@ -176,9 +164,7 @@
     settingsData = newSettings;
   }
 
-  function handleEditorUpdate(
-    updates: Partial<import("../types").EditorSettings>,
-  ) {
+  function handleEditorUpdate(updates: Partial<import('../types').EditorSettings>) {
     if (!settingsData) return;
     const newSettings = {
       ...settingsData,
@@ -187,9 +173,7 @@
     settingsData = newSettings;
   }
 
-  function handleTerminalUpdate(
-    updates: Partial<import("../types").TerminalSettings>,
-  ) {
+  function handleTerminalUpdate(updates: Partial<import('../types').TerminalSettings>) {
     if (!settingsData) return;
     const newSettings = {
       ...settingsData,
@@ -198,9 +182,7 @@
     settingsData = newSettings;
   }
 
-  function handleThemeUpdate(
-    updates: Partial<import("../types").ThemeSettings>,
-  ) {
+  function handleThemeUpdate(updates: Partial<import('../types').ThemeSettings>) {
     if (!settingsData) return;
     const newSettings = {
       ...settingsData,
@@ -232,17 +214,11 @@
         <Settings class="h-8 w-8" />
         Settings
       </h1>
-      <p class="text-muted-foreground">
-        Configure your application preferences and behavior
-      </p>
+      <p class="text-muted-foreground">Configure your application preferences and behavior</p>
     </div>
     <div class="flex gap-2">
-      {#if activeSection !== "learning"}
-        <Button
-          variant="outline"
-          onclick={handleExport}
-          disabled={isExporting || !settingsData}
-        >
+      {#if activeSection !== 'learning'}
+        <Button variant="outline" onclick={handleExport} disabled={isExporting || !settingsData}>
           {#if isExporting}
             <Loader2 class="mr-2 h-4 w-4 animate-spin" />
           {:else}
@@ -299,14 +275,13 @@
       <CardContent>
         <div class="flex items-center gap-4">
           <Badge variant="outline">
-            Configured: {getSettingsStats().configured}/{getSettingsStats()
-              .total}
+            Configured: {getSettingsStats().configured}/{getSettingsStats().total}
           </Badge>
           <Badge variant="outline">
-            Theme: {settingsData.app?.theme || "system"}
+            Theme: {settingsData.app?.theme || 'system'}
           </Badge>
           <Badge variant="outline">
-            Language: {settingsData.app?.language || "en"}
+            Language: {settingsData.app?.language || 'en'}
           </Badge>
         </div>
       </CardContent>
@@ -320,9 +295,7 @@
       <div class="sticky top-8">
         <Card class="p-3">
           <SettingsNavigation
-            currentSection={activeSection === "framework-ides"
-              ? "ides"
-              : activeSection}
+            currentSection={activeSection === 'framework-ides' ? 'ides' : activeSection}
           />
         </Card>
       </div>
@@ -348,31 +321,19 @@
           {/each}
         </div>
       {:else if settingsData}
-        {#if activeSection === "general"}
-          <GeneralSettings
-            settings={settingsData.app}
-            onUpdate={handleGeneralUpdate}
-          />
-        {:else if activeSection === "editor"}
-          <EditorSettings
-            settings={settingsData.editor}
-            onUpdate={handleEditorUpdate}
-          />
-        {:else if activeSection === "terminal"}
-          <TerminalSettings
-            settings={settingsData.terminal}
-            onUpdate={handleTerminalUpdate}
-          />
-        {:else if activeSection === "ides"}
+        {#if activeSection === 'general'}
+          <GeneralSettings settings={settingsData.app} onUpdate={handleGeneralUpdate} />
+        {:else if activeSection === 'editor'}
+          <EditorSettings settings={settingsData.editor} onUpdate={handleEditorUpdate} />
+        {:else if activeSection === 'terminal'}
+          <TerminalSettings settings={settingsData.terminal} onUpdate={handleTerminalUpdate} />
+        {:else if activeSection === 'ides'}
           <IdeSettings />
-        {:else if activeSection === "framework-ides"}
+        {:else if activeSection === 'framework-ides'}
           <FrameworkIdeSettings />
-        {:else if activeSection === "theme"}
-          <ThemeCustomizer
-            settings={settingsData.theme}
-            onUpdate={handleThemeUpdate}
-          />
-        {:else if activeSection === "learning"}
+        {:else if activeSection === 'theme'}
+          <ThemeCustomizer settings={settingsData.theme} onUpdate={handleThemeUpdate} />
+        {:else if activeSection === 'learning'}
           <LearningSettings />
         {/if}
       {:else}

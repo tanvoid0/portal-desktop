@@ -18,7 +18,7 @@ interface Props {
   emptyMessage?: string;
 }
 
-let { pods = [], onViewPod, emptyMessage = "No pods found" }: Props = $props();
+let { pods = [], onViewPod, emptyMessage = 'No pods found' }: Props = $props();
 ```
 
 **Used in:**
@@ -33,8 +33,8 @@ let { pods = [], onViewPod, emptyMessage = "No pods found" }: Props = $props();
 
 ```typescript
 // ✅ Correct pattern
-let searchQuery = $state("");
-let statusFilter = $state("");
+let searchQuery = $state('');
+let statusFilter = $state('');
 let isLoading = $state(false);
 let error = $state<string | null>(null);
 ```
@@ -52,18 +52,17 @@ let error = $state<string | null>(null);
 const filteredPods = $derived(
   $cloudStore.resources[ResourceType.POD].filter((pod) => {
     const matchesSearch =
-      !searchQuery ||
-      pod.name.toLowerCase().includes(searchQuery.toLowerCase());
+      !searchQuery || pod.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = !statusFilter || pod.status === statusFilter;
     return matchesSearch && matchesStatus;
-  }),
+  })
 );
 
 // ✅ Correct pattern - Complex derived with .by()
 const defaultColumns = $derived.by(() => {
   if (columns.length > 0) return columns;
   return [
-    { key: "name", label: "Name", width: "w-1/3" },
+    { key: 'name', label: 'Name', width: 'w-1/3' },
     // ...
   ];
 });
@@ -139,15 +138,15 @@ function handlePodClick(pod: ICloudResource) {
 ### ✅ Using `$page` store for route data
 
 ```typescript
-import { page } from "$app/stores";
+import { page } from '$app/stores';
 
 // ✅ Correct pattern
-let projectId = $derived(parseInt($page.params.id || "0"));
-let isSdkPage = $derived($page.url.pathname.startsWith("/sdk"));
+let projectId = $derived(parseInt($page.params.id || '0'));
+let isSdkPage = $derived($page.url.pathname.startsWith('/sdk'));
 
 onMount(async () => {
   if (isNaN(projectId)) {
-    error = "Invalid project ID";
+    error = 'Invalid project ID';
     return;
   }
   await loadProjectData();
@@ -165,7 +164,7 @@ onMount(async () => {
 ### ✅ Using `onMount()`
 
 ```typescript
-import { onMount } from "svelte";
+import { onMount } from 'svelte';
 
 // ✅ Correct pattern - Async operations
 onMount(async () => {
@@ -196,7 +195,7 @@ onMount(() => {
 ### ✅ Using `onDestroy()`
 
 ```typescript
-import { onDestroy } from "svelte";
+import { onDestroy } from 'svelte';
 
 // ✅ Correct pattern
 onDestroy(() => {

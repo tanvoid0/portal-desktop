@@ -2,10 +2,10 @@
  * Memory management service for learning data
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { logger } from "$lib/domains/shared/services/logger";
+import { invoke } from '@tauri-apps/api/core';
+import { logger } from '$lib/domains/shared/services/logger';
 
-const log = logger.createScoped("MemoryService");
+const log = logger.createScoped('MemoryService');
 
 export interface MemoryStats {
   total_events: number;
@@ -35,12 +35,12 @@ class MemoryService {
    */
   async cleanup(): Promise<CleanupStats> {
     try {
-      log.info("Cleaning up learning data");
-      const stats = await invoke<CleanupStats>("cleanup_learning_data");
-      log.info("Cleanup completed", stats);
+      log.info('Cleaning up learning data');
+      const stats = await invoke<CleanupStats>('cleanup_learning_data');
+      log.info('Cleanup completed', stats);
       return stats;
     } catch (error) {
-      log.error("Failed to cleanup learning data", error);
+      log.error('Failed to cleanup learning data', error);
       throw error;
     }
   }
@@ -50,11 +50,11 @@ class MemoryService {
    */
   async getStats(): Promise<MemoryStats> {
     try {
-      const stats = await invoke<MemoryStats>("get_memory_stats");
-      log.debug("Memory stats retrieved", stats);
+      const stats = await invoke<MemoryStats>('get_memory_stats');
+      log.debug('Memory stats retrieved', stats);
       return stats;
     } catch (error) {
-      log.error("Failed to get memory stats", error);
+      log.error('Failed to get memory stats', error);
       throw error;
     }
   }
@@ -64,11 +64,11 @@ class MemoryService {
    */
   async getCleanupPreview(): Promise<CleanupPreview> {
     try {
-      const preview = await invoke<CleanupPreview>("get_cleanup_preview");
-      log.debug("Cleanup preview retrieved", preview);
+      const preview = await invoke<CleanupPreview>('get_cleanup_preview');
+      log.debug('Cleanup preview retrieved', preview);
       return preview;
     } catch (error) {
-      log.error("Failed to get cleanup preview", error);
+      log.error('Failed to get cleanup preview', error);
       throw error;
     }
   }

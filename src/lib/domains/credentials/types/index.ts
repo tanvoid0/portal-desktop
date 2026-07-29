@@ -3,20 +3,20 @@
  */
 
 export enum CredentialType {
-  SSH_KEY = "ssh_key",
-  API_TOKEN = "api_token",
-  ENV_VAR = "env_var",
-  DATABASE = "database",
-  CLOUD_PROVIDER = "cloud_provider",
-  REGISTRY = "registry",
-  OTHER = "other",
+  SSH_KEY = 'ssh_key',
+  API_TOKEN = 'api_token',
+  ENV_VAR = 'env_var',
+  DATABASE = 'database',
+  CLOUD_PROVIDER = 'cloud_provider',
+  REGISTRY = 'registry',
+  OTHER = 'other',
 }
 
 export enum CredentialStatus {
-  ACTIVE = "active",
-  INACTIVE = "inactive",
-  EXPIRED = "expired",
-  REVOKED = "revoked",
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  EXPIRED = 'expired',
+  REVOKED = 'revoked',
 }
 
 export interface Credential {
@@ -116,7 +116,7 @@ export interface SSHKeyCredential extends Credential {
 export interface SSHKeyMetadata extends CredentialMetadata {
   publicKey: string;
   privateKey: string; // Encrypted
-  keyType: "rsa" | "ed25519" | "ecdsa" | "dsa";
+  keyType: 'rsa' | 'ed25519' | 'ecdsa' | 'dsa';
   keySize: number;
   fingerprint: string;
   comment?: string;
@@ -159,7 +159,7 @@ export interface CloudProviderCredential extends Credential {
 }
 
 export interface CloudProviderMetadata extends CredentialMetadata {
-  provider: "aws" | "gcp" | "azure" | "digitalocean" | "linode" | "vultr";
+  provider: 'aws' | 'gcp' | 'azure' | 'digitalocean' | 'linode' | 'vultr';
   accessKey: string; // Encrypted
   secretKey: string; // Encrypted
   region?: string;

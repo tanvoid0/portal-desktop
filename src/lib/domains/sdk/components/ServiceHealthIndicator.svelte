@@ -4,17 +4,12 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Progress } from "$lib/components/ui/progress";
-  import { Button } from "$lib/components/ui/button";
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Progress } from '$lib/components/ui/progress';
+  import { Button } from '$lib/components/ui/button';
   import {
     Heart,
     HeartOff,
@@ -27,7 +22,7 @@
     CheckCircle,
     XCircle,
     RefreshCw,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface HealthData {
     is_healthy: boolean;
@@ -45,12 +40,7 @@
     refreshInterval?: number; // in seconds
   }
 
-  let {
-    serviceId,
-    serviceName,
-    showDetails = false,
-    refreshInterval = 30,
-  }: Props = $props();
+  let { serviceId, serviceName, showDetails = false, refreshInterval = 30 }: Props = $props();
 
   // State
   let health = $state<HealthData | null>(null);
@@ -60,32 +50,32 @@
 
   // Derived state
   let healthStatus = $derived.by(() => {
-    if (!health) return "unknown";
-    if (health.is_healthy) return "healthy";
-    if (health.error_message) return "error";
-    return "unhealthy";
+    if (!health) return 'unknown';
+    if (health.is_healthy) return 'healthy';
+    if (health.error_message) return 'error';
+    return 'unhealthy';
   });
 
   let statusColor = $derived.by(() => {
     switch (healthStatus) {
-      case "healthy":
-        return "text-green-600";
-      case "error":
-        return "text-red-600";
-      case "unhealthy":
-        return "text-yellow-600";
+      case 'healthy':
+        return 'text-green-600';
+      case 'error':
+        return 'text-red-600';
+      case 'unhealthy':
+        return 'text-yellow-600';
       default:
-        return "text-gray-600";
+        return 'text-gray-600';
     }
   });
 
   let statusIcon = $derived.by(() => {
     switch (healthStatus) {
-      case "healthy":
+      case 'healthy':
         return CheckCircle;
-      case "error":
+      case 'error':
         return XCircle;
-      case "unhealthy":
+      case 'unhealthy':
         return AlertTriangle;
       default:
         return HeartOff;
@@ -94,14 +84,14 @@
 
   let statusText = $derived.by(() => {
     switch (healthStatus) {
-      case "healthy":
-        return "Healthy";
-      case "error":
-        return "Error";
-      case "unhealthy":
-        return "Unhealthy";
+      case 'healthy':
+        return 'Healthy';
+      case 'error':
+        return 'Error';
+      case 'unhealthy':
+        return 'Unhealthy';
       default:
-        return "Unknown";
+        return 'Unknown';
     }
   });
 
@@ -121,23 +111,23 @@
     error = null;
 
     try {
-      const healthData = await invoke("get_service_health", { serviceId });
+      const healthData = await invoke('get_service_health', { serviceId });
       health = healthData as HealthData;
       lastUpdate = new Date().toISOString();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load health data";
-      console.error("Failed to load service health:", err);
+      error = err instanceof Error ? err.message : 'Failed to load health data';
+      console.error('Failed to load service health:', err);
     } finally {
       loading = false;
     }
   }
 
   function formatBytes(bytes: number): string {
-    if (bytes === 0) return "0 B";
+    if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
+    const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   function formatCpuUsage(cpu: number): string {
@@ -161,17 +151,10 @@
         Service Health
       </CardTitle>
       <div class="flex items-center gap-2">
-        <Badge
-          variant={healthStatus === "healthy" ? "default" : "destructive"}
-        >
+        <Badge variant={healthStatus === 'healthy' ? 'default' : 'destructive'}>
           {statusText}
         </Badge>
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={loadHealth}
-          disabled={loading}
-        >
+        <Button variant="ghost" size="sm" onclick={loadHealth} disabled={loading}>
           <RefreshCw class="h-4 w-4" />
         </Button>
       </div>
@@ -256,9 +239,7 @@
     <!-- Loading State -->
     {#if loading}
       <div class="flex items-center gap-2 text-sm text-muted-foreground">
-        <div
-          class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"
-        ></div>
+        <div class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
         Checking health...
       </div>
     {/if}

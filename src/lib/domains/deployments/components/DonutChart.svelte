@@ -9,7 +9,7 @@
     segments,
     total,
     centerLabel,
-    centerSubLabel = "",
+    centerSubLabel = '',
     size = 140,
     stroke = 20,
   }: {
@@ -66,7 +66,7 @@
     </g>
     <text
       x="50%"
-      y={centerSubLabel ? "44%" : "50%"}
+      y={centerSubLabel ? '44%' : '50%'}
       text-anchor="middle"
       dominant-baseline="middle"
       class="fill-foreground"
@@ -90,10 +90,7 @@
   <div class="min-w-0 flex-1 space-y-1.5">
     {#each segments as s (s.label)}
       <div class="flex items-center gap-2 text-xs">
-        <span
-          class="h-2.5 w-2.5 shrink-0 rounded-sm"
-          style="background-color:{s.color}"
-        ></span>
+        <span class="h-2.5 w-2.5 shrink-0 rounded-sm" style="background-color:{s.color}"></span>
         <span class="truncate text-foreground">{s.label}</span>
         <span class="ml-auto tabular-nums text-muted-foreground">{s.value}</span>
       </div>

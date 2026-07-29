@@ -2,9 +2,9 @@
  * Pipeline Store - Svelte store for pipeline state management
  */
 
-import { writable, derived } from "svelte/store";
-import type { Pipeline, PipelineExecution } from "../types";
-import { pipelineService } from "../services/pipelineService";
+import { writable, derived } from 'svelte/store';
+import type { Pipeline, PipelineExecution } from '../types';
+import { pipelineService } from '../services/pipelineService';
 
 interface PipelineState {
   pipelines: Pipeline[];
@@ -45,8 +45,7 @@ function createPipelineStore() {
       } catch (error) {
         update((state) => ({
           ...state,
-          error:
-            error instanceof Error ? error.message : "Failed to load pipelines",
+          error: error instanceof Error ? error.message : 'Failed to load pipelines',
           loading: false,
         }));
       }
@@ -82,10 +81,7 @@ function createPipelineStore() {
       update((state) => ({
         ...state,
         pipelines: state.pipelines.filter((p) => p.id !== pipelineId),
-        currentPipeline:
-          state.currentPipeline?.id === pipelineId
-            ? null
-            : state.currentPipeline,
+        currentPipeline: state.currentPipeline?.id === pipelineId ? null : state.currentPipeline,
       }));
     },
 
@@ -103,10 +99,7 @@ function createPipelineStore() {
       } catch (error) {
         update((state) => ({
           ...state,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to load executions",
+          error: error instanceof Error ? error.message : 'Failed to load executions',
         }));
       }
     },
@@ -134,9 +127,7 @@ function createPipelineStore() {
             ...state,
             executions: newExecutions,
             currentExecution:
-              state.currentExecution?.id === execution.id
-                ? execution
-                : state.currentExecution,
+              state.currentExecution?.id === execution.id ? execution : state.currentExecution,
           };
         } else {
           const newExecutions = new Map(state.executions);
@@ -169,13 +160,7 @@ export const pipelineStore = createPipelineStore();
 
 // Derived stores
 export const pipelines = derived(pipelineStore, ($store) => $store.pipelines);
-export const currentPipeline = derived(
-  pipelineStore,
-  ($store) => $store.currentPipeline,
-);
-export const currentExecution = derived(
-  pipelineStore,
-  ($store) => $store.currentExecution,
-);
+export const currentPipeline = derived(pipelineStore, ($store) => $store.currentPipeline);
+export const currentExecution = derived(pipelineStore, ($store) => $store.currentExecution);
 export const isLoading = derived(pipelineStore, ($store) => $store.loading);
 export const pipelineError = derived(pipelineStore, ($store) => $store.error);

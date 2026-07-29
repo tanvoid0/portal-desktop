@@ -1,29 +1,29 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
+  import { Button } from '$lib/components/ui/button';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import Icon from "@iconify/svelte";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import Icon from '@iconify/svelte';
   import {
     aiDocumentService,
     type GeneratedDocumentStructure,
     type ConversationMessage,
     type DocumentContext,
-  } from "../services/aiDocumentService";
-  import { documentActions } from "../stores/documentStore";
-  import { toastActions } from "$lib/utils/toast";
-  import type { Document } from "../types";
-  import AIChatPanel from "$lib/domains/ai/components/chat/AIChatPanel.svelte";
-  import type { ChatMessage } from "$lib/domains/ai/types";
-  import LoadingSpinner from "$lib/components/ui/loading-spinner.svelte";
-  import { goto } from "$app/navigation";
+  } from '../services/aiDocumentService';
+  import { documentActions } from '../stores/documentStore';
+  import { toastActions } from '$lib/utils/toast';
+  import type { Document } from '../types';
+  import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
+  import type { ChatMessage } from '$lib/domains/ai/types';
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
+  import { goto } from '$app/navigation';
 
   interface Props {
     taskId?: number; // For creating document linked to task
@@ -33,8 +33,8 @@
 
   let { taskId, taskTitle, taskDescription }: Props = $props();
 
-  let prompt = $state(taskDescription || "");
-  let customInstruction = $state("");
+  let prompt = $state(taskDescription || '');
+  let customInstruction = $state('');
   let isGenerating = $state(false);
   let generatedData = $state<GeneratedDocumentStructure | null>(null);
   let chatMessages = $state<ChatMessage[]>([]);
@@ -47,12 +47,12 @@
             description: taskDescription,
           },
         }
-      : undefined,
+      : undefined
   );
 
   async function handleGenerate() {
     if (!prompt.trim()) {
-      toastActions.error("Please enter a prompt");
+      toastActions.error('Please enter a prompt');
       return;
     }
 
@@ -60,7 +60,7 @@
     try {
       const result = await aiDocumentService.generateDocumentFromPrompt({
         prompt,
-        providerType: "AgentPlatform",
+        providerType: 'AgentPlatform',
         instruction: customInstruction.trim() || undefined,
         context: documentContext,
       });
@@ -68,15 +68,15 @@
       generatedData = result;
       chatMessages = [
         {
-          role: "assistant",
+          role: 'assistant',
           content: `I've generated a document titled "${result.title}". You can review and edit it, or chat with me to make adjustments.`,
           timestamp: new Date(),
         },
       ];
     } catch (error) {
       toastActions.error(
-        "Failed to generate document",
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        'Failed to generate document',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     } finally {
       isGenerating = false;
@@ -85,27 +85,25 @@
 
   async function handleChatMessage(message: string, history: ChatMessage[]) {
     if (!generatedData) {
-      toastActions.error("Please generate a document first");
+      toastActions.error('Please generate a document first');
       return;
     }
 
     const conversationHistory: ConversationMessage[] = [
       {
-        role: "assistant",
+        role: 'assistant',
         content: JSON.stringify(generatedData, null, 2),
       },
       ...history
         .filter(
-          (m) =>
-            m.role === "user" ||
-            (m.role === "assistant" && !m.content.includes("generated")),
+          (m) => m.role === 'user' || (m.role === 'assistant' && !m.content.includes('generated'))
         )
         .map((m) => ({
           role: m.role,
           content: m.content,
         })),
       {
-        role: "user",
+        role: 'user',
         content: message,
       },
     ];
@@ -113,7 +111,7 @@
     try {
       const result = await aiDocumentService.generateDocumentFromPrompt({
         prompt,
-        providerType: "AgentPlatform",
+        providerType: 'AgentPlatform',
         history: conversationHistory,
         instruction: customInstruction.trim() || undefined,
         context: documentContext,
@@ -123,15 +121,15 @@
       chatMessages = [
         ...chatMessages,
         {
-          role: "assistant",
+          role: 'assistant',
           content: `I've updated the document based on your feedback. The preview has been refreshed.`,
           timestamp: new Date(),
         },
       ];
     } catch (error) {
       toastActions.error(
-        "Failed to update document",
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        'Failed to update document',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     }
   }
@@ -143,14 +141,14 @@
       const doc = await documentActions.createDocument(
         generatedData.title,
         generatedData.content,
-        generatedData.suggestedTags || [],
+        generatedData.suggestedTags || []
       );
-      toastActions.success("Document created successfully");
+      toastActions.success('Document created successfully');
       goto(`/documents/${doc.id}`);
     } catch (error) {
       toastActions.error(
-        "Failed to create document",
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        'Failed to create document',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     }
   }
@@ -160,12 +158,12 @@
   <div class="container mx-auto p-6">
     <div class="mb-6">
       <h1 class="text-2xl font-bold">
-        {taskId ? "Create Document for Task" : "Generate Document with AI"}
+        {taskId ? 'Create Document for Task' : 'Generate Document with AI'}
       </h1>
       <p class="text-sm text-muted-foreground">
         {taskId
-          ? "Use AI to generate a document linked to this task"
-          : "Describe what you want to document and let AI create it for you"}
+          ? 'Use AI to generate a document linked to this task'
+          : 'Describe what you want to document and let AI create it for you'}
       </p>
     </div>
 
@@ -176,8 +174,7 @@
         <Card>
           <CardHeader>
             <CardTitle>Prompt / Description</CardTitle>
-            <CardDescription>Describe what you want to document</CardDescription
-            >
+            <CardDescription>Describe what you want to document</CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div class="space-y-2">
@@ -220,13 +217,10 @@
               <div class="flex items-center justify-between">
                 <div>
                   <CardTitle>Preview</CardTitle>
-                  <CardDescription
-                    >Review the generated document</CardDescription
-                  >
+                  <CardDescription>Review the generated document</CardDescription>
                 </div>
                 <Badge variant="outline" class="text-xs">
-                  Confidence: {Math.round(generatedData.confidence * 100)}% |
-                  Model:{" "}
+                  Confidence: {Math.round(generatedData.confidence * 100)}% | Model:{' '}
                   {generatedData.modelUsed}
                 </Badge>
               </div>
@@ -235,8 +229,7 @@
               <div>
                 <h3 class="mb-2 font-semibold">{generatedData.title}</h3>
                 <div class="prose dark:prose-invert max-w-none">
-                  <pre
-                    class="whitespace-pre-wrap text-sm">{generatedData.content}</pre>
+                  <pre class="whitespace-pre-wrap text-sm">{generatedData.content}</pre>
                 </div>
               </div>
               {#if generatedData.suggestedTags && generatedData.suggestedTags.length > 0}

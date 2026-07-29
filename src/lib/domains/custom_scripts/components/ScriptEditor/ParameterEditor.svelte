@@ -4,14 +4,14 @@
 -->
 
 <script lang="ts">
-  import Select from "$lib/components/ui/select.svelte";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Button } from "$lib/components/ui/button";
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import { X } from "@lucide/svelte";
-  import { FilePicker } from "$lib/domains/shared/components";
-  import type { ScriptParameter } from "$lib/domains/custom_scripts/services/customScriptService";
+  import Select from '$lib/components/ui/select.svelte';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Button } from '$lib/components/ui/button';
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import { X } from '@lucide/svelte';
+  import { FilePicker } from '$lib/domains/shared/components';
+  import type { ScriptParameter } from '$lib/domains/custom_scripts/services/customScriptService';
 
   interface Props {
     parameter: ScriptParameter;
@@ -26,12 +26,7 @@
 <div class="space-y-4 rounded-lg border p-4">
   <div class="flex items-center justify-between">
     <h4 class="font-medium">Parameter {index + 1}</h4>
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onclick={() => onRemove(index)}
-    >
+    <Button type="button" variant="ghost" size="sm" onclick={() => onRemove(index)}>
       <X class="h-4 w-4" />
     </Button>
   </div>
@@ -41,8 +36,7 @@
       <Label>Name</Label>
       <Input
         value={parameter.name}
-        oninput={(e) =>
-          onUpdate(index, { name: (e.target as HTMLInputElement).value })}
+        oninput={(e) => onUpdate(index, { name: (e.target as HTMLInputElement).value })}
         placeholder="VPN_CONFIG"
       />
     </div>
@@ -51,8 +45,7 @@
       <Label>Label</Label>
       <Input
         value={parameter.label}
-        oninput={(e) =>
-          onUpdate(index, { label: (e.target as HTMLInputElement).value })}
+        oninput={(e) => onUpdate(index, { label: (e.target as HTMLInputElement).value })}
         placeholder="VPN Directory"
       />
     </div>
@@ -63,28 +56,28 @@
     <Select
       defaultValue={parameter.parameter_type}
       options={[
-        { value: "string", label: "String" },
-        { value: "file", label: "File" },
-        { value: "folder", label: "Folder" },
-        { value: "number", label: "Number" },
-        { value: "boolean", label: "Boolean" },
-        { value: "password", label: "Password" },
+        { value: 'string', label: 'String' },
+        { value: 'file', label: 'File' },
+        { value: 'folder', label: 'Folder' },
+        { value: 'number', label: 'Number' },
+        { value: 'boolean', label: 'Boolean' },
+        { value: 'password', label: 'Password' },
       ]}
       onSelect={(value) =>
         onUpdate(index, {
-          parameter_type: value as ScriptParameter["parameter_type"],
+          parameter_type: value as ScriptParameter['parameter_type'],
         })}
     />
   </div>
 
-  {#if parameter.parameter_type === "file"}
+  {#if parameter.parameter_type === 'file'}
     <div>
       <Label>File Filters (comma-separated)</Label>
       <Input
-        value={parameter.file_filters?.join(", ") || ""}
+        value={parameter.file_filters?.join(', ') || ''}
         oninput={(e) => {
           const filters = (e.target as HTMLInputElement).value
-            .split(",")
+            .split(',')
             .map((f) => f.trim())
             .filter(Boolean);
           onUpdate(index, {
@@ -99,7 +92,7 @@
   <div>
     <Label>Description</Label>
     <Input
-      value={parameter.description || ""}
+      value={parameter.description || ''}
       oninput={(e) =>
         onUpdate(index, {
           description: (e.target as HTMLInputElement).value || undefined,
@@ -110,15 +103,13 @@
 
   <div>
     <Label>Default Value</Label>
-    {#if parameter.parameter_type === "file"}
+    {#if parameter.parameter_type === 'file'}
       {@const fileFilters = parameter.file_filters || []}
       <FilePicker
-        value={parameter.default_value || ""}
+        value={parameter.default_value || ''}
         label=""
         description=""
-        filters={fileFilters.length > 0
-          ? [{ name: "Files", extensions: fileFilters }]
-          : []}
+        filters={fileFilters.length > 0 ? [{ name: 'Files', extensions: fileFilters }] : []}
         selectFolder={false}
         onChange={(path) => {
           onUpdate(index, {
@@ -126,9 +117,9 @@
           });
         }}
       />
-    {:else if parameter.parameter_type === "folder"}
+    {:else if parameter.parameter_type === 'folder'}
       <FilePicker
-        value={parameter.default_value || ""}
+        value={parameter.default_value || ''}
         label=""
         description=""
         selectFolder={true}
@@ -140,7 +131,7 @@
       />
     {:else}
       <Input
-        value={parameter.default_value || ""}
+        value={parameter.default_value || ''}
         oninput={(e) =>
           onUpdate(index, {
             default_value: (e.target as HTMLInputElement).value || undefined,
@@ -153,8 +144,7 @@
   <div class="flex items-center gap-2">
     <Checkbox
       checked={parameter.required}
-      onCheckedChange={(checked) =>
-        onUpdate(index, { required: checked === true })}
+      onCheckedChange={(checked) => onUpdate(index, { required: checked === true })}
     />
     <Label>Required</Label>
   </div>

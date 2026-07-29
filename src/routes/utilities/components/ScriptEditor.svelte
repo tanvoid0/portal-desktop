@@ -4,29 +4,29 @@
 -->
 
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Switch } from "$lib/components/ui/switch";
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import Select from "$lib/components/ui/select.svelte";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import Select from '$lib/components/ui/select.svelte';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Plus, X, Trash2 } from "@lucide/svelte";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Plus, X, Trash2 } from '@lucide/svelte';
   import {
     CustomScriptService,
     type CustomScript,
     type ScriptParameter,
-  } from "$lib/domains/custom_scripts/services/customScriptService";
-  import FilePicker from "$lib/components/ui/file-picker.svelte";
+  } from '$lib/domains/custom_scripts/services/customScriptService';
+  import FilePicker from '$lib/components/ui/file-picker.svelte';
 
   interface Props {
     script?: CustomScript | null;
@@ -37,15 +37,15 @@
   let { script, onClose, onSaved }: Props = $props();
 
   // Form state
-  let name = $state(script?.name || "");
-  let description = $state(script?.description || "");
-  let command = $state(script?.command || "");
-  let category = $state(script?.category || "");
-  let icon = $state(script?.icon || "");
+  let name = $state(script?.name || '');
+  let description = $state(script?.description || '');
+  let command = $state(script?.command || '');
+  let category = $state(script?.category || '');
+  let icon = $state(script?.icon || '');
   let requiresSudo = $state(script?.requires_sudo || false);
   let isInteractive = $state(script?.is_interactive || false);
   let parameters = $state<ScriptParameter[]>(
-    script ? CustomScriptService.parseParameters(script.parameters_json) : [],
+    script ? CustomScriptService.parseParameters(script.parameters_json) : []
   );
 
   let saving = $state(false);
@@ -57,27 +57,25 @@
       {
         name: `param${parameters.length + 1}`,
         label: `Parameter ${parameters.length + 1}`,
-        parameter_type: "string",
+        parameter_type: 'string',
         required: false,
       },
     ];
   }
 
   function removeParameter(index: number) {
-    parameters = parameters.filter(
-      (_param: ScriptParameter, i: number) => i !== index,
-    );
+    parameters = parameters.filter((_param: ScriptParameter, i: number) => i !== index);
   }
 
   function updateParameter(index: number, updates: Partial<ScriptParameter>) {
     parameters = parameters.map((param: ScriptParameter, i: number) =>
-      i === index ? { ...param, ...updates } : param,
+      i === index ? { ...param, ...updates } : param
     );
   }
 
   async function handleSave() {
     if (!name.trim() || !command.trim()) {
-      error = "Name and command are required";
+      error = 'Name and command are required';
       return;
     }
 
@@ -111,8 +109,8 @@
       }
       onSaved();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to save script";
-      console.error("Failed to save script:", err);
+      error = err instanceof Error ? err.message : 'Failed to save script';
+      console.error('Failed to save script:', err);
     } finally {
       saving = false;
     }
@@ -125,12 +123,10 @@
     if (!isOpen) onClose();
   }}
 >
-  <Dialog.Content
-    class="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0"
-  >
+  <Dialog.Content class="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0">
     <Dialog.Header class="divider-edge-b divider-edge-full p-6">
       <Dialog.Title class="text-2xl">
-        {script ? "Edit Script" : "Create Script"}
+        {script ? 'Edit Script' : 'Create Script'}
       </Dialog.Title>
     </Dialog.Header>
 
@@ -144,11 +140,7 @@
       <div class="space-y-4">
         <div>
           <Label for="name">Name *</Label>
-          <Input
-            id="name"
-            bind:value={name}
-            placeholder="e.g., OpenVPN Connection"
-          />
+          <Input id="name" bind:value={name} placeholder="e.g., OpenVPN Connection" />
         </div>
 
         <div>
@@ -167,9 +159,9 @@
             id="command"
             bind:value={command}
             placeholder={'e.g., openvpn --config "${' +
-              "CONFIG_FILE" +
+              'CONFIG_FILE' +
               '}" --auth-retry interact --auth-user-pass "${' +
-              "AUTH_FILE" +
+              'AUTH_FILE' +
               '}"'}
             rows={4}
             class="font-mono text-sm"
@@ -180,8 +172,8 @@
             {#if requiresSudo}
               <br />
               <span class="text-amber-600 dark:text-amber-400">
-                Note: Don't include "sudo" in the command - it will be added
-                automatically when "Requires Sudo" is enabled.
+                Note: Don't include "sudo" in the command - it will be added automatically when
+                "Requires Sudo" is enabled.
               </span>
             {/if}
           </p>
@@ -190,11 +182,7 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <Label for="category">Category</Label>
-            <Input
-              id="category"
-              bind:value={category}
-              placeholder="e.g., VPN, Network"
-            />
+            <Input id="category" bind:value={category} placeholder="e.g., VPN, Network" />
           </div>
 
           <div>
@@ -229,11 +217,7 @@
               <CardHeader>
                 <div class="flex items-center justify-between">
                   <CardTitle class="text-sm">Parameter {index + 1}</CardTitle>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onclick={() => removeParameter(index)}
-                  >
+                  <Button size="sm" variant="ghost" onclick={() => removeParameter(index)}>
                     <X class="h-4 w-4" />
                   </Button>
                 </div>
@@ -270,31 +254,29 @@
                   <Select
                     defaultValue={(param as ScriptParameter).parameter_type}
                     options={[
-                      { value: "string", label: "String" },
-                      { value: "file", label: "File" },
-                      { value: "folder", label: "Folder" },
-                      { value: "number", label: "Number" },
-                      { value: "boolean", label: "Boolean" },
-                      { value: "password", label: "Password" },
+                      { value: 'string', label: 'String' },
+                      { value: 'file', label: 'File' },
+                      { value: 'folder', label: 'Folder' },
+                      { value: 'number', label: 'Number' },
+                      { value: 'boolean', label: 'Boolean' },
+                      { value: 'password', label: 'Password' },
                     ]}
                     onSelect={(value) =>
                       updateParameter(index, {
-                        parameter_type: value as ScriptParameter["parameter_type"],
+                        parameter_type: value as ScriptParameter['parameter_type'],
                       })}
                   />
                 </div>
 
-                {#if param.parameter_type === "file"}
+                {#if param.parameter_type === 'file'}
                   <div>
                     <Label>File Filters (comma-separated)</Label>
                     <Input
-                      value={(param as ScriptParameter).file_filters?.join(
-                        ", ",
-                      ) || ""}
+                      value={(param as ScriptParameter).file_filters?.join(', ') || ''}
                       oninput={(e: Event) =>
                         updateParameter(index, {
                           file_filters: (e.target as HTMLInputElement).value
-                            .split(",")
+                            .split(',')
                             .map((f: string) => f.trim())
                             .filter(Boolean),
                         })}
@@ -306,11 +288,10 @@
                 <div>
                   <Label>Description</Label>
                   <Input
-                    value={(param as ScriptParameter).description || ""}
+                    value={(param as ScriptParameter).description || ''}
                     oninput={(e: Event) =>
                       updateParameter(index, {
-                        description:
-                          (e.target as HTMLInputElement).value || undefined,
+                        description: (e.target as HTMLInputElement).value || undefined,
                       })}
                     placeholder="Optional description"
                   />
@@ -318,15 +299,14 @@
 
                 <div>
                   <Label>Default Value</Label>
-                  {#if (param as ScriptParameter).parameter_type === "file"}
-                    {@const fileFilters =
-                      (param as ScriptParameter).file_filters || []}
+                  {#if (param as ScriptParameter).parameter_type === 'file'}
+                    {@const fileFilters = (param as ScriptParameter).file_filters || []}
                     <FilePicker
-                      value={(param as ScriptParameter).default_value || ""}
+                      value={(param as ScriptParameter).default_value || ''}
                       label=""
                       description=""
                       filters={fileFilters.length > 0
-                        ? [{ name: "Files", extensions: fileFilters }]
+                        ? [{ name: 'Files', extensions: fileFilters }]
                         : []}
                       selectFolder={false}
                       onChange={(path) => {
@@ -335,9 +315,9 @@
                         });
                       }}
                     />
-                  {:else if (param as ScriptParameter).parameter_type === "folder"}
+                  {:else if (param as ScriptParameter).parameter_type === 'folder'}
                     <FilePicker
-                      value={(param as ScriptParameter).default_value || ""}
+                      value={(param as ScriptParameter).default_value || ''}
                       label=""
                       description=""
                       selectFolder={true}
@@ -349,11 +329,10 @@
                     />
                   {:else}
                     <Input
-                      value={(param as ScriptParameter).default_value || ""}
+                      value={(param as ScriptParameter).default_value || ''}
                       oninput={(e: Event) =>
                         updateParameter(index, {
-                          default_value:
-                            (e.target as HTMLInputElement).value || undefined,
+                          default_value: (e.target as HTMLInputElement).value || undefined,
                         })}
                       placeholder="Optional default value"
                     />
@@ -376,11 +355,9 @@
     </div>
 
     <div class="divider-edge-t divider-edge-full flex justify-end gap-2 p-6">
-      <Button variant="outline" onclick={onClose} disabled={saving}>
-        Cancel
-      </Button>
+      <Button variant="outline" onclick={onClose} disabled={saving}>Cancel</Button>
       <Button onclick={handleSave} disabled={saving}>
-        {saving ? "Saving..." : "Save"}
+        {saving ? 'Saving...' : 'Save'}
       </Button>
     </div>
   </Dialog.Content>

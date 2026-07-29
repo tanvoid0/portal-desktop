@@ -2,7 +2,7 @@
  * Shared types for settings components (Languages, Package Managers, Frameworks)
  */
 
-import type { PatternType } from "$lib/domains/learning/types";
+import type { PatternType } from '$lib/domains/learning/types';
 
 /**
  * Base interface for all item types (Language, PackageManager, Framework)
@@ -11,7 +11,7 @@ export interface BaseItem {
   id: number;
   name: string;
   icon: string;
-  icon_type: "devicon" | "file";
+  icon_type: 'devicon' | 'file';
   category: string;
   created_at?: string;
   updated_at?: string;
@@ -37,38 +37,27 @@ export interface BaseItemGroup<T extends BaseSuggestedItem> {
 /**
  * Service interface for CRUD operations
  */
-export interface ItemService<
-  T extends BaseItem,
-  TSuggested extends BaseSuggestedItem,
-> {
+export interface ItemService<T extends BaseItem, TSuggested extends BaseSuggestedItem> {
   getAll(): Promise<T[]>;
   getSuggested(): Promise<BaseItemGroup<TSuggested>[]>;
-  create(
-    name: string,
-    icon: string,
-    iconType: "devicon" | "file",
-    category: string,
-  ): Promise<T>;
+  create(name: string, icon: string, iconType: 'devicon' | 'file', category: string): Promise<T>;
   update(
     id: number,
     name?: string,
     icon?: string,
-    iconType?: "devicon" | "file",
-    category?: string,
+    iconType?: 'devicon' | 'file',
+    category?: string
   ): Promise<T>;
   delete(id: number): Promise<void>;
   createBatch(
-    items: TSuggested[],
+    items: TSuggested[]
   ): Promise<{ success: T[]; failed: { item: TSuggested; error: string }[] }>;
 }
 
 /**
  * Configuration for the reusable settings component
  */
-export interface SettingsComponentConfig<
-  T extends BaseItem,
-  TSuggested extends BaseSuggestedItem,
-> {
+export interface SettingsComponentConfig<T extends BaseItem, TSuggested extends BaseSuggestedItem> {
   // Display labels
   itemName: string; // e.g., "Language", "Package Manager", "Framework"
   itemNamePlural: string; // e.g., "Languages", "Package Managers", "Frameworks"

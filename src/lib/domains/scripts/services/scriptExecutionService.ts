@@ -5,10 +5,10 @@
  * Executions are stored in the database with their status, output, and process info.
  */
 
-import { invokeClient } from "$lib/utils/invokeClient";
-import { logger } from "$lib/domains/shared";
+import { invokeClient } from '$lib/utils/invokeClient';
+import { logger } from '$lib/domains/shared';
 
-const log = logger.createScoped("ScriptExecutionService");
+const log = logger.createScoped('ScriptExecutionService');
 
 export interface ScriptExecutionInfo {
   id: string;
@@ -16,7 +16,7 @@ export interface ScriptExecutionInfo {
   command: string;
   parameters: Record<string, string>;
   workingDirectory: string | null;
-  status: "pending" | "running" | "success" | "failed" | "cancelled";
+  status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled';
   exitCode: number | null;
   pid: number | null;
   output: string;
@@ -49,13 +49,13 @@ class ScriptExecutionService {
    */
   async executeScript(params: ExecuteScriptParams): Promise<string> {
     try {
-      log.info("Executing script", {
+      log.info('Executing script', {
         command: params.command,
         blockId: params.blockId,
       });
 
       // Note: Tauri 2.0 uses camelCase for parameter names in JS/TS
-      const executionId = await invokeClient.post<string>("execute_script", {
+      const executionId = await invokeClient.post<string>('execute_script', {
         params: {
           blockId: params.blockId,
           command: params.command,
@@ -64,10 +64,10 @@ class ScriptExecutionService {
         },
       });
 
-      log.info("Script execution started", { executionId });
+      log.info('Script execution started', { executionId });
       return executionId;
     } catch (error) {
-      log.error("Failed to execute script", { error });
+      log.error('Failed to execute script', { error });
       throw error;
     }
   }
@@ -78,15 +78,15 @@ class ScriptExecutionService {
   async getExecution(executionId: string): Promise<ScriptExecutionInfo | null> {
     try {
       const execution = await invokeClient.post<ScriptExecutionInfo | null>(
-        "get_script_execution",
+        'get_script_execution',
         {
           executionId,
-        },
+        }
       );
 
       return execution ? this.mapExecutionResponse(execution) : null;
     } catch (error) {
-      log.error("Failed to get execution", { executionId, error });
+      log.error('Failed to get execution', { executionId, error });
       throw error;
     }
   }
@@ -97,15 +97,12 @@ class ScriptExecutionService {
    */
   async getLiveOutput(executionId: string): Promise<string[]> {
     try {
-      const output = await invokeClient.post<string[]>(
-        "get_script_execution_live_output",
-        {
-          executionId,
-        },
-      );
+      const output = await invokeClient.post<string[]>('get_script_execution_live_output', {
+        executionId,
+      });
       return output;
     } catch (error) {
-      log.error("Failed to get live output", { executionId, error });
+      log.error('Failed to get live output', { executionId, error });
       return [];
     }
   }
@@ -115,13 +112,13 @@ class ScriptExecutionService {
    */
   async cancelExecution(executionId: string): Promise<void> {
     try {
-      log.info("Cancelling execution", { executionId });
-      await invokeClient.post("cancel_script_execution", {
+      log.info('Cancelling execution', { executionId });
+      await invokeClient.post('cancel_script_execution', {
         executionId,
       });
-      log.info("Execution cancelled", { executionId });
+      log.info('Execution cancelled', { executionId });
     } catch (error) {
-      log.error("Failed to cancel execution", { executionId, error });
+      log.error('Failed to cancel execution', { executionId, error });
       throw error;
     }
   }
@@ -129,21 +126,18 @@ class ScriptExecutionService {
   /**
    * Get executions for a specific block/script
    */
-  async getExecutionsByBlock(
-    blockId: string,
-    limit?: number,
-  ): Promise<ScriptExecutionInfo[]> {
+  async getExecutionsByBlock(blockId: string, limit?: number): Promise<ScriptExecutionInfo[]> {
     try {
       const executions = await invokeClient.post<ScriptExecutionInfo[]>(
-        "get_script_executions_by_block",
+        'get_script_executions_by_block',
         {
           blockId,
           limit,
-        },
+        }
       );
       return executions.map((e) => this.mapExecutionResponse(e));
     } catch (error) {
-      log.error("Failed to get executions by block", { blockId, error });
+      log.error('Failed to get executions by block', { blockId, error });
       return [];
     }
   }
@@ -154,11 +148,11 @@ class ScriptExecutionService {
   async getRunningExecutions(): Promise<ScriptExecutionInfo[]> {
     try {
       const executions = await invokeClient.post<ScriptExecutionInfo[]>(
-        "get_running_script_executions",
+        'get_running_script_executions'
       );
       return executions.map((e) => this.mapExecutionResponse(e));
     } catch (error) {
-      log.error("Failed to get running executions", { error });
+      log.error('Failed to get running executions', { error });
       return [];
     }
   }
@@ -166,19 +160,17 @@ class ScriptExecutionService {
   /**
    * Get recent executions
    */
-  async getRecentExecutions(
-    limit: number = 20,
-  ): Promise<ScriptExecutionInfo[]> {
+  async getRecentExecutions(limit: number = 20): Promise<ScriptExecutionInfo[]> {
     try {
       const executions = await invokeClient.post<ScriptExecutionInfo[]>(
-        "get_recent_script_executions",
+        'get_recent_script_executions',
         {
           limit,
-        },
+        }
       );
       return executions.map((e) => this.mapExecutionResponse(e));
     } catch (error) {
-      log.error("Failed to get recent executions", { error });
+      log.error('Failed to get recent executions', { error });
       return [];
     }
   }
@@ -189,11 +181,11 @@ class ScriptExecutionService {
    */
   async syncExecutions(): Promise<void> {
     try {
-      log.info("Syncing script executions");
-      await invokeClient.post("sync_script_executions");
-      log.info("Script executions synced");
+      log.info('Syncing script executions');
+      await invokeClient.post('sync_script_executions');
+      log.info('Script executions synced');
     } catch (error) {
-      log.error("Failed to sync executions", { error });
+      log.error('Failed to sync executions', { error });
     }
   }
 
@@ -202,13 +194,13 @@ class ScriptExecutionService {
    */
   async deleteExecution(executionId: string): Promise<void> {
     try {
-      log.info("Deleting execution", { executionId });
-      await invokeClient.post("delete_script_execution", {
+      log.info('Deleting execution', { executionId });
+      await invokeClient.post('delete_script_execution', {
         executionId,
       });
-      log.info("Execution deleted", { executionId });
+      log.info('Execution deleted', { executionId });
     } catch (error) {
-      log.error("Failed to delete execution", { executionId, error });
+      log.error('Failed to delete execution', { executionId, error });
       throw error;
     }
   }
@@ -220,7 +212,7 @@ class ScriptExecutionService {
   subscribeToExecution(
     executionId: string,
     callback: (execution: ScriptExecutionInfo) => void,
-    intervalMs: number = 1000,
+    intervalMs: number = 1000
   ): () => void {
     // Clear any existing interval for this execution
     this.unsubscribeFromExecution(executionId);
@@ -233,15 +225,15 @@ class ScriptExecutionService {
 
           // Auto-unsubscribe when execution is complete
           if (
-            execution.status === "success" ||
-            execution.status === "failed" ||
-            execution.status === "cancelled"
+            execution.status === 'success' ||
+            execution.status === 'failed' ||
+            execution.status === 'cancelled'
           ) {
             this.unsubscribeFromExecution(executionId);
           }
         }
       } catch (error) {
-        log.error("Error polling execution", { executionId, error });
+        log.error('Error polling execution', { executionId, error });
       }
     }, intervalMs);
 
@@ -279,16 +271,15 @@ class ScriptExecutionService {
       blockId: execution.block_id ?? execution.blockId ?? null,
       command: execution.command,
       parameters: execution.parameters || {},
-      workingDirectory:
-        execution.working_directory ?? execution.workingDirectory ?? null,
+      workingDirectory: execution.working_directory ?? execution.workingDirectory ?? null,
       status: execution.status,
       exitCode: execution.exit_code ?? execution.exitCode ?? null,
       pid: execution.pid ?? null,
-      output: execution.output || "",
+      output: execution.output || '',
       error: execution.error ?? null,
       startedAt: execution.started_at ?? execution.startedAt,
       finishedAt: execution.finished_at ?? execution.finishedAt ?? null,
-      triggeredBy: execution.triggered_by ?? execution.triggeredBy ?? "user",
+      triggeredBy: execution.triggered_by ?? execution.triggeredBy ?? 'user',
     };
   }
 }

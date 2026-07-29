@@ -1,14 +1,8 @@
 // Hook for table row navigation with keyboard
 
-import {
-  writable,
-  derived,
-  get,
-  type Readable,
-  type Writable,
-} from "svelte/store";
-import { KEY_CODES, VIM_KEYS } from "../utils/keyboardConstants";
-import type { NavigationState } from "../types";
+import { writable, derived, get, type Readable, type Writable } from 'svelte/store';
+import { KEY_CODES, VIM_KEYS } from '../utils/keyboardConstants';
+import type { NavigationState } from '../types';
 
 export interface TableNavigationOptions {
   totalItems: number | (() => number);
@@ -20,20 +14,15 @@ export interface TableNavigationOptions {
 export function useTableNavigation(options: TableNavigationOptions) {
   const { onSelect, onActivate, enabled = true } = options;
   const getTotalItems = (): number => {
-    return typeof options.totalItems === "function"
-      ? options.totalItems()
-      : options.totalItems;
+    return typeof options.totalItems === 'function' ? options.totalItems() : options.totalItems;
   };
 
   const selectedIndex = writable<number>(-1);
 
-  const state: Readable<NavigationState> = derived(
-    [selectedIndex],
-    ([$selectedIndex]) => ({
-      selectedIndex: $selectedIndex,
-      totalItems: getTotalItems(),
-    }),
-  );
+  const state: Readable<NavigationState> = derived([selectedIndex], ([$selectedIndex]) => ({
+    selectedIndex: $selectedIndex,
+    totalItems: getTotalItems(),
+  }));
 
   function selectIndex(index: number) {
     const total = getTotalItems();
@@ -90,7 +79,7 @@ export function useTableNavigation(options: TableNavigationOptions) {
 
     // Ignore if typing in input/textarea
     const target = event.target as HTMLElement;
-    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
       return false;
     }
 
@@ -148,12 +137,7 @@ export function useTableNavigation(options: TableNavigationOptions) {
         return false;
 
       case VIM_KEYS.TOP:
-        if (
-          !event.ctrlKey &&
-          !event.metaKey &&
-          !event.altKey &&
-          !event.shiftKey
-        ) {
+        if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
           event.preventDefault();
           moveToTop();
           return true;
@@ -161,12 +145,7 @@ export function useTableNavigation(options: TableNavigationOptions) {
         return false;
 
       case VIM_KEYS.BOTTOM:
-        if (
-          !event.ctrlKey &&
-          !event.metaKey &&
-          !event.altKey &&
-          event.shiftKey
-        ) {
+        if (!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey) {
           event.preventDefault();
           moveToBottom();
           return true;

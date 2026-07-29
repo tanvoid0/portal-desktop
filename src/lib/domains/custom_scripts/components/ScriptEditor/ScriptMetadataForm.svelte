@@ -4,9 +4,9 @@
 -->
 
 <script lang="ts">
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
 
   interface Props {
     name: string;
@@ -48,8 +48,7 @@
     <Textarea
       id="script-description"
       value={description}
-      oninput={(e) =>
-        onDescriptionChange((e.target as HTMLTextAreaElement).value)}
+      oninput={(e) => onDescriptionChange((e.target as HTMLTextAreaElement).value)}
       placeholder="Optional description of what this script does"
       rows={3}
     />

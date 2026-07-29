@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { PageHeader, PageLoading, PageError, PageEmpty } from "$lib/components/shell";
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
   import {
     createGitHubIssuesQuery,
     createGitHubRepositoriesQuery,
@@ -12,27 +12,27 @@
     githubService,
     GitHubConnectPrompt,
     type GitHubIssue,
-  } from "$lib/domains/github";
-  import { createTaskUiState } from "$lib/domains/tasks/state/taskUi.svelte";
-  import KanbanBoard from "$lib/domains/tasks/components/KanbanBoard.svelte";
-  import TaskList from "$lib/domains/tasks/components/TaskList.svelte";
-  import type { Task } from "$lib/domains/tasks/types";
-  import { toast } from "$lib/utils/toast";
-  import { Bug, ExternalLink, Plus } from "@lucide/svelte";
-  import Icon from "@iconify/svelte";
+  } from '$lib/domains/github';
+  import { createTaskUiState } from '$lib/domains/tasks/state/taskUi.svelte';
+  import KanbanBoard from '$lib/domains/tasks/components/KanbanBoard.svelte';
+  import TaskList from '$lib/domains/tasks/components/TaskList.svelte';
+  import type { Task } from '$lib/domains/tasks/types';
+  import { toast } from '$lib/utils/toast';
+  import { Bug, ExternalLink, Plus } from '@lucide/svelte';
+  import Icon from '@iconify/svelte';
 
-  let filter: "assigned" | "created" = $state("assigned");
-  let stateValue: "open" | "closed" | "all" = $state("open");
+  let filter: 'assigned' | 'created' = $state('assigned');
+  let stateValue: 'open' | 'closed' | 'all' = $state('open');
   let createDialogOpen = $state(false);
   let editDialogOpen = $state(false);
   let selectedIssue: GitHubIssue | null = $state(null);
-  let createRepoFullName = $state("");
-  let createTitle = $state("");
-  let createBody = $state("");
-  let editTitle = $state("");
-  let editBody = $state("");
+  let createRepoFullName = $state('');
+  let createTitle = $state('');
+  let createBody = $state('');
+  let editTitle = $state('');
+  let editBody = $state('');
   let submitting = $state(false);
-  let currentView = $state<"kanban" | "list">("kanban");
+  let currentView = $state<'kanban' | 'list'>('kanban');
 
   const statusQuery = createGitHubStatusQuery();
   const isConnected = $derived(statusQuery.data?.connected ?? false);
@@ -43,17 +43,17 @@
       page: 1,
       perPage: 50,
     }),
-    () => isConnected,
+    () => isConnected
   );
   const reposQuery = createGitHubRepositoriesQuery(
-    () => "",
-    () => isConnected && createDialogOpen,
+    () => '',
+    () => isConnected && createDialogOpen
   );
   const repoOptions = $derived(
     (reposQuery.data ?? []).map((repo) => ({
       value: repo.fullName,
       label: repo.fullName,
-    })),
+    }))
   );
 
   // Reuse the tasks board UI: map GitHub issues onto the Task shape and give
@@ -62,7 +62,7 @@
   const issueByTaskId = new Map<string, GitHubIssue>();
 
   function issueTaskId(issue: GitHubIssue): string {
-    return `github:${issue.repoFullName ?? "unknown"}#${issue.number}`;
+    return `github:${issue.repoFullName ?? 'unknown'}#${issue.number}`;
   }
 
   function issueToTask(issue: GitHubIssue): Task {
@@ -72,13 +72,13 @@
       id,
       title: `#${issue.number} ${issue.title}`,
       description: issue.body,
-      status: issue.state === "closed" ? "completed" : "pending",
-      priority: "medium",
-      type: issue.labels[0] ?? "Bug",
+      status: issue.state === 'closed' ? 'completed' : 'pending',
+      priority: 'medium',
+      type: issue.labels[0] ?? 'Bug',
       createdAt: issue.createdAt ? new Date(issue.createdAt) : new Date(),
       updatedAt: issue.updatedAt ? new Date(issue.updatedAt) : new Date(),
       resourceId: String(issue.id),
-      resourceType: "github_issue",
+      resourceType: 'github_issue',
     };
   }
 
@@ -90,7 +90,7 @@
   function openEditDialog(issue: GitHubIssue) {
     selectedIssue = issue;
     editTitle = issue.title;
-    editBody = issue.body || "";
+    editBody = issue.body || '';
     editDialogOpen = true;
   }
 
@@ -99,9 +99,9 @@
     if (issue) openEditDialog(issue);
   }
 
-  async function setIssueState(issue: GitHubIssue, newState: "open" | "closed") {
+  async function setIssueState(issue: GitHubIssue, newState: 'open' | 'closed') {
     if (!issue.repoFullName) return;
-    const [owner, repo] = issue.repoFullName.split("/");
+    const [owner, repo] = issue.repoFullName.split('/');
     try {
       await githubService.updateIssue({
         owner,
@@ -112,7 +112,7 @@
       toast.success(`Issue ${newState}`);
       await issuesQuery.refetch();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update issue");
+      toast.error(error instanceof Error ? error.message : 'Failed to update issue');
     }
   }
 
@@ -120,13 +120,16 @@
   function handleTaskMove(taskId: string, newStatus: string) {
     const issue = issueByTaskId.get(taskId);
     if (!issue) return;
-    setIssueState(issue, newStatus === "pending" || newStatus === "in-progress" ? "open" : "closed");
+    setIssueState(
+      issue,
+      newStatus === 'pending' || newStatus === 'in-progress' ? 'open' : 'closed'
+    );
   }
 
   function handleTaskStatusToggle(taskId: string) {
     const issue = issueByTaskId.get(taskId);
     if (!issue) return;
-    setIssueState(issue, issue.state === "closed" ? "open" : "closed");
+    setIssueState(issue, issue.state === 'closed' ? 'open' : 'closed');
   }
 
   function noop() {}
@@ -135,7 +138,7 @@
   }
 
   async function handleCreateIssue() {
-    const [owner, repo] = createRepoFullName.split("/");
+    const [owner, repo] = createRepoFullName.split('/');
     if (!owner || !repo) return;
     try {
       submitting = true;
@@ -145,22 +148,22 @@
         title: createTitle.trim(),
         body: createBody.trim() || undefined,
       });
-      toast.success("Issue created");
+      toast.success('Issue created');
       createDialogOpen = false;
-      createRepoFullName = "";
-      createTitle = "";
-      createBody = "";
+      createRepoFullName = '';
+      createTitle = '';
+      createBody = '';
       await issuesQuery.refetch();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create issue");
+      toast.error(error instanceof Error ? error.message : 'Failed to create issue');
     } finally {
       submitting = false;
     }
   }
 
-  async function handleUpdateIssue(nextState?: "open" | "closed") {
+  async function handleUpdateIssue(nextState?: 'open' | 'closed') {
     if (!selectedIssue?.repoFullName) return;
-    const [owner, repo] = selectedIssue.repoFullName.split("/");
+    const [owner, repo] = selectedIssue.repoFullName.split('/');
     try {
       submitting = true;
       await githubService.updateIssue({
@@ -171,11 +174,11 @@
         body: editBody.trim() || undefined,
         state: nextState,
       });
-      toast.success(nextState ? `Issue ${nextState}` : "Issue updated");
+      toast.success(nextState ? `Issue ${nextState}` : 'Issue updated');
       editDialogOpen = false;
       await issuesQuery.refetch();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update issue");
+      toast.error(error instanceof Error ? error.message : 'Failed to update issue');
     } finally {
       submitting = false;
     }
@@ -187,15 +190,12 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <PageHeader
-    title="Issues"
-    description="View and manage GitHub issues across your repositories"
-  >
+  <PageHeader title="Issues" description="View and manage GitHub issues across your repositories">
     {#snippet actions()}
       <div class="flex rounded-lg bg-muted p-1">
         <Button
-          onclick={() => (currentView = "kanban")}
-          variant={currentView === "kanban" ? "default" : "ghost"}
+          onclick={() => (currentView = 'kanban')}
+          variant={currentView === 'kanban' ? 'default' : 'ghost'}
           size="sm"
           class="px-3 py-1.5 text-sm font-medium"
         >
@@ -203,8 +203,8 @@
           Kanban
         </Button>
         <Button
-          onclick={() => (currentView = "list")}
-          variant={currentView === "list" ? "default" : "ghost"}
+          onclick={() => (currentView = 'list')}
+          variant={currentView === 'list' ? 'default' : 'ghost'}
           size="sm"
           class="px-3 py-1.5 text-sm font-medium"
         >
@@ -222,39 +222,36 @@
   {#if statusQuery.isPending}
     <PageLoading message="Checking GitHub connection..." />
   {:else if !statusQuery.data?.connected}
-    <GitHubConnectPrompt
-      status={statusQuery.data}
-      onConnected={() => statusQuery.refetch()}
-    />
+    <GitHubConnectPrompt status={statusQuery.data} onConnected={() => statusQuery.refetch()} />
   {:else}
     <div class="flex flex-wrap items-center gap-3">
       <Button
-        variant={filter === "assigned" ? "default" : "outline"}
-        onclick={() => (filter = "assigned")}
+        variant={filter === 'assigned' ? 'default' : 'outline'}
+        onclick={() => (filter = 'assigned')}
       >
         Assigned
       </Button>
       <Button
-        variant={filter === "created" ? "default" : "outline"}
-        onclick={() => (filter = "created")}
+        variant={filter === 'created' ? 'default' : 'outline'}
+        onclick={() => (filter = 'created')}
       >
         Created
       </Button>
       <Button
-        variant={stateValue === "open" ? "default" : "outline"}
-        onclick={() => (stateValue = "open")}
+        variant={stateValue === 'open' ? 'default' : 'outline'}
+        onclick={() => (stateValue = 'open')}
       >
         Open
       </Button>
       <Button
-        variant={stateValue === "closed" ? "default" : "outline"}
-        onclick={() => (stateValue = "closed")}
+        variant={stateValue === 'closed' ? 'default' : 'outline'}
+        onclick={() => (stateValue = 'closed')}
       >
         Closed
       </Button>
       <Button
-        variant={stateValue === "all" ? "default" : "outline"}
-        onclick={() => (stateValue = "all")}
+        variant={stateValue === 'all' ? 'default' : 'outline'}
+        onclick={() => (stateValue = 'all')}
       >
         All
       </Button>
@@ -267,7 +264,7 @@
         title="Failed to load issues"
         message={issuesQuery.error instanceof Error
           ? issuesQuery.error.message
-          : "Unable to load issues"}
+          : 'Unable to load issues'}
         onRetry={() => issuesQuery.refetch()}
       />
     {:else if (issuesQuery.data ?? []).length === 0}
@@ -276,7 +273,7 @@
         description="Try a different filter or create a new issue."
         icon={Bug}
       />
-    {:else if currentView === "kanban"}
+    {:else if currentView === 'kanban'}
       <KanbanBoard
         ui={issueUi}
         {handleTaskSelect}
@@ -284,13 +281,15 @@
         handleTaskSelection={noop}
         handleCreateSubtask={noop}
         getSubtaskCount={zero}
-        getTaskStatusColor={(status) => (status === "completed" ? "text-red-500" : "text-green-500")}
+        getTaskStatusColor={(status) =>
+          status === 'completed' ? 'text-red-500' : 'text-green-500'}
         getStatusBadgeColor={(status) =>
-          status === "completed"
-            ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"
-            : "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"}
-        getPriorityColor={() => "text-muted-foreground"}
-        getTaskIcon={(task) => (task.status === "completed" ? "mdi:source-merge" : "mdi:source-branch")}
+          status === 'completed'
+            ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+            : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'}
+        getPriorityColor={() => 'text-muted-foreground'}
+        getTaskIcon={(task) =>
+          task.status === 'completed' ? 'mdi:source-merge' : 'mdi:source-branch'}
         onTaskMove={handleTaskMove}
         showSubtaskActions={false}
       />
@@ -302,13 +301,15 @@
         handleTaskSelection={noop}
         handleCreateSubtask={noop}
         getSubtaskCount={zero}
-        getTaskStatusColor={(status) => (status === "completed" ? "text-red-500" : "text-green-500")}
+        getTaskStatusColor={(status) =>
+          status === 'completed' ? 'text-red-500' : 'text-green-500'}
         getStatusBadgeColor={(status) =>
-          status === "completed"
-            ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"
-            : "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"}
-        getPriorityColor={() => "text-muted-foreground"}
-        getTaskIcon={(task) => (task.status === "completed" ? "mdi:source-merge" : "mdi:source-branch")}
+          status === 'completed'
+            ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+            : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'}
+        getPriorityColor={() => 'text-muted-foreground'}
+        getTaskIcon={(task) =>
+          task.status === 'completed' ? 'mdi:source-merge' : 'mdi:source-branch'}
         showSubtaskActions={false}
       />
     {/if}
@@ -323,7 +324,7 @@
         <Select
           bind:value={createRepoFullName}
           options={repoOptions}
-          placeholder={reposQuery.isPending ? "Loading repositories..." : "Select a repository"}
+          placeholder={reposQuery.isPending ? 'Loading repositories...' : 'Select a repository'}
         />
         <Input bind:value={createTitle} placeholder="Issue title" />
         <Textarea bind:value={createBody} placeholder="Issue description" />
@@ -357,21 +358,15 @@
           </a>
         {/if}
         <div class="flex flex-wrap gap-2">
-          <Button onclick={() => handleUpdateIssue(undefined)} disabled={submitting}>
-            Save
-          </Button>
+          <Button onclick={() => handleUpdateIssue(undefined)} disabled={submitting}>Save</Button>
           <Button
             variant="outline"
-            onclick={() => handleUpdateIssue("closed")}
+            onclick={() => handleUpdateIssue('closed')}
             disabled={submitting}
           >
             Close
           </Button>
-          <Button
-            variant="outline"
-            onclick={() => handleUpdateIssue("open")}
-            disabled={submitting}
-          >
+          <Button variant="outline" onclick={() => handleUpdateIssue('open')} disabled={submitting}>
             Reopen
           </Button>
         </div>

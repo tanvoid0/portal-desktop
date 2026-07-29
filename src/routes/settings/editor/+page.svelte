@@ -3,14 +3,14 @@
 -->
 
 <script lang="ts">
-  import { settings } from "$lib/domains/settings/stores/settingsStore";
-  import EditorSettings from "$lib/domains/settings/components/EditorSettings.svelte";
-  import { get } from "svelte/store";
+  import { settings } from '$lib/domains/settings/stores/settingsStore';
+  import EditorSettings from '$lib/domains/settings/components/EditorSettings.svelte';
+  import { get } from 'svelte/store';
 
   const settingsData = $derived($settings);
 
   function handleEditorUpdate(
-    updates: Partial<import("$lib/domains/settings/types").EditorSettings>,
+    updates: Partial<import('$lib/domains/settings/types').EditorSettings>
   ) {
     const current = get(settings);
     if (!current) return;
@@ -30,16 +30,11 @@
 <div class="space-y-6">
   <div>
     <h2 class="text-2xl font-bold tracking-tight">Editor Settings</h2>
-    <p class="text-muted-foreground">
-      Configure code editor preferences and behavior
-    </p>
+    <p class="text-muted-foreground">Configure code editor preferences and behavior</p>
   </div>
 
   {#if settingsData}
-    <EditorSettings
-      settings={settingsData.editor}
-      onUpdate={handleEditorUpdate}
-    />
+    <EditorSettings settings={settingsData.editor} onUpdate={handleEditorUpdate} />
   {:else}
     <div class="py-12 text-center text-muted-foreground">
       <p>Loading settings...</p>

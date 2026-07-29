@@ -3,13 +3,13 @@
  */
 
 export type WorkspacePanel =
-  | "chat"
-  | "terminal"
-  | "files"
-  | "file"
-  | "browser"
-  | "changes"
-  | "git-changes";
+  | 'chat'
+  | 'terminal'
+  | 'files'
+  | 'file'
+  | 'browser'
+  | 'changes'
+  | 'git-changes';
 
 export interface WorkspaceTab {
   id: string;
@@ -28,12 +28,12 @@ class CoderWorkspaceStore {
     files: false,
     browser: false,
     changes: false,
-    "git-changes": false,
+    'git-changes': false,
   });
-  activePanel = $state<WorkspacePanel>("chat");
+  activePanel = $state<WorkspacePanel>('chat');
   openTabs = $state<WorkspaceTab[]>([]);
   activeTabId = $state<string | null>(null);
-  browserUrl = $state("http://localhost:1420");
+  browserUrl = $state('http://localhost:1420');
 
   private bumpTabs() {
     this.openTabs = [...this.openTabs];
@@ -63,8 +63,7 @@ class CoderWorkspaceStore {
         existing.label === tab.label &&
         existing.panel === tab.panel &&
         existing.terminalId === tab.terminalId;
-      const alreadyActive =
-        this.activeTabId === tab.id && this.activePanel === tab.panel;
+      const alreadyActive = this.activeTabId === tab.id && this.activePanel === tab.panel;
       if (unchanged && alreadyActive) return;
       if (!unchanged) {
         this.openTabs = this.openTabs.map((t, idx) => (idx === i ? tab : t));
@@ -77,7 +76,7 @@ class CoderWorkspaceStore {
   }
 
   openChat() {
-    this.activePanel = "chat";
+    this.activePanel = 'chat';
     this.activeTabId = null;
   }
 
@@ -85,37 +84,37 @@ class CoderWorkspaceStore {
     const id = `terminal:${terminalId}`;
     this.upsertTab({
       id,
-      panel: "terminal",
+      panel: 'terminal',
       label,
       terminalId,
     });
     void threadId;
   }
 
-  openChanges(label = "Agent changes") {
-    this.upsertTab({ id: "changes", panel: "changes", label });
+  openChanges(label = 'Agent changes') {
+    this.upsertTab({ id: 'changes', panel: 'changes', label });
   }
 
-  openGitChanges(label = "Git changes") {
-    this.upsertTab({ id: "git-changes", panel: "git-changes", label });
+  openGitChanges(label = 'Git changes') {
+    this.upsertTab({ id: 'git-changes', panel: 'git-changes', label });
   }
 
-  openFiles(label = "Files") {
-    this.upsertTab({ id: "files", panel: "files", label });
+  openFiles(label = 'Files') {
+    this.upsertTab({ id: 'files', panel: 'files', label });
   }
 
   openFile(filePath: string, label?: string) {
     this.upsertTab({
       id: `file:${filePath}`,
-      panel: "file",
+      panel: 'file',
       label: label ?? filePath.split(/[/\\]/).pop() ?? filePath,
       filePath,
     });
   }
 
-  openBrowser(url?: string, label = "Browser") {
+  openBrowser(url?: string, label = 'Browser') {
     if (url) this.browserUrl = url;
-    this.upsertTab({ id: "browser", panel: "browser", label });
+    this.upsertTab({ id: 'browser', panel: 'browser', label });
   }
 
   selectTab(tabId: string) {
@@ -140,7 +139,7 @@ class CoderWorkspaceStore {
 
   /** Active terminal id when terminal panel is showing. */
   activeTerminalId(): string | null {
-    if (this.activePanel !== "terminal") return null;
+    if (this.activePanel !== 'terminal') return null;
     const tab = this.openTabs.find((t) => t.id === this.activeTabId);
     return tab?.terminalId ?? null;
   }

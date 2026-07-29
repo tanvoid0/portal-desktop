@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 
 export interface SDKManagerInfo {
   id: string;
@@ -17,13 +17,13 @@ export interface SDKManagerInfo {
 }
 
 export async function listSDKManagers(): Promise<SDKManagerInfo[]> {
-  return invoke<SDKManagerInfo[]>("get_all_sdk_managers");
+  return invoke<SDKManagerInfo[]>('get_all_sdk_managers');
 }
 
 export async function installSDKManager(managerName: string): Promise<string> {
-  return invoke<string>("install_sdk_manager", { managerName });
+  return invoke<string>('install_sdk_manager', { managerName });
 }
 
 export async function uninstallSDKManager(managerName: string): Promise<string> {
-  return invoke<string>("uninstall_sdk_manager", { managerName });
+  return invoke<string>('uninstall_sdk_manager', { managerName });
 }

@@ -1,12 +1,9 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import { PageEmpty, PageError, PageLoading } from "$lib/components/shell";
-  import {
-    createGitHubWorkflowRunsQuery,
-    type GitHubWorkflowRun,
-  } from "$lib/domains/github";
+  import { goto } from '$app/navigation';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { PageEmpty, PageError, PageLoading } from '$lib/components/shell';
+  import { createGitHubWorkflowRunsQuery, type GitHubWorkflowRun } from '$lib/domains/github';
   import {
     formatWorkflowDuration,
     getWorkflowDisplayStatus,
@@ -14,8 +11,8 @@
     getWorkflowStatusColor,
     getWorkflowStatusIcon,
     isWorkflowRunActive,
-  } from "$lib/domains/github/utils/workflowDisplay";
-  import { ExternalLink, RefreshCw, Workflow } from "@lucide/svelte";
+  } from '$lib/domains/github/utils/workflowDisplay';
+  import { ExternalLink, RefreshCw, Workflow } from '@lucide/svelte';
 
   interface Props {
     owner: string;
@@ -34,7 +31,7 @@
       page: 1,
       perPage: 20,
     }),
-    () => enabled,
+    () => enabled
   );
 
   const runs = $derived(runsQuery.data ?? []);
@@ -52,7 +49,7 @@
     title="Failed to load workflow runs"
     message={runsQuery.error instanceof Error
       ? runsQuery.error.message
-      : "Unable to load GitHub Actions runs"}
+      : 'Unable to load GitHub Actions runs'}
     onRetry={() => runsQuery.refetch()}
   />
 {:else if runs.length === 0}
@@ -60,7 +57,7 @@
     title="No workflow runs yet"
     description={branch
       ? `No GitHub Actions runs found for branch ${branch}. Try turning off branch filtering or push a commit to this branch.`
-      : "Push a commit or open a pull request to trigger GitHub Actions."}
+      : 'Push a commit or open a pull request to trigger GitHub Actions.'}
     icon={Workflow}
   />
 {:else}
@@ -69,8 +66,8 @@
       <p class="text-sm text-muted-foreground">
         {#if branch}
           Showing runs for branch {branch}.{hasActiveRuns
-            ? " Live updates every 3 seconds while runs are active."
-            : ""}
+            ? ' Live updates every 3 seconds while runs are active.'
+            : ''}
         {:else if hasActiveRuns}
           Live updates every 3 seconds while runs are active.
         {:else}
@@ -83,9 +80,7 @@
         onclick={() => runsQuery.refetch()}
         disabled={runsQuery.isFetching}
       >
-        <RefreshCw
-          class="h-4 w-4 {runsQuery.isFetching ? 'animate-spin' : ''}"
-        />
+        <RefreshCw class="h-4 w-4 {runsQuery.isFetching ? 'animate-spin' : ''}" />
       </Button>
     </div>
 
@@ -102,7 +97,10 @@
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex min-w-0 items-center gap-2">
               <StatusIcon
-                class="h-4 w-4 shrink-0 {getWorkflowStatusColor(displayStatus)}{displayStatus === 'running' ? ' animate-spin' : ''}"
+                class="h-4 w-4 shrink-0 {getWorkflowStatusColor(displayStatus)}{displayStatus ===
+                'running'
+                  ? ' animate-spin'
+                  : ''}"
               />
               <Badge variant={getWorkflowStatusBadgeVariant(displayStatus)}>
                 {displayStatus}

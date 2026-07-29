@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { NetworkService } from "$lib/services/networkService";
-  import DeviceAuthService from "$lib/services/deviceAuthService";
-  import { isTauriEnvironment, tauriInvoke } from "$lib/utils/tauri";
-  import QRCode from "qrcode";
-  import { Copy, Check, Loader2, AlertCircle, Shield } from "@lucide/svelte";
+  import { onMount } from 'svelte';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { NetworkService } from '$lib/services/networkService';
+  import DeviceAuthService from '$lib/services/deviceAuthService';
+  import { isTauriEnvironment, tauriInvoke } from '$lib/utils/tauri';
+  import QRCode from 'qrcode';
+  import { Copy, Check, Loader2, AlertCircle, Shield } from '@lucide/svelte';
 
   let {
     open = $bindable(false),
@@ -15,8 +15,8 @@
   } = $props();
 
   let qrCodeDataUrl = $state<string | null>(null);
-  let url = $state<string>("");
-  let passcode = $state<string>("");
+  let url = $state<string>('');
+  let passcode = $state<string>('');
   let loading = $state(false);
   let error = $state<string | null>(null);
   let copied = $state(false);
@@ -29,7 +29,7 @@
     } else {
       // Reset state when dialog closes
       qrCodeDataUrl = null;
-      url = "";
+      url = '';
       error = null;
       copied = false;
     }
@@ -39,7 +39,7 @@
     loading = true;
     error = null;
     qrCodeDataUrl = null;
-    passcode = "";
+    passcode = '';
 
     try {
       const port = NetworkService.getPort();
@@ -50,32 +50,32 @@
       await generatePasscode();
 
       if (!passcode) {
-        throw new Error("Failed to generate passcode");
+        throw new Error('Failed to generate passcode');
       }
 
       // Encode passcode as a query param so any QR reader opens the link
       // directly and the target page auto-fills the passcode.
       const qrUrl = new URL(appUrl);
-      qrUrl.searchParams.set("passcode", passcode);
+      qrUrl.searchParams.set('passcode', passcode);
       url = qrUrl.toString();
 
       const dataUrl = await QRCode.toDataURL(url, {
         width: 300,
         margin: 2,
         color: {
-          dark: "#000000",
-          light: "#FFFFFF",
+          dark: '#000000',
+          light: '#FFFFFF',
         },
       });
 
       if (!dataUrl) {
-        throw new Error("Failed to generate QR code image");
+        throw new Error('Failed to generate QR code image');
       }
 
       qrCodeDataUrl = dataUrl;
     } catch (err) {
-      console.error("Failed to generate QR code:", err);
-      error = err instanceof Error ? err.message : "Failed to generate QR code";
+      console.error('Failed to generate QR code:', err);
+      error = err instanceof Error ? err.message : 'Failed to generate QR code';
       qrCodeDataUrl = null;
     } finally {
       loading = false;
@@ -90,7 +90,7 @@
       let result;
       if (isTauriEnvironment()) {
         // Use Tauri command directly - wrap in request object
-        result = await tauriInvoke("generate_device_passcode", {
+        result = await tauriInvoke('generate_device_passcode', {
           request: {
             device_id: deviceInfo.device_id,
             device_name: deviceInfo.device_name,
@@ -99,10 +99,10 @@
         });
       } else {
         // Use API endpoint (for browser access)
-        const response = await fetch("/api/tauri/generate_device_passcode", {
-          method: "POST",
+        const response = await fetch('/api/tauri/generate_device_passcode', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             device_id: deviceInfo.device_id,
@@ -112,7 +112,7 @@
         });
 
         if (!response.ok) {
-          throw new Error("Failed to generate passcode");
+          throw new Error('Failed to generate passcode');
         }
 
         result = await response.json();
@@ -120,7 +120,7 @@
 
       passcode = result.passcode;
     } catch (err) {
-      console.error("Failed to generate passcode:", err);
+      console.error('Failed to generate passcode:', err);
       throw err;
     } finally {
       generatingPasscode = false;
@@ -135,7 +135,7 @@
         copied = false;
       }, 2000);
     } catch (err) {
-      console.error("Failed to copy to clipboard:", err);
+      console.error('Failed to copy to clipboard:', err);
     }
   }
 
@@ -147,7 +147,7 @@
         passcodeCopied = false;
       }, 2000);
     } catch (err) {
-      console.error("Failed to copy passcode:", err);
+      console.error('Failed to copy passcode:', err);
     }
   }
 </script>
@@ -157,8 +157,7 @@
     <Dialog.Header>
       <Dialog.Title>Share via QR Code</Dialog.Title>
       <Dialog.Description>
-        Scan this QR code with your smartphone to access the application on your
-        local network.
+        Scan this QR code with your smartphone to access the application on your local network.
       </Dialog.Description>
     </Dialog.Header>
 
@@ -166,23 +165,14 @@
       {#if loading}
         <div class="flex flex-col items-center gap-2 py-8">
           <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
-          <p class="text-sm text-muted-foreground">
-            Detecting network address...
-          </p>
+          <p class="text-sm text-muted-foreground">Detecting network address...</p>
         </div>
       {:else if error}
         <div class="flex flex-col items-center gap-2 py-8">
           <AlertCircle class="h-8 w-8 text-destructive" />
           <p class="text-sm font-medium text-destructive">Error</p>
           <p class="text-center text-sm text-muted-foreground">{error}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onclick={generateQRCode}
-            class="mt-2"
-          >
-            Retry
-          </Button>
+          <Button variant="outline" size="sm" onclick={generateQRCode} class="mt-2">Retry</Button>
         </div>
       {:else if qrCodeDataUrl}
         <div class="flex flex-col items-center gap-4">
@@ -217,13 +207,9 @@
                 >
                   <Shield class="h-4 w-4 text-primary" />
                   <div class="flex-1">
-                    <p class="mb-1 text-xs text-muted-foreground">
-                      Access Passcode
-                    </p>
+                    <p class="mb-1 text-xs text-muted-foreground">Access Passcode</p>
                     <div class="flex items-center gap-2">
-                      <code class="font-mono text-lg font-bold tracking-wider"
-                        >{passcode}</code
-                      >
+                      <code class="font-mono text-lg font-bold tracking-wider">{passcode}</code>
                       <Button
                         variant="ghost"
                         size="icon"

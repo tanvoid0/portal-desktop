@@ -10,7 +10,7 @@ export function fuzzySearch<T>(
   query: string,
   items: T[],
   getText: (item: T) => string,
-  getKeywords?: (item: T) => string[],
+  getKeywords?: (item: T) => string[]
 ): SearchResult<T>[] {
   if (!query.trim()) {
     return items.map((item, index) => ({
@@ -25,9 +25,7 @@ export function fuzzySearch<T>(
 
   for (const item of items) {
     const text = getText(item).toLowerCase();
-    const keywords = getKeywords
-      ? getKeywords(item).join(" ").toLowerCase()
-      : "";
+    const keywords = getKeywords ? getKeywords(item).join(' ').toLowerCase() : '';
     const searchable = `${text} ${keywords}`;
 
     let score = 0;
@@ -46,11 +44,7 @@ export function fuzzySearch<T>(
     }
 
     // Fuzzy match - find all characters in order
-    for (
-      let i = 0;
-      i < searchable.length && queryIndex < queryLower.length;
-      i++
-    ) {
+    for (let i = 0; i < searchable.length && queryIndex < queryLower.length; i++) {
       if (searchable[i] === queryLower[queryIndex]) {
         matches.push(i);
         queryIndex++;
@@ -71,7 +65,7 @@ export function fuzzySearch<T>(
       // Bonus for matches at word boundaries
       let wordBoundaryBonus = 0;
       for (const match of matches) {
-        if (match === 0 || searchable[match - 1] === " ") {
+        if (match === 0 || searchable[match - 1] === ' ') {
           wordBoundaryBonus += 10;
         }
       }
@@ -110,5 +104,5 @@ export function highlightMatches(text: string, matches: number[]): string {
     parts.push(text.slice(lastIndex));
   }
 
-  return parts.join("");
+  return parts.join('');
 }

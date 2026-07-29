@@ -17,42 +17,38 @@
  *   await automation.forProject(project).run(presets.ci());
  */
 
-import { logger } from "$lib/domains/shared";
-import { blockLibraryService } from "$lib/domains/projects/pipelines/services/blockLibraryService";
-import { executionService } from "$lib/domains/projects/pipelines/services/executionService";
-import { pipelineService } from "$lib/domains/projects/pipelines/services/pipelineService";
+import { logger } from '$lib/domains/shared';
+import { blockLibraryService } from '$lib/domains/projects/pipelines/services/blockLibraryService';
+import { executionService } from '$lib/domains/projects/pipelines/services/executionService';
+import { pipelineService } from '$lib/domains/projects/pipelines/services/pipelineService';
 import {
   scriptExecutionService,
   type ScriptExecutionInfo,
-} from "$lib/domains/scripts/services/scriptExecutionService";
+} from '$lib/domains/scripts/services/scriptExecutionService';
 import type {
   ExecutePipelineRequest,
   Pipeline,
   PipelineExecution,
-} from "$lib/domains/projects/pipelines/types";
+} from '$lib/domains/projects/pipelines/types';
 import type {
   AutomationStepInput,
   ResolveContext,
   ResolvePlanResult,
   ResolvedExecutionStep,
-} from "../utils/blockResolver";
+} from '../utils/blockResolver';
 import {
   buildExecutionPlan,
   materializePipelineSteps,
   pipelineVariablesToRecord,
-} from "../utils/blockResolver";
+} from '../utils/blockResolver';
 import {
   createAutomationContext,
   type AutomationContextOptions,
   type AutomationProjectRef,
-} from "../utils/automationContext";
-import {
-  normalizeStepRefs,
-  presets,
-  type AutomationStepRef,
-} from "../utils/stepRefs";
+} from '../utils/automationContext';
+import { normalizeStepRefs, presets, type AutomationStepRef } from '../utils/stepRefs';
 
-const log = logger.createScoped("AutomationExecutionService");
+const log = logger.createScoped('AutomationExecutionService');
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -81,7 +77,7 @@ export interface AutomationStepResult {
   name: string;
   command: string;
   blockId: string;
-  status: "success" | "failed" | "skipped";
+  status: 'success' | 'failed' | 'skipped';
   executionId?: string;
   exitCode?: number | null;
   output?: string;
@@ -102,18 +98,15 @@ export interface AutomationRunner {
   readonly cwd: string;
   resolve(
     blocks: AutomationStepRef[],
-    variables?: Record<string, string | number | boolean>,
+    variables?: Record<string, string | number | boolean>
   ): Promise<ResolvedExecutionStep[]>;
-  command(
-    blockId: string,
-    parameters?: Record<string, string | number | boolean>,
-  ): Promise<string>;
+  command(blockId: string, parameters?: Record<string, string | number | boolean>): Promise<string>;
   run(
     blocks: AutomationStepRef[],
     options?: {
       variables?: Record<string, string | number | boolean>;
       stopOnError?: boolean;
-    },
+    }
   ): Promise<AutomationRunResult>;
 }
 
@@ -137,9 +130,7 @@ class AutomationExecutionService {
     return blockLibraryService.getBlocks();
   }
 
-  async preview(
-    options: ResolveAutomationOptions,
-  ): Promise<AutomationPlanPreview> {
+  async preview(options: ResolveAutomationOptions): Promise<AutomationPlanPreview> {
     const blocks = await this.loadBlocks();
     const context = this.buildContext({
       cwd: options.cwd,
@@ -147,11 +138,7 @@ class AutomationExecutionService {
       secrets: options.secrets,
       project: options.project,
     });
-    const result = buildExecutionPlan(
-      normalizeStepRefs(options.blocks),
-      blocks,
-      context,
-    );
+    const result = buildExecutionPlan(normalizeStepRefs(options.blocks), blocks, context);
     return {
       ...result,
       ready: result.errors.length === 0 && result.steps.length > 0,
@@ -161,10 +148,10 @@ class AutomationExecutionService {
   async resolve(options: ResolveAutomationOptions): Promise<ResolvedExecutionStep[]> {
     const preview = await this.preview(options);
     if (!preview.ready) {
-      throw new Error(preview.errors.join("; "));
+      throw new Error(preview.errors.join('; '));
     }
     if (preview.warnings.length > 0) {
-      log.warn("Resolved with warnings", { warnings: preview.warnings });
+      log.warn('Resolved with warnings', { warnings: preview.warnings });
     }
     return preview.steps;
   }
@@ -192,7 +179,7 @@ class AutomationExecutionService {
           name: step.name,
           command: step.command,
           blockId: step.blockId,
-          status: "skipped",
+          status: 'skipped',
         });
         continue;
       }
@@ -206,26 +193,24 @@ class AutomationExecutionService {
         });
 
         const finished = await this.waitForExecution(executionId, step.longRunning);
-        const stepSuccess = finished.status === "success";
+        const stepSuccess = finished.status === 'success';
         const failureError = stepSuccess
           ? undefined
           : finished.error?.trim() ||
-            (finished.exitCode != null
-              ? `Exit code ${finished.exitCode}`
-              : undefined) ||
+            (finished.exitCode != null ? `Exit code ${finished.exitCode}` : undefined) ||
             finished.output
               ?.split(/\r?\n/)
               .map((l) => l.trim())
               .filter(Boolean)
               .slice(-6)
-              .join("\n") ||
+              .join('\n') ||
             `Execution ${finished.status}`;
 
         results.push({
           name: step.name,
           command: step.command,
           blockId: step.blockId,
-          status: stepSuccess ? "success" : "failed",
+          status: stepSuccess ? 'success' : 'failed',
           executionId,
           exitCode: finished.exitCode,
           output: finished.output,
@@ -242,7 +227,7 @@ class AutomationExecutionService {
           name: step.name,
           command: step.command,
           blockId: step.blockId,
-          status: "failed",
+          status: 'failed',
           error: error instanceof Error ? error.message : String(error),
         });
         if (stopOnError) break;
@@ -253,20 +238,18 @@ class AutomationExecutionService {
   }
 
   /** Directory-bound runner for integrations */
-  in(cwd: string, project?: RunAutomationOptions["project"]): AutomationRunner {
-    const service = this;
+  in(cwd: string, project?: RunAutomationOptions['project']): AutomationRunner {
     return {
       cwd,
-      resolve: (blocks, variables) =>
-        service.resolve({ cwd, blocks, variables, project }),
+      resolve: (blocks, variables) => this.resolve({ cwd, blocks, variables, project }),
       command: (blockId, parameters) =>
-        service.resolveBlockCommand(
+        this.resolveBlockCommand(
           blockId,
           parameters ?? {},
-          createAutomationContext({ cwd, project, variables: parameters }),
+          createAutomationContext({ cwd, project, variables: parameters })
         ),
       run: (blocks, opts) =>
-        service.run({
+        this.run({
           cwd,
           blocks,
           variables: opts?.variables,
@@ -276,9 +259,9 @@ class AutomationExecutionService {
     };
   }
 
-  forProject(
-    project: AutomationProjectRef,
-  ): AutomationRunner & { runAsPipeline: (blocks: AutomationStepRef[]) => Promise<AutomationRunResult> } {
+  forProject(project: AutomationProjectRef): AutomationRunner & {
+    runAsPipeline: (blocks: AutomationStepRef[]) => Promise<AutomationRunResult>;
+  } {
     const runner = this.in(project.path, project);
     return {
       ...runner,
@@ -295,7 +278,7 @@ class AutomationExecutionService {
   async resolveBlockCommand(
     blockId: string,
     parameters: Record<string, string | number | boolean> = {},
-    context: ResolveContext = {},
+    context: ResolveContext = {}
   ): Promise<string> {
     const blocks = await this.loadBlocks();
     const block = blocks.find((b) => b.id === blockId);
@@ -305,14 +288,14 @@ class AutomationExecutionService {
 
     const plan = buildExecutionPlan([{ blockId, parameters }], blocks, context);
     if (plan.errors.length > 0) {
-      throw new Error(plan.errors.join("; "));
+      throw new Error(plan.errors.join('; '));
     }
-    return plan.steps[0]?.command ?? "";
+    return plan.steps[0]?.command ?? '';
   }
 
   async ensurePipelineReady(
     pipeline: Pipeline,
-    runtimeVariables: Record<string, string> = {},
+    runtimeVariables: Record<string, string> = {}
   ): Promise<Pipeline> {
     const blocks = await this.loadBlocks();
     const context: ResolveContext = {
@@ -323,27 +306,21 @@ class AutomationExecutionService {
     };
 
     const needsResolution = pipeline.steps.some(
-      (s) => !(s.config as Record<string, unknown>)?.command,
+      (s) => !(s.config as Record<string, unknown>)?.command
     );
     if (!needsResolution) return pipeline;
 
-    const { steps, errors } = materializePipelineSteps(
-      pipeline.steps,
-      blocks,
-      context,
-    );
+    const { steps, errors } = materializePipelineSteps(pipeline.steps, blocks, context);
     if (errors.length > 0) {
-      throw new Error(`Cannot execute pipeline: ${errors.join("; ")}`);
+      throw new Error(`Cannot execute pipeline: ${errors.join('; ')}`);
     }
 
     return pipelineService.updatePipeline(pipeline.id, { steps });
   }
 
-  async executePipeline(
-    request: ExecutePipelineRequest,
-  ): Promise<PipelineExecution> {
+  async executePipeline(request: ExecutePipelineRequest): Promise<PipelineExecution> {
     const pipeline = await pipelineService.getPipeline(request.pipelineId);
-    if (!pipeline) throw new Error("Pipeline not found");
+    if (!pipeline) throw new Error('Pipeline not found');
     await this.ensurePipelineReady(pipeline, request.variables);
     return executionService.executePipeline(request);
   }
@@ -352,7 +329,7 @@ class AutomationExecutionService {
 
   private async waitForExecution(
     executionId: string,
-    longRunning = false,
+    longRunning = false
   ): Promise<ScriptExecutionInfo> {
     const pollMs = 500;
     const maxWait = longRunning ? undefined : 30 * 60 * 1000;
@@ -362,7 +339,7 @@ class AutomationExecutionService {
       const exec = await scriptExecutionService.getExecution(executionId);
       if (!exec) throw new Error(`Execution not found: ${executionId}`);
 
-      if (["success", "failed", "cancelled"].includes(exec.status)) {
+      if (['success', 'failed', 'cancelled'].includes(exec.status)) {
         return exec;
       }
 
@@ -375,30 +352,25 @@ class AutomationExecutionService {
   }
 }
 
-export const automationExecutionService =
-  AutomationExecutionService.getInstance();
+export const automationExecutionService = AutomationExecutionService.getInstance();
 
 /** Primary public API */
 export const automation = {
   /** Run blocks in any directory */
-  run: (options: RunAutomationOptions) =>
-    automationExecutionService.run(options),
+  run: (options: RunAutomationOptions) => automationExecutionService.run(options),
 
   /** Resolve blocks to commands without running */
-  resolve: (options: ResolveAutomationOptions) =>
-    automationExecutionService.resolve(options),
+  resolve: (options: ResolveAutomationOptions) => automationExecutionService.resolve(options),
 
   /** Preview plan with errors/warnings */
-  preview: (options: ResolveAutomationOptions) =>
-    automationExecutionService.preview(options),
+  preview: (options: ResolveAutomationOptions) => automationExecutionService.preview(options),
 
   /** Bind to a working directory */
-  in: (cwd: string, project?: RunAutomationOptions["project"]) =>
+  in: (cwd: string, project?: RunAutomationOptions['project']) =>
     automationExecutionService.in(cwd, project),
 
   /** Bind to a registered project */
-  forProject: (project: AutomationProjectRef) =>
-    automationExecutionService.forProject(project),
+  forProject: (project: AutomationProjectRef) => automationExecutionService.forProject(project),
 
   /** Common block sequences */
   presets,
@@ -409,4 +381,4 @@ export const automation = {
 
 // Legacy aliases
 export type RunBlockSequenceOptions = RunAutomationOptions;
-export type { AutomationStepRef } from "../utils/stepRefs";
+export type { AutomationStepRef } from '../utils/stepRefs';

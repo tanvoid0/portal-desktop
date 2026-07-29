@@ -1,6 +1,6 @@
 <!-- BaseResourceTable - Generic table component that works with any provider's resources -->
 <script lang="ts">
-  import type { ICloudResource, ResourceType } from "../../types";
+  import type { ICloudResource, ResourceType } from '../../types';
   import {
     Table,
     TableBody,
@@ -8,9 +8,9 @@
     TableHead,
     TableHeader,
     TableRow,
-  } from "$lib/components/ui/table";
-  import { Button } from "$lib/components/ui/button";
-  import { Inbox } from "@lucide/svelte";
+  } from '$lib/components/ui/table';
+  import { Button } from '$lib/components/ui/button';
+  import { Inbox } from '@lucide/svelte';
 
   interface Column {
     key: string;
@@ -37,14 +37,12 @@
     onResourceClick,
     onViewLogs,
     onDelete,
-    emptyMessage = "No resources found",
-    filteredEmptyMessage = "No resources match your filters",
+    emptyMessage = 'No resources found',
+    filteredEmptyMessage = 'No resources match your filters',
     isFiltered = false,
   }: Props = $props();
 
-  const displayEmptyMessage = $derived(
-    isFiltered ? filteredEmptyMessage : emptyMessage,
-  );
+  const displayEmptyMessage = $derived(isFiltered ? filteredEmptyMessage : emptyMessage);
 
   // Default columns if none provided
   const defaultColumns = $derived.by(() => {
@@ -52,107 +50,105 @@
 
     // Default columns based on resource type
     return [
-      { key: "name", label: "Name", width: "w-1/3" },
-      { key: "status", label: "Status", width: "w-1/8" },
-      { key: "namespace", label: "Namespace", width: "w-1/6" },
-      { key: "age", label: "Age", width: "w-1/6" },
-      { key: "actions", label: "Actions", width: "w-1/6" },
+      { key: 'name', label: 'Name', width: 'w-1/3' },
+      { key: 'status', label: 'Status', width: 'w-1/8' },
+      { key: 'namespace', label: 'Namespace', width: 'w-1/6' },
+      { key: 'age', label: 'Age', width: 'w-1/6' },
+      { key: 'actions', label: 'Actions', width: 'w-1/6' },
     ];
   });
 
   function getStatusColor(status: string): string {
     const statusLower = status.toLowerCase();
     switch (statusLower) {
-      case "running":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "succeeded":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-      case "failed":
-      case "error":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+      case 'running':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'succeeded':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'failed':
+      case 'error':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
     }
   }
 
   function getCellValue(resource: ICloudResource, key: string): string {
-    if (key === "name") return resource.name;
-    if (key === "status") return resource.status;
-    if (key === "namespace") return resource.namespace;
-    if (key === "age") return resource.metadata.age || "N/A";
-    if (key === "ready") return resource.metadata.ready || "N/A";
-    if (key === "restarts") return String(resource.metadata.restarts || 0);
-    if (key === "type") return resource.metadata.type || "N/A";
-    if (key === "clusterIP") return resource.metadata.clusterIP || "N/A";
-    if (key === "ports") {
+    if (key === 'name') return resource.name;
+    if (key === 'status') return resource.status;
+    if (key === 'namespace') return resource.namespace;
+    if (key === 'age') return resource.metadata.age || 'N/A';
+    if (key === 'ready') return resource.metadata.ready || 'N/A';
+    if (key === 'restarts') return String(resource.metadata.restarts || 0);
+    if (key === 'type') return resource.metadata.type || 'N/A';
+    if (key === 'clusterIP') return resource.metadata.clusterIP || 'N/A';
+    if (key === 'ports') {
       const ports = resource.metadata.ports;
       if (Array.isArray(ports) && ports.length > 0) {
         return ports
-          .map((p: any) => `${p.port}${p.targetPort ? `:${p.targetPort}` : ""}`)
-          .join(", ");
+          .map((p: any) => `${p.port}${p.targetPort ? `:${p.targetPort}` : ''}`)
+          .join(', ');
       }
-      return resource.metadata.ports || "N/A";
+      return resource.metadata.ports || 'N/A';
     }
-    if (key === "replicas") {
-      const replicas =
-        resource.metadata.replicas || resource.metadata.desired || 0;
-      const ready =
-        resource.metadata.readyReplicas || resource.metadata.ready || 0;
-      return replicas ? `${ready}/${replicas}` : "N/A";
+    if (key === 'replicas') {
+      const replicas = resource.metadata.replicas || resource.metadata.desired || 0;
+      const ready = resource.metadata.readyReplicas || resource.metadata.ready || 0;
+      return replicas ? `${ready}/${replicas}` : 'N/A';
     }
-    if (key === "desired") {
+    if (key === 'desired') {
       return String(resource.metadata.desired || 0);
     }
-    if (key === "current") {
+    if (key === 'current') {
       return String(resource.metadata.current || 0);
     }
-    if (key === "ready") {
+    if (key === 'ready') {
       return String(resource.metadata.ready || 0);
     }
-    if (key === "dataCount") {
+    if (key === 'dataCount') {
       return String(resource.metadata.dataCount || 0);
     }
-    if (key === "completions") {
+    if (key === 'completions') {
       return String(resource.metadata.completions || 0);
     }
-    if (key === "succeeded") {
+    if (key === 'succeeded') {
       return String(resource.metadata.succeeded || 0);
     }
-    if (key === "failed") {
+    if (key === 'failed') {
       return String(resource.metadata.failed || 0);
     }
-    if (key === "schedule") {
-      return resource.metadata.schedule || "N/A";
+    if (key === 'schedule') {
+      return resource.metadata.schedule || 'N/A';
     }
-    if (key === "suspend") {
-      return resource.metadata.suspend ? "Yes" : "No";
+    if (key === 'suspend') {
+      return resource.metadata.suspend ? 'Yes' : 'No';
     }
-    if (key === "active") {
+    if (key === 'active') {
       return String(resource.metadata.active || 0);
     }
-    if (key === "lastSchedule") {
-      return resource.metadata.last_schedule_time || "Never";
+    if (key === 'lastSchedule') {
+      return resource.metadata.last_schedule_time || 'Never';
     }
-    if (key === "class") {
-      return resource.metadata.class || "N/A";
+    if (key === 'class') {
+      return resource.metadata.class || 'N/A';
     }
-    if (key === "addresses") {
+    if (key === 'addresses') {
       const addrs = resource.metadata.addresses;
       if (Array.isArray(addrs) && addrs.length > 0) {
-        return addrs.join(", ");
+        return addrs.join(', ');
       }
-      return "N/A";
+      return 'N/A';
     }
-    if (key === "ports") {
+    if (key === 'ports') {
       const ports = resource.metadata.ports;
       if (Array.isArray(ports) && ports.length > 0) {
-        return ports.join(", ");
+        return ports.join(', ');
       }
-      return "N/A";
+      return 'N/A';
     }
-    return resource.metadata[key] || "";
+    return resource.metadata[key] || '';
   }
 </script>
 
@@ -184,11 +180,11 @@
           {#each defaultColumns as column}
             {@const value = getCellValue(resource, column.key)}
             <TableCell>
-              {#if column.key === "name"}
+              {#if column.key === 'name'}
                 <div class="flex items-center space-x-2">
                   <div
-                    class="h-2 w-2 rounded-full {resource.status ===
-                      'running' || resource.status === 'succeeded'
+                    class="h-2 w-2 rounded-full {resource.status === 'running' ||
+                    resource.status === 'succeeded'
                       ? 'bg-green-500'
                       : resource.status === 'pending'
                         ? 'bg-yellow-500'
@@ -196,15 +192,15 @@
                   ></div>
                   <span class="font-medium">{value}</span>
                 </div>
-              {:else if column.key === "status"}
+              {:else if column.key === 'status'}
                 <span
                   class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium {getStatusColor(
-                    value,
+                    value
                   )}"
                 >
                   {value}
                 </span>
-              {:else if column.key === "actions"}
+              {:else if column.key === 'actions'}
                 <div class="flex items-center space-x-1">
                   {#if onViewLogs && resource.getLogs}
                     <Button
@@ -216,12 +212,7 @@
                       }}
                       title="View Logs"
                     >
-                      <svg
-                        class="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
+                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           stroke-linecap="round"
                           stroke-linejoin="round"

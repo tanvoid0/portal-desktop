@@ -3,60 +3,60 @@
  * Values use the shadcn HSL token format: "H S% L%" (no hsl() wrapper).
  */
 
-import type { ThemeSettings } from "$lib/domains/settings/types";
+import type { ThemeSettings } from '$lib/domains/settings/types';
 
-const DEFAULT_THEME_ID = "default";
+const DEFAULT_THEME_ID = 'default';
 
 const DEFAULT_COLORS = {
-  primary: "#3b82f6",
-  secondary: "#64748b",
-  accent: "#f59e0b",
-  background: "#ffffff",
-  surface: "#f8fafc",
-  text: "#1e293b",
+  primary: '#3b82f6',
+  secondary: '#64748b',
+  accent: '#f59e0b',
+  background: '#ffffff',
+  surface: '#f8fafc',
+  text: '#1e293b',
 } as const;
 
 const MANAGED_CSS_VARS = [
-  "--primary",
-  "--primary-foreground",
-  "--secondary",
-  "--secondary-foreground",
-  "--accent",
-  "--accent-foreground",
-  "--background",
-  "--foreground",
-  "--card",
-  "--card-foreground",
-  "--muted",
-  "--muted-foreground",
-  "--popover",
-  "--popover-foreground",
-  "--border",
-  "--input",
-  "--ring",
-  "--radius",
-  "--gradient-from",
-  "--gradient-to",
-  "--card-gradient-from",
-  "--card-gradient-to",
+  '--primary',
+  '--primary-foreground',
+  '--secondary',
+  '--secondary-foreground',
+  '--accent',
+  '--accent-foreground',
+  '--background',
+  '--foreground',
+  '--card',
+  '--card-foreground',
+  '--muted',
+  '--muted-foreground',
+  '--popover',
+  '--popover-foreground',
+  '--border',
+  '--input',
+  '--ring',
+  '--radius',
+  '--gradient-from',
+  '--gradient-to',
+  '--card-gradient-from',
+  '--card-gradient-to',
 ] as const;
 
 /** Surface tokens — keep CSS `.dark` values in dark mode; only apply custom hex in light mode */
 const SURFACE_CSS_VARS = [
-  "--background",
-  "--foreground",
-  "--card",
-  "--card-foreground",
-  "--muted",
-  "--muted-foreground",
-  "--popover",
-  "--popover-foreground",
-  "--border",
-  "--input",
-  "--gradient-from",
-  "--gradient-to",
-  "--card-gradient-from",
-  "--card-gradient-to",
+  '--background',
+  '--foreground',
+  '--card',
+  '--card-foreground',
+  '--muted',
+  '--muted-foreground',
+  '--popover',
+  '--popover-foreground',
+  '--border',
+  '--input',
+  '--gradient-from',
+  '--gradient-to',
+  '--card-gradient-from',
+  '--card-gradient-to',
 ] as const;
 
 function clearSurfaceOverrides(html: HTMLElement): void {
@@ -66,25 +66,25 @@ function clearSurfaceOverrides(html: HTMLElement): void {
 }
 
 function ensureHex(hex: string | undefined | null, fallback: string): string {
-  return typeof hex === "string" && hex.length > 0 ? hex : fallback;
+  return typeof hex === 'string' && hex.length > 0 ? hex : fallback;
 }
 
 export function hexToHslComponents(hex: string | undefined | null): string {
-  if (typeof hex !== "string" || hex.length === 0) {
-    return "0 0% 50%";
+  if (typeof hex !== 'string' || hex.length === 0) {
+    return '0 0% 50%';
   }
 
-  const normalized = hex.replace(/^#/, "");
+  const normalized = hex.replace(/^#/, '');
   const expanded =
     normalized.length === 3
       ? normalized
-          .split("")
+          .split('')
           .map((c) => c + c)
-          .join("")
+          .join('')
       : normalized;
 
   if (expanded.length !== 6) {
-    return "0 0% 50%";
+    return '0 0% 50%';
   }
 
   const r = parseInt(expanded.slice(0, 2), 16) / 255;
@@ -118,13 +118,13 @@ export function hexToHslComponents(hex: string | undefined | null): string {
 
 function getRelativeLuminance(hex: string | undefined | null): number {
   const safeHex = ensureHex(hex, DEFAULT_COLORS.primary);
-  const normalized = safeHex.replace(/^#/, "");
+  const normalized = safeHex.replace(/^#/, '');
   const expanded =
     normalized.length === 3
       ? normalized
-          .split("")
+          .split('')
           .map((c) => c + c)
-          .join("")
+          .join('')
       : normalized;
 
   const channels = [
@@ -137,15 +137,13 @@ function getRelativeLuminance(hex: string | undefined | null): number {
 }
 
 function contrastingForeground(hex: string | undefined | null): string {
-  return getRelativeLuminance(hex) > 0.5 ? "0 0% 9%" : "0 0% 98%";
+  return getRelativeLuminance(hex) > 0.5 ? '0 0% 9%' : '0 0% 98%';
 }
 
 function resolveColors(settings: ThemeSettings) {
   const activeTheme = settings.activeTheme ?? DEFAULT_THEME_ID;
   if (activeTheme !== DEFAULT_THEME_ID) {
-    const custom = settings.customThemes?.find(
-      (theme) => theme.id === activeTheme,
-    );
+    const custom = settings.customThemes?.find((theme) => theme.id === activeTheme);
     if (custom) {
       return {
         primary: ensureHex(custom.colors.primary, DEFAULT_COLORS.primary),
@@ -186,7 +184,7 @@ function usesDefaultPalette(settings: ThemeSettings): boolean {
 }
 
 export function resetCustomTheme(): void {
-  if (typeof document === "undefined") return;
+  if (typeof document === 'undefined') return;
 
   const html = document.documentElement;
   for (const variable of MANAGED_CSS_VARS) {
@@ -195,7 +193,7 @@ export function resetCustomTheme(): void {
 }
 
 export function applyCustomTheme(settings: ThemeSettings): void {
-  if (typeof document === "undefined") return;
+  if (typeof document === 'undefined') return;
 
   if (usesDefaultPalette(settings)) {
     resetCustomTheme();
@@ -212,23 +210,14 @@ export function applyCustomTheme(settings: ThemeSettings): void {
   const foreground = hexToHslComponents(colors.text);
   const surface = hexToHslComponents(colors.surface);
 
-  html.style.setProperty("--primary", primary);
-  html.style.setProperty(
-    "--primary-foreground",
-    contrastingForeground(colors.primary),
-  );
-  html.style.setProperty("--secondary", secondary);
-  html.style.setProperty(
-    "--secondary-foreground",
-    contrastingForeground(colors.secondary),
-  );
-  html.style.setProperty("--accent", accent);
-  html.style.setProperty(
-    "--accent-foreground",
-    contrastingForeground(colors.accent),
-  );
+  html.style.setProperty('--primary', primary);
+  html.style.setProperty('--primary-foreground', contrastingForeground(colors.primary));
+  html.style.setProperty('--secondary', secondary);
+  html.style.setProperty('--secondary-foreground', contrastingForeground(colors.secondary));
+  html.style.setProperty('--accent', accent);
+  html.style.setProperty('--accent-foreground', contrastingForeground(colors.accent));
 
-  const isDark = html.classList.contains("dark");
+  const isDark = html.classList.contains('dark');
   if (isDark) {
     // Brand colors only — structural dark tokens come from app.css `.dark`
     clearSurfaceOverrides(html);
@@ -240,19 +229,16 @@ export function applyCustomTheme(settings: ThemeSettings): void {
   // palette's `secondary` turned every hairline into a solid dark outline.
   // Clear first so structural vars set by an earlier call are dropped.
   clearSurfaceOverrides(html);
-  html.style.setProperty("--background", background);
-  html.style.setProperty("--foreground", foreground);
-  html.style.setProperty("--card", surface);
-  html.style.setProperty("--card-foreground", foreground);
-  html.style.setProperty("--popover", surface);
-  html.style.setProperty("--popover-foreground", foreground);
-  html.style.setProperty("--ring", primary);
-  html.style.setProperty(
-    "--radius",
-    `${(settings.borderRadius ?? 8) / 16}rem`,
-  );
-  html.style.setProperty("--gradient-from", background);
-  html.style.setProperty("--gradient-to", surface);
-  html.style.setProperty("--card-gradient-from", surface);
-  html.style.setProperty("--card-gradient-to", background);
+  html.style.setProperty('--background', background);
+  html.style.setProperty('--foreground', foreground);
+  html.style.setProperty('--card', surface);
+  html.style.setProperty('--card-foreground', foreground);
+  html.style.setProperty('--popover', surface);
+  html.style.setProperty('--popover-foreground', foreground);
+  html.style.setProperty('--ring', primary);
+  html.style.setProperty('--radius', `${(settings.borderRadius ?? 8) / 16}rem`);
+  html.style.setProperty('--gradient-from', background);
+  html.style.setProperty('--gradient-to', surface);
+  html.style.setProperty('--card-gradient-from', surface);
+  html.style.setProperty('--card-gradient-to', background);
 }

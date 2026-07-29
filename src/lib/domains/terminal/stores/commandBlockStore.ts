@@ -2,10 +2,10 @@
  * Unified command block store — OSC 133 events, readonly captures, AI blocks.
  */
 
-import { writable, derived, get } from "svelte/store";
-import type { TerminalCommand } from "../types";
+import { writable, derived, get } from 'svelte/store';
+import type { TerminalCommand } from '../types';
 
-export type CommandBlockSource = "pty" | "readonly" | "ai";
+export type CommandBlockSource = 'pty' | 'readonly' | 'ai';
 
 export interface CapturedCommand {
   id: string;
@@ -19,7 +19,7 @@ export interface CapturedCommand {
   timestamp: string;
   isExpanded?: boolean;
   source: CommandBlockSource;
-  status?: "pending" | "running" | "completed" | "failed" | "paused";
+  status?: 'pending' | 'running' | 'completed' | 'failed' | 'paused';
 }
 
 interface CommandBlockState {
@@ -46,7 +46,7 @@ const initialState: CommandBlockState = {
  * writing rather than raising/lowering this number.
  */
 export const MAX_BLOCK_OUTPUT = 128 * 1024;
-export const TRUNCATION_NOTICE = "…[earlier output truncated]\n";
+export const TRUNCATION_NOTICE = '…[earlier output truncated]\n';
 /** How far past the cut point to look for a line boundary before hard-cutting. */
 const LINE_BOUNDARY_SCAN = 4096;
 
@@ -60,7 +60,7 @@ export function appendCapped(existing: string, content: string): string {
   // half — but only if one is close by. Scanning to an arbitrarily distant
   // newline would discard live output (or everything, for output that has no
   // newlines at all), so fall back to a hard cut.
-  const boundary = combined.indexOf("\n", excess);
+  const boundary = combined.indexOf('\n', excess);
   const kept =
     boundary !== -1 && boundary - excess <= LINE_BOUNDARY_SCAN
       ? combined.slice(boundary + 1)
@@ -87,11 +87,11 @@ function normalizeShellIntegrationEvent(raw: unknown): {
   process_id?: string;
 } | null {
   // Unit enum variants (e.g. PromptDetected) serialize as bare strings.
-  if (typeof raw === "string") return { type: raw, payload: {} };
-  if (!raw || typeof raw !== "object") return null;
+  if (typeof raw === 'string') return { type: raw, payload: {} };
+  if (!raw || typeof raw !== 'object') return null;
   const obj = raw as Record<string, unknown>;
 
-  if ("process_id" in obj && "event" in obj) {
+  if ('process_id' in obj && 'event' in obj) {
     const inner = normalizeShellIntegrationEvent(obj.event);
     if (!inner) return null;
     return {
@@ -101,7 +101,7 @@ function normalizeShellIntegrationEvent(raw: unknown): {
     };
   }
 
-  if (typeof obj.type === "string" && "payload" in obj) {
+  if (typeof obj.type === 'string' && 'payload' in obj) {
     return {
       type: obj.type,
       payload: (obj.payload as Record<string, unknown>) ?? {},
@@ -119,10 +119,7 @@ function normalizeShellIntegrationEvent(raw: unknown): {
 
 function createCommandBlockStore() {
   const { subscribe, set, update } = writable<CommandBlockState>(initialState);
-  const tabSubscribers = new Map<
-    string,
-    Set<(blocks: CapturedCommand[]) => void>
-  >();
+  const tabSubscribers = new Map<string, Set<(blocks: CapturedCommand[]) => void>>();
   const processToTab = new Map<string, string>();
   /** Processes whose shell emitted at least one OSC 133 event — for these,
    *  blocks are created by shell integration, not manually on submit. */
@@ -142,9 +139,7 @@ function createCommandBlockStore() {
       const existing = state.blocksByTab[tabId] ?? [];
       const idx = existing.findIndex((b) => b.id === block.id);
       const next =
-        idx === -1
-          ? [block, ...existing]
-          : existing.map((b, i) => (i === idx ? block : b));
+        idx === -1 ? [block, ...existing] : existing.map((b, i) => (i === idx ? block : b));
       const blocksByTab = { ...state.blocksByTab, [tabId]: next };
       notifyTab(tabId, next);
       return { ...state, blocksByTab };
@@ -152,7 +147,7 @@ function createCommandBlockStore() {
   }
 
   function resolveTabId(processId?: string): string {
-    if (!processId) return "global";
+    if (!processId) return 'global';
     return processToTab.get(processId) ?? processId;
   }
 
@@ -161,35 +156,28 @@ function createCommandBlockStore() {
     if (state.listenerStarted) return;
 
     try {
-      const { listen } = await import("@tauri-apps/api/event");
+      const { listen } = await import('@tauri-apps/api/event');
 
       const onEvent = (event: { payload: unknown }) => {
         const normalized = normalizeShellIntegrationEvent(event.payload);
         if (!normalized) return;
 
         const { type, payload } = normalized;
-        const scopedIdPrefix = normalized.process_id
-          ? `${normalized.process_id}:`
-          : "";
+        const scopedIdPrefix = normalized.process_id ? `${normalized.process_id}:` : '';
         const tabId = resolveTabId(normalized.process_id);
         if (normalized.process_id) {
           integrationActive.add(normalized.process_id);
         }
 
-        if (type === "CommandDetected") {
+        if (type === 'CommandDetected') {
           // Payload is the raw command string (unit enum variant).
-          const command =
-            typeof payload === "string" ? payload : String(payload ?? "");
+          const command = typeof payload === 'string' ? payload : String(payload ?? '');
           if (!command) return;
           update((state) => {
             const existing = state.blocksByTab[tabId] ?? [];
-            const idx = existing.findIndex(
-              (b) => b.status === "running" && b.source === "pty",
-            );
+            const idx = existing.findIndex((b) => b.status === 'running' && b.source === 'pty');
             if (idx === -1) return state;
-            const next = existing.map((b, i) =>
-              i === idx ? { ...b, command } : b,
-            );
+            const next = existing.map((b, i) => (i === idx ? { ...b, command } : b));
             notifyTab(tabId, next);
             return {
               ...state,
@@ -199,7 +187,7 @@ function createCommandBlockStore() {
           return;
         }
 
-        if (type === "CommandStarted" || type === "CommandStart") {
+        if (type === 'CommandStarted' || type === 'CommandStart') {
           const started = payload;
           if (!started?.id) return;
           // A manual block may exist for this same command (submitted before
@@ -210,11 +198,11 @@ function createCommandBlockStore() {
             const next = existing.filter(
               (b) =>
                 !(
-                  b.status === "running" &&
-                  b.source === "pty" &&
+                  b.status === 'running' &&
+                  b.source === 'pty' &&
                   b.processId === normalized.process_id &&
                   !b.id.startsWith(scopedIdPrefix)
-                ),
+                )
             );
             if (next.length === existing.length) return state;
             notifyTab(tabId, next);
@@ -227,8 +215,8 @@ function createCommandBlockStore() {
             id: `${scopedIdPrefix}${String(started.id)}`,
             tabId,
             processId: normalized.process_id,
-            command: String(started.command ?? ""),
-            output: "",
+            command: String(started.command ?? ''),
+            output: '',
             exitCode: undefined,
             duration: undefined,
             workingDirectory: started.working_directory
@@ -238,48 +226,41 @@ function createCommandBlockStore() {
                 : undefined,
             timestamp: parseDateMaybe(started.start_time ?? started.timestamp),
             isExpanded: true,
-            source: "pty",
-            status: "running",
+            source: 'pty',
+            status: 'running',
           });
         } else if (
-          type === "CommandCompleted" ||
-          type === "CommandEnd" ||
-          type === "CommandEndEvent"
+          type === 'CommandCompleted' ||
+          type === 'CommandEnd' ||
+          type === 'CommandEndEvent'
         ) {
           const completed = payload;
           if (!completed?.id) return;
-          const exitCode = toNumberMaybe(
-            completed.exit_code ?? completed.exitCode,
-          );
+          const exitCode = toNumberMaybe(completed.exit_code ?? completed.exitCode);
           upsertBlock(tabId, {
             id: `${scopedIdPrefix}${String(completed.id)}`,
             tabId,
             processId: normalized.process_id,
-            command: String(completed.command ?? ""),
-            output: String(completed.output ?? ""),
+            command: String(completed.command ?? ''),
+            output: String(completed.output ?? ''),
             exitCode,
-            duration: toNumberMaybe(
-              completed.duration ?? completed.durationMs,
-            ),
+            duration: toNumberMaybe(completed.duration ?? completed.durationMs),
             workingDirectory: completed.working_directory
               ? String(completed.working_directory)
               : completed.workingDirectory
                 ? String(completed.workingDirectory)
                 : undefined,
-            timestamp: parseDateMaybe(
-              completed.start_time ?? completed.timestamp,
-            ),
+            timestamp: parseDateMaybe(completed.start_time ?? completed.timestamp),
             isExpanded: true,
-            source: "pty",
-            status:
-              exitCode === 0 || exitCode === undefined ? "completed" : "failed",
+            source: 'pty',
+            status: exitCode === 0 || exitCode === undefined ? 'completed' : 'failed',
           });
         }
       };
 
       unsubs = [
-        (await listen("shell-integration-event-v2", onEvent)) as () => void,
-        (await listen("shell-integration-event", onEvent)) as () => void,
+        (await listen('shell-integration-event-v2', onEvent)) as () => void,
+        (await listen('shell-integration-event', onEvent)) as () => void,
       ];
       update((s) => ({ ...s, listenerStarted: true }));
     } catch {
@@ -299,10 +280,7 @@ function createCommandBlockStore() {
       return blocks[0] ?? null;
     },
 
-    subscribeToBlocks(
-      tabId: string,
-      callback: (blocks: CapturedCommand[]) => void,
-    ): () => void {
+    subscribeToBlocks(tabId: string, callback: (blocks: CapturedCommand[]) => void): () => void {
       if (!tabSubscribers.has(tabId)) {
         tabSubscribers.set(tabId, new Set());
       }
@@ -313,10 +291,10 @@ function createCommandBlockStore() {
 
     addBlock(
       tabId: string,
-      block: Omit<CapturedCommand, "id" | "tabId" | "timestamp"> & {
+      block: Omit<CapturedCommand, 'id' | 'tabId' | 'timestamp'> & {
         id?: string;
         timestamp?: string;
-      },
+      }
     ): string {
       const id = block.id ?? crypto.randomUUID();
       upsertBlock(tabId, {
@@ -331,7 +309,7 @@ function createCommandBlockStore() {
         timestamp: block.timestamp ?? new Date().toISOString(),
         isExpanded: block.isExpanded ?? true,
         source: block.source,
-        status: block.status ?? "running",
+        status: block.status ?? 'running',
       });
       return id;
     },
@@ -349,12 +327,10 @@ function createCommandBlockStore() {
       const tabId = resolveTabId(processId);
       update((state) => {
         const existing = state.blocksByTab[tabId] ?? [];
-        const idx = existing.findIndex(
-          (b) => b.status === "running" && b.source === "pty",
-        );
+        const idx = existing.findIndex((b) => b.status === 'running' && b.source === 'pty');
         if (idx === -1) return state;
         const next = existing.map((b, i) =>
-          i === idx ? { ...b, output: appendCapped(b.output, content) } : b,
+          i === idx ? { ...b, output: appendCapped(b.output, content) } : b
         );
         notifyTab(tabId, next);
         return {
@@ -368,7 +344,7 @@ function createCommandBlockStore() {
       update((state) => {
         const existing = state.blocksByTab[tabId] ?? [];
         const next = existing.map((b) =>
-          b.id === blockId ? { ...b, output: appendCapped(b.output, content) } : b,
+          b.id === blockId ? { ...b, output: appendCapped(b.output, content) } : b
         );
         notifyTab(tabId, next);
         return { ...state, blocksByTab: { ...state.blocksByTab, [tabId]: next } };
@@ -385,10 +361,10 @@ function createCommandBlockStore() {
                 exitCode,
                 status:
                   exitCode === 0 || exitCode === undefined
-                    ? ("completed" as const)
-                    : ("failed" as const),
+                    ? ('completed' as const)
+                    : ('failed' as const),
               }
-            : b,
+            : b
         );
         notifyTab(tabId, next);
         return { ...state, blocksByTab: { ...state.blocksByTab, [tabId]: next } };
@@ -397,21 +373,21 @@ function createCommandBlockStore() {
 
     captureReadonlyResult(
       tabId: string,
-      result: TerminalCommand | { command: string; output?: string; exitCode?: number },
+      result: TerminalCommand | { command: string; output?: string; exitCode?: number }
     ): string {
-      const output = "output" in result ? (result.output ?? "") : "";
+      const output = 'output' in result ? (result.output ?? '') : '';
       const exitCode =
-        "exitCode" in result && result.exitCode !== undefined
+        'exitCode' in result && result.exitCode !== undefined
           ? result.exitCode
-          : "status" in result && result.status === "failed"
+          : 'status' in result && result.status === 'failed'
             ? 1
             : 0;
       return this.addBlock(tabId, {
         command: result.command,
         output,
         exitCode,
-        source: "readonly",
-        status: exitCode === 0 ? "completed" : "failed",
+        source: 'readonly',
+        status: exitCode === 0 ? 'completed' : 'failed',
       });
     },
 
@@ -421,10 +397,7 @@ function createCommandBlockStore() {
         const processBlocks = state.blocksByTab[processId];
         if (!processBlocks?.length) return state;
         const tabBlocks = state.blocksByTab[tabId] ?? [];
-        const merged = [
-          ...processBlocks.map((b) => ({ ...b, tabId })),
-          ...tabBlocks,
-        ];
+        const merged = [...processBlocks.map((b) => ({ ...b, tabId })), ...tabBlocks];
         const blocksByTab = { ...state.blocksByTab, [tabId]: merged };
         delete blocksByTab[processId];
         notifyTab(tabId, merged);
@@ -460,5 +433,5 @@ export const commandBlockStore = createCommandBlockStore();
 
 export const blocksForActiveTab = (tabId: string) =>
   derived({ subscribe: commandBlockStore.subscribe }, () =>
-    commandBlockStore.getBlocksForTab(tabId),
+    commandBlockStore.getBlocksForTab(tabId)
   );

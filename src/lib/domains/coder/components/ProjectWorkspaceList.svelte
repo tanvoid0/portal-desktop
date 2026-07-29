@@ -1,22 +1,22 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
-  import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
-  import { Button } from "$lib/components/ui/button";
-  import { Skeleton } from "$lib/components/ui/skeleton/index.js";
-  import { FolderPlus, Loader2 } from "@lucide/svelte";
-  import { projectService } from "$lib/domains/projects";
-  import type { Project } from "$lib/domains/projects";
-  import ProjectWorkspaceSection from "./ProjectWorkspaceSection.svelte";
-  import { coderUi } from "../state/coderUi.svelte.js";
+  import { onMount } from 'svelte';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+  import { Button } from '$lib/components/ui/button';
+  import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+  import { FolderPlus, Loader2 } from '@lucide/svelte';
+  import { projectService } from '$lib/domains/projects';
+  import type { Project } from '$lib/domains/projects';
+  import ProjectWorkspaceSection from './ProjectWorkspaceSection.svelte';
+  import { coderUi } from '../state/coderUi.svelte.js';
   import {
     groupSessionsByProject,
     sortThreadsForWorkspace,
     filterAndSortSessions,
     type SessionListFilters,
     type SessionSortKey,
-  } from "../utils/sessionList.js";
-  import type { CoderThread } from "../types.js";
+  } from '../utils/sessionList.js';
+  import type { CoderThread } from '../types.js';
 
   interface Props {
     threads: CoderThread[];
@@ -81,7 +81,7 @@
 
   async function browseFolder() {
     const dir = await open({ directory: true, multiple: false });
-    if (typeof dir !== "string") return;
+    if (typeof dir !== 'string') return;
     const match = projects.find((p) => p.path === dir);
     if (match) {
       selectProject(match);
@@ -130,28 +130,17 @@
   function threadsForWorkspace(path: string, raw: CoderThread[]): CoderThread[] {
     const scopedFilters = {
       ...filters,
-      project: "all" as const,
+      project: 'all' as const,
     };
-    let scoped = filterAndSortSessions(
-      raw,
-      scopedFilters,
-      runningThreadIds,
-      queuedCountFor,
-    );
-    return sortThreadsForWorkspace(
-      scoped,
-      filters.sort as SessionSortKey,
-      runningThreadIds,
-    );
+    let scoped = filterAndSortSessions(raw, scopedFilters, runningThreadIds, queuedCountFor);
+    return sortThreadsForWorkspace(scoped, filters.sort as SessionSortKey, runningThreadIds);
   }
 
   const showLoading = $derived(loading && threads.length === 0 && projectsLoading);
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col">
-  <div
-    class="divider-edge-b divider-edge-full flex items-center justify-between gap-2 px-3 py-2"
-  >
+  <div class="divider-edge-b divider-edge-full flex items-center justify-between gap-2 px-3 py-2">
     <span class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
       Workspaces
     </span>
@@ -174,9 +163,15 @@
       <span class="truncate font-mono" title={importPath}>{importPath}</span>
       <div class="flex gap-1">
         <Button size="sm" class="h-6 text-xs" onclick={confirmImport} disabled={importing}>
-          {importing ? "Importing…" : "Import project"}
+          {importing ? 'Importing…' : 'Import project'}
         </Button>
-        <Button size="sm" variant="ghost" class="h-6 text-xs" onclick={cancelImport} disabled={importing}>
+        <Button
+          size="sm"
+          variant="ghost"
+          class="h-6 text-xs"
+          onclick={cancelImport}
+          disabled={importing}
+        >
           Cancel
         </Button>
       </div>
@@ -207,10 +202,9 @@
       {:else}
         {#each workspaces as workspace (workspace.path)}
           {@const isActive = workspace.path === coderUi.activeProjectPath}
-          {@const expanded =
-            coderUi.showAllWorkspaces
-              ? coderUi.isExpanded(workspace.path)
-              : isActive}
+          {@const expanded = coderUi.showAllWorkspaces
+            ? coderUi.isExpanded(workspace.path)
+            : isActive}
           {@const wsThreads = expanded
             ? threadsForWorkspace(workspace.path, workspace.threads)
             : []}

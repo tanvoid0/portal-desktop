@@ -115,8 +115,7 @@ class EventBusService {
         this.on(`${namespace}:${event}`, listener),
       once: <T = any>(event: string, listener: EventListener<T>) =>
         this.once(`${namespace}:${event}`, listener),
-      emit: <T = any>(event: string, data?: T) =>
-        this.emit(`${namespace}:${event}`, data),
+      emit: <T = any>(event: string, data?: T) => this.emit(`${namespace}:${event}`, data),
       off: (event: string) => this.off(`${namespace}:${event}`),
       removeListener: <T = any>(event: string, listener: EventListener<T>) =>
         this.removeListener(`${namespace}:${event}`, listener),
@@ -128,5 +127,4 @@ class EventBusService {
 export const eventBus = new EventBusService();
 
 // Export convenience functions
-export const createEventBus = (namespace: string) =>
-  eventBus.createScoped(namespace);
+export const createEventBus = (namespace: string) => eventBus.createScoped(namespace);

@@ -194,16 +194,16 @@ impl KubernetesManager {
 ```svelte
 <!-- src/lib/domains/kubernetes/components/ClusterBrowser.svelte -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/tauri";
-  import PodList from "./PodList.svelte";
-  import ResourceTree from "./ResourceTree.svelte";
-  import LogViewer from "./LogViewer.svelte";
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/tauri';
+  import PodList from './PodList.svelte';
+  import ResourceTree from './ResourceTree.svelte';
+  import LogViewer from './LogViewer.svelte';
 
   let clusters: KubernetesCluster[] = [];
   let selectedCluster: KubernetesCluster | null = null;
   let selectedPod: Pod | null = null;
-  let logs: string = "";
+  let logs: string = '';
 
   onMount(async () => {
     await loadClusters();
@@ -211,21 +211,21 @@ impl KubernetesManager {
 
   async function loadClusters() {
     try {
-      clusters = await invoke("k8s:list_clusters");
+      clusters = await invoke('k8s:list_clusters');
     } catch (error) {
-      console.error("Failed to load clusters:", error);
+      console.error('Failed to load clusters:', error);
     }
   }
 
   async function selectCluster(cluster: KubernetesCluster) {
     selectedCluster = cluster;
-    await invoke("k8s:connect_cluster", { clusterName: cluster.name });
+    await invoke('k8s:connect_cluster', { clusterName: cluster.name });
   }
 
   async function selectPod(pod: Pod) {
     selectedPod = pod;
     if (pod && selectedCluster) {
-      logs = await invoke("k8s:get_pod_logs", {
+      logs = await invoke('k8s:get_pod_logs', {
         namespace: pod.metadata.namespace,
         podName: pod.metadata.name,
       });
@@ -233,7 +233,7 @@ impl KubernetesManager {
   }
 
   async function portForward(pod: Pod, localPort: number, remotePort: number) {
-    await invoke("k8s:port_forward", {
+    await invoke('k8s:port_forward', {
       namespace: pod.metadata.namespace,
       podName: pod.metadata.name,
       localPort,
@@ -252,10 +252,7 @@ impl KubernetesManager {
         on:click={() => selectCluster(cluster)}
       >
         <div class="cluster-name">{cluster.name}</div>
-        <div
-          class="cluster-status"
-          class:connected={cluster.status === "Connected"}
-        >
+        <div class="cluster-status" class:connected={cluster.status === 'Connected'}>
           {cluster.status}
         </div>
       </div>
@@ -265,14 +262,8 @@ impl KubernetesManager {
   <div class="main-content">
     {#if selectedCluster}
       <div class="resource-browser">
-        <ResourceTree
-          {selectedCluster}
-          on:pod-selected={(e) => selectPod(e.detail)}
-        />
-        <PodList
-          {selectedCluster}
-          on:pod-selected={(e) => selectPod(e.detail)}
-        />
+        <ResourceTree {selectedCluster} on:pod-selected={(e) => selectPod(e.detail)} />
+        <PodList {selectedCluster} on:pod-selected={(e) => selectPod(e.detail)} />
       </div>
 
       {#if selectedPod}
@@ -282,9 +273,7 @@ impl KubernetesManager {
             <button on:click={() => portForward(selectedPod, 8080, 80)}>
               Port Forward 8080:80
             </button>
-            <button on:click={() => execIntoPod(selectedPod)}>
-              Exec into Pod
-            </button>
+            <button on:click={() => execIntoPod(selectedPod)}> Exec into Pod </button>
           </div>
         </div>
       {/if}
@@ -346,8 +335,8 @@ impl KubernetesManager {
 
 ```typescript
 // src-tauri/src/domains/kubernetes/kubernetes_service.ts
-import * as k8s from "@kubernetes/client-node";
-import { EventEmitter } from "events";
+import * as k8s from '@kubernetes/client-node';
+import { EventEmitter } from 'events';
 
 export class KubernetesService extends EventEmitter {
   private kubeConfig: k8s.KubeConfig;
@@ -362,39 +351,35 @@ export class KubernetesService extends EventEmitter {
     this.watch = new k8s.Watch(this.kubeConfig);
   }
 
-  async listPods(namespace: string = "default"): Promise<k8s.V1Pod[]> {
+  async listPods(namespace: string = 'default'): Promise<k8s.V1Pod[]> {
     try {
       const response = await this.k8sApi.listNamespacedPod(namespace);
       return response.body.items;
     } catch (error) {
-      console.error("Error listing pods:", error);
+      console.error('Error listing pods:', error);
       throw error;
     }
   }
 
-  async watchPods(namespace: string = "default"): Promise<void> {
+  async watchPods(namespace: string = 'default'): Promise<void> {
     const path = `/api/v1/namespaces/${namespace}/pods`;
 
     this.watch.watch(
       path,
       {},
       (type, obj) => {
-        this.emit("pod-event", { type, pod: obj });
+        this.emit('pod-event', { type, pod: obj });
       },
       (err) => {
         if (err) {
-          console.error("Watch error:", err);
-          this.emit("watch-error", err);
+          console.error('Watch error:', err);
+          this.emit('watch-error', err);
         }
-      },
+      }
     );
   }
 
-  async getPodLogs(
-    namespace: string,
-    podName: string,
-    container?: string,
-  ): Promise<string> {
+  async getPodLogs(namespace: string, podName: string, container?: string): Promise<string> {
     try {
       const response = await this.k8sApi.readNamespacedPodLog(
         podName,
@@ -407,23 +392,19 @@ export class KubernetesService extends EventEmitter {
         undefined, // timestamps
         undefined, // tailLines
         undefined, // limitBytes
-        undefined, // pretty
+        undefined // pretty
       );
       return response.body;
     } catch (error) {
-      console.error("Error getting pod logs:", error);
+      console.error('Error getting pod logs:', error);
       throw error;
     }
   }
 
-  async portForward(
-    namespace: string,
-    podName: string,
-    ports: number[],
-  ): Promise<void> {
+  async portForward(namespace: string, podName: string, ports: number[]): Promise<void> {
     const portForward = new k8s.PortForward(this.kubeConfig);
     await portForward.portForward(namespace, podName, ports, (data) => {
-      this.emit("port-forward-data", data);
+      this.emit('port-forward-data', data);
     });
   }
 }
@@ -456,11 +437,11 @@ export class KubernetesService extends EventEmitter {
 
 ```ts
 // backend.ts
-import pty from "node-pty";
+import pty from 'node-pty';
 
-const shell = process.env.SHELL || "bash"; // or 'pwsh.exe' on Windows
+const shell = process.env.SHELL || 'bash'; // or 'pwsh.exe' on Windows
 const p = pty.spawn(shell, [], {
-  name: "xterm-256color",
+  name: 'xterm-256color',
   cols: 120,
   rows: 30,
   cwd: process.cwd(),
@@ -469,23 +450,23 @@ const p = pty.spawn(shell, [], {
 
 // Stream PTY → UI
 p.onData((data) => {
-  tauri.emit("term:data", data); // whatever IPC you use
+  tauri.emit('term:data', data); // whatever IPC you use
   interceptBuffer.feed(data); // optional: for parsing/prompts
 });
 
 // UI → PTY
-tauri.listen("term:input", (evt) => {
+tauri.listen('term:input', (evt) => {
   p.write(evt.payload as string);
 });
 
 // Resize
-tauri.listen("term:resize", ({ payload: { cols, rows } }) => {
+tauri.listen('term:resize', ({ payload: { cols, rows } }) => {
   p.resize(cols, rows);
 });
 
 // Clean up
 p.onExit((code) => {
-  tauri.emit("term:exit", code);
+  tauri.emit('term:exit', code);
 });
 ```
 

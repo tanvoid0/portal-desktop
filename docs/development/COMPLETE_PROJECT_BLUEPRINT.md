@@ -65,11 +65,11 @@ src/lib/domains/
 
 ```typescript
 // ✅ CORRECT - Use domain imports
-import { getProjects } from "$lib/domains/projects";
-import { logger } from "$lib/domains/shared";
+import { getProjects } from '$lib/domains/projects';
+import { logger } from '$lib/domains/shared';
 
 // ❌ WRONG - No relative imports
-import { getProjects } from "../../utils/dataLoader";
+import { getProjects } from '../../utils/dataLoader';
 ```
 
 ### 3. Svelte 5 Runes (From Day One)
@@ -125,9 +125,9 @@ export const logger = {
 };
 
 // Usage
-logger.info("User created project", {
-  context: "ProjectService",
-  data: { projectId: "123" },
+logger.info('User created project', {
+  context: 'ProjectService',
+  data: { projectId: '123' },
 });
 ```
 
@@ -135,18 +135,14 @@ logger.info("User created project", {
 
 ```typescript
 // src/utils/tauriUtils.ts
-export async function smartBackendCall<T>(
-  command: string,
-  args?: any,
-  fallback?: T,
-): Promise<T> {
+export async function smartBackendCall<T>(command: string, args?: any, fallback?: T): Promise<T> {
   if (isTauriAvailable()) {
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
+      const { invoke } = await import('@tauri-apps/api/core');
       return await invoke<T>(command, args);
     } catch (error) {
       logger.warn(`Tauri IPC failed for ${command}`, {
-        context: "TauriUtils",
+        context: 'TauriUtils',
         error,
       });
     }
@@ -173,15 +169,15 @@ class ProjectService {
 
   async getProjects(): Promise<Project[]> {
     try {
-      const projects = await smartBackendCall<Project[]>("get_projects");
-      logger.info("Projects loaded", {
-        context: "ProjectService",
+      const projects = await smartBackendCall<Project[]>('get_projects');
+      logger.info('Projects loaded', {
+        context: 'ProjectService',
         data: { count: projects.length },
       });
       return projects;
     } catch (error) {
-      logger.error("Failed to load projects", {
-        context: "ProjectService",
+      logger.error('Failed to load projects', {
+        context: 'ProjectService',
         error,
       });
       throw error;
@@ -196,21 +192,15 @@ export const projectService = ProjectService.getInstance();
 
 ```typescript
 // src/lib/domains/projects/stores/projectStore.ts
-import { writable, derived } from "svelte/store";
-import { createLoadingState } from "../../shared/stores/loadingState";
-import { projectService } from "../services/projectService";
+import { writable, derived } from 'svelte/store';
+import { createLoadingState } from '../../shared/stores/loadingState';
+import { projectService } from '../services/projectService';
 
 export const projects = writable<Project[]>([]);
 export const projectsLoading = createLoadingState();
 
-export const isLoading = derived(
-  projectsLoading,
-  ($loading) => $loading.isLoading,
-);
-export const hasError = derived(
-  projectsLoading,
-  ($loading) => $loading.hasError,
-);
+export const isLoading = derived(projectsLoading, ($loading) => $loading.isLoading);
+export const hasError = derived(projectsLoading, ($loading) => $loading.hasError);
 
 export const projectActions = {
   async loadProjects(): Promise<void> {
@@ -219,9 +209,7 @@ export const projectActions = {
       const projectsData = await projectService.getProjects();
       projects.set(projectsData);
     } catch (error) {
-      projectsLoading.setError(
-        error instanceof Error ? error.message : "Failed to load projects",
-      );
+      projectsLoading.setError(error instanceof Error ? error.message : 'Failed to load projects');
     } finally {
       projectsLoading.setLoading(false);
     }
@@ -236,26 +224,20 @@ export const projectActions = {
 ```svelte
 <!-- src/lib/components/ui/Button.svelte -->
 <script lang="ts">
-  import { cn } from "$lib/utils/cn";
+  import { cn } from '$lib/utils/cn';
 
   interface Props {
-    variant?:
-      | "default"
-      | "destructive"
-      | "outline"
-      | "secondary"
-      | "ghost"
-      | "link";
-    size?: "default" | "sm" | "lg" | "icon";
+    variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+    size?: 'default' | 'sm' | 'lg' | 'icon';
     className?: string;
     children?: () => any;
     [key: string]: any;
   }
 
   const {
-    variant = "default",
-    size = "default",
-    className = "",
+    variant = 'default',
+    size = 'default',
+    className = '',
     children,
     ...rest
   }: Props = $props();
@@ -263,28 +245,25 @@ export const projectActions = {
 
 <button
   class={cn(
-    "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-    "disabled:pointer-events-none disabled:opacity-50",
+    'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+    'disabled:pointer-events-none disabled:opacity-50',
     {
-      "bg-primary text-primary-foreground hover:bg-primary/90":
-        variant === "default",
-      "bg-destructive text-destructive-foreground hover:bg-destructive/90":
-        variant === "destructive",
-      "border border-input bg-background hover:bg-accent":
-        variant === "outline",
-      "bg-secondary text-secondary-foreground hover:bg-secondary/80":
-        variant === "secondary",
-      "hover:bg-accent hover:text-accent-foreground": variant === "ghost",
-      "text-primary underline-offset-4 hover:underline": variant === "link",
+      'bg-primary text-primary-foreground hover:bg-primary/90': variant === 'default',
+      'bg-destructive text-destructive-foreground hover:bg-destructive/90':
+        variant === 'destructive',
+      'border border-input bg-background hover:bg-accent': variant === 'outline',
+      'bg-secondary text-secondary-foreground hover:bg-secondary/80': variant === 'secondary',
+      'hover:bg-accent hover:text-accent-foreground': variant === 'ghost',
+      'text-primary underline-offset-4 hover:underline': variant === 'link',
     },
     {
-      "h-10 px-4 py-2": size === "default",
-      "h-9 rounded-md px-3": size === "sm",
-      "h-11 rounded-md px-8": size === "lg",
-      "h-10 w-10": size === "icon",
+      'h-10 px-4 py-2': size === 'default',
+      'h-9 rounded-md px-3': size === 'sm',
+      'h-11 rounded-md px-8': size === 'lg',
+      'h-10 w-10': size === 'icon',
     },
-    className,
+    className
   )}
   {...rest}
 >
@@ -311,7 +290,7 @@ export const projectActions = {
 
 <!-- Parent usage -->
 <MyComponent
-  onSave={(data) => logger.info("Form saved", { context: "Parent", data })}
+  onSave={(data) => logger.info('Form saved', { context: 'Parent', data })}
   onCancel={() => setModalOpen(false)}
 />
 ```
@@ -466,50 +445,50 @@ my-app/
 ### 2. tailwind.config.js
 
 ```javascript
-import { fontFamily } from "tailwindcss/defaultTheme";
+import { fontFamily } from 'tailwindcss/defaultTheme';
 
 export default {
-  content: ["./src/**/*.{html,js,svelte,ts}"],
-  darkMode: "class",
+  content: ['./src/**/*.{html,js,svelte,ts}'],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", ...fontFamily.sans],
-        mono: ["JetBrains Mono", ...fontFamily.mono],
+        sans: ['Inter', ...fontFamily.sans],
+        mono: ['JetBrains Mono', ...fontFamily.mono],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
         },
       },
     },
@@ -546,12 +525,12 @@ export default {
 
 ```typescript
 // ❌ NEVER DO THIS
-console.log("Debug message");
-console.error("Error occurred");
+console.log('Debug message');
+console.error('Error occurred');
 
 // ✅ ALWAYS DO THIS
-logger.info("Debug message", { context: "MyComponent" });
-logger.error("Error occurred", { context: "MyComponent", error });
+logger.info('Debug message', { context: 'MyComponent' });
+logger.error('Error occurred', { context: 'MyComponent', error });
 ```
 
 ### 2. Raw HTML Components
@@ -570,12 +549,12 @@ logger.error("Error occurred", { context: "MyComponent", error });
 
 ```typescript
 // ❌ NEVER DO THIS
-import { getProjects } from "../../utils/dataLoader";
-import { logger } from "../../../shared/logger";
+import { getProjects } from '../../utils/dataLoader';
+import { logger } from '../../../shared/logger';
 
 // ✅ ALWAYS DO THIS
-import { getProjects } from "$lib/domains/projects";
-import { logger } from "$lib/domains/shared";
+import { getProjects } from '$lib/domains/projects';
+import { logger } from '$lib/domains/shared';
 ```
 
 ### 4. Old Svelte Patterns

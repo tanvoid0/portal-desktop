@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { Input } from "$lib/components/ui/input";
-  import { Button } from "$lib/components/ui/button";
-  import { Search, X } from "@lucide/svelte";
-  import { commandHistoryStore } from "../stores/commandHistoryStore";
+  import { Input } from '$lib/components/ui/input';
+  import { Button } from '$lib/components/ui/button';
+  import { Search, X } from '@lucide/svelte';
+  import { commandHistoryStore } from '../stores/commandHistoryStore';
 
-  export const tabId: string = "";
+  export const tabId: string = '';
 
-  let searchQuery = "";
+  let searchQuery = '';
   let isSearching = false;
 
   function handleSearch() {
@@ -19,15 +19,15 @@
   }
 
   function clearSearch() {
-    searchQuery = "";
+    searchQuery = '';
     isSearching = false;
-    commandHistoryStore.setSearchQuery("");
+    commandHistoryStore.setSearchQuery('');
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter") {
+    if (event.key === 'Enter') {
       handleSearch();
-    } else if (event.key === "Escape") {
+    } else if (event.key === 'Escape') {
       clearSearch();
     }
   }
@@ -57,12 +57,7 @@
       {/if}
     </div>
 
-    <Button
-      variant="outline"
-      size="sm"
-      onclick={handleSearch}
-      disabled={!searchQuery.trim()}
-    >
+    <Button variant="outline" size="sm" onclick={handleSearch} disabled={!searchQuery.trim()}>
       Search
     </Button>
 

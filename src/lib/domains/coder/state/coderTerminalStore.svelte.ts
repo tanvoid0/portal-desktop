@@ -3,8 +3,8 @@
  * Lightweight — no full TerminalWorkspace chrome; backs the session dock.
  */
 
-export type CoderTerminalKind = "interactive" | "oneshot";
-export type CoderTerminalOwner = "user" | "agent";
+export type CoderTerminalKind = 'interactive' | 'oneshot';
+export type CoderTerminalOwner = 'user' | 'agent';
 
 export interface CoderTerminalTab {
   id: string;
@@ -16,14 +16,14 @@ export interface CoderTerminalTab {
   createdAt: string;
 }
 
-const STORAGE_KEY = "portal-coder-terminals-v1";
+const STORAGE_KEY = 'portal-coder-terminals-v1';
 
 function storageKey(threadId: string): string {
   return `${STORAGE_KEY}:${threadId}`;
 }
 
 function loadTabs(threadId: string): CoderTerminalTab[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(storageKey(threadId));
     if (!raw) return [];
@@ -34,7 +34,7 @@ function loadTabs(threadId: string): CoderTerminalTab[] {
 }
 
 function saveTabs(threadId: string, tabs: CoderTerminalTab[]) {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(storageKey(threadId), JSON.stringify(tabs));
   } catch {
@@ -99,7 +99,7 @@ class CoderTerminalStoreState {
       kind?: CoderTerminalKind;
       id?: string;
       label?: string;
-    },
+    }
   ): CoderTerminalTab {
     this.ensureLoaded(threadId);
     const tabs = this.tabsByThread[threadId] ?? [];
@@ -109,8 +109,8 @@ class CoderTerminalStoreState {
       id,
       label: opts.label ?? `Terminal ${n}`,
       tabId: coderTerminalTabId(threadId, id),
-      kind: opts.kind ?? "interactive",
-      createdBy: opts.createdBy ?? "user",
+      kind: opts.kind ?? 'interactive',
+      createdBy: opts.createdBy ?? 'user',
       running: false,
       createdAt: new Date().toISOString(),
     };
@@ -124,9 +124,9 @@ class CoderTerminalStoreState {
   /** First interactive tab, or create one. Call from $effect / handlers only. */
   ensureDefault(threadId: string, workspaceRoot: string): CoderTerminalTab {
     const tabs = this.peekTabs(threadId);
-    const existing = tabs.find((t) => t.kind === "interactive");
+    const existing = tabs.find((t) => t.kind === 'interactive');
     if (existing) return existing;
-    return this.createTab(threadId, { workspaceRoot, createdBy: "user" });
+    return this.createTab(threadId, { workspaceRoot, createdBy: 'user' });
   }
 
   setRunning(threadId: string, terminalId: string, running: boolean) {
@@ -143,13 +143,11 @@ class CoderTerminalStoreState {
 
   removeTab(threadId: string, terminalId: string) {
     this.ensureLoaded(threadId);
-    const tabs = (this.tabsByThread[threadId] ?? []).filter(
-      (t) => t.id !== terminalId,
-    );
+    const tabs = (this.tabsByThread[threadId] ?? []).filter((t) => t.id !== terminalId);
     this.tabsByThread[threadId] = tabs;
     saveTabs(threadId, tabs);
     if (this.activeByThread[threadId] === terminalId) {
-      this.activeByThread[threadId] = tabs[0]?.id ?? "";
+      this.activeByThread[threadId] = tabs[0]?.id ?? '';
     }
     this.bump();
   }
@@ -166,7 +164,7 @@ class CoderTerminalStoreState {
   clearThread(threadId: string) {
     delete this.tabsByThread[threadId];
     delete this.activeByThread[threadId];
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       localStorage.removeItem(storageKey(threadId));
     }
     this.bump();

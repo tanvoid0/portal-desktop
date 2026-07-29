@@ -1,5 +1,5 @@
 <script lang="ts">
-  import UtilitiesPage from "$lib/domains/automation/components/UtilitiesPage.svelte";
+  import UtilitiesPage from '$lib/domains/automation/components/UtilitiesPage.svelte';
 </script>
 
 <svelte:head>

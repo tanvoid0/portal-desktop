@@ -8,9 +8,7 @@
 <div class="rounded-lg border bg-blue-50 p-4">
   <div class="flex items-center gap-4">
     {#if showSpinner}
-      <div
-        class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"
-      ></div>
+      <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"></div>
     {/if}
     <div class="flex-1">
       <div class="font-medium">{title}</div>

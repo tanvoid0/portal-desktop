@@ -1,14 +1,10 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import {
-    PageHeader,
-    PageLoading,
-    PageEmpty,
-  } from "$lib/components/shell";
-  import { Button } from "$lib/components/ui/button";
-  import { RefreshCw } from "@lucide/svelte";
-  import { cloudStore } from "$lib/domains/cloud/stores";
-  import type { ResourceType } from "$lib/domains/cloud/core/types";
+  import type { Snippet } from 'svelte';
+  import { PageHeader, PageLoading, PageEmpty } from '$lib/components/shell';
+  import { Button } from '$lib/components/ui/button';
+  import { RefreshCw } from '@lucide/svelte';
+  import { cloudStore } from '$lib/domains/cloud/stores';
+  import type { ResourceType } from '$lib/domains/cloud/core/types';
 
   interface Props {
     title: string;
@@ -30,8 +26,8 @@
     resourceType,
     isLoading = false,
     itemCount = 0,
-    emptyTitle = "No resources found",
-    emptyDescription = "Connect to a cluster to load resources",
+    emptyTitle = 'No resources found',
+    emptyDescription = 'Connect to a cluster to load resources',
     onRefresh,
     children,
     filters,

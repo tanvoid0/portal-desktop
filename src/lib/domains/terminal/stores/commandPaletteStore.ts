@@ -3,11 +3,8 @@
  * Manages command palette state and actions
  */
 
-import { writable } from "svelte/store";
-import {
-  commandHistoryStore,
-  type CommandHistoryEntry,
-} from "./commandHistoryStore";
+import { writable } from 'svelte/store';
+import { commandHistoryStore, type CommandHistoryEntry } from './commandHistoryStore';
 
 export interface CommandPaletteAction {
   id: string;
@@ -28,15 +25,14 @@ export interface CommandPaletteState {
 
 const initialState: CommandPaletteState = {
   isOpen: false,
-  query: "",
+  query: '',
   selectedIndex: 0,
   actions: [],
   filteredActions: [],
 };
 
 function createCommandPaletteStore() {
-  const { subscribe, set, update } =
-    writable<CommandPaletteState>(initialState);
+  const { subscribe, set, update } = writable<CommandPaletteState>(initialState);
 
   return {
     subscribe,
@@ -45,7 +41,7 @@ function createCommandPaletteStore() {
       update((state) => ({
         ...state,
         isOpen: true,
-        query: "",
+        query: '',
         selectedIndex: 0,
       }));
     },
@@ -54,7 +50,7 @@ function createCommandPaletteStore() {
       update((state) => ({
         ...state,
         isOpen: false,
-        query: "",
+        query: '',
         selectedIndex: 0,
       }));
     },
@@ -65,9 +61,7 @@ function createCommandPaletteStore() {
           (action) =>
             action.label.toLowerCase().includes(query.toLowerCase()) ||
             action.description.toLowerCase().includes(query.toLowerCase()) ||
-            action.keywords.some((keyword) =>
-              keyword.toLowerCase().includes(query.toLowerCase()),
-            ),
+            action.keywords.some((keyword) => keyword.toLowerCase().includes(query.toLowerCase()))
         );
 
         return {
@@ -82,20 +76,14 @@ function createCommandPaletteStore() {
     setSelectedIndex: (index: number) => {
       update((state) => ({
         ...state,
-        selectedIndex: Math.max(
-          0,
-          Math.min(index, state.filteredActions.length - 1),
-        ),
+        selectedIndex: Math.max(0, Math.min(index, state.filteredActions.length - 1)),
       }));
     },
 
     selectNext: () => {
       update((state) => ({
         ...state,
-        selectedIndex: Math.min(
-          state.selectedIndex + 1,
-          state.filteredActions.length - 1,
-        ),
+        selectedIndex: Math.min(state.selectedIndex + 1, state.filteredActions.length - 1),
       }));
     },
 
@@ -115,7 +103,7 @@ function createCommandPaletteStore() {
         return {
           ...state,
           isOpen: false,
-          query: "",
+          query: '',
           selectedIndex: 0,
         };
       });
@@ -141,9 +129,7 @@ function createCommandPaletteStore() {
       update((state) => ({
         ...state,
         actions: state.actions.filter((action) => action.id !== actionId),
-        filteredActions: state.filteredActions.filter(
-          (action) => action.id !== actionId,
-        ),
+        filteredActions: state.filteredActions.filter((action) => action.id !== actionId),
       }));
     },
   };

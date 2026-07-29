@@ -1,44 +1,29 @@
 <!-- ConfigMap Detail Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { goto, replaceState } from "$app/navigation";
-  import { cloudStore, loadResources } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { ArrowLeft, RefreshCw, FileCode, Trash2 } from "@lucide/svelte";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import Loading from "$lib/components/ui/loading.svelte";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { toastActions } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import YamlEditor from "$lib/domains/cloud/components/YamlEditor.svelte";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto, replaceState } from '$app/navigation';
+  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { ArrowLeft, RefreshCw, FileCode, Trash2 } from '@lucide/svelte';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import Loading from '$lib/components/ui/loading.svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { toastActions } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
 
   const configMapName = $derived($page.params.configmap);
   const namespace = $derived(
-    $page.url.searchParams.get("namespace") ||
-      $cloudStore.selectedNamespace ||
-      "default",
+    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get("tab") || "overview");
+  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
 
-  let activeTab = $state("overview");
+  let activeTab = $state('overview');
 
   // Sync activeTab with tabParam when it changes
   $effect(() => {
@@ -49,26 +34,26 @@
   let error = $state<string | null>(null);
 
   // YAML state
-  let yaml = $state("");
+  let yaml = $state('');
   let yamlLoading = $state(false);
   let yamlError = $state<string | null>(null);
 
   onMount(async () => {
     await loadConfigMap();
-    if (activeTab === "yaml") {
+    if (activeTab === 'yaml') {
       await loadYAML();
     }
   });
 
   $effect(() => {
-    if (activeTab === "yaml" && !yaml && !yamlLoading && configMap) {
+    if (activeTab === 'yaml' && !yaml && !yamlLoading && configMap) {
       loadYAML();
     }
   });
 
   async function loadConfigMap() {
     if (!configMapName || !$cloudStore.connection.isConnected) {
-      error = "ConfigMap name or connection required";
+      error = 'ConfigMap name or connection required';
       isLoading = false;
       return;
     }
@@ -85,8 +70,8 @@
         error = `ConfigMap "${configMapName}" not found in namespace "${namespace}".`;
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load ConfigMap";
-      console.error("Failed to load ConfigMap:", err);
+      error = err instanceof Error ? err.message : 'Failed to load ConfigMap';
+      console.error('Failed to load ConfigMap:', err);
     } finally {
       isLoading = false;
     }
@@ -99,14 +84,18 @@
       yamlLoading = true;
       yamlError = null;
 
-      const yamlContent = await k8sResourceService.getResourceYaml("ConfigMap", configMap.namespace, configMap.name);
+      const yamlContent = await k8sResourceService.getResourceYaml(
+        'ConfigMap',
+        configMap.namespace,
+        configMap.name
+      );
 
       // Convert JSON to YAML (basic conversion)
       // For now, we'll use JSON pretty-printed
       yaml = yamlContent;
     } catch (err) {
-      yamlError = err instanceof Error ? err.message : "Failed to load YAML";
-      console.error("Failed to load YAML:", err);
+      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
+      console.error('Failed to load YAML:', err);
     } finally {
       yamlLoading = false;
     }
@@ -124,8 +113,7 @@
       await loadConfigMap();
       await loadYAML();
     } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to apply YAML";
+      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
       toastActions.error(errorMsg);
       throw err;
     }
@@ -136,28 +124,24 @@
 
     const confirmed = await confirmAction(
       `Are you sure you want to delete ConfigMap "${configMap.name}"? This action cannot be undone.`,
-      "Delete config map",
+      'Delete config map'
     );
     if (!confirmed) return;
 
     try {
       await k8sResourceService.deleteConfigmap(configMap.namespace, configMap.name);
 
-      toastActions.success(
-        `ConfigMap "${configMap.name}" deleted successfully`,
-      );
-      goto("/cloud/configmaps");
+      toastActions.success(`ConfigMap "${configMap.name}" deleted successfully`);
+      goto('/cloud/configmaps');
     } catch (err) {
-      toastActions.error(
-        err instanceof Error ? err.message : "Failed to delete ConfigMap",
-      );
+      toastActions.error(err instanceof Error ? err.message : 'Failed to delete ConfigMap');
     }
   }
 
   function handleTabChange(tab: string) {
     activeTab = tab;
     const url = new URL($page.url);
-    url.searchParams.set("tab", tab);
+    url.searchParams.set('tab', tab);
     replaceState(url, {});
   }
 
@@ -171,11 +155,7 @@
   {#if isLoading}
     <PageLoading message="Loading configmap..." />
   {:else if error}
-    <PageError
-      title="Failed to load configmap"
-      message={error}
-      onRetry={loadConfigMap}
-    />
+    <PageError title="Failed to load configmap" message={error} onRetry={loadConfigMap} />
   {:else if configMap}
     <div class="flex items-center justify-between">
       <div>
@@ -191,11 +171,7 @@
           <Trash2 class="mr-2 h-4 w-4" />
           Delete
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={() => goto("/cloud/configmaps")}
-        >
+        <Button variant="outline" size="sm" onclick={() => goto('/cloud/configmaps')}>
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back to ConfigMaps
         </Button>
@@ -232,7 +208,7 @@
               </div>
               <div>
                 <p class="text-sm text-muted-foreground">Age</p>
-                <p class="font-medium">{configMap.metadata?.age || "N/A"}</p>
+                <p class="font-medium">{configMap.metadata?.age || 'N/A'}</p>
               </div>
             </CardContent>
           </Card>
@@ -276,7 +252,7 @@
                         size="sm"
                         onclick={() => {
                           navigator.clipboard.writeText(String(value));
-                          toastActions.success("Value copied to clipboard");
+                          toastActions.success('Value copied to clipboard');
                         }}
                       >
                         Copy
@@ -299,9 +275,7 @@
             <Loading text="Loading YAML..." />
           </div>
         {:else if yamlError}
-          <div
-            class="flex h-[600px] items-center justify-center text-center text-destructive"
-          >
+          <div class="flex h-[600px] items-center justify-center text-center text-destructive">
             <p>{yamlError}</p>
           </div>
         {:else if yaml}
@@ -313,9 +287,7 @@
             namespace={configMap.namespace}
           />
         {:else}
-          <div
-            class="flex h-[600px] items-center justify-center text-center text-muted-foreground"
-          >
+          <div class="flex h-[600px] items-center justify-center text-center text-muted-foreground">
             <p>No YAML available.</p>
           </div>
         {/if}

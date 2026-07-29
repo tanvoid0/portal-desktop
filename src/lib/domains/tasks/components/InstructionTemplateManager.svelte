@@ -1,26 +1,26 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
-  import { Input } from "$lib/components/ui/input";
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-  } from "$lib/components/ui/collapsible/index.js";
-  import Select from "$lib/components/ui/select.svelte";
-  import Icon from "@iconify/svelte";
-  import { toastActions } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
+  } from '$lib/components/ui/collapsible/index.js';
+  import Select from '$lib/components/ui/select.svelte';
+  import Icon from '@iconify/svelte';
+  import { toastActions } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
 
   export interface InstructionTemplate {
     id: string;
@@ -39,7 +39,7 @@
 
   let {
     selectedTemplateId = $bindable<string | null>(null),
-    customInstruction = $bindable(""),
+    customInstruction = $bindable(''),
     onTemplateSelect,
     onInstructionChange,
   }: Props = $props();
@@ -47,26 +47,26 @@
   // Default templates
   const defaultTemplates: InstructionTemplate[] = [
     {
-      id: "default-1",
-      name: "Standard Breakdown",
+      id: 'default-1',
+      name: 'Standard Breakdown',
       instruction:
-        "Break down into logical subtasks, prioritize developer-friendly descriptions, and estimate time for each subtask.",
+        'Break down into logical subtasks, prioritize developer-friendly descriptions, and estimate time for each subtask.',
       isDefault: true,
       createdAt: new Date(),
     },
     {
-      id: "default-2",
-      name: "Detailed Subtasks",
+      id: 'default-2',
+      name: 'Detailed Subtasks',
       instruction:
-        "Create detailed subtasks with clear acceptance criteria. Focus on breaking down complex work into smaller, actionable items.",
+        'Create detailed subtasks with clear acceptance criteria. Focus on breaking down complex work into smaller, actionable items.',
       isDefault: true,
       createdAt: new Date(),
     },
     {
-      id: "default-3",
-      name: "API Focus",
+      id: 'default-3',
+      name: 'API Focus',
       instruction:
-        "Focus on API endpoints, request/response structures, and error handling. Break down by endpoint or resource.",
+        'Focus on API endpoints, request/response structures, and error handling. Break down by endpoint or resource.',
       isDefault: true,
       createdAt: new Date(),
     },
@@ -75,7 +75,7 @@
   // Initialize templates - load from localStorage or use defaults
   function loadTemplatesFromStorage(): InstructionTemplate[] {
     try {
-      const stored = localStorage.getItem("task-instruction-templates");
+      const stored = localStorage.getItem('task-instruction-templates');
       if (stored) {
         const parsed = JSON.parse(stored);
         return parsed.map((t: any) => ({
@@ -84,7 +84,7 @@
         }));
       }
     } catch (error) {
-      console.error("Failed to load templates from localStorage:", error);
+      console.error('Failed to load templates from localStorage:', error);
     }
     return [...defaultTemplates];
   }
@@ -92,25 +92,22 @@
   let templates = $state<InstructionTemplate[]>(loadTemplatesFromStorage());
   let showTemplateManager = $state(false);
   let showNewTemplateForm = $state(false);
-  let newTemplateName = $state("");
-  let newTemplateInstruction = $state("");
+  let newTemplateName = $state('');
+  let newTemplateInstruction = $state('');
   let editingTemplateId = $state<string | null>(null);
 
   onMount(() => {
     // Save defaults if they don't exist in localStorage
-    if (!localStorage.getItem("task-instruction-templates")) {
+    if (!localStorage.getItem('task-instruction-templates')) {
       saveTemplates();
     }
   });
 
   function saveTemplates() {
     try {
-      localStorage.setItem(
-        "task-instruction-templates",
-        JSON.stringify(templates),
-      );
+      localStorage.setItem('task-instruction-templates', JSON.stringify(templates));
     } catch (error) {
-      console.error("Failed to save templates:", error);
+      console.error('Failed to save templates:', error);
     }
   }
 
@@ -125,7 +122,7 @@
 
   function handleCreateTemplate() {
     if (!newTemplateName.trim() || !newTemplateInstruction.trim()) {
-      toastActions.error("Please fill in both name and instruction");
+      toastActions.error('Please fill in both name and instruction');
       return;
     }
 
@@ -138,27 +135,27 @@
 
     templates = [...templates, newTemplate];
     saveTemplates();
-    toastActions.success("Template created successfully");
+    toastActions.success('Template created successfully');
 
     // Select the new template
     handleTemplateSelect(newTemplate.id);
 
     // Reset form
-    newTemplateName = "";
-    newTemplateInstruction = "";
+    newTemplateName = '';
+    newTemplateInstruction = '';
     showNewTemplateForm = false;
   }
 
   async function handleDeleteTemplate(templateId: string) {
     const template = templates.find((t) => t.id === templateId);
     if (template?.isDefault) {
-      toastActions.error("Cannot delete default templates");
+      toastActions.error('Cannot delete default templates');
       return;
     }
 
     const confirmed = await confirmAction(
-      "Are you sure you want to delete this template?",
-      "Delete template",
+      'Are you sure you want to delete this template?',
+      'Delete template'
     );
     if (!confirmed) return;
 
@@ -166,9 +163,9 @@
     saveTemplates();
     if (selectedTemplateId === templateId) {
       selectedTemplateId = null;
-      customInstruction = "";
+      customInstruction = '';
     }
-    toastActions.success("Template deleted");
+    toastActions.success('Template deleted');
   }
 
   function handleEditTemplate(templateId: string) {
@@ -182,17 +179,13 @@
   }
 
   function handleUpdateTemplate() {
-    if (
-      !editingTemplateId ||
-      !newTemplateName.trim() ||
-      !newTemplateInstruction.trim()
-    ) {
+    if (!editingTemplateId || !newTemplateName.trim() || !newTemplateInstruction.trim()) {
       return;
     }
 
     const template = templates.find((t) => t.id === editingTemplateId);
     if (template?.isDefault) {
-      toastActions.error("Cannot edit default templates");
+      toastActions.error('Cannot edit default templates');
       return;
     }
 
@@ -203,10 +196,10 @@
             name: newTemplateName.trim(),
             instruction: newTemplateInstruction.trim(),
           }
-        : t,
+        : t
     );
     saveTemplates();
-    toastActions.success("Template updated");
+    toastActions.success('Template updated');
 
     // Update selected instruction if this template is selected
     if (selectedTemplateId === editingTemplateId) {
@@ -216,29 +209,26 @@
 
     // Reset form
     editingTemplateId = null;
-    newTemplateName = "";
-    newTemplateInstruction = "";
+    newTemplateName = '';
+    newTemplateInstruction = '';
     showNewTemplateForm = false;
   }
 
   function handleCancelForm() {
     editingTemplateId = null;
-    newTemplateName = "";
-    newTemplateInstruction = "";
+    newTemplateName = '';
+    newTemplateInstruction = '';
     showNewTemplateForm = false;
   }
 
   const templateOptions = $derived(
     templates.map((t) => ({
       value: t.id,
-      label: t.name + (t.isDefault ? " (Default)" : ""),
-    })),
+      label: t.name + (t.isDefault ? ' (Default)' : ''),
+    }))
   );
 
-  const selectOptions = $derived([
-    { value: "", label: "None (Custom)" },
-    ...templateOptions,
-  ]);
+  const selectOptions = $derived([{ value: '', label: 'None (Custom)' }, ...templateOptions]);
 </script>
 
 <Collapsible bind:open={showTemplateManager}>
@@ -259,13 +249,13 @@
           <Label>Instruction Template</Label>
           <Select
             options={selectOptions}
-            defaultValue={selectedTemplateId || ""}
+            defaultValue={selectedTemplateId || ''}
             onSelect={(value) => {
               if (value) {
                 handleTemplateSelect(value);
               } else {
                 selectedTemplateId = null;
-                customInstruction = "";
+                customInstruction = '';
               }
             }}
           />
@@ -284,8 +274,7 @@
             }}
           />
           <p class="text-xs text-muted-foreground">
-            Specify how you want the tasks to be generated (format, focus areas,
-            structure, etc.).
+            Specify how you want the tasks to be generated (format, focus areas, structure, etc.).
           </p>
         </div>
 
@@ -304,10 +293,10 @@
               }}
             >
               <Icon
-                icon={showNewTemplateForm ? "lucide:minus" : "lucide:plus"}
+                icon={showNewTemplateForm ? 'lucide:minus' : 'lucide:plus'}
                 class="mr-1 h-4 w-4"
               />
-              {showNewTemplateForm ? "Cancel" : "New Template"}
+              {showNewTemplateForm ? 'Cancel' : 'New Template'}
             </Button>
           </div>
 
@@ -334,20 +323,12 @@
                 <div class="flex gap-2">
                   <Button
                     size="sm"
-                    onclick={editingTemplateId
-                      ? handleUpdateTemplate
-                      : handleCreateTemplate}
+                    onclick={editingTemplateId ? handleUpdateTemplate : handleCreateTemplate}
                   >
-                    {editingTemplateId ? "Update" : "Create"} Template
+                    {editingTemplateId ? 'Update' : 'Create'} Template
                   </Button>
                   {#if editingTemplateId}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onclick={handleCancelForm}
-                    >
-                      Cancel
-                    </Button>
+                    <Button size="sm" variant="outline" onclick={handleCancelForm}>Cancel</Button>
                   {/if}
                 </div>
               </CardContent>
@@ -357,14 +338,10 @@
           <!-- Template List -->
           <div class="max-h-48 space-y-2 overflow-y-auto">
             {#each templates as template}
-              <div
-                class="flex items-center justify-between rounded-lg border p-2"
-              >
+              <div class="flex items-center justify-between rounded-lg border p-2">
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
-                    <span class="truncate text-sm font-medium"
-                      >{template.name}</span
-                    >
+                    <span class="truncate text-sm font-medium">{template.name}</span>
                     {#if template.isDefault}
                       <Badge variant="secondary" class="text-xs">Default</Badge>
                     {/if}

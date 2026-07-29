@@ -4,9 +4,9 @@
 -->
 
 <script lang="ts">
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Info } from "@lucide/svelte";
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Info } from '@lucide/svelte';
 
   interface Props {
     command: string;
@@ -28,12 +28,10 @@
   <div
     class="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
   >
-    <Info
-      class="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400"
-    />
+    <Info class="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
     <p class="text-sm text-blue-800 dark:text-blue-200">
-      Use <code>$param_name</code> or <code>$&#123;param_name&#125;</code> to reference
-      parameters in your command.
+      Use <code>$param_name</code> or <code>$&#123;param_name&#125;</code> to reference parameters in
+      your command.
     </p>
   </div>
 </div>

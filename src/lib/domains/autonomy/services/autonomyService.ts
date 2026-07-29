@@ -2,16 +2,12 @@
  * Autonomy service for managing autonomous actions
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { logger } from "$lib/domains/shared/services/logger";
+import { invoke } from '@tauri-apps/api/core';
+import { logger } from '$lib/domains/shared/services/logger';
 
-const log = logger.createScoped("AutonomyService");
+const log = logger.createScoped('AutonomyService');
 
-export type AutonomyLevel =
-  | "observation"
-  | "conservative"
-  | "balanced"
-  | "aggressive";
+export type AutonomyLevel = 'observation' | 'conservative' | 'balanced' | 'aggressive';
 
 export interface AutonomousActionRequest {
   action_type: string;
@@ -49,16 +45,16 @@ class AutonomyService {
     if (this.initialized) return;
 
     try {
-      log.info("Initializing autonomy service");
+      log.info('Initializing autonomy service');
 
       // Check current autonomy settings
       const enabled = await this.getEnabled();
       const level = await this.getLevel();
 
-      log.info("Autonomy service initialized", { enabled, level });
+      log.info('Autonomy service initialized', { enabled, level });
       this.initialized = true;
     } catch (error) {
-      log.error("Failed to initialize autonomy service", error);
+      log.error('Failed to initialize autonomy service', error);
       throw error;
     }
   }
@@ -66,24 +62,19 @@ class AutonomyService {
   /**
    * Evaluate if an action should be executed autonomously
    */
-  async evaluateAction(
-    request: AutonomousActionRequest,
-  ): Promise<AutonomousActionResult> {
+  async evaluateAction(request: AutonomousActionRequest): Promise<AutonomousActionResult> {
     try {
-      log.info("Evaluating autonomous action", {
+      log.info('Evaluating autonomous action', {
         action_type: request.action_type,
       });
 
-      const result = await invoke<AutonomousActionResult>(
-        "evaluate_autonomous_action",
-        {
-          actionType: request.action_type,
-          actionData: request.action_data,
-          context: request.context,
-        },
-      );
+      const result = await invoke<AutonomousActionResult>('evaluate_autonomous_action', {
+        actionType: request.action_type,
+        actionData: request.action_data,
+        context: request.context,
+      });
 
-      log.info("Action evaluation complete", {
+      log.info('Action evaluation complete', {
         action_id: result.action_id,
         executed: result.executed,
         requires_approval: result.requires_approval,
@@ -91,7 +82,7 @@ class AutonomyService {
 
       return result;
     } catch (error) {
-      log.error("Failed to evaluate autonomous action", error);
+      log.error('Failed to evaluate autonomous action', error);
       throw error;
     }
   }
@@ -104,12 +95,12 @@ class AutonomyService {
     actionType: string,
     context: string,
     success: boolean,
-    feedback?: string,
+    feedback?: string
   ): Promise<void> {
     try {
-      log.info("Recording action outcome", { action_id: actionId, success });
+      log.info('Recording action outcome', { action_id: actionId, success });
 
-      await invoke("record_autonomous_action_outcome", {
+      await invoke('record_autonomous_action_outcome', {
         actionId,
         actionType,
         context,
@@ -117,9 +108,9 @@ class AutonomyService {
         feedback: feedback ?? null,
       });
 
-      log.info("Action outcome recorded successfully", { action_id: actionId });
+      log.info('Action outcome recorded successfully', { action_id: actionId });
     } catch (error) {
-      log.error("Failed to record action outcome", error);
+      log.error('Failed to record action outcome', error);
       throw error;
     }
   }
@@ -129,11 +120,11 @@ class AutonomyService {
    */
   async getLevel(): Promise<AutonomyLevel> {
     try {
-      const level = await invoke<string>("get_autonomy_level");
+      const level = await invoke<string>('get_autonomy_level');
       return level.toLowerCase() as AutonomyLevel;
     } catch (error) {
-      log.error("Failed to get autonomy level", error);
-      return "balanced"; // Default
+      log.error('Failed to get autonomy level', error);
+      return 'balanced'; // Default
     }
   }
 
@@ -142,11 +133,11 @@ class AutonomyService {
    */
   async setLevel(level: AutonomyLevel): Promise<void> {
     try {
-      log.info("Setting autonomy level", { level });
-      await invoke("set_autonomy_level", { level });
-      log.info("Autonomy level updated successfully");
+      log.info('Setting autonomy level', { level });
+      await invoke('set_autonomy_level', { level });
+      log.info('Autonomy level updated successfully');
     } catch (error) {
-      log.error("Failed to set autonomy level", error);
+      log.error('Failed to set autonomy level', error);
       throw error;
     }
   }
@@ -156,9 +147,9 @@ class AutonomyService {
    */
   async getEnabled(): Promise<boolean> {
     try {
-      return await invoke<boolean>("get_autonomy_enabled");
+      return await invoke<boolean>('get_autonomy_enabled');
     } catch (error) {
-      log.error("Failed to get autonomy enabled state", error);
+      log.error('Failed to get autonomy enabled state', error);
       return false; // Default to disabled for safety
     }
   }
@@ -168,11 +159,11 @@ class AutonomyService {
    */
   async setEnabled(enabled: boolean): Promise<void> {
     try {
-      log.info("Setting autonomy enabled state", { enabled });
-      await invoke("set_autonomy_enabled", { enabled });
-      log.info("Autonomy enabled state updated successfully");
+      log.info('Setting autonomy enabled state', { enabled });
+      await invoke('set_autonomy_enabled', { enabled });
+      log.info('Autonomy enabled state updated successfully');
     } catch (error) {
-      log.error("Failed to set autonomy enabled state", error);
+      log.error('Failed to set autonomy enabled state', error);
       throw error;
     }
   }
@@ -182,9 +173,9 @@ class AutonomyService {
    */
   async getApprovalStats(): Promise<ApprovalStats> {
     try {
-      return await invoke<ApprovalStats>("get_approval_stats");
+      return await invoke<ApprovalStats>('get_approval_stats');
     } catch (error) {
-      log.error("Failed to get approval stats", error);
+      log.error('Failed to get approval stats', error);
       throw error;
     }
   }

@@ -2,7 +2,7 @@
  * Shared utilities for Portal Desktop
  */
 
-import type { BaseEntity } from "../types";
+import type { BaseEntity } from '../types';
 
 /**
  * Generate a unique ID
@@ -15,25 +15,21 @@ export function generateId(): string {
  * Format bytes to human readable string
  */
 export function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return "0 Bytes";
+  if (bytes === 0) return '0 Bytes';
 
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 /**
  * Format a count with correct singular/plural label.
  */
-export function formatCount(
-  count: number,
-  singular: string,
-  plural?: string,
-): string {
+export function formatCount(count: number, singular: string, plural?: string): string {
   const label = count === 1 ? singular : (plural ?? `${singular}s`);
   return `${count.toLocaleString()} ${label}`;
 }
@@ -43,12 +39,12 @@ export function formatCount(
  */
 export function formatSessionDateTime(iso: string | Date): string {
   const date = iso instanceof Date ? iso : new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
+  if (Number.isNaN(date.getTime())) return '';
 
   const now = new Date();
   const time = date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
+    hour: 'numeric',
+    minute: '2-digit',
   });
 
   if (date.toDateString() === now.toDateString()) {
@@ -63,9 +59,9 @@ export function formatSessionDateTime(iso: string | Date): string {
 
   const sameYear = date.getFullYear() === now.getFullYear();
   const datePart = date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
   });
   return `${datePart}, ${time}`;
 }
@@ -73,10 +69,10 @@ export function formatSessionDateTime(iso: string | Date): string {
 /** Full locale datetime for tooltips. */
 export function formatSessionDateTimeFull(iso: string | Date): string {
   const date = iso instanceof Date ? iso : new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
+  if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleString(undefined, {
-    dateStyle: "full",
-    timeStyle: "short",
+    dateStyle: 'full',
+    timeStyle: 'short',
   });
 }
 
@@ -91,7 +87,7 @@ export function formatRelativeTime(date: Date): string {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (seconds < 60) return "just now";
+  if (seconds < 60) return 'just now';
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
   if (days < 7) return `${days}d ago`;
@@ -104,7 +100,7 @@ export function formatRelativeTime(date: Date): string {
  */
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
-  wait: number,
+  wait: number
 ): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout;
   return (...args: Parameters<T>) => {
@@ -118,7 +114,7 @@ export function debounce<T extends (...args: any[]) => any>(
  */
 export function throttle<T extends (...args: any[]) => any>(
   func: T,
-  limit: number,
+  limit: number
 ): (...args: Parameters<T>) => void {
   let inThrottle: boolean;
   return (...args: Parameters<T>) => {
@@ -134,10 +130,10 @@ export function throttle<T extends (...args: any[]) => any>(
  * Deep clone an object
  */
 export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== "object") return obj;
+  if (obj === null || typeof obj !== 'object') return obj;
   if (obj instanceof Date) return new Date(obj.getTime()) as any;
   if (obj instanceof Array) return obj.map((item) => deepClone(item)) as any;
-  if (typeof obj === "object") {
+  if (typeof obj === 'object') {
     const cloned = {} as any;
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
@@ -156,7 +152,7 @@ export function deepEqual(a: any, b: any): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
   if (typeof a !== typeof b) return false;
-  if (typeof a !== "object") return false;
+  if (typeof a !== 'object') return false;
 
   const keysA = Object.keys(a);
   const keysB = Object.keys(b);
@@ -184,7 +180,7 @@ export function sleep(ms: number): Promise<void> {
 export async function retry<T>(
   fn: () => Promise<T>,
   maxAttempts = 3,
-  baseDelay = 1000,
+  baseDelay = 1000
 ): Promise<T> {
   let lastError: Error;
 
@@ -219,18 +215,18 @@ export function isValidEmail(email: string): boolean {
  */
 export function sanitizeFilename(filename: string): string {
   return filename
-    .replace(/[<>:"/\\|?*]/g, "_")
-    .replace(/\s+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
 }
 
 /**
  * Get file extension
  */
 export function getFileExtension(filename: string): string {
-  const lastDot = filename.lastIndexOf(".");
-  return lastDot === -1 ? "" : filename.slice(lastDot + 1).toLowerCase();
+  const lastDot = filename.lastIndexOf('.');
+  return lastDot === -1 ? '' : filename.slice(lastDot + 1).toLowerCase();
 }
 
 /**
@@ -238,9 +234,9 @@ export function getFileExtension(filename: string): string {
  */
 export function isEmpty(value: any): boolean {
   if (value == null) return true;
-  if (typeof value === "string") return value.trim() === "";
+  if (typeof value === 'string') return value.trim() === '';
   if (Array.isArray(value)) return value.length === 0;
-  if (typeof value === "object") return Object.keys(value).length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
   return false;
 }
 
@@ -256,8 +252,8 @@ export function capitalize(str: string): string {
  */
 export function kebabCase(str: string): string {
   return str
-    .replace(/([a-z])([A-Z])/g, "$1-$2")
-    .replace(/[\s_]+/g, "-")
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/[\s_]+/g, '-')
     .toLowerCase();
 }
 
@@ -269,7 +265,7 @@ export function camelCase(str: string): string {
     .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => {
       return index === 0 ? word.toLowerCase() : word.toUpperCase();
     })
-    .replace(/\s+/g, "");
+    .replace(/\s+/g, '');
 }
 
 /**
@@ -277,7 +273,7 @@ export function camelCase(str: string): string {
  */
 export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - 3) + "...";
+  return text.slice(0, maxLength - 3) + '...';
 }
 
 /**
@@ -285,12 +281,12 @@ export function truncate(text: string, maxLength: number): string {
  */
 export function sortByCreatedAt<T extends BaseEntity>(
   entities: T[],
-  direction: "asc" | "desc" = "desc",
+  direction: 'asc' | 'desc' = 'desc'
 ): T[] {
   return [...entities].sort((a, b) => {
     const aTime = a.createdAt.getTime();
     const bTime = b.createdAt.getTime();
-    return direction === "asc" ? aTime - bTime : bTime - aTime;
+    return direction === 'asc' ? aTime - bTime : bTime - aTime;
   });
 }
 
@@ -299,11 +295,11 @@ export function sortByCreatedAt<T extends BaseEntity>(
  */
 export function sortByUpdatedAt<T extends BaseEntity>(
   entities: T[],
-  direction: "asc" | "desc" = "desc",
+  direction: 'asc' | 'desc' = 'desc'
 ): T[] {
   return [...entities].sort((a, b) => {
     const aTime = a.updatedAt.getTime();
     const bTime = b.updatedAt.getTime();
-    return direction === "asc" ? aTime - bTime : bTime - aTime;
+    return direction === 'asc' ? aTime - bTime : bTime - aTime;
   });
 }

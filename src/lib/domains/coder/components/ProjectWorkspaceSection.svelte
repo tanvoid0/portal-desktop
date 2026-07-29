@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { ChevronRight, Folder } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import CoderSessionCard from "./CoderSessionCard.svelte";
-  import type { CoderThread } from "../types.js";
-  import type { ProjectWorkspace } from "../utils/sessionList.js";
+  import { ChevronRight, Folder } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import CoderSessionCard from './CoderSessionCard.svelte';
+  import type { CoderThread } from '../types.js';
+  import type { ProjectWorkspace } from '../utils/sessionList.js';
 
   interface Props {
     workspace: ProjectWorkspace;
@@ -36,9 +36,7 @@
   }: Props = $props();
 
   const sessionCount = $derived(threads.length);
-  const hasRunning = $derived(
-    threads.some((t) => runningThreadIds.has(t.id)),
-  );
+  const hasRunning = $derived(threads.some((t) => runningThreadIds.has(t.id)));
 </script>
 
 <div class="rounded-md {active ? 'bg-muted/50' : ''}">
@@ -50,13 +48,11 @@
       variant="ghost"
       size="icon-sm"
       class="h-5 w-5 shrink-0"
-      title={expanded ? "Collapse" : "Expand"}
+      title={expanded ? 'Collapse' : 'Expand'}
       onclick={() => onToggle?.()}
     >
       <ChevronRight
-        class="h-3.5 w-3.5 text-muted-foreground transition-transform {expanded
-          ? 'rotate-90'
-          : ''}"
+        class="h-3.5 w-3.5 text-muted-foreground transition-transform {expanded ? 'rotate-90' : ''}"
       />
     </Button>
     <Button
@@ -68,9 +64,7 @@
         if (!expanded) onToggle?.();
       }}
     >
-      <Folder
-        class="h-3.5 w-3.5 shrink-0 {active ? 'text-primary' : 'text-muted-foreground'}"
-      />
+      <Folder class="h-3.5 w-3.5 shrink-0 {active ? 'text-primary' : 'text-muted-foreground'}" />
       <span
         class="min-w-0 flex-1 truncate font-medium {active
           ? 'text-foreground'
@@ -109,8 +103,6 @@
       {/each}
     </div>
   {:else if expanded && sessionCount === 0}
-    <p class="px-3 pb-2 pl-8 text-[11px] text-muted-foreground">
-      No sessions — start one below
-    </p>
+    <p class="px-3 pb-2 pl-8 text-[11px] text-muted-foreground">No sessions — start one below</p>
   {/if}
 </div>

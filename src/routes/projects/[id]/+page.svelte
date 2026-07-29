@@ -4,21 +4,21 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { buildTabUrl, resolveUrlTab } from "$lib/utils/url-tabs";
-  import { Button } from "$lib/components/ui/button";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
   import {
     Edit,
     FolderOpen,
@@ -42,48 +42,36 @@
     Play,
     Loader2,
     Workflow,
-  } from "@lucide/svelte";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import { ProjectTerminal } from "$lib/domains/terminal";
-  import {
-    projectService,
-    createProjectQuery,
-    createProjectsQuery,
-  } from "$lib/domains/projects";
-  import { breadcrumbActions } from "$lib/domains/shared/stores/breadcrumbStore";
-  import { logger } from "$lib/domains/shared/services/logger";
-  import { confirmAction } from "$lib/utils/confirm";
-  import type { Project } from "$lib/domains/projects/types";
-  import ProjectActionsPanel from "$lib/domains/actions/components/ProjectActionsPanel.svelte";
-  import type {
-    Pipeline,
-    PipelineExecutionListItem,
-  } from "$lib/domains/projects/pipelines";
+  } from '@lucide/svelte';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { ProjectTerminal } from '$lib/domains/terminal';
+  import { projectService, createProjectQuery, createProjectsQuery } from '$lib/domains/projects';
+  import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
+  import { logger } from '$lib/domains/shared/services/logger';
+  import { confirmAction } from '$lib/utils/confirm';
+  import type { Project } from '$lib/domains/projects/types';
+  import ProjectActionsPanel from '$lib/domains/actions/components/ProjectActionsPanel.svelte';
+  import type { Pipeline, PipelineExecutionListItem } from '$lib/domains/projects/pipelines';
   import {
     pipelineService,
     executionService,
     frameworkStarterService,
     type StarterPackStatus,
-  } from "$lib/domains/projects/pipelines";
-  import { projectIconRegistry } from "$lib/domains/projects/utils/iconRegistry";
-  import ProjectTechStack from "$lib/domains/projects/components/ProjectTechStack.svelte";
+  } from '$lib/domains/projects/pipelines';
+  import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
+  import ProjectTechStack from '$lib/domains/projects/components/ProjectTechStack.svelte';
   import {
     getProjectGitBranch,
     getProjectPackageManager,
-  } from "$lib/domains/projects/utils/display";
+  } from '$lib/domains/projects/utils/display';
   import {
     getProjectCommand,
     findPipelineForCommand,
     runShellCommand,
     commandKindLabel,
     type ProjectCommandKind,
-  } from "$lib/domains/projects/utils/projectCommandRunner";
-  import { formatRelativeTime } from "$lib/domains/shared/utils";
+  } from '$lib/domains/projects/utils/projectCommandRunner';
+  import { formatRelativeTime } from '$lib/domains/shared/utils';
   import {
     PageHeader,
     PageLoading,
@@ -91,12 +79,12 @@
     PageEmpty,
     PageStats,
     type PageStat,
-  } from "$lib/components/shell";
-  import { toast } from "$lib/utils/toast";
-  import { Sparkles } from "@lucide/svelte";
-  import { actions } from "$lib/domains/actions";
+  } from '$lib/components/shell';
+  import { toast } from '$lib/utils/toast';
+  import { Sparkles } from '@lucide/svelte';
+  import { actions } from '$lib/domains/actions';
 
-  const log = logger.createScoped("ProjectDetailsPage");
+  const log = logger.createScoped('ProjectDetailsPage');
 
   const projectIdParam = $derived($page.params.id);
   const projectsQuery = createProjectsQuery();
@@ -113,7 +101,7 @@
     if (list) {
       const projectByName = list.find((p) => p.name === projectIdParam);
       if (projectByName) {
-        log.warn("Project ID was a name, redirecting to numeric ID", {
+        log.warn('Project ID was a name, redirecting to numeric ID', {
           name: projectIdParam,
           id: projectByName.id,
         });
@@ -125,12 +113,7 @@
     return null;
   });
 
-  const PROJECT_TABS = [
-    "overview",
-    "dependencies",
-    "actions",
-    "terminal",
-  ] as const;
+  const PROJECT_TABS = ['overview', 'dependencies', 'actions', 'terminal'] as const;
   type ProjectTab = (typeof PROJECT_TABS)[number];
 
   const activeTab = $derived(
@@ -138,15 +121,15 @@
       (() => {
         // Legacy tab aliases
         const params = new URLSearchParams($page.url.searchParams);
-        const tab = params.get("tab");
-        if (tab === "pipelines" || tab === "ci") {
-          params.set("tab", "actions");
+        const tab = params.get('tab');
+        if (tab === 'pipelines' || tab === 'ci') {
+          params.set('tab', 'actions');
         }
         return params;
       })(),
       PROJECT_TABS,
-      "overview",
-    ),
+      'overview'
+    )
   );
 
   function setActiveTab(tab: ProjectTab) {
@@ -161,22 +144,20 @@
 
   // State
   let project = $state<Project | null>(null);
-  let error = $state("");
+  let error = $state('');
   let refreshing = $state(false);
 
   const loading = $derived(
-    projectQuery.isPending || (resolvedProjectId === null && projectsQuery.isPending),
+    projectQuery.isPending || (resolvedProjectId === null && projectsQuery.isPending)
   );
 
   const hasDependencies = $derived(
     Boolean(
       project?.metadata?.dependencies &&
-        (Object.keys(project.metadata.dependencies.dependencies || {}).length >
-          0 ||
-          Object.keys(project.metadata.dependencies.devDependencies || {})
-            .length > 0 ||
-          project.metadata.dependencies.packageManager),
-    ),
+      (Object.keys(project.metadata.dependencies.dependencies || {}).length > 0 ||
+        Object.keys(project.metadata.dependencies.devDependencies || {}).length > 0 ||
+        project.metadata.dependencies.packageManager)
+    )
   );
 
   const detailStats = $derived.by((): PageStat[] => {
@@ -184,17 +165,17 @@
 
     const stats: PageStat[] = [
       {
-        label: "Project Size",
+        label: 'Project Size',
         value: formatFileSize(project.size),
         icon: HardDrive,
       },
       {
-        label: "Files",
+        label: 'Files',
         value: project.file_count,
         icon: FileText,
       },
       {
-        label: "Opens",
+        label: 'Opens',
         value: project.open_count,
         icon: Eye,
       },
@@ -203,20 +184,20 @@
     const gitBranch = getProjectGitBranch(project);
     if (gitBranch) {
       stats.push({
-        label: "Git Branch",
+        label: 'Git Branch',
         value: gitBranch,
         icon: GitBranch,
       });
     } else if (project.last_opened) {
       stats.push({
-        label: "Last Opened",
+        label: 'Last Opened',
         value: formatRelativeTime(project.last_opened),
         icon: Clock,
         description: formatDate(project.last_opened),
       });
     } else if (project.dev_port) {
       stats.push({
-        label: "Dev Port",
+        label: 'Dev Port',
         value: `:${project.dev_port}`,
         icon: Globe,
       });
@@ -234,23 +215,19 @@
 
   $effect(() => {
     if (projectQuery.isError) {
-      error = "Failed to load project details. Please try again.";
-    } else if (
-      projectQuery.isSuccess &&
-      projectQuery.data === null &&
-      resolvedProjectId
-    ) {
-      error = "Project not found";
+      error = 'Failed to load project details. Please try again.';
+    } else if (projectQuery.isSuccess && projectQuery.data === null && resolvedProjectId) {
+      error = 'Project not found';
     } else if (
       resolvedProjectId === null &&
       projectIdParam &&
       projectsQuery.isFetched &&
       !projectsQuery.isPending
     ) {
-      error = "Invalid project ID";
-      setTimeout(() => goto("/projects"), 2000);
+      error = 'Invalid project ID';
+      setTimeout(() => goto('/projects'), 2000);
     } else if (projectQuery.isSuccess && projectQuery.data) {
-      error = "";
+      error = '';
     }
   });
 
@@ -290,28 +267,28 @@
 
   // Format date for display
   function formatDate(date: Date | string | null | undefined): string {
-    if (!date) return "Never";
+    if (!date) return 'Never';
     const d = new Date(date);
-    return d.toLocaleDateString() + " " + d.toLocaleTimeString();
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   }
 
   // Format file size
   function formatFileSize(bytes: number): string {
-    if (bytes === 0) return "0 B";
+    if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
+    const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   function toGitHubUrl(remote?: string): string | null {
     if (!remote) return null;
-    const trimmed = remote.trim().replace(/\.git$/, "");
-    if (trimmed.startsWith("https://github.com/")) {
+    const trimmed = remote.trim().replace(/\.git$/, '');
+    if (trimmed.startsWith('https://github.com/')) {
       return trimmed;
     }
-    if (trimmed.startsWith("git@github.com:")) {
-      return `https://github.com/${trimmed.slice("git@github.com:".length)}`;
+    if (trimmed.startsWith('git@github.com:')) {
+      return `https://github.com/${trimmed.slice('git@github.com:'.length)}`;
     }
     return null;
   }
@@ -325,7 +302,7 @@
 
   // Navigate back to projects list
   function handleBack() {
-    goto("/projects");
+    goto('/projects');
   }
 
   // Open project in file explorer
@@ -335,15 +312,15 @@
     try {
       await projectService.openProjectInExplorer(project.path);
     } catch (err) {
-      log.error("Failed to open project in explorer", err);
+      log.error('Failed to open project in explorer', err);
     }
   }
 
   // Switch to terminal tab
   function switchToTerminal() {
-    setActiveTab("terminal");
+    setActiveTab('terminal');
     const projectId = getValidProjectId(projectIdParam);
-    log.info("Switched to terminal tab for project", { projectId });
+    log.info('Switched to terminal tab for project', { projectId });
   }
 
   // Refresh project metadata
@@ -353,17 +330,17 @@
 
     try {
       refreshing = true;
-      log.info("Refreshing project metadata", { projectId });
+      log.info('Refreshing project metadata', { projectId });
 
       // Refresh metadata in the backend
       await projectService.refreshProjectMetadata(projectId);
       await projectQuery.refetch();
 
-      toast.success("Project metadata and commands refreshed");
-      log.info("Project metadata refreshed successfully", { projectId });
+      toast.success('Project metadata and commands refreshed');
+      log.info('Project metadata refreshed successfully', { projectId });
     } catch (err) {
-      log.error("Failed to refresh project metadata", err);
-      error = "Failed to refresh project metadata. Please try again.";
+      log.error('Failed to refresh project metadata', err);
+      error = 'Failed to refresh project metadata. Please try again.';
     } finally {
       refreshing = false;
     }
@@ -376,7 +353,7 @@
 
     try {
       const newStarredStatus = !project.starred;
-      log.info("Toggling star status", {
+      log.info('Toggling star status', {
         projectId,
         starred: newStarredStatus,
       });
@@ -390,20 +367,20 @@
       // For now, we'll update locally. If backend persistence is needed,
       // we may need to add a specific toggleStar method to the service
 
-      log.info("Star status toggled successfully", {
+      log.info('Star status toggled successfully', {
         projectId,
         starred: newStarredStatus,
       });
     } catch (err) {
-      log.error("Failed to toggle star status", err);
-      error = "Failed to toggle star status. Please try again.";
+      log.error('Failed to toggle star status', err);
+      error = 'Failed to toggle star status. Please try again.';
     }
   }
 
   // Start inline editing
   function startEditing(field: string, currentValue: string | undefined) {
     editingField = field;
-    editValues[field] = currentValue || "";
+    editValues[field] = currentValue || '';
   }
 
   // Cancel editing
@@ -421,7 +398,7 @@
       savingField = field;
       const newValue = editValues[field]?.trim() || undefined;
 
-      log.info("Saving field", { projectId, field, newValue });
+      log.info('Saving field', { projectId, field, newValue });
 
       // Update project via service
       const updates: Record<string, any> = { [field]: newValue };
@@ -432,9 +409,9 @@
       editingField = null;
       editValues = {};
 
-      log.info("Field saved successfully", { projectId, field });
+      log.info('Field saved successfully', { projectId, field });
     } catch (err) {
-      log.error("Failed to save field", err);
+      log.error('Failed to save field', err);
       error = `Failed to save ${field}. Please try again.`;
     } finally {
       savingField = null;
@@ -447,10 +424,7 @@
       return;
     }
     await projectIconRegistry.ensureLoaded();
-    starterPackStatus = frameworkStarterService.getStarterPackForProject(
-      project,
-      pipelines,
-    );
+    starterPackStatus = frameworkStarterService.getStarterPackForProject(project, pipelines);
   }
 
   async function loadRunHistory() {
@@ -461,7 +435,7 @@
     try {
       runHistory = await executionService.getExecutionsByProject(projectId, 25);
     } catch (err) {
-      log.error("Failed to load pipeline run history", err);
+      log.error('Failed to load pipeline run history', err);
     } finally {
       runHistoryLoading = false;
     }
@@ -476,7 +450,7 @@
       await refreshStarterPackStatus();
       await loadRunHistory();
     } catch (error) {
-      log.error("Failed to load pipelines", error);
+      log.error('Failed to load pipelines', error);
     } finally {
       pipelinesLoading = false;
     }
@@ -499,8 +473,8 @@
 
   async function handleDeletePipeline(pipelineId: string) {
     const confirmed = await confirmAction(
-      "Are you sure you want to delete this pipeline?",
-      "Delete pipeline",
+      'Are you sure you want to delete this pipeline?',
+      'Delete pipeline'
     );
     if (!confirmed) return;
 
@@ -508,7 +482,7 @@
       await pipelineService.deletePipeline(pipelineId);
       await loadPipelines();
     } catch (error) {
-      log.error("Failed to delete pipeline", error);
+      log.error('Failed to delete pipeline', error);
     }
   }
 
@@ -523,8 +497,8 @@
       void loadRunHistory();
       goto(`/projects/${projectId}/pipelines/run/${execution.id}`);
     } catch (error) {
-      log.error("Failed to execute pipeline", error);
-      toast.error("Failed to start pipeline");
+      log.error('Failed to execute pipeline', error);
+      toast.error('Failed to start pipeline');
     }
   }
 
@@ -543,39 +517,37 @@
       const created = await frameworkStarterService.provisionStarterPipelines(
         projectId,
         project,
-        pipelines,
+        pipelines
       );
       await loadPipelines();
       if (created.length > 0) {
         toast.success(`Created ${created.length} default pipeline(s)`);
       } else {
-        toast.info("Default pipelines are already set up");
+        toast.info('Default pipelines are already set up');
       }
     } catch (error) {
-      log.error("Failed to provision starter pipelines", error);
-      toast.error("Failed to set up default pipelines");
+      log.error('Failed to provision starter pipelines', error);
+      toast.error('Failed to set up default pipelines');
     } finally {
       provisioningPipelines = false;
     }
   }
 
-  function categoryBadgeVariant(
-    category: string | undefined,
-  ): "default" | "secondary" | "outline" {
+  function categoryBadgeVariant(category: string | undefined): 'default' | 'secondary' | 'outline' {
     switch (category) {
-      case "install":
-        return "secondary";
-      case "dev":
-        return "default";
-      case "build":
-        return "outline";
+      case 'install':
+        return 'secondary';
+      case 'dev':
+        return 'default';
+      case 'build':
+        return 'outline';
       default:
-        return "outline";
+        return 'outline';
     }
   }
 
   function runButtonLabel(pipeline: Pipeline): string {
-    return pipeline.category === "dev" ? "Start" : "Run";
+    return pipeline.category === 'dev' ? 'Start' : 'Run';
   }
 
   function handleBuilderClose() {
@@ -587,8 +559,7 @@
   async function handleRunCommand(kind: ProjectCommandKind) {
     if (!project || runningCommand) return;
 
-    const actionId =
-      kind === "build" ? "build" : kind === "start" ? "dev" : "test";
+    const actionId = kind === 'build' ? 'build' : kind === 'start' ? 'dev' : 'test';
 
     runningCommand = kind;
     try {
@@ -596,17 +567,15 @@
       if (result.success) {
         toast.success(`${commandKindLabel(kind)} completed`);
       } else {
-        const err =
-          result.steps.find((s) => s.error)?.error ??
-          `${commandKindLabel(kind)} failed`;
+        const err = result.steps.find((s) => s.error)?.error ?? `${commandKindLabel(kind)} failed`;
         toast.error(err);
       }
     } catch (err) {
       // Fallback: shell command if action missing
       const command = getProjectCommand(project, kind);
       if (command) {
-        if (kind === "start") {
-          setActiveTab("terminal");
+        if (kind === 'start') {
+          setActiveTab('terminal');
           toast.info(`Run in terminal: ${command}`);
           return;
         }
@@ -628,11 +597,11 @@
   function hasAnyCommands(proj: Project): boolean {
     return Boolean(
       proj.build_command ||
-        proj.start_command ||
-        proj.test_command ||
-        proj.output_directory ||
-        proj.dev_port ||
-        proj.prod_port,
+      proj.start_command ||
+      proj.test_command ||
+      proj.output_directory ||
+      proj.dev_port ||
+      proj.prod_port
     );
   }
 
@@ -647,29 +616,22 @@
 
   onMount(() => {
     void projectIconRegistry.ensureLoaded();
-    const tabParam = $page.url.searchParams.get("tab");
+    const tabParam = $page.url.searchParams.get('tab');
     // Only rewrite legacy aliases — avoid goto when already on a valid tab
-    if (tabParam === "pipelines" || tabParam === "ci") {
-      setActiveTab("actions");
+    if (tabParam === 'pipelines' || tabParam === 'ci') {
+      setActiveTab('actions');
     }
     loadPipelines();
   });
 </script>
 
 <svelte:head>
-  <title
-    >{project ? `${project.name} - Project Details` : "Project Details"} - Portal
-    Desktop</title
+  <title>{project ? `${project.name} - Project Details` : 'Project Details'} - Portal Desktop</title
   >
 </svelte:head>
 
 <div class="space-y-6">
-  <Button
-    variant="ghost"
-    size="sm"
-    onclick={handleBack}
-    class="w-fit gap-2"
-  >
+  <Button variant="ghost" size="sm" onclick={handleBack} class="w-fit gap-2">
     <ArrowLeft class="h-4 w-4" />
     Back to Projects
   </Button>
@@ -677,11 +639,7 @@
   {#if loading}
     <PageLoading message="Loading project details..." />
   {:else if error}
-    <PageError
-      title="Failed to load project"
-      message={error}
-      onRetry={reloadProject}
-    />
+    <PageError title="Failed to load project" message={error} onRetry={reloadProject} />
   {:else if project}
     {@const currentProject = project}
     {@const githubUrl = toGitHubUrl(currentProject.git_repository)}
@@ -692,13 +650,13 @@
     >
       {#snippet actions()}
         <Button
-          variant={currentProject.starred ? "default" : "outline"}
+          variant={currentProject.starred ? 'default' : 'outline'}
           onclick={handleToggleStar}
           class="gap-2"
-          title={currentProject.starred ? "Unstar project" : "Star project"}
+          title={currentProject.starred ? 'Unstar project' : 'Star project'}
         >
           <Star class="h-4 w-4 {currentProject.starred ? 'fill-current' : ''}" />
-          {currentProject.starred ? "Starred" : "Star"}
+          {currentProject.starred ? 'Starred' : 'Star'}
         </Button>
         <Button
           variant="outline"
@@ -710,11 +668,7 @@
           <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
           Refresh
         </Button>
-        <Button
-          variant="outline"
-          onclick={handleOpenInExplorer}
-          class="gap-2"
-        >
+        <Button variant="outline" onclick={handleOpenInExplorer} class="gap-2">
           <ExternalLink class="h-4 w-4" />
           Explorer
         </Button>
@@ -746,11 +700,7 @@
 
     <PageStats stats={detailStats} columns={4} />
 
-    <Tabs
-      value={activeTab}
-      onValueChange={(v) => setActiveTab(v as ProjectTab)}
-      class="w-full"
-    >
+    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ProjectTab)} class="w-full">
       <TabsList class="grid w-full grid-cols-4">
         <TabsTrigger value="overview" class="gap-2">
           <FolderOpen class="h-4 w-4" />
@@ -770,756 +720,692 @@
         </TabsTrigger>
       </TabsList>
 
-        <TabsContent value="overview" class="mt-6 space-y-6">
+      <TabsContent value="overview" class="mt-6 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+              <Layers class="h-5 w-5" />
+              Tech Stack
+            </CardTitle>
+            <CardDescription>
+              Frameworks, languages, and package managers assigned to this project
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProjectTechStack {project} />
+          </CardContent>
+        </Card>
+
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle class="flex items-center gap-2">
-                <Layers class="h-5 w-5" />
-                Tech Stack
+                <FolderOpen class="h-5 w-5" />
+                Project Details
               </CardTitle>
-              <CardDescription>
-                Frameworks, languages, and package managers assigned to this
-                project
-              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <ProjectTechStack {project} />
+            <CardContent class="space-y-4">
+              <div>
+                <p class="text-sm font-medium text-muted-foreground">Project Path</p>
+                <p class="mt-1 break-all rounded-md bg-muted p-2 font-mono text-sm">
+                  {project.path}
+                </p>
+              </div>
+
+              {#if getProjectPackageManager(project)}
+                <div>
+                  <p class="text-sm font-medium text-muted-foreground">Detected Package Manager</p>
+                  <p class="mt-1 text-sm">
+                    {getProjectPackageManager(project)}
+                  </p>
+                </div>
+              {/if}
+
+              {#if project.created_at}
+                <div>
+                  <p class="text-sm font-medium text-muted-foreground">Created</p>
+                  <p class="mt-1 text-sm">
+                    {formatDate(project.created_at)}
+                  </p>
+                </div>
+              {/if}
+
+              {#if project.updated_at}
+                <div>
+                  <p class="text-sm font-medium text-muted-foreground">Last Updated</p>
+                  <p class="mt-1 text-sm">
+                    {formatDate(project.updated_at)}
+                  </p>
+                </div>
+              {/if}
             </CardContent>
           </Card>
 
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle class="flex items-center gap-2">
-                  <FolderOpen class="h-5 w-5" />
-                  Project Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent class="space-y-4">
-                <div>
-                  <p class="text-sm font-medium text-muted-foreground">
-                    Project Path
-                  </p>
-                  <p
-                    class="mt-1 break-all rounded-md bg-muted p-2 font-mono text-sm"
-                  >
-                    {project.path}
-                  </p>
-                </div>
-
-                {#if getProjectPackageManager(project)}
-                  <div>
-                    <p class="text-sm font-medium text-muted-foreground">
-                      Detected Package Manager
-                    </p>
-                    <p class="mt-1 text-sm">
-                      {getProjectPackageManager(project)}
-                    </p>
-                  </div>
-                {/if}
-
-                {#if project.created_at}
-                  <div>
-                    <p class="text-sm font-medium text-muted-foreground">
-                      Created
-                    </p>
-                    <p class="mt-1 text-sm">
-                      {formatDate(project.created_at)}
-                    </p>
-                  </div>
-                {/if}
-
-                {#if project.updated_at}
-                  <div>
-                    <p class="text-sm font-medium text-muted-foreground">
-                      Last Updated
-                    </p>
-                    <p class="mt-1 text-sm">
-                      {formatDate(project.updated_at)}
-                    </p>
-                  </div>
-                {/if}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle class="flex items-center gap-2">
-                  <Calendar class="h-5 w-5" />
-                  Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent class="space-y-4">
-                <div>
-                  <p class="text-sm font-medium text-muted-foreground">
-                    Open Count
-                  </p>
-                  <p class="mt-1 text-sm">{project.open_count} times</p>
-                </div>
-
-                <div>
-                  <p class="text-sm font-medium text-muted-foreground">
-                    Project Size
-                  </p>
-                  <p class="mt-1 text-sm">{formatFileSize(project.size)}</p>
-                </div>
-
-                <div>
-                  <p class="text-sm font-medium text-muted-foreground">
-                    File Count
-                  </p>
-                  <p class="mt-1 text-sm">{project.file_count} files</p>
-                </div>
-
-                {#if project.last_opened}
-                  <div>
-                    <p class="text-sm font-medium text-muted-foreground">
-                      Last Opened
-                    </p>
-                    <p class="mt-1 text-sm">
-                      {formatDate(project.last_opened)}
-                    </p>
-                  </div>
-                {/if}
-              </CardContent>
-            </Card>
-          </div>
-
-          <!-- Commands & Configuration -->
           <Card>
             <CardHeader>
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <CardTitle class="flex items-center gap-2">
-                    <Terminal class="h-5 w-5" />
-                    Commands & Configuration
-                  </CardTitle>
-                  <CardDescription class="mt-1">
-                    Scripts detected from your project. Run via the Actions tab
-                    when available, or directly for build/test.
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onclick={handleRefreshMetadata}
-                  disabled={refreshing}
-                  class="gap-2"
-                >
-                  <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
-                  Re-detect
-                </Button>
-              </div>
+              <CardTitle class="flex items-center gap-2">
+                <Calendar class="h-5 w-5" />
+                Activity
+              </CardTitle>
             </CardHeader>
             <CardContent class="space-y-4">
-              {#if !hasAnyCommands(project) && editingField === null}
-                <div class="rounded-md border border-dashed p-6 text-center">
-                  <p class="mb-3 text-sm text-muted-foreground">
-                    No commands configured yet. Re-detect from your project folder
-                    or add them manually.
+              <div>
+                <p class="text-sm font-medium text-muted-foreground">Open Count</p>
+                <p class="mt-1 text-sm">{project.open_count} times</p>
+              </div>
+
+              <div>
+                <p class="text-sm font-medium text-muted-foreground">Project Size</p>
+                <p class="mt-1 text-sm">{formatFileSize(project.size)}</p>
+              </div>
+
+              <div>
+                <p class="text-sm font-medium text-muted-foreground">File Count</p>
+                <p class="mt-1 text-sm">{project.file_count} files</p>
+              </div>
+
+              {#if project.last_opened}
+                <div>
+                  <p class="text-sm font-medium text-muted-foreground">Last Opened</p>
+                  <p class="mt-1 text-sm">
+                    {formatDate(project.last_opened)}
                   </p>
-                  <div class="flex flex-wrap justify-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={handleRefreshMetadata}
-                      disabled={refreshing}
-                      class="gap-2"
-                    >
-                      <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
-                      Detect from project
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => startEditing("build_command", "")}
-                    >
-                      Add manually
-                    </Button>
-                  </div>
                 </div>
               {/if}
+            </CardContent>
+          </Card>
+        </div>
 
-              {#if project.build_command || editingField === "build_command"}
-                <div>
-                  <div class="mb-1 flex items-center justify-between gap-2">
-                    <Label class="text-sm font-medium text-muted-foreground"
-                      >Build Command</Label
-                    >
-                    {#if editingField !== "build_command"}
-                      <div class="flex items-center gap-1">
-                        {#if project.build_command}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onclick={() => handleRunCommand("build")}
-                            disabled={runningCommand !== null}
-                            class="h-7 gap-1 px-2"
-                          >
-                            {#if runningCommand === "build"}
-                              <Loader2 class="h-3 w-3 animate-spin" />
-                            {:else}
-                              <Play class="h-3 w-3" />
-                            {/if}
-                            Run
-                          </Button>
-                        {/if}
+        <!-- Commands & Configuration -->
+        <Card>
+          <CardHeader>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle class="flex items-center gap-2">
+                  <Terminal class="h-5 w-5" />
+                  Commands & Configuration
+                </CardTitle>
+                <CardDescription class="mt-1">
+                  Scripts detected from your project. Run via the Actions tab when available, or
+                  directly for build/test.
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onclick={handleRefreshMetadata}
+                disabled={refreshing}
+                class="gap-2"
+              >
+                <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
+                Re-detect
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            {#if !hasAnyCommands(project) && editingField === null}
+              <div class="rounded-md border border-dashed p-6 text-center">
+                <p class="mb-3 text-sm text-muted-foreground">
+                  No commands configured yet. Re-detect from your project folder or add them
+                  manually.
+                </p>
+                <div class="flex flex-wrap justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onclick={handleRefreshMetadata}
+                    disabled={refreshing}
+                    class="gap-2"
+                  >
+                    <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
+                    Detect from project
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onclick={() => startEditing('build_command', '')}
+                  >
+                    Add manually
+                  </Button>
+                </div>
+              </div>
+            {/if}
+
+            {#if project.build_command || editingField === 'build_command'}
+              <div>
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <Label class="text-sm font-medium text-muted-foreground">Build Command</Label>
+                  {#if editingField !== 'build_command'}
+                    <div class="flex items-center gap-1">
+                      {#if project.build_command}
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onclick={() =>
-                            project &&
-                            startEditing("build_command", project.build_command)}
-                          class="h-7 px-2"
+                          onclick={() => handleRunCommand('build')}
+                          disabled={runningCommand !== null}
+                          class="h-7 gap-1 px-2"
                         >
-                          <Edit class="h-3 w-3" />
+                          {#if runningCommand === 'build'}
+                            <Loader2 class="h-3 w-3 animate-spin" />
+                          {:else}
+                            <Play class="h-3 w-3" />
+                          {/if}
+                          Run
                         </Button>
-                      </div>
-                    {/if}
-                  </div>
-                  {#if editingField === "build_command"}
-                    <div class="flex items-center gap-2">
-                      <Input
-                        bind:value={editValues.build_command}
-                        class="font-mono text-sm"
-                        placeholder="npm run build"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => saveField("build_command")}
-                        disabled={savingField === "build_command"}
-                        class="h-8"
-                      >
-                        <Check class="h-4 w-4 text-green-600" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={cancelEditing}
-                        disabled={savingField === "build_command"}
-                        class="h-8"
-                      >
-                        <X class="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
-                  {:else}
-                    <p class="rounded bg-muted p-2 font-mono text-sm">
-                      {project.build_command}
-                    </p>
-                  {/if}
-                </div>
-              {/if}
-
-              {#if project.start_command || editingField === "start_command"}
-                <div>
-                  <div class="mb-1 flex items-center justify-between gap-2">
-                    <Label class="text-sm font-medium text-muted-foreground"
-                      >Start Command</Label
-                    >
-                    {#if editingField !== "start_command"}
-                      <div class="flex items-center gap-1">
-                        {#if project.start_command}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onclick={() => handleRunCommand("start")}
-                            disabled={runningCommand !== null}
-                            class="h-7 gap-1 px-2"
-                          >
-                            {#if runningCommand === "start"}
-                              <Loader2 class="h-3 w-3 animate-spin" />
-                            {:else}
-                              <Play class="h-3 w-3" />
-                            {/if}
-                            Run
-                          </Button>
-                        {/if}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onclick={() =>
-                            project &&
-                            startEditing("start_command", project.start_command)}
-                          class="h-7 px-2"
-                        >
-                          <Edit class="h-3 w-3" />
-                        </Button>
-                      </div>
-                    {/if}
-                  </div>
-                  {#if editingField === "start_command"}
-                    <div class="flex items-center gap-2">
-                      <Input
-                        bind:value={editValues.start_command}
-                        class="font-mono text-sm"
-                        placeholder="npm start"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => saveField("start_command")}
-                        disabled={savingField === "start_command"}
-                        class="h-8"
-                      >
-                        <Check class="h-4 w-4 text-green-600" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={cancelEditing}
-                        disabled={savingField === "start_command"}
-                        class="h-8"
-                      >
-                        <X class="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
-                  {:else}
-                    <p class="rounded bg-muted p-2 font-mono text-sm">
-                      {project.start_command}
-                    </p>
-                  {/if}
-                </div>
-              {/if}
-
-              {#if project.test_command || editingField === "test_command"}
-                <div>
-                  <div class="mb-1 flex items-center justify-between gap-2">
-                    <Label class="text-sm font-medium text-muted-foreground"
-                      >Test Command</Label
-                    >
-                    {#if editingField !== "test_command"}
-                      <div class="flex items-center gap-1">
-                        {#if project.test_command}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onclick={() => handleRunCommand("test")}
-                            disabled={runningCommand !== null}
-                            class="h-7 gap-1 px-2"
-                          >
-                            {#if runningCommand === "test"}
-                              <Loader2 class="h-3 w-3 animate-spin" />
-                            {:else}
-                              <Play class="h-3 w-3" />
-                            {/if}
-                            Run
-                          </Button>
-                        {/if}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onclick={() =>
-                            project &&
-                            startEditing("test_command", project.test_command)}
-                          class="h-7 px-2"
-                        >
-                          <Edit class="h-3 w-3" />
-                        </Button>
-                      </div>
-                    {/if}
-                  </div>
-                  {#if editingField === "test_command"}
-                    <div class="flex items-center gap-2">
-                      <Input
-                        bind:value={editValues.test_command}
-                        class="font-mono text-sm"
-                        placeholder="npm test"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => saveField("test_command")}
-                        disabled={savingField === "test_command"}
-                        class="h-8"
-                      >
-                        <Check class="h-4 w-4 text-green-600" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={cancelEditing}
-                        disabled={savingField === "test_command"}
-                        class="h-8"
-                      >
-                        <X class="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
-                  {:else}
-                    <p class="rounded bg-muted p-2 font-mono text-sm">
-                      {project.test_command}
-                    </p>
-                  {/if}
-                </div>
-              {/if}
-
-              {#if project.output_directory || editingField === "output_directory"}
-                <div>
-                  <div class="mb-1 flex items-center justify-between">
-                    <Label class="text-sm font-medium text-muted-foreground"
-                      >Output Directory</Label
-                    >
-                    {#if editingField !== "output_directory"}
+                      {/if}
                       <Button
                         variant="ghost"
                         size="sm"
                         onclick={() =>
-                          project &&
-                          startEditing(
-                            "output_directory",
-                            project.output_directory,
-                          )}
-                        class="h-6 px-2"
+                          project && startEditing('build_command', project.build_command)}
+                        class="h-7 px-2"
                       >
                         <Edit class="h-3 w-3" />
                       </Button>
-                    {/if}
+                    </div>
+                  {/if}
+                </div>
+                {#if editingField === 'build_command'}
+                  <div class="flex items-center gap-2">
+                    <Input
+                      bind:value={editValues.build_command}
+                      class="font-mono text-sm"
+                      placeholder="npm run build"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={() => saveField('build_command')}
+                      disabled={savingField === 'build_command'}
+                      class="h-8"
+                    >
+                      <Check class="h-4 w-4 text-green-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={cancelEditing}
+                      disabled={savingField === 'build_command'}
+                      class="h-8"
+                    >
+                      <X class="h-4 w-4 text-red-600" />
+                    </Button>
                   </div>
-                  {#if editingField === "output_directory"}
-                    <div class="flex items-center gap-2">
-                      <Input
-                        bind:value={editValues.output_directory}
-                        class="font-mono text-sm"
-                        placeholder="dist"
-                      />
+                {:else}
+                  <p class="rounded bg-muted p-2 font-mono text-sm">
+                    {project.build_command}
+                  </p>
+                {/if}
+              </div>
+            {/if}
+
+            {#if project.start_command || editingField === 'start_command'}
+              <div>
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <Label class="text-sm font-medium text-muted-foreground">Start Command</Label>
+                  {#if editingField !== 'start_command'}
+                    <div class="flex items-center gap-1">
+                      {#if project.start_command}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onclick={() => handleRunCommand('start')}
+                          disabled={runningCommand !== null}
+                          class="h-7 gap-1 px-2"
+                        >
+                          {#if runningCommand === 'start'}
+                            <Loader2 class="h-3 w-3 animate-spin" />
+                          {:else}
+                            <Play class="h-3 w-3" />
+                          {/if}
+                          Run
+                        </Button>
+                      {/if}
                       <Button
                         variant="ghost"
                         size="sm"
-                        onclick={() => saveField("output_directory")}
-                        disabled={savingField === "output_directory"}
-                        class="h-8"
+                        onclick={() =>
+                          project && startEditing('start_command', project.start_command)}
+                        class="h-7 px-2"
                       >
-                        <Check class="h-4 w-4 text-green-600" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={cancelEditing}
-                        disabled={savingField === "output_directory"}
-                        class="h-8"
-                      >
-                        <X class="h-4 w-4 text-red-600" />
+                        <Edit class="h-3 w-3" />
                       </Button>
                     </div>
-                  {:else}
-                    <p class="rounded bg-muted p-2 font-mono text-sm">
-                      {project.output_directory}
-                    </p>
+                  {/if}
+                </div>
+                {#if editingField === 'start_command'}
+                  <div class="flex items-center gap-2">
+                    <Input
+                      bind:value={editValues.start_command}
+                      class="font-mono text-sm"
+                      placeholder="npm start"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={() => saveField('start_command')}
+                      disabled={savingField === 'start_command'}
+                      class="h-8"
+                    >
+                      <Check class="h-4 w-4 text-green-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={cancelEditing}
+                      disabled={savingField === 'start_command'}
+                      class="h-8"
+                    >
+                      <X class="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
+                {:else}
+                  <p class="rounded bg-muted p-2 font-mono text-sm">
+                    {project.start_command}
+                  </p>
+                {/if}
+              </div>
+            {/if}
+
+            {#if project.test_command || editingField === 'test_command'}
+              <div>
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <Label class="text-sm font-medium text-muted-foreground">Test Command</Label>
+                  {#if editingField !== 'test_command'}
+                    <div class="flex items-center gap-1">
+                      {#if project.test_command}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onclick={() => handleRunCommand('test')}
+                          disabled={runningCommand !== null}
+                          class="h-7 gap-1 px-2"
+                        >
+                          {#if runningCommand === 'test'}
+                            <Loader2 class="h-3 w-3 animate-spin" />
+                          {:else}
+                            <Play class="h-3 w-3" />
+                          {/if}
+                          Run
+                        </Button>
+                      {/if}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onclick={() =>
+                          project && startEditing('test_command', project.test_command)}
+                        class="h-7 px-2"
+                      >
+                        <Edit class="h-3 w-3" />
+                      </Button>
+                    </div>
+                  {/if}
+                </div>
+                {#if editingField === 'test_command'}
+                  <div class="flex items-center gap-2">
+                    <Input
+                      bind:value={editValues.test_command}
+                      class="font-mono text-sm"
+                      placeholder="npm test"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={() => saveField('test_command')}
+                      disabled={savingField === 'test_command'}
+                      class="h-8"
+                    >
+                      <Check class="h-4 w-4 text-green-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={cancelEditing}
+                      disabled={savingField === 'test_command'}
+                      class="h-8"
+                    >
+                      <X class="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
+                {:else}
+                  <p class="rounded bg-muted p-2 font-mono text-sm">
+                    {project.test_command}
+                  </p>
+                {/if}
+              </div>
+            {/if}
+
+            {#if project.output_directory || editingField === 'output_directory'}
+              <div>
+                <div class="mb-1 flex items-center justify-between">
+                  <Label class="text-sm font-medium text-muted-foreground">Output Directory</Label>
+                  {#if editingField !== 'output_directory'}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={() =>
+                        project && startEditing('output_directory', project.output_directory)}
+                      class="h-6 px-2"
+                    >
+                      <Edit class="h-3 w-3" />
+                    </Button>
+                  {/if}
+                </div>
+                {#if editingField === 'output_directory'}
+                  <div class="flex items-center gap-2">
+                    <Input
+                      bind:value={editValues.output_directory}
+                      class="font-mono text-sm"
+                      placeholder="dist"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={() => saveField('output_directory')}
+                      disabled={savingField === 'output_directory'}
+                      class="h-8"
+                    >
+                      <Check class="h-4 w-4 text-green-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={cancelEditing}
+                      disabled={savingField === 'output_directory'}
+                      class="h-8"
+                    >
+                      <X class="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
+                {:else}
+                  <p class="rounded bg-muted p-2 font-mono text-sm">
+                    {project.output_directory}
+                  </p>
+                {/if}
+              </div>
+            {/if}
+
+            <!-- Add New Command Section -->
+            {#if hasAnyCommands(project) && editingField === null}
+              <div class="divider-edge-t divider-edge-full pt-2">
+                <div class="flex flex-wrap gap-2">
+                  {#if !project.build_command && editingField !== 'build_command'}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onclick={() => startEditing('build_command', '')}
+                    >
+                      + Build
+                    </Button>
+                  {/if}
+                  {#if !project.start_command && editingField !== 'start_command'}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onclick={() => startEditing('start_command', '')}
+                    >
+                      + Start
+                    </Button>
+                  {/if}
+                  {#if !project.test_command && editingField !== 'test_command'}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onclick={() => startEditing('test_command', '')}
+                    >
+                      + Test
+                    </Button>
+                  {/if}
+                  {#if !project.output_directory && editingField !== 'output_directory'}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onclick={() => startEditing('output_directory', '')}
+                    >
+                      + Output Dir
+                    </Button>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+
+            {#if project.dev_port || project.prod_port}
+              <div>
+                <p class="text-sm font-medium text-muted-foreground">Ports</p>
+                <div class="mt-1 flex gap-2">
+                  {#if project.dev_port}
+                    <Badge variant="outline">Dev: {project.dev_port}</Badge>
+                  {/if}
+                  {#if project.prod_port}
+                    <Badge variant="outline">Prod: {project.prod_port}</Badge>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+          </CardContent>
+        </Card>
+
+        <!-- Git Information -->
+        {#if project.git_repository || project.git_branch}
+          <Card>
+            <CardHeader>
+              <CardTitle class="flex items-center gap-2">
+                <Code class="h-5 w-5" />
+                Git Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              {#if project.git_repository}
+                <div>
+                  <p class="text-sm font-medium text-muted-foreground">Repository</p>
+                  <p class="mt-1 break-all rounded bg-muted p-2 font-mono text-sm">
+                    {project.git_repository}
+                  </p>
+                  {#if toGitHubUrl(project.git_repository)}
+                    <a
+                      href={toGitHubUrl(project.git_repository) ?? '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      class="mt-2 inline-flex items-center text-sm text-primary"
+                    >
+                      Open repository
+                      <ExternalLink class="ml-1 h-3 w-3" />
+                    </a>
                   {/if}
                 </div>
               {/if}
 
-              <!-- Add New Command Section -->
-              {#if hasAnyCommands(project) && editingField === null}
-                <div class="divider-edge-t divider-edge-full pt-2">
-                  <div class="flex flex-wrap gap-2">
-                    {#if !project.build_command && editingField !== "build_command"}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => startEditing("build_command", "")}
-                      >
-                        + Build
-                      </Button>
-                    {/if}
-                    {#if !project.start_command && editingField !== "start_command"}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => startEditing("start_command", "")}
-                      >
-                        + Start
-                      </Button>
-                    {/if}
-                    {#if !project.test_command && editingField !== "test_command"}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => startEditing("test_command", "")}
-                      >
-                        + Test
-                      </Button>
-                    {/if}
-                    {#if !project.output_directory && editingField !== "output_directory"}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => startEditing("output_directory", "")}
-                      >
-                        + Output Dir
-                      </Button>
-                    {/if}
-                  </div>
+              {#if project.git_branch}
+                <div>
+                  <p class="text-sm font-medium text-muted-foreground">Branch</p>
+                  <p class="mt-1 text-sm">{project.git_branch}</p>
                 </div>
               {/if}
 
-              {#if project.dev_port || project.prod_port}
+              {#if project.git_commit}
                 <div>
-                  <p class="text-sm font-medium text-muted-foreground">Ports</p>
-                  <div class="mt-1 flex gap-2">
-                    {#if project.dev_port}
-                      <Badge variant="outline">Dev: {project.dev_port}</Badge>
-                    {/if}
-                    {#if project.prod_port}
-                      <Badge variant="outline">Prod: {project.prod_port}</Badge>
-                    {/if}
-                  </div>
+                  <p class="text-sm font-medium text-muted-foreground">Last Commit</p>
+                  <p class="mt-1 rounded bg-muted p-2 font-mono text-sm">
+                    {project.git_commit}
+                  </p>
+                </div>
+              {/if}
+
+              {#if project.has_uncommitted_changes !== undefined}
+                <div>
+                  <p class="text-sm font-medium text-muted-foreground">Uncommitted Changes</p>
+                  <Badge variant={project.has_uncommitted_changes ? 'destructive' : 'default'}>
+                    {project.has_uncommitted_changes ? 'Yes' : 'No'}
+                  </Badge>
                 </div>
               {/if}
             </CardContent>
           </Card>
+        {/if}
+      </TabsContent>
 
-          <!-- Git Information -->
-          {#if project.git_repository || project.git_branch}
+      <TabsContent value="dependencies" class="mt-6 space-y-6">
+        {#if hasDependencies && project.metadata?.dependencies}
+          <div class="space-y-6">
+            <!-- Package Manager Info -->
             <Card>
               <CardHeader>
                 <CardTitle class="flex items-center gap-2">
-                  <Code class="h-5 w-5" />
-                  Git Information
+                  <Package class="h-5 w-5" />
+                  Package Manager
                 </CardTitle>
               </CardHeader>
-              <CardContent class="space-y-4">
-                {#if project.git_repository}
-                  <div>
-                    <p class="text-sm font-medium text-muted-foreground">
-                      Repository
-                    </p>
-                    <p
-                      class="mt-1 break-all rounded bg-muted p-2 font-mono text-sm"
-                    >
-                      {project.git_repository}
-                    </p>
-                    {#if toGitHubUrl(project.git_repository)}
-                      <a
-                        href={toGitHubUrl(project.git_repository) ?? "#"}
-                        target="_blank"
-                        rel="noreferrer"
-                        class="mt-2 inline-flex items-center text-sm text-primary"
-                      >
-                        Open repository
-                        <ExternalLink class="ml-1 h-3 w-3" />
-                      </a>
-                    {/if}
-                  </div>
-                {/if}
-
-                {#if project.git_branch}
-                  <div>
-                    <p class="text-sm font-medium text-muted-foreground">
-                      Branch
-                    </p>
-                    <p class="mt-1 text-sm">{project.git_branch}</p>
-                  </div>
-                {/if}
-
-                {#if project.git_commit}
-                  <div>
-                    <p class="text-sm font-medium text-muted-foreground">
-                      Last Commit
-                    </p>
-                    <p class="mt-1 rounded bg-muted p-2 font-mono text-sm">
-                      {project.git_commit}
-                    </p>
-                  </div>
-                {/if}
-
-                {#if project.has_uncommitted_changes !== undefined}
-                  <div>
-                    <p class="text-sm font-medium text-muted-foreground">
-                      Uncommitted Changes
-                    </p>
-                    <Badge
-                      variant={project.has_uncommitted_changes
-                        ? "destructive"
-                        : "default"}
-                    >
-                      {project.has_uncommitted_changes ? "Yes" : "No"}
-                    </Badge>
-                  </div>
-                {/if}
+              <CardContent>
+                <Badge variant="outline" class="px-3 py-1 text-base">
+                  {project.metadata.dependencies.packageManager}
+                </Badge>
               </CardContent>
             </Card>
-          {/if}
-        </TabsContent>
 
-        <TabsContent value="dependencies" class="mt-6 space-y-6">
-          {#if hasDependencies && project.metadata?.dependencies}
-            <div class="space-y-6">
-              <!-- Package Manager Info -->
+            <!-- Dependencies -->
+            {#if Object.keys(project.metadata.dependencies.dependencies || {}).length > 0}
               <Card>
                 <CardHeader>
-                  <CardTitle class="flex items-center gap-2">
-                    <Package class="h-5 w-5" />
-                    Package Manager
-                  </CardTitle>
+                  <CardTitle>Dependencies</CardTitle>
+                  <CardDescription>
+                    {Object.keys(project.metadata.dependencies.dependencies).length} production dependencies
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Badge variant="outline" class="px-3 py-1 text-base">
-                    {project.metadata.dependencies.packageManager}
-                  </Badge>
+                  <div class="max-h-[400px] space-y-2 overflow-y-auto">
+                    {#each Object.entries(project.metadata.dependencies.dependencies) as [name, version]}
+                      <div
+                        class="flex items-center justify-between rounded border p-2 {project.metadata.dependencies.outdated?.includes(
+                          name
+                        )
+                          ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20'
+                          : ''}"
+                      >
+                        <div class="flex items-center gap-2">
+                          <Package class="h-4 w-4 text-muted-foreground" />
+                          <span class="font-mono text-sm font-medium">{name}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <span class="text-sm text-muted-foreground">{version}</span>
+                          {#if project.metadata.dependencies.outdated?.includes(name)}
+                            <Badge
+                              variant="outline"
+                              class="border-yellow-300 bg-yellow-100 text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900 dark:text-yellow-200"
+                            >
+                              Outdated
+                            </Badge>
+                          {/if}
+                          {#if project.metadata.dependencies.vulnerabilities?.includes(name)}
+                            <Badge variant="destructive">Vulnerable</Badge>
+                          {/if}
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
                 </CardContent>
               </Card>
+            {/if}
 
-              <!-- Dependencies -->
-              {#if Object.keys(project.metadata.dependencies.dependencies || {}).length > 0}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Dependencies</CardTitle>
-                    <CardDescription>
-                      {Object.keys(project.metadata.dependencies.dependencies)
-                        .length} production dependencies
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div class="max-h-[400px] space-y-2 overflow-y-auto">
-                      {#each Object.entries(project.metadata.dependencies.dependencies) as [name, version]}
-                        <div
-                          class="flex items-center justify-between rounded border p-2 {project.metadata.dependencies.outdated?.includes(
-                            name,
-                          )
-                            ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20'
-                            : ''}"
-                        >
-                          <div class="flex items-center gap-2">
-                            <Package class="h-4 w-4 text-muted-foreground" />
-                            <span class="font-mono text-sm font-medium"
-                              >{name}</span
-                            >
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <span class="text-sm text-muted-foreground"
-                              >{version}</span
-                            >
-                            {#if project.metadata.dependencies.outdated?.includes(name)}
-                              <Badge
-                                variant="outline"
-                                class="border-yellow-300 bg-yellow-100 text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900 dark:text-yellow-200"
-                              >
-                                Outdated
-                              </Badge>
-                            {/if}
-                            {#if project.metadata.dependencies.vulnerabilities?.includes(name)}
-                              <Badge variant="destructive">Vulnerable</Badge>
-                            {/if}
-                          </div>
+            <!-- Dev Dependencies -->
+            {#if Object.keys(project.metadata.dependencies.devDependencies || {}).length > 0}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Dev Dependencies</CardTitle>
+                  <CardDescription>
+                    {Object.keys(project.metadata.dependencies.devDependencies).length} development dependencies
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div class="max-h-[400px] space-y-2 overflow-y-auto">
+                    {#each Object.entries(project.metadata.dependencies.devDependencies) as [name, version]}
+                      <div
+                        class="flex items-center justify-between rounded border p-2 {project.metadata.dependencies.outdated?.includes(
+                          name
+                        )
+                          ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20'
+                          : ''}"
+                      >
+                        <div class="flex items-center gap-2">
+                          <Package class="h-4 w-4 text-muted-foreground" />
+                          <span class="font-mono text-sm font-medium">{name}</span>
                         </div>
-                      {/each}
-                    </div>
-                  </CardContent>
-                </Card>
-              {/if}
-
-              <!-- Dev Dependencies -->
-              {#if Object.keys(project.metadata.dependencies.devDependencies || {}).length > 0}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Dev Dependencies</CardTitle>
-                    <CardDescription>
-                      {Object.keys(
-                        project.metadata.dependencies.devDependencies,
-                      ).length} development dependencies
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div class="max-h-[400px] space-y-2 overflow-y-auto">
-                      {#each Object.entries(project.metadata.dependencies.devDependencies) as [name, version]}
-                        <div
-                          class="flex items-center justify-between rounded border p-2 {project.metadata.dependencies.outdated?.includes(
-                            name,
-                          )
-                            ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20'
-                            : ''}"
-                        >
-                          <div class="flex items-center gap-2">
-                            <Package class="h-4 w-4 text-muted-foreground" />
-                            <span class="font-mono text-sm font-medium"
-                              >{name}</span
+                        <div class="flex items-center gap-2">
+                          <span class="text-sm text-muted-foreground">{version}</span>
+                          {#if project.metadata.dependencies.outdated?.includes(name)}
+                            <Badge
+                              variant="outline"
+                              class="border-yellow-300 bg-yellow-100 text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900 dark:text-yellow-200"
                             >
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <span class="text-sm text-muted-foreground"
-                              >{version}</span
-                            >
-                            {#if project.metadata.dependencies.outdated?.includes(name)}
-                              <Badge
-                                variant="outline"
-                                class="border-yellow-300 bg-yellow-100 text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900 dark:text-yellow-200"
-                              >
-                                Outdated
-                              </Badge>
-                            {/if}
-                            {#if project.metadata.dependencies.vulnerabilities?.includes(name)}
-                              <Badge variant="destructive">Vulnerable</Badge>
-                            {/if}
-                          </div>
+                              Outdated
+                            </Badge>
+                          {/if}
+                          {#if project.metadata.dependencies.vulnerabilities?.includes(name)}
+                            <Badge variant="destructive">Vulnerable</Badge>
+                          {/if}
                         </div>
-                      {/each}
+                      </div>
+                    {/each}
+                  </div>
+                </CardContent>
+              </Card>
+            {/if}
+
+            <!-- Summary -->
+            {#if (project.metadata.dependencies.outdated?.length || 0) > 0 || (project.metadata.dependencies.vulnerabilities?.length || 0) > 0}
+              <Card class="border-orange-200 dark:border-orange-800">
+                <CardHeader>
+                  <CardTitle>Summary</CardTitle>
+                </CardHeader>
+                <CardContent class="space-y-2">
+                  {#if (project.metadata.dependencies.outdated?.length || 0) > 0}
+                    <div class="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        class="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                      >
+                        {project.metadata.dependencies.outdated.length} outdated packages
+                      </Badge>
                     </div>
-                  </CardContent>
-                </Card>
-              {/if}
-
-              <!-- Summary -->
-              {#if (project.metadata.dependencies.outdated?.length || 0) > 0 || (project.metadata.dependencies.vulnerabilities?.length || 0) > 0}
-                <Card class="border-orange-200 dark:border-orange-800">
-                  <CardHeader>
-                    <CardTitle>Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent class="space-y-2">
-                    {#if (project.metadata.dependencies.outdated?.length || 0) > 0}
-                      <div class="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          class="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                        >
-                          {project.metadata.dependencies.outdated.length} outdated
-                          packages
-                        </Badge>
-                      </div>
-                    {/if}
-                    {#if (project.metadata.dependencies.vulnerabilities?.length || 0) > 0}
-                      <div class="flex items-center gap-2">
-                        <Badge variant="destructive">
-                          {project.metadata.dependencies.vulnerabilities.length} vulnerable
-                          packages
-                        </Badge>
-                      </div>
-                    {/if}
-                  </CardContent>
-                </Card>
-              {/if}
-            </div>
-          {:else}
-            <PageEmpty
-              title="No dependency data"
-              description="Dependency information has not been scanned for this project yet. Refresh metadata to update size and git info, or edit the project to assign package managers."
-              icon={Package}
-              actionLabel="Refresh metadata"
-              onAction={handleRefreshMetadata}
-            />
-          {/if}
-        </TabsContent>
-
-        <TabsContent value="actions" class="mt-6 space-y-6">
-          <ProjectActionsPanel
-            project={currentProject}
-            enabled={activeTab === "actions"}
+                  {/if}
+                  {#if (project.metadata.dependencies.vulnerabilities?.length || 0) > 0}
+                    <div class="flex items-center gap-2">
+                      <Badge variant="destructive">
+                        {project.metadata.dependencies.vulnerabilities.length} vulnerable packages
+                      </Badge>
+                    </div>
+                  {/if}
+                </CardContent>
+              </Card>
+            {/if}
+          </div>
+        {:else}
+          <PageEmpty
+            title="No dependency data"
+            description="Dependency information has not been scanned for this project yet. Refresh metadata to update size and git info, or edit the project to assign package managers."
+            icon={Package}
+            actionLabel="Refresh metadata"
+            onAction={handleRefreshMetadata}
           />
-        </TabsContent>
+        {/if}
+      </TabsContent>
 
-        <TabsContent value="terminal" class="mt-6">
-          <Card class="overflow-hidden">
-            <CardContent class="p-0">
-              <div class="h-[600px]">
-                <ProjectTerminal
-                  projectId={project.id}
-                  projectName={project.name}
-                  projectPath={project.path}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <TabsContent value="actions" class="mt-6 space-y-6">
+        <ProjectActionsPanel project={currentProject} enabled={activeTab === 'actions'} />
+      </TabsContent>
+
+      <TabsContent value="terminal" class="mt-6">
+        <Card class="overflow-hidden">
+          <CardContent class="p-0">
+            <div class="h-[600px]">
+              <ProjectTerminal
+                projectId={project.id}
+                projectName={project.name}
+                projectPath={project.path}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   {/if}
 </div>

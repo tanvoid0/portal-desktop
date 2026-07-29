@@ -1,23 +1,23 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { page } from "$app/stores";
-  import UtilitiesNavigation from "$lib/domains/utilities/components/UtilitiesNavigation.svelte";
-  import ShellSidebarLayout from "$lib/components/shell/shell-sidebar-layout.svelte";
-  import PageContainer from "$lib/components/shell/page-container.svelte";
-  import { Card } from "$lib/components/ui/card";
-  import { Wrench } from "@lucide/svelte";
+  import type { Snippet } from 'svelte';
+  import { page } from '$app/stores';
+  import UtilitiesNavigation from '$lib/domains/utilities/components/UtilitiesNavigation.svelte';
+  import ShellSidebarLayout from '$lib/components/shell/shell-sidebar-layout.svelte';
+  import PageContainer from '$lib/components/shell/page-container.svelte';
+  import { Card } from '$lib/components/ui/card';
+  import { Wrench } from '@lucide/svelte';
 
   let { children }: { children: Snippet<[]> } = $props();
 
   let currentSection = $derived.by(() => {
     const path = $page.url.pathname;
-    if (path.startsWith("/utilities/environment")) return "environment" as const;
-    if (path.startsWith("/utilities/disk")) return "disk" as const;
-    return "disk" as const;
+    if (path.startsWith('/utilities/environment')) return 'environment' as const;
+    if (path.startsWith('/utilities/disk')) return 'disk' as const;
+    return 'disk' as const;
   });
 
   let containerVariant = $derived(
-    currentSection === "disk" ? ("full" as const) : ("readable" as const),
+    currentSection === 'disk' ? ('full' as const) : ('readable' as const)
   );
 </script>
 
@@ -29,7 +29,9 @@
   <div
     class="divider-edge-b divider-edge-full flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
-    <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 3xl:px-8">
+    <div
+      class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 3xl:px-8"
+    >
       <div class="min-w-0">
         <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Wrench class="h-6 w-6" />
@@ -46,7 +48,7 @@
     {#snippet sidebar()}
       <div class="p-4">
         <Card class="p-3">
-          <UtilitiesNavigation currentSection={currentSection} />
+          <UtilitiesNavigation {currentSection} />
         </Card>
       </div>
     {/snippet}

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Play, Square } from "@lucide/svelte";
-  import { Switch } from "$lib/components/ui/switch";
-  import type { SDKSidebarVariant } from "./sdkSidebarTypes";
+  import { Button } from '$lib/components/ui/button';
+  import { Play, Square } from '@lucide/svelte';
+  import { Switch } from '$lib/components/ui/switch';
+  import type { SDKSidebarVariant } from './sdkSidebarTypes';
 
   interface Props {
     variant: SDKSidebarVariant;
@@ -21,14 +21,14 @@
   }
 </script>
 
-{#if variant === "collapsed"}
+{#if variant === 'collapsed'}
   <Button
     type="button"
     variant="ghost"
     size="icon"
     class="h-4 w-4"
-    title={checked ? "Stop service" : "Start service"}
-    disabled={disabled}
+    title={checked ? 'Stop service' : 'Start service'}
+    {disabled}
     onclick={toggleCollapsed}
   >
     {#if checked}
@@ -39,11 +39,10 @@
   </Button>
 {:else}
   <Switch
-    checked={checked}
-    disabled={disabled}
-    title={checked ? "Stop service" : "Start service"}
+    {checked}
+    {disabled}
+    title={checked ? 'Stop service' : 'Start service'}
     onclick={(e) => e.stopPropagation()}
     onCheckedChange={(next) => onToggle(next)}
   />
 {/if}
-

@@ -11,23 +11,13 @@
     TableHead,
     TableHeader,
     TableRow,
-  } from "$lib/components/ui/table";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import { Progress } from "$lib/components/ui/progress";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import { Download, Trash2, Check, Clock, AlertCircle } from "@lucide/svelte";
+  } from '$lib/components/ui/table';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { Progress } from '$lib/components/ui/progress';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Download, Trash2, Check, Clock, AlertCircle } from '@lucide/svelte';
 
   interface VersionInfo {
     version: string;
@@ -49,13 +39,7 @@
     loading?: boolean;
   }
 
-  let {
-    versions,
-    onInstall,
-    onUninstall,
-    onSetActive,
-    loading = false,
-  }: Props = $props();
+  let { versions, onInstall, onUninstall, onSetActive, loading = false }: Props = $props();
 
   // Derived state
   let installedVersions = $derived(versions.filter((v) => v.installed));
@@ -68,25 +52,25 @@
   function getStatusBadge(version: VersionInfo) {
     if (version.error) {
       return {
-        variant: "destructive" as const,
-        text: "Error",
+        variant: 'destructive' as const,
+        text: 'Error',
         icon: AlertCircle,
       };
     }
     if (version.downloading) {
       return {
-        variant: "secondary" as const,
-        text: "Downloading",
+        variant: 'secondary' as const,
+        text: 'Downloading',
         icon: Clock,
       };
     }
     if (version.active) {
-      return { variant: "default" as const, text: "Active", icon: Check };
+      return { variant: 'default' as const, text: 'Active', icon: Check };
     }
     if (version.installed) {
-      return { variant: "secondary" as const, text: "Installed", icon: Check };
+      return { variant: 'secondary' as const, text: 'Installed', icon: Check };
     }
-    return { variant: "outline" as const, text: "Available", icon: Download };
+    return { variant: 'outline' as const, text: 'Available', icon: Download };
   }
 
   function canInstall(version: VersionInfo) {
@@ -124,9 +108,7 @@
 <div class="space-y-6">
   <!-- Active Version Card -->
   {#if activeVersion}
-    <Card
-      class="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
-    >
+    <Card class="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
       <CardHeader class="pb-3">
         <CardTitle class="flex items-center gap-2 text-lg">
           <Check class="h-5 w-5 text-green-600" />
@@ -163,9 +145,7 @@
     <TabsContent value="installed" class="space-y-4">
       {#if installedVersions.length === 0}
         <Card>
-          <CardContent
-            class="flex flex-col items-center justify-center py-8 text-center"
-          >
+          <CardContent class="flex flex-col items-center justify-center py-8 text-center">
             <Download class="mb-4 h-12 w-12 text-muted-foreground" />
             <h3 class="mb-2 text-lg font-semibold">No Versions Installed</h3>
             <p class="text-muted-foreground">
@@ -197,10 +177,7 @@
                 <TableCell>
                   {#if version.downloading}
                     <div class="space-y-2">
-                      <Badge
-                        variant="secondary"
-                        class="flex w-fit items-center gap-1"
-                      >
+                      <Badge variant="secondary" class="flex w-fit items-center gap-1">
                         <Clock class="h-3 w-3" />
                         Downloading
                       </Badge>
@@ -209,19 +186,13 @@
                       {/if}
                     </div>
                   {:else if version.error}
-                    <Badge
-                      variant="destructive"
-                      class="flex w-fit items-center gap-1"
-                    >
+                    <Badge variant="destructive" class="flex w-fit items-center gap-1">
                       <AlertCircle class="h-3 w-3" />
                       Error
                     </Badge>
                   {:else}
                     {@const status = getStatusBadge(version)}
-                    <Badge
-                      variant={status.variant}
-                      class="flex w-fit items-center gap-1"
-                    >
+                    <Badge variant={status.variant} class="flex w-fit items-center gap-1">
                       <status.icon class="h-3 w-3" />
                       {status.text}
                     </Badge>
@@ -229,25 +200,18 @@
                 </TableCell>
                 <TableCell>
                   <div class="text-sm text-muted-foreground">
-                    {version.description || "No description available"}
+                    {version.description || 'No description available'}
                   </div>
                   {#if version.releaseDate}
                     <div class="mt-1 text-xs text-muted-foreground">
-                      Released: {new Date(
-                        version.releaseDate,
-                      ).toLocaleDateString()}
+                      Released: {new Date(version.releaseDate).toLocaleDateString()}
                     </div>
                   {/if}
                 </TableCell>
                 <TableCell>
                   <div class="flex gap-2">
                     {#if canSetActive(version)}
-                      <Button
-                        size="sm"
-                        onclick={() => handleSetActive(version)}
-                      >
-                        Set Active
-                      </Button>
+                      <Button size="sm" onclick={() => handleSetActive(version)}>Set Active</Button>
                     {/if}
                     {#if canUninstall(version)}
                       <Button
@@ -271,14 +235,10 @@
     <TabsContent value="available" class="space-y-4">
       {#if availableVersions.length === 0}
         <Card>
-          <CardContent
-            class="flex flex-col items-center justify-center py-8 text-center"
-          >
+          <CardContent class="flex flex-col items-center justify-center py-8 text-center">
             <Check class="mb-4 h-12 w-12 text-muted-foreground" />
             <h3 class="mb-2 text-lg font-semibold">All Versions Installed</h3>
-            <p class="text-muted-foreground">
-              You have all available versions installed.
-            </p>
+            <p class="text-muted-foreground">You have all available versions installed.</p>
           </CardContent>
         </Card>
       {:else}
@@ -304,33 +264,24 @@
                 </TableCell>
                 <TableCell>
                   {@const status = getStatusBadge(version)}
-                  <Badge
-                    variant={status.variant}
-                    class="flex w-fit items-center gap-1"
-                  >
+                  <Badge variant={status.variant} class="flex w-fit items-center gap-1">
                     <status.icon class="h-3 w-3" />
                     {status.text}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <div class="text-sm text-muted-foreground">
-                    {version.description || "No description available"}
+                    {version.description || 'No description available'}
                   </div>
                   {#if version.releaseDate}
                     <div class="mt-1 text-xs text-muted-foreground">
-                      Released: {new Date(
-                        version.releaseDate,
-                      ).toLocaleDateString()}
+                      Released: {new Date(version.releaseDate).toLocaleDateString()}
                     </div>
                   {/if}
                 </TableCell>
                 <TableCell>
                   {#if canInstall(version)}
-                    <Button
-                      size="sm"
-                      onclick={() => handleInstall(version)}
-                      disabled={loading}
-                    >
+                    <Button size="sm" onclick={() => handleInstall(version)} disabled={loading}>
                       <Download class="mr-1 h-4 w-4" />
                       Install
                     </Button>

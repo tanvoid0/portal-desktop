@@ -3,11 +3,11 @@ name: Build and Release
 on:
   push:
     tags:
-      - "v*.*.*"
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (e.g., v1.0.0). Created if it does not exist."
+        description: 'Tag to release (e.g., v1.0.0). Created if it does not exist.'
         required: true
 
 concurrency:
@@ -38,13 +38,13 @@ jobs:
         include:
           # Listed for readability; all jobs start in parallel after smoke passes.
           - platform: windows-2022
-            args: ""
+            args: ''
           - platform: macos-14 # Apple Silicon
-            args: "--target aarch64-apple-darwin"
+            args: '--target aarch64-apple-darwin'
           - platform: macos-14 # Intel
-            args: "--target x86_64-apple-darwin"
+            args: '--target x86_64-apple-darwin'
           - platform: ubuntu-22.04
-            args: ""
+            args: ''
     runs-on: ${{ matrix.platform }}
     steps:
       # Local actions must be on disk before they can be resolved.

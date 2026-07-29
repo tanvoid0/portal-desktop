@@ -1,42 +1,36 @@
 <!-- Namespace Selector Component -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    cloudStore,
-    loadResources,
-    setSelectedNamespace,
-  } from "$lib/domains/cloud/stores";
-  import { ResourceType } from "$lib/domains/cloud/core/types";
-  import { SearchableSelect } from "$lib/components/ui/searchable-select";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import { useNamespaceShortcuts } from "$lib/domains/k8s-navigation";
-  import KeyboardShortcutHint from "$lib/domains/k8s-navigation/components/KeyboardShortcutHint.svelte";
+  import { onMount } from 'svelte';
+  import { cloudStore, loadResources, setSelectedNamespace } from '$lib/domains/cloud/stores';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
+  import { SearchableSelect } from '$lib/components/ui/searchable-select';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import { useNamespaceShortcuts } from '$lib/domains/k8s-navigation';
+  import KeyboardShortcutHint from '$lib/domains/k8s-navigation/components/KeyboardShortcutHint.svelte';
 
   // Get namespace list for selector
   const namespaceOptions = $derived.by(() => {
     const namespaces = $cloudStore.resources[ResourceType.NAMESPACE];
     const names = namespaces.map((ns: any) => ns.name).sort();
     return [
-      { value: "", label: "All Namespaces" },
+      { value: '', label: 'All Namespaces' },
       ...names.map((name) => ({ value: name, label: name })),
     ];
   });
 
   // Derived namespace shortcuts array
   const namespaceShortcutsArray = $derived.by(() => {
-    return namespaceOptions
-      .slice(1)
-      .map((opt, index) => ({
-        value: opt.value,
-        label: opt.label,
-        shortcut: index < 9 ? index + 1 : undefined,
-      }));
+    return namespaceOptions.slice(1).map((opt, index) => ({
+      value: opt.value,
+      label: opt.label,
+      shortcut: index < 9 ? index + 1 : undefined,
+    }));
   });
 
   // Namespace shortcuts - pass getter function to make it reactive
   const namespaceShortcuts = useNamespaceShortcuts({
     namespaces: () => namespaceShortcutsArray,
-    selectedNamespace: $cloudStore.selectedNamespace || "",
+    selectedNamespace: $cloudStore.selectedNamespace || '',
     onSelect: async (namespace) => {
       await handleNamespaceChange(namespace);
     },
@@ -51,9 +45,9 @@
   }
 
   onMount(() => {
-    window.addEventListener("keydown", handleKeydown);
+    window.addEventListener('keydown', handleKeydown);
     return () => {
-      window.removeEventListener("keydown", handleKeydown);
+      window.removeEventListener('keydown', handleKeydown);
     };
   });
 
@@ -79,7 +73,7 @@
         // Metrics will be handled by individual pages that need them
       } catch (error) {
         // Metrics might not be available, ignore
-        console.debug("Metrics not available:", error);
+        console.debug('Metrics not available:', error);
       }
     }
   }
@@ -102,7 +96,7 @@
       // Use setTimeout to break reactive cycle
       setTimeout(() => {
         loadResources(ResourceType.NAMESPACE).catch((err) => {
-          console.error("Failed to load namespaces:", err);
+          console.error('Failed to load namespaces:', err);
           hasLoadedNamespaces = false; // Reset on error so we can retry
         });
       }, 0);
@@ -115,12 +109,10 @@
     class="divider-edge-b divider-edge-full flex items-center gap-2 bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
     <div class="flex min-w-0 flex-1 items-center gap-2">
-      <span class="shrink-0 text-sm font-medium text-muted-foreground"
-        >Namespace:</span
-      >
+      <span class="shrink-0 text-sm font-medium text-muted-foreground">Namespace:</span>
       <SearchableSelect
         options={namespaceOptions}
-        value={$cloudStore.selectedNamespace || ""}
+        value={$cloudStore.selectedNamespace || ''}
         placeholder="All Namespaces"
         searchPlaceholder="Search namespaces..."
         onValueChange={handleNamespaceChange}
@@ -128,16 +120,11 @@
         class="w-full max-w-[14rem] sm:max-w-[16rem] md:max-w-[18rem]"
       />
       {#if $namespaceShortcutsStore.size > 1}
-        <div
-          class="hidden items-center gap-1 text-xs text-muted-foreground sm:flex"
-        >
+        <div class="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
           <span>Quick:</span>
           {#each Array.from($namespaceShortcutsStore.entries()).slice(0, 5) as [number, namespace]}
             <span class="px-1">
-              <KeyboardShortcutHint
-                shortcut={number.toString()}
-                variant="subtle"
-              />
+              <KeyboardShortcutHint shortcut={number.toString()} variant="subtle" />
               <span class="ml-1">{namespace.label.slice(0, 8)}</span>
             </span>
           {/each}

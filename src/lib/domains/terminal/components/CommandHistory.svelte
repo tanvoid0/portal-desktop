@@ -1,19 +1,16 @@
 <script lang="ts">
-  import {
-    commandHistoryStore,
-    type CommandHistoryEntry,
-  } from "../stores/commandHistoryStore";
-  import { formatCommandOutput } from "../utils/textUtils";
+  import { commandHistoryStore, type CommandHistoryEntry } from '../stores/commandHistoryStore';
+  import { formatCommandOutput } from '../utils/textUtils';
   import {
     formatDuration,
     getDurationColor,
     getDurationBadgeVariant,
     calculateAverageDuration,
-  } from "../utils/durationUtils";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import { onMount } from "svelte";
+  } from '../utils/durationUtils';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { onMount } from 'svelte';
 
   interface Props {
     tabId: string;
@@ -25,9 +22,7 @@
   let showModal = $state(false);
 
   // Get reactive history for the current tab
-  const tabHistoryStore = $derived(
-    commandHistoryStore.getTabHistoryReactive(tabId),
-  );
+  const tabHistoryStore = $derived(commandHistoryStore.getTabHistoryReactive(tabId));
   let tabHistory = $state<CommandHistoryEntry[]>([]);
 
   // Subscribe to store to get array
@@ -46,21 +41,21 @@
 
   function truncateText(text: string, maxLength: number = 100): string {
     if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + "...";
+    return text.substring(0, maxLength) + '...';
   }
 
   function getStatusIcon(entry: CommandHistoryEntry): string {
-    if (entry.intercepted) return "🎯";
-    if (entry.exitCode === 0) return "✅";
-    if (entry.exitCode && entry.exitCode !== 0) return "❌";
-    return "⏳";
+    if (entry.intercepted) return '🎯';
+    if (entry.exitCode === 0) return '✅';
+    if (entry.exitCode && entry.exitCode !== 0) return '❌';
+    return '⏳';
   }
 
   function getStatusColor(entry: CommandHistoryEntry): string {
-    if (entry.intercepted) return "text-status-info";
-    if (entry.exitCode === 0) return "text-status-success";
-    if (entry.exitCode && entry.exitCode !== 0) return "text-status-error";
-    return "text-status-warning";
+    if (entry.intercepted) return 'text-status-info';
+    if (entry.exitCode === 0) return 'text-status-success';
+    if (entry.exitCode && entry.exitCode !== 0) return 'text-status-error';
+    return 'text-status-warning';
   }
 
   function showEntryDetails(entry: CommandHistoryEntry) {
@@ -107,7 +102,7 @@
         variant="ghost"
         class="divider-edge-b divider-edge-full h-auto w-full cursor-pointer justify-start p-3 text-left transition-colors hover:bg-accent/50"
         onclick={() => showEntryDetails(entry)}
-        onkeydown={(e) => e.key === "Enter" && showEntryDetails(entry)}
+        onkeydown={(e) => e.key === 'Enter' && showEntryDetails(entry)}
         type="button"
       >
         <div class="mb-2 flex items-start justify-between">
@@ -115,9 +110,7 @@
             <span class="text-xs {getStatusColor(entry)}">
               {getStatusIcon(entry)}
             </span>
-            <code
-              class="rounded bg-muted px-2 py-1 font-mono text-sm text-foreground"
-            >
+            <code class="rounded bg-muted px-2 py-1 font-mono text-sm text-foreground">
               {entry.command}
             </code>
             {#if entry.duration}
@@ -142,9 +135,7 @@
       <div class="p-6 text-center text-muted-foreground">
         <div class="text-4xl mb-2">📝</div>
         <div class="text-sm">No commands executed yet</div>
-        <div class="text-xs mt-1">
-          Commands will appear here as you use the terminal
-        </div>
+        <div class="text-xs mt-1">Commands will appear here as you use the terminal</div>
       </div>
     {/each}
   </div>
@@ -161,9 +152,7 @@
         <!-- Command -->
         <div>
           <h3 class="mb-2 text-sm font-medium text-foreground">Command</h3>
-          <code
-            class="block rounded bg-muted p-3 font-mono text-sm text-status-success"
-          >
+          <code class="block rounded bg-muted p-3 font-mono text-sm text-status-success">
             {selectedEntry.command}
           </code>
         </div>
@@ -172,31 +161,25 @@
         <div class="grid grid-cols-2 gap-4 text-sm">
           <div>
             <span class="text-muted-foreground">Timestamp:</span>
-            <span class="ml-2 text-foreground"
-              >{selectedEntry.timestamp.toLocaleString()}</span
-            >
+            <span class="ml-2 text-foreground">{selectedEntry.timestamp.toLocaleString()}</span>
           </div>
           <div>
             <span class="text-muted-foreground">Status:</span>
             <span class="ml-2 {getStatusColor(selectedEntry)}">
               {getStatusIcon(selectedEntry)}
               {selectedEntry.intercepted
-                ? "Intercepted"
+                ? 'Intercepted'
                 : selectedEntry.exitCode === 0
-                  ? "Success"
+                  ? 'Success'
                   : selectedEntry.exitCode
                     ? `Failed (${selectedEntry.exitCode})`
-                    : "Running"}
+                    : 'Running'}
             </span>
           </div>
           {#if selectedEntry.duration}
             <div>
               <span class="text-muted-foreground">Duration:</span>
-              <span
-                class="ml-2 {getDurationColor(
-                  selectedEntry.duration,
-                )} font-mono"
-              >
+              <span class="ml-2 {getDurationColor(selectedEntry.duration)} font-mono">
                 {formatDuration(selectedEntry.duration)}
               </span>
             </div>
@@ -208,7 +191,7 @@
           <h3 class="mb-2 text-sm font-medium text-foreground">Output</h3>
           <pre
             class="overflow-x-auto whitespace-pre-wrap rounded bg-muted p-3 text-xs text-foreground">{selectedEntry.output ||
-              "(No output)"}</pre>
+              '(No output)'}</pre>
         </div>
       </div>
 
@@ -222,7 +205,7 @@
 <style>
   .command-history {
     font-family:
-      "Inter",
+      'Inter',
       -apple-system,
       BlinkMacSystemFont,
       sans-serif;

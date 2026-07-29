@@ -7,7 +7,7 @@ export interface ToolCall {
 }
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content?: string | null;
   tool_calls?: ToolCall[] | null;
   tool_call_id?: string | null;
@@ -62,7 +62,7 @@ export function summaryToThread(summary: CoderThreadSummary): CoderThread {
   };
 }
 
-export type CoderThreadKind = "session" | "coordinator" | "sub-agent";
+export type CoderThreadKind = 'session' | 'coordinator' | 'sub-agent';
 
 export interface PendingApproval {
   call_id: string;
@@ -114,7 +114,7 @@ export interface Hunk {
   accepted: boolean;
 }
 
-export type ChangeStatus = "pending" | "accepted" | "rejected";
+export type ChangeStatus = 'pending' | 'accepted' | 'rejected';
 
 export interface FileChange {
   id: string;
@@ -129,10 +129,10 @@ export interface FileChange {
   created_at: string;
 }
 
-export type CoderAgentMode = "plan" | "debug" | "multitask" | "ask" | "auto";
+export type CoderAgentMode = 'plan' | 'debug' | 'multitask' | 'ask' | 'auto';
 
 /** Review vs auto-approve for mutating tools (orthogonal to agent mode). */
-export type PermissionMode = "review" | "auto-accept-all";
+export type PermissionMode = 'review' | 'auto-accept-all';
 
 export interface PermissionRule {
   tool: string;
@@ -165,12 +165,7 @@ export interface GitCommitDraft {
   aiGenerated: boolean;
 }
 
-export type CoderSubAgentStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled";
+export type CoderSubAgentStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export interface GitHubIssueRef {
   owner: string;

@@ -1,13 +1,7 @@
 <script lang="ts">
-  import {
-    Terminal,
-    defaultTerminalConfig,
-    type TerminalConfig,
-  } from "$lib/domains/terminal";
-  import type { CoderTerminalTab } from "../state/coderTerminalStore.svelte.js";
-  import {
-    registerCoderTerminal,
-  } from "../services/coderTerminalCoordinator.js";
+  import { Terminal, defaultTerminalConfig, type TerminalConfig } from '$lib/domains/terminal';
+  import type { CoderTerminalTab } from '../state/coderTerminalStore.svelte.js';
+  import { registerCoderTerminal } from '../services/coderTerminalCoordinator.js';
 
   interface Props {
     threadId: string;

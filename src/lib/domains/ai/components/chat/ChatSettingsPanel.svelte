@@ -1,18 +1,18 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Slider } from "$lib/components/ui/slider";
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import { Button } from "$lib/components/ui/button";
-  import { ChevronDown, RotateCcw, X } from "@lucide/svelte";
+  import type { Snippet } from 'svelte';
+  import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Slider } from '$lib/components/ui/slider';
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import { Button } from '$lib/components/ui/button';
+  import { ChevronDown, RotateCcw, X } from '@lucide/svelte';
   import {
     DEFAULT_CHAT_SETTINGS,
     saveChatSettings,
     type ChatSettings,
-  } from "../../utils/chatSettings.js";
+  } from '../../utils/chatSettings.js';
 
   interface Props {
     settings: ChatSettings;
@@ -22,24 +22,22 @@
 
   let { settings = $bindable(), systemPromptTokens }: Props = $props();
 
-  let stopDraft = $state("");
+  let stopDraft = $state('');
 
   // ~4 chars per token is close enough for a composer-side hint.
-  const promptTokens = $derived(
-    systemPromptTokens ?? Math.ceil(settings.systemPrompt.length / 4),
-  );
+  const promptTokens = $derived(systemPromptTokens ?? Math.ceil(settings.systemPrompt.length / 4));
 
   $effect(() => {
     saveChatSettings($state.snapshot(settings));
   });
 
   function addStop(event: KeyboardEvent) {
-    if (event.key !== "Enter") return;
+    if (event.key !== 'Enter') return;
     event.preventDefault();
     const value = stopDraft.trim();
     if (!value || settings.stopStrings.includes(value)) return;
     settings.stopStrings = [...settings.stopStrings, value];
-    stopDraft = "";
+    stopDraft = '';
   }
 </script>
 
@@ -50,7 +48,7 @@
   min: number,
   max: number,
   step: number,
-  hint?: string,
+  hint?: string
 )}
   <div class="space-y-1.5">
     <div class="flex items-center justify-between gap-2">
@@ -60,7 +58,7 @@
         {min}
         {max}
         {step}
-        value={value}
+        {value}
         oninput={(e) => {
           const next = Number((e.currentTarget as HTMLInputElement).value);
           if (!Number.isNaN(next)) set(next);
@@ -68,14 +66,7 @@
         class="h-7 w-20 px-2 text-right text-xs tabular-nums"
       />
     </div>
-    <Slider
-      type="single"
-      value={value}
-      onValueChange={set}
-      {min}
-      {max}
-      {step}
-    />
+    <Slider type="single" {value} onValueChange={set} {min} {max} {step} />
     {#if hint}
       <p class="text-[10px] leading-snug text-muted-foreground">{hint}</p>
     {/if}
@@ -90,7 +81,7 @@
   fallback: number,
   min: number,
   max: number,
-  step: number,
+  step: number
 )}
   <div class="space-y-1.5">
     <div class="flex items-center justify-between gap-2">
@@ -117,14 +108,7 @@
       />
     </div>
     {#if value != null}
-      <Slider
-        type="single"
-        value={value}
-        onValueChange={set}
-        {min}
-        {max}
-        {step}
-      />
+      <Slider type="single" {value} onValueChange={set} {min} {max} {step} />
     {/if}
   </div>
 {/snippet}
@@ -135,9 +119,7 @@
       class="flex cursor-pointer list-none items-center justify-between py-2.5 text-xs font-medium text-muted-foreground marker:content-none hover:text-foreground"
     >
       {title}
-      <ChevronDown
-        class="h-3.5 w-3.5 transition-transform group-open/sec:rotate-180"
-      />
+      <ChevronDown class="h-3.5 w-3.5 transition-transform group-open/sec:rotate-180" />
     </summary>
     <div class="space-y-4 pb-4">
       {@render body()}
@@ -161,25 +143,22 @@
         </p>
       </div>
     {/snippet}
-    {@render section("System Prompt", systemPromptBody)}
+    {@render section('System Prompt', systemPromptBody)}
 
     {#snippet settingsBody()}
       {@render numberRow(
-        "Temperature",
+        'Temperature',
         settings.temperature,
         (v) => (settings.temperature = v),
         0,
         2,
-        0.05,
+        0.05
       )}
 
       <div class="space-y-1.5">
         <div class="flex items-center justify-between gap-2">
           <label class="flex items-center gap-2 text-xs">
-            <Checkbox
-              bind:checked={settings.limitResponseLength}
-              class="h-3.5 w-3.5"
-            />
+            <Checkbox bind:checked={settings.limitResponseLength} class="h-3.5 w-3.5" />
             Limit Response Length
           </label>
           <Input
@@ -209,73 +188,65 @@
                 class="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px]"
               >
                 <code class="font-mono">{stop}</code>
-                <button
+                <Button
                   type="button"
-                  class="text-muted-foreground hover:text-destructive"
+                  variant="ghost"
+                  size="icon"
+                  class="h-4 w-4 text-muted-foreground hover:text-destructive"
                   aria-label="Remove stop string {stop}"
                   onclick={() =>
-                    (settings.stopStrings = settings.stopStrings.filter(
-                      (s) => s !== stop,
-                    ))}
+                    (settings.stopStrings = settings.stopStrings.filter((s) => s !== stop))}
                 >
                   <X class="h-3 w-3" />
-                </button>
+                </Button>
               </span>
             {/each}
           </div>
         {/if}
       </div>
     {/snippet}
-    {@render section("Settings", settingsBody)}
+    {@render section('Settings', settingsBody)}
 
     {#snippet samplingBody()}
+      {@render gatedRow('Top K Sampling', settings.topK, (v) => (settings.topK = v), 40, 1, 200, 1)}
       {@render gatedRow(
-        "Top K Sampling",
-        settings.topK,
-        (v) => (settings.topK = v),
-        40,
-        1,
-        200,
-        1,
-      )}
-      {@render gatedRow(
-        "Repeat Penalty",
+        'Repeat Penalty',
         settings.repeatPenalty,
         (v) => (settings.repeatPenalty = v),
         1.1,
         1,
         2,
-        0.01,
+        0.01
       )}
       {@render gatedRow(
-        "Presence Penalty",
+        'Presence Penalty',
         settings.presencePenalty,
         (v) => (settings.presencePenalty = v),
         0,
         -2,
         2,
-        0.05,
+        0.05
       )}
       {@render gatedRow(
-        "Top P Sampling",
+        'Top P Sampling',
         settings.topP,
         (v) => (settings.topP = v),
         0.95,
         0,
         1,
-        0.01,
+        0.01
       )}
       {@render gatedRow(
-        "Min P Sampling",
+        'Min P Sampling',
         settings.minP,
         (v) => (settings.minP = v),
         0.05,
         0,
         1,
-        0.01,
+        0.01
       )}
     {/snippet}
-    {@render section("Sampling", samplingBody)}
+    {@render section('Sampling', samplingBody)}
 
     <Button
       variant="outline"

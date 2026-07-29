@@ -4,25 +4,25 @@
 -->
 
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { X } from "@lucide/svelte";
+  } from '$lib/components/ui/card';
+  import { X } from '@lucide/svelte';
   import {
     CustomScriptService,
     type CustomScript,
     type ScriptParameter,
-  } from "$lib/domains/custom_scripts/services/customScriptService";
-  import ScriptMetadataForm from "./ScriptMetadataForm.svelte";
-  import CommandTemplateInput from "./CommandTemplateInput.svelte";
-  import ScriptOptions from "./ScriptOptions.svelte";
-  import ParameterList from "./ParameterList.svelte";
+  } from '$lib/domains/custom_scripts/services/customScriptService';
+  import ScriptMetadataForm from './ScriptMetadataForm.svelte';
+  import CommandTemplateInput from './CommandTemplateInput.svelte';
+  import ScriptOptions from './ScriptOptions.svelte';
+  import ParameterList from './ParameterList.svelte';
 
   interface Props {
     script?: CustomScript | null;
@@ -33,11 +33,11 @@
   let { script, onClose, onSaved }: Props = $props();
 
   // Form state - initialized from script prop
-  let name = $state("");
-  let description = $state("");
-  let command = $state("");
-  let category = $state("");
-  let icon = $state("");
+  let name = $state('');
+  let description = $state('');
+  let command = $state('');
+  let category = $state('');
+  let icon = $state('');
   let requiresSudo = $state(false);
   let isInteractive = $state(false);
   let parameters = $state<ScriptParameter[]>([]);
@@ -49,21 +49,21 @@
   $effect(() => {
     if (script) {
       // Edit mode: populate from existing script
-      name = script.name || "";
-      description = script.description || "";
-      command = script.command || "";
-      category = script.category || "";
-      icon = script.icon || "";
+      name = script.name || '';
+      description = script.description || '';
+      command = script.command || '';
+      category = script.category || '';
+      icon = script.icon || '';
       requiresSudo = script.requires_sudo || false;
       isInteractive = script.is_interactive || false;
       parameters = CustomScriptService.parseParameters(script.parameters_json);
     } else {
       // Create mode: reset to defaults
-      name = "";
-      description = "";
-      command = "";
-      category = "";
-      icon = "";
+      name = '';
+      description = '';
+      command = '';
+      category = '';
+      icon = '';
       requiresSudo = false;
       isInteractive = false;
       parameters = [];
@@ -73,7 +73,7 @@
 
   async function handleSave() {
     if (!name.trim() || !command.trim()) {
-      error = "Name and command are required";
+      error = 'Name and command are required';
       return;
     }
 
@@ -106,8 +106,8 @@
       }
       onSaved();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to save script";
-      console.error("Failed to save script:", err);
+      error = err instanceof Error ? err.message : 'Failed to save script';
+      console.error('Failed to save script:', err);
     } finally {
       saving = false;
     }
@@ -120,12 +120,10 @@
     if (!isOpen) onClose();
   }}
 >
-  <Dialog.Content
-    class="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0"
-  >
+  <Dialog.Content class="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0">
     <div class="divider-edge-b divider-edge-full flex items-center justify-between p-6">
       <Dialog.Title class="text-2xl">
-        {script ? "Edit Script" : "Create Script"}
+        {script ? 'Edit Script' : 'Create Script'}
       </Dialog.Title>
       <Button variant="ghost" size="sm" onclick={onClose}>
         <X class="h-4 w-4" />
@@ -161,15 +159,10 @@
       <Card>
         <CardHeader>
           <CardTitle>Command Template</CardTitle>
-          <CardDescription
-            >Define the command with parameter placeholders</CardDescription
-          >
+          <CardDescription>Define the command with parameter placeholders</CardDescription>
         </CardHeader>
         <CardContent>
-          <CommandTemplateInput
-            {command}
-            onChange={(value) => (command = value)}
-          />
+          <CommandTemplateInput {command} onChange={(value) => (command = value)} />
         </CardContent>
       </Card>
 
@@ -196,20 +189,15 @@
           >
         </CardHeader>
         <CardContent>
-          <ParameterList
-            {parameters}
-            onParametersChange={(params) => (parameters = params)}
-          />
+          <ParameterList {parameters} onParametersChange={(params) => (parameters = params)} />
         </CardContent>
       </Card>
     </div>
 
     <div class="divider-edge-t divider-edge-full flex justify-end gap-2 p-6">
-      <Button variant="outline" onclick={onClose} disabled={saving}>
-        Cancel
-      </Button>
+      <Button variant="outline" onclick={onClose} disabled={saving}>Cancel</Button>
       <Button onclick={handleSave} disabled={saving}>
-        {saving ? "Saving..." : script ? "Update Script" : "Create Script"}
+        {saving ? 'Saving...' : script ? 'Update Script' : 'Create Script'}
       </Button>
     </div>
   </Dialog.Content>

@@ -4,27 +4,17 @@
 -->
 
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from '$app/stores';
   import {
     sdkConfigService,
     type ProcessedSDKConfig,
-  } from "$lib/domains/sdk/services/sdkConfigService";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    CheckCircle,
-    XCircle,
-    ArrowLeft,
-    Settings,
-  } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import { PageLoading, PageError } from "$lib/components/shell";
+  } from '$lib/domains/sdk/services/sdkConfigService';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { CheckCircle, XCircle, ArrowLeft, Settings } from '@lucide/svelte';
+  import { goto } from '$app/navigation';
+  import { PageLoading, PageError } from '$lib/components/shell';
 
   // Get SDK ID from URL
   let sdkId = $derived($page.params.sdk);
@@ -45,7 +35,7 @@
 
     try {
       if (!sdkId) {
-        error = "SDK ID is required";
+        error = 'SDK ID is required';
         return;
       }
 
@@ -57,9 +47,8 @@
 
       sdkConfig = config;
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to load SDK configuration";
-      console.error("Failed to load SDK config:", err);
+      error = err instanceof Error ? err.message : 'Failed to load SDK configuration';
+      console.error('Failed to load SDK config:', err);
     } finally {
       loading = false;
     }
@@ -70,21 +59,13 @@
   {#if loading}
     <PageLoading message="Loading package managers..." />
   {:else if error}
-    <PageError
-      title="Failed to load package managers"
-      message={error}
-      onRetry={loadData}
-    />
+    <PageError title="Failed to load package managers" message={error} onRetry={loadData} />
   {:else if sdkConfig}
     <div class="space-y-6">
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onclick={() => goto(`/sdk/${sdkId}`)}
-          >
+          <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
             <ArrowLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -106,15 +87,11 @@
           {#if sdkConfig.package_managers.length > 0}
             <div class="space-y-4">
               {#each sdkConfig.package_managers as pm}
-                <div
-                  class="flex items-center justify-between rounded-lg border p-4"
-                >
+                <div class="flex items-center justify-between rounded-lg border p-4">
                   <div>
                     <h3 class="font-semibold">{pm.display_name}</h3>
                     <p class="text-sm text-muted-foreground">
-                      {pm.installed
-                        ? `Installed (${pm.version || "unknown"})`
-                        : "Not installed"}
+                      {pm.installed ? `Installed (${pm.version || 'unknown'})` : 'Not installed'}
                     </p>
                   </div>
                   <div class="flex items-center gap-2">
@@ -124,11 +101,7 @@
                       <XCircle class="h-5 w-5 text-muted-foreground" />
                     {/if}
                     {#if pm.website}
-                      <a
-                        href={pm.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <a href={pm.website} target="_blank" rel="noopener noreferrer">
                         <Button variant="ghost" size="sm">
                           <Settings class="h-4 w-4" />
                         </Button>
@@ -139,9 +112,7 @@
               {/each}
             </div>
           {:else}
-            <p class="text-muted-foreground">
-              No package managers configured for this SDK.
-            </p>
+            <p class="text-muted-foreground">No package managers configured for this SDK.</p>
           {/if}
         </CardContent>
       </Card>

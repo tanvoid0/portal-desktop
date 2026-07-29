@@ -1,13 +1,10 @@
 <script lang="ts">
-  import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
-  import ChatMessage from "../chat/ChatMessage.svelte";
-  import TypingIndicator from "$lib/components/ui/typing-indicator.svelte";
-  import ChatInput from "../chat/ChatInput.svelte";
-  import ConversationHeader from "./ConversationHeader.svelte";
-  import type {
-    Conversation,
-    ChatMessage as ChatMessageType,
-  } from "../../types/index.js";
+  import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+  import ChatMessage from '../chat/ChatMessage.svelte';
+  import TypingIndicator from '$lib/components/ui/typing-indicator.svelte';
+  import ChatInput from '../chat/ChatInput.svelte';
+  import ConversationHeader from './ConversationHeader.svelte';
+  import type { Conversation, ChatMessage as ChatMessageType } from '../../types/index.js';
 
   interface Props {
     conversation: Conversation;
@@ -33,13 +30,13 @@
     onModelChange,
   }: Props = $props();
 
-  let messageInput = $state("");
+  let messageInput = $state('');
   let messagesContainer: HTMLElement | null = $state(null);
 
   async function handleSend() {
     if (!messageInput.trim() || isLoading) return;
     const currentMessage = messageInput.trim();
-    messageInput = "";
+    messageInput = '';
     if (onSendMessage) {
       await onSendMessage(currentMessage);
     }

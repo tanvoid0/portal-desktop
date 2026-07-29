@@ -1,20 +1,16 @@
 <script lang="ts">
-  import {
-    terminalStore,
-    terminalActions,
-    tabCount,
-  } from "../stores/terminalStore";
-  import type { TerminalTab } from "../stores/terminalStore";
-  import { Plus, X, ChevronDown } from "@lucide/svelte";
-  import { TerminalService } from "../services/terminalService";
-  import { Button } from "$lib/components/ui/button";
-  import { onMount } from "svelte";
-  import { logger } from "$lib/domains/shared";
-  import ShellIcon from "./ShellIcon.svelte";
-  import ShellProfileSelect from "./ShellProfileSelect.svelte";
-  import { resolveShellIcon } from "../utils/shellIcons";
+  import { terminalStore, terminalActions, tabCount } from '../stores/terminalStore';
+  import type { TerminalTab } from '../stores/terminalStore';
+  import { Plus, X, ChevronDown } from '@lucide/svelte';
+  import { TerminalService } from '../services/terminalService';
+  import { Button } from '$lib/components/ui/button';
+  import { onMount } from 'svelte';
+  import { logger } from '$lib/domains/shared';
+  import ShellIcon from './ShellIcon.svelte';
+  import ShellProfileSelect from './ShellProfileSelect.svelte';
+  import { resolveShellIcon } from '../utils/shellIcons';
 
-  const log = logger.createScoped("TabBar");
+  const log = logger.createScoped('TabBar');
 
   // Props
   interface Props {
@@ -35,7 +31,7 @@
 
   // Terminal profile state
   let availableProfiles = $state<any[]>([]);
-  let selectedProfile = $state("");
+  let selectedProfile = $state('');
   let systemInfo = $state<any>(null);
 
   // Reactive stores
@@ -83,30 +79,27 @@
                 name,
                 command: info.command || name,
                 icon: resolveShellIcon(name),
-                category: "shell",
+                category: 'shell',
               });
-            },
+            }
           );
         }
 
         // Add Windows Terminal profiles if available
         if (systemInfo.terminal_profiles.windows_terminal) {
-          systemInfo.terminal_profiles.windows_terminal.forEach(
-            (profile: any) => {
-              profiles.push({
-                name: profile.name,
-                command: profile.commandline || profile.name,
-                icon: resolveShellIcon(profile.name),
-                category: "windows_terminal",
-              });
-            },
-          );
+          systemInfo.terminal_profiles.windows_terminal.forEach((profile: any) => {
+            profiles.push({
+              name: profile.name,
+              command: profile.commandline || profile.name,
+              icon: resolveShellIcon(profile.name),
+              category: 'windows_terminal',
+            });
+          });
         }
 
         // Remove duplicates based on name
         const uniqueProfiles = profiles.filter(
-          (profile, index, self) =>
-            index === self.findIndex((p) => p.name === profile.name),
+          (profile, index, self) => index === self.findIndex((p) => p.name === profile.name)
         );
 
         availableProfiles = uniqueProfiles;
@@ -125,7 +118,7 @@
         availableProfiles = [];
       }
     } catch (error: any) {
-      log.error("Failed to load system info", { error });
+      log.error('Failed to load system info', { error });
       availableProfiles = [];
     }
   }
@@ -159,22 +152,19 @@
 
   function getTabStatusColor(tab: any) {
     switch (tab.status) {
-      case "active":
-        return "border-status-info";
-      case "loading":
-        return "border-status-warning";
-      case "error":
-        return "border-status-error";
+      case 'active':
+        return 'border-status-info';
+      case 'loading':
+        return 'border-status-warning';
+      case 'error':
+        return 'border-status-error';
       default:
-        return "border-transparent";
+        return 'border-transparent';
     }
   }
-
 </script>
 
-<div
-  class="tab-bar divider-edge-b divider-edge-full flex min-h-[40px] items-center bg-card"
->
+<div class="tab-bar divider-edge-b divider-edge-full flex min-h-[40px] items-center bg-card">
   <!-- Tab List -->
   <div class="flex flex-1 overflow-x-auto">
     {#each tabs as tab (tab.id)}
@@ -184,14 +174,14 @@
         tab.id
           ? 'bg-accent text-accent-foreground'
           : 'bg-card text-muted-foreground hover:bg-accent/60 hover:text-foreground'} {getTabStatusColor(
-          tab,
+          tab
         )}"
         role="button"
         tabindex="0"
-        onkeydown={(e) => e.key === "Enter" && handleTabClick(tab.id)}
+        onkeydown={(e) => e.key === 'Enter' && handleTabClick(tab.id)}
         title={tab.title}
       >
-        <ShellIcon tab={tab} size="sm" />
+        <ShellIcon {tab} size="sm" />
         <span class="max-w-32 truncate">{tab.title}</span>
         {#if closable && tab.closable !== false && tabs.length > 1}
           <Button
@@ -216,9 +206,7 @@
         profiles={availableProfiles}
         bind:value={selectedProfile}
         onSelect={handleProfileChange}
-        placeholder={availableProfiles.length === 0
-          ? "Loading profiles..."
-          : "Select shell..."}
+        placeholder={availableProfiles.length === 0 ? 'Loading profiles...' : 'Select shell...'}
         disabled={availableProfiles.length === 0}
       />
     </div>

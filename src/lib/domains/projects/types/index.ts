@@ -2,7 +2,7 @@
  * Projects domain types
  */
 
-import type { BaseEntity } from "$lib/domains/shared/types";
+import type { BaseEntity } from '$lib/domains/shared/types';
 
 export interface Project extends BaseEntity {
   name: string;
@@ -34,9 +34,9 @@ export interface Project extends BaseEntity {
 }
 
 export enum ProjectStatus {
-  ACTIVE = "active",
-  ARCHIVED = "archived",
-  DELETED = "deleted",
+  ACTIVE = 'active',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
 }
 
 export interface ProjectSettings {
@@ -50,7 +50,7 @@ export interface ProjectSettings {
     prod?: number;
   };
   framework?: string;
-  packageManager?: "npm" | "yarn" | "pnpm";
+  packageManager?: 'npm' | 'yarn' | 'pnpm';
 }
 
 export interface ProjectMetadata {

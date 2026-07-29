@@ -2,41 +2,41 @@
 // These define the contract that all cloud providers must implement
 
 export enum CloudProviderType {
-  GCP = "gcp",
-  AWS = "aws",
-  AZURE = "azure",
-  DIGITAL_OCEAN = "digital-ocean",
+  GCP = 'gcp',
+  AWS = 'aws',
+  AZURE = 'azure',
+  DIGITAL_OCEAN = 'digital-ocean',
 }
 
 export enum ResourceType {
-  POD = "pod",
-  SERVICE = "service",
-  DEPLOYMENT = "deployment",
-  STATEFULSET = "statefulset",
-  DAEMONSET = "daemonset",
-  JOB = "job",
-  CRONJOB = "cronjob",
-  CONFIGMAP = "configmap",
-  SECRET = "secret",
-  INGRESS = "ingress",
-  NAMESPACE = "namespace",
+  POD = 'pod',
+  SERVICE = 'service',
+  DEPLOYMENT = 'deployment',
+  STATEFULSET = 'statefulset',
+  DAEMONSET = 'daemonset',
+  JOB = 'job',
+  CRONJOB = 'cronjob',
+  CONFIGMAP = 'configmap',
+  SECRET = 'secret',
+  INGRESS = 'ingress',
+  NAMESPACE = 'namespace',
 }
 
 export enum ResourceStatus {
-  RUNNING = "running",
-  PENDING = "pending",
-  FAILED = "failed",
-  SUCCEEDED = "succeeded",
-  UNKNOWN = "unknown",
-  TERMINATING = "terminating",
+  RUNNING = 'running',
+  PENDING = 'pending',
+  FAILED = 'failed',
+  SUCCEEDED = 'succeeded',
+  UNKNOWN = 'unknown',
+  TERMINATING = 'terminating',
 }
 
 export enum ClusterStatus {
-  CONNECTED = "connected",
-  DISCONNECTED = "disconnected",
-  CONNECTING = "connecting",
-  ERROR = "error",
-  READY = "ready",
+  CONNECTED = 'connected',
+  DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting',
+  ERROR = 'error',
+  READY = 'ready',
 }
 
 export interface ICluster {
@@ -69,7 +69,7 @@ export interface ICloudResource {
 }
 
 export interface ResourceEvent {
-  type: "added" | "modified" | "deleted";
+  type: 'added' | 'modified' | 'deleted';
   resource: ICloudResource;
 }
 
@@ -96,19 +96,9 @@ export interface ICloudProvider {
   getCurrentCluster(): Promise<ICluster | null>;
 
   // Resource operations (provider-agnostic interface)
-  listResources(
-    type: ResourceType,
-    namespace?: string,
-  ): Promise<ICloudResource[]>;
-  getResource(
-    type: ResourceType,
-    id: string,
-    namespace: string,
-  ): Promise<ICloudResource | null>;
-  watchResources(
-    type: ResourceType,
-    namespace?: string,
-  ): AsyncIterable<ResourceEvent>;
+  listResources(type: ResourceType, namespace?: string): Promise<ICloudResource[]>;
+  getResource(type: ResourceType, id: string, namespace: string): Promise<ICloudResource | null>;
+  watchResources(type: ResourceType, namespace?: string): AsyncIterable<ResourceEvent>;
 
   // Namespace operations
   listNamespaces(): Promise<string[]>;

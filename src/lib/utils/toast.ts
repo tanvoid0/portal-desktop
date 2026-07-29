@@ -1,23 +1,18 @@
-import {
-  toastActions,
-  type Toast,
-} from "$lib/domains/shared/stores/toastStore";
+import { toastActions, type Toast } from '$lib/domains/shared/stores/toastStore';
 
-export type ToastOptions = Partial<
-  Pick<Toast, "duration" | "action" | "description">
->;
+export type ToastOptions = Partial<Pick<Toast, 'duration' | 'action' | 'description'>>;
 
 function resolveDescription(
   descriptionOrOptions?: string | unknown | ToastOptions,
-  options?: ToastOptions,
+  options?: ToastOptions
 ): { description?: string; options?: ToastOptions } {
   if (
     descriptionOrOptions &&
-    typeof descriptionOrOptions === "object" &&
+    typeof descriptionOrOptions === 'object' &&
     !Array.isArray(descriptionOrOptions) &&
-    ("description" in descriptionOrOptions ||
-      "duration" in descriptionOrOptions ||
-      "action" in descriptionOrOptions)
+    ('description' in descriptionOrOptions ||
+      'duration' in descriptionOrOptions ||
+      'action' in descriptionOrOptions)
   ) {
     const opts = descriptionOrOptions as ToastOptions;
     return {
@@ -26,7 +21,7 @@ function resolveDescription(
     };
   }
 
-  if (typeof descriptionOrOptions === "string") {
+  if (typeof descriptionOrOptions === 'string') {
     return {
       description: descriptionOrOptions,
       options,
@@ -42,14 +37,10 @@ export const toast = {
     return toastActions.show({ title, ...options });
   },
 
-  success(
-    title: string,
-    descriptionOrOptions?: string | ToastOptions,
-    options?: ToastOptions,
-  ) {
+  success(title: string, descriptionOrOptions?: string | ToastOptions, options?: ToastOptions) {
     const { description, options: resolvedOptions } = resolveDescription(
       descriptionOrOptions,
-      options,
+      options
     );
     return toastActions.success(title, description, resolvedOptions);
   },
@@ -57,47 +48,36 @@ export const toast = {
   error(
     title: string,
     descriptionOrOptions?: string | unknown | ToastOptions,
-    options?: ToastOptions,
+    options?: ToastOptions
   ) {
     const { description, options: resolvedOptions } = resolveDescription(
       descriptionOrOptions,
-      options,
+      options
     );
 
     if (description !== undefined) {
       return toastActions.error(title, description, resolvedOptions);
     }
 
-    if (
-      descriptionOrOptions !== undefined &&
-      typeof descriptionOrOptions !== "object"
-    ) {
+    if (descriptionOrOptions !== undefined && typeof descriptionOrOptions !== 'object') {
       return toastActions.error(title, descriptionOrOptions, resolvedOptions);
     }
 
     return toastActions.error(title, undefined, resolvedOptions);
   },
 
-  warning(
-    title: string,
-    descriptionOrOptions?: string | ToastOptions,
-    options?: ToastOptions,
-  ) {
+  warning(title: string, descriptionOrOptions?: string | ToastOptions, options?: ToastOptions) {
     const { description, options: resolvedOptions } = resolveDescription(
       descriptionOrOptions,
-      options,
+      options
     );
     return toastActions.warning(title, description, resolvedOptions);
   },
 
-  info(
-    title: string,
-    descriptionOrOptions?: string | ToastOptions,
-    options?: ToastOptions,
-  ) {
+  info(title: string, descriptionOrOptions?: string | ToastOptions, options?: ToastOptions) {
     const { description, options: resolvedOptions } = resolveDescription(
       descriptionOrOptions,
-      options,
+      options
     );
     return toastActions.info(title, description, resolvedOptions);
   },
@@ -111,5 +91,5 @@ export const toast = {
   },
 };
 
-export { toastActions, toastStore } from "$lib/domains/shared/stores/toastStore";
-export type { Toast } from "$lib/domains/shared/stores/toastStore";
+export { toastActions, toastStore } from '$lib/domains/shared/stores/toastStore';
+export type { Toast } from '$lib/domains/shared/stores/toastStore';

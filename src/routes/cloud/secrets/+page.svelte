@@ -1,32 +1,17 @@
 <!-- Secrets List Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    cloudStore,
-    loadResources,
-    refreshResources,
-  } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import BaseResourceTable from "$lib/domains/cloud/core/components/BaseResourceTable.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import { RefreshCw, Search, Plus, Eye, EyeOff } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import {
-    useTableNavigation,
-    useResourceActions,
-  } from "$lib/domains/k8s-navigation";
+  import { onMount } from 'svelte';
+  import { cloudStore, loadResources, refreshResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import BaseResourceTable from '$lib/domains/cloud/core/components/BaseResourceTable.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import { RefreshCw, Search, Plus, Eye, EyeOff } from '@lucide/svelte';
+  import { goto } from '$app/navigation';
+  import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 
-  let searchQuery = $state("");
+  let searchQuery = $state('');
   let showSecrets = $state(false); // Toggle to show/hide secret values
 
   onMount(async () => {
@@ -38,25 +23,24 @@
   const filteredSecrets = $derived(
     $cloudStore.resources[ResourceType.SECRET].filter((secret) => {
       const matchesSearch =
-        !searchQuery ||
-        secret.name.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery || secret.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
-    }),
+    })
   );
 
   const secretStats = $derived({
     total: $cloudStore.resources[ResourceType.SECRET].length,
     withData: $cloudStore.resources[ResourceType.SECRET].filter(
-      (s: any) => (s.metadata?.dataCount || 0) > 0,
+      (s: any) => (s.metadata?.dataCount || 0) > 0
     ).length,
   });
 
   const secretColumns = [
-    { key: "name", label: "Name", width: "w-1/4" },
-    { key: "type", label: "Type", width: "w-1/8" },
-    { key: "dataCount", label: "Data Keys", width: "w-1/8" },
-    { key: "age", label: "Age", width: "w-1/8" },
-    { key: "namespace", label: "Namespace", width: "w-1/6" },
+    { key: 'name', label: 'Name', width: 'w-1/4' },
+    { key: 'type', label: 'Type', width: 'w-1/8' },
+    { key: 'dataCount', label: 'Data Keys', width: 'w-1/8' },
+    { key: 'age', label: 'Age', width: 'w-1/8' },
+    { key: 'namespace', label: 'Namespace', width: 'w-1/6' },
   ];
 
   async function handleRefresh() {
@@ -89,14 +73,10 @@
         goto(`/cloud/secrets/${resource.name}?namespace=${resource.namespace}`);
       },
       onEdit: (resource) => {
-        goto(
-          `/cloud/secrets/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/secrets/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onYaml: (resource) => {
-        goto(
-          `/cloud/secrets/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/secrets/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onRefresh: () => {
         refreshResources();
@@ -127,13 +107,13 @@
         {:else}
           <Eye class="mr-2 h-4 w-4" />
         {/if}
-        {showSecrets ? "Hide" : "Show"} Secrets
+        {showSecrets ? 'Hide' : 'Show'} Secrets
       </Button>
       <Button variant="outline" onclick={handleRefresh}>
         <RefreshCw class="mr-2 h-4 w-4" />
         Refresh
       </Button>
-      <Button onclick={() => goto("/cloud/secrets/new")}>
+      <Button onclick={() => goto('/cloud/secrets/new')}>
         <Plus class="mr-2 h-4 w-4" />
         Create Secret
       </Button>
@@ -146,8 +126,7 @@
       class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20"
     >
       <p class="text-sm text-yellow-800 dark:text-yellow-200">
-        <strong>Warning:</strong> Secret values are now visible. Be careful when sharing
-        your screen.
+        <strong>Warning:</strong> Secret values are now visible. Be careful when sharing your screen.
       </p>
     </div>
   {/if}
@@ -204,10 +183,7 @@
           {/if}
         </div>
       {:else}
-        <div
-          class="k8s-navigable-table"
-          data-selected-index={tableNav.selectedIndex}
-        >
+        <div class="k8s-navigable-table" data-selected-index={tableNav.selectedIndex}>
           <BaseResourceTable
             resources={filteredSecrets}
             resourceType={ResourceType.SECRET}

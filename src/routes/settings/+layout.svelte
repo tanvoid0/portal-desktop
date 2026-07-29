@@ -3,35 +3,28 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import type { Snippet } from "svelte";
-  import SettingsNavigation from "$lib/domains/settings/components/SettingsNavigation.svelte";
-  import ShellSidebarLayout from "$lib/components/shell/shell-sidebar-layout.svelte";
-  import PageContainer from "$lib/components/shell/page-container.svelte";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import type { Snippet } from 'svelte';
+  import SettingsNavigation from '$lib/domains/settings/components/SettingsNavigation.svelte';
+  import ShellSidebarLayout from '$lib/components/shell/shell-sidebar-layout.svelte';
+  import PageContainer from '$lib/components/shell/page-container.svelte';
   import {
     settingsActions,
     settings,
     isLoadingSettings,
     settingsError,
-  } from "$lib/domains/settings/stores/settingsStore";
-  import { Button } from "$lib/components/ui/button";
-  import { Card } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Settings,
-    Download,
-    RotateCcw,
-    Save,
-    RefreshCw,
-    Loader2,
-  } from "@lucide/svelte";
-  import { toast } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { logger } from "$lib/domains/shared";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { get } from "svelte/store";
+  } from '$lib/domains/settings/stores/settingsStore';
+  import { Button } from '$lib/components/ui/button';
+  import { Card } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Settings, Download, RotateCcw, Save, RefreshCw, Loader2 } from '@lucide/svelte';
+  import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { logger } from '$lib/domains/shared';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { get } from 'svelte/store';
 
   // Get children snippet from props for Svelte 5
   let { children }: { children: Snippet<[]> } = $props();
@@ -43,21 +36,20 @@
   // Get current section from URL
   let currentSection = $derived.by(() => {
     const path = $page.url.pathname;
-    if (path === "/settings" || path === "/settings/")
-      return "general" as const;
-    const section = path.replace("/settings/", "").replace(/\/$/, "");
+    if (path === '/settings' || path === '/settings/') return 'general' as const;
+    const section = path.replace('/settings/', '').replace(/\/$/, '');
     // Redirect framework-ides to ides
-    if (section === "framework-ides") return "ides" as const;
-    if (section.startsWith("ai")) return "ai" as const;
-    return (section || "general") as
-      | "general"
-      | "editor"
-      | "terminal"
-      | "theme"
-      | "ides"
-      | "ai"
-      | "github"
-      | "updates";
+    if (section === 'framework-ides') return 'ides' as const;
+    if (section.startsWith('ai')) return 'ai' as const;
+    return (section || 'general') as
+      | 'general'
+      | 'editor'
+      | 'terminal'
+      | 'theme'
+      | 'ides'
+      | 'ai'
+      | 'github'
+      | 'updates';
   });
 
   onMount(async () => {
@@ -70,11 +62,11 @@
     try {
       await settingsActions.loadSettings();
     } catch (err) {
-      logger.error("Failed to load settings", {
-        context: "SettingsLayout",
+      logger.error('Failed to load settings', {
+        context: 'SettingsLayout',
         error: err,
       });
-      toast.error("Failed to load settings");
+      toast.error('Failed to load settings');
     }
   });
 
@@ -85,13 +77,13 @@
     isSaving = true;
     try {
       await settingsActions.saveSettings(settingsData);
-      toast.success("Settings saved successfully");
+      toast.success('Settings saved successfully');
     } catch (err) {
-      logger.error("Failed to save settings", {
-        context: "SettingsLayout",
+      logger.error('Failed to save settings', {
+        context: 'SettingsLayout',
         error: err,
       });
-      toast.error("Failed to save settings");
+      toast.error('Failed to save settings');
     } finally {
       isSaving = false;
     }
@@ -106,23 +98,23 @@
       const exportedSettings = await settingsActions.exportSettings();
 
       // Create download link
-      const blob = new Blob([exportedSettings], { type: "application/json" });
+      const blob = new Blob([exportedSettings], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `portal-desktop-settings-${new Date().toISOString().split("T")[0]}.json`;
+      a.download = `portal-desktop-settings-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("Settings exported successfully");
+      toast.success('Settings exported successfully');
     } catch (err) {
-      logger.error("Failed to export settings", {
-        context: "SettingsLayout",
+      logger.error('Failed to export settings', {
+        context: 'SettingsLayout',
         error: err,
       });
-      toast.error("Failed to export settings");
+      toast.error('Failed to export settings');
     } finally {
       isExporting = false;
     }
@@ -130,22 +122,22 @@
 
   async function handleReset() {
     const confirmed = await confirmAction(
-      "This resets every setting to its default, including theme and custom colors. This cannot be undone.",
-      "Reset all settings",
-      { confirmLabel: "Reset", destructive: true },
+      'This resets every setting to its default, including theme and custom colors. This cannot be undone.',
+      'Reset all settings',
+      { confirmLabel: 'Reset', destructive: true }
     );
     if (!confirmed) return;
 
     isResetting = true;
     try {
       await settingsActions.resetSettings();
-      toast.success("Settings reset to defaults");
+      toast.success('Settings reset to defaults');
     } catch (err) {
-      logger.error("Failed to reset settings", {
-        context: "SettingsLayout",
+      logger.error('Failed to reset settings', {
+        context: 'SettingsLayout',
         error: err,
       });
-      toast.error("Failed to reset settings");
+      toast.error('Failed to reset settings');
     } finally {
       isResetting = false;
     }
@@ -177,7 +169,9 @@
   <div
     class="divider-edge-b divider-edge-full flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
-    <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 3xl:px-8">
+    <div
+      class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 3xl:px-8"
+    >
       <div class="min-w-0">
         <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Settings class="h-6 w-6" />
@@ -188,11 +182,7 @@
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          onclick={handleExport}
-          disabled={isExporting || !get(settings)}
-        >
+        <Button variant="outline" onclick={handleExport} disabled={isExporting || !get(settings)}>
           {#if isExporting}
             <Loader2 class="mr-2 h-4 w-4 animate-spin" />
           {:else}
@@ -225,14 +215,13 @@
       <div class="px-6 pb-4">
         <div class="flex items-center gap-4">
           <Badge variant="outline">
-            Configured: {getSettingsStats().configured}/{getSettingsStats()
-              .total}
+            Configured: {getSettingsStats().configured}/{getSettingsStats().total}
           </Badge>
           <Badge variant="outline">
-            Theme: {currentSettings?.app?.theme || "system"}
+            Theme: {currentSettings?.app?.theme || 'system'}
           </Badge>
           <Badge variant="outline">
-            Language: {currentSettings?.app?.language || "en"}
+            Language: {currentSettings?.app?.language || 'en'}
           </Badge>
         </div>
       </div>
@@ -243,24 +232,24 @@
     {#snippet sidebar()}
       <div class="p-4">
         <Card class="p-3">
-          <SettingsNavigation currentSection={currentSection} />
+          <SettingsNavigation {currentSection} />
         </Card>
       </div>
     {/snippet}
 
     <div class="min-h-0 flex-1 overflow-y-auto">
       <PageContainer variant="readable" class="py-6">
-      {#if $isLoadingSettings}
-        <PageLoading message="Loading settings..." />
-      {:else if $settingsError}
-        <PageError
-          title="Failed to load settings"
-          message={$settingsError}
-          onRetry={() => settingsActions.loadSettings()}
-        />
-      {:else}
-        {@render children()}
-      {/if}
+        {#if $isLoadingSettings}
+          <PageLoading message="Loading settings..." />
+        {:else if $settingsError}
+          <PageError
+            title="Failed to load settings"
+            message={$settingsError}
+            onRetry={() => settingsActions.loadSettings()}
+          />
+        {:else}
+          {@render children()}
+        {/if}
       </PageContainer>
     </div>
   </ShellSidebarLayout>

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { ChevronDown, ChevronRight, GitBranchPlus, Trash2 } from "@lucide/svelte";
-  import type { CoderSubAgent } from "../types.js";
-  import CoderSubAgentInline from "./CoderSubAgentInline.svelte";
+  import { Button } from '$lib/components/ui/button';
+  import { ChevronDown, ChevronRight, GitBranchPlus, Trash2 } from '@lucide/svelte';
+  import type { CoderSubAgent } from '../types.js';
+  import CoderSubAgentInline from './CoderSubAgentInline.svelte';
 
   interface Props {
     subAgents: CoderSubAgent[];
@@ -15,7 +15,7 @@
 
   let {
     subAgents = [],
-    coordinatorId = "",
+    coordinatorId = '',
     onOpen,
     onCancel,
     onCleanupOne,
@@ -24,7 +24,7 @@
 
   let expanded = $state(true);
   const runningCount = $derived(
-    subAgents.filter((item) => item.status === "running" || item.status === "pending").length,
+    subAgents.filter((item) => item.status === 'running' || item.status === 'pending').length
   );
 </script>
 
@@ -65,15 +65,15 @@
 
   {#if expanded && subAgents.length > 0}
     <div class="mt-2">
-    <CoderSubAgentInline
-      {subAgents}
-      {coordinatorId}
-      {onOpen}
-      onCancel={onCancel}
-      onCleanup={onCleanupOne}
-      compact={true}
-      showHeader={false}
-    />
+      <CoderSubAgentInline
+        {subAgents}
+        {coordinatorId}
+        {onOpen}
+        {onCancel}
+        onCleanup={onCleanupOne}
+        compact={true}
+        showHeader={false}
+      />
     </div>
   {/if}
 </div>

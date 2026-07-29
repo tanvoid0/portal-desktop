@@ -2,16 +2,11 @@
 <!-- Can be customized per page/domain to show relevant shortcuts -->
 
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Keyboard, X } from "@lucide/svelte";
-  import KeyboardShortcutHint from "$lib/domains/k8s-navigation/components/KeyboardShortcutHint.svelte";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Keyboard, X } from '@lucide/svelte';
+  import KeyboardShortcutHint from '$lib/domains/k8s-navigation/components/KeyboardShortcutHint.svelte';
 
   export interface ShortcutGroup {
     title: string;
@@ -19,27 +14,25 @@
   }
 
   interface Props {
-    shortcuts:
-      | Array<{ key: string; description: string; category?: string }>
-      | ShortcutGroup[];
+    shortcuts: Array<{ key: string; description: string; category?: string }> | ShortcutGroup[];
     title?: string;
-    variant?: "panel" | "modal" | "inline" | "tooltip";
+    variant?: 'panel' | 'modal' | 'inline' | 'tooltip';
     showTitle?: boolean;
     showCategoryHeaders?: boolean;
     collapsible?: boolean;
     maxHeight?: string;
-    position?: "top" | "bottom" | "left" | "right";
+    position?: 'top' | 'bottom' | 'left' | 'right';
   }
 
   let {
     shortcuts,
-    title = "Keyboard Shortcuts",
-    variant = "panel",
+    title = 'Keyboard Shortcuts',
+    variant = 'panel',
     showTitle = true,
     showCategoryHeaders = true,
     collapsible = false,
-    maxHeight = "400px",
-    position = "bottom",
+    maxHeight = '400px',
+    position = 'bottom',
   }: Props = $props();
 
   let isExpanded = $state(!collapsible);
@@ -48,11 +41,7 @@
   // Normalize shortcuts to groups
   const shortcutGroups = $derived.by(() => {
     // If already in group format
-    if (
-      shortcuts.length > 0 &&
-      "title" in shortcuts[0] &&
-      "shortcuts" in shortcuts[0]
-    ) {
+    if (shortcuts.length > 0 && 'title' in shortcuts[0] && 'shortcuts' in shortcuts[0]) {
       return shortcuts as ShortcutGroup[];
     }
 
@@ -62,19 +51,14 @@
       description: string;
       category?: string;
     }>;
-    const groups = new Map<
-      string,
-      Array<{ key: string; description: string }>
-    >();
+    const groups = new Map<string, Array<{ key: string; description: string }>>();
 
     flatShortcuts.forEach((shortcut) => {
-      const category = shortcut.category || "Other";
+      const category = shortcut.category || 'Other';
       if (!groups.has(category)) {
         groups.set(category, []);
       }
-      groups
-        .get(category)!
-        .push({ key: shortcut.key, description: shortcut.description });
+      groups.get(category)!.push({ key: shortcut.key, description: shortcut.description });
     });
 
     return Array.from(groups.entries()).map(([title, shortcuts]) => ({
@@ -98,7 +82,7 @@
   }
 </script>
 
-{#if variant === "inline"}
+{#if variant === 'inline'}
   <div class="space-y-2">
     {#if showTitle}
       <h3 class="flex items-center gap-2 text-sm font-semibold">
@@ -110,17 +94,14 @@
       {#each shortcutGroups as group}
         <div>
           {#if showCategoryHeaders}
-            <h4
-              class="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground"
-            >
+            <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {group.title}
             </h4>
           {/if}
           <div class="space-y-1.5">
             {#each group.shortcuts as shortcut}
               <div class="flex items-center justify-between text-sm">
-                <span class="text-muted-foreground">{shortcut.description}</span
-                >
+                <span class="text-muted-foreground">{shortcut.description}</span>
                 <KeyboardShortcutHint shortcut={shortcut.key} />
               </div>
             {/each}
@@ -129,7 +110,7 @@
       {/each}
     </div>
   </div>
-{:else if variant === "panel"}
+{:else if variant === 'panel'}
   <Card>
     <CardHeader class="pb-3">
       <div class="flex items-center justify-between">
@@ -150,25 +131,18 @@
     </CardHeader>
     {#if isExpanded}
       <CardContent>
-        <div
-          class="space-y-4"
-          style="max-height: {maxHeight}; overflow-y: auto;"
-        >
+        <div class="space-y-4" style="max-height: {maxHeight}; overflow-y: auto;">
           {#each shortcutGroups as group}
             <div>
               {#if showCategoryHeaders}
-                <h4
-                  class="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground"
-                >
+                <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   {group.title}
                 </h4>
               {/if}
               <div class="space-y-1.5">
                 {#each group.shortcuts as shortcut}
                   <div class="flex items-center justify-between py-1 text-sm">
-                    <span class="text-muted-foreground"
-                      >{shortcut.description}</span
-                    >
+                    <span class="text-muted-foreground">{shortcut.description}</span>
                     <KeyboardShortcutHint shortcut={shortcut.key} />
                   </div>
                 {/each}
@@ -179,7 +153,7 @@
       </CardContent>
     {/if}
   </Card>
-{:else if variant === "modal"}
+{:else if variant === 'modal'}
   <!-- Modal variant -->
   <Button variant="outline" size="sm" onclick={openModal}>
     <Keyboard class="mr-2 h-4 w-4" />
@@ -194,10 +168,7 @@
           {title}
         </Dialog.Title>
       </Dialog.Header>
-      <div
-        class="space-y-6 px-6 pb-6"
-        style="max-height: calc(80vh - 120px); overflow-y: auto;"
-      >
+      <div class="space-y-6 px-6 pb-6" style="max-height: calc(80vh - 120px); overflow-y: auto;">
         {#each shortcutGroups as group}
           <div>
             {#if showCategoryHeaders}
@@ -206,9 +177,7 @@
             <div class="grid grid-cols-2 gap-x-4 gap-y-2">
               {#each group.shortcuts as shortcut}
                 <div class="flex items-center justify-between text-sm">
-                  <span class="text-muted-foreground"
-                    >{shortcut.description}</span
-                  >
+                  <span class="text-muted-foreground">{shortcut.description}</span>
                   <KeyboardShortcutHint shortcut={shortcut.key} />
                 </div>
               {/each}
@@ -218,7 +187,7 @@
       </div>
     </Dialog.Content>
   </Dialog.Root>
-{:else if variant === "tooltip"}
+{:else if variant === 'tooltip'}
   <!-- Tooltip variant - minimal inline display -->
   <div class="inline-flex items-center gap-1 text-xs text-muted-foreground">
     <Keyboard class="h-3 w-3" />

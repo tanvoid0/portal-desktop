@@ -1,27 +1,24 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import Select from "$lib/components/ui/select.svelte";
-  import CatalogModelSelect from "./CatalogModelSelect.svelte";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Loader } from "@lucide/svelte";
+  import { onMount } from 'svelte';
+  import Select from '$lib/components/ui/select.svelte';
+  import CatalogModelSelect from './CatalogModelSelect.svelte';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Loader } from '@lucide/svelte';
   import type {
     ProviderType,
     CatalogProvider,
     PlatformCatalog,
     CatalogModel,
-  } from "../../types/index.js";
-  import { aiProviderService } from "../../services/aiProviderService.js";
+  } from '../../types/index.js';
+  import { aiProviderService } from '../../services/aiProviderService.js';
   import {
     selectableCatalogProviders,
     modelsForCatalogProvider,
     defaultModelForCatalogProvider,
-  } from "../../utils/catalog.js";
-  import {
-    loadChatCatalogPrefs,
-    saveChatCatalogPrefs,
-  } from "../../utils/chatCatalogPrefs.js";
+  } from '../../utils/catalog.js';
+  import { loadChatCatalogPrefs, saveChatCatalogPrefs } from '../../utils/chatCatalogPrefs.js';
 
-  import type { CatalogStatus } from "../../types/index.js";
+  import type { CatalogStatus } from '../../types/index.js';
 
   interface Props {
     selectedProvider?: ProviderType | null;
@@ -40,15 +37,15 @@
   }
 
   let {
-    selectedProvider = $bindable<ProviderType | null>("AgentPlatform"),
+    selectedProvider = $bindable<ProviderType | null>('AgentPlatform'),
     selectedBackendProvider = $bindable<string | null>(null),
     selectedModel = $bindable<string | null>(null),
     onBackendProviderChange,
     onModelChange,
     onStatusChange,
     disabled = false,
-    backendSelectClass = "w-[140px]",
-    modelSelectClass = "w-[280px]",
+    backendSelectClass = 'w-[140px]',
+    modelSelectClass = 'w-[280px]',
     showPlatformLabel = true,
     showInlineError = true,
   }: Props = $props();
@@ -60,32 +57,27 @@
 
   function pickInitialSelection(
     providers: CatalogProvider[],
-    resolved: PlatformCatalog["resolved_defaults"],
+    resolved: PlatformCatalog['resolved_defaults']
   ) {
     const selectable = selectableCatalogProviders(providers);
     if (selectable.length === 0) return;
 
     const saved = loadChatCatalogPrefs();
     let backend =
-      saved?.backendProvider &&
-      selectable.some((entry) => entry.id === saved.backendProvider)
+      saved?.backendProvider && selectable.some((entry) => entry.id === saved.backendProvider)
         ? saved.backendProvider
         : null;
 
     if (!backend) {
       backend =
-        selectable.find((entry) => entry.id === resolved.provider)?.id ??
-        selectable[0]?.id ??
-        null;
+        selectable.find((entry) => entry.id === resolved.provider)?.id ?? selectable[0]?.id ?? null;
     }
     if (!backend) return;
 
     const providerEntry = selectable.find((entry) => entry.id === backend);
     const models = modelsForCatalogProvider(providers, backend);
     let model =
-      saved?.model && models.some((entry) => entry.id === saved.model)
-        ? saved.model
-        : null;
+      saved?.model && models.some((entry) => entry.id === saved.model) ? saved.model : null;
     if (!model) {
       model = defaultModelForCatalogProvider(providerEntry, resolved);
     }
@@ -108,7 +100,7 @@
     loadError = null;
     onStatusChange?.({ checking: true, online: false, error: null });
     try {
-      selectedProvider = selectedProvider ?? "AgentPlatform";
+      selectedProvider = selectedProvider ?? 'AgentPlatform';
       const next = await aiProviderService.getCatalogLive();
       catalog = next;
       catalogProviders = selectableCatalogProviders(next.providers);
@@ -120,9 +112,8 @@
       }
       onStatusChange?.({ checking: false, online: true, error: null });
     } catch (error) {
-      console.error("Failed to load live catalog:", error);
-      loadError =
-        error instanceof Error ? error.message : "Failed to load catalog";
+      console.error('Failed to load live catalog:', error);
+      loadError = error instanceof Error ? error.message : 'Failed to load catalog';
       catalogProviders = [];
       onStatusChange?.({ checking: false, online: false, error: loadError });
     } finally {
@@ -143,14 +134,9 @@
     selectedBackendProvider = providerId;
     onBackendProviderChange?.(providerId);
 
-    const providerEntry = catalogProviders.find(
-      (entry) => entry.id === providerId,
-    );
+    const providerEntry = catalogProviders.find((entry) => entry.id === providerId);
     const models = modelsForCatalogProvider(catalog.providers, providerId);
-    const nextModel = defaultModelForCatalogProvider(
-      providerEntry,
-      catalog.resolved_defaults,
-    );
+    const nextModel = defaultModelForCatalogProvider(providerEntry, catalog.resolved_defaults);
     if (nextModel && models.some((entry) => entry.id === nextModel)) {
       selectedModel = nextModel;
       onModelChange?.(nextModel);
@@ -173,24 +159,18 @@
     catalogProviders.map((provider) => ({
       value: provider.id,
       label: provider.label,
-    })),
+    }))
   );
 
   const catalogModels = $derived.by((): CatalogModel[] => {
     if (!catalog || !selectedBackendProvider) return [];
-    const models = modelsForCatalogProvider(
-      catalog.providers,
-      selectedBackendProvider,
-    );
-    if (
-      selectedModel &&
-      !models.some((entry) => entry.id === selectedModel)
-    ) {
+    const models = modelsForCatalogProvider(catalog.providers, selectedBackendProvider);
+    if (selectedModel && !models.some((entry) => entry.id === selectedModel)) {
       return [
         {
           id: selectedModel,
           provider: selectedBackendProvider,
-          source: "alias",
+          source: 'alias',
         },
         ...models,
       ];
@@ -200,14 +180,11 @@
 
   const isDefaultModel = $derived.by(() => {
     if (!catalog || !selectedBackendProvider || !selectedModel) return false;
-    const provider = catalogProviders.find(
-      (entry) => entry.id === selectedBackendProvider,
-    );
+    const provider = catalogProviders.find((entry) => entry.id === selectedBackendProvider);
     const resolved = catalog.resolved_defaults;
     return (
       selectedModel === provider?.default_model ||
-      (resolved.provider === selectedBackendProvider &&
-        selectedModel === resolved.model)
+      (resolved.provider === selectedBackendProvider && selectedModel === resolved.model)
     );
   });
 
@@ -225,7 +202,7 @@
     options={backendOptions}
     value={selectedBackendProvider || undefined}
     onSelect={handleBackendProviderChange}
-    placeholder={isLoading ? "Loading..." : "Provider"}
+    placeholder={isLoading ? 'Loading...' : 'Provider'}
     disabled={disabled || isLoading || backendOptions.length === 0}
     class={backendSelectClass}
   />
@@ -234,7 +211,7 @@
     models={catalogModels}
     bind:value={selectedModel}
     onSelect={handleModelChange}
-    placeholder={isLoading ? "Loading..." : "Select model"}
+    placeholder={isLoading ? 'Loading...' : 'Select model'}
     disabled={disabled || isLoading || !selectedBackendProvider}
     class={modelSelectClass}
   />

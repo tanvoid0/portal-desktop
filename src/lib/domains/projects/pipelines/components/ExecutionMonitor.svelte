@@ -2,30 +2,16 @@
 	Execution Monitor - Vercel-style step timeline with per-step logs
 -->
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import { listen } from "@tauri-apps/api/event";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import {
-    CheckCircle2,
-    XCircle,
-    Loader2,
-    Circle,
-    Ban,
-    Clock,
-    Copy,
-    Check,
-  } from "@lucide/svelte";
-  import { toast } from "$lib/utils/toast";
-  import type { PipelineExecution, StepExecution } from "../types";
-  import { executionService } from "../services/executionService";
-  import StepLogViewer from "./StepLogViewer.svelte";
+  import { onMount, onDestroy } from 'svelte';
+  import { listen } from '@tauri-apps/api/event';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { CheckCircle2, XCircle, Loader2, Circle, Ban, Clock, Copy, Check } from '@lucide/svelte';
+  import { toast } from '$lib/utils/toast';
+  import type { PipelineExecution, StepExecution } from '../types';
+  import { executionService } from '../services/executionService';
+  import StepLogViewer from './StepLogViewer.svelte';
 
   interface Props {
     executionId: string;
@@ -44,18 +30,16 @@
   let errorCopied = $state(false);
 
   const hasRunningStep = $derived(
-    execution?.stepExecutions.some((s) => s.status === "running") ?? false,
+    execution?.stepExecutions.some((s) => s.status === 'running') ?? false
   );
 
-  const cancelLabel = $derived(hasRunningStep ? "Stop" : "Cancel");
+  const cancelLabel = $derived(hasRunningStep ? 'Stop' : 'Cancel');
 
   const selectedStep = $derived(
-    execution?.stepExecutions.find((s) => s.stepId === selectedStepId) ?? null,
+    execution?.stepExecutions.find((s) => s.stepId === selectedStepId) ?? null
   );
 
-  const selectedLiveLines = $derived(
-    selectedStepId ? (liveLogBuffers[selectedStepId] ?? []) : [],
-  );
+  const selectedLiveLines = $derived(selectedStepId ? (liveLogBuffers[selectedStepId] ?? []) : []);
 
   function normalizeExecution(raw: PipelineExecution): PipelineExecution {
     return {
@@ -84,9 +68,9 @@
   }
 
   function pickActiveStep(exec: PipelineExecution): string | null {
-    const running = exec.stepExecutions.find((s) => s.status === "running");
+    const running = exec.stepExecutions.find((s) => s.status === 'running');
     if (running) return running.stepId;
-    const failed = exec.stepExecutions.find((s) => s.status === "failed");
+    const failed = exec.stepExecutions.find((s) => s.status === 'failed');
     if (failed) return failed.stepId;
     if (exec.stepExecutions.length > 0) {
       return exec.stepExecutions[exec.stepExecutions.length - 1].stepId;
@@ -107,39 +91,39 @@
   onMount(async () => {
     await refreshExecution();
 
-    unlistenExecution = await listen<PipelineExecution>(
-      "pipeline-execution-update",
-      (event) => {
-        if (event.payload.id !== executionId) return;
-        execution = normalizeExecution(event.payload);
-        syncLiveBuffersFromExecution(execution);
-        if (!selectedStepId || execution.stepExecutions.some((s) => s.status === "running")) {
-          selectedStepId = pickActiveStep(execution) ?? selectedStepId;
-        }
-      },
-    );
+    unlistenExecution = await listen<PipelineExecution>('pipeline-execution-update', (event) => {
+      if (event.payload.id !== executionId) return;
+      execution = normalizeExecution(event.payload);
+      syncLiveBuffersFromExecution(execution);
+      if (!selectedStepId || execution.stepExecutions.some((s) => s.status === 'running')) {
+        selectedStepId = pickActiveStep(execution) ?? selectedStepId;
+      }
+    });
 
     unlistenStepLog = await listen<{
       executionId: string;
       stepId: string;
       line: string;
       stream: string;
-    }>("pipeline-step-log", (event) => {
+    }>('pipeline-step-log', (event) => {
       if (event.payload.executionId !== executionId) return;
       const { stepId, line, stream } = event.payload;
-      const formatted = stream === "stderr" ? `[stderr] ${line}` : line;
+      const formatted = stream === 'stderr' ? `[stderr] ${line}` : line;
       const existing = liveLogBuffers[stepId] ?? [];
       liveLogBuffers = {
         ...liveLogBuffers,
         [stepId]: [...existing, formatted],
       };
-      if (!selectedStepId || execution?.stepExecutions.some((s) => s.stepId === stepId && s.status === "running")) {
+      if (
+        !selectedStepId ||
+        execution?.stepExecutions.some((s) => s.stepId === stepId && s.status === 'running')
+      ) {
         selectedStepId = stepId;
       }
     });
 
     pollInterval = setInterval(async () => {
-      if (execution && ["pending", "running"].includes(execution.status)) {
+      if (execution && ['pending', 'running'].includes(execution.status)) {
         await refreshExecution();
       } else if (pollInterval) {
         clearInterval(pollInterval);
@@ -156,26 +140,24 @@
 
   function getStatusColor(status: string): string {
     switch (status) {
-      case "success":
-        return "text-green-500";
-      case "failed":
-        return "text-red-500";
-      case "running":
-        return "text-blue-500";
-      case "cancelled":
-        return "text-yellow-500";
+      case 'success':
+        return 'text-green-500';
+      case 'failed':
+        return 'text-red-500';
+      case 'running':
+        return 'text-blue-500';
+      case 'cancelled':
+        return 'text-yellow-500';
       default:
-        return "text-muted-foreground";
+        return 'text-muted-foreground';
     }
   }
 
   function formatDuration(step: StepExecution): string {
     if (step.duration) {
-      return step.duration < 1000
-        ? `${step.duration}ms`
-        : `${Math.round(step.duration / 1000)}s`;
+      return step.duration < 1000 ? `${step.duration}ms` : `${Math.round(step.duration / 1000)}s`;
     }
-    return "";
+    return '';
   }
 
   async function copyError() {
@@ -184,21 +166,17 @@
     try {
       await navigator.clipboard.writeText(execution.error);
       errorCopied = true;
-      toast.success("Error copied to clipboard");
+      toast.success('Error copied to clipboard');
       setTimeout(() => {
         errorCopied = false;
       }, 2000);
     } catch {
-      toast.error("Failed to copy error");
+      toast.error('Failed to copy error');
     }
   }
 
   async function handleCancel() {
-    if (
-      !execution ||
-      cancelling ||
-      !["pending", "running"].includes(execution.status)
-    ) {
+    if (!execution || cancelling || !['pending', 'running'].includes(execution.status)) {
       return;
     }
 
@@ -231,13 +209,8 @@
           {execution.status}
         </Badge>
       {/if}
-      {#if execution && ["pending", "running"].includes(execution.status)}
-        <Button
-          variant="destructive"
-          size="sm"
-          onclick={handleCancel}
-          disabled={cancelling}
-        >
+      {#if execution && ['pending', 'running'].includes(execution.status)}
+        <Button variant="destructive" size="sm" onclick={handleCancel} disabled={cancelling}>
           {#if cancelling}
             <Loader2 class="mr-2 h-4 w-4 animate-spin" />
             Stopping...
@@ -277,13 +250,13 @@
               onclick={() => (selectedStepId = step.stepId)}
             >
               <div class="mt-0.5 shrink-0">
-                {#if step.status === "success"}
+                {#if step.status === 'success'}
                   <CheckCircle2 class="h-4 w-4 text-green-500" />
-                {:else if step.status === "failed"}
+                {:else if step.status === 'failed'}
                   <XCircle class="h-4 w-4 text-red-500" />
-                {:else if step.status === "running"}
+                {:else if step.status === 'running'}
                   <Loader2 class="h-4 w-4 animate-spin text-blue-500" />
-                {:else if step.status === "cancelled"}
+                {:else if step.status === 'cancelled'}
                   <Ban class="h-4 w-4 text-yellow-500" />
                 {:else}
                   <Circle class="h-4 w-4 text-muted-foreground" />
@@ -291,11 +264,8 @@
               </div>
               <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-medium">{step.stepName}</p>
-                <div
-                  class="flex items-center gap-2 text-xs text-muted-foreground"
-                >
-                  <span class={getStatusColor(step.status)}>{step.status}</span
-                  >
+                <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span class={getStatusColor(step.status)}>{step.status}</span>
                   {#if formatDuration(step)}
                     <span class="flex items-center gap-0.5">
                       <Clock class="h-3 w-3" />
@@ -313,7 +283,7 @@
       <StepLogViewer
         step={selectedStep}
         liveLines={selectedLiveLines}
-        autoScroll={execution.status === "running"}
+        autoScroll={execution.status === 'running'}
       />
     </div>
 

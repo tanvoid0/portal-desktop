@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { X, Maximize2, MessageSquare } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { coderWorkspaceStore } from "../state/coderWorkspaceStore.svelte.js";
-  import CoderTerminalPanel from "./CoderTerminalPanel.svelte";
-  import CoderFileExplorer from "./CoderFileExplorer.svelte";
-  import CoderFilePreview from "./CoderFilePreview.svelte";
-  import CoderBrowserPanel from "./CoderBrowserPanel.svelte";
-  import ChangesPanel from "./ChangesPanel.svelte";
-  import GitChangesPanel from "./GitChangesPanel.svelte";
-  import type { FileChange } from "../types.js";
+  import { X, Maximize2, MessageSquare } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import CoderTerminalPanel from './CoderTerminalPanel.svelte';
+  import CoderFileExplorer from './CoderFileExplorer.svelte';
+  import CoderFilePreview from './CoderFilePreview.svelte';
+  import CoderBrowserPanel from './CoderBrowserPanel.svelte';
+  import ChangesPanel from './ChangesPanel.svelte';
+  import GitChangesPanel from './GitChangesPanel.svelte';
+  import type { FileChange } from '../types.js';
 
   interface Props {
     threadId: string | null;
@@ -22,19 +22,19 @@
 
   const panel = $derived(coderWorkspaceStore.activePanel);
   const activeTab = $derived(
-    coderWorkspaceStore.openTabs.find(
-      (t) => t.id === coderWorkspaceStore.activeTabId,
-    ),
+    coderWorkspaceStore.openTabs.find((t) => t.id === coderWorkspaceStore.activeTabId)
   );
 
-  const title = $derived(activeTab?.label ?? "Workspace");
+  const title = $derived(activeTab?.label ?? 'Workspace');
 
   function backToChat() {
     coderWorkspaceStore.openChat();
   }
 </script>
 
-<div class="divider-edge-l flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+<div
+  class="divider-edge-l flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
+>
   <div
     class="divider-edge-b divider-edge-full flex shrink-0 items-center justify-between gap-2 px-3 py-2"
   >
@@ -67,23 +67,23 @@
   </div>
 
   <div class="min-h-0 flex-1">
-    {#if panel === "terminal" && threadId && workspaceRoot}
+    {#if panel === 'terminal' && threadId && workspaceRoot}
       <CoderTerminalPanel
         {threadId}
         {workspaceRoot}
         activeTerminalId={coderWorkspaceStore.activeTerminalId()}
       />
-    {:else if panel === "files" && workspaceRoot}
+    {:else if panel === 'files' && workspaceRoot}
       <CoderFileExplorer {workspaceRoot} />
-    {:else if panel === "file" && workspaceRoot && activeTab?.filePath}
+    {:else if panel === 'file' && workspaceRoot && activeTab?.filePath}
       <CoderFilePreview {workspaceRoot} filePath={activeTab.filePath} />
-    {:else if panel === "browser"}
+    {:else if panel === 'browser'}
       <CoderBrowserPanel />
-    {:else if panel === "changes"}
+    {:else if panel === 'changes'}
       <div class="h-full overflow-auto p-4">
         <ChangesPanel {changes} onRefresh={onRefreshChanges} />
       </div>
-    {:else if panel === "git-changes" && workspaceRoot}
+    {:else if panel === 'git-changes' && workspaceRoot}
       <div class="h-full overflow-auto p-4">
         <GitChangesPanel {workspaceRoot} {onCommit} />
       </div>

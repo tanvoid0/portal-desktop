@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
-  import { Button } from "$lib/components/ui/button";
+  import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+  import { Button } from '$lib/components/ui/button';
   import {
     MessageSquare,
     MessageCircle,
@@ -10,23 +10,23 @@
     Pencil,
     Trash2,
     GitBranch,
-  } from "@lucide/svelte";
-  import ChatMessage from "./ChatMessage.svelte";
-  import ChatInput from "./ChatInput.svelte";
-  import ChatCatalogSelectors from "./ChatCatalogSelectors.svelte";
+  } from '@lucide/svelte';
+  import ChatMessage from './ChatMessage.svelte';
+  import ChatInput from './ChatInput.svelte';
+  import ChatCatalogSelectors from './ChatCatalogSelectors.svelte';
   import type {
     ChatMessage as ChatMessageType,
     ContextUsage,
     ProviderType,
-  } from "../../types/index.js";
-  import { aiChatService } from "../../services/aiChatService.js";
+  } from '../../types/index.js';
+  import { aiChatService } from '../../services/aiChatService.js';
 
   interface Props {
     messages?: ChatMessageType[];
     onSendMessage?: (message: string) => void | Promise<void>;
     onSendMessageWithHistory?: (
       message: string,
-      history: ChatMessageType[],
+      history: ChatMessageType[]
     ) => void | Promise<void>;
     /** When set, a stop button replaces send while a response is streaming. */
     onStop?: () => void;
@@ -70,9 +70,9 @@
     sendDisabledHint,
     modelLabel = null,
     isLoading = $bindable(false),
-    placeholder = "Type your message...",
-    title = "Chat",
-    class: className = "",
+    placeholder = 'Type your message...',
+    title = 'Chat',
+    class: className = '',
     conversationId,
     showSelectors = true,
     selectedProvider = $bindable<ProviderType | null>(null),
@@ -83,7 +83,7 @@
     settingsOpen = false,
   }: Props = $props();
 
-  let messageInput = $state("");
+  let messageInput = $state('');
   let messagesContainer: HTMLElement | null = $state(null);
   let scrollViewport: HTMLElement | null = $state(null);
   let copiedIndex = $state<number | null>(null);
@@ -106,7 +106,7 @@
     if (!messageInput.trim() || isLoading || sendDisabled) return;
 
     const currentMessage = messageInput.trim();
-    messageInput = "";
+    messageInput = '';
 
     if (onSendMessageWithHistory) {
       // Don't add message here - parent will handle it
@@ -127,7 +127,7 @@
     } else {
       // Use default AI chat service - only add message here if no callback provided
       const userMessage: ChatMessageType = {
-        role: "user",
+        role: 'user',
         content: currentMessage,
         timestamp: new Date(),
       };
@@ -135,24 +135,20 @@
 
       isLoading = true;
       try {
-        const response = await aiChatService.sendMessage(
-          currentMessage,
-          messages,
-          {
-            provider: selectedProvider || undefined,
-            llm_provider: selectedBackendProvider || undefined,
-            conversation_id: conversationId,
-            model: selectedModel || undefined,
-          },
-        );
+        const response = await aiChatService.sendMessage(currentMessage, messages, {
+          provider: selectedProvider || undefined,
+          llm_provider: selectedBackendProvider || undefined,
+          conversation_id: conversationId,
+          model: selectedModel || undefined,
+        });
         const assistantMessage: ChatMessageType = {
-          role: "assistant",
+          role: 'assistant',
           content: response,
           timestamp: new Date(),
         };
         messages = [...messages, assistantMessage];
       } catch (error) {
-        console.error("Failed to send message:", error);
+        console.error('Failed to send message:', error);
         // Remove user message on error
         messages = messages.slice(0, -1);
       } finally {
@@ -176,16 +172,14 @@
 
 <div class="flex h-full min-h-0 flex-col {className}">
   {#if showSelectors}
-    <div class="divider-edge-b divider-edge-full flex items-center justify-between gap-2 px-4 py-2.5">
+    <div
+      class="divider-edge-b divider-edge-full flex items-center justify-between gap-2 px-4 py-2.5"
+    >
       <h2 class="flex items-center gap-2 text-sm font-semibold">
         <MessageSquare class="h-4 w-4" />
         {title}
       </h2>
-      <ChatCatalogSelectors
-        bind:selectedProvider
-        bind:selectedBackendProvider
-        bind:selectedModel
-      />
+      <ChatCatalogSelectors bind:selectedProvider bind:selectedBackendProvider bind:selectedModel />
     </div>
   {/if}
   <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -195,7 +189,9 @@
         bind:this={messagesContainer}
       >
         {#if messages.length === 0}
-          <div class="flex flex-col items-center justify-center py-24 text-center text-muted-foreground">
+          <div
+            class="flex flex-col items-center justify-center py-24 text-center text-muted-foreground"
+          >
             <MessageCircle class="mb-3 h-8 w-8 opacity-40" />
             <p class="text-sm">Start a conversation</p>
           </div>
@@ -203,15 +199,9 @@
           {#each messages as message, index}
             {@const isLastMessage = index === messages.length - 1}
             {@const shouldShowLoader =
-              isLoading &&
-              isLastMessage &&
-              message.role === "assistant" &&
-              !message.content}
+              isLoading && isLastMessage && message.role === 'assistant' && !message.content}
             {@const isStreamingMessage =
-              isLoading &&
-              isLastMessage &&
-              message.role === "assistant" &&
-              !!message.content}
+              isLoading && isLastMessage && message.role === 'assistant' && !!message.content}
             <ChatMessage
               {message}
               {modelLabel}
@@ -229,7 +219,7 @@
                     size="icon"
                     variant="ghost"
                     class="h-6 w-6 text-muted-foreground"
-                    title={copiedIndex === index ? "Copied" : "Copy"}
+                    title={copiedIndex === index ? 'Copied' : 'Copy'}
                     onclick={() => copyMessage(index, message.content)}
                   >
                     {#if copiedIndex === index}
@@ -238,12 +228,12 @@
                       <Copy class="h-3 w-3" />
                     {/if}
                   </Button>
-                  {#if onRegenerate && isLastMessage && message.role === "assistant"}
+                  {#if onRegenerate && isLastMessage && message.role === 'assistant'}
                     <Button
                       size="icon"
                       variant="ghost"
                       class="h-6 w-6 text-muted-foreground"
-                      title={sendDisabled ? "Unavailable while offline" : "Regenerate"}
+                      title={sendDisabled ? 'Unavailable while offline' : 'Regenerate'}
                       disabled={isLoading || sendDisabled}
                       onclick={() => onRegenerate?.()}
                     >
@@ -262,7 +252,7 @@
                       <GitBranch class="h-3 w-3" />
                     </Button>
                   {/if}
-                  {#if onTruncate && message.role === "user"}
+                  {#if onTruncate && message.role === 'user'}
                     <Button
                       size="icon"
                       variant="ghost"

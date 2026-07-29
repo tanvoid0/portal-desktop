@@ -27,38 +27,32 @@ export function formatDuration(ms: number): string {
 
 export function getDurationColor(duration: number): string {
   if (duration < 5000) {
-    return "text-status-success";
+    return 'text-status-success';
   } else if (duration < 30000) {
-    return "text-status-warning";
+    return 'text-status-warning';
   } else {
-    return "text-status-error";
+    return 'text-status-error';
   }
 }
 
 export function getDurationBadgeVariant(
-  duration: number,
-): "default" | "secondary" | "destructive" | "outline" {
+  duration: number
+): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (duration < 5000) {
-    return "default";
+    return 'default';
   } else if (duration < 30000) {
-    return "secondary";
+    return 'secondary';
   } else {
-    return "destructive";
+    return 'destructive';
   }
 }
 
-export function calculateAverageDuration(
-  entries: Array<{ duration?: number }>,
-): number {
+export function calculateAverageDuration(entries: Array<{ duration?: number }>): number {
   const durations = entries
     .map((entry) => entry.duration)
-    .filter(
-      (duration): duration is number => duration !== undefined && duration > 0,
-    );
+    .filter((duration): duration is number => duration !== undefined && duration > 0);
 
   if (durations.length === 0) return 0;
 
-  return (
-    durations.reduce((sum, duration) => sum + duration, 0) / durations.length
-  );
+  return durations.reduce((sum, duration) => sum + duration, 0) / durations.length;
 }

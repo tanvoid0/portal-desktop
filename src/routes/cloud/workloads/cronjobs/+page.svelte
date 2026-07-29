@@ -1,34 +1,19 @@
 <!-- CronJobs List Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    cloudStore,
-    loadResources,
-    refreshResources,
-  } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import BaseResourceTable from "$lib/domains/cloud/core/components/BaseResourceTable.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { RefreshCw, Search } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import {
-    useTableNavigation,
-    useResourceActions,
-  } from "$lib/domains/k8s-navigation";
+  import { onMount } from 'svelte';
+  import { cloudStore, loadResources, refreshResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import BaseResourceTable from '$lib/domains/cloud/core/components/BaseResourceTable.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { RefreshCw, Search } from '@lucide/svelte';
+  import { goto } from '$app/navigation';
+  import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 
-  let searchQuery = $state("");
-  let suspendFilter = $state("");
+  let searchQuery = $state('');
+  let suspendFilter = $state('');
 
   onMount(async () => {
     if ($cloudStore.connection.isConnected) {
@@ -39,37 +24,34 @@
   const filteredCronJobs = $derived(
     $cloudStore.resources[ResourceType.CRONJOB].filter((cj) => {
       const matchesSearch =
-        !searchQuery ||
-        cj.name.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery || cj.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesSuspend =
         !suspendFilter ||
-        (suspendFilter === "active" && !cj.metadata?.suspend) ||
-        (suspendFilter === "suspended" && cj.metadata?.suspend);
+        (suspendFilter === 'active' && !cj.metadata?.suspend) ||
+        (suspendFilter === 'suspended' && cj.metadata?.suspend);
       return matchesSearch && matchesSuspend;
-    }),
+    })
   );
 
   const cronJobStats = $derived({
     total: $cloudStore.resources[ResourceType.CRONJOB].length,
-    active: $cloudStore.resources[ResourceType.CRONJOB].filter(
-      (cj: any) => !cj.metadata?.suspend,
-    ).length,
-    suspended: $cloudStore.resources[ResourceType.CRONJOB].filter(
-      (cj: any) => cj.metadata?.suspend,
-    ).length,
+    active: $cloudStore.resources[ResourceType.CRONJOB].filter((cj: any) => !cj.metadata?.suspend)
+      .length,
+    suspended: $cloudStore.resources[ResourceType.CRONJOB].filter((cj: any) => cj.metadata?.suspend)
+      .length,
     withActiveJobs: $cloudStore.resources[ResourceType.CRONJOB].filter(
-      (cj: any) => (cj.metadata?.active || 0) > 0,
+      (cj: any) => (cj.metadata?.active || 0) > 0
     ).length,
   });
 
   const cronJobColumns = [
-    { key: "name", label: "Name", width: "w-1/4" },
-    { key: "schedule", label: "Schedule", width: "w-1/6" },
-    { key: "suspend", label: "Suspend", width: "w-1/8" },
-    { key: "active", label: "Active", width: "w-1/8" },
-    { key: "lastSchedule", label: "Last Schedule", width: "w-1/6" },
-    { key: "age", label: "Age", width: "w-1/8" },
-    { key: "namespace", label: "Namespace", width: "w-1/6" },
+    { key: 'name', label: 'Name', width: 'w-1/4' },
+    { key: 'schedule', label: 'Schedule', width: 'w-1/6' },
+    { key: 'suspend', label: 'Suspend', width: 'w-1/8' },
+    { key: 'active', label: 'Active', width: 'w-1/8' },
+    { key: 'lastSchedule', label: 'Last Schedule', width: 'w-1/6' },
+    { key: 'age', label: 'Age', width: 'w-1/8' },
+    { key: 'namespace', label: 'Namespace', width: 'w-1/6' },
   ];
 
   async function handleRefresh() {
@@ -77,9 +59,7 @@
   }
 
   function handleCronJobClick(cronJob: ICloudResource) {
-    goto(
-      `/cloud/workloads/cronjobs/${cronJob.name}?namespace=${cronJob.namespace}`,
-    );
+    goto(`/cloud/workloads/cronjobs/${cronJob.name}?namespace=${cronJob.namespace}`);
   }
 
   // Table navigation
@@ -89,9 +69,7 @@
     onActivate: (index) => {
       const cronJob = filteredCronJobs[index];
       if (cronJob) {
-        goto(
-          `/cloud/workloads/cronjobs/${cronJob.name}?namespace=${cronJob.namespace}`,
-        );
+        goto(`/cloud/workloads/cronjobs/${cronJob.name}?namespace=${cronJob.namespace}`);
       }
     },
     enabled: $cloudStore.connection.isConnected,
@@ -103,19 +81,13 @@
     resources: filteredCronJobs,
     handlers: {
       onDescribe: (resource) => {
-        goto(
-          `/cloud/workloads/cronjobs/${resource.name}?namespace=${resource.namespace}`,
-        );
+        goto(`/cloud/workloads/cronjobs/${resource.name}?namespace=${resource.namespace}`);
       },
       onEdit: (resource) => {
-        goto(
-          `/cloud/workloads/cronjobs/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/workloads/cronjobs/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onYaml: (resource) => {
-        goto(
-          `/cloud/workloads/cronjobs/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/workloads/cronjobs/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onRefresh: () => {
         refreshResources();
@@ -203,9 +175,9 @@
     </div>
     <Select
       options={[
-        { value: "", label: "All Statuses" },
-        { value: "active", label: "Active" },
-        { value: "suspended", label: "Suspended" },
+        { value: '', label: 'All Statuses' },
+        { value: 'active', label: 'Active' },
+        { value: 'suspended', label: 'Suspended' },
       ]}
       bind:value={suspendFilter}
       placeholder="Filter by status"
@@ -219,10 +191,7 @@
       <CardTitle>CronJobs ({filteredCronJobs.length})</CardTitle>
     </CardHeader>
     <CardContent>
-      <div
-        class="k8s-navigable-table"
-        data-selected-index={tableNav.selectedIndex}
-      >
+      <div class="k8s-navigable-table" data-selected-index={tableNav.selectedIndex}>
         <BaseResourceTable
           resources={filteredCronJobs}
           resourceType={ResourceType.CRONJOB}

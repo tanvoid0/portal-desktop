@@ -3,97 +3,92 @@
  * Provides utilities for creating theme-aware component variants
  */
 
-import { tv, type VariantProps } from "tailwind-variants";
+import { tv, type VariantProps } from 'tailwind-variants';
 
 /**
  * Base component styles that all themed components should inherit
  */
 export const baseComponentStyles = {
   // Focus styles
-  focus: "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  focus: 'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
 
   // Disabled styles
-  disabled: "disabled:pointer-events-none disabled:opacity-50",
+  disabled: 'disabled:pointer-events-none disabled:opacity-50',
 
   // Transition styles
-  transition: "transition-all duration-200",
+  transition: 'transition-all duration-200',
 
   // Border radius
-  rounded: "rounded-md",
+  rounded: 'rounded-md',
 
   // Shadow styles
-  shadow: "shadow-sm",
-  shadowHover: "hover:shadow-md",
+  shadow: 'shadow-sm',
+  shadowHover: 'hover:shadow-md',
 
   // Ring styles for focus
-  ring: "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+  ring: 'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
 
   // Animation styles
-  animate: "animate-in fade-in-0 zoom-in-95",
+  animate: 'animate-in fade-in-0 zoom-in-95',
 };
 
 /**
  * Color variants for components
  */
 export const colorVariants = {
-  default: "bg-primary text-primary-foreground hover:bg-primary/90",
-  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-  secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-  destructive:
-    "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-  outline:
-    "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-  ghost: "hover:bg-accent hover:text-accent-foreground",
-  link: "text-primary underline-offset-4 hover:underline",
+  default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+  primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+  secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+  destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+  outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+  ghost: 'hover:bg-accent hover:text-accent-foreground',
+  link: 'text-primary underline-offset-4 hover:underline',
 };
 
 /**
  * Size variants for components
  */
 export const sizeVariants = {
-  sm: "h-8 px-3 text-sm",
-  default: "h-9 px-4 py-2",
-  lg: "h-10 px-6",
-  icon: "size-9",
+  sm: 'h-8 px-3 text-sm',
+  default: 'h-9 px-4 py-2',
+  lg: 'h-10 px-6',
+  icon: 'size-9',
 };
 
 /**
  * Create a themed component variant
  */
-export function createThemedVariant(
-  baseStyles: string,
-  variants: Record<string, any>,
-) {
+export function createThemedVariant(baseStyles: string, variants: Record<string, any>) {
   return tv({
     base: `${baseStyles} ${baseComponentStyles.transition}`,
     variants,
     compoundVariants: [
       {
-        variant: "default",
+        variant: 'default',
         class: `${colorVariants.default} ${baseComponentStyles.focus}`,
       },
       {
-        variant: "primary",
+        variant: 'primary',
         class: `${colorVariants.primary} ${baseComponentStyles.focus}`,
       },
       {
-        variant: "secondary",
+        variant: 'secondary',
         class: `${colorVariants.secondary} ${baseComponentStyles.focus}`,
       },
       {
-        variant: "destructive",
+        variant: 'destructive',
         class: `${colorVariants.destructive} ${baseComponentStyles.focus}`,
       },
       {
-        variant: "outline",
+        variant: 'outline',
         class: `${colorVariants.outline} ${baseComponentStyles.focus}`,
       },
       {
-        variant: "ghost",
+        variant: 'ghost',
         class: `${colorVariants.ghost} ${baseComponentStyles.focus}`,
       },
       {
-        variant: "link",
+        variant: 'link',
         class: `${colorVariants.link} ${baseComponentStyles.focus}`,
       },
     ],
@@ -105,39 +100,39 @@ export function createThemedVariant(
  */
 export const themeColors = {
   // Background colors
-  background: "bg-background",
-  card: "bg-card",
-  popover: "bg-popover",
-  sidebar: "bg-sidebar",
+  background: 'bg-background',
+  card: 'bg-card',
+  popover: 'bg-popover',
+  sidebar: 'bg-sidebar',
 
   // Text colors
-  foreground: "text-foreground",
-  muted: "text-muted-foreground",
-  accent: "text-accent-foreground",
+  foreground: 'text-foreground',
+  muted: 'text-muted-foreground',
+  accent: 'text-accent-foreground',
 
   // Border colors
-  border: "border-border",
-  input: "border-input",
-  ring: "ring-ring",
+  border: 'border-border',
+  input: 'border-input',
+  ring: 'ring-ring',
 
   // Interactive colors
-  primary: "bg-primary text-primary-foreground",
-  secondary: "bg-secondary text-secondary-foreground",
-  destructive: "bg-destructive text-destructive-foreground",
+  primary: 'bg-primary text-primary-foreground',
+  secondary: 'bg-secondary text-secondary-foreground',
+  destructive: 'bg-destructive text-destructive-foreground',
 };
 
 /**
  * Create responsive theme classes
  */
-export function createResponsiveTheme(theme: "light" | "dark" | "auto") {
-  const baseClasses = "transition-colors duration-200";
+export function createResponsiveTheme(theme: 'light' | 'dark' | 'auto') {
+  const baseClasses = 'transition-colors duration-200';
 
   switch (theme) {
-    case "light":
+    case 'light':
       return `${baseClasses} light`;
-    case "dark":
+    case 'dark':
       return `${baseClasses} dark`;
-    case "auto":
+    case 'auto':
     default:
       return baseClasses;
   }
@@ -147,16 +142,10 @@ export function createResponsiveTheme(theme: "light" | "dark" | "auto") {
  * Theme context for components
  */
 export interface ThemeContext {
-  theme: "light" | "dark" | "system";
-  resolvedTheme: "light" | "dark";
-  variant:
-    | "default"
-    | "destructive"
-    | "outline"
-    | "secondary"
-    | "ghost"
-    | "link";
-  size: "sm" | "default" | "lg" | "icon";
+  theme: 'light' | 'dark' | 'system';
+  resolvedTheme: 'light' | 'dark';
+  variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  size: 'sm' | 'default' | 'lg' | 'icon';
 }
 
 /**
@@ -173,7 +162,7 @@ export function getThemeClasses(context: Partial<ThemeContext>): string {
     classes.push(sizeVariants[context.size] || sizeVariants.default);
   }
 
-  return classes.join(" ");
+  return classes.join(' ');
 }
 
 /**
@@ -181,61 +170,55 @@ export function getThemeClasses(context: Partial<ThemeContext>): string {
  */
 export const cssVariables = {
   // Base colors
-  background: "--background",
-  foreground: "--foreground",
-  card: "--card",
-  cardForeground: "--card-foreground",
-  popover: "--popover",
-  popoverForeground: "--popover-foreground",
+  background: '--background',
+  foreground: '--foreground',
+  card: '--card',
+  cardForeground: '--card-foreground',
+  popover: '--popover',
+  popoverForeground: '--popover-foreground',
 
   // Interactive colors
-  primary: "--primary",
-  primaryForeground: "--primary-foreground",
-  secondary: "--secondary",
-  secondaryForeground: "--secondary-foreground",
-  destructive: "--destructive",
-  destructiveForeground: "--destructive-foreground",
+  primary: '--primary',
+  primaryForeground: '--primary-foreground',
+  secondary: '--secondary',
+  secondaryForeground: '--secondary-foreground',
+  destructive: '--destructive',
+  destructiveForeground: '--destructive-foreground',
 
   // Utility colors
-  muted: "--muted",
-  mutedForeground: "--muted-foreground",
-  accent: "--accent",
-  accentForeground: "--accent-foreground",
+  muted: '--muted',
+  mutedForeground: '--muted-foreground',
+  accent: '--accent',
+  accentForeground: '--accent-foreground',
 
   // Border and input
-  border: "--border",
-  input: "--input",
-  ring: "--ring",
+  border: '--border',
+  input: '--input',
+  ring: '--ring',
 
   // Sidebar
-  sidebar: "--sidebar",
-  sidebarForeground: "--sidebar-foreground",
-  sidebarPrimary: "--sidebar-primary",
-  sidebarPrimaryForeground: "--sidebar-primary-foreground",
-  sidebarAccent: "--sidebar-accent",
-  sidebarAccentForeground: "--sidebar-accent-foreground",
-  sidebarBorder: "--sidebar-border",
-  sidebarRing: "--sidebar-ring",
+  sidebar: '--sidebar',
+  sidebarForeground: '--sidebar-foreground',
+  sidebarPrimary: '--sidebar-primary',
+  sidebarPrimaryForeground: '--sidebar-primary-foreground',
+  sidebarAccent: '--sidebar-accent',
+  sidebarAccentForeground: '--sidebar-accent-foreground',
+  sidebarBorder: '--sidebar-border',
+  sidebarRing: '--sidebar-ring',
 };
 
 /**
  * Apply theme to an element
  */
-export function applyTheme(
-  element: HTMLElement,
-  theme: "light" | "dark" | "system",
-) {
+export function applyTheme(element: HTMLElement, theme: 'light' | 'dark' | 'system') {
   // Remove existing theme classes
-  element.classList.remove("light", "dark");
+  element.classList.remove('light', 'dark');
 
   // Add new theme class
-  if (theme !== "system") {
+  if (theme !== 'system') {
     element.classList.add(theme);
   }
 
   // Update CSS custom properties
-  element.style.setProperty(
-    "--color-scheme",
-    theme === "system" ? "auto" : theme,
-  );
+  element.style.setProperty('--color-scheme', theme === 'system' ? 'auto' : theme);
 }

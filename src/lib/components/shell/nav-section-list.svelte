@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
+  import { Badge } from '$lib/components/ui/badge';
   import {
     MenuAction as SidebarMenuAction,
     MenuButton as SidebarMenuButton,
@@ -7,15 +7,15 @@
     MenuSub,
     MenuSubButton,
     MenuSubItem,
-  } from "$lib/components/ui/sidebar";
+  } from '$lib/components/ui/sidebar';
   import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-  } from "$lib/components/ui/collapsible";
-  import { ChevronDown } from "@lucide/svelte";
-  import NavIcon from "./nav-icon.svelte";
-  import type { NavItem, NavSection } from "./nav-types";
+  } from '$lib/components/ui/collapsible';
+  import { ChevronDown } from '@lucide/svelte';
+  import NavIcon from './nav-icon.svelte';
+  import type { NavItem, NavSection } from './nav-types';
 
   interface Props {
     sections: NavSection[];
@@ -28,7 +28,7 @@
 
   function isNavItemActive(url: string, path: string): boolean {
     if (path === url) return true;
-    if (url === "/") return false;
+    if (url === '/') return false;
     return path.startsWith(`${url}/`);
   }
 
@@ -74,11 +74,7 @@
                 tooltipContent={item.title}
               >
                 {#snippet child({ props })}
-                  <a
-                    {...props}
-                    href={item.url}
-                    onclick={() => expandOnNavigate(item)}
-                  >
+                  <a {...props} href={item.url} onclick={() => expandOnNavigate(item)}>
                     <NavIcon icon={item.icon} />
                     <span class="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     {#if item.badge}
@@ -94,10 +90,7 @@
               </SidebarMenuButton>
               <CollapsibleTrigger>
                 {#snippet child({ props })}
-                  <SidebarMenuAction
-                    {...props}
-                    aria-label="Toggle {item.title} submenu"
-                  >
+                  <SidebarMenuAction {...props} aria-label="Toggle {item.title} submenu">
                     <ChevronDown
                       class="transition-transform group-data-[state=open]/collapsible:rotate-180"
                     />

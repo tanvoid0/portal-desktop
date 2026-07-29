@@ -3,23 +3,20 @@
 	Supports Languages, Package Managers, and Frameworks
 -->
 
-<script
-  lang="ts"
-  generics="T extends BaseItem, TSuggested extends BaseSuggestedItem"
->
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Input } from "$lib/components/ui/input";
+<script lang="ts" generics="T extends BaseItem, TSuggested extends BaseSuggestedItem">
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Input } from '$lib/components/ui/input';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Badge } from "$lib/components/ui/badge";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     Dialog,
     DialogContent,
@@ -27,34 +24,21 @@
     DialogFooter,
     DialogHeader,
     DialogTitle,
-  } from "$lib/components/ui/dialog";
-  import {
-    Tabs,
-    TabsList,
-    TabsTrigger,
-    TabsContent,
-  } from "$lib/components/ui/tabs";
-  import {
-    Plus,
-    Edit,
-    Trash2,
-    Search,
-    Loader2,
-    Sparkles,
-    TrendingUp,
-  } from "@lucide/svelte";
-  import { toast } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { logger } from "$lib/domains/shared";
-  import { suggestionEngine, learningService } from "$lib/domains/learning";
-  import Icon from "@iconify/svelte";
+  } from '$lib/components/ui/dialog';
+  import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
+  import { Plus, Edit, Trash2, Search, Loader2, Sparkles, TrendingUp } from '@lucide/svelte';
+  import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { logger } from '$lib/domains/shared';
+  import { suggestionEngine, learningService } from '$lib/domains/learning';
+  import Icon from '@iconify/svelte';
   import type {
     BaseItem,
     BaseSuggestedItem,
     BaseItemGroup,
     ItemService,
     SettingsComponentConfig,
-  } from "./types";
+  } from './types';
 
   interface Props<T extends BaseItem, TSuggested extends BaseSuggestedItem> {
     config: SettingsComponentConfig<T, TSuggested>;
@@ -69,15 +53,15 @@
   let suggestedGroups = $state<BaseItemGroup<TSuggested>[]>([]);
   let recommendedNames = $state<string[]>([]);
   let isLoading = $state(false);
-  let searchQuery = $state("");
+  let searchQuery = $state('');
   let showAddDialog = $state(false);
   let editingItem = $state<T | null>(null);
 
   // Form state
-  let itemName = $state("");
-  let itemIcon = $state("");
-  let itemIconType = $state<"devicon" | "file">("devicon");
-  let itemCategory = $state("Custom");
+  let itemName = $state('');
+  let itemIcon = $state('');
+  let itemIconType = $state<'devicon' | 'file'>('devicon');
+  let itemCategory = $state('Custom');
 
   onMount(async () => {
     await loadData();
@@ -86,11 +70,7 @@
   async function loadData() {
     isLoading = true;
     try {
-      await Promise.all([
-        loadItems(),
-        loadSuggestedItems(),
-        loadRecommendedItems(),
-      ]);
+      await Promise.all([loadItems(), loadSuggestedItems(), loadRecommendedItems()]);
     } catch (error) {
       log.error(`Failed to load ${config.itemName.toLowerCase()} data`, error);
       toast.error(`Failed to load ${config.itemNamePlural.toLowerCase()}`);
@@ -116,27 +96,21 @@
         count: suggestedGroups.length,
       });
     } catch (error) {
-      log.error(
-        `Failed to load suggested ${config.itemNamePlural.toLowerCase()}`,
-        error,
-      );
+      log.error(`Failed to load suggested ${config.itemNamePlural.toLowerCase()}`, error);
     }
   }
 
   async function loadRecommendedItems() {
     try {
       const suggestions = await suggestionEngine.getContextualSuggestions(
-        config.recommendationPatternType,
+        config.recommendationPatternType
       );
       const scores = new Map<string, number>();
       for (const suggestion of suggestions) {
-        if (
-          suggestion.pattern_data &&
-          typeof suggestion.pattern_data === "object"
-        ) {
+        if (suggestion.pattern_data && typeof suggestion.pattern_data === 'object') {
           const data = suggestion.pattern_data as Record<string, unknown>;
           const value = data[config.recommendationDataKey];
-          if (value && typeof value === "string") {
+          if (value && typeof value === 'string') {
             const score = suggestion.frequency * suggestion.success_rate;
             const currentScore = scores.get(value) || 0;
             scores.set(value, currentScore + score);
@@ -152,29 +126,26 @@
         count: recommendedNames.length,
       });
     } catch (error) {
-      log.error(
-        `Failed to load recommended ${config.itemNamePlural.toLowerCase()}`,
-        error,
-      );
+      log.error(`Failed to load recommended ${config.itemNamePlural.toLowerCase()}`, error);
     }
   }
 
   function startAddingItem(suggested?: TSuggested | string) {
-    if (typeof suggested === "string") {
-      itemName = suggested || "";
-      itemIcon = "";
-      itemIconType = "devicon";
-      itemCategory = "Custom";
+    if (typeof suggested === 'string') {
+      itemName = suggested || '';
+      itemIcon = '';
+      itemIconType = 'devicon';
+      itemCategory = 'Custom';
     } else if (suggested) {
       itemName = suggested.name;
       itemIcon = suggested.icon;
-      itemIconType = "devicon";
+      itemIconType = 'devicon';
       itemCategory = suggested.category;
     } else {
-      itemName = "";
-      itemIcon = "";
-      itemIconType = "devicon";
-      itemCategory = "Custom";
+      itemName = '';
+      itemIcon = '';
+      itemIconType = 'devicon';
+      itemCategory = 'Custom';
     }
     editingItem = null;
     showAddDialog = true;
@@ -200,17 +171,17 @@
         await config.service.update(
           editingItem.id,
           itemName.trim(),
-          itemIcon.trim() || "logos:code",
+          itemIcon.trim() || 'logos:code',
           itemIconType,
-          itemCategory.trim() || "Custom",
+          itemCategory.trim() || 'Custom'
         );
         toast.success(`${config.itemName} updated successfully`);
       } else {
         const created = await config.service.create(
           itemName.trim(),
-          itemIcon.trim() || "logos:code",
+          itemIcon.trim() || 'logos:code',
           itemIconType,
-          itemCategory.trim() || "Custom",
+          itemCategory.trim() || 'Custom'
         );
         toast.success(`${config.itemName} added successfully`);
 
@@ -224,9 +195,7 @@
     } catch (error) {
       log.error(`Failed to save ${config.itemName.toLowerCase()}`, error);
       toast.error(
-        error instanceof Error
-          ? error.message
-          : `Failed to save ${config.itemName.toLowerCase()}`,
+        error instanceof Error ? error.message : `Failed to save ${config.itemName.toLowerCase()}`
       );
     }
   }
@@ -234,7 +203,7 @@
   async function deleteItem(id: number, name: string) {
     const confirmed = await confirmAction(
       `Are you sure you want to delete the ${config.itemName.toLowerCase()} "${name}"?`,
-      `Delete ${config.itemName.toLowerCase()}`,
+      `Delete ${config.itemName.toLowerCase()}`
     );
     if (!confirmed) return;
 
@@ -259,7 +228,7 @@
       (item) =>
         item.name.toLowerCase().includes(query) ||
         item.category.toLowerCase().includes(query) ||
-        item.icon.toLowerCase().includes(query),
+        item.icon.toLowerCase().includes(query)
     );
   });
 
@@ -278,7 +247,7 @@
     if (recommendedNames.length > 0) {
       const recommendedItems: TSuggested[] = recommendedNames.map((name) => {
         const existing = allSuggestedItems.find(
-          (si) => si.name.toLowerCase() === name.toLowerCase(),
+          (si) => si.name.toLowerCase() === name.toLowerCase()
         );
 
         if (existing) {
@@ -287,13 +256,13 @@
 
         return {
           name,
-          icon: `logos:${name.toLowerCase().replace(/\s+/g, "-")}`,
-          category: "Recommended",
+          icon: `logos:${name.toLowerCase().replace(/\s+/g, '-')}`,
+          category: 'Recommended',
         } as TSuggested;
       });
 
       groups.unshift({
-        category: "Recommended (Based on Your Usage)",
+        category: 'Recommended (Based on Your Usage)',
         items: recommendedItems,
       });
     }
@@ -313,19 +282,14 @@
 
   // Calculate total count of available suggested items (after filtering)
   const totalSuggestedCount = $derived.by(() => {
-    return filteredSuggestedGroups.reduce(
-      (sum, group) => sum + group.items.length,
-      0,
-    );
+    return filteredSuggestedGroups.reduce((sum, group) => sum + group.items.length, 0);
   });
 
   async function addAllItemsFromGroup(group: BaseItemGroup<TSuggested>) {
     const itemsToAdd = group.items.filter((item) => !isItemInList(item.name));
 
     if (itemsToAdd.length === 0) {
-      toast.info(
-        `All ${config.itemNamePlural.toLowerCase()} from this group are already added`,
-      );
+      toast.info(`All ${config.itemNamePlural.toLowerCase()} from this group are already added`);
       return;
     }
 
@@ -335,7 +299,7 @@
 
       if (result.success.length > 0) {
         toast.success(
-          `Successfully added ${result.success.length} ${config.itemName.toLowerCase()}${result.success.length > 1 ? "s" : ""}`,
+          `Successfully added ${result.success.length} ${config.itemName.toLowerCase()}${result.success.length > 1 ? 's' : ''}`
         );
 
         if (config.onItemsBatchAdded) {
@@ -344,18 +308,15 @@
       }
 
       if (result.failed.length > 0) {
-        const failedNames = result.failed.map((f) => f.item.name).join(", ");
+        const failedNames = result.failed.map((f) => f.item.name).join(', ');
         toast.error(
-          `Failed to add ${result.failed.length} ${config.itemName.toLowerCase()}${result.failed.length > 1 ? "s" : ""}: ${failedNames}`,
+          `Failed to add ${result.failed.length} ${config.itemName.toLowerCase()}${result.failed.length > 1 ? 's' : ''}: ${failedNames}`
         );
       }
 
       await loadData();
     } catch (error) {
-      log.error(
-        `Failed to add ${config.itemNamePlural.toLowerCase()} in batch`,
-        error,
-      );
+      log.error(`Failed to add ${config.itemNamePlural.toLowerCase()} in batch`, error);
       toast.error(`Failed to add ${config.itemNamePlural.toLowerCase()}`);
     } finally {
       isLoading = false;
@@ -405,9 +366,7 @@
         {@const filtered = filteredItems}
         {#if filtered.length === 0}
           <Card>
-            <CardContent
-              class="flex flex-col items-center justify-center py-12"
-            >
+            <CardContent class="flex flex-col items-center justify-center py-12">
               <svelte:component
                 this={config.emptyIcon}
                 class="mb-4 h-12 w-12 text-muted-foreground"
@@ -432,7 +391,7 @@
                 <CardHeader>
                   <div class="flex items-start justify-between">
                     <div class="flex items-center gap-3">
-                      {#if item.icon_type === "devicon"}
+                      {#if item.icon_type === 'devicon'}
                         <Icon icon={item.icon} class="h-8 w-8" />
                       {:else}
                         <img src={item.icon} alt={item.name} class="h-8 w-8" />
@@ -446,11 +405,7 @@
                 </CardHeader>
                 <CardContent>
                   <div class="mt-2 flex items-center justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => startEditingItem(item)}
-                    >
+                    <Button variant="outline" size="sm" onclick={() => startEditingItem(item)}>
                       <Edit class="mr-1 h-3 w-3" />
                       Edit
                     </Button>
@@ -474,9 +429,7 @@
       <TabsContent value="suggested" class="space-y-4">
         {#if filteredSuggestedGroups.length === 0}
           <Card>
-            <CardContent
-              class="flex flex-col items-center justify-center py-12"
-            >
+            <CardContent class="flex flex-col items-center justify-center py-12">
               <svelte:component
                 this={config.emptyIcon}
                 class="mb-4 h-12 w-12 text-muted-foreground"
@@ -496,16 +449,14 @@
               <CardHeader>
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
-                    {#if group.category.includes("Recommended")}
+                    {#if group.category.includes('Recommended')}
                       <Sparkles class="h-5 w-5 text-primary" />
                     {/if}
                     <div>
                       <CardTitle>{group.category}</CardTitle>
                       <CardDescription>
                         {group.items.length}
-                        {config.itemName.toLowerCase()}{group.items.length > 1
-                          ? "s"
-                          : ""} available
+                        {config.itemName.toLowerCase()}{group.items.length > 1 ? 's' : ''} available
                       </CardDescription>
                     </div>
                   </div>
@@ -521,9 +472,7 @@
                 </div>
               </CardHeader>
               <CardContent>
-                <div
-                  class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
-                >
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {#each group.items as item}
                     <div
                       class="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-accent/50"
@@ -531,11 +480,9 @@
                       <div class="flex min-w-0 flex-1 items-center gap-3">
                         <Icon icon={item.icon} class="h-6 w-6 flex-shrink-0" />
                         <div class="min-w-0 flex-1">
-                          <div
-                            class="flex items-center gap-1 truncate font-medium"
-                          >
+                          <div class="flex items-center gap-1 truncate font-medium">
                             {item.name}
-                            {#if group.category.includes("Recommended")}
+                            {#if group.category.includes('Recommended')}
                               <Badge
                                 variant="outline"
                                 class="border-primary bg-primary/5 text-xs text-primary"
@@ -550,11 +497,7 @@
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => startAddingItem(item)}
-                      >
+                      <Button variant="ghost" size="sm" onclick={() => startAddingItem(item)}>
                         <Plus class="h-4 w-4" />
                       </Button>
                     </div>
@@ -585,19 +528,11 @@
     <div class="grid gap-4 py-4">
       <div class="space-y-2">
         <Label for="item-name">{config.itemName} Name *</Label>
-        <Input
-          id="item-name"
-          bind:value={itemName}
-          placeholder="Enter name..."
-        />
+        <Input id="item-name" bind:value={itemName} placeholder="Enter name..." />
       </div>
       <div class="space-y-2">
         <Label for="item-category">Category</Label>
-        <Input
-          id="item-category"
-          bind:value={itemCategory}
-          placeholder="Enter category..."
-        />
+        <Input id="item-category" bind:value={itemCategory} placeholder="Enter category..." />
       </div>
       <div class="space-y-2">
         <Label for="item-icon">Icon</Label>
@@ -615,19 +550,17 @@
         <Select
           bind:value={itemIconType}
           options={[
-            { value: "devicon", label: "Devicon" },
-            { value: "file", label: "Image URL" },
+            { value: 'devicon', label: 'Devicon' },
+            { value: 'file', label: 'Image URL' },
           ]}
         />
       </div>
     </div>
 
     <DialogFooter>
-      <Button variant="outline" onclick={() => (showAddDialog = false)}
-        >Cancel</Button
-      >
+      <Button variant="outline" onclick={() => (showAddDialog = false)}>Cancel</Button>
       <Button onclick={saveItem}>
-        {editingItem ? "Update" : "Add"}
+        {editingItem ? 'Update' : 'Add'}
         {config.itemName}
       </Button>
     </DialogFooter>

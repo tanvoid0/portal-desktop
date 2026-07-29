@@ -18,7 +18,7 @@ export interface Command {
   description?: string;
   keywords?: string[];
   action: () => void | Promise<void>;
-  category?: "navigation" | "namespace" | "action" | "resource";
+  category?: 'navigation' | 'namespace' | 'action' | 'resource';
 }
 
 export interface NavigationState {

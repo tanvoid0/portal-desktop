@@ -8,12 +8,12 @@ import type {
   BlockParameter,
   PipelineStep,
   PipelineVariable,
-} from "$lib/domains/projects/pipelines/types";
+} from '$lib/domains/projects/pipelines/types';
 import {
   substituteVariables,
   validateVariables,
   type SubstitutionContext,
-} from "$lib/domains/projects/pipelines/utils/variableSubstitution";
+} from '$lib/domains/projects/pipelines/utils/variableSubstitution';
 
 /** A block reference with optional per-step parameter overrides */
 export interface AutomationStepInput {
@@ -35,7 +35,7 @@ export interface ResolvedExecutionStep {
   blockId: string;
   name: string;
   command: string;
-  executionType: Block["executionType"];
+  executionType: Block['executionType'];
   longRunning: boolean;
   workingDirectory?: string;
   dependsOn: string[];
@@ -55,8 +55,8 @@ export interface ResolvePlanResult {
 }
 
 function paramValueToString(value: unknown): string {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "boolean") return value ? "true" : "false";
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
   return String(value);
 }
 
@@ -64,7 +64,7 @@ function paramValueToString(value: unknown): string {
 export function mergeStepParameters(
   block: Block,
   stepConfig: Record<string, unknown> = {},
-  explicitParams: Record<string, string | number | boolean> = {},
+  explicitParams: Record<string, string | number | boolean> = {}
 ): Record<string, string> {
   const merged: Record<string, string> = {};
 
@@ -79,7 +79,7 @@ export function mergeStepParameters(
   }
 
   for (const [key, value] of Object.entries(stepConfig)) {
-    if (key === "command" || key === "longRunning" || key === "workingDirectory") {
+    if (key === 'command' || key === 'longRunning' || key === 'workingDirectory') {
       continue;
     }
     merged[key] = paramValueToString(value);
@@ -97,13 +97,13 @@ export function resolveBlockCommand(
   block: Block,
   stepConfig: Record<string, unknown> = {},
   explicitParams: Record<string, string | number | boolean> = {},
-  context: ResolveContext = {},
+  context: ResolveContext = {}
 ): { command: string; parameters: Record<string, string>; missing: string[] } {
   const parameters = mergeStepParameters(block, stepConfig, explicitParams);
 
   const commandTemplate =
     (stepConfig.command as string | undefined) ??
-    (explicitParams as Record<string, unknown>).command as string | undefined ??
+    ((explicitParams as Record<string, unknown>).command as string | undefined) ??
     block.command;
 
   const substitutionContext: SubstitutionContext = {
@@ -121,7 +121,7 @@ export function resolveBlockCommand(
 /** Build a pipeline step from a block library entry */
 export function createStepFromBlock(
   block: Block,
-  overrides?: Partial<AutomationStepInput>,
+  overrides?: Partial<AutomationStepInput>
 ): PipelineStep {
   const config: Record<string, unknown> = {
     ...block.defaultConfig,
@@ -143,7 +143,7 @@ export function createStepFromBlock(
 export function resolvePipelineStep(
   step: PipelineStep,
   block: Block | null,
-  context: ResolveContext = {},
+  context: ResolveContext = {}
 ): { resolved: ResolvedExecutionStep | null; error?: string } {
   const config = (step.config ?? {}) as Record<string, unknown>;
 
@@ -165,9 +165,9 @@ export function resolvePipelineStep(
   const parameters = block
     ? mergeStepParameters(block, config)
     : Object.fromEntries(
-        Object.entries(config).filter(
-          ([k]) => !["command", "longRunning", "workingDirectory"].includes(k),
-        ).map(([k, v]) => [k, paramValueToString(v)]),
+        Object.entries(config)
+          .filter(([k]) => !['command', 'longRunning', 'workingDirectory'].includes(k))
+          .map(([k, v]) => [k, paramValueToString(v)])
       );
 
   const substitutionContext: SubstitutionContext = {
@@ -184,7 +184,7 @@ export function resolvePipelineStep(
       blockId: step.blockId,
       name: step.name,
       command,
-      executionType: block?.executionType ?? "command",
+      executionType: block?.executionType ?? 'command',
       longRunning: Boolean(config.longRunning),
       workingDirectory: config.workingDirectory as string | undefined,
       dependsOn: step.dependsOn ?? [],
@@ -197,7 +197,7 @@ export function resolvePipelineStep(
 export function buildExecutionPlan(
   inputs: AutomationStepInput[],
   blocks: Block[],
-  context: ResolveContext = {},
+  context: ResolveContext = {}
 ): ResolvePlanResult {
   const blockMap = new Map(blocks.map((b) => [b.id, b]));
   const steps: ResolvedExecutionStep[] = [];
@@ -219,22 +219,20 @@ export function buildExecutionPlan(
       block,
       stepConfig,
       input.parameters ?? {},
-      context,
+      context
     );
 
     if (missing.length > 0) {
       const requiredMissing = missing.filter((name) =>
-        block.parameters.some((p: BlockParameter) => p.name === name && p.required),
+        block.parameters.some((p: BlockParameter) => p.name === name && p.required)
       );
       if (requiredMissing.length > 0) {
         errors.push(
-          `Block "${block.name}": missing required parameters: ${requiredMissing.join(", ")}`,
+          `Block "${block.name}": missing required parameters: ${requiredMissing.join(', ')}`
         );
         continue;
       }
-      warnings.push(
-        `Block "${block.name}": unresolved variables: ${missing.join(", ")}`,
-      );
+      warnings.push(`Block "${block.name}": unresolved variables: ${missing.join(', ')}`);
     }
 
     steps.push({
@@ -257,7 +255,7 @@ export function buildExecutionPlan(
 export function materializePipelineSteps(
   steps: PipelineStep[],
   blocks: Block[],
-  context: ResolveContext = {},
+  context: ResolveContext = {}
 ): { steps: PipelineStep[]; errors: string[] } {
   const blockMap = new Map(blocks.map((b) => [b.id, b]));
   const errors: string[] = [];
@@ -289,9 +287,7 @@ export function materializePipelineSteps(
 
 /** Convert pipeline variables array to a flat record */
 export function pipelineVariablesToRecord(
-  variables: PipelineVariable[] = [],
+  variables: PipelineVariable[] = []
 ): Record<string, string> {
-  return Object.fromEntries(
-    variables.map((v) => [v.name, String(v.value ?? "")]),
-  );
+  return Object.fromEntries(variables.map((v) => [v.name, String(v.value ?? '')]));
 }

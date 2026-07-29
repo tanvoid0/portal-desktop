@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Button } from "$lib/components/ui/button";
-  import { Label } from "$lib/components/ui/label";
-  import { Switch } from "$lib/components/ui/switch";
-  import { PageEmpty, PageLoading } from "$lib/components/shell";
-  import type { Project } from "$lib/domains/projects/types";
-  import { getProjectGitBranch } from "$lib/domains/projects/utils/display";
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
+  import { Label } from '$lib/components/ui/label';
+  import { Switch } from '$lib/components/ui/switch';
+  import { PageEmpty, PageLoading } from '$lib/components/shell';
+  import type { Project } from '$lib/domains/projects/types';
+  import { getProjectGitBranch } from '$lib/domains/projects/utils/display';
   import {
     createGitHubProjectLinkQuery,
     createGitHubStatusQuery,
     GitHubConnectPrompt,
     GitHubWorkflowRunsPanel,
-  } from "$lib/domains/github";
-  import { parseGitHubRemote } from "$lib/domains/github/utils/parseGitHubRemote";
-  import { ExternalLink, Workflow } from "@lucide/svelte";
+  } from '$lib/domains/github';
+  import { parseGitHubRemote } from '$lib/domains/github/utils/parseGitHubRemote';
+  import { ExternalLink, Workflow } from '@lucide/svelte';
 
   interface Props {
     project: Project;
@@ -27,7 +27,7 @@
   const statusQuery = createGitHubStatusQuery();
   const linkQuery = createGitHubProjectLinkQuery(
     () => project.id,
-    () => enabled,
+    () => enabled
   );
 
   const isConnected = $derived(statusQuery.data?.connected ?? false);
@@ -35,23 +35,16 @@
   const parsedRemote = $derived(parseGitHubRemote(project.git_repository));
   const repoOwner = $derived(link?.repoOwner ?? parsedRemote?.owner ?? null);
   const repoName = $derived(link?.repoName ?? parsedRemote?.repo ?? null);
-  const branch = $derived(
-    link?.defaultBranch ?? getProjectGitBranch(project) ?? undefined,
-  );
+  const branch = $derived(link?.defaultBranch ?? getProjectGitBranch(project) ?? undefined);
   const hasRepo = $derived(Boolean(repoOwner && repoName));
-  const repoFullName = $derived(
-    repoOwner && repoName ? `${repoOwner}/${repoName}` : null,
-  );
+  const repoFullName = $derived(repoOwner && repoName ? `${repoOwner}/${repoName}` : null);
   const activeBranchFilter = $derived(filterByBranch && branch ? branch : undefined);
 </script>
 
 {#if statusQuery.isPending || linkQuery.isPending}
   <PageLoading message="Loading GitHub CI/CD..." />
 {:else if !statusQuery.data?.connected}
-  <GitHubConnectPrompt
-    status={statusQuery.data}
-    onConnected={() => statusQuery.refetch()}
-  />
+  <GitHubConnectPrompt status={statusQuery.data} onConnected={() => statusQuery.refetch()} />
 {:else if !hasRepo}
   <PageEmpty
     title="No GitHub repository linked"
@@ -59,15 +52,15 @@
     icon={Workflow}
     actionLabel={project.git_repository && parsedRemote
       ? `Open ${parsedRemote.owner}/${parsedRemote.repo}`
-      : "Browse GitHub repositories"}
+      : 'Browse GitHub repositories'}
     onAction={() =>
       project.git_repository && parsedRemote
         ? goto(`/github/repos/${parsedRemote.owner}/${parsedRemote.repo}`)
-        : goto("/github/repos")}
+        : goto('/github/repos')}
   />
   {#if project.git_repository && parsedRemote}
     <div class="flex justify-center">
-      <Button variant="outline" onclick={() => goto("/github/repos")}>
+      <Button variant="outline" onclick={() => goto('/github/repos')}>
         Browse GitHub repositories
       </Button>
     </div>
@@ -87,10 +80,7 @@
       <div class="flex flex-wrap items-center gap-3">
         {#if branch}
           <div class="flex items-center gap-2">
-            <Switch
-              id="filter-by-branch"
-              bind:checked={filterByBranch}
-            />
+            <Switch id="filter-by-branch" bind:checked={filterByBranch} />
             <Label for="filter-by-branch" class="text-sm font-normal">
               Current branch only ({branch})
             </Label>

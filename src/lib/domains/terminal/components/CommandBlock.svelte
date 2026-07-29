@@ -4,8 +4,8 @@
   Used by BlocksView (main surface) and CommandBlocksPanel (side rail).
 -->
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
   import {
     ChevronDown,
     ChevronRight,
@@ -18,11 +18,11 @@
     Sparkles,
     CheckCircle,
     XCircle,
-  } from "@lucide/svelte";
-  import type { CapturedCommand } from "../stores/commandBlockStore";
-  import { stripForDisplay } from "../utils/textUtils";
-  import AiResponse from "./ai/AiResponse.svelte";
-  import ErrorOutput from "./ErrorOutput.svelte";
+  } from '@lucide/svelte';
+  import type { CapturedCommand } from '../stores/commandBlockStore';
+  import { stripForDisplay } from '../utils/textUtils';
+  import AiResponse from './ai/AiResponse.svelte';
+  import ErrorOutput from './ErrorOutput.svelte';
 
   interface Props {
     block: CapturedCommand;
@@ -34,18 +34,15 @@
   let { block, onRerun, onExplain, onclick = undefined }: Props = $props();
 
   let isExpanded = $state(block.isExpanded ?? true);
-  let copied = $state<"command" | "output" | null>(null);
+  let copied = $state<'command' | 'output' | null>(null);
   let outputEl = $state<HTMLPreElement | null>(null);
 
-  const isRunning = $derived(block.status === "running");
+  const isRunning = $derived(block.status === 'running');
   const isFailed = $derived(
-    block.status === "failed" ||
-      (block.exitCode !== undefined && block.exitCode !== 0),
+    block.status === 'failed' || (block.exitCode !== undefined && block.exitCode !== 0)
   );
-  const isAI = $derived(block.source === "ai");
-  const displayOutput = $derived(
-    isAI ? block.output : stripForDisplay(block.output),
-  );
+  const isAI = $derived(block.source === 'ai');
+  const displayOutput = $derived(isAI ? block.output : stripForDisplay(block.output));
 
   // Auto-follow live output while running.
   $effect(() => {
@@ -61,7 +58,7 @@
     return `${(ms / 60000).toFixed(1)}m`;
   }
 
-  async function copy(text: string, what: "command" | "output") {
+  async function copy(text: string, what: 'command' | 'output') {
     try {
       await navigator.clipboard.writeText(text);
       copied = what;
@@ -79,10 +76,10 @@
       ? 'border-status-info/50'
       : 'border-border'} {onclick ? 'cursor-pointer' : ''}"
   onclick={() => onclick && onclick()}
-  role={onclick ? "button" : undefined}
+  role={onclick ? 'button' : undefined}
   tabindex={onclick ? 0 : undefined}
   onkeydown={(e) => {
-    if (onclick && (e.key === "Enter" || e.key === " ")) {
+    if (onclick && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
       onclick();
     }
@@ -103,7 +100,7 @@
     </div>
 
     <code class="min-w-0 flex-1 truncate font-mono text-sm text-foreground" title={block.command}>
-      {block.command || "(command running…)"}
+      {block.command || '(command running…)'}
     </code>
 
     <!-- Metadata -->
@@ -138,10 +135,12 @@
         title="Copy command"
         onclick={(e: MouseEvent) => {
           e.stopPropagation();
-          copy(block.command, "command");
+          copy(block.command, 'command');
         }}
       >
-        {#if copied === "command"}<Check class="h-3 w-3 text-status-success" />{:else}<Copy class="h-3 w-3" />{/if}
+        {#if copied === 'command'}<Check class="h-3 w-3 text-status-success" />{:else}<Copy
+            class="h-3 w-3"
+          />{/if}
       </Button>
       {#if onRerun && !isAI}
         <Button
@@ -176,7 +175,7 @@
         variant="ghost"
         size="sm"
         class="h-6 w-6 p-0"
-        title={isExpanded ? "Collapse output" : "Expand output"}
+        title={isExpanded ? 'Collapse output' : 'Expand output'}
         onclick={(e: MouseEvent) => {
           e.stopPropagation();
           isExpanded = !isExpanded;
@@ -204,8 +203,8 @@
       {:else}
         <pre
           bind:this={outputEl}
-          class="max-h-96 overflow-auto whitespace-pre-wrap break-words bg-muted/20 px-3 py-2 font-mono text-xs leading-relaxed text-foreground/90"
-        >{displayOutput || " "}</pre>
+          class="max-h-96 overflow-auto whitespace-pre-wrap break-words bg-muted/20 px-3 py-2 font-mono text-xs leading-relaxed text-foreground/90">{displayOutput ||
+            ' '}</pre>
         {#if displayOutput}
           <Button
             variant="ghost"
@@ -214,10 +213,12 @@
             title="Copy output"
             onclick={(e: MouseEvent) => {
               e.stopPropagation();
-              copy(displayOutput, "output");
+              copy(displayOutput, 'output');
             }}
           >
-            {#if copied === "output"}<Check class="h-3 w-3 text-status-success" />{:else}<Copy class="h-3 w-3" />{/if}
+            {#if copied === 'output'}<Check class="h-3 w-3 text-status-success" />{:else}<Copy
+                class="h-3 w-3"
+              />{/if}
           </Button>
         {/if}
       {/if}

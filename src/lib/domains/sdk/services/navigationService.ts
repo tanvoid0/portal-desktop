@@ -4,7 +4,7 @@
  * Frontend service for managing SDK navigation items
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 
 export interface NavigationItem {
   id: string;
@@ -37,13 +37,11 @@ export class SDKNavigationService {
    */
   async getNavigationItems(): Promise<NavigationResponse> {
     try {
-      const response = await invoke<NavigationResponse>(
-        "get_sdk_navigation_items",
-      );
+      const response = await invoke<NavigationResponse>('get_sdk_navigation_items');
       return response;
     } catch (error) {
-      console.error("Failed to fetch SDK navigation items:", error);
-      throw new Error("Failed to load SDK navigation items");
+      console.error('Failed to fetch SDK navigation items:', error);
+      throw new Error('Failed to load SDK navigation items', { cause: error });
     }
   }
 
@@ -66,9 +64,7 @@ export class SDKNavigationService {
    */
   async getInstalledSDKs(): Promise<NavigationItem[]> {
     const response = await this.getNavigationItems();
-    return response.sections
-      .flatMap((section) => section.items)
-      .filter((item) => item.installed);
+    return response.sections.flatMap((section) => section.items).filter((item) => item.installed);
   }
 
   /**
@@ -91,9 +87,7 @@ export class SDKNavigationService {
     const response = await this.getNavigationItems();
     const installed_percentage =
       response.total_available > 0
-        ? Math.round(
-            (response.total_installed / response.total_available) * 100,
-          )
+        ? Math.round((response.total_installed / response.total_available) * 100)
         : 0;
 
     return {

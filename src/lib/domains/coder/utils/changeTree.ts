@@ -1,4 +1,4 @@
-import type { GitFileChange } from "../types.js";
+import type { GitFileChange } from '../types.js';
 
 export interface ChangeTreeNode {
   name: string;
@@ -16,8 +16,8 @@ function splitPath(p: string): string[] {
 
 export function buildChangeTree(changes: GitFileChange[]): ChangeTreeNode[] {
   const root: ChangeTreeNode = {
-    name: "",
-    path: "",
+    name: '',
+    path: '',
     isFile: false,
     children: [],
     additions: 0,
@@ -30,7 +30,7 @@ export function buildChangeTree(changes: GitFileChange[]): ChangeTreeNode[] {
     for (let i = 0; i < segs.length; i++) {
       const seg = segs[i]!;
       const isFile = i === segs.length - 1;
-      const path = segs.slice(0, i + 1).join("/");
+      const path = segs.slice(0, i + 1).join('/');
       let child = node.children.find((c) => c.name === seg && c.isFile === isFile);
       if (!child) {
         child = {
@@ -82,7 +82,7 @@ export interface FlatChangeRow {
 export function flattenChangeTree(
   nodes: ChangeTreeNode[],
   expanded: Set<string>,
-  depth = 0,
+  depth = 0
 ): FlatChangeRow[] {
   const rows: FlatChangeRow[] = [];
   for (const node of nodes) {

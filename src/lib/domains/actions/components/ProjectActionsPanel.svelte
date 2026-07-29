@@ -1,45 +1,37 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Checkbox } from "$lib/components/ui/checkbox";
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Checkbox } from '$lib/components/ui/checkbox';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { PageEmpty, PageLoading } from "$lib/components/shell";
-  import { toast } from "$lib/utils/toast";
-  import {
-    Play,
-    RefreshCw,
-    Workflow,
-    Terminal,
-    GitBranch,
-    Layers,
-    History,
-  } from "@lucide/svelte";
-  import type { Project } from "$lib/domains/projects/types";
+  } from '$lib/components/ui/card';
+  import { PageEmpty, PageLoading } from '$lib/components/shell';
+  import { toast } from '$lib/utils/toast';
+  import { Play, RefreshCw, Workflow, Terminal, GitBranch, Layers, History } from '@lucide/svelte';
+  import type { Project } from '$lib/domains/projects/types';
   import {
     actions,
     type UnifiedAction,
     type UnifiedWorkflow,
     type ActionRunResult,
     type ActionSource,
-  } from "$lib/domains/actions";
-  import { GitHubProjectActionsPanel } from "$lib/domains/github";
+  } from '$lib/domains/actions';
+  import { GitHubProjectActionsPanel } from '$lib/domains/github';
   import {
     scriptExecutionService,
     type ScriptExecutionInfo,
-  } from "$lib/domains/scripts/services/scriptExecutionService";
+  } from '$lib/domains/scripts/services/scriptExecutionService';
   import {
     formatExecutionDuration,
     getExecutionStatusBadgeVariant,
     getExecutionStatusColor,
     getExecutionStatusIcon,
-  } from "$lib/domains/projects/pipelines/utils/executionDisplay";
-  import { untrack } from "svelte";
+  } from '$lib/domains/projects/pipelines/utils/executionDisplay';
+  import { untrack } from 'svelte';
 
   interface Props {
     project: Project;
@@ -48,7 +40,7 @@
 
   let { project, enabled = true }: Props = $props();
 
-  type SourceFilter = "all" | ActionSource;
+  type SourceFilter = 'all' | ActionSource;
 
   let loading = $state(true);
   let running = $state(false);
@@ -56,7 +48,7 @@
   let workflows = $state<UnifiedWorkflow[]>([]);
   let warnings = $state<string[]>([]);
   let filePath = $state<string | undefined>();
-  let sourceFilter = $state<SourceFilter>("all");
+  let sourceFilter = $state<SourceFilter>('all');
   let selected = $state<Set<string>>(new Set());
   let lastResult = $state<ActionRunResult | null>(null);
   let runHistory = $state<ScriptExecutionInfo[]>([]);
@@ -64,7 +56,7 @@
   let selectedExecution = $state<ScriptExecutionInfo | null>(null);
 
   function normalizePath(path: string): string {
-    return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
   }
 
   function isProjectExecution(exec: ScriptExecutionInfo): boolean {
@@ -73,29 +65,25 @@
   }
 
   const FILTERS: { id: SourceFilter; label: string }[] = [
-    { id: "all", label: "All" },
-    { id: "local", label: "Local" },
-    { id: "file", label: "File" },
-    { id: "github", label: "GitHub" },
-    { id: "n8n", label: "n8n" },
+    { id: 'all', label: 'All' },
+    { id: 'local', label: 'Local' },
+    { id: 'file', label: 'File' },
+    { id: 'github', label: 'GitHub' },
+    { id: 'n8n', label: 'n8n' },
   ];
 
   const filteredActions = $derived(
-    sourceFilter === "all"
-      ? actionsList
-      : actionsList.filter((a) => a.source === sourceFilter),
+    sourceFilter === 'all' ? actionsList : actionsList.filter((a) => a.source === sourceFilter)
   );
 
   const filteredWorkflows = $derived(
-    sourceFilter === "all"
-      ? workflows
-      : workflows.filter((w) => w.source === sourceFilter),
+    sourceFilter === 'all' ? workflows : workflows.filter((w) => w.source === sourceFilter)
   );
 
   function sourceIcon(source: ActionSource) {
-    if (source === "github") return GitBranch;
-    if (source === "n8n") return Layers;
-    if (source === "file") return Workflow;
+    if (source === 'github') return GitBranch;
+    if (source === 'n8n') return Layers;
+    if (source === 'file') return Workflow;
     return Terminal;
   }
 
@@ -110,9 +98,7 @@
       warnings = catalog.warnings;
       filePath = catalog.filePath;
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to load actions catalog",
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to load actions catalog');
     } finally {
       loading = false;
     }
@@ -159,7 +145,7 @@
   async function runSelected() {
     const ids = [...selected];
     if (ids.length === 0) {
-      toast.info("Select one or more actions to run");
+      toast.info('Select one or more actions to run');
       return;
     }
     await runTarget(ids.length === 1 ? ids[0]! : ids);
@@ -184,21 +170,16 @@
       }
       if (result.success) {
         toast.success(
-          typeof target === "string"
-            ? `Ran ${target}`
-            : `Ran ${target.length} actions`,
-          result.remoteRunId ? `Remote: ${result.remoteRunId}` : undefined,
+          typeof target === 'string' ? `Ran ${target}` : `Ran ${target.length} actions`,
+          result.remoteRunId ? `Remote: ${result.remoteRunId}` : undefined
         );
       } else {
         const failed =
-          result.steps.find((s) => s.error) ??
-          result.steps.find((s) => s.status === "failed");
+          result.steps.find((s) => s.error) ?? result.steps.find((s) => s.status === 'failed');
         const err =
           failed?.error?.trim() ||
-          (failed?.exitCode != null
-            ? `Exit code ${failed.exitCode}`
-            : null) ||
-          "Action run finished with errors";
+          (failed?.exitCode != null ? `Exit code ${failed.exitCode}` : null) ||
+          'Action run finished with errors';
         toast.error(err);
       }
       await loadHistory();
@@ -256,7 +237,7 @@
         disabled={running || selected.size === 0}
       >
         <Play class="h-4 w-4" />
-        {running ? "Running…" : `Run selected (${selected.size})`}
+        {running ? 'Running…' : `Run selected (${selected.size})`}
       </Button>
     </div>
   </div>
@@ -270,7 +251,7 @@
         {#each FILTERS as filter (filter.id)}
           <Button
             size="sm"
-            variant={sourceFilter === filter.id ? "default" : "outline"}
+            variant={sourceFilter === filter.id ? 'default' : 'outline'}
             onclick={() => (sourceFilter = filter.id)}
           >
             {filter.label}
@@ -279,9 +260,7 @@
       </div>
 
       {#if warnings.length > 0}
-        <div
-          class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
-        >
+        <div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
           {#each warnings as warning (warning)}
             <p>{warning}</p>
           {/each}
@@ -321,7 +300,7 @@
                     >
                       <Icon class="h-3.5 w-3.5 shrink-0" />
                       {workflow.steps.length > 0
-                        ? workflow.steps.map((s) => s.action).join(" → ")
+                        ? workflow.steps.map((s) => s.action).join(' → ')
                         : workflow.runner}
                     </p>
                     <Button
@@ -370,15 +349,11 @@
                 </CardHeader>
                 <CardContent class="space-y-2">
                   {#if action.command}
-                    <code
-                      class="block truncate rounded bg-muted px-2 py-1 text-xs"
-                    >
+                    <code class="block truncate rounded bg-muted px-2 py-1 text-xs">
                       {action.command}
                     </code>
                   {:else}
-                    <p
-                      class="flex items-center gap-1 text-xs text-muted-foreground"
-                    >
+                    <p class="flex items-center gap-1 text-xs text-muted-foreground">
                       <Icon class="h-3.5 w-3.5" />
                       {action.runner} runner
                     </p>
@@ -423,9 +398,7 @@
                 class="gap-1"
               >
                 <StatusIcon
-                  class="h-3.5 w-3.5 {getExecutionStatusColor(
-                    selectedExecution.status,
-                  )}"
+                  class="h-3.5 w-3.5 {getExecutionStatusColor(selectedExecution.status)}"
                 />
                 {selectedExecution.status}
               </Badge>
@@ -433,9 +406,7 @@
           </CardHeader>
           <CardContent class="space-y-3">
             <div>
-              <p class="mb-1 text-xs font-medium text-muted-foreground">
-                Command
-              </p>
+              <p class="mb-1 text-xs font-medium text-muted-foreground">Command</p>
               <code
                 class="block whitespace-pre-wrap break-all rounded bg-muted px-2 py-1.5 text-xs"
               >
@@ -449,7 +420,7 @@
               <span>
                 Duration: {formatExecutionDuration(
                   selectedExecution.startedAt,
-                  selectedExecution.finishedAt,
+                  selectedExecution.finishedAt
                 )}
               </span>
             </div>
@@ -457,18 +428,14 @@
               <div>
                 <p class="mb-1 text-xs font-medium text-destructive">Error</p>
                 <pre
-                  class="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive"
-                >{selectedExecution.error}</pre>
+                  class="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">{selectedExecution.error}</pre>
               </div>
             {/if}
             {#if selectedExecution.output?.trim()}
               <div>
-                <p class="mb-1 text-xs font-medium text-muted-foreground">
-                  Output
-                </p>
+                <p class="mb-1 text-xs font-medium text-muted-foreground">Output</p>
                 <pre
-                  class="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-1.5 text-xs"
-                >{selectedExecution.output}</pre>
+                  class="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-1.5 text-xs">{selectedExecution.output}</pre>
               </div>
             {:else if !selectedExecution.error}
               <p class="text-xs text-muted-foreground">No output captured.</p>
@@ -480,7 +447,7 @@
           <CardHeader>
             <CardTitle class="text-base">Last run</CardTitle>
             <CardDescription>
-              {lastResult.success ? "Succeeded" : "Failed"} · {lastResult.cwd}
+              {lastResult.success ? 'Succeeded' : 'Failed'} · {lastResult.cwd}
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-3">
@@ -489,11 +456,11 @@
                 <div class="flex items-center justify-between gap-2 text-sm">
                   <span class="font-medium">{step.name}</span>
                   <Badge
-                    variant={step.status === "success"
-                      ? "default"
-                      : step.status === "skipped"
-                        ? "secondary"
-                        : "destructive"}
+                    variant={step.status === 'success'
+                      ? 'default'
+                      : step.status === 'skipped'
+                        ? 'secondary'
+                        : 'destructive'}
                   >
                     {step.status}
                   </Badge>
@@ -510,13 +477,11 @@
                 {/if}
                 {#if step.error}
                   <pre
-                    class="max-h-32 overflow-auto whitespace-pre-wrap text-xs text-destructive"
-                  >{step.error}</pre>
+                    class="max-h-32 overflow-auto whitespace-pre-wrap text-xs text-destructive">{step.error}</pre>
                 {/if}
                 {#if step.output?.trim()}
                   <pre
-                    class="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-1 text-xs"
-                  >{step.output}</pre>
+                    class="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-1 text-xs">{step.output}</pre>
                 {/if}
                 {#if step.executionId}
                   <Button
@@ -543,9 +508,7 @@
                 <History class="h-5 w-5" />
                 Local run history
               </CardTitle>
-              <CardDescription>
-                Script executions for this project (Actions runs)
-              </CardDescription>
+              <CardDescription>Script executions for this project (Actions runs)</CardDescription>
             </div>
             <Button
               variant="ghost"
@@ -553,9 +516,7 @@
               onclick={() => void loadHistory()}
               disabled={historyLoading}
             >
-              <RefreshCw
-                class="h-4 w-4 {historyLoading ? 'animate-spin' : ''}"
-              />
+              <RefreshCw class="h-4 w-4 {historyLoading ? 'animate-spin' : ''}" />
             </Button>
           </div>
         </CardHeader>
@@ -585,16 +546,10 @@
                     <div class="flex min-w-0 items-center gap-2">
                       <StatusIcon
                         class="h-4 w-4 shrink-0 {getExecutionStatusColor(
-                          execution.status,
-                        )}{execution.status === 'running'
-                          ? ' animate-spin'
-                          : ''}"
+                          execution.status
+                        )}{execution.status === 'running' ? ' animate-spin' : ''}"
                       />
-                      <Badge
-                        variant={getExecutionStatusBadgeVariant(
-                          execution.status,
-                        )}
-                      >
+                      <Badge variant={getExecutionStatusBadgeVariant(execution.status)}>
                         {execution.status}
                       </Badge>
                       <span class="truncate text-sm font-medium">
@@ -609,18 +564,13 @@
                     class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
                   >
                     <span>
-                      Duration: {formatExecutionDuration(
-                        execution.startedAt,
-                        execution.finishedAt,
-                      )}
+                      Duration: {formatExecutionDuration(execution.startedAt, execution.finishedAt)}
                     </span>
                     {#if execution.exitCode != null}
                       <span>exit {execution.exitCode}</span>
                     {/if}
                     {#if execution.error}
-                      <span class="truncate text-destructive"
-                        >{execution.error}</span
-                      >
+                      <span class="truncate text-destructive">{execution.error}</span>
                     {/if}
                   </div>
                 </Button>
@@ -632,11 +582,9 @@
     </div>
   </div>
 
-  {#if sourceFilter === "all" || sourceFilter === "github"}
+  {#if sourceFilter === 'all' || sourceFilter === 'github'}
     <div class="space-y-3 border-t pt-6">
-      <h3 class="text-sm font-medium text-muted-foreground">
-        GitHub Actions runs
-      </h3>
+      <h3 class="text-sm font-medium text-muted-foreground">GitHub Actions runs</h3>
       <GitHubProjectActionsPanel {project} {enabled} />
     </div>
   {/if}

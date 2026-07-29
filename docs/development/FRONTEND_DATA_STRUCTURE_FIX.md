@@ -44,20 +44,20 @@ installed.push(info);
 **Before:**
 
 ```javascript
-if (manager.type.includes("node") || manager.type.includes("python")) {
-  category = "language";
+if (manager.type.includes('node') || manager.type.includes('python')) {
+  category = 'language';
 }
 ```
 
 **After:**
 
 ```javascript
-let category = manager.category || "other";
+let category = manager.category || 'other';
 
-if (!category || category === "other") {
-  const sdkType = manager.sdk_type || manager.type || "";
-  if (sdkType.includes("node") || sdkType.includes("python")) {
-    category = "language";
+if (!category || category === 'other') {
+  const sdkType = manager.sdk_type || manager.type || '';
+  if (sdkType.includes('node') || sdkType.includes('python')) {
+    category = 'language';
   }
 }
 ```

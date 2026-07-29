@@ -4,23 +4,12 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Play,
-    Square,
-    Settings,
-    ExternalLink,
-    AlertCircle,
-  } from "@lucide/svelte";
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Play, Square, Settings, ExternalLink, AlertCircle } from '@lucide/svelte';
 
   // State
   let loading = $state(true);
@@ -38,7 +27,7 @@
 
     try {
       // Load available SDKs
-      const availableSDKs = await invoke<any[]>("get_all_available_sdks");
+      const availableSDKs = await invoke<any[]>('get_all_available_sdks');
 
       // Load service status for each SDK type
       const servicePromises = availableSDKs.map(async (sdk: any) => {
@@ -46,20 +35,20 @@
           // Ensure we have a valid sdkType
           const sdkType = sdk.id || sdk.name || sdk.type;
           if (!sdkType) {
-            console.warn("Skipping SDK without valid id/name/type:", sdk);
+            console.warn('Skipping SDK without valid id/name/type:', sdk);
             return {
               ...sdk,
               services: [],
             };
           }
 
-          const serviceStatus = await invoke("get_service_status", { sdkType });
+          const serviceStatus = await invoke('get_service_status', { sdkType });
           return {
             ...sdk,
             services: serviceStatus || [],
           };
         } catch (err) {
-          console.warn("Failed to load service status for SDK:", sdk, err);
+          console.warn('Failed to load service status for SDK:', sdk, err);
           return {
             ...sdk,
             services: [],
@@ -75,13 +64,12 @@
         return sdkServices.map((service: any) => ({
           ...service,
           sdkType: sdk.id || sdk.name || sdk.type,
-          sdkName: sdk.name || sdk.title || "Unknown SDK",
+          sdkName: sdk.name || sdk.title || 'Unknown SDK',
         }));
       });
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to load SDK services";
-      console.error("Failed to load SDK services:", err);
+      error = err instanceof Error ? err.message : 'Failed to load SDK services';
+      console.error('Failed to load SDK services:', err);
     } finally {
       loading = false;
     }
@@ -89,52 +77,52 @@
 
   async function toggleService(service: any) {
     try {
-      if (service.status === "running") {
+      if (service.status === 'running') {
         // Stop service
-        service.status = "stopping";
-        await invoke("stop_sdk_service", {
+        service.status = 'stopping';
+        await invoke('stop_sdk_service', {
           sdkType: service.sdkType,
           pid: service.pid,
         });
-        service.status = "stopped";
+        service.status = 'stopped';
         service.pid = null;
       } else {
         // Start service
-        service.status = "starting";
+        service.status = 'starting';
         const config = {
           port: service.port,
-          host: "localhost",
+          host: 'localhost',
           data_dir: null,
           config_file: null,
           environment: {},
         };
-        const pid = await invoke("start_sdk_service", {
+        const pid = await invoke('start_sdk_service', {
           sdkType: service.sdkType,
           version: service.version,
           config,
         });
-        service.status = "running";
+        service.status = 'running';
         service.pid = pid;
       }
     } catch (err) {
-      service.status = "error";
-      error = err instanceof Error ? err.message : "Failed to toggle service";
+      service.status = 'error';
+      error = err instanceof Error ? err.message : 'Failed to toggle service';
     }
   }
 
   async function configureService(service: any) {
     // FUTURE: Open configuration dialog for service settings
-    console.log("Configure service:", service.id);
+    console.log('Configure service:', service.id);
   }
 
   async function viewServiceLogs(service: any) {
     // FUTURE: Open log viewer with service logs
-    console.log("View logs for:", service.id);
+    console.log('View logs for:', service.id);
   }
 
   async function openServiceUrl(service: any) {
     if (service.port) {
-      window.open(`http://localhost:${service.port}`, "_blank");
+      window.open(`http://localhost:${service.port}`, '_blank');
     }
   }
 </script>
@@ -148,14 +136,10 @@
   <div class="flex items-center gap-4">
     <div class="flex-1">
       <h1 class="text-3xl font-bold">SDK Services</h1>
-      <p class="text-muted-foreground">
-        Manage running SDK services and their configurations
-      </p>
+      <p class="text-muted-foreground">Manage running SDK services and their configurations</p>
     </div>
     <div class="flex items-center gap-2">
-      <Button variant="outline" onclick={loadServices} disabled={loading}>
-        Refresh
-      </Button>
+      <Button variant="outline" onclick={loadServices} disabled={loading}>Refresh</Button>
     </div>
   </div>
 
@@ -176,17 +160,17 @@
               <div class="flex items-center gap-2">
                 <h3 class="text-lg font-semibold">{service.sdkName}</h3>
                 <Badge variant="outline">{service.version}</Badge>
-                {#if service.status === "running"}
+                {#if service.status === 'running'}
                   <Badge variant="default" class="bg-green-100 text-green-800">
                     <Play class="mr-1 h-3 w-3" />
                     Running
                   </Badge>
-                {:else if service.status === "stopped"}
+                {:else if service.status === 'stopped'}
                   <Badge variant="outline" class="text-gray-500">
                     <Square class="mr-1 h-3 w-3" />
                     Stopped
                   </Badge>
-                {:else if service.status === "error"}
+                {:else if service.status === 'error'}
                   <Badge variant="destructive">
                     <AlertCircle class="mr-1 h-3 w-3" />
                     Error
@@ -202,18 +186,17 @@
 
             <div class="flex items-center gap-2">
               <Button
-                variant={service.status === "running" ? "outline" : "default"}
+                variant={service.status === 'running' ? 'outline' : 'default'}
                 size="sm"
                 onclick={() => toggleService(service)}
-                disabled={service.status === "starting" ||
-                  service.status === "stopping"}
+                disabled={service.status === 'starting' || service.status === 'stopping'}
               >
-                {#if service.status === "running"}
+                {#if service.status === 'running'}
                   <Square class="mr-1 h-4 w-4" />
                   Stop
-                {:else if service.status === "starting"}
+                {:else if service.status === 'starting'}
                   Starting...
-                {:else if service.status === "stopping"}
+                {:else if service.status === 'stopping'}
                   Stopping...
                 {:else}
                   <Play class="mr-1 h-4 w-4" />
@@ -221,31 +204,19 @@
                 {/if}
               </Button>
 
-              {#if service.status === "running" && service.port}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onclick={() => openServiceUrl(service)}
-                >
+              {#if service.status === 'running' && service.port}
+                <Button variant="outline" size="sm" onclick={() => openServiceUrl(service)}>
                   <ExternalLink class="mr-1 h-4 w-4" />
                   Open
                 </Button>
               {/if}
 
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={() => configureService(service)}
-              >
+              <Button variant="outline" size="sm" onclick={() => configureService(service)}>
                 <Settings class="mr-1 h-4 w-4" />
                 Configure
               </Button>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={() => viewServiceLogs(service)}
-              >
+              <Button variant="outline" size="sm" onclick={() => viewServiceLogs(service)}>
                 View Logs
               </Button>
             </div>

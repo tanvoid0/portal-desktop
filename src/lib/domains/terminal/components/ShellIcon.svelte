@@ -1,12 +1,12 @@
 <script lang="ts">
-  import Icon from "@iconify/svelte";
+  import Icon from '@iconify/svelte';
   import {
     resolveShellIcon,
     resolveTabIcon,
     normalizeTerminalIcon,
     isIconifyIcon,
-  } from "../utils/shellIcons";
-  import { getShellIconSvg } from "../utils/shellIconSvgs";
+  } from '../utils/shellIcons';
+  import { getShellIconSvg } from '../utils/shellIconSvgs';
 
   interface Props {
     icon?: string;
@@ -17,22 +17,16 @@
       type?: string;
       resourceName?: string;
     };
-    size?: "xs" | "sm" | "md";
+    size?: 'xs' | 'sm' | 'md';
     class?: string;
   }
 
-  let {
-    icon,
-    shell,
-    tab,
-    size = "sm",
-    class: className = "",
-  }: Props = $props();
+  let { icon, shell, tab, size = 'sm', class: className = '' }: Props = $props();
 
   const sizeClasses = {
-    xs: "h-3.5 w-3.5",
-    sm: "h-4 w-4",
-    md: "h-5 w-5",
+    xs: 'h-3.5 w-3.5',
+    sm: 'h-4 w-4',
+    md: 'h-5 w-5',
   };
 
   const resolvedIcon = $derived.by(() => {

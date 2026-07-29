@@ -5,14 +5,14 @@
  * that works seamlessly in Tauri desktop app and browser environments.
  */
 
-import { isTauriEnvironment, tauriInvoke } from "./tauri";
-import DeviceAuthService from "$lib/services/deviceAuthService";
+import { isTauriEnvironment, tauriInvoke } from './tauri';
+import DeviceAuthService from '$lib/services/deviceAuthService';
 
 /**
  * Get the base URL for HTTP API calls
  */
 function getApiBaseUrl(): string {
-  if (typeof window === "undefined") return "";
+  if (typeof window === 'undefined') return '';
   return `${window.location.protocol}//${window.location.host}`;
 }
 
@@ -21,22 +21,22 @@ function getApiBaseUrl(): string {
  */
 function isUrl(endpoint: string): boolean {
   return (
-    endpoint.startsWith("http://") ||
-    endpoint.startsWith("https://") ||
-    endpoint.startsWith("/api/")
+    endpoint.startsWith('http://') ||
+    endpoint.startsWith('https://') ||
+    endpoint.startsWith('/api/')
   );
 }
 
 /**
  * Localhost strategy options
  */
-export type LocalhostStrategy = "http" | "empty" | "error";
+export type LocalhostStrategy = 'http' | 'empty' | 'error';
 
 /**
  * Request configuration
  */
 export interface RequestConfig {
-  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   data?: any;
   params?: Record<string, any>;
   headers?: Record<string, string>;
@@ -63,9 +63,7 @@ export interface InvokeClientConfig {
 /**
  * Interceptor types
  */
-export type RequestInterceptor = (
-  config: RequestConfig,
-) => RequestConfig | Promise<RequestConfig>;
+export type RequestInterceptor = (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
 export type ResponseInterceptor<T = any> = (response: T) => T | Promise<T>;
 export type ErrorInterceptor = (error: Error) => Error | Promise<Error>;
 
@@ -132,22 +130,22 @@ export class InvokeClient {
    * Can be reused anywhere in the codebase
    */
   static isLocalhost(): boolean {
-    if (typeof window === "undefined") return false;
+    if (typeof window === 'undefined') return false;
     const hostname = window.location.hostname;
     return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "[::1]"
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '[::1]'
     );
   }
 
   constructor(config: InvokeClientConfig = {}) {
     this.config = {
-      baseURL: config.baseURL || "",
+      baseURL: config.baseURL || '',
       defaultHeaders: config.defaultHeaders || {},
       timeout: config.timeout || 30000, // 30 seconds
-      localhostStrategy: config.localhostStrategy || "empty",
+      localhostStrategy: config.localhostStrategy || 'empty',
       requireAuth: config.requireAuth !== false, // Default true
       transformRequest: config.transformRequest || ((data) => data),
       transformResponse: config.transformResponse || ((data) => data),
@@ -178,25 +176,19 @@ export class InvokeClient {
   /**
    * Main request method - handles both Tauri commands and HTTP requests
    */
-  async request<T = any>(
-    endpoint: string,
-    config: RequestConfig = {},
-  ): Promise<T> {
+  async request<T = any>(endpoint: string, config: RequestConfig = {}): Promise<T> {
     try {
       // Merge config with defaults
       const mergedConfig: RequestConfig = {
-        method: config.method || "POST",
+        method: config.method || 'POST',
         data: config.data,
         params: config.params,
         headers: { ...this.config.defaultHeaders, ...config.headers },
         timeout: config.timeout ?? this.config.timeout,
         requireAuth: config.requireAuth ?? this.config.requireAuth,
-        localhostStrategy:
-          config.localhostStrategy ?? this.config.localhostStrategy,
-        transformRequest:
-          config.transformRequest ?? this.config.transformRequest,
-        transformResponse:
-          config.transformResponse ?? this.config.transformResponse,
+        localhostStrategy: config.localhostStrategy ?? this.config.localhostStrategy,
+        transformRequest: config.transformRequest ?? this.config.transformRequest,
+        transformResponse: config.transformResponse ?? this.config.transformResponse,
       };
 
       // Apply request interceptors
@@ -231,8 +223,7 @@ export class InvokeClient {
       return response;
     } catch (error) {
       // Apply error interceptors
-      let finalError =
-        error instanceof Error ? error : new Error(String(error));
+      let finalError = error instanceof Error ? error : new Error(String(error));
       for (const interceptor of this.errorInterceptors) {
         finalError = await interceptor(finalError);
       }
@@ -243,24 +234,18 @@ export class InvokeClient {
   /**
    * HTTP request handler
    */
-  private async httpRequest<T>(
-    endpoint: string,
-    config: RequestConfig,
-  ): Promise<T> {
+  private async httpRequest<T>(endpoint: string, config: RequestConfig): Promise<T> {
     // Build full URL
     let fullUrl = endpoint;
-    if (this.config.baseURL && !endpoint.startsWith("http")) {
+    if (this.config.baseURL && !endpoint.startsWith('http')) {
       fullUrl = `${this.config.baseURL}${endpoint}`;
-    } else if (
-      !endpoint.startsWith("http://") &&
-      !endpoint.startsWith("https://")
-    ) {
+    } else if (!endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
       fullUrl = `${getApiBaseUrl()}${endpoint}`;
     }
 
     // Prepare headers
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       ...config.headers,
     };
 
@@ -268,9 +253,9 @@ export class InvokeClient {
     if (config.requireAuth && !InvokeClient.isLocalhost()) {
       const accessToken = DeviceAuthService.getAccessToken();
       if (accessToken) {
-        headers["Authorization"] = `Bearer ${accessToken}`;
+        headers['Authorization'] = `Bearer ${accessToken}`;
       } else {
-        throw new Error("Authentication required");
+        throw new Error('Authentication required');
       }
     }
 
@@ -281,9 +266,9 @@ export class InvokeClient {
     };
 
     // Add body for non-GET requests
-    if (config.method !== "GET" && config.data !== undefined) {
+    if (config.method !== 'GET' && config.data !== undefined) {
       requestOptions.body = JSON.stringify(config.data);
-    } else if (config.method === "GET" && (config.params || config.data)) {
+    } else if (config.method === 'GET' && (config.params || config.data)) {
       // For GET requests, add params/data as query params
       const params = new URLSearchParams();
       const queryData = config.params || config.data || {};
@@ -328,8 +313,10 @@ export class InvokeClient {
       return await response.json();
     } catch (error) {
       clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error(`Request timeout after ${config.timeout}ms`);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${config.timeout}ms`, {
+          cause: error,
+        });
       }
       throw error;
     }
@@ -338,10 +325,7 @@ export class InvokeClient {
   /**
    * Tauri command request handler
    */
-  private async tauriRequest<T>(
-    command: string,
-    config: RequestConfig,
-  ): Promise<T> {
+  private async tauriRequest<T>(command: string, config: RequestConfig): Promise<T> {
     if (isTauriEnvironment()) {
       // Tauri app - direct invoke (fastest)
       const args = config.data || config.params || {};
@@ -352,13 +336,12 @@ export class InvokeClient {
     } else {
       // Remote browser - HTTP API
       // Check if auth is required (defaults to true unless explicitly set to false)
-      const requiresAuth =
-        config.requireAuth !== false && this.config.requireAuth !== false;
+      const requiresAuth = config.requireAuth !== false && this.config.requireAuth !== false;
 
       if (requiresAuth) {
         const accessToken = DeviceAuthService.getAccessToken();
         if (!accessToken) {
-          throw new Error("Authentication required");
+          throw new Error('Authentication required');
         }
       }
 
@@ -373,14 +356,11 @@ export class InvokeClient {
   /**
    * Handle localhost strategy for browser access
    */
-  private async handleLocalhostStrategy<T>(
-    command: string,
-    config: RequestConfig,
-  ): Promise<T> {
+  private async handleLocalhostStrategy<T>(command: string, config: RequestConfig): Promise<T> {
     const strategy = config.localhostStrategy || this.config.localhostStrategy;
 
     switch (strategy) {
-      case "http":
+      case 'http':
         // Try HTTP API first, fallback to empty
         try {
           return await this.httpRequest<T>(`/api/tauri/${command}`, {
@@ -392,16 +372,16 @@ export class InvokeClient {
           return this.getEmptyValue<T>(command);
         }
 
-      case "empty":
+      case 'empty':
         // Return empty/default values
         return this.getEmptyValue<T>(command);
 
-      case "error":
+      case 'error':
       default:
         // Throw error indicating Tauri required
         throw new Error(
           `Tauri command '${command}' is not available in browser. ` +
-            `Please use the Tauri desktop app for full functionality.`,
+            `Please use the Tauri desktop app for full functionality.`
         );
     }
   }
@@ -469,7 +449,7 @@ export class InvokeClient {
 
       if (stringPatterns.some((pattern) => pattern.test(command))) {
         // Return empty string for string-returning commands
-        return "" as T;
+        return '' as T;
       }
     }
 
@@ -486,40 +466,40 @@ export class InvokeClient {
    */
   async get<T = any>(
     endpoint: string,
-    config?: Omit<RequestConfig, "method" | "data">,
+    config?: Omit<RequestConfig, 'method' | 'data'>
   ): Promise<T> {
-    return this.request<T>(endpoint, { ...config, method: "GET" });
+    return this.request<T>(endpoint, { ...config, method: 'GET' });
   }
 
   async post<T = any>(
     endpoint: string,
     data?: any,
-    config?: Omit<RequestConfig, "method" | "data">,
+    config?: Omit<RequestConfig, 'method' | 'data'>
   ): Promise<T> {
-    return this.request<T>(endpoint, { ...config, method: "POST", data });
+    return this.request<T>(endpoint, { ...config, method: 'POST', data });
   }
 
   async put<T = any>(
     endpoint: string,
     data?: any,
-    config?: Omit<RequestConfig, "method" | "data">,
+    config?: Omit<RequestConfig, 'method' | 'data'>
   ): Promise<T> {
-    return this.request<T>(endpoint, { ...config, method: "PUT", data });
+    return this.request<T>(endpoint, { ...config, method: 'PUT', data });
   }
 
   async delete<T = any>(
     endpoint: string,
-    config?: Omit<RequestConfig, "method" | "data">,
+    config?: Omit<RequestConfig, 'method' | 'data'>
   ): Promise<T> {
-    return this.request<T>(endpoint, { ...config, method: "DELETE" });
+    return this.request<T>(endpoint, { ...config, method: 'DELETE' });
   }
 
   async patch<T = any>(
     endpoint: string,
     data?: any,
-    config?: Omit<RequestConfig, "method" | "data">,
+    config?: Omit<RequestConfig, 'method' | 'data'>
   ): Promise<T> {
-    return this.request<T>(endpoint, { ...config, method: "PATCH", data });
+    return this.request<T>(endpoint, { ...config, method: 'PATCH', data });
   }
 
   /**
@@ -540,12 +520,11 @@ export class InvokeClient {
       onError?: (error: Error) => void;
       onClose?: () => void;
       streamId?: string; // Unique ID for this stream
-    } = {},
+    } = {}
   ): Promise<() => void> {
     const { onData, onError, onClose, streamId, ...requestConfig } = config;
     const uniqueStreamId =
-      streamId ||
-      `stream-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      streamId || `stream-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     if (isTauriEnvironment()) {
       // Tauri: Use Tauri events for streaming
@@ -578,13 +557,13 @@ export class InvokeClient {
       onData?: (data: T) => void;
       onError?: (error: Error) => void;
       onClose?: () => void;
-    },
+    }
   ): Promise<() => void> {
     const { streamId, onData, onError, onClose, ...requestConfig } = config;
 
     try {
       // Import Tauri event listener
-      const { listen } = await import("@tauri-apps/api/event");
+      const { listen } = await import('@tauri-apps/api/event');
 
       // Set up event listeners for streaming data
       const eventName = `${command}:stream:${streamId}`;
@@ -603,12 +582,9 @@ export class InvokeClient {
 
       // Listen for error events
       if (onError) {
-        const unsubscribe = await listen<{ message: string }>(
-          errorEventName,
-          (event) => {
-            onError(new Error(event.payload.message));
-          },
-        );
+        const unsubscribe = await listen<{ message: string }>(errorEventName, (event) => {
+          onError(new Error(event.payload.message));
+        });
         unsubscribers.push(unsubscribe);
       }
 
@@ -660,7 +636,7 @@ export class InvokeClient {
       onData?: (data: T) => void;
       onError?: (error: Error) => void;
       onClose?: () => void;
-    },
+    }
   ): Promise<() => void> {
     const { streamId, onData, onError, onClose, ...requestConfig } = config;
 
@@ -679,7 +655,7 @@ export class InvokeClient {
         });
       } catch (error) {
         // Fall back to SSE if WebSocket fails
-        console.warn("WebSocket failed, falling back to SSE:", error);
+        console.warn('WebSocket failed, falling back to SSE:', error);
       }
     }
 
@@ -703,15 +679,14 @@ export class InvokeClient {
       onData?: (data: T) => void;
       onError?: (error: Error) => void;
       onClose?: () => void;
-    },
+    }
   ): Promise<() => void> {
     const { streamId, onData, onError, onClose, ...requestConfig } = config;
 
     // Convert HTTP URL to WebSocket URL
     const baseUrl = getApiBaseUrl();
     const wsUrl =
-      baseUrl.replace(/^http/, "ws") +
-      `/ws/${endpoint}?streamId=${encodeURIComponent(streamId)}`;
+      baseUrl.replace(/^http/, 'ws') + `/ws/${endpoint}?streamId=${encodeURIComponent(streamId)}`;
 
     return new Promise<() => void>((resolve, reject) => {
       const ws = new WebSocket(wsUrl);
@@ -720,20 +695,16 @@ export class InvokeClient {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === "data" && onData) {
+          if (data.type === 'data' && onData) {
             onData(data.payload as T);
-          } else if (data.type === "error" && onError) {
-            onError(new Error(data.message || "Stream error"));
-          } else if (data.type === "close" && onClose) {
+          } else if (data.type === 'error' && onError) {
+            onError(new Error(data.message || 'Stream error'));
+          } else if (data.type === 'close' && onClose) {
             onClose();
           }
         } catch (error) {
           if (onError) {
-            onError(
-              error instanceof Error
-                ? error
-                : new Error("Failed to parse stream data"),
-            );
+            onError(error instanceof Error ? error : new Error('Failed to parse stream data'));
           }
         }
       };
@@ -741,9 +712,9 @@ export class InvokeClient {
       ws.onerror = () => {
         if (!isResolved) {
           isResolved = true;
-          reject(new Error("WebSocket connection error"));
+          reject(new Error('WebSocket connection error'));
         } else if (onError) {
-          onError(new Error("WebSocket connection error"));
+          onError(new Error('WebSocket connection error'));
         }
       };
 
@@ -764,10 +735,7 @@ export class InvokeClient {
 
           // Return cleanup function
           resolve(() => {
-            if (
-              ws.readyState === WebSocket.OPEN ||
-              ws.readyState === WebSocket.CONNECTING
-            ) {
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
               ws.close();
             }
           });
@@ -779,7 +747,7 @@ export class InvokeClient {
         if (!isResolved) {
           isResolved = true;
           ws.close();
-          reject(new Error("WebSocket connection timeout"));
+          reject(new Error('WebSocket connection timeout'));
         }
       }, 5000);
     });
@@ -796,7 +764,7 @@ export class InvokeClient {
       onData?: (data: T) => void;
       onError?: (error: Error) => void;
       onClose?: () => void;
-    },
+    }
   ): Promise<() => void> {
     const { streamId, onData, onError, onClose, ...requestConfig } = config;
 
@@ -811,7 +779,7 @@ export class InvokeClient {
       // Remote: use authenticated endpoint
       const accessToken = DeviceAuthService.getAccessToken();
       if (!accessToken) {
-        throw new Error("Authentication required for remote streaming");
+        throw new Error('Authentication required for remote streaming');
       }
       sseUrl = `${baseUrl}/api/stream/${endpoint}?streamId=${encodeURIComponent(streamId)}&token=${encodeURIComponent(accessToken)}`;
     }
@@ -835,38 +803,34 @@ export class InvokeClient {
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === "data" && onData) {
+          if (data.type === 'data' && onData) {
             onData(data.payload as T);
-          } else if (data.type === "error" && onError) {
-            onError(new Error(data.message || "Stream error"));
-          } else if (data.type === "close" && onClose) {
+          } else if (data.type === 'error' && onError) {
+            onError(new Error(data.message || 'Stream error'));
+          } else if (data.type === 'close' && onClose) {
             onClose();
             eventSource.close();
           }
         } catch (error) {
           if (onError) {
-            onError(
-              error instanceof Error
-                ? error
-                : new Error("Failed to parse stream data"),
-            );
+            onError(error instanceof Error ? error : new Error('Failed to parse stream data'));
           }
         }
       };
 
       // Listen for custom event types
-      eventSource.addEventListener("error", (event: any) => {
+      eventSource.addEventListener('error', (event: any) => {
         if (onError) {
           try {
             const data = JSON.parse(event.data);
-            onError(new Error(data.message || "Stream error"));
+            onError(new Error(data.message || 'Stream error'));
           } catch {
-            onError(new Error("Stream error"));
+            onError(new Error('Stream error'));
           }
         }
       });
 
-      eventSource.addEventListener("close", () => {
+      eventSource.addEventListener('close', () => {
         if (onClose) {
           onClose();
         }
@@ -879,7 +843,7 @@ export class InvokeClient {
             onClose();
           }
         } else if (onError) {
-          onError(new Error("SSE connection error"));
+          onError(new Error('SSE connection error'));
         }
       };
 

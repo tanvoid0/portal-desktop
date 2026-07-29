@@ -1,9 +1,9 @@
 <!-- PodsFilters - Search and filter pods -->
 <script lang="ts">
-  import { Input } from "$lib/components/ui/input";
-  import { Button } from "$lib/components/ui/button";
-  import Select from "$lib/components/ui/select.svelte";
-  import { ResourceStatus } from "../../core/types";
+  import { Input } from '$lib/components/ui/input';
+  import { Button } from '$lib/components/ui/button';
+  import Select from '$lib/components/ui/select.svelte';
+  import { ResourceStatus } from '../../core/types';
 
   interface Props {
     searchQuery: string;
@@ -13,20 +13,15 @@
     onClear: () => void;
   }
 
-  let {
-    searchQuery,
-    statusFilter,
-    onSearchChange,
-    onStatusFilterChange,
-    onClear,
-  }: Props = $props();
+  let { searchQuery, statusFilter, onSearchChange, onStatusFilterChange, onClear }: Props =
+    $props();
 
   const statusOptions = [
-    { value: "", label: "All Statuses" },
-    { value: ResourceStatus.RUNNING, label: "Running" },
-    { value: ResourceStatus.PENDING, label: "Pending" },
-    { value: ResourceStatus.FAILED, label: "Failed" },
-    { value: ResourceStatus.SUCCEEDED, label: "Succeeded" },
+    { value: '', label: 'All Statuses' },
+    { value: ResourceStatus.RUNNING, label: 'Running' },
+    { value: ResourceStatus.PENDING, label: 'Pending' },
+    { value: ResourceStatus.FAILED, label: 'Failed' },
+    { value: ResourceStatus.SUCCEEDED, label: 'Succeeded' },
   ];
 
   const hasFilters = $derived(searchQuery || statusFilter);

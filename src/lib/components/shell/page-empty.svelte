@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { Component } from "svelte";
-  import { Inbox } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Card, CardContent } from "$lib/components/ui/card";
+  import type { Component } from 'svelte';
+  import { Inbox } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent } from '$lib/components/ui/card';
 
   interface Props {
     title: string;
@@ -25,7 +25,7 @@
   }: Props = $props();
 
   const displayDescription = $derived(
-    isFiltered && filteredDescription ? filteredDescription : description,
+    isFiltered && filteredDescription ? filteredDescription : description
   );
 </script>
 

@@ -4,7 +4,7 @@ export function resolveUrlTab<T extends string>(
   searchParams: URLSearchParams,
   allowed: readonly T[],
   defaultTab: T,
-  param = "tab",
+  param = 'tab'
 ): T {
   const value = searchParams.get(param);
   if (value && (allowed as readonly string[]).includes(value)) {
@@ -17,7 +17,7 @@ export function buildTabUrl(
   pathname: string,
   searchParams: URLSearchParams,
   tab: string,
-  param = "tab",
+  param = 'tab'
 ): string {
   const params = new URLSearchParams(searchParams);
   params.set(param, tab);

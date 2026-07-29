@@ -4,13 +4,10 @@
   pane via the view toggle in TerminalSession.
 -->
 <script lang="ts">
-  import { onMount, tick } from "svelte";
-  import { Terminal as TerminalIcon } from "@lucide/svelte";
-  import CommandBlock from "../CommandBlock.svelte";
-  import {
-    commandBlockStore,
-    type CapturedCommand,
-  } from "../../stores/commandBlockStore";
+  import { onMount, tick } from 'svelte';
+  import { Terminal as TerminalIcon } from '@lucide/svelte';
+  import CommandBlock from '../CommandBlock.svelte';
+  import { commandBlockStore, type CapturedCommand } from '../../stores/commandBlockStore';
 
   interface Props {
     tabId: string;
@@ -40,8 +37,7 @@
 
   function handleScroll() {
     if (!scrollEl) return;
-    stickToBottom =
-      scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 40;
+    stickToBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 40;
   }
 </script>
 
@@ -55,8 +51,8 @@
       <TerminalIcon class="h-8 w-8" />
       <p class="text-sm">Run a command below — each one becomes a block.</p>
       <p class="text-xs">
-        Use <kbd class="rounded bg-muted px-1 text-foreground">Ctrl+Space</kbd> for AI, or switch
-        to Terminal view for interactive apps (vim, htop…).
+        Use <kbd class="rounded bg-muted px-1 text-foreground">Ctrl+Space</kbd> for AI, or switch to Terminal
+        view for interactive apps (vim, htop…).
       </p>
     </div>
   {:else}

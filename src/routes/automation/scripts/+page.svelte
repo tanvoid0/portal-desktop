@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ScriptsPage from "$lib/domains/automation/components/ScriptsPage.svelte";
+  import ScriptsPage from '$lib/domains/automation/components/ScriptsPage.svelte';
 </script>
 
 <svelte:head>

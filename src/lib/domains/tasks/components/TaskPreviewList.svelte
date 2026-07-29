@@ -1,14 +1,9 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import SubtaskPreviewCard from "./SubtaskPreviewCard.svelte";
-  import type { GeneratedSubtask } from "../services/aiTaskService";
-  import Icon from "@iconify/svelte";
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import SubtaskPreviewCard from './SubtaskPreviewCard.svelte';
+  import type { GeneratedSubtask } from '../services/aiTaskService';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     subtasks: GeneratedSubtask[];
@@ -47,8 +42,8 @@
     subtasks = [
       ...subtasks,
       {
-        title: "",
-        description: "",
+        title: '',
+        description: '',
         estimated_time: null,
         dependencies: [],
         order: subtasks.length + 1,
@@ -76,9 +71,7 @@
         {subtask}
         {index}
         onUpdate={(s) => handleUpdate(index, s)}
-        onAdd={showAddButtons && onAdd
-          ? () => handleAdd(index, subtask)
-          : undefined}
+        onAdd={showAddButtons && onAdd ? () => handleAdd(index, subtask) : undefined}
         onRemove={onRemove ? () => handleRemove(index) : undefined}
         showAddButton={showAddButtons}
       />

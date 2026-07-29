@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import { Progress } from "$lib/components/ui/progress";
-  import type { DockerContainer } from "../types";
-  import { fmtBytes, fmtPercent, isContainerRunning } from "../utils/format";
-  import { Play, Square, Trash2, Cpu, MemoryStick } from "@lucide/svelte";
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { Progress } from '$lib/components/ui/progress';
+  import type { DockerContainer } from '../types';
+  import { fmtBytes, fmtPercent, isContainerRunning } from '../utils/format';
+  import { Play, Square, Trash2, Cpu, MemoryStick } from '@lucide/svelte';
 
   interface Props {
     container: DockerContainer;
@@ -21,38 +21,38 @@
 
   function getStatusColor(): string {
     if (running) {
-      return "bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300";
+      return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300';
     }
-    const s = container.status?.toLowerCase() || "";
-    if (s.includes("paused")) {
-      return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    const s = container.status?.toLowerCase() || '';
+    if (s.includes('paused')) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     }
-    return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300";
+    return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300';
   }
 
   function getStatusLabel(): string {
-    if (running) return "Running";
-    const s = container.status?.toLowerCase() || "";
-    if (s.includes("exited")) return "Exited";
-    if (s.includes("paused")) return "Paused";
-    if (s.includes("created")) return "Created";
-    return "Stopped";
+    if (running) return 'Running';
+    const s = container.status?.toLowerCase() || '';
+    if (s.includes('exited')) return 'Exited';
+    if (s.includes('paused')) return 'Paused';
+    if (s.includes('created')) return 'Created';
+    return 'Stopped';
   }
 
   function formatPorts(): string {
     if (Array.isArray(container.ports)) {
-      if (container.ports.length === 0) return "—";
+      if (container.ports.length === 0) return '—';
       return container.ports
         .map((p: any) => {
-          if (typeof p === "string") return p;
-          return `${p.hostPort || ""}:${p.containerPort || ""}`;
+          if (typeof p === 'string') return p;
+          return `${p.hostPort || ''}:${p.containerPort || ''}`;
         })
-        .join(", ");
+        .join(', ');
     }
-    if (typeof container.ports === "string") {
-      return container.ports || "—";
+    if (typeof container.ports === 'string') {
+      return container.ports || '—';
     }
-    return "—";
+    return '—';
   }
 </script>
 
@@ -93,14 +93,12 @@
                 : new Date(container.createdAt)}
             {#if !isNaN(createdDate.getTime())}
               <div class="col-span-2 flex items-center gap-2">
-                <span class="shrink-0 font-medium text-foreground/70"
-                  >Created</span
-                >
+                <span class="shrink-0 font-medium text-foreground/70">Created</span>
                 <span class="text-xs">
                   {createdDate.toLocaleDateString()}
                   {createdDate.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })}
                 </span>
               </div>
@@ -115,9 +113,7 @@
                 <span class="flex items-center gap-1 text-muted-foreground">
                   <Cpu class="h-3 w-3" /> CPU
                 </span>
-                <span class="tabular-nums font-medium"
-                  >{fmtPercent(stats.cpuPercent)}</span
-                >
+                <span class="tabular-nums font-medium">{fmtPercent(stats.cpuPercent)}</span>
               </div>
               <Progress
                 value={Math.min(stats.cpuPercent, 100)}
@@ -144,37 +140,23 @@
             </div>
           </div>
         {:else if running}
-          <p class="text-xs text-muted-foreground italic">
-            Resource stats unavailable
-          </p>
+          <p class="text-xs text-muted-foreground italic">Resource stats unavailable</p>
         {/if}
       </div>
 
       <div class="flex shrink-0 flex-col gap-2">
         {#if running}
-          <Button
-            variant="outline"
-            size="sm"
-            onclick={() => onStop?.(container.id)}
-          >
+          <Button variant="outline" size="sm" onclick={() => onStop?.(container.id)}>
             <Square class="mr-1 h-4 w-4" />
             Stop
           </Button>
         {:else}
-          <Button
-            variant="default"
-            size="sm"
-            onclick={() => onStart?.(container.id)}
-          >
+          <Button variant="default" size="sm" onclick={() => onStart?.(container.id)}>
             <Play class="mr-1 h-4 w-4" />
             Start
           </Button>
         {/if}
-        <Button
-          variant="destructive"
-          size="sm"
-          onclick={() => onRemove?.(container.id)}
-        >
+        <Button variant="destructive" size="sm" onclick={() => onRemove?.(container.id)}>
           <Trash2 class="mr-1 h-4 w-4" />
           Remove
         </Button>

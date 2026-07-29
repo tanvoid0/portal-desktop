@@ -1,6 +1,6 @@
 <script lang="ts">
-  import ChatCatalogSelectors from "./chat/ChatCatalogSelectors.svelte";
-  import type { CatalogStatus, ProviderType } from "../types/index.js";
+  import ChatCatalogSelectors from './chat/ChatCatalogSelectors.svelte';
+  import type { CatalogStatus, ProviderType } from '../types/index.js';
 
   interface Props {
     selectedProvider?: ProviderType | null;
@@ -24,8 +24,8 @@
     onBackendProviderChange,
     onModelChange,
     onStatusChange,
-    backendSelectClass = "w-[140px]",
-    modelSelectClass = "w-[280px]",
+    backendSelectClass = 'w-[140px]',
+    modelSelectClass = 'w-[280px]',
     showPlatformLabel = true,
     showInlineError = true,
   }: Props = $props();

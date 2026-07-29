@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import * as Sheet from "$lib/components/ui/sheet/index.js";
-  import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
-  import { cn } from "$lib/utils.js";
+  import type { Snippet } from 'svelte';
+  import * as Sheet from '$lib/components/ui/sheet/index.js';
+  import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
+  import { cn } from '$lib/utils.js';
 
   interface Props {
-    side?: "left" | "right";
+    side?: 'left' | 'right';
     title?: string;
     open?: boolean;
     desktopClass?: string;
@@ -15,10 +15,10 @@
   }
 
   let {
-    side = "left",
+    side = 'left',
     title,
     open = $bindable(false),
-    desktopClass = "w-64",
+    desktopClass = 'w-64',
     borderClass,
     children,
     header,
@@ -27,8 +27,7 @@
   const isMobile = new IsMobile();
 
   const resolvedBorder = $derived(
-    borderClass ??
-      (side === "left" ? "divider-edge-r" : "divider-edge-l"),
+    borderClass ?? (side === 'left' ? 'divider-edge-r' : 'divider-edge-l')
   );
 </script>
 
@@ -36,10 +35,7 @@
   <Sheet.Root bind:open>
     <Sheet.Content
       {side}
-      class={cn(
-        "flex w-[min(20rem,85vw)] max-w-sm flex-col gap-0 p-0",
-        "[&>button]:hidden",
-      )}
+      class={cn('flex w-[min(20rem,85vw)] max-w-sm flex-col gap-0 p-0', '[&>button]:hidden')}
     >
       {#if header}
         <div class="divider-edge-b divider-edge-full shrink-0 bg-background">
@@ -57,11 +53,7 @@
   </Sheet.Root>
 {:else}
   <aside
-    class={cn(
-      "flex shrink-0 flex-col overflow-hidden bg-background",
-      resolvedBorder,
-      desktopClass,
-    )}
+    class={cn('flex shrink-0 flex-col overflow-hidden bg-background', resolvedBorder, desktopClass)}
   >
     {#if header}
       <div class="divider-edge-b divider-edge-full shrink-0 bg-background">

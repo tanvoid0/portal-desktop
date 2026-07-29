@@ -9,15 +9,15 @@
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Separator } from "$lib/components/ui/separator";
-  import { Palette, Download, Upload, RotateCcw } from "@lucide/svelte";
-  import { settingsService } from "../services/settingsService";
-  import type { ThemeSettings, CustomTheme } from "../types";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Separator } from '$lib/components/ui/separator';
+  import { Palette, Download, Upload, RotateCcw } from '@lucide/svelte';
+  import { settingsService } from '../services/settingsService';
+  import type { ThemeSettings, CustomTheme } from '../types';
 
   interface Props {
     settings: ThemeSettings | null;
@@ -28,17 +28,17 @@
 
   if (!settings) {
     settings = {
-      primaryColor: "#3b82f6",
-      secondaryColor: "#64748b",
-      accentColor: "#f59e0b",
-      backgroundColor: "#ffffff",
-      surfaceColor: "#f8fafc",
-      textColor: "#1e293b",
+      primaryColor: '#3b82f6',
+      secondaryColor: '#64748b',
+      accentColor: '#f59e0b',
+      backgroundColor: '#ffffff',
+      surfaceColor: '#f8fafc',
+      textColor: '#1e293b',
       borderRadius: 8,
       shadowIntensity: 5,
-      animationSpeed: "normal",
+      animationSpeed: 'normal',
       customThemes: [],
-      activeTheme: "default",
+      activeTheme: 'default',
     };
   }
 
@@ -48,25 +48,25 @@
 
   function handleResetColors() {
     onUpdate({
-      primaryColor: "#3b82f6",
-      secondaryColor: "#64748b",
-      accentColor: "#f59e0b",
-      backgroundColor: "#ffffff",
-      surfaceColor: "#f8fafc",
-      textColor: "#1e293b",
+      primaryColor: '#3b82f6',
+      secondaryColor: '#64748b',
+      accentColor: '#f59e0b',
+      backgroundColor: '#ffffff',
+      surfaceColor: '#f8fafc',
+      textColor: '#1e293b',
     });
   }
 
   function handleSaveCustomTheme() {
     if (!settings) return;
 
-    const themeName = prompt("Enter theme name:");
+    const themeName = prompt('Enter theme name:');
     if (!themeName) return;
 
     const customTheme: CustomTheme = {
       id: `custom-${Date.now()}`,
       name: themeName,
-      description: "Custom theme",
+      description: 'Custom theme',
       colors: {
         primary: settings.primaryColor,
         secondary: settings.secondaryColor,
@@ -105,9 +105,8 @@
     </CardHeader>
     <CardContent class="space-y-4">
       <p class="text-sm text-muted-foreground">
-        Color changes preview live in the component gallery below. Save
-        settings to persist across sessions. Use the header theme toggle for
-        light, dark, and system modes.
+        Color changes preview live in the component gallery below. Save settings to persist across
+        sessions. Use the header theme toggle for light, dark, and system modes.
       </p>
       <div class="grid grid-cols-2 gap-4">
         <div class="space-y-2">
@@ -117,15 +116,13 @@
               id="primaryColor"
               type="color"
               bind:value={settings.primaryColor}
-              onchange={() =>
-                handleColorChange("primaryColor", settings.primaryColor)}
+              onchange={() => handleColorChange('primaryColor', settings.primaryColor)}
               class="h-10 w-20 p-1"
             />
             <Input
               type="text"
               bind:value={settings.primaryColor}
-              onchange={() =>
-                handleColorChange("primaryColor", settings.primaryColor)}
+              onchange={() => handleColorChange('primaryColor', settings.primaryColor)}
               placeholder="#3b82f6"
             />
           </div>
@@ -138,15 +135,13 @@
               id="secondaryColor"
               type="color"
               bind:value={settings.secondaryColor}
-              onchange={() =>
-                handleColorChange("secondaryColor", settings.secondaryColor)}
+              onchange={() => handleColorChange('secondaryColor', settings.secondaryColor)}
               class="h-10 w-20 p-1"
             />
             <Input
               type="text"
               bind:value={settings.secondaryColor}
-              onchange={() =>
-                handleColorChange("secondaryColor", settings.secondaryColor)}
+              onchange={() => handleColorChange('secondaryColor', settings.secondaryColor)}
               placeholder="#64748b"
             />
           </div>
@@ -159,15 +154,13 @@
               id="accentColor"
               type="color"
               bind:value={settings.accentColor}
-              onchange={() =>
-                handleColorChange("accentColor", settings.accentColor)}
+              onchange={() => handleColorChange('accentColor', settings.accentColor)}
               class="h-10 w-20 p-1"
             />
             <Input
               type="text"
               bind:value={settings.accentColor}
-              onchange={() =>
-                handleColorChange("accentColor", settings.accentColor)}
+              onchange={() => handleColorChange('accentColor', settings.accentColor)}
               placeholder="#f59e0b"
             />
           </div>
@@ -180,15 +173,13 @@
               id="textColor"
               type="color"
               bind:value={settings.textColor}
-              onchange={() =>
-                handleColorChange("textColor", settings.textColor)}
+              onchange={() => handleColorChange('textColor', settings.textColor)}
               class="h-10 w-20 p-1"
             />
             <Input
               type="text"
               bind:value={settings.textColor}
-              onchange={() =>
-                handleColorChange("textColor", settings.textColor)}
+              onchange={() => handleColorChange('textColor', settings.textColor)}
               placeholder="#1e293b"
             />
           </div>
@@ -201,15 +192,13 @@
               id="backgroundColor"
               type="color"
               bind:value={settings.backgroundColor}
-              onchange={() =>
-                handleColorChange("backgroundColor", settings.backgroundColor)}
+              onchange={() => handleColorChange('backgroundColor', settings.backgroundColor)}
               class="h-10 w-20 p-1"
             />
             <Input
               type="text"
               bind:value={settings.backgroundColor}
-              onchange={() =>
-                handleColorChange("backgroundColor", settings.backgroundColor)}
+              onchange={() => handleColorChange('backgroundColor', settings.backgroundColor)}
               placeholder="#ffffff"
             />
           </div>
@@ -222,15 +211,13 @@
               id="surfaceColor"
               type="color"
               bind:value={settings.surfaceColor}
-              onchange={() =>
-                handleColorChange("surfaceColor", settings.surfaceColor)}
+              onchange={() => handleColorChange('surfaceColor', settings.surfaceColor)}
               class="h-10 w-20 p-1"
             />
             <Input
               type="text"
               bind:value={settings.surfaceColor}
-              onchange={() =>
-                handleColorChange("surfaceColor", settings.surfaceColor)}
+              onchange={() => handleColorChange('surfaceColor', settings.surfaceColor)}
               placeholder="#f8fafc"
             />
           </div>
@@ -272,8 +259,7 @@
             bind:value={settings.shadowIntensity}
             onchange={() =>
               onUpdate({
-                shadowIntensity:
-                  parseInt(String(settings.shadowIntensity)) || 5,
+                shadowIntensity: parseInt(String(settings.shadowIntensity)) || 5,
               })}
           />
         </div>
@@ -283,9 +269,8 @@
         <Label for="animationSpeed">Animation Speed</Label>
         <Select
           defaultValue={settings.animationSpeed}
-          options={["slow", "normal", "fast"]}
-          onSelect={(value) =>
-            onUpdate({ animationSpeed: value as "slow" | "normal" | "fast" })}
+          options={['slow', 'normal', 'fast']}
+          onSelect={(value) => onUpdate({ animationSpeed: value as 'slow' | 'normal' | 'fast' })}
           placeholder="Select speed"
         />
       </div>
@@ -310,9 +295,7 @@
       {#if settings.customThemes.length > 0}
         <div class="space-y-2">
           {#each settings.customThemes as theme (theme.id)}
-            <div
-              class="flex items-center justify-between rounded-lg border p-3"
-            >
+            <div class="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <p class="font-medium">{theme.name}</p>
                 {#if theme.description}
@@ -337,9 +320,7 @@
                   size="sm"
                   onclick={() => {
                     onUpdate({
-                      customThemes: settings.customThemes.filter(
-                        (t) => t.id !== theme.id,
-                      ),
+                      customThemes: settings.customThemes.filter((t) => t.id !== theme.id),
                     });
                   }}
                 >
@@ -352,9 +333,7 @@
       {:else}
         <div class="py-8 text-center text-muted-foreground">
           <p>No custom themes yet.</p>
-          <p class="mt-2 text-sm">
-            Adjust colors above and click "Save Theme" to create one.
-          </p>
+          <p class="mt-2 text-sm">Adjust colors above and click "Save Theme" to create one.</p>
         </div>
       {/if}
     </CardContent>

@@ -3,19 +3,19 @@
 -->
 
 <script lang="ts">
-  import { credentialService } from "../services/credentialService";
-  import { logger } from "$lib/domains/shared";
-  import { toast } from "$lib/utils/toast";
-  import type { Credential, CredentialType } from "../types";
+  import { credentialService } from '../services/credentialService';
+  import { logger } from '$lib/domains/shared';
+  import { toast } from '$lib/utils/toast';
+  import type { Credential, CredentialType } from '../types';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
+  } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     AlertDialog,
     AlertDialogAction,
@@ -25,16 +25,8 @@
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-  } from "$lib/components/ui/alert-dialog";
-  import {
-    Eye,
-    EyeOff,
-    Copy,
-    Edit,
-    Trash2,
-    Calendar,
-    Tag,
-  } from "@lucide/svelte";
+  } from '$lib/components/ui/alert-dialog';
+  import { Eye, EyeOff, Copy, Edit, Trash2, Calendar, Tag } from '@lucide/svelte';
 
   interface Props {
     credential: Credential;
@@ -59,8 +51,8 @@
     try {
       isDecrypting = true;
 
-      logger.info("Decrypting credential", {
-        context: "CredentialCard",
+      logger.info('Decrypting credential', {
+        context: 'CredentialCard',
         data: { credentialId: credential.id },
       });
 
@@ -68,17 +60,17 @@
       decryptedValue = value;
       showValue = true;
 
-      logger.info("Credential decrypted successfully", {
-        context: "CredentialCard",
+      logger.info('Credential decrypted successfully', {
+        context: 'CredentialCard',
         data: { credentialId: credential.id },
       });
     } catch (err) {
-      logger.error("Failed to decrypt credential", {
-        context: "CredentialCard",
+      logger.error('Failed to decrypt credential', {
+        context: 'CredentialCard',
         error: err,
         data: { credentialId: credential.id },
       });
-      toast.error("Failed to decrypt credential");
+      toast.error('Failed to decrypt credential');
     } finally {
       isDecrypting = false;
     }
@@ -89,13 +81,13 @@
 
     try {
       await navigator.clipboard.writeText(decryptedValue);
-      toast.success("Value copied to clipboard");
+      toast.success('Value copied to clipboard');
     } catch (err) {
-      logger.error("Failed to copy to clipboard", {
-        context: "CredentialCard",
+      logger.error('Failed to copy to clipboard', {
+        context: 'CredentialCard',
         error: err,
       });
-      toast.error("Failed to copy to clipboard");
+      toast.error('Failed to copy to clipboard');
     }
   }
 
@@ -114,12 +106,12 @@
 
   function getStatusColor(status: string): string {
     const colors: Record<string, string> = {
-      active: "bg-green-100 text-green-800",
-      inactive: "bg-gray-100 text-gray-800",
-      expired: "bg-red-100 text-red-800",
-      revoked: "bg-orange-100 text-orange-800",
+      active: 'bg-green-100 text-green-800',
+      inactive: 'bg-gray-100 text-gray-800',
+      expired: 'bg-red-100 text-red-800',
+      revoked: 'bg-orange-100 text-orange-800',
     };
-    return colors[status] || "bg-gray-100 text-gray-800";
+    return colors[status] || 'bg-gray-100 text-gray-800';
   }
 
   function getTypeIcon(type: CredentialType): string {
@@ -131,10 +123,10 @@
   }
 
   function formatDate(date: Date): string {
-    return new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
     }).format(date);
   }
 
@@ -152,10 +144,10 @@
           <CardTitle class="text-lg">{credential.name}</CardTitle>
           <CardDescription class="flex items-center gap-2">
             <Badge variant="outline" class={getTypeColor(credential.type)}>
-              {credential.type.replace("_", " ")}
+              {credential.type.replace('_', ' ')}
             </Badge>
             <Badge
-              variant={isExpired() ? "destructive" : "secondary"}
+              variant={isExpired() ? 'destructive' : 'secondary'}
               class={getStatusColor(credential.status)}
             >
               {credential.status}
@@ -164,12 +156,7 @@
         </div>
       </div>
       <div class="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={handleToggleVisibility}
-          disabled={isDecrypting}
-        >
+        <Button variant="ghost" size="sm" onclick={handleToggleVisibility} disabled={isDecrypting}>
           {#if isDecrypting}
             <Eye class="h-4 w-4 animate-pulse" />
           {:else if showValue}
@@ -210,7 +197,7 @@
           {#if showValue && decryptedValue}
             {decryptedValue}
           {:else}
-            {credentialService.maskValue("encrypted_value", credential.type)}
+            {credentialService.maskValue('encrypted_value', credential.type)}
           {/if}
         </div>
       </div>
@@ -252,8 +239,7 @@
     <AlertDialogHeader>
       <AlertDialogTitle>Delete Credential</AlertDialogTitle>
       <AlertDialogDescription>
-        Are you sure you want to delete "{credential.name}"? This action cannot
-        be undone.
+        Are you sure you want to delete "{credential.name}"? This action cannot be undone.
       </AlertDialogDescription>
     </AlertDialogHeader>
     <AlertDialogFooter>

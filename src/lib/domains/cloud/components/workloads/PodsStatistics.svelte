@@ -1,13 +1,8 @@
 <!-- PodsStatistics - Shows pod count breakdown by status -->
 <script lang="ts">
-  import type { ICloudResource } from "../../core/types";
-  import { ResourceStatus } from "../../core/types";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
+  import type { ICloudResource } from '../../core/types';
+  import { ResourceStatus } from '../../core/types';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 
   interface Props {
     pods: ICloudResource[];
@@ -27,9 +22,7 @@
 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
   <Card>
     <CardHeader class="pb-2">
-      <CardTitle class="text-sm font-medium text-muted-foreground"
-        >Total Pods</CardTitle
-      >
+      <CardTitle class="text-sm font-medium text-muted-foreground">Total Pods</CardTitle>
     </CardHeader>
     <CardContent>
       <div class="text-2xl font-bold">{stats.total}</div>
@@ -38,9 +31,7 @@
 
   <Card>
     <CardHeader class="pb-2">
-      <CardTitle class="text-sm font-medium text-muted-foreground"
-        >Running</CardTitle
-      >
+      <CardTitle class="text-sm font-medium text-muted-foreground">Running</CardTitle>
     </CardHeader>
     <CardContent>
       <div class="text-2xl font-bold text-green-600 dark:text-green-400">
@@ -51,9 +42,7 @@
 
   <Card>
     <CardHeader class="pb-2">
-      <CardTitle class="text-sm font-medium text-muted-foreground"
-        >Pending</CardTitle
-      >
+      <CardTitle class="text-sm font-medium text-muted-foreground">Pending</CardTitle>
     </CardHeader>
     <CardContent>
       <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
@@ -64,9 +53,7 @@
 
   <Card>
     <CardHeader class="pb-2">
-      <CardTitle class="text-sm font-medium text-muted-foreground"
-        >Failed</CardTitle
-      >
+      <CardTitle class="text-sm font-medium text-muted-foreground">Failed</CardTitle>
     </CardHeader>
     <CardContent>
       <div class="text-2xl font-bold text-red-600 dark:text-red-400">
@@ -77,9 +64,7 @@
 
   <Card>
     <CardHeader class="pb-2">
-      <CardTitle class="text-sm font-medium text-muted-foreground"
-        >Succeeded</CardTitle
-      >
+      <CardTitle class="text-sm font-medium text-muted-foreground">Succeeded</CardTitle>
     </CardHeader>
     <CardContent>
       <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">

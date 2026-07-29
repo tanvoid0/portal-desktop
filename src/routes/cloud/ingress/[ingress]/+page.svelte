@@ -1,43 +1,28 @@
 <!-- Ingress Detail Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { goto, replaceState } from "$app/navigation";
-  import { cloudStore, loadResources } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { ArrowLeft, RefreshCw } from "@lucide/svelte";
-  import Loading from "$lib/components/ui/loading.svelte";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import YamlEditor from "$lib/domains/cloud/components/YamlEditor.svelte";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import { toastActions } from "$lib/utils/toast";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto, replaceState } from '$app/navigation';
+  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { ArrowLeft, RefreshCw } from '@lucide/svelte';
+  import Loading from '$lib/components/ui/loading.svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import { toastActions } from '$lib/utils/toast';
 
   const ingressName = $derived($page.params.ingress);
   const namespace = $derived(
-    $page.url.searchParams.get("namespace") ||
-      $cloudStore.selectedNamespace ||
-      "default",
+    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get("tab") || "overview");
+  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
 
-  let activeTab = $state("overview");
+  let activeTab = $state('overview');
 
   // Sync activeTab with tabParam when it changes
   $effect(() => {
@@ -49,26 +34,26 @@
   let error = $state<string | null>(null);
 
   // YAML state
-  let yaml = $state("");
+  let yaml = $state('');
   let yamlLoading = $state(false);
   let yamlError = $state<string | null>(null);
 
   onMount(async () => {
     await loadIngress();
-    if (activeTab === "yaml") {
+    if (activeTab === 'yaml') {
       await loadYAML();
     }
   });
 
   $effect(() => {
-    if (activeTab === "yaml" && !yaml && !yamlLoading && ingress) {
+    if (activeTab === 'yaml' && !yaml && !yamlLoading && ingress) {
       loadYAML();
     }
   });
 
   async function loadIngress() {
     if (!ingressName || !$cloudStore.connection.isConnected) {
-      error = "Ingress name or connection required";
+      error = 'Ingress name or connection required';
       isLoading = false;
       return;
     }
@@ -85,8 +70,8 @@
         error = `Ingress "${ingressName}" not found in namespace "${namespace}".`;
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load Ingress";
-      console.error("Failed to load Ingress:", err);
+      error = err instanceof Error ? err.message : 'Failed to load Ingress';
+      console.error('Failed to load Ingress:', err);
     } finally {
       isLoading = false;
     }
@@ -99,12 +84,16 @@
       yamlLoading = true;
       yamlError = null;
 
-      const yamlContent = await k8sResourceService.getResourceYaml("Ingress", ingress.namespace, ingress.name);
+      const yamlContent = await k8sResourceService.getResourceYaml(
+        'Ingress',
+        ingress.namespace,
+        ingress.name
+      );
 
       yaml = yamlContent;
     } catch (err) {
-      yamlError = err instanceof Error ? err.message : "Failed to load YAML";
-      console.error("Failed to load YAML:", err);
+      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
+      console.error('Failed to load YAML:', err);
     } finally {
       yamlLoading = false;
     }
@@ -122,8 +111,7 @@
       await loadIngress();
       await loadYAML();
     } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to apply YAML";
+      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
       toastActions.error(errorMsg);
       throw err;
     }
@@ -132,7 +120,7 @@
   function handleTabChange(tab: string) {
     activeTab = tab;
     const url = new URL($page.url);
-    url.searchParams.set("tab", tab);
+    url.searchParams.set('tab', tab);
     replaceState(url, {});
   }
 
@@ -151,11 +139,7 @@
   {#if isLoading}
     <PageLoading message="Loading ingress..." />
   {:else if error}
-    <PageError
-      title="Failed to load ingress"
-      message={error}
-      onRetry={loadIngress}
-    />
+    <PageError title="Failed to load ingress" message={error} onRetry={loadIngress} />
   {:else if ingress}
     <div class="flex items-center justify-between">
       <div>
@@ -167,11 +151,7 @@
           <RefreshCw class="mr-2 h-4 w-4" />
           Refresh
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={() => goto("/cloud/ingress")}
-        >
+        <Button variant="outline" size="sm" onclick={() => goto('/cloud/ingress')}>
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back to Ingress
         </Button>
@@ -203,11 +183,11 @@
               </div>
               <div>
                 <p class="text-sm text-muted-foreground">Ingress Class</p>
-                <p class="font-medium">{ingress.metadata?.class || "N/A"}</p>
+                <p class="font-medium">{ingress.metadata?.class || 'N/A'}</p>
               </div>
               <div>
                 <p class="text-sm text-muted-foreground">Age</p>
-                <p class="font-medium">{ingress.metadata?.age || "N/A"}</p>
+                <p class="font-medium">{ingress.metadata?.age || 'N/A'}</p>
               </div>
             </CardContent>
           </Card>
@@ -271,9 +251,7 @@
                 <Loading text="Loading YAML..." />
               </div>
             {:else if yamlError}
-              <div
-                class="flex h-full items-center justify-center text-center text-destructive"
-              >
+              <div class="flex h-full items-center justify-center text-center text-destructive">
                 <p>{yamlError}</p>
               </div>
             {:else if yaml}

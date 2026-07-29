@@ -1,68 +1,62 @@
-export type TaskStatus = "pending" | "in-progress" | "completed" | "cancelled";
+export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'cancelled';
 
-export type TaskPriority = "low" | "medium" | "high";
+export type TaskPriority = 'low' | 'medium' | 'high';
 
-export type TaskType =
-  | "Story"
-  | "Bug"
-  | "Feature"
-  | "Task"
-  | "Epic"
-  | "Subtask";
+export type TaskType = 'Story' | 'Bug' | 'Feature' | 'Task' | 'Epic' | 'Subtask';
 
 // Actual TypeScript enums for direct use with Select component
 export enum TaskStatusEnum {
-  PENDING = "pending",
-  IN_PROGRESS = "in-progress",
-  COMPLETED = "completed",
-  CANCELLED = "cancelled",
+  PENDING = 'pending',
+  IN_PROGRESS = 'in-progress',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
 }
 
 export enum TaskPriorityEnum {
-  LOW = "low",
-  MEDIUM = "medium",
-  HIGH = "high",
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
 }
 
 export enum TaskTypeEnum {
-  STORY = "Story",
-  BUG = "Bug",
-  FEATURE = "Feature",
-  TASK = "Task",
-  EPIC = "Epic",
-  SUBTASK = "Subtask",
+  STORY = 'Story',
+  BUG = 'Bug',
+  FEATURE = 'Feature',
+  TASK = 'Task',
+  EPIC = 'Epic',
+  SUBTASK = 'Subtask',
 }
 
 // Recurring pattern enum
 export enum RecurringPatternEnum {
-  DAILY = "daily",
-  WEEKLY = "weekly",
-  MONTHLY = "monthly",
-  YEARLY = "yearly",
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  MONTHLY = 'monthly',
+  YEARLY = 'yearly',
 }
 
 // Enums for dropdown options
 export const TASK_STATUS_OPTIONS = [
-  { value: "pending" as const, label: "To Do" },
-  { value: "in-progress" as const, label: "In Progress" },
-  { value: "completed" as const, label: "Completed" },
-  { value: "cancelled" as const, label: "Cancelled" },
+  { value: 'pending' as const, label: 'To Do' },
+  { value: 'in-progress' as const, label: 'In Progress' },
+  { value: 'completed' as const, label: 'Completed' },
+  { value: 'cancelled' as const, label: 'Cancelled' },
 ] as const;
 
 export const TASK_PRIORITY_OPTIONS = [
-  { value: "low" as const, label: "Low" },
-  { value: "medium" as const, label: "Medium" },
-  { value: "high" as const, label: "High" },
+  { value: 'low' as const, label: 'Low' },
+  { value: 'medium' as const, label: 'Medium' },
+  { value: 'high' as const, label: 'High' },
 ] as const;
 
 export const TASK_TYPE_OPTIONS = [
-  { value: "" as const, label: "Select type..." },
-  { value: "Story" as const, label: "Story" },
-  { value: "Bug" as const, label: "Bug" },
-  { value: "Feature" as const, label: "Feature" },
-  { value: "Task" as const, label: "Task" },
-  { value: "Epic" as const, label: "Epic" },
-  { value: "Subtask" as const, label: "Subtask" },
+  { value: '' as const, label: 'Select type...' },
+  { value: 'Story' as const, label: 'Story' },
+  { value: 'Bug' as const, label: 'Bug' },
+  { value: 'Feature' as const, label: 'Feature' },
+  { value: 'Task' as const, label: 'Task' },
+  { value: 'Epic' as const, label: 'Epic' },
+  { value: 'Subtask' as const, label: 'Subtask' },
 ] as const;
 
 export interface Task {
@@ -151,7 +145,7 @@ export interface TaskStats {
 }
 
 export interface RecurringTask {
-  pattern: "daily" | "weekly" | "monthly" | "yearly";
+  pattern: 'daily' | 'weekly' | 'monthly' | 'yearly';
   interval: number; // every N days/weeks/months/years
   endDate?: Date;
   lastGenerated?: Date;

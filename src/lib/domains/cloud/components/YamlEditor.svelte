@@ -1,15 +1,11 @@
 <!-- Safe YAML Editor Component with Validation -->
 <script lang="ts">
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-  } from "$lib/components/ui/alert";
-  import { Badge } from "$lib/components/ui/badge";
-  import { AlertCircle, CheckCircle, Save, X, RotateCcw } from "@lucide/svelte";
-  import { confirmAction } from "$lib/utils/confirm";
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Button } from '$lib/components/ui/button';
+  import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
+  import { Badge } from '$lib/components/ui/badge';
+  import { AlertCircle, CheckCircle, Save, X, RotateCcw } from '@lucide/svelte';
+  import { confirmAction } from '$lib/utils/confirm';
   import {
     AlertDialog,
     AlertDialogAction,
@@ -19,9 +15,9 @@
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-  } from "$lib/components/ui/alert-dialog";
-  import { buttonVariants } from "$lib/components/ui/button";
-  import { cn } from "$lib/utils";
+  } from '$lib/components/ui/alert-dialog';
+  import { buttonVariants } from '$lib/components/ui/button';
+  import { cn } from '$lib/utils';
 
   interface Props {
     value: string;
@@ -34,13 +30,13 @@
   }
 
   let {
-    value = "",
+    value = '',
     onSave,
     onCancel,
     readOnly = false,
-    resourceName = "",
-    resourceKind = "Resource",
-    namespace = "",
+    resourceName = '',
+    resourceKind = 'Resource',
+    namespace = '',
   }: Props = $props();
 
   let editedValue = $state(value);
@@ -67,19 +63,19 @@
 
   function validateYAML(yamlContent: string): string | null {
     if (!yamlContent.trim()) {
-      return "YAML content cannot be empty";
+      return 'YAML content cannot be empty';
     }
 
     // Basic YAML structure validation
     try {
       // Check for required fields
-      if (!yamlContent.includes("kind:")) {
+      if (!yamlContent.includes('kind:')) {
         return 'YAML must contain a "kind" field';
       }
-      if (!yamlContent.includes("metadata:")) {
+      if (!yamlContent.includes('metadata:')) {
         return 'YAML must contain a "metadata" field';
       }
-      if (!yamlContent.includes("name:")) {
+      if (!yamlContent.includes('name:')) {
         return 'YAML must contain "metadata.name" field';
       }
 
@@ -93,7 +89,7 @@
 
       return null;
     } catch (error) {
-      return `YAML validation error: ${error instanceof Error ? error.message : "Unknown error"}`;
+      return `YAML validation error: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   }
 
@@ -131,8 +127,7 @@
       hasChanges = false;
       showConfirmDialog = false;
     } catch (error) {
-      validationError =
-        error instanceof Error ? error.message : "Failed to save YAML";
+      validationError = error instanceof Error ? error.message : 'Failed to save YAML';
     } finally {
       isSaving = false;
     }
@@ -141,8 +136,8 @@
   async function handleCancel() {
     if (hasChanges) {
       const confirmed = await confirmAction(
-        "You have unsaved changes. Are you sure you want to discard them?",
-        "Discard changes",
+        'You have unsaved changes. Are you sure you want to discard them?',
+        'Discard changes'
       );
       if (!confirmed) return;
 
@@ -156,10 +151,7 @@
   }
 
   async function handleReset() {
-    const confirmed = await confirmAction(
-      "Reset all changes to original YAML?",
-      "Reset YAML",
-    );
+    const confirmed = await confirmAction('Reset all changes to original YAML?', 'Reset YAML');
     if (!confirmed) return;
 
     editedValue = originalValue;
@@ -182,9 +174,7 @@
     <Alert>
       <CheckCircle class="h-4 w-4" />
       <AlertTitle>Valid YAML</AlertTitle>
-      <AlertDescription
-        >YAML is valid. You have unsaved changes.</AlertDescription
-      >
+      <AlertDescription>YAML is valid. You have unsaved changes.</AlertDescription>
     </Alert>
   {/if}
 
@@ -199,32 +189,20 @@
         <Badge variant="secondary">ns: {namespace}</Badge>
       {/if}
       {#if hasChanges}
-        <Badge
-          variant="secondary"
-          class="bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
+        <Badge variant="secondary" class="bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
           >Unsaved Changes</Badge
         >
       {/if}
     </div>
     <div class="flex items-center gap-2">
       {#if hasChanges}
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={handleReset}
-          disabled={isSaving}
-        >
+        <Button variant="outline" size="sm" onclick={handleReset} disabled={isSaving}>
           <RotateCcw class="mr-2 h-4 w-4" />
           Reset
         </Button>
       {/if}
       {#if !readOnly}
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={handleCancel}
-          disabled={isSaving}
-        >
+        <Button variant="outline" size="sm" onclick={handleCancel} disabled={isSaving}>
           <X class="mr-2 h-4 w-4" />
           Cancel
         </Button>
@@ -235,7 +213,7 @@
           disabled={!isValid || isSaving || !hasChanges}
         >
           <Save class="mr-2 h-4 w-4" />
-          {isSaving ? "Saving..." : "Save"}
+          {isSaving ? 'Saving...' : 'Save'}
         </Button>
       {/if}
     </div>
@@ -263,23 +241,21 @@
       <AlertDialogHeader>
         <AlertDialogTitle>Confirm Update</AlertDialogTitle>
         <AlertDialogDescription>
-          You are about to update <strong>{resourceKind}</strong> "<strong
-            >{resourceName}</strong
-          >" in namespace "<strong>{namespace}</strong>".
+          You are about to update <strong>{resourceKind}</strong> "<strong>{resourceName}</strong>"
+          in namespace "<strong>{namespace}</strong>".
           <br /><br />
-          <strong class="text-destructive">Warning:</strong> This will modify the
-          resource in your Kubernetes cluster. Make sure the YAML is correct before
-          proceeding.
+          <strong class="text-destructive">Warning:</strong> This will modify the resource in your Kubernetes
+          cluster. Make sure the YAML is correct before proceeding.
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
         <AlertDialogAction
-          class={cn(buttonVariants({ variant: "destructive" }))}
+          class={cn(buttonVariants({ variant: 'destructive' }))}
           onclick={performSave}
           disabled={isSaving}
         >
-          {isSaving ? "Applying..." : "Apply Changes"}
+          {isSaving ? 'Applying...' : 'Apply Changes'}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

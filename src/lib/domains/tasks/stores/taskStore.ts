@@ -1,21 +1,17 @@
-import { writable } from "svelte/store";
+import { writable } from 'svelte/store';
 import type {
   Task,
   TaskFilters,
   CreateTaskRequest,
   UpdateTaskRequest,
   TaskTemplate,
-} from "../types";
-import { tauriTaskService } from "../services/tauriTaskService";
-import { fetchAllTasks } from "../api/taskApi";
-import {
-  queryClient,
-  invalidateDashboardOverview,
-  queryKeys,
-} from "$lib/domains/shared/query";
-import { invalidateTaskCaches } from "../queries/invalidateTasks";
-import { taskUi } from "../state/taskUi.svelte";
-import { toastActions } from "$lib/utils/toast";
+} from '../types';
+import { tauriTaskService } from '../services/tauriTaskService';
+import { fetchAllTasks } from '../api/taskApi';
+import { queryClient, invalidateDashboardOverview, queryKeys } from '$lib/domains/shared/query';
+import { invalidateTaskCaches } from '../queries/invalidateTasks';
+import { taskUi } from '../state/taskUi.svelte';
+import { toastActions } from '$lib/utils/toast';
 
 // Mutation loading/error (list loading comes from TanStack Query)
 export const isLoading = writable(false);
@@ -36,11 +32,10 @@ export const taskActions = {
         console.log(`✅ Loaded ${allTasks.length} tasks successfully`);
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to load tasks";
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load tasks';
       error.set(errorMessage);
-      console.error("❌ Failed to load tasks:", err);
-      toastActions.error("Failed to load tasks", errorMessage);
+      console.error('❌ Failed to load tasks:', err);
+      toastActions.error('Failed to load tasks', errorMessage);
     } finally {
       isLoading.set(false);
     }
@@ -48,19 +43,19 @@ export const taskActions = {
 
   async createTask(request: CreateTaskRequest): Promise<Task> {
     if (!request.title?.trim()) {
-      const errorMsg = "Task title is required";
+      const errorMsg = 'Task title is required';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
 
     if (request.title.length > 200) {
-      const errorMsg = "Task title must be less than 200 characters";
+      const errorMsg = 'Task title must be less than 200 characters';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
 
     if (request.description && request.description.length > 1000) {
-      const errorMsg = "Task description must be less than 1000 characters";
+      const errorMsg = 'Task description must be less than 1000 characters';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
@@ -76,10 +71,9 @@ export const taskActions = {
 
       return newTask;
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to create task";
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create task';
       error.set(errorMessage);
-      console.error("❌ Failed to create task:", err);
+      console.error('❌ Failed to create task:', err);
       throw err;
     } finally {
       isLoading.set(false);
@@ -88,19 +82,19 @@ export const taskActions = {
 
   async updateTask(taskId: string, request: UpdateTaskRequest): Promise<Task> {
     if (request.title !== undefined && !request.title?.trim()) {
-      const errorMsg = "Task title cannot be empty";
+      const errorMsg = 'Task title cannot be empty';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
 
     if (request.title && request.title.length > 200) {
-      const errorMsg = "Task title must be less than 200 characters";
+      const errorMsg = 'Task title must be less than 200 characters';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
 
     if (request.description && request.description.length > 1000) {
-      const errorMsg = "Task description must be less than 1000 characters";
+      const errorMsg = 'Task description must be less than 1000 characters';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
@@ -116,10 +110,9 @@ export const taskActions = {
 
       return updatedTask;
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to update task";
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update task';
       error.set(errorMessage);
-      console.error("❌ Failed to update task:", err);
+      console.error('❌ Failed to update task:', err);
       throw err;
     } finally {
       isLoading.set(false);
@@ -128,7 +121,7 @@ export const taskActions = {
 
   async deleteTask(taskId: string): Promise<void> {
     if (!taskId?.trim()) {
-      const errorMsg = "Task ID is required";
+      const errorMsg = 'Task ID is required';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
@@ -144,10 +137,9 @@ export const taskActions = {
 
       taskUi.clearSelectedIfDeleted(taskId);
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to delete task";
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete task';
       error.set(errorMessage);
-      console.error("❌ Failed to delete task:", err);
+      console.error('❌ Failed to delete task:', err);
       throw err;
     } finally {
       isLoading.set(false);
@@ -156,14 +148,14 @@ export const taskActions = {
 
   async deleteTasksBulk(taskIds: string[]): Promise<void> {
     if (!taskIds || taskIds.length === 0) {
-      const errorMsg = "No tasks selected for deletion";
+      const errorMsg = 'No tasks selected for deletion';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
 
     const invalidIds = taskIds.filter((id) => !id?.trim());
     if (invalidIds.length > 0) {
-      const errorMsg = "Invalid task IDs provided";
+      const errorMsg = 'Invalid task IDs provided';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
@@ -172,9 +164,7 @@ export const taskActions = {
       isLoading.set(true);
       error.set(null);
 
-      const deletePromises = taskIds.map((taskId) =>
-        tauriTaskService.deleteTask(taskId),
-      );
+      const deletePromises = taskIds.map((taskId) => tauriTaskService.deleteTask(taskId));
       await Promise.all(deletePromises);
 
       await this.loadTasks();
@@ -183,10 +173,9 @@ export const taskActions = {
 
       taskUi.clearSelectedIfDeletedBulk(taskIds);
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to delete tasks";
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete tasks';
       error.set(errorMessage);
-      console.error("❌ Failed to delete tasks:", err);
+      console.error('❌ Failed to delete tasks:', err);
       throw err;
     } finally {
       isLoading.set(false);
@@ -195,7 +184,7 @@ export const taskActions = {
 
   async toggleTaskStatus(taskId: string): Promise<void> {
     if (!taskId?.trim()) {
-      const errorMsg = "Task ID is required";
+      const errorMsg = 'Task ID is required';
       error.set(errorMsg);
       throw new Error(errorMsg);
     }
@@ -204,23 +193,20 @@ export const taskActions = {
       const task = await tauriTaskService.getTask(taskId);
 
       if (!task) {
-        const errorMsg = "Task not found";
+        const errorMsg = 'Task not found';
         error.set(errorMsg);
         throw new Error(errorMsg);
       }
 
-      const statusOrder = ["pending", "in-progress", "completed", "cancelled"];
+      const statusOrder = ['pending', 'in-progress', 'completed', 'cancelled'];
       const currentIndex = statusOrder.indexOf(task.status);
-      const nextStatus = statusOrder[
-        (currentIndex + 1) % statusOrder.length
-      ] as Task["status"];
+      const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length] as Task['status'];
 
       await this.updateTask(taskId, { status: nextStatus });
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to toggle task status";
+      const errorMessage = err instanceof Error ? err.message : 'Failed to toggle task status';
       error.set(errorMessage);
-      console.error("❌ Failed to toggle task status:", err);
+      console.error('❌ Failed to toggle task status:', err);
       throw err;
     }
   },
@@ -261,11 +247,7 @@ export const taskActions = {
     taskUi.stopTimeTracking();
   },
 
-  async addComment(
-    taskId: string,
-    content: string,
-    author: string,
-  ): Promise<void> {
+  async addComment(taskId: string, content: string, author: string): Promise<void> {
     await this.loadTasks();
   },
 
@@ -278,7 +260,7 @@ export const taskActions = {
     name: string,
     url: string,
     type: string,
-    size: number,
+    size: number
   ): Promise<void> {
     await this.loadTasks();
   },
@@ -307,20 +289,15 @@ export const taskActions = {
     taskUi.setDefaultView(viewId);
   },
 
-  async applyTemplate(
-    templateId: string,
-    taskData: Partial<CreateTaskRequest>,
-  ): Promise<Task> {
-    return taskUi.applyTemplate(templateId, taskData, (request) =>
-      this.createTask(request),
-    );
+  async applyTemplate(templateId: string, taskData: Partial<CreateTaskRequest>): Promise<Task> {
+    return taskUi.applyTemplate(templateId, taskData, (request) => this.createTask(request));
   },
 
   async saveView(
     name: string,
     description: string,
     filters: TaskFilters,
-    isDefault: boolean = false,
+    isDefault: boolean = false
   ): Promise<void> {
     taskUi.saveView(name, description, filters, isDefault);
   },
@@ -329,9 +306,7 @@ export const taskActions = {
     taskUi.loadView(viewId);
   },
 
-  async checkDependencies(
-    taskId: string,
-  ): Promise<{ blocked: boolean; blockingTasks: string[] }> {
+  async checkDependencies(taskId: string): Promise<{ blocked: boolean; blockingTasks: string[] }> {
     return taskUi.checkDependencies(taskId);
   },
 

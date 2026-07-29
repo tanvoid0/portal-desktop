@@ -12,9 +12,7 @@ export interface ThinkingSplit {
  * `reasoning_content` delta.
  */
 export function splitThinking(content: string): ThinkingSplit {
-  const match = content.match(
-    /^\s*<think(?:ing)?>([\s\S]*?)(?:<\/think(?:ing)?>|$)/,
-  );
+  const match = content.match(/^\s*<think(?:ing)?>([\s\S]*?)(?:<\/think(?:ing)?>|$)/);
   if (!match) return { reasoning: null, answer: content, closed: true };
   return {
     reasoning: match[1].trim(),

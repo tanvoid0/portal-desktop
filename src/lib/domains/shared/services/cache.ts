@@ -89,12 +89,7 @@ class CacheService {
   /**
    * Cache a list. By default, empty arrays are not cached (delete key instead).
    */
-  setList<T>(
-    key: string,
-    value: T[],
-    ttl?: number,
-    options?: { cacheEmpty?: boolean },
-  ): void {
+  setList<T>(key: string, value: T[], ttl?: number, options?: { cacheEmpty?: boolean }): void {
     if (value.length === 0 && !options?.cacheEmpty) {
       this.delete(key);
       return;
@@ -179,7 +174,7 @@ class CacheService {
    * Remove the oldest entry
    */
   private evictOldest(): void {
-    let oldestKey = "";
+    let oldestKey = '';
     let oldestTime = Infinity;
 
     for (const [key, entry] of this.cache.entries()) {

@@ -4,11 +4,11 @@
 
 export interface AppSettings {
   // General settings
-  theme: "light" | "dark" | "system";
+  theme: 'light' | 'dark' | 'system';
   language: string;
   timezone: string;
   dateFormat: string;
-  timeFormat: "12h" | "24h";
+  timeFormat: '12h' | '24h';
 
   // Window settings
   windowState: WindowState;
@@ -81,7 +81,7 @@ export interface UpdateSettings {
   autoDownload: boolean;
   autoInstall: boolean;
   checkInterval: number; // hours
-  channel: "stable" | "beta" | "alpha";
+  channel: 'stable' | 'beta' | 'alpha';
   notifyOnUpdate: boolean;
 }
 
@@ -124,14 +124,14 @@ export interface TerminalSettings {
   fontFamily: string;
   fontSize: number;
   lineHeight: number;
-  cursorStyle: "block" | "underline" | "line";
+  cursorStyle: 'block' | 'underline' | 'line';
   cursorBlink: boolean;
 
   // Terminal behavior
   scrollback: number;
-  bellStyle: "none" | "visual" | "sound";
+  bellStyle: 'none' | 'visual' | 'sound';
   rightClickSelectsWord: boolean;
-  selectionMode: "normal" | "column";
+  selectionMode: 'normal' | 'column';
 
   // Shell integration
   shellIntegration: boolean;
@@ -184,7 +184,7 @@ export interface ThemeSettings {
   // UI elements
   borderRadius: number;
   shadowIntensity: number;
-  animationSpeed: "slow" | "normal" | "fast";
+  animationSpeed: 'slow' | 'normal' | 'fast';
 
   // Custom themes
   customThemes: CustomTheme[];
@@ -285,14 +285,7 @@ export interface SettingsField {
   id: string;
   name: string;
   description: string;
-  type:
-    | "text"
-    | "number"
-    | "boolean"
-    | "select"
-    | "color"
-    | "file"
-    | "keybinding";
+  type: 'text' | 'number' | 'boolean' | 'select' | 'color' | 'file' | 'keybinding';
   value: any;
   defaultValue: any;
   options?: { value: any; label: string }[];

@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { logger } from "$lib/domains/shared";
-  import { onMount, onDestroy } from "svelte";
-  import { terminalStore, terminalActions } from "../stores/terminalStore";
-  import { defaultTerminalConfig } from "../config/defaultTerminalConfig";
-  import TerminalWorkspace from "./TerminalWorkspace.svelte";
-  import type { TerminalConfig } from "../types";
+  import { logger } from '$lib/domains/shared';
+  import { onMount, onDestroy } from 'svelte';
+  import { terminalStore, terminalActions } from '../stores/terminalStore';
+  import { defaultTerminalConfig } from '../config/defaultTerminalConfig';
+  import TerminalWorkspace from './TerminalWorkspace.svelte';
+  import type { TerminalConfig } from '../types';
   import {
     migratedProjectTabFields,
     projectTabNeedsMigration,
-  } from "../utils/resolveSessionSettings";
+  } from '../utils/resolveSessionSettings';
 
-  const log = logger.createScoped("ProjectTerminal");
+  const log = logger.createScoped('ProjectTerminal');
 
   interface Props {
     projectId: string;
@@ -19,28 +19,23 @@
     settings?: TerminalConfig;
   }
 
-  let {
-    projectId,
-    projectName,
-    projectPath,
-    settings: providedSettings,
-  }: Props = $props();
+  let { projectId, projectName, projectPath, settings: providedSettings }: Props = $props();
 
   const settings = $derived(
     providedSettings ?? {
       ...defaultTerminalConfig,
       workingDirectory: projectPath,
-    },
+    }
   );
 
   const tabs = $derived(
     $terminalStore.tabs.filter(
-      (tab) => tab.resourceName === "project" && tab.resourceId === projectId,
-    ),
+      (tab) => tab.resourceName === 'project' && tab.resourceId === projectId
+    )
   );
 
   function createNewTerminalTab(shellCommand?: string) {
-    log.debug("Creating new project terminal tab", { projectId });
+    log.debug('Creating new project terminal tab', { projectId });
     const tabNumber = tabs.length + 1;
     const actualShellCommand = shellCommand || settings.defaultShell;
 
@@ -48,27 +43,20 @@
       title: `${projectName} Terminal ${tabNumber}`,
       workingDirectory: projectPath,
       shell: actualShellCommand,
-      resourceName: "project",
+      resourceName: 'project',
       resourceId: projectId,
     });
   }
 
   onMount(() => {
-    log.info("ProjectTerminal mounted", { projectId });
+    log.info('ProjectTerminal mounted', { projectId });
     terminalActions.cleanupStaleData();
 
     for (const tab of $terminalStore.tabs) {
-      if (
-        projectTabNeedsMigration(
-          tab,
-          projectId,
-          projectPath,
-          settings.defaultShell,
-        )
-      ) {
+      if (projectTabNeedsMigration(tab, projectId, projectPath, settings.defaultShell)) {
         terminalActions.updateTab(
           tab.id,
-          migratedProjectTabFields(projectPath, settings.defaultShell),
+          migratedProjectTabFields(projectPath, settings.defaultShell)
         );
       }
     }
@@ -77,15 +65,14 @@
       createNewTerminalTab();
     } else if (
       tabs.length > 0 &&
-      (!$terminalStore.activeTabId ||
-        !tabs.some((tab) => tab.id === $terminalStore.activeTabId))
+      (!$terminalStore.activeTabId || !tabs.some((tab) => tab.id === $terminalStore.activeTabId))
     ) {
       terminalActions.setActiveTab(tabs[0].id);
     }
   });
 
   onDestroy(() => {
-    log.info("ProjectTerminal destroyed", { projectId });
+    log.info('ProjectTerminal destroyed', { projectId });
   });
 </script>
 
@@ -106,8 +93,7 @@
       showHistory={false}
       autoCreateTab={false}
       onNewTab={createNewTerminalTab}
-      tabFilter={(tab) =>
-        tab.resourceName === "project" && tab.resourceId === projectId}
+      tabFilter={(tab) => tab.resourceName === 'project' && tab.resourceId === projectId}
     />
   </div>
 </div>

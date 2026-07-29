@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import Icon from "@iconify/svelte";
-  import { taskActions } from "../stores/taskStore";
-  import { taskUi as defaultTaskUi, type TaskUiState } from "../state/taskUi.svelte";
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import Icon from '@iconify/svelte';
+  import { taskActions } from '../stores/taskStore';
+  import { taskUi as defaultTaskUi, type TaskUiState } from '../state/taskUi.svelte';
   import {
     createDragDropState,
     handleDragStart,
@@ -15,9 +15,9 @@
     handleDrop,
     getDropZoneClasses,
     getTaskCardClasses,
-  } from "../utils/dragDrop";
-  import type { Task } from "../types";
-  import TaskCard from "./TaskCard.svelte";
+  } from '../utils/dragDrop';
+  import type { Task } from '../types';
+  import TaskCard from './TaskCard.svelte';
 
   interface Props {
     ui?: TaskUiState;
@@ -65,7 +65,7 @@
     try {
       await taskActions.updateTask(taskId, { status: newStatus as any });
     } catch (error) {
-      console.error("Failed to move task:", error);
+      console.error('Failed to move task:', error);
     }
   }
 </script>
@@ -76,7 +76,7 @@
       class="space-y-3 {getDropZoneClasses(
         column.id,
         dragDropState,
-        'min-h-[200px] rounded-lg border-2 border-dashed border-transparent p-2',
+        'min-h-[200px] rounded-lg border-2 border-dashed border-transparent p-2'
       )}"
       role="region"
       aria-label="Drop zone for {column.title} tasks"
@@ -86,9 +86,7 @@
     >
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-semibold text-foreground">{column.title}</h3>
-        <span
-          class="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground"
-        >
+        <span class="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
           {column.tasks.length}
         </span>
       </div>
@@ -100,22 +98,18 @@
             ondragstart={(e) => handleDragStart(e, task, dragDropState)}
             ondragend={(e) => handleDragEnd(e, dragDropState)}
             onclick={() =>
-              taskUi.isMultiSelectMode
-                ? handleTaskSelection(task.id)
-                : handleTaskSelect(task)}
+              taskUi.isMultiSelectMode ? handleTaskSelection(task.id) : handleTaskSelect(task)}
             onkeydown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
+              if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                taskUi.isMultiSelectMode
-                  ? handleTaskSelection(task.id)
-                  : handleTaskSelect(task);
+                taskUi.isMultiSelectMode ? handleTaskSelection(task.id) : handleTaskSelect(task);
               }
             }}
             role="button"
             tabindex="0"
             aria-label="Select task: {task.title}"
             class="cursor-pointer transition-shadow hover:shadow-md {taskUi.selectedTaskIds.has(
-              task.id,
+              task.id
             )
               ? 'bg-warning-50 ring-2 ring-warning-500 dark:bg-warning-900/20'
               : ''} {getTaskCardClasses(task, dragDropState)}"
@@ -136,23 +130,13 @@
                   </h4>
                   <div class="flex items-center gap-1">
                     {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
-                      <div
-                        class="flex items-center gap-1 text-xs text-muted-foreground"
-                      >
-                        <Icon
-                          icon="mdi:subdirectory-arrow-right"
-                          class="h-3 w-3"
-                        />
+                      <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Icon icon="mdi:subdirectory-arrow-right" class="h-3 w-3" />
                         <span>{getSubtaskCount(task.id, taskUi.tasks)}</span>
                       </div>
                     {/if}
-                    <Icon
-                      icon="mdi:flag"
-                      class="h-3 w-3 {getPriorityColor(task.priority)}"
-                    />
-                    <span class="text-xs uppercase text-muted-foreground"
-                      >{task.priority}</span
-                    >
+                    <Icon icon="mdi:flag" class="h-3 w-3 {getPriorityColor(task.priority)}" />
+                    <span class="text-xs uppercase text-muted-foreground">{task.priority}</span>
                   </div>
                 </div>
 
@@ -183,10 +167,7 @@
                         class="h-8 w-8 p-0"
                         title="Create subtask"
                       >
-                        <Icon
-                          icon="mdi:plus"
-                          class="h-4 w-4 text-muted-foreground"
-                        />
+                        <Icon icon="mdi:plus" class="h-4 w-4 text-muted-foreground" />
                       </Button>
                     {/if}
                     <Button
@@ -218,7 +199,7 @@
                       handleTaskSelect(subtask);
                     }}
                     onkeydown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
+                      if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         e.stopPropagation();
                         handleTaskSelect(subtask);
@@ -229,9 +210,7 @@
                     aria-label="Select subtask: {subtask.title}"
                     class="cursor-pointer transition-shadow hover:shadow-md"
                   >
-                    <Card
-                      class="border-l-4 border-l-primary bg-primary/5 dark:bg-primary/10"
-                    >
+                    <Card class="border-l-4 border-l-primary bg-primary/5 dark:bg-primary/10">
                       <CardContent class="p-3">
                         <div class="mb-2 flex items-start justify-between">
                           <div class="flex items-center gap-2">
@@ -246,32 +225,23 @@
                           <div class="flex items-center gap-1">
                             <Icon
                               icon="mdi:flag"
-                              class="h-3 w-3 {getPriorityColor(
-                                subtask.priority,
-                              )}"
+                              class="h-3 w-3 {getPriorityColor(subtask.priority)}"
                             />
-                            <span
-                              class="text-xs uppercase text-muted-foreground"
+                            <span class="text-xs uppercase text-muted-foreground"
                               >{subtask.priority}</span
                             >
                           </div>
                         </div>
 
                         {#if subtask.description}
-                          <p
-                            class="mb-2 line-clamp-2 text-xs text-muted-foreground"
-                          >
+                          <p class="mb-2 line-clamp-2 text-xs text-muted-foreground">
                             {subtask.description}
                           </p>
                         {/if}
 
                         <div class="flex items-center justify-between">
                           <div class="flex items-center gap-2">
-                            <Badge
-                              class="text-xs {getStatusBadgeColor(
-                                subtask.status,
-                              )}"
-                            >
+                            <Badge class="text-xs {getStatusBadgeColor(subtask.status)}">
                               {subtask.status}
                             </Badge>
                           </div>
@@ -287,9 +257,7 @@
                           >
                             <Icon
                               icon={getTaskIcon(subtask)}
-                              class="h-4 w-4 {getTaskStatusColor(
-                                subtask.status,
-                              )}"
+                              class="h-4 w-4 {getTaskStatusColor(subtask.status)}"
                             />
                           </Button>
                         </div>

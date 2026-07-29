@@ -3,30 +3,15 @@
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-  } from "$lib/components/ui/collapsible";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-  } from "$lib/components/ui/card";
-  import type { WorkloadGroup } from "../utils/workloadGrouping";
-  import {
-    computeGroupRollup,
-    kindBadgeLabel,
-  } from "../utils/workloadGrouping";
-  import { fmtBytes, fmtPercent, isContainerRunning } from "../utils/format";
-  import ContainerRow from "./ContainerRow.svelte";
-  import {
-    ChevronDown,
-    Play,
-    Square,
-    FolderOpen,
-    Layers,
-    Cpu,
-    MemoryStick,
-  } from "@lucide/svelte";
+  } from '$lib/components/ui/collapsible';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
+  import type { WorkloadGroup } from '../utils/workloadGrouping';
+  import { computeGroupRollup, kindBadgeLabel } from '../utils/workloadGrouping';
+  import { fmtBytes, fmtPercent, isContainerRunning } from '../utils/format';
+  import ContainerRow from './ContainerRow.svelte';
+  import { ChevronDown, Play, Square, FolderOpen, Layers, Cpu, MemoryStick } from '@lucide/svelte';
 
   interface Props {
     group: WorkloadGroup;
@@ -78,15 +63,19 @@
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
-              {#if group.kind === "portal"}
+              {#if group.kind === 'portal'}
                 <FolderOpen class="h-4 w-4 shrink-0 text-muted-foreground" />
-              {:else if group.kind === "compose"}
+              {:else if group.kind === 'compose'}
                 <Layers class="h-4 w-4 shrink-0 text-muted-foreground" />
               {/if}
               <h3 class="truncate text-lg font-semibold">{group.name}</h3>
               <Badge variant="outline">{kindBadgeLabel(group.kind)}</Badge>
               <Badge
-                variant={rollup.running === rollup.total ? "default" : rollup.running === 0 ? "secondary" : "outline"}
+                variant={rollup.running === rollup.total
+                  ? 'default'
+                  : rollup.running === 0
+                    ? 'secondary'
+                    : 'outline'}
                 class="tabular-nums"
               >
                 {rollup.running}/{rollup.total} running
@@ -125,7 +114,7 @@
           {#if group.images.length > 0}
             <span class="truncate">
               Images:
-              {group.images.slice(0, 3).join(" · ")}
+              {group.images.slice(0, 3).join(' · ')}
               {#if group.images.length > 3}
                 +{group.images.length - 3} more
               {/if}
@@ -133,7 +122,7 @@
           {/if}
           {#if group.networks.length > 0}
             <span class="truncate">
-              Networks: {group.networks.slice(0, 2).join(", ")}
+              Networks: {group.networks.slice(0, 2).join(', ')}
             </span>
           {/if}
         </div>
@@ -144,7 +133,7 @@
       <CardContent class="divider-edge-t divider-edge-full space-y-3 pt-4">
         <div class="flex flex-wrap gap-2">
           {#if group.deployment}
-            {#if group.deployment.status === "running"}
+            {#if group.deployment.status === 'running'}
               <Button
                 variant="outline"
                 size="sm"
@@ -185,12 +174,7 @@
         {:else}
           <div class="space-y-2">
             {#each group.containers as container (container.id)}
-              <ContainerRow
-                {container}
-                {onStart}
-                {onStop}
-                {onRemove}
-              />
+              <ContainerRow {container} {onStart} {onStop} {onRemove} />
             {/each}
           </div>
         {/if}

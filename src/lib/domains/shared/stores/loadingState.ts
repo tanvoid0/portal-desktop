@@ -2,7 +2,7 @@
  * Loading state management utilities
  */
 
-import { writable } from "svelte/store";
+import { writable } from 'svelte/store';
 
 export interface LoadingState {
   isLoading: boolean;

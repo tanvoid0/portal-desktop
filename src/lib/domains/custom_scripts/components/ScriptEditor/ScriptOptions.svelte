@@ -4,8 +4,8 @@
 -->
 
 <script lang="ts">
-  import { Label } from "$lib/components/ui/label";
-  import { Switch } from "$lib/components/ui/switch";
+  import { Label } from '$lib/components/ui/label';
+  import { Switch } from '$lib/components/ui/switch';
 
   interface Props {
     requiresSudo: boolean;
@@ -14,12 +14,8 @@
     onIsInteractiveChange: (value: boolean) => void;
   }
 
-  let {
-    requiresSudo,
-    isInteractive,
-    onRequiresSudoChange,
-    onIsInteractiveChange,
-  }: Props = $props();
+  let { requiresSudo, isInteractive, onRequiresSudoChange, onIsInteractiveChange }: Props =
+    $props();
 </script>
 
 <div class="space-y-4">
@@ -27,8 +23,7 @@
     <div class="space-y-0.5">
       <Label>Requires Sudo</Label>
       <p class="text-sm text-muted-foreground">
-        Automatically prepend sudo to the command (Linux/Mac) or note admin
-        requirement (Windows)
+        Automatically prepend sudo to the command (Linux/Mac) or note admin requirement (Windows)
       </p>
     </div>
     <Switch checked={requiresSudo} onCheckedChange={onRequiresSudoChange} />
@@ -39,8 +34,8 @@
       class="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950"
     >
       <p class="text-sm text-amber-800 dark:text-amber-200">
-        <strong>Note:</strong> You don't need to include "sudo" in your command template.
-        It will be added automatically.
+        <strong>Note:</strong> You don't need to include "sudo" in your command template. It will be added
+        automatically.
       </p>
     </div>
   {/if}

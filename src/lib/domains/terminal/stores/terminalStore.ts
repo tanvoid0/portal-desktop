@@ -3,20 +3,20 @@
  * Unified state management for terminal tabs and processes
  */
 
-import { writable, derived } from "svelte/store";
-import type { TerminalConfig } from "../types/index";
-import { defaultTerminalConfig } from "../config/defaultTerminalConfig";
-import { resolveShellIcon } from "../utils/shellIcons";
+import { writable, derived } from 'svelte/store';
+import type { TerminalConfig } from '../types/index';
+import { defaultTerminalConfig } from '../config/defaultTerminalConfig';
+import { resolveShellIcon } from '../utils/shellIcons';
 
 // Storage keys
-const STORAGE_KEY = "portal-terminal-state";
+const STORAGE_KEY = 'portal-terminal-state';
 // 1.0 → 1.1: default shell on Windows changed cmd.exe → powershell.exe (OSC
 // 133 blocks); old persisted state carried cmd.exe tabs/settings forward.
-const STORAGE_VERSION = "1.1";
+const STORAGE_VERSION = '1.1';
 
 // Persistence functions
 function saveStateToStorage(state: TerminalState): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
 
   try {
     const serializableState = {
@@ -37,12 +37,12 @@ function saveStateToStorage(state: TerminalState): void {
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializableState));
   } catch (error) {
-    console.warn("Failed to save terminal state to localStorage:", error);
+    console.warn('Failed to save terminal state to localStorage:', error);
   }
 }
 
 function loadStateFromStorage(): TerminalState {
-  if (typeof window === "undefined") return initialState;
+  if (typeof window === 'undefined') return initialState;
 
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -52,7 +52,7 @@ function loadStateFromStorage(): TerminalState {
 
     // Check version compatibility
     if (parsed.version !== STORAGE_VERSION) {
-      console.warn("Terminal state version mismatch, using default state");
+      console.warn('Terminal state version mismatch, using default state');
       return initialState;
     }
 
@@ -62,7 +62,7 @@ function loadStateFromStorage(): TerminalState {
         ...tab,
         createdAt: new Date(tab.createdAt),
         lastActivity: tab.lastActivity ? new Date(tab.lastActivity) : undefined,
-        status: "inactive", // Reset all tabs to inactive on restore
+        status: 'inactive', // Reset all tabs to inactive on restore
       })),
       processes: [], // Clear processes since backend restarts kill them
       activeTabId: parsed.activeTabId,
@@ -75,7 +75,7 @@ function loadStateFromStorage(): TerminalState {
     // State restored from localStorage (no sensitive data)
     return restoredState;
   } catch (error) {
-    console.warn("Failed to load terminal state from localStorage:", error);
+    console.warn('Failed to load terminal state from localStorage:', error);
     return initialState;
   }
 }
@@ -84,10 +84,10 @@ export interface TerminalTab {
   id: string;
   title: string;
   processId?: string; // Associated terminal process ID
-  type: "terminal" | "editor" | "file" | "custom";
+  type: 'terminal' | 'editor' | 'file' | 'custom';
   closable?: boolean;
   icon?: string;
-  status: "active" | "inactive" | "loading" | "error" | "disconnected";
+  status: 'active' | 'inactive' | 'loading' | 'error' | 'disconnected';
   workingDirectory: string;
   shell?: string;
   createdAt: Date;
@@ -106,7 +106,7 @@ export interface TerminalProcess {
   command: string;
   workingDirectory: string;
   environment: Record<string, string>;
-  status: "running" | "stopped" | "error";
+  status: 'running' | 'stopped' | 'error';
   startTime: Date;
   endTime?: Date;
   exitCode?: number;
@@ -154,16 +154,13 @@ export const activeTab = derived(terminalStore, ($store) => {
 export const activeProcess = derived(terminalStore, ($store) => {
   const activeTab = $store.tabs.find((tab) => tab.id === $store.activeTabId);
   if (!activeTab?.processId) return null;
-  return (
-    $store.processes.find((process) => process.id === activeTab.processId) ||
-    null
-  );
+  return $store.processes.find((process) => process.id === activeTab.processId) || null;
 });
 
 export const tabCount = derived(terminalStore, ($store) => $store.tabs.length);
 
 export const runningProcesses = derived(terminalStore, ($store) =>
-  $store.processes.filter((process) => process.status === "running"),
+  $store.processes.filter((process) => process.status === 'running')
 );
 
 // Store actions
@@ -177,11 +174,11 @@ export const terminalActions = {
     closable?: boolean;
     resourceName?: string;
     resourceId?: string;
-    type?: TerminalTab["type"];
+    type?: TerminalTab['type'];
   }) => {
     const tabId = terminalActions.createTab({
       title: options.title,
-      type: options.type ?? "terminal",
+      type: options.type ?? 'terminal',
       workingDirectory: options.workingDirectory,
       shell: options.shell,
       icon: options.icon ?? resolveShellIcon(options.shell),
@@ -195,42 +192,42 @@ export const terminalActions = {
       command: options.shell,
       workingDirectory: options.workingDirectory,
       environment: {},
-      status: "running",
+      status: 'running',
     });
 
     return tabId;
   },
 
   // Tab management
-  createTab: (tab: Omit<TerminalTab, "id" | "createdAt" | "status">) => {
-    console.log("TerminalStore: Creating new tab:", tab);
+  createTab: (tab: Omit<TerminalTab, 'id' | 'createdAt' | 'status'>) => {
+    console.log('TerminalStore: Creating new tab:', tab);
     const newTab: TerminalTab = {
       id: crypto.randomUUID(),
-      status: "inactive",
+      status: 'inactive',
       createdAt: new Date(),
       ...tab,
     };
 
-    console.log("TerminalStore: New tab object:", newTab);
+    console.log('TerminalStore: New tab object:', newTab);
 
     terminalStore.update((state) => {
-      console.log("TerminalStore: Current state before update:", state);
+      console.log('TerminalStore: Current state before update:', state);
       const updatedTabs = state.tabs.map((t) => ({
         ...t,
-        status: "inactive" as const,
+        status: 'inactive' as const,
       }));
       const newState = {
         ...state,
         tabs: [...updatedTabs, newTab],
         activeTabId: newTab.id,
       };
-      console.log("TerminalStore: New state after update:", newState);
+      console.log('TerminalStore: New state after update:', newState);
       return newState;
     });
 
     // Set the new tab as active
     terminalActions.setActiveTab(newTab.id);
-    console.log("TerminalStore: Created tab with ID:", newTab.id);
+    console.log('TerminalStore: Created tab with ID:', newTab.id);
     return newTab.id;
   },
 
@@ -240,7 +237,7 @@ export const terminalActions = {
       activeTabId: tabId,
       tabs: state.tabs.map((tab) => ({
         ...tab,
-        status: tab.id === tabId ? "active" : "inactive",
+        status: tab.id === tabId ? 'active' : 'inactive',
         lastActivity: tab.id === tabId ? new Date() : tab.lastActivity,
       })),
     }));
@@ -252,23 +249,19 @@ export const terminalActions = {
       if (!tabToClose) return state;
 
       // Kill associated process if running
-      const processToKill = state.processes.find(
-        (process) => process.tabId === tabId,
-      );
-      if (processToKill && processToKill.status === "running") {
-        import("../services/terminalService").then(({ TerminalService }) => {
+      const processToKill = state.processes.find((process) => process.tabId === tabId);
+      if (processToKill && processToKill.status === 'running') {
+        import('../services/terminalService').then(({ TerminalService }) => {
           TerminalService.killProcess(processToKill.id).catch(console.error);
         });
       }
 
-      import("./sessionStore").then(({ sessionStore }) => {
+      import('./sessionStore').then(({ sessionStore }) => {
         sessionStore.deleteSession(tabId).catch(console.error);
       });
 
       // Remove the process from the store
-      const newProcesses = state.processes.filter(
-        (process) => process.tabId !== tabId,
-      );
+      const newProcesses = state.processes.filter((process) => process.tabId !== tabId);
 
       const newTabs = state.tabs.filter((tab) => tab.id !== tabId);
       let newActiveTabId = state.activeTabId;
@@ -279,7 +272,7 @@ export const terminalActions = {
         if (newActiveTabId) {
           newTabs.forEach((tab) => {
             if (tab.id === newActiveTabId) {
-              tab.status = "active";
+              tab.status = 'active';
             }
           });
         }
@@ -297,14 +290,12 @@ export const terminalActions = {
   updateTab: (tabId: string, updates: Partial<TerminalTab>) => {
     terminalStore.update((state) => ({
       ...state,
-      tabs: state.tabs.map((tab) =>
-        tab.id === tabId ? { ...tab, ...updates } : tab,
-      ),
+      tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, ...updates } : tab)),
     }));
   },
 
   // Process management
-  createProcess: (process: Omit<TerminalProcess, "id" | "startTime">) => {
+  createProcess: (process: Omit<TerminalProcess, 'id' | 'startTime'>) => {
     const newProcess: TerminalProcess = {
       id: crypto.randomUUID(),
       startTime: new Date(),
@@ -315,9 +306,7 @@ export const terminalActions = {
       ...state,
       processes: [...state.processes, newProcess],
       tabs: state.tabs.map((tab) =>
-        tab.id === process.tabId
-          ? { ...tab, processId: newProcess.id, status: "active" }
-          : tab,
+        tab.id === process.tabId ? { ...tab, processId: newProcess.id, status: 'active' } : tab
       ),
     }));
 
@@ -328,7 +317,7 @@ export const terminalActions = {
     terminalStore.update((state) => ({
       ...state,
       processes: state.processes.map((process) =>
-        process.id === processId ? { ...process, ...updates } : process,
+        process.id === processId ? { ...process, ...updates } : process
       ),
     }));
   },
@@ -337,12 +326,10 @@ export const terminalActions = {
     terminalStore.update((state) => ({
       ...state,
       processes: state.processes.map((process) =>
-        process.id === processId
-          ? { ...process, status: "stopped", endTime: new Date() }
-          : process,
+        process.id === processId ? { ...process, status: 'stopped', endTime: new Date() } : process
       ),
       tabs: state.tabs.map((tab) =>
-        tab.processId === processId ? { ...tab, status: "disconnected" } : tab,
+        tab.processId === processId ? { ...tab, status: 'disconnected' } : tab
       ),
     }));
   },
@@ -382,9 +369,7 @@ export const terminalActions = {
     terminalStore.subscribe((state) => {
       const tab = state.tabs.find((tab) => tab.id === tabId);
       if (tab?.processId) {
-        result =
-          state.processes.find((process) => process.id === tab.processId) ||
-          null;
+        result = state.processes.find((process) => process.id === tab.processId) || null;
       }
     })();
     return result;
@@ -396,18 +381,14 @@ export const terminalActions = {
   },
 
   clearStorage: () => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
     }
     terminalStore.set(initialState);
   },
 
   // Save terminal output for a tab
-  saveTerminalOutput: (
-    tabId: string,
-    output: string,
-    workingDirectory?: string,
-  ) => {
+  saveTerminalOutput: (tabId: string, output: string, workingDirectory?: string) => {
     terminalStore.update((state) => ({
       ...state,
       tabs: state.tabs.map((tab) =>
@@ -415,11 +396,10 @@ export const terminalActions = {
           ? {
               ...tab,
               savedOutput: output,
-              currentWorkingDirectory:
-                workingDirectory || tab.currentWorkingDirectory,
+              currentWorkingDirectory: workingDirectory || tab.currentWorkingDirectory,
               lastActivity: new Date(),
             }
-          : tab,
+          : tab
       ),
     }));
   },
@@ -431,7 +411,7 @@ export const terminalActions = {
       const tab = state.tabs.find((tab) => tab.id === tabId);
       if (tab) {
         result = {
-          output: tab.savedOutput || "",
+          output: tab.savedOutput || '',
           workingDirectory: tab.currentWorkingDirectory,
         };
       }
@@ -461,7 +441,7 @@ export const terminalActions = {
 
       // Remove processes for stale tabs
       const remainingProcesses = state.processes.filter(
-        (process) => !staleTabs.some((tab) => tab.id === process.tabId),
+        (process) => !staleTabs.some((tab) => tab.id === process.tabId)
       );
 
       // Update active tab if it was stale
@@ -471,7 +451,7 @@ export const terminalActions = {
         if (newActiveTabId) {
           remainingTabs.forEach((tab) => {
             if (tab.id === newActiveTabId) {
-              tab.status = "active";
+              tab.status = 'active';
             }
           });
         }
@@ -491,8 +471,7 @@ export const terminalActions = {
     let result: TerminalTab[] = [];
     terminalStore.subscribe((state) => {
       result = state.tabs.filter(
-        (tab) =>
-          tab.resourceName === resourceName && tab.resourceId === resourceId,
+        (tab) => tab.resourceName === resourceName && tab.resourceId === resourceId
       );
     })();
     return result;
@@ -517,21 +496,18 @@ export const terminalActions = {
   closeTabsForResource: (resourceName: string, resourceId: string) => {
     terminalStore.update((state) => {
       const tabsToClose = state.tabs.filter(
-        (tab) =>
-          tab.resourceName === resourceName && tab.resourceId === resourceId,
+        (tab) => tab.resourceName === resourceName && tab.resourceId === resourceId
       );
 
       const remainingTabs = state.tabs.filter(
-        (tab) =>
-          !(tab.resourceName === resourceName && tab.resourceId === resourceId),
+        (tab) => !(tab.resourceName === resourceName && tab.resourceId === resourceId)
       );
 
       // Stop associated processes
       const newProcesses = state.processes.map((process) =>
-        tabsToClose.some((tab) => tab.id === process.tabId) &&
-        process.status === "running"
-          ? { ...process, status: "stopped" as const, endTime: new Date() }
-          : process,
+        tabsToClose.some((tab) => tab.id === process.tabId) && process.status === 'running'
+          ? { ...process, status: 'stopped' as const, endTime: new Date() }
+          : process
       );
 
       // Update active tab if needed
@@ -541,7 +517,7 @@ export const terminalActions = {
         if (newActiveTabId) {
           remainingTabs.forEach((tab) => {
             if (tab.id === newActiveTabId) {
-              tab.status = "active";
+              tab.status = 'active';
             }
           });
         }

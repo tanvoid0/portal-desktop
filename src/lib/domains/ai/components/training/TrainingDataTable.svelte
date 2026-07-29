@@ -6,10 +6,10 @@
     TableHead,
     TableHeader,
     TableRow,
-  } from "$lib/components/ui/table";
-  import { Button } from "$lib/components/ui/button";
-  import Icon from "@iconify/svelte";
-  import type { TrainingData } from "../../types/index.js";
+  } from '$lib/components/ui/table';
+  import { Button } from '$lib/components/ui/button';
+  import Icon from '@iconify/svelte';
+  import type { TrainingData } from '../../types/index.js';
 
   interface Props {
     data: TrainingData[];
@@ -44,41 +44,24 @@
           <TableRow>
             <TableCell class="font-medium">{item.name}</TableCell>
             <TableCell>
-              <span class="rounded bg-muted px-2 py-1 text-xs">{item.type}</span
-              >
+              <span class="rounded bg-muted px-2 py-1 text-xs">{item.type}</span>
             </TableCell>
-            <TableCell
-              >{new Date(item.created_at).toLocaleDateString()}</TableCell
-            >
-            <TableCell
-              >{new Date(item.updated_at).toLocaleDateString()}</TableCell
-            >
+            <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
+            <TableCell>{new Date(item.updated_at).toLocaleDateString()}</TableCell>
             <TableCell class="text-right">
               <div class="flex items-center justify-end gap-2">
                 {#if onView}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={() => onView(item)}
-                  >
+                  <Button variant="ghost" size="sm" onclick={() => onView(item)}>
                     <Icon icon="lucide:eye" class="h-4 w-4" />
                   </Button>
                 {/if}
                 {#if onEdit}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={() => onEdit(item)}
-                  >
+                  <Button variant="ghost" size="sm" onclick={() => onEdit(item)}>
                     <Icon icon="lucide:edit" class="h-4 w-4" />
                   </Button>
                 {/if}
                 {#if onDelete}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={() => onDelete(item)}
-                  >
+                  <Button variant="ghost" size="sm" onclick={() => onDelete(item)}>
                     <Icon icon="lucide:trash-2" class="h-4 w-4" />
                   </Button>
                 {/if}

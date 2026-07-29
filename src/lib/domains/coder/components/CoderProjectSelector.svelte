@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
-  import { FolderOpen, FolderPlus } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import Select from "$lib/components/ui/select.svelte";
-  import { projectService } from "$lib/domains/projects";
-  import type { Project } from "$lib/domains/projects";
+  import { onMount } from 'svelte';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import { FolderOpen, FolderPlus } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import Select from '$lib/components/ui/select.svelte';
+  import { projectService } from '$lib/domains/projects';
+  import type { Project } from '$lib/domains/projects';
 
   interface Props {
     value: string;
@@ -13,7 +13,7 @@
     onSelect?: (path: string, projectId?: string) => void;
   }
 
-  let { value = $bindable(""), disabled = false, onSelect }: Props = $props();
+  let { value = $bindable(''), disabled = false, onSelect }: Props = $props();
 
   let projects = $state<Project[]>([]);
   let loading = $state(false);
@@ -21,10 +21,10 @@
   let importing = $state(false);
   let importError = $state<string | null>(null);
 
-  const STORAGE_KEY = "portal-coder-last-workspace";
+  const STORAGE_KEY = 'portal-coder-last-workspace';
 
   function loadLastWorkspace(): string | null {
-    if (typeof window === "undefined") return null;
+    if (typeof window === 'undefined') return null;
     try {
       return localStorage.getItem(STORAGE_KEY);
     } catch {
@@ -33,7 +33,7 @@
   }
 
   function saveLastWorkspace(path: string): void {
-    if (typeof window === "undefined" || !path) return;
+    if (typeof window === 'undefined' || !path) return;
     try {
       localStorage.setItem(STORAGE_KEY, path);
     } catch {
@@ -44,7 +44,7 @@
   function resolveDefaultWorkspace(): string {
     const cached = loadLastWorkspace();
     if (cached) return cached;
-    return projects[0]?.path ?? "";
+    return projects[0]?.path ?? '';
   }
 
   onMount(load);
@@ -94,7 +94,7 @@
 
   async function browse() {
     const dir = await open({ directory: true, multiple: false });
-    if (typeof dir !== "string") return;
+    if (typeof dir !== 'string') return;
     const match = projects.find((p) => p.path === dir);
     if (match) {
       value = match.path;
@@ -138,19 +138,13 @@
     <Select
       bind:value
       options={projectOptions}
-      placeholder={loading ? "Loading projects…" : "Select a project…"}
+      placeholder={loading ? 'Loading projects…' : 'Select a project…'}
       disabled={disabled || loading}
       class="flex-1 font-mono text-xs"
       onSelect={handleProjectChange}
     />
 
-    <Button
-      size="icon"
-      variant="ghost"
-      title="Browse for a folder"
-      onclick={browse}
-      {disabled}
-    >
+    <Button size="icon" variant="ghost" title="Browse for a folder" onclick={browse} {disabled}>
       <FolderOpen class="h-4 w-4" />
     </Button>
   </div>
@@ -164,11 +158,9 @@
         Import <span class="font-mono">{importPath}</span> as a new project?
       </span>
       <Button size="sm" onclick={confirmImport} disabled={importing}>
-        {importing ? "Importing…" : "Import"}
+        {importing ? 'Importing…' : 'Import'}
       </Button>
-      <Button size="sm" variant="ghost" onclick={cancelImport} disabled={importing}>
-        Cancel
-      </Button>
+      <Button size="sm" variant="ghost" onclick={cancelImport} disabled={importing}>Cancel</Button>
     </div>
   {/if}
 

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
-  import TaskForm from "$lib/domains/tasks/components/TaskForm.svelte";
-  import { createTaskQuery } from "$lib/domains/tasks/queries/taskQueries";
-  import { toastActions } from "$lib/utils/toast";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import type { Task } from "$lib/domains/tasks/types";
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
+  import TaskForm from '$lib/domains/tasks/components/TaskForm.svelte';
+  import { createTaskQuery } from '$lib/domains/tasks/queries/taskQueries';
+  import { toastActions } from '$lib/utils/toast';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import type { Task } from '$lib/domains/tasks/types';
 
   const taskId = $derived($page.params.id);
   const taskQuery = createTaskQuery(() => taskId);
@@ -16,18 +16,15 @@
     taskQuery.isError
       ? taskQuery.error instanceof Error
         ? taskQuery.error.message
-        : "Failed to load task"
+        : 'Failed to load task'
       : taskQuery.isSuccess && !taskQuery.data
-        ? "Task not found"
-        : null,
+        ? 'Task not found'
+        : null
   );
 
   $effect(() => {
     if (taskQuery.isSuccess && !taskQuery.data) {
-      toastActions.error(
-        "Task not found",
-        "The requested task could not be found",
-      );
+      toastActions.error('Task not found', 'The requested task could not be found');
     }
   });
 
@@ -39,7 +36,7 @@
     if (task) {
       goto(`/tasks/${task.id}`);
     } else {
-      goto("/tasks");
+      goto('/tasks');
     }
   }
 

@@ -4,7 +4,7 @@
 -->
 
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import type { Snippet } from 'svelte';
 
   // Get children snippet from props for Svelte 5
   let { children }: { children: Snippet<[]> } = $props();

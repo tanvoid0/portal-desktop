@@ -2,12 +2,12 @@
  * Variable Service - Management of pipeline variables and secrets
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { logger } from "$lib/domains/shared";
-import { credentialService } from "$lib/domains/credentials/services/credentialService";
-import type { PipelineVariable } from "../types";
+import { invoke } from '@tauri-apps/api/core';
+import { logger } from '$lib/domains/shared';
+import { credentialService } from '$lib/domains/credentials/services/credentialService';
+import type { PipelineVariable } from '../types';
 
-const log = logger.createScoped("VariableService");
+const log = logger.createScoped('VariableService');
 
 export interface VariableScope {
   projectId?: string;
@@ -17,7 +17,7 @@ export interface VariableScope {
 export interface SecretReference {
   id: string;
   name: string;
-  scope: "project" | "pipeline";
+  scope: 'project' | 'pipeline';
 }
 
 export class VariableService {
@@ -35,15 +35,12 @@ export class VariableService {
    */
   async getVariables(scope: VariableScope): Promise<PipelineVariable[]> {
     try {
-      log.info("Loading variables", { scope });
-      const variables = await invoke<PipelineVariable[]>(
-        "get_pipeline_variables",
-        { scope },
-      );
-      log.info("Variables loaded", { scope, count: variables.length });
+      log.info('Loading variables', { scope });
+      const variables = await invoke<PipelineVariable[]>('get_pipeline_variables', { scope });
+      log.info('Variables loaded', { scope, count: variables.length });
       return variables;
     } catch (error) {
-      log.error("Failed to load variables", { error });
+      log.error('Failed to load variables', { error });
       throw error;
     }
   }
@@ -51,20 +48,17 @@ export class VariableService {
   /**
    * Set a variable
    */
-  async setVariable(
-    scope: VariableScope,
-    variable: PipelineVariable,
-  ): Promise<PipelineVariable> {
+  async setVariable(scope: VariableScope, variable: PipelineVariable): Promise<PipelineVariable> {
     try {
-      log.info("Setting variable", { scope, name: variable.name });
-      const result = await invoke<PipelineVariable>("set_pipeline_variable", {
+      log.info('Setting variable', { scope, name: variable.name });
+      const result = await invoke<PipelineVariable>('set_pipeline_variable', {
         scope,
         variable,
       });
-      log.info("Variable set", { scope, name: variable.name });
+      log.info('Variable set', { scope, name: variable.name });
       return result;
     } catch (error) {
-      log.error("Failed to set variable", { error });
+      log.error('Failed to set variable', { error });
       throw error;
     }
   }
@@ -72,16 +66,13 @@ export class VariableService {
   /**
    * Delete a variable
    */
-  async deleteVariable(
-    scope: VariableScope,
-    variableName: string,
-  ): Promise<void> {
+  async deleteVariable(scope: VariableScope, variableName: string): Promise<void> {
     try {
-      log.info("Deleting variable", { scope, variableName });
-      await invoke("delete_pipeline_variable", { scope, variableName });
-      log.info("Variable deleted", { scope, variableName });
+      log.info('Deleting variable', { scope, variableName });
+      await invoke('delete_pipeline_variable', { scope, variableName });
+      log.info('Variable deleted', { scope, variableName });
     } catch (error) {
-      log.error("Failed to delete variable", { error });
+      log.error('Failed to delete variable', { error });
       throw error;
     }
   }
@@ -91,8 +82,8 @@ export class VariableService {
    */
   async getSecrets(scope: VariableScope): Promise<SecretReference[]> {
     try {
-      log.info("Loading secrets", { scope });
-      const secretIds = await invoke<string[]>("get_pipeline_secrets", {
+      log.info('Loading secrets', { scope });
+      const secretIds = await invoke<string[]>('get_pipeline_secrets', {
         scope,
       });
 
@@ -104,17 +95,17 @@ export class VariableService {
           secrets.push({
             id: secretId,
             name: credential.name,
-            scope: scope.pipelineId ? "pipeline" : "project",
+            scope: scope.pipelineId ? 'pipeline' : 'project',
           });
         } catch (error) {
-          log.warn("Failed to load secret", { secretId, error });
+          log.warn('Failed to load secret', { secretId, error });
         }
       }
 
-      log.info("Secrets loaded", { scope, count: secrets.length });
+      log.info('Secrets loaded', { scope, count: secrets.length });
       return secrets;
     } catch (error) {
-      log.error("Failed to load secrets", { error });
+      log.error('Failed to load secrets', { error });
       throw error;
     }
   }
@@ -124,11 +115,11 @@ export class VariableService {
    */
   async addSecret(scope: VariableScope, secretId: string): Promise<void> {
     try {
-      log.info("Adding secret", { scope, secretId });
-      await invoke("add_pipeline_secret", { scope, secretId });
-      log.info("Secret added", { scope, secretId });
+      log.info('Adding secret', { scope, secretId });
+      await invoke('add_pipeline_secret', { scope, secretId });
+      log.info('Secret added', { scope, secretId });
     } catch (error) {
-      log.error("Failed to add secret", { error });
+      log.error('Failed to add secret', { error });
       throw error;
     }
   }
@@ -138,11 +129,11 @@ export class VariableService {
    */
   async removeSecret(scope: VariableScope, secretId: string): Promise<void> {
     try {
-      log.info("Removing secret", { scope, secretId });
-      await invoke("remove_pipeline_secret", { scope, secretId });
-      log.info("Secret removed", { scope, secretId });
+      log.info('Removing secret', { scope, secretId });
+      await invoke('remove_pipeline_secret', { scope, secretId });
+      log.info('Secret removed', { scope, secretId });
     } catch (error) {
-      log.error("Failed to remove secret", { error });
+      log.error('Failed to remove secret', { error });
       throw error;
     }
   }
@@ -150,10 +141,7 @@ export class VariableService {
   /**
    * Resolve variable value (handles both variables and secrets)
    */
-  async resolveVariable(
-    scope: VariableScope,
-    variableName: string,
-  ): Promise<string | null> {
+  async resolveVariable(scope: VariableScope, variableName: string): Promise<string | null> {
     try {
       // First check regular variables
       const variables = await this.getVariables(scope);
@@ -167,19 +155,17 @@ export class VariableService {
       const secret = secrets.find((s) => s.name === variableName);
       if (secret) {
         try {
-          const decryptedValue = await credentialService.decryptCredential(
-            secret.id,
-          );
+          const decryptedValue = await credentialService.decryptCredential(secret.id);
           return decryptedValue || null;
         } catch (error) {
-          log.warn("Failed to resolve secret", { secretId: secret.id, error });
+          log.warn('Failed to resolve secret', { secretId: secret.id, error });
           return null;
         }
       }
 
       return null;
     } catch (error) {
-      log.error("Failed to resolve variable", { scope, variableName, error });
+      log.error('Failed to resolve variable', { scope, variableName, error });
       return null;
     }
   }
@@ -187,9 +173,7 @@ export class VariableService {
   /**
    * Resolve all variables for a scope
    */
-  async resolveAllVariables(
-    scope: VariableScope,
-  ): Promise<Record<string, string>> {
+  async resolveAllVariables(scope: VariableScope): Promise<Record<string, string>> {
     try {
       const resolved: Record<string, string> = {};
 
@@ -203,20 +187,18 @@ export class VariableService {
       const secrets = await this.getSecrets(scope);
       for (const secret of secrets) {
         try {
-          const decryptedValue = await credentialService.decryptCredential(
-            secret.id,
-          );
+          const decryptedValue = await credentialService.decryptCredential(secret.id);
           if (decryptedValue) {
             resolved[secret.name] = decryptedValue;
           }
         } catch (error) {
-          log.warn("Failed to resolve secret", { secretId: secret.id, error });
+          log.warn('Failed to resolve secret', { secretId: secret.id, error });
         }
       }
 
       return resolved;
     } catch (error) {
-      log.error("Failed to resolve all variables", { scope, error });
+      log.error('Failed to resolve all variables', { scope, error });
       return {};
     }
   }
@@ -226,14 +208,14 @@ export class VariableService {
    */
   validateVariableName(name: string): { valid: boolean; error?: string } {
     if (!name || name.trim().length === 0) {
-      return { valid: false, error: "Variable name cannot be empty" };
+      return { valid: false, error: 'Variable name cannot be empty' };
     }
 
     // Must start with letter or underscore
     if (!/^[a-zA-Z_]/.test(name)) {
       return {
         valid: false,
-        error: "Variable name must start with a letter or underscore",
+        error: 'Variable name must start with a letter or underscore',
       };
     }
 
@@ -241,8 +223,7 @@ export class VariableService {
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
       return {
         valid: false,
-        error:
-          "Variable name can only contain letters, numbers, underscores, and dashes",
+        error: 'Variable name can only contain letters, numbers, underscores, and dashes',
       };
     }
 

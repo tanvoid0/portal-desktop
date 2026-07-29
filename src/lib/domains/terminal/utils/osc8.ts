@@ -12,7 +12,7 @@ const windowsPathRe =
 
 function osc8Wrap(uri: string, visible: string): string {
   // OSC 8 hyperlink: ST = BEL (\\x07)
-  const st = "\x07";
+  const st = '\x07';
   return `\x1b]8;;${uri}${st}${visible}\x1b]8;;${st}`;
 }
 
@@ -43,21 +43,21 @@ function linkify(content: string): string {
 export function injectOsc8Links(
   content: string,
   tail: string,
-  options: Osc8InjectOptions = {},
+  options: Osc8InjectOptions = {}
 ): { transformed: string; newTail: string } {
   const maxTailChars = options.maxTailChars ?? 256;
   const flush = options.flush ?? false;
 
-  const combined = `${tail}${content ?? ""}`;
-  if (!combined) return { transformed: "", newTail: "" };
+  const combined = `${tail}${content ?? ''}`;
+  if (!combined) return { transformed: '', newTail: '' };
 
   if (flush) {
-    return { transformed: linkify(combined), newTail: "" };
+    return { transformed: linkify(combined), newTail: '' };
   }
 
   // Short streams: render immediately instead of holding everything in tail.
   if (combined.length <= maxTailChars) {
-    return { transformed: linkify(combined), newTail: "" };
+    return { transformed: linkify(combined), newTail: '' };
   }
 
   // Keep the last N chars unprocessed; linkification will happen when enough data arrives.
@@ -70,4 +70,3 @@ export function injectOsc8Links(
     newTail,
   };
 }
-

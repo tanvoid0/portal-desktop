@@ -32,9 +32,9 @@ const PROMPT_PATTERNS = {
 export function extractCommandOutput(
   rawOutput: string,
   command: string,
-  shellType?: "bash" | "zsh" | "powershell" | "cmd" | "fish" | "sh",
+  shellType?: 'bash' | 'zsh' | 'powershell' | 'cmd' | 'fish' | 'sh'
 ): string {
-  if (!rawOutput) return "";
+  if (!rawOutput) return '';
 
   // First, clean ANSI codes and control sequences
   let cleaned = cleanRawOutput(rawOutput);
@@ -54,37 +54,37 @@ export function extractCommandOutput(
  * Clean raw terminal output by removing ANSI codes and control sequences
  */
 function cleanRawOutput(text: string): string {
-  if (!text) return "";
+  if (!text) return '';
 
   let cleaned = text;
 
   // Remove all ANSI escape sequences
   cleaned = cleaned.replace(
     /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-PRZcf-nqry=><]/g,
-    "",
+    ''
   );
-  cleaned = cleaned.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
-  cleaned = cleaned.replace(/\[[0-9;]*[A-Za-z]/g, "");
+  cleaned = cleaned.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+  cleaned = cleaned.replace(/\[[0-9;]*[A-Za-z]/g, '');
 
   // Remove OSC sequences (like ]2;command or ]1;command)
-  cleaned = cleaned.replace(/\x1b\]\d+;[^\x07\x1b]*[\x07\x1b\\]/g, "");
-  cleaned = cleaned.replace(/\]\d+;[^\x07\x1b]*[\x07\x1b\\]/g, "");
+  cleaned = cleaned.replace(/\x1b\]\d+;[^\x07\x1b]*[\x07\x1b\\]/g, '');
+  cleaned = cleaned.replace(/\]\d+;[^\x07\x1b]*[\x07\x1b\\]/g, '');
   // Also remove OSC sequences without proper termination (common in terminal output)
-  cleaned = cleaned.replace(/\]\d+;[^\x07\x1b\n]*/g, "");
-  cleaned = cleaned.replace(/\]\]\d+;/g, ""); // Handle double brackets like ]]2;
+  cleaned = cleaned.replace(/\]\d+;[^\x07\x1b\n]*/g, '');
+  cleaned = cleaned.replace(/\]\]\d+;/g, ''); // Handle double brackets like ]]2;
 
   // Remove backspace sequences (iteratively until no more matches)
   let prevLength = 0;
   while (cleaned.length !== prevLength) {
     prevLength = cleaned.length;
-    cleaned = cleaned.replace(/.\x08/g, "");
+    cleaned = cleaned.replace(/.\x08/g, '');
   }
 
   // Remove control characters except newlines
-  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, "");
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
 
   // Remove carriage returns
-  cleaned = cleaned.replace(/\r/g, "");
+  cleaned = cleaned.replace(/\r/g, '');
 
   return cleaned;
 }
@@ -92,31 +92,29 @@ function cleanRawOutput(text: string): string {
 /**
  * Detect shell type from output patterns
  */
-function detectShellType(
-  output: string,
-): "bash" | "zsh" | "powershell" | "cmd" | "fish" | "sh" {
+function detectShellType(output: string): 'bash' | 'zsh' | 'powershell' | 'cmd' | 'fish' | 'sh' {
   // Check for PowerShell patterns
   if (PROMPT_PATTERNS.powershell.test(output)) {
-    return "powershell";
+    return 'powershell';
   }
 
   // Check for CMD patterns
   if (PROMPT_PATTERNS.cmd.test(output)) {
-    return "cmd";
+    return 'cmd';
   }
 
   // Check for zsh patterns (usually has % or special characters)
-  if (PROMPT_PATTERNS.zsh.test(output) || output.includes("❯")) {
-    return "zsh";
+  if (PROMPT_PATTERNS.zsh.test(output) || output.includes('❯')) {
+    return 'zsh';
   }
 
   // Check for fish patterns
   if (PROMPT_PATTERNS.fish.test(output)) {
-    return "fish";
+    return 'fish';
   }
 
   // Default to bash
-  return "bash";
+  return 'bash';
 }
 
 /**
@@ -125,18 +123,18 @@ function detectShellType(
 function extractOutputBetweenPrompts(
   cleaned: string,
   command: string,
-  shellType: "bash" | "zsh" | "powershell" | "cmd" | "fish" | "sh",
+  shellType: 'bash' | 'zsh' | 'powershell' | 'cmd' | 'fish' | 'sh'
 ): string {
-  if (!cleaned) return "";
+  if (!cleaned) return '';
 
-  const lines = cleaned.split("\n");
+  const lines = cleaned.split('\n');
   let outputLines: string[] = [];
 
   let foundCommandStart = false;
   let collectingOutput = false;
   const commandTrimmed = command.trim();
   const commandWords = commandTrimmed.split(/\s+/);
-  const firstCommandWord = commandWords[0] || "";
+  const firstCommandWord = commandWords[0] || '';
 
   // Get prompt pattern for this shell
   const promptPattern = PROMPT_PATTERNS[shellType] || PROMPT_PATTERNS.generic;
@@ -157,8 +155,7 @@ function extractOutputBetweenPrompts(
       const hasCommand =
         trimmed.includes(commandTrimmed) ||
         trimmed.includes(firstCommandWord) ||
-        (firstCommandWord &&
-          trimmed.toLowerCase().includes(firstCommandWord.toLowerCase()));
+        (firstCommandWord && trimmed.toLowerCase().includes(firstCommandWord.toLowerCase()));
 
       if (hasCommand) {
         foundCommandStart = true;
@@ -187,7 +184,7 @@ function extractOutputBetweenPrompts(
           (word) =>
             word.length > 0 &&
             (word.includes(firstCommandWord.toLowerCase()) ||
-              firstCommandWord.toLowerCase().includes(word)),
+              firstCommandWord.toLowerCase().includes(word))
         );
         if (isCommandArtifact && words.length <= commandWords.length) {
           continue;
@@ -239,8 +236,7 @@ function extractOutputBetweenPrompts(
       if (
         lineTrimmed.includes(commandTrimmed) ||
         lineTrimmed.includes(firstCommandWord) ||
-        (firstCommandWord &&
-          lineTrimmed.toLowerCase().includes(firstCommandWord.toLowerCase()))
+        (firstCommandWord && lineTrimmed.toLowerCase().includes(firstCommandWord.toLowerCase()))
       ) {
         lastCommandIndex = i;
         break;
@@ -264,10 +260,7 @@ function extractOutputBetweenPrompts(
           trimmed &&
           !isPrompt &&
           trimmed !== commandTrimmed &&
-          !(
-            firstCommandWord &&
-            trimmed.toLowerCase() === firstCommandWord.toLowerCase()
-          ) &&
+          !(firstCommandWord && trimmed.toLowerCase() === firstCommandWord.toLowerCase()) &&
           !/^[\\\/\-\|]+$/.test(trimmed)
         ) {
           outputLines.push(lines[i]);
@@ -290,8 +283,7 @@ function extractOutputBetweenPrompts(
         /~\s*❯/.test(trimmed) ||
         /\d{2}:\d{2}:\d{2}\s*(AM|PM)/.test(trimmed);
 
-      const isCommand =
-        trimmed.includes(commandTrimmed) || trimmed.includes(firstCommandWord);
+      const isCommand = trimmed.includes(commandTrimmed) || trimmed.includes(firstCommandWord);
 
       if (
         trimmed &&
@@ -342,10 +334,7 @@ function extractOutputBetweenPrompts(
 
       // Skip lines that are just backslashes or special characters
       // Match: 3+ backslashes, or lines that are 80%+ special chars
-      if (
-        /^[\\\/\-\|_\s]{3,}$/.test(trimmed) ||
-        /^[\\\/\-\|_\s]+$/.test(trimmed)
-      ) {
+      if (/^[\\\/\-\|_\s]{3,}$/.test(trimmed) || /^[\\\/\-\|_\s]+$/.test(trimmed)) {
         continue;
       }
 
@@ -366,10 +355,7 @@ function extractOutputBetweenPrompts(
       }
 
       // Skip PowerShell/CMD prompts
-      if (
-        /^PS [A-Z]:[\\][^>]*>\s*$/.test(trimmed) ||
-        /^[A-Z]:[\\][^>]*>\s*$/.test(trimmed)
-      ) {
+      if (/^PS [A-Z]:[\\][^>]*>\s*$/.test(trimmed) || /^[A-Z]:[\\][^>]*>\s*$/.test(trimmed)) {
         continue;
       }
 
@@ -383,7 +369,7 @@ function extractOutputBetweenPrompts(
 
       // If line starts with a prompt but has content, extract just the content
       if (/^[%~$#❯>]+\s+/.test(trimmed)) {
-        const withoutPrompt = trimmed.replace(/^[%~$#❯>]+\s+/, "").trim();
+        const withoutPrompt = trimmed.replace(/^[%~$#❯>]+\s+/, '').trim();
         if (withoutPrompt && !/^[\\\/\-\|_\s]+$/.test(withoutPrompt)) {
           filtered.push(withoutPrompt);
         }
@@ -392,7 +378,7 @@ function extractOutputBetweenPrompts(
 
       // If line ends with a prompt, extract just the content before it
       if (/\s+[%~$#❯>]+$/.test(trimmed)) {
-        const withoutPrompt = trimmed.replace(/\s+[%~$#❯>]+$/, "").trim();
+        const withoutPrompt = trimmed.replace(/\s+[%~$#❯>]+$/, '').trim();
         if (withoutPrompt && !/^[\\\/\-\|_\s]+$/.test(withoutPrompt)) {
           filtered.push(withoutPrompt);
         }
@@ -406,7 +392,7 @@ function extractOutputBetweenPrompts(
     outputLines = filtered;
   }
 
-  let output = outputLines.join("\n");
+  let output = outputLines.join('\n');
 
   // Remove duplicate consecutive lines (terminal redraws)
   const deduplicated = removeDuplicateLines(output);
@@ -415,7 +401,7 @@ function extractOutputBetweenPrompts(
   let final = deduplicated.trim();
 
   // Split into lines for final filtering
-  const finalLines = final.split("\n");
+  const finalLines = final.split('\n');
   const cleanLines: string[] = [];
 
   for (const line of finalLines) {
@@ -451,16 +437,13 @@ function extractOutputBetweenPrompts(
     }
 
     // Skip zsh prompts
-    if (/~\s*❯/.test(trimmed) && !trimmed.replace(/~\s*❯/, "").trim()) {
+    if (/~\s*❯/.test(trimmed) && !trimmed.replace(/~\s*❯/, '').trim()) {
       continue;
     }
 
     // Skip lines that are just special characters (backslashes, etc.)
     // Match: 3+ backslashes, or lines that are mostly special chars
-    if (
-      /^[\\\/\-\|_\s]{3,}$/.test(trimmed) ||
-      /^[\\\/\-\|_\s]+$/.test(trimmed)
-    ) {
+    if (/^[\\\/\-\|_\s]{3,}$/.test(trimmed) || /^[\\\/\-\|_\s]+$/.test(trimmed)) {
       continue;
     }
 
@@ -477,7 +460,7 @@ function extractOutputBetweenPrompts(
 
     // If line has a prompt at the start, extract content after it
     if (/^[%~$#❯>]+\s+/.test(trimmed)) {
-      const extracted = trimmed.replace(/^[%~$#❯>]+\s+/, "").trim();
+      const extracted = trimmed.replace(/^[%~$#❯>]+\s+/, '').trim();
       if (extracted && !/^[\\\/\-\|_\s]+$/.test(extracted)) {
         cleanLines.push(extracted);
       }
@@ -486,7 +469,7 @@ function extractOutputBetweenPrompts(
 
     // If line has a prompt at the end, extract content before it
     if (/\s+[%~$#❯>]+$/.test(trimmed)) {
-      const extracted = trimmed.replace(/\s+[%~$#❯>]+$/, "").trim();
+      const extracted = trimmed.replace(/\s+[%~$#❯>]+$/, '').trim();
       if (extracted && !/^[\\\/\-\|_\s]+$/.test(extracted)) {
         cleanLines.push(extracted);
       }
@@ -507,19 +490,19 @@ function extractOutputBetweenPrompts(
     }
   }
 
-  return uniqueLines.join("\n").trim();
+  return uniqueLines.join('\n').trim();
 }
 
 /**
  * Remove duplicate consecutive lines and filter out prompts/artifacts
  */
 function removeDuplicateLines(text: string): string {
-  if (!text) return "";
+  if (!text) return '';
 
-  const lines = text.split("\n");
+  const lines = text.split('\n');
   const result: string[] = [];
   const seenLines = new Set<string>();
-  let lastLine = "";
+  let lastLine = '';
   let lastLineCount = 0;
 
   // Patterns for prompts and terminal artifacts
@@ -541,7 +524,7 @@ function removeDuplicateLines(text: string): string {
     let cleanedLine = line;
 
     // Remove OSC sequences from the line
-    cleanedLine = cleanedLine.replace(oscPattern, "");
+    cleanedLine = cleanedLine.replace(oscPattern, '');
 
     const trimmed = cleanedLine.trim();
 
@@ -592,7 +575,7 @@ function removeDuplicateLines(text: string): string {
     }
   }
 
-  return result.join("\n");
+  return result.join('\n');
 }
 
 /**
@@ -602,7 +585,7 @@ function removeDuplicateLines(text: string): string {
 export function parseCommandOutput(
   rawOutput: string,
   command: string,
-  shellType?: "bash" | "zsh" | "powershell" | "cmd" | "fish" | "sh",
+  shellType?: 'bash' | 'zsh' | 'powershell' | 'cmd' | 'fish' | 'sh'
 ): string {
   return extractCommandOutput(rawOutput, command, shellType);
 }

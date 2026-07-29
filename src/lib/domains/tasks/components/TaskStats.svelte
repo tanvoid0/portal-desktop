@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import Icon from "@iconify/svelte";
-  import { taskUi } from "../state/taskUi.svelte";
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import Icon from '@iconify/svelte';
+  import { taskUi } from '../state/taskUi.svelte';
 </script>
 
 <div class="grid grid-cols-2 gap-2 md:grid-cols-4">

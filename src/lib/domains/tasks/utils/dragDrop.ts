@@ -1,4 +1,4 @@
-import type { Task } from "../types";
+import type { Task } from '../types';
 
 export interface DragDropState {
   isDragging: boolean;
@@ -14,23 +14,19 @@ export function createDragDropState() {
   };
 }
 
-export function handleDragStart(
-  event: DragEvent,
-  task: Task,
-  state: DragDropState,
-) {
+export function handleDragStart(event: DragEvent, task: Task, state: DragDropState) {
   if (!event.dataTransfer) return;
 
   state.isDragging = true;
   state.draggedTask = task;
 
   // Set drag data
-  event.dataTransfer.setData("text/plain", task.id);
-  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData('text/plain', task.id);
+  event.dataTransfer.effectAllowed = 'move';
 
   // Add visual feedback
   if (event.target instanceof HTMLElement) {
-    event.target.style.opacity = "0.5";
+    event.target.style.opacity = '0.5';
   }
 }
 
@@ -41,17 +37,13 @@ export function handleDragEnd(event: DragEvent, state: DragDropState) {
 
   // Reset visual feedback
   if (event.target instanceof HTMLElement) {
-    event.target.style.opacity = "1";
+    event.target.style.opacity = '1';
   }
 }
 
-export function handleDragOver(
-  event: DragEvent,
-  columnId: string,
-  state: DragDropState,
-) {
+export function handleDragOver(event: DragEvent, columnId: string, state: DragDropState) {
   event.preventDefault();
-  event.dataTransfer!.dropEffect = "move";
+  event.dataTransfer!.dropEffect = 'move';
   state.dragOverColumn = columnId;
 }
 
@@ -70,19 +62,19 @@ export function handleDrop(
   event: DragEvent,
   columnId: string,
   state: DragDropState,
-  onTaskMove: (taskId: string, newStatus: string) => void,
+  onTaskMove: (taskId: string, newStatus: string) => void
 ) {
   event.preventDefault();
 
-  const taskId = event.dataTransfer?.getData("text/plain");
+  const taskId = event.dataTransfer?.getData('text/plain');
   if (!taskId || !state.draggedTask) return;
 
   // Map column IDs to status values
   const columnToStatus: Record<string, string> = {
-    pending: "pending",
-    "in-progress": "in-progress",
-    completed: "completed",
-    cancelled: "cancelled",
+    pending: 'pending',
+    'in-progress': 'in-progress',
+    completed: 'completed',
+    cancelled: 'cancelled',
   };
 
   const newStatus = columnToStatus[columnId];
@@ -98,31 +90,31 @@ export function handleDrop(
 export function getDropZoneClasses(
   columnId: string,
   state: DragDropState,
-  baseClasses: string = "",
+  baseClasses: string = ''
 ): string {
   const classes = [baseClasses];
 
   if (state.dragOverColumn === columnId) {
-    classes.push("ring-2 ring-primary bg-primary/5");
+    classes.push('ring-2 ring-primary bg-primary/5');
   }
 
   if (state.isDragging) {
-    classes.push("transition-all duration-200");
+    classes.push('transition-all duration-200');
   }
 
-  return classes.join(" ");
+  return classes.join(' ');
 }
 
 export function getTaskCardClasses(
   task: Task,
   state: DragDropState,
-  baseClasses: string = "",
+  baseClasses: string = ''
 ): string {
   const classes = [baseClasses];
 
   if (state.draggedTask?.id === task.id) {
-    classes.push("opacity-50 scale-95");
+    classes.push('opacity-50 scale-95');
   }
 
-  return classes.join(" ");
+  return classes.join(' ');
 }

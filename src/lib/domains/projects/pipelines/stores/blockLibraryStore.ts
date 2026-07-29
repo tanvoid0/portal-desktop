@@ -2,23 +2,23 @@
  * Block Library Store - Svelte store for block library state
  */
 
-import { writable, derived } from "svelte/store";
-import type { Block } from "../types";
-import { blockLibraryService } from "../services/blockLibraryService";
+import { writable, derived } from 'svelte/store';
+import type { Block } from '../types';
+import { blockLibraryService } from '../services/blockLibraryService';
 
 interface BlockLibraryState {
   blocks: Block[];
   loading: boolean;
   error: string | null;
   searchQuery: string;
-  selectedCategory: Block["category"] | null;
+  selectedCategory: Block['category'] | null;
 }
 
 const initialState: BlockLibraryState = {
   blocks: [],
   loading: false,
   error: null,
-  searchQuery: "",
+  searchQuery: '',
   selectedCategory: null,
 };
 
@@ -43,8 +43,7 @@ function createBlockLibraryStore() {
       } catch (error) {
         update((state) => ({
           ...state,
-          error:
-            error instanceof Error ? error.message : "Failed to load blocks",
+          error: error instanceof Error ? error.message : 'Failed to load blocks',
           loading: false,
         }));
       }
@@ -60,7 +59,7 @@ function createBlockLibraryStore() {
     /**
      * Set selected category
      */
-    setSelectedCategory(category: Block["category"] | null) {
+    setSelectedCategory(category: Block['category'] | null) {
       update((state) => ({ ...state, selectedCategory: category }));
     },
 
@@ -125,17 +124,11 @@ export const filteredBlocks = derived([blockLibraryStore], ([$store]) => {
       (b) =>
         b.name.toLowerCase().includes(query) ||
         b.description.toLowerCase().includes(query) ||
-        b.tags.some((tag) => tag.toLowerCase().includes(query)),
+        b.tags.some((tag) => tag.toLowerCase().includes(query))
     );
   }
 
   return filtered;
 });
-export const blockLibraryLoading = derived(
-  blockLibraryStore,
-  ($store) => $store.loading,
-);
-export const blockLibraryError = derived(
-  blockLibraryStore,
-  ($store) => $store.error,
-);
+export const blockLibraryLoading = derived(blockLibraryStore, ($store) => $store.loading);
+export const blockLibraryError = derived(blockLibraryStore, ($store) => $store.error);

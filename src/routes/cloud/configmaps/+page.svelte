@@ -1,32 +1,17 @@
 <!-- ConfigMaps List Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    cloudStore,
-    loadResources,
-    refreshResources,
-  } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import BaseResourceTable from "$lib/domains/cloud/core/components/BaseResourceTable.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import { RefreshCw, Search, Plus } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import {
-    useTableNavigation,
-    useResourceActions,
-  } from "$lib/domains/k8s-navigation";
+  import { onMount } from 'svelte';
+  import { cloudStore, loadResources, refreshResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import BaseResourceTable from '$lib/domains/cloud/core/components/BaseResourceTable.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import { RefreshCw, Search, Plus } from '@lucide/svelte';
+  import { goto } from '$app/navigation';
+  import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 
-  let searchQuery = $state("");
+  let searchQuery = $state('');
 
   onMount(async () => {
     if ($cloudStore.connection.isConnected) {
@@ -37,24 +22,23 @@
   const filteredConfigMaps = $derived(
     $cloudStore.resources[ResourceType.CONFIGMAP].filter((cm) => {
       const matchesSearch =
-        !searchQuery ||
-        cm.name.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery || cm.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
-    }),
+    })
   );
 
   const configMapStats = $derived({
     total: $cloudStore.resources[ResourceType.CONFIGMAP].length,
     withData: $cloudStore.resources[ResourceType.CONFIGMAP].filter(
-      (cm: any) => (cm.metadata?.dataCount || 0) > 0,
+      (cm: any) => (cm.metadata?.dataCount || 0) > 0
     ).length,
   });
 
   const configMapColumns = [
-    { key: "name", label: "Name", width: "w-1/4" },
-    { key: "dataCount", label: "Data Keys", width: "w-1/8" },
-    { key: "age", label: "Age", width: "w-1/8" },
-    { key: "namespace", label: "Namespace", width: "w-1/6" },
+    { key: 'name', label: 'Name', width: 'w-1/4' },
+    { key: 'dataCount', label: 'Data Keys', width: 'w-1/8' },
+    { key: 'age', label: 'Age', width: 'w-1/8' },
+    { key: 'namespace', label: 'Namespace', width: 'w-1/6' },
   ];
 
   async function handleRefresh() {
@@ -62,9 +46,7 @@
   }
 
   function handleConfigMapClick(configMap: ICloudResource) {
-    goto(
-      `/cloud/configmaps/${configMap.name}?namespace=${configMap.namespace}`,
-    );
+    goto(`/cloud/configmaps/${configMap.name}?namespace=${configMap.namespace}`);
   }
 
   // Table navigation
@@ -74,9 +56,7 @@
     onActivate: (index) => {
       const configMap = filteredConfigMaps[index];
       if (configMap) {
-        goto(
-          `/cloud/configmaps/${configMap.name}?namespace=${configMap.namespace}`,
-        );
+        goto(`/cloud/configmaps/${configMap.name}?namespace=${configMap.namespace}`);
       }
     },
     enabled: $cloudStore.connection.isConnected,
@@ -88,19 +68,13 @@
     resources: filteredConfigMaps,
     handlers: {
       onDescribe: (resource) => {
-        goto(
-          `/cloud/configmaps/${resource.name}?namespace=${resource.namespace}`,
-        );
+        goto(`/cloud/configmaps/${resource.name}?namespace=${resource.namespace}`);
       },
       onEdit: (resource) => {
-        goto(
-          `/cloud/configmaps/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/configmaps/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onYaml: (resource) => {
-        goto(
-          `/cloud/configmaps/${resource.name}?namespace=${resource.namespace}&tab=yaml`,
-        );
+        goto(`/cloud/configmaps/${resource.name}?namespace=${resource.namespace}&tab=yaml`);
       },
       onRefresh: () => {
         refreshResources();
@@ -129,7 +103,7 @@
         <RefreshCw class="mr-2 h-4 w-4" />
         Refresh
       </Button>
-      <Button onclick={() => goto("/cloud/configmaps/new")}>
+      <Button onclick={() => goto('/cloud/configmaps/new')}>
         <Plus class="mr-2 h-4 w-4" />
         Create ConfigMap
       </Button>
@@ -188,10 +162,7 @@
           {/if}
         </div>
       {:else}
-        <div
-          class="k8s-navigable-table"
-          data-selected-index={tableNav.selectedIndex}
-        >
+        <div class="k8s-navigable-table" data-selected-index={tableNav.selectedIndex}>
           <BaseResourceTable
             resources={filteredConfigMaps}
             resourceType={ResourceType.CONFIGMAP}

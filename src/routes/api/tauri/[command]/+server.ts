@@ -1,6 +1,6 @@
-import { json } from "@sveltejs/kit";
-import type { RequestHandler } from "./$types";
-import { getClientIp } from "$lib/utils/serverUtils";
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { getClientIp } from '$lib/utils/serverUtils';
 
 /**
  * API Proxy for Tauri commands
@@ -21,7 +21,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const command = params.command;
 
     if (!command) {
-      return json({ error: "Command name is required" }, { status: 400 });
+      return json({ error: 'Command name is required' }, { status: 400 });
     }
 
     // Parse request body for command arguments (for logging/debugging)
@@ -38,19 +38,15 @@ export const POST: RequestHandler = async ({ params, request }) => {
     const clientIp = getClientIp(request, request.headers);
 
     // For generate_device_passcode, inject IP address into device_info if available
-    if (
-      command === "generate_device_passcode" &&
-      args.request &&
-      args.request.device_info
-    ) {
+    if (command === 'generate_device_passcode' && args.request && args.request.device_info) {
       try {
         const deviceInfo =
-          typeof args.request.device_info === "string"
+          typeof args.request.device_info === 'string'
             ? JSON.parse(args.request.device_info)
             : args.request.device_info;
 
         // Add IP address to device_info if not already present or if it was "Unknown"
-        if (!deviceInfo.ip || deviceInfo.ip === "Unknown") {
+        if (!deviceInfo.ip || deviceInfo.ip === 'Unknown') {
           deviceInfo.ip = clientIp;
           args.request.device_info = JSON.stringify(deviceInfo);
         }
@@ -64,17 +60,16 @@ export const POST: RequestHandler = async ({ params, request }) => {
     return json(
       {
         error:
-          "Tauri commands can only be called from the Tauri frontend. For external device access, a Tauri HTTP server plugin is required.",
+          'Tauri commands can only be called from the Tauri frontend. For external device access, a Tauri HTTP server plugin is required.',
         command,
         args,
-        hint: "This endpoint is a placeholder. To enable external device access, implement a Tauri HTTP server plugin that exposes commands as REST endpoints.",
+        hint: 'This endpoint is a placeholder. To enable external device access, implement a Tauri HTTP server plugin that exposes commands as REST endpoints.',
       },
-      { status: 501 }, // Not Implemented
+      { status: 501 } // Not Implemented
     );
   } catch (error) {
-    console.error("Tauri proxy error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error occurred";
+    console.error('Tauri proxy error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return json({ error: errorMessage }, { status: 500 });
   }
 };

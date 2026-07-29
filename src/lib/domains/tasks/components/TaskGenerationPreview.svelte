@@ -1,25 +1,25 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Separator } from "$lib/components/ui/separator";
-  import { Input } from "$lib/components/ui/input";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
-  import Select from "$lib/components/ui/select.svelte";
-  import { TASK_PRIORITY_OPTIONS, TaskPriorityEnum } from "../types";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Separator } from '$lib/components/ui/separator';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
+  import Select from '$lib/components/ui/select.svelte';
+  import { TASK_PRIORITY_OPTIONS, TaskPriorityEnum } from '../types';
   import type {
     GeneratedTaskStructure,
     GeneratedTask,
     GeneratedSubtask,
-  } from "../services/aiTaskService";
-  import Icon from "@iconify/svelte";
+  } from '../services/aiTaskService';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     generated: GeneratedTaskStructure;
@@ -29,8 +29,7 @@
     onRegenerate?: (previousResult: GeneratedTaskStructure) => void;
   }
 
-  let { generated, originalText, onApprove, onCancel, onRegenerate }: Props =
-    $props();
+  let { generated, originalText, onApprove, onCancel, onRegenerate }: Props = $props();
 
   // Editable state
   let mainTask = $state<GeneratedTask>({ ...generated.main_task });
@@ -61,8 +60,8 @@
     subtasks = [
       ...subtasks,
       {
-        title: "",
-        description: "",
+        title: '',
+        description: '',
         estimated_time: null,
         dependencies: [],
         order: subtasks.length + 1,
@@ -96,11 +95,7 @@
     <CardContent class="space-y-4">
       <div class="space-y-2">
         <Label for="main-title">Title</Label>
-        <Input
-          id="main-title"
-          bind:value={mainTask.title}
-          placeholder="Task title..."
-        />
+        <Input id="main-title" bind:value={mainTask.title} placeholder="Task title..." />
       </div>
 
       <div class="space-y-2">
@@ -125,11 +120,7 @@
 
         <div class="space-y-2">
           <Label for="main-type">Type</Label>
-          <Input
-            id="main-type"
-            bind:value={mainTask.type_}
-            placeholder="Story, Bug, Feature..."
-          />
+          <Input id="main-type" bind:value={mainTask.type_} placeholder="Story, Bug, Feature..." />
         </div>
 
         <div class="space-y-2">
@@ -153,9 +144,7 @@
                 icon="lucide:x"
                 class="ml-1 h-3 w-3"
                 onclick={() => {
-                  suggestedLabels = suggestedLabels.filter(
-                    (_, i) => i !== index,
-                  );
+                  suggestedLabels = suggestedLabels.filter((_, i) => i !== index);
                 }}
               />
             </Badge>
@@ -164,12 +153,12 @@
             placeholder="Add tag..."
             class="w-auto min-w-[120px]"
             onkeydown={(e) => {
-              if (e.key === "Enter" && e.currentTarget.value.trim()) {
+              if (e.key === 'Enter' && e.currentTarget.value.trim()) {
                 const newTag = e.currentTarget.value.trim();
                 if (!suggestedLabels.includes(newTag)) {
                   suggestedLabels = [...suggestedLabels, newTag];
                 }
-                e.currentTarget.value = "";
+                e.currentTarget.value = '';
               }
             }}
           />
@@ -224,11 +213,7 @@
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label>Estimated Time (minutes)</Label>
-              <Input
-                type="number"
-                bind:value={subtask.estimated_time}
-                placeholder="30"
-              />
+              <Input type="number" bind:value={subtask.estimated_time} placeholder="30" />
             </div>
             <div class="space-y-2">
               <Label>Order</Label>
@@ -237,9 +222,7 @@
           </div>
         </div>
       {:else}
-        <p class="text-sm text-muted-foreground text-center py-4">
-          No subtasks
-        </p>
+        <p class="text-sm text-muted-foreground text-center py-4">No subtasks</p>
       {/each}
     </CardContent>
   </Card>
@@ -273,15 +256,9 @@
           <Icon icon="lucide:file-text" class="h-5 w-5" />
           Original Text Reference
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={() => (showOriginalText = !showOriginalText)}
-        >
+        <Button variant="ghost" size="sm" onclick={() => (showOriginalText = !showOriginalText)}>
           <Icon
-            icon={showOriginalText
-              ? "lucide:chevron-up"
-              : "lucide:chevron-down"}
+            icon={showOriginalText ? 'lucide:chevron-up' : 'lucide:chevron-down'}
             class="h-4 w-4"
           />
         </Button>
@@ -290,8 +267,7 @@
     {#if showOriginalText}
       <CardContent>
         <div class="rounded-lg border bg-muted/50 p-4">
-          <pre
-            class="whitespace-pre-wrap font-mono text-sm">{originalText}</pre>
+          <pre class="whitespace-pre-wrap font-mono text-sm">{originalText}</pre>
         </div>
       </CardContent>
     {/if}

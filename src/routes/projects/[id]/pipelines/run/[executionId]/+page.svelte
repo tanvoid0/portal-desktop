@@ -2,19 +2,19 @@
 	Pipeline Run Page - Full-page execution monitor with Vercel-style logs
 -->
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { Button } from "$lib/components/ui/button";
-  import { ArrowLeft } from "@lucide/svelte";
-  import ExecutionMonitor from "$lib/domains/projects/pipelines/components/ExecutionMonitor.svelte";
-  import { createProjectQuery } from "$lib/domains/projects";
-  import { breadcrumbActions } from "$lib/domains/shared/stores/breadcrumbStore";
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
+  import { ArrowLeft } from '@lucide/svelte';
+  import ExecutionMonitor from '$lib/domains/projects/pipelines/components/ExecutionMonitor.svelte';
+  import { createProjectQuery } from '$lib/domains/projects';
+  import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
 
   const projectId = $derived($page.params.id);
   const executionId = $derived($page.params.executionId);
   const projectQuery = createProjectQuery(() => projectId);
 
-  const projectName = $derived(projectQuery.data?.name ?? "");
+  const projectName = $derived(projectQuery.data?.name ?? '');
 
   $effect(() => {
     if (projectQuery.data) {
@@ -28,7 +28,7 @@
 </script>
 
 <svelte:head>
-  <title>Pipeline Run - {projectName || "Project"} - Portal Desktop</title>
+  <title>Pipeline Run - {projectName || 'Project'} - Portal Desktop</title>
 </svelte:head>
 
 <div class="container mx-auto flex h-[calc(100vh-4rem)] flex-col space-y-4 p-6">

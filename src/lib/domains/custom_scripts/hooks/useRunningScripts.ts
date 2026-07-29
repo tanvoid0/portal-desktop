@@ -3,8 +3,8 @@
  * Supports the same script running multiple times or different scripts running simultaneously
  */
 
-import { TerminalService, type TerminalProcess } from "$lib/domains/terminal";
-import type { CustomScript } from "../services/customScriptService";
+import { TerminalService, type TerminalProcess } from '$lib/domains/terminal';
+import type { CustomScript } from '../services/customScriptService';
 
 export interface RunningScript {
   id: string; // Unique ID for this running instance
@@ -51,7 +51,7 @@ class RunningScriptsManager {
     processId: string,
     tabId: string,
     stopCallback: () => Promise<void>,
-    outputUnsubscribe?: () => void,
+    outputUnsubscribe?: () => void
   ): string {
     const id = `${script.id}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     const runningScript: RunningScript = {
@@ -62,7 +62,7 @@ class RunningScriptsManager {
       tabId,
       startTime: new Date(),
       stopCallback,
-      output: "",
+      output: '',
       outputUnsubscribe,
     };
 
@@ -116,9 +116,7 @@ class RunningScriptsManager {
    * Get running scripts for a specific script ID
    */
   getByScriptId(scriptId: number): RunningScript[] {
-    return Array.from(this.runningScripts.values()).filter(
-      (rs) => rs.scriptId === scriptId,
-    );
+    return Array.from(this.runningScripts.values()).filter((rs) => rs.scriptId === scriptId);
   }
 
   /**
@@ -155,19 +153,11 @@ export function useRunningScripts() {
     add: runningScriptsManager.add.bind(runningScriptsManager),
     remove: runningScriptsManager.remove.bind(runningScriptsManager),
     getAll: runningScriptsManager.getAll.bind(runningScriptsManager),
-    getByScriptId: runningScriptsManager.getByScriptId.bind(
-      runningScriptsManager,
-    ),
+    getByScriptId: runningScriptsManager.getByScriptId.bind(runningScriptsManager),
     getById: runningScriptsManager.getById.bind(runningScriptsManager),
     isRunning: runningScriptsManager.isRunning.bind(runningScriptsManager),
-    getRunningCount: runningScriptsManager.getRunningCount.bind(
-      runningScriptsManager,
-    ),
-    updateOutput: runningScriptsManager.updateOutput.bind(
-      runningScriptsManager,
-    ),
-    appendOutput: runningScriptsManager.appendOutput.bind(
-      runningScriptsManager,
-    ),
+    getRunningCount: runningScriptsManager.getRunningCount.bind(runningScriptsManager),
+    updateOutput: runningScriptsManager.updateOutput.bind(runningScriptsManager),
+    appendOutput: runningScriptsManager.appendOutput.bind(runningScriptsManager),
   };
 }

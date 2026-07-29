@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Button } from "$lib/components/ui/button";
-  import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { PageHeader, PageLoading, PageError } from "$lib/components/shell";
-  import { createGitHubStatusQuery, githubService } from "$lib/domains/github";
-  import type { GitHubDeviceFlowStart } from "$lib/domains/github";
-  import { openExternalUrl } from "$lib/utils/tauri";
-  import { toast } from "$lib/utils/toast";
-  import { FolderGit2, Bug, Unplug } from "@lucide/svelte";
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { PageHeader, PageLoading, PageError } from '$lib/components/shell';
+  import { createGitHubStatusQuery, githubService } from '$lib/domains/github';
+  import type { GitHubDeviceFlowStart } from '$lib/domains/github';
+  import { openExternalUrl } from '$lib/utils/tauri';
+  import { toast } from '$lib/utils/toast';
+  import { FolderGit2, Bug, Unplug } from '@lucide/svelte';
 
   const statusQuery = createGitHubStatusQuery();
   const status = $derived(statusQuery.data);
@@ -21,7 +21,7 @@
   async function handleConnect() {
     try {
       if (!status?.clientIdConfigured) {
-        goto("/settings/github");
+        goto('/settings/github');
         return;
       }
       connecting = true;
@@ -30,18 +30,16 @@
       await githubService.connectWithDeviceFlow(undefined, {
         onStarted: (start) => {
           deviceFlow = start;
-          flowMessage =
-            "Authorize GitHub in your browser. If nothing opened, use the code below.";
+          flowMessage = 'Authorize GitHub in your browser. If nothing opened, use the code below.';
         },
         onPolling: () => {
-          flowMessage = "Waiting for you to authorize on GitHub...";
+          flowMessage = 'Waiting for you to authorize on GitHub...';
         },
       });
-      toast.success("GitHub connected");
+      toast.success('GitHub connected');
       await statusQuery.refetch();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to connect GitHub";
+      const message = error instanceof Error ? error.message : 'Failed to connect GitHub';
       toast.error(message);
     } finally {
       connecting = false;
@@ -52,15 +50,12 @@
 
   async function handleOpenGitHub() {
     if (!deviceFlow) return;
-    const target =
-      deviceFlow.verificationUriComplete || deviceFlow.verificationUri;
+    const target = deviceFlow.verificationUriComplete || deviceFlow.verificationUri;
     try {
       await openExternalUrl(target);
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to open GitHub authorization page",
+        error instanceof Error ? error.message : 'Failed to open GitHub authorization page'
       );
     }
   }
@@ -69,11 +64,10 @@
     try {
       disconnecting = true;
       await githubService.disconnect();
-      toast.success("GitHub disconnected");
+      toast.success('GitHub disconnected');
       await statusQuery.refetch();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to disconnect GitHub";
+      const message = error instanceof Error ? error.message : 'Failed to disconnect GitHub';
       toast.error(message);
     } finally {
       disconnecting = false;
@@ -86,17 +80,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <PageHeader
-    title="GitHub"
-    description="Connect GitHub, browse repositories, and manage issues"
-  >
+  <PageHeader title="GitHub" description="Connect GitHub, browse repositories, and manage issues">
     {#snippet actions()}
       {#if status?.connected}
-        <Button
-          variant="outline"
-          onclick={handleDisconnect}
-          disabled={disconnecting}
-        >
+        <Button variant="outline" onclick={handleDisconnect} disabled={disconnecting}>
           <Unplug class="mr-2 h-4 w-4" />
           Disconnect
         </Button>
@@ -116,7 +103,7 @@
       title="GitHub unavailable"
       message={statusQuery.error instanceof Error
         ? statusQuery.error.message
-        : "Failed to load GitHub status"}
+        : 'Failed to load GitHub status'}
       onRetry={() => statusQuery.refetch()}
     />
   {:else}
@@ -141,9 +128,7 @@
               {/each}
             </div>
           {:else if status?.clientIdConfigured}
-            <p class="text-sm text-muted-foreground">
-              No GitHub account connected yet.
-            </p>
+            <p class="text-sm text-muted-foreground">No GitHub account connected yet.</p>
           {:else}
             <p class="text-sm text-muted-foreground">
               GitHub OAuth is not configured yet. Add a client ID in Settings > GitHub.
@@ -152,7 +137,7 @@
         </CardContent>
       </Card>
 
-      <Card class="cursor-pointer" onclick={() => goto("/github/repos")}>
+      <Card class="cursor-pointer" onclick={() => goto('/github/repos')}>
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <FolderGit2 class="h-4 w-4" />
@@ -166,7 +151,7 @@
         </CardContent>
       </Card>
 
-      <Card class="cursor-pointer" onclick={() => goto("/github/issues")}>
+      <Card class="cursor-pointer" onclick={() => goto('/github/issues')}>
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <Bug class="h-4 w-4" />

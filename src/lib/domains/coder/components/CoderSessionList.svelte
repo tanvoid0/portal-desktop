@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Plus, X, LayoutGrid, SlidersHorizontal } from "@lucide/svelte";
-  import { formatCount } from "$lib/domains/shared/utils";
-  import AISessionSidebar from "$lib/domains/ai/components/shared/AISessionSidebar.svelte";
-  import ProjectWorkspaceList from "./ProjectWorkspaceList.svelte";
-  import CoderSidebarFooter from "./CoderSidebarFooter.svelte";
-  import { coderUi } from "../state/coderUi.svelte.js";
+  import { Button } from '$lib/components/ui/button';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Plus, X, LayoutGrid, SlidersHorizontal } from '@lucide/svelte';
+  import { formatCount } from '$lib/domains/shared/utils';
+  import AISessionSidebar from '$lib/domains/ai/components/shared/AISessionSidebar.svelte';
+  import ProjectWorkspaceList from './ProjectWorkspaceList.svelte';
+  import CoderSidebarFooter from './CoderSidebarFooter.svelte';
+  import { coderUi } from '../state/coderUi.svelte.js';
   import {
     DEFAULT_SESSION_FILTERS,
     SORT_OPTIONS,
@@ -17,8 +17,8 @@
     type SessionListFilters,
     type SessionSortKey,
     type SessionStatusFilter,
-  } from "../utils/sessionList.js";
-  import type { CoderThread } from "../types.js";
+  } from '../utils/sessionList.js';
+  import type { CoderThread } from '../types.js';
 
   interface Props {
     threads: CoderThread[];
@@ -50,7 +50,7 @@
     onToggleRules,
   }: Props = $props();
 
-  let searchValue = $state("");
+  let searchValue = $state('');
   /** Filters stay folded away until asked for — the list is the point. */
   let filtersOpen = $state(false);
   let statusFilter = $state<SessionStatusFilter>(DEFAULT_SESSION_FILTERS.status);
@@ -76,13 +76,11 @@
       if (byId.has(id)) continue;
       byId.set(id, {
         id,
-        title: "Running session",
-        workspace_root: coderUi.activeProjectPath ?? "",
-        project_id: coderUi.activeProjectId
-          ? Number.parseInt(coderUi.activeProjectId, 10)
-          : null,
+        title: 'Running session',
+        workspace_root: coderUi.activeProjectPath ?? '',
+        project_id: coderUi.activeProjectId ? Number.parseInt(coderUi.activeProjectId, 10) : null,
         messages: [],
-        created_at: "",
+        created_at: '',
         updated_at: new Date().toISOString(),
       });
     }
@@ -91,7 +89,7 @@
   });
 
   const providerOptions = $derived([
-    { value: "all", label: "All providers" },
+    { value: 'all', label: 'All providers' },
     ...extractProviderOptions(displayThreads),
   ]);
 
@@ -102,26 +100,20 @@
       displayThreads,
       {
         ...listFilters,
-        project: coderUi.showAllWorkspaces
-          ? "all"
-          : (coderUi.activeProjectPath ?? "all"),
-        projectId: coderUi.showAllWorkspaces
-          ? "all"
-          : (coderUi.activeProjectId ?? "all"),
+        project: coderUi.showAllWorkspaces ? 'all' : (coderUi.activeProjectPath ?? 'all'),
+        projectId: coderUi.showAllWorkspaces ? 'all' : (coderUi.activeProjectId ?? 'all'),
       },
       runningThreadIds,
-      queuedCountFor,
-    ).length,
+      queuedCountFor
+    ).length
   );
 
-  const filtersActive = $derived(
-    hasActiveFilters(listFilters) || coderUi.showAllWorkspaces,
-  );
+  const filtersActive = $derived(hasActiveFilters(listFilters) || coderUi.showAllWorkspaces);
 
   const showLoadingSkeleton = $derived(loading && displayThreads.length === 0);
 
   function clearFilters() {
-    searchValue = "";
+    searchValue = '';
     statusFilter = DEFAULT_SESSION_FILTERS.status;
     sortFilter = DEFAULT_SESSION_FILTERS.sort;
     providerFilter = DEFAULT_SESSION_FILTERS.provider;
@@ -132,7 +124,7 @@
 <AISessionSidebar
   title="Sessions"
   searchPlaceholder="Search sessions..."
-  bind:searchValue={searchValue}
+  bind:searchValue
   {showLoadingSkeleton}
   internalScroll={false}
 >
@@ -140,7 +132,7 @@
     <Button
       onclick={() => (filtersOpen = !filtersOpen)}
       size="icon"
-      variant={filtersOpen || filtersActive ? "secondary" : "ghost"}
+      variant={filtersOpen || filtersActive ? 'secondary' : 'ghost'}
       class="h-7 w-7 shrink-0"
       title="Filters"
     >
@@ -159,32 +151,32 @@
 
   {#snippet filters()}
     {#if filtersOpen}
-    <div class="grid grid-cols-2 gap-2">
-      <Select
-        options={[...STATUS_OPTIONS]}
-        value={statusFilter}
-        onSelect={(v) => (statusFilter = v as SessionStatusFilter)}
-        placeholder="All statuses"
-        class="h-8 text-xs"
-      />
-      <Select
-        options={[...SORT_OPTIONS]}
-        value={sortFilter}
-        onSelect={(v) => (sortFilter = v as SessionSortKey)}
-        placeholder="Sort by"
-        class="h-8 text-xs"
-      />
-    </div>
+      <div class="grid grid-cols-2 gap-2">
+        <Select
+          options={[...STATUS_OPTIONS]}
+          value={statusFilter}
+          onSelect={(v) => (statusFilter = v as SessionStatusFilter)}
+          placeholder="All statuses"
+          class="h-8 text-xs"
+        />
+        <Select
+          options={[...SORT_OPTIONS]}
+          value={sortFilter}
+          onSelect={(v) => (sortFilter = v as SessionSortKey)}
+          placeholder="Sort by"
+          class="h-8 text-xs"
+        />
+      </div>
 
-    {#if showProviderFilter}
-      <Select
-        options={providerOptions}
-        value={providerFilter}
-        onSelect={(v) => (providerFilter = v)}
-        placeholder="All providers"
-        class="h-8 text-xs"
-      />
-    {/if}
+      {#if showProviderFilter}
+        <Select
+          options={providerOptions}
+          value={providerFilter}
+          onSelect={(v) => (providerFilter = v)}
+          placeholder="All providers"
+          class="h-8 text-xs"
+        />
+      {/if}
     {/if}
   {/snippet}
 
@@ -194,17 +186,15 @@
         {#if showLoadingSkeleton}
           Loading sessions…
         {:else}
-          {formatCount(filteredCount, "session")}
+          {formatCount(filteredCount, 'session')}
         {/if}
       </p>
       <div class="flex shrink-0 items-center gap-1">
         <Button
-          variant={coderUi.showAllWorkspaces ? "secondary" : "ghost"}
+          variant={coderUi.showAllWorkspaces ? 'secondary' : 'ghost'}
           size="sm"
           class="h-7 gap-1 px-2 text-xs"
-          title={coderUi.showAllWorkspaces
-            ? "Show active workspace only"
-            : "Show all workspaces"}
+          title={coderUi.showAllWorkspaces ? 'Show active workspace only' : 'Show all workspaces'}
           onclick={() => (coderUi.showAllWorkspaces = !coderUi.showAllWorkspaces)}
         >
           <LayoutGrid class="h-3 w-3" />
@@ -225,20 +215,18 @@
     </div>
   {/snippet}
 
-  {#snippet children()}
-    <ProjectWorkspaceList
-      threads={displayThreads}
-      filters={listFilters}
-      {selectedThreadId}
-      {runningThreadIds}
-      {loading}
-      {onThreadClick}
-      {onDeleteThread}
-      {onProjectSelect}
-      {queuedCountFor}
-      {subAgentSummaryFor}
-    />
-  {/snippet}
+  <ProjectWorkspaceList
+    threads={displayThreads}
+    filters={listFilters}
+    {selectedThreadId}
+    {runningThreadIds}
+    {loading}
+    {onThreadClick}
+    {onDeleteThread}
+    {onProjectSelect}
+    {queuedCountFor}
+    {subAgentSummaryFor}
+  />
 
   {#snippet footer()}
     <CoderSidebarFooter {showRules} {onToggleRules} />

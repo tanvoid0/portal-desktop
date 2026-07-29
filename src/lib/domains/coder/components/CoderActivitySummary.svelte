@@ -1,22 +1,17 @@
 <script lang="ts">
-  import { ChevronRight } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import type { ActivitySummaryPart } from "../utils/feedBlocks.js";
+  import { ChevronRight } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import type { ActivitySummaryPart } from '../utils/feedBlocks.js';
 
   interface Props {
     parts: ActivitySummaryPart[];
     isRunning?: boolean;
     hasFailed?: boolean;
     /** When expanded, render child tool lines. */
-    children?: import("svelte").Snippet;
+    children?: import('svelte').Snippet;
   }
 
-  let {
-    parts,
-    isRunning = false,
-    hasFailed = false,
-    children,
-  }: Props = $props();
+  let { parts, isRunning = false, hasFailed = false, children }: Props = $props();
 
   let open = $state(false);
 </script>
@@ -36,22 +31,17 @@
       {#each parts as part, i}
         {#if i > 0}<span class="text-muted-foreground">, </span>{/if}
         {#if part.isActive}
-          <span class="font-semibold text-foreground">{part.verb}</span
-          ><span>{part.rest}</span>
+          <span class="font-semibold text-foreground">{part.verb}</span><span>{part.rest}</span>
         {:else}
           <span>{part.verb}{part.rest}</span>
         {/if}
       {/each}
     </span>
-    <ChevronRight
-      class="h-3 w-3 shrink-0 transition-transform {open ? 'rotate-90' : ''}"
-    />
+    <ChevronRight class="h-3 w-3 shrink-0 transition-transform {open ? 'rotate-90' : ''}" />
   </Button>
 
   {#if open && children}
-    <div
-      class="mt-1 space-y-0.5 rounded-lg border border-border/80 px-2.5 py-1.5"
-    >
+    <div class="mt-1 space-y-0.5 rounded-lg border border-border/80 px-2.5 py-1.5">
       {@render children()}
     </div>
   {/if}

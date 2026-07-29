@@ -9,12 +9,12 @@
  * Check if running in a Tauri environment
  */
 export function isTauriEnvironment(): boolean {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return false;
   }
 
   // Check for Tauri internals (handle both possible property names)
-  return "__TAURI_INTERNALS__" in window || "__TAURI__" in window;
+  return '__TAURI_INTERNALS__' in window || '__TAURI__' in window;
 }
 
 /**
@@ -38,15 +38,13 @@ let invokeFn: ((cmd: string, args?: any) => Promise<any>) | null = null;
  * const result = await invoke('my_command', { arg: 'value' });
  * ```
  */
-export async function getInvoke(): Promise<
-  (cmd: string, args?: any) => Promise<any>
-> {
+export async function getInvoke(): Promise<(cmd: string, args?: any) => Promise<any>> {
   if (!isTauriEnvironment()) {
-    throw new Error("Tauri environment required");
+    throw new Error('Tauri environment required');
   }
 
   if (!invokeFn) {
-    const tauriCore = await import("@tauri-apps/api/core");
+    const tauriCore = await import('@tauri-apps/api/core');
     invokeFn = tauriCore.invoke;
   }
 
@@ -61,12 +59,9 @@ export async function getInvoke(): Promise<
  * const result = await tauriInvoke<string>('my_command', { arg: 'value' });
  * ```
  */
-export async function tauriInvoke<T = any>(
-  cmd: string,
-  args?: any,
-): Promise<T> {
-  if (typeof window === "undefined") {
-    throw new Error("Tauri environment required");
+export async function tauriInvoke<T = any>(cmd: string, args?: any): Promise<T> {
+  if (typeof window === 'undefined') {
+    throw new Error('Tauri environment required');
   }
   const invoke = await getInvoke();
   return invoke(cmd, args) as Promise<T>;
@@ -77,10 +72,10 @@ export async function tauriInvoke<T = any>(
  */
 export async function openExternalUrl(url: string): Promise<void> {
   if (isTauriEnvironment()) {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    const { openUrl } = await import('@tauri-apps/plugin-opener');
     await openUrl(url);
     return;
   }
 
-  window.open(url, "_blank", "noopener,noreferrer");
+  window.open(url, '_blank', 'noopener,noreferrer');
 }

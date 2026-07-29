@@ -1,17 +1,12 @@
 <!-- Keyboard Shortcuts Help Modal -->
 <script lang="ts">
-  import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-  } from "$lib/components/ui/dialog";
+  import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
   import {
     NAVIGATION_SHORTCUTS,
     ACTION_SHORTCUTS,
     RESOURCE_TYPE_SHORTCUTS,
-  } from "../utils/keyboardConstants";
-  import { formatShortcut, parseShortcut } from "../utils/shortcutParser";
+  } from '../utils/keyboardConstants';
+  import { formatShortcut, parseShortcut } from '../utils/shortcutParser';
 
   interface ShortcutGroup {
     title: string;
@@ -21,88 +16,84 @@
   interface Props {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
-    context?: "table" | "detail" | "overview";
+    context?: 'table' | 'detail' | 'overview';
   }
 
-  let {
-    open = $bindable(false),
-    onOpenChange,
-    context = "table",
-  }: Props = $props();
+  let { open = $bindable(false), onOpenChange, context = 'table' }: Props = $props();
 
   const shortcutGroups = $derived.by<ShortcutGroup[]>(() => {
     const groups: ShortcutGroup[] = [
       {
-        title: "Navigation",
+        title: 'Navigation',
         shortcuts: [
-          { key: "ArrowUp / k", description: "Move up" },
-          { key: "ArrowDown / j", description: "Move down" },
-          { key: "Enter", description: "Open selected resource" },
-          { key: "g", description: "Go to top" },
-          { key: "Shift+G", description: "Go to bottom" },
+          { key: 'ArrowUp / k', description: 'Move up' },
+          { key: 'ArrowDown / j', description: 'Move down' },
+          { key: 'Enter', description: 'Open selected resource' },
+          { key: 'g', description: 'Go to top' },
+          { key: 'Shift+G', description: 'Go to bottom' },
           {
             key: formatShortcut(NAVIGATION_SHORTCUTS.COMMAND_PALETTE[0]),
-            description: "Open command palette",
+            description: 'Open command palette',
           },
-          { key: NAVIGATION_SHORTCUTS.HELP, description: "Show this help" },
+          { key: NAVIGATION_SHORTCUTS.HELP, description: 'Show this help' },
         ],
       },
       {
-        title: "Resource Types",
+        title: 'Resource Types',
         shortcuts: [
-          { key: RESOURCE_TYPE_SHORTCUTS.OVERVIEW, description: "Overview" },
-          { key: RESOURCE_TYPE_SHORTCUTS.PODS, description: "Pods" },
-          { key: RESOURCE_TYPE_SHORTCUTS.SERVICES, description: "Services" },
+          { key: RESOURCE_TYPE_SHORTCUTS.OVERVIEW, description: 'Overview' },
+          { key: RESOURCE_TYPE_SHORTCUTS.PODS, description: 'Pods' },
+          { key: RESOURCE_TYPE_SHORTCUTS.SERVICES, description: 'Services' },
           {
             key: RESOURCE_TYPE_SHORTCUTS.DEPLOYMENTS,
-            description: "Deployments",
+            description: 'Deployments',
           },
           {
             key: RESOURCE_TYPE_SHORTCUTS.STATEFULSETS,
-            description: "StatefulSets",
+            description: 'StatefulSets',
           },
           {
             key: RESOURCE_TYPE_SHORTCUTS.DAEMONSETS,
-            description: "DaemonSets",
+            description: 'DaemonSets',
           },
-          { key: RESOURCE_TYPE_SHORTCUTS.JOBS, description: "Jobs" },
-          { key: RESOURCE_TYPE_SHORTCUTS.CRONJOBS, description: "CronJobs" },
+          { key: RESOURCE_TYPE_SHORTCUTS.JOBS, description: 'Jobs' },
+          { key: RESOURCE_TYPE_SHORTCUTS.CRONJOBS, description: 'CronJobs' },
           {
             key: RESOURCE_TYPE_SHORTCUTS.CONFIGMAPS,
-            description: "ConfigMaps",
+            description: 'ConfigMaps',
           },
-          { key: RESOURCE_TYPE_SHORTCUTS.SECRETS, description: "Secrets" },
+          { key: RESOURCE_TYPE_SHORTCUTS.SECRETS, description: 'Secrets' },
         ],
       },
     ];
 
-    if (context === "table") {
+    if (context === 'table') {
       groups.push({
-        title: "Actions",
+        title: 'Actions',
         shortcuts: [
           {
             key: ACTION_SHORTCUTS.DESCRIBE,
-            description: "Describe/View details",
+            description: 'Describe/View details',
           },
-          { key: ACTION_SHORTCUTS.EDIT, description: "Edit YAML" },
-          { key: ACTION_SHORTCUTS.LOGS, description: "View logs" },
-          { key: ACTION_SHORTCUTS.RESTART, description: "Restart" },
-          { key: ACTION_SHORTCUTS.SCALE, description: "Scale (deployments)" },
-          { key: ACTION_SHORTCUTS.YAML, description: "View YAML" },
-          { key: `Ctrl+${ACTION_SHORTCUTS.DELETE}`, description: "Delete" },
-          { key: ACTION_SHORTCUTS.PORT_FORWARD, description: "Port forward" },
+          { key: ACTION_SHORTCUTS.EDIT, description: 'Edit YAML' },
+          { key: ACTION_SHORTCUTS.LOGS, description: 'View logs' },
+          { key: ACTION_SHORTCUTS.RESTART, description: 'Restart' },
+          { key: ACTION_SHORTCUTS.SCALE, description: 'Scale (deployments)' },
+          { key: ACTION_SHORTCUTS.YAML, description: 'View YAML' },
+          { key: `Ctrl+${ACTION_SHORTCUTS.DELETE}`, description: 'Delete' },
+          { key: ACTION_SHORTCUTS.PORT_FORWARD, description: 'Port forward' },
         ],
       });
     }
 
     groups.push({
-      title: "Namespace",
+      title: 'Namespace',
       shortcuts: [
         {
           key: NAVIGATION_SHORTCUTS.NAMESPACE_SWITCH[0],
-          description: "Switch namespace",
+          description: 'Switch namespace',
         },
-        { key: "0-9", description: "Quick select namespace" },
+        { key: '0-9', description: 'Quick select namespace' },
       ],
     });
 
@@ -128,12 +119,8 @@
           <div class="space-y-1">
             {#each group.shortcuts as shortcut}
               <div class="flex items-center justify-between py-1">
-                <span class="text-sm text-muted-foreground"
-                  >{shortcut.description}</span
-                >
-                <kbd
-                  class="rounded border bg-muted px-2 py-1 text-xs font-semibold"
-                >
+                <span class="text-sm text-muted-foreground">{shortcut.description}</span>
+                <kbd class="rounded border bg-muted px-2 py-1 text-xs font-semibold">
                   {shortcut.key}
                 </kbd>
               </div>

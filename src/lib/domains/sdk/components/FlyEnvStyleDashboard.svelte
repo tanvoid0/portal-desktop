@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount } from 'svelte';
   import {
     sdkActions,
     sdkManagers,
@@ -11,29 +11,24 @@
     installedSDKs,
     isDetecting,
     detectionError,
-  } from "../stores/sdkStore";
-  import { sdkService } from "../services/sdkService";
-  import { logger } from "$lib/domains/shared";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { Button } from "$lib/components/ui/button";
+  } from '../stores/sdkStore';
+  import { sdkService } from '../services/sdkService';
+  import { logger } from '$lib/domains/shared';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { Button } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import Select from "$lib/components/ui/select.svelte";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import Select from '$lib/components/ui/select.svelte';
   import {
     Dialog,
     DialogContent,
@@ -41,7 +36,7 @@
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from "$lib/components/ui/dialog";
+  } from '$lib/components/ui/dialog';
   import {
     RefreshCw,
     Download,
@@ -59,7 +54,7 @@
     ArrowRightLeft,
     Play,
     Square,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface Props {
     onSDKSelect?: (sdk: any) => void;
@@ -69,9 +64,9 @@
   const { onSDKSelect, onVersionSwitch }: Props = $props();
 
   let refreshing = $state(false);
-  let selectedProjectPath = $state("");
-  let selectedSDKType = $state("");
-  let selectedVersion = $state("");
+  let selectedProjectPath = $state('');
+  let selectedSDKType = $state('');
+  let selectedVersion = $state('');
   let availableVersions = $state<string[]>([]);
   let showProjectDialog = $state(false);
 
@@ -93,8 +88,8 @@
 
   // Debug: Log managers array changes
   $effect(() => {
-    logger.info("Managers array updated", {
-      context: "FlyEnvStyleDashboard",
+    logger.info('Managers array updated', {
+      context: 'FlyEnvStyleDashboard',
       data: {
         managers: managers,
         managersLength: managers.length,
@@ -115,27 +110,27 @@
 
     managers.forEach((manager) => {
       // Categorize based on manager category or sdk_type
-      let category = manager.category || "other";
+      let category = manager.category || 'other';
 
       // Fallback to sdk_type if category is not available
-      if (!category || category === "other") {
-        const sdkType = manager.sdk_type || manager.type || "";
+      if (!category || category === 'other') {
+        const sdkType = manager.sdk_type || manager.type || '';
         if (
-          sdkType.includes("node") ||
-          sdkType.includes("python") ||
-          sdkType.includes("java") ||
-          sdkType.includes("rust") ||
-          sdkType.includes("go") ||
-          sdkType.includes("ruby") ||
-          sdkType.includes("php")
+          sdkType.includes('node') ||
+          sdkType.includes('python') ||
+          sdkType.includes('java') ||
+          sdkType.includes('rust') ||
+          sdkType.includes('go') ||
+          sdkType.includes('ruby') ||
+          sdkType.includes('php')
         ) {
-          category = "language";
-        } else if (sdkType.includes("nginx") || sdkType.includes("apache")) {
-          category = "web";
-        } else if (sdkType.includes("docker") || sdkType.includes("podman")) {
-          category = "container";
-        } else if (sdkType.includes("npm") || sdkType.includes("pip")) {
-          category = "package";
+          category = 'language';
+        } else if (sdkType.includes('nginx') || sdkType.includes('apache')) {
+          category = 'web';
+        } else if (sdkType.includes('docker') || sdkType.includes('podman')) {
+          category = 'container';
+        } else if (sdkType.includes('npm') || sdkType.includes('pip')) {
+          category = 'package';
         }
       }
 
@@ -159,8 +154,8 @@
       refreshing = true;
       sdkActions.setDetecting(true);
 
-      logger.info("Starting comprehensive SDK detection", {
-        context: "FlyEnvStyleDashboard",
+      logger.info('Starting comprehensive SDK detection', {
+        context: 'FlyEnvStyleDashboard',
       });
 
       const allSDKs = await sdkService.getAllAvailableSDKs();
@@ -169,48 +164,42 @@
         sdks: [],
         errors: [],
       };
-      logger.info("SDK detection result received", {
-        context: "FlyEnvStyleDashboard",
+      logger.info('SDK detection result received', {
+        context: 'FlyEnvStyleDashboard',
         data: result,
       });
 
       // Debug: Log the managers array specifically
-      logger.info("Managers array details", {
-        context: "FlyEnvStyleDashboard",
+      logger.info('Managers array details', {
+        context: 'FlyEnvStyleDashboard',
         data: {
           managers: result.managers,
           managersLength: result.managers.length,
           firstManager: result.managers[0],
-          firstManagerKeys: result.managers[0]
-            ? Object.keys(result.managers[0])
-            : "no managers",
-          firstManagerInstalled: result.managers[0]
-            ? result.managers[0].installed
-            : "no managers",
+          firstManagerKeys: result.managers[0] ? Object.keys(result.managers[0]) : 'no managers',
+          firstManagerInstalled: result.managers[0] ? result.managers[0].installed : 'no managers',
           firstManagerInstalledType: result.managers[0]
             ? typeof result.managers[0].installed
-            : "no managers",
+            : 'no managers',
           fullResult: result,
         },
       });
 
       sdkActions.setDetectionResult(result);
 
-      logger.info("SDK detection completed", {
-        context: "FlyEnvStyleDashboard",
+      logger.info('SDK detection completed', {
+        context: 'FlyEnvStyleDashboard',
         data: {
           managersCount: result.managers.length,
           sdksCount: result.sdks.length,
         },
       });
     } catch (err) {
-      logger.error("SDK detection failed", {
-        context: "FlyEnvStyleDashboard",
+      logger.error('SDK detection failed', {
+        context: 'FlyEnvStyleDashboard',
         error: err,
       });
-      sdkActions.setDetectionError(
-        err instanceof Error ? err.message : "Detection failed",
-      );
+      sdkActions.setDetectionError(err instanceof Error ? err.message : 'Detection failed');
     } finally {
       refreshing = false;
       sdkActions.setDetecting(false);
@@ -226,13 +215,13 @@
 
     try {
       await sdkService.setupProjectEnvironment(selectedProjectPath);
-      logger.info("Project environment setup completed", {
-        context: "FlyEnvStyleDashboard",
+      logger.info('Project environment setup completed', {
+        context: 'FlyEnvStyleDashboard',
         data: { projectPath: selectedProjectPath },
       });
     } catch (err) {
-      logger.error("Failed to setup project environment", {
-        context: "FlyEnvStyleDashboard",
+      logger.error('Failed to setup project environment', {
+        context: 'FlyEnvStyleDashboard',
         error: err,
       });
     }
@@ -243,13 +232,13 @@
 
     try {
       await sdkService.setupTerminalIntegration(selectedProjectPath);
-      logger.info("Terminal integration setup completed", {
-        context: "FlyEnvStyleDashboard",
+      logger.info('Terminal integration setup completed', {
+        context: 'FlyEnvStyleDashboard',
         data: { projectPath: selectedProjectPath },
       });
     } catch (err) {
-      logger.error("Failed to setup terminal integration", {
-        context: "FlyEnvStyleDashboard",
+      logger.error('Failed to setup terminal integration', {
+        context: 'FlyEnvStyleDashboard',
         error: err,
       });
     }
@@ -259,13 +248,9 @@
     if (!selectedProjectPath || !selectedSDKType || !selectedVersion) return;
 
     try {
-      await sdkService.createProjectConfig(
-        selectedProjectPath,
-        selectedSDKType,
-        selectedVersion,
-      );
-      logger.info("Project config created", {
-        context: "FlyEnvStyleDashboard",
+      await sdkService.createProjectConfig(selectedProjectPath, selectedSDKType, selectedVersion);
+      logger.info('Project config created', {
+        context: 'FlyEnvStyleDashboard',
         data: {
           projectPath: selectedProjectPath,
           sdkType: selectedSDKType,
@@ -274,8 +259,8 @@
       });
       showProjectDialog = false;
     } catch (err) {
-      logger.error("Failed to create project config", {
-        context: "FlyEnvStyleDashboard",
+      logger.error('Failed to create project config', {
+        context: 'FlyEnvStyleDashboard',
         error: err,
       });
     }
@@ -286,8 +271,8 @@
     try {
       availableVersions = await sdkService.listVersions(sdkType);
     } catch (err) {
-      logger.error("Failed to list versions", {
-        context: "FlyEnvStyleDashboard",
+      logger.error('Failed to list versions', {
+        context: 'FlyEnvStyleDashboard',
         error: err,
       });
       availableVersions = [];
@@ -300,15 +285,15 @@
 
   function getCategoryIcon(category: string) {
     switch (category) {
-      case "language":
+      case 'language':
         return Code;
-      case "web":
+      case 'web':
         return Globe;
-      case "database":
+      case 'database':
         return Database;
-      case "container":
+      case 'container':
         return Container;
-      case "package":
+      case 'package':
         return Download;
       default:
         return Settings;
@@ -317,18 +302,18 @@
 
   function getCategoryName(category: string) {
     switch (category) {
-      case "language":
-        return "Programming Languages";
-      case "web":
-        return "Web Servers";
-      case "database":
-        return "Databases";
-      case "container":
-        return "Containers";
-      case "package":
-        return "Package Managers";
+      case 'language':
+        return 'Programming Languages';
+      case 'web':
+        return 'Web Servers';
+      case 'database':
+        return 'Databases';
+      case 'container':
+        return 'Containers';
+      case 'package':
+        return 'Package Managers';
       default:
-        return "Other Tools";
+        return 'Other Tools';
     }
   }
 
@@ -343,8 +328,8 @@
     try {
       availableVersions = await sdkService.listVersions(sdk.type);
     } catch (err) {
-      logger.error("Failed to list versions", {
-        context: "FlyEnvStyleDashboard",
+      logger.error('Failed to list versions', {
+        context: 'FlyEnvStyleDashboard',
         error: err,
       });
       availableVersions = [];
@@ -357,8 +342,8 @@
     try {
       availableVersions = await sdkService.listVersions(sdk.type);
     } catch (err) {
-      logger.error("Failed to list versions", {
-        context: "FlyEnvStyleDashboard",
+      logger.error('Failed to list versions', {
+        context: 'FlyEnvStyleDashboard',
         error: err,
       });
       availableVersions = [];
@@ -384,8 +369,7 @@
       // Refresh the detection
       await detectSDKs();
     } catch (err) {
-      operationError =
-        err instanceof Error ? err.message : "Installation failed";
+      operationError = err instanceof Error ? err.message : 'Installation failed';
     } finally {
       operationLoading = false;
     }
@@ -411,8 +395,7 @@
       // Refresh the detection
       await detectSDKs();
     } catch (err) {
-      operationError =
-        err instanceof Error ? err.message : "Installation failed";
+      operationError = err instanceof Error ? err.message : 'Installation failed';
     } finally {
       operationLoading = false;
     }
@@ -438,8 +421,7 @@
       // Refresh the detection
       await detectSDKs();
     } catch (err) {
-      operationError =
-        err instanceof Error ? err.message : "Version switch failed";
+      operationError = err instanceof Error ? err.message : 'Version switch failed';
     } finally {
       operationLoading = false;
     }
@@ -448,7 +430,7 @@
   async function handleRemoveSDK(sdk: any) {
     const confirmed = await confirmAction(
       `Are you sure you want to remove ${sdk.name}?`,
-      "Remove SDK",
+      'Remove SDK'
     );
     if (!confirmed) return;
 
@@ -466,7 +448,7 @@
       // Refresh the detection
       await detectSDKs();
     } catch (err) {
-      operationError = err instanceof Error ? err.message : "Removal failed";
+      operationError = err instanceof Error ? err.message : 'Removal failed';
     } finally {
       operationLoading = false;
     }
@@ -508,9 +490,7 @@
         <DialogContent class="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Project Environment Setup</DialogTitle>
-            <DialogDescription>
-              Configure SDK versions for your project directory
-            </DialogDescription>
+            <DialogDescription>Configure SDK versions for your project directory</DialogDescription>
           </DialogHeader>
           <div class="space-y-4">
             <div>
@@ -525,13 +505,13 @@
               <Label for="sdk-type">SDK Type</Label>
               <Select
                 options={[
-                  { value: "node", label: "Node.js" },
-                  { value: "python", label: "Python" },
-                  { value: "rust", label: "Rust" },
-                  { value: "java", label: "Java" },
-                  { value: "go", label: "Go" },
-                  { value: "php", label: "PHP" },
-                  { value: "ruby", label: "Ruby" },
+                  { value: 'node', label: 'Node.js' },
+                  { value: 'python', label: 'Python' },
+                  { value: 'rust', label: 'Rust' },
+                  { value: 'java', label: 'Java' },
+                  { value: 'go', label: 'Go' },
+                  { value: 'php', label: 'PHP' },
+                  { value: 'ruby', label: 'Ruby' },
                 ]}
                 onSelect={handleSDKTypeChange}
                 placeholder="Select SDK type"
@@ -552,9 +532,7 @@
             <div class="flex gap-2">
               <Button
                 onclick={handleCreateProjectConfig}
-                disabled={!selectedProjectPath ||
-                  !selectedSDKType ||
-                  !selectedVersion}
+                disabled={!selectedProjectPath || !selectedSDKType || !selectedVersion}
               >
                 <Zap class="mr-2 h-4 w-4" />
                 Create Config
@@ -596,12 +574,7 @@
       <AlertCircle class="h-4 w-4" />
       <AlertDescription>
         {operationError}
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={clearOperationMessages}
-          class="ml-2"
-        >
+        <Button variant="ghost" size="sm" onclick={clearOperationMessages} class="ml-2">
           <Square class="h-3 w-3" />
         </Button>
       </AlertDescription>
@@ -613,12 +586,7 @@
       <AlertCircle class="h-4 w-4 text-green-600" />
       <AlertDescription class="text-green-800">
         {operationSuccess}
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={clearOperationMessages}
-          class="ml-2"
-        >
+        <Button variant="ghost" size="sm" onclick={clearOperationMessages} class="ml-2">
           <Square class="h-3 w-3" />
         </Button>
       </AlertDescription>
@@ -644,9 +612,7 @@
         <!-- Quick Stats -->
         <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle class="text-sm font-medium">Total Managers</CardTitle>
               <Settings class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -655,9 +621,7 @@
             </CardContent>
           </Card>
           <Card class="col-span-1">
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle class="text-sm font-medium">Installed SDKs</CardTitle>
               <Download class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -666,9 +630,7 @@
             </CardContent>
           </Card>
           <Card class="col-span-1">
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle class="text-sm font-medium">Languages</CardTitle>
               <Code class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -679,9 +641,7 @@
             </CardContent>
           </Card>
           <Card class="col-span-1">
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle class="text-sm font-medium">Web Servers</CardTitle>
               <Globe class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -697,9 +657,7 @@
         <Card>
           <CardHeader>
             <CardTitle>FlyEnv-Style Features</CardTitle>
-            <CardDescription
-              >Comprehensive development environment management</CardDescription
-            >
+            <CardDescription>Comprehensive development environment management</CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -708,8 +666,7 @@
                 <div>
                   <h4 class="font-semibold">Project-Level Isolation</h4>
                   <p class="text-sm text-muted-foreground">
-                    Automatic SDK version switching when entering project
-                    directories
+                    Automatic SDK version switching when entering project directories
                   </p>
                 </div>
               </div>
@@ -759,15 +716,11 @@
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div
-                    class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
-                  >
+                  <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {#each categoryManagers as manager}
                       <Card class="transition-shadow hover:shadow-md">
                         <CardHeader class="pb-2">
-                          <CardTitle
-                            class="flex items-center justify-between text-sm"
-                          >
+                          <CardTitle class="flex items-center justify-between text-sm">
                             {manager.display_name || manager.name}
                             <Badge variant="outline" class="text-xs">
                               {manager.version}
@@ -777,25 +730,19 @@
                         <CardContent class="space-y-3 pt-0">
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-muted-foreground"
-                              >{manager.sdk_type ||
-                                manager.type ||
-                                manager.name}</span
+                              >{manager.sdk_type || manager.type || manager.name}</span
                             >
                             <Badge
-                              variant={manager.installed === "true"
-                                ? "default"
-                                : "secondary"}
+                              variant={manager.installed === 'true' ? 'default' : 'secondary'}
                               class="text-xs"
                             >
-                              {manager.installed === "true"
-                                ? "Installed"
-                                : "Not Found"}
+                              {manager.installed === 'true' ? 'Installed' : 'Not Found'}
                             </Badge>
                           </div>
 
                           <!-- Action Buttons -->
                           <div class="flex gap-1">
-                            {#if manager.installed !== "true"}
+                            {#if manager.installed !== 'true'}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -848,8 +795,7 @@
               <Settings class="mb-2 h-8 w-8 text-muted-foreground" />
               <p class="text-muted-foreground">No SDK managers detected</p>
               <p class="text-sm text-muted-foreground">
-                Install SDK managers like nvm, pyenv, rustup, or sdkman to get
-                started
+                Install SDK managers like nvm, pyenv, rustup, or sdkman to get started
               </p>
             </CardContent>
           </Card>
@@ -873,17 +819,13 @@
                 <CardContent class="space-y-3 pt-0">
                   <div class="flex items-center justify-between">
                     <Badge variant="outline" class="text-xs">
-                      {sdk.installation.activeVersion || "No version"}
+                      {sdk.installation.activeVersion || 'No version'}
                     </Badge>
                     <Badge
-                      variant={sdk.installation.installed
-                        ? "default"
-                        : "secondary"}
+                      variant={sdk.installation.installed ? 'default' : 'secondary'}
                       class="text-xs"
                     >
-                      {sdk.installation.installed
-                        ? "Installed"
-                        : "Not Installed"}
+                      {sdk.installation.installed ? 'Installed' : 'Not Installed'}
                     </Badge>
                   </div>
 
@@ -928,9 +870,7 @@
             <CardContent class="flex flex-col items-center justify-center py-8">
               <Download class="mb-2 h-8 w-8 text-muted-foreground" />
               <p class="text-muted-foreground">No SDK installations found</p>
-              <p class="text-sm text-muted-foreground">
-                Install SDKs using the managers above
-              </p>
+              <p class="text-sm text-muted-foreground">Install SDKs using the managers above</p>
             </CardContent>
           </Card>
         {/if}
@@ -944,8 +884,7 @@
       <DialogHeader>
         <DialogTitle>Install SDK Manager</DialogTitle>
         <DialogDescription>
-          Install {selectedManager?.display_name || selectedManager?.name} to manage
-          SDK versions
+          Install {selectedManager?.display_name || selectedManager?.name} to manage SDK versions
         </DialogDescription>
       </DialogHeader>
       <div class="space-y-4">
@@ -966,8 +905,8 @@
             <Label>Installation Method</Label>
             <Select
               options={[
-                { value: "auto", label: "Automatic (Recommended)" },
-                { value: "manual", label: "Manual Installation" },
+                { value: 'auto', label: 'Automatic (Recommended)' },
+                { value: 'manual', label: 'Manual Installation' },
               ]}
               defaultValue="auto"
               placeholder="Select installation method"
@@ -975,11 +914,7 @@
           </div>
 
           <div class="flex gap-2">
-            <Button
-              onclick={executeInstallManager}
-              disabled={operationLoading}
-              class="flex-1"
-            >
+            <Button onclick={executeInstallManager} disabled={operationLoading} class="flex-1">
               {#if operationLoading}
                 <RefreshCw class="mr-2 h-4 w-4 animate-spin" />
               {:else}
@@ -987,10 +922,7 @@
               {/if}
               Install Manager
             </Button>
-            <Button
-              variant="outline"
-              onclick={() => (showInstallManagerDialog = false)}
-            >
+            <Button variant="outline" onclick={() => (showInstallManagerDialog = false)}>
               Cancel
             </Button>
           </div>
@@ -1045,12 +977,7 @@
               {/if}
               Install Version
             </Button>
-            <Button
-              variant="outline"
-              onclick={() => (showInstallSDKDialog = false)}
-            >
-              Cancel
-            </Button>
+            <Button variant="outline" onclick={() => (showInstallSDKDialog = false)}>Cancel</Button>
           </div>
         {/if}
       </div>
@@ -1073,7 +1000,7 @@
             <div class="rounded-md bg-muted p-3">
               <div class="font-medium">{selectedSDK.name}</div>
               <div class="text-sm text-muted-foreground">
-                Current: {selectedSDK.installation?.activeVersion || "None"}
+                Current: {selectedSDK.installation?.activeVersion || 'None'}
               </div>
             </div>
           </div>
@@ -1097,9 +1024,7 @@
               bind:value={selectedProjectPath}
               placeholder="/path/to/your/project"
             />
-            <p class="text-xs text-muted-foreground">
-              Leave empty for global switch
-            </p>
+            <p class="text-xs text-muted-foreground">Leave empty for global switch</p>
           </div>
 
           <div class="flex gap-2">
@@ -1115,10 +1040,7 @@
               {/if}
               Switch Version
             </Button>
-            <Button
-              variant="outline"
-              onclick={() => (showSwitchVersionDialog = false)}
-            >
+            <Button variant="outline" onclick={() => (showSwitchVersionDialog = false)}>
               Cancel
             </Button>
           </div>

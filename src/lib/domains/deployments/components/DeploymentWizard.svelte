@@ -5,24 +5,20 @@
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import Select from "$lib/components/ui/select.svelte";
-  import {
-    DeploymentType,
-    ProjectType,
-    type DeploymentCreateRequest,
-  } from "../types";
+  } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import Select from '$lib/components/ui/select.svelte';
+  import { DeploymentType, ProjectType, type DeploymentCreateRequest } from '../types';
   import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-  } from "$lib/components/ui/dialog";
+  } from '$lib/components/ui/dialog';
 
   interface Props {
     onCreate?: (data: DeploymentCreateRequest) => void;
@@ -32,20 +28,20 @@
   let { onCreate, onCancel }: Props = $props();
 
   let deploymentType = $state<DeploymentType>(DeploymentType.DOCKER);
-  let name = $state("");
-  let description = $state("");
-  let projectPath = $state("");
+  let name = $state('');
+  let description = $state('');
+  let projectPath = $state('');
   let projectType = $state<ProjectType>(ProjectType.NODE);
-  let sdkVersion = $state("latest");
+  let sdkVersion = $state('latest');
 
   // Docker-specific fields
-  let dockerImageName = $state("");
-  let dockerfilePath = $state("");
+  let dockerImageName = $state('');
+  let dockerfilePath = $state('');
   let exposedPort = $state<number | undefined>(3000);
 
   // CLI-specific fields
-  let command = $state("");
-  let workingDirectory = $state("");
+  let command = $state('');
+  let workingDirectory = $state('');
 
   // Environment variables
   let envVars = $state<Record<string, string>>({});
@@ -75,28 +71,21 @@
       },
       // Docker-specific
       dockerImageName:
-        deploymentType === DeploymentType.DOCKER
-          ? dockerImageName || undefined
-          : undefined,
+        deploymentType === DeploymentType.DOCKER ? dockerImageName || undefined : undefined,
       dockerfilePath:
-        deploymentType === DeploymentType.DOCKER
-          ? dockerfilePath || undefined
-          : undefined,
-      exposedPort:
-        deploymentType === DeploymentType.DOCKER ? exposedPort : undefined,
+        deploymentType === DeploymentType.DOCKER ? dockerfilePath || undefined : undefined,
+      exposedPort: deploymentType === DeploymentType.DOCKER ? exposedPort : undefined,
       // CLI-specific
       command: deploymentType === DeploymentType.CLI ? command : undefined,
       workingDirectory:
-        deploymentType === DeploymentType.CLI
-          ? workingDirectory || projectPath
-          : undefined,
+        deploymentType === DeploymentType.CLI ? workingDirectory || projectPath : undefined,
     };
 
     onCreate?.(request);
   }
 
   function addEnvVar() {
-    envVars = { ...envVars, "": "" };
+    envVars = { ...envVars, '': '' };
   }
 
   function removeEnvVar(key: string) {
@@ -133,8 +122,8 @@
         <Label for="deploymentType">Deployment Type</Label>
         <Select
           options={[
-            { value: DeploymentType.DOCKER, label: "Docker" },
-            { value: DeploymentType.CLI, label: "CLI Command" },
+            { value: DeploymentType.DOCKER, label: 'Docker' },
+            { value: DeploymentType.CLI, label: 'CLI Command' },
           ]}
           defaultValue={deploymentType}
           onSelect={(value) => {
@@ -151,20 +140,12 @@
 
       <div>
         <Label for="description">Description</Label>
-        <Textarea
-          id="description"
-          bind:value={description}
-          placeholder="Optional description"
-        />
+        <Textarea id="description" bind:value={description} placeholder="Optional description" />
       </div>
 
       <div>
         <Label for="projectPath">Project Path *</Label>
-        <Input
-          id="projectPath"
-          bind:value={projectPath}
-          placeholder="/path/to/project"
-        />
+        <Input id="projectPath" bind:value={projectPath} placeholder="/path/to/project" />
       </div>
 
       <div>
@@ -205,12 +186,7 @@
 
         <div>
           <Label for="exposedPort">Exposed Port</Label>
-          <Input
-            id="exposedPort"
-            type="number"
-            bind:value={exposedPort}
-            placeholder="3000"
-          />
+          <Input id="exposedPort" type="number" bind:value={exposedPort} placeholder="3000" />
         </div>
       {/if}
 
@@ -220,8 +196,7 @@
           <Label for="command">Command *</Label>
           <Input id="command" bind:value={command} placeholder="npm start" />
           <p class="mt-1 text-xs text-muted-foreground">
-            Enter the command to run (e.g., "npm start", "python app.py", "cargo
-            run")
+            Enter the command to run (e.g., "npm start", "python app.py", "cargo run")
           </p>
         </div>
 
@@ -257,27 +232,17 @@
                   updateEnvVar(key, key, input.value);
                 }}
               />
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={() => removeEnvVar(key)}
-              >
-                Remove
-              </Button>
+              <Button variant="outline" size="sm" onclick={() => removeEnvVar(key)}>Remove</Button>
             </div>
           {/each}
-          <Button variant="outline" size="sm" onclick={addEnvVar}>
-            Add Environment Variable
-          </Button>
+          <Button variant="outline" size="sm" onclick={addEnvVar}>Add Environment Variable</Button>
         </div>
       </div>
 
       <div class="flex gap-2 pt-4">
         <Button
           onclick={handleSubmit}
-          disabled={!name ||
-            !projectPath ||
-            (deploymentType === DeploymentType.CLI && !command)}
+          disabled={!name || !projectPath || (deploymentType === DeploymentType.CLI && !command)}
         >
           Create Deployment
         </Button>

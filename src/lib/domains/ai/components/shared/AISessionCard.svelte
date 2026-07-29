@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Trash2 } from "@lucide/svelte";
-  import { cn } from "$lib/utils";
+  import { Button } from '$lib/components/ui/button';
+  import { Trash2 } from '@lucide/svelte';
+  import { cn } from '$lib/utils';
   import {
     formatCount,
     formatSessionDateTime,
     formatSessionDateTimeFull,
-  } from "$lib/domains/shared/utils";
+  } from '$lib/domains/shared/utils';
 
   export interface SessionCardBadge {
     label: string;
-    variant?: "default" | "secondary" | "outline" | "destructive";
+    variant?: 'default' | 'secondary' | 'outline' | 'destructive';
     class?: string;
   }
 
@@ -36,7 +36,7 @@
     isRunning = false,
     onClick,
     onDelete,
-    deleteTitle = "Delete",
+    deleteTitle = 'Delete',
     updatedAt = null,
     messageCount = 0,
     subtitle = null,
@@ -45,24 +45,18 @@
     queuedCount = 0,
   }: Props = $props();
 
-  const updatedIso = $derived(
-    updatedAt instanceof Date ? updatedAt.toISOString() : updatedAt,
-  );
-  const updatedLabel = $derived(
-    updatedIso ? formatSessionDateTime(updatedIso) : "",
-  );
+  const updatedIso = $derived(updatedAt instanceof Date ? updatedAt.toISOString() : updatedAt);
+  const updatedLabel = $derived(updatedIso ? formatSessionDateTime(updatedIso) : '');
 
   /** Everything that used to take a second line now lives in the tooltip. */
   const tooltip = $derived(
     [title, subtitle, updatedIso ? formatSessionDateTimeFull(updatedIso) : null]
       .filter(Boolean)
-      .join("\n"),
+      .join('\n')
   );
 
   /** Right-hand metric, mirroring LM Studio's per-row token count. */
-  const metric = $derived(
-    messageCount > 0 ? formatCount(messageCount, "message") : updatedLabel,
-  );
+  const metric = $derived(messageCount > 0 ? formatCount(messageCount, 'message') : updatedLabel);
 
   function handleDelete(e: MouseEvent) {
     e.stopPropagation();
@@ -70,7 +64,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onClick?.();
     }
@@ -83,10 +77,10 @@
   tabindex="0"
   title={tooltip}
   class={cn(
-    "group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+    'group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors',
     isActive
-      ? "bg-primary font-medium text-primary-foreground"
-      : "text-foreground hover:bg-muted/60",
+      ? 'bg-primary font-medium text-primary-foreground'
+      : 'text-foreground hover:bg-muted/60'
   )}
   onclick={() => onClick?.()}
   onkeydown={handleKeydown}
@@ -94,8 +88,8 @@
   {#if isRunning}
     <span
       class={cn(
-        "h-1.5 w-1.5 shrink-0 animate-pulse rounded-full",
-        isActive ? "bg-primary-foreground" : "bg-primary",
+        'h-1.5 w-1.5 shrink-0 animate-pulse rounded-full',
+        isActive ? 'bg-primary-foreground' : 'bg-primary'
       )}
       aria-label="Running"
     ></span>
@@ -106,8 +100,8 @@
   {#each inlineBadges as badge (badge.label)}
     <span
       class={cn(
-        "shrink-0 rounded px-1 text-[10px]",
-        isActive ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground",
+        'shrink-0 rounded px-1 text-[10px]',
+        isActive ? 'bg-primary-foreground/20' : 'bg-muted text-muted-foreground'
       )}
     >
       {badge.label}
@@ -117,8 +111,8 @@
   {#if queuedCount > 0}
     <span
       class={cn(
-        "shrink-0 rounded px-1 text-[10px] tabular-nums",
-        isActive ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground",
+        'shrink-0 rounded px-1 text-[10px] tabular-nums',
+        isActive ? 'bg-primary-foreground/20' : 'bg-muted text-muted-foreground'
       )}
       title="{formatCount(queuedCount, 'message')} queued"
     >
@@ -129,8 +123,8 @@
   {#each trailingBadges as badge (badge.label)}
     <span
       class={cn(
-        "shrink-0 rounded px-1 text-[10px]",
-        isActive ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground",
+        'shrink-0 rounded px-1 text-[10px]',
+        isActive ? 'bg-primary-foreground/20' : 'bg-muted text-muted-foreground'
       )}
     >
       {badge.label}
@@ -140,9 +134,9 @@
   {#if metric}
     <span
       class={cn(
-        "shrink-0 text-[11px] tabular-nums",
-        isActive ? "text-primary-foreground/70" : "text-muted-foreground",
-        onDelete && "group-hover:hidden",
+        'shrink-0 text-[11px] tabular-nums',
+        isActive ? 'text-primary-foreground/70' : 'text-muted-foreground',
+        onDelete && 'group-hover:hidden'
       )}
     >
       {metric}
@@ -154,10 +148,10 @@
       variant="ghost"
       size="icon"
       class={cn(
-        "hidden h-5 w-5 shrink-0 group-hover:flex",
+        'hidden h-5 w-5 shrink-0 group-hover:flex',
         isActive
-          ? "text-primary-foreground hover:bg-primary-foreground/20"
-          : "text-muted-foreground hover:text-destructive",
+          ? 'text-primary-foreground hover:bg-primary-foreground/20'
+          : 'text-muted-foreground hover:text-destructive'
       )}
       onclick={handleDelete}
       title={deleteTitle}

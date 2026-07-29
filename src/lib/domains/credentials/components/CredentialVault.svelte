@@ -3,39 +3,29 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount } from 'svelte';
   import {
     credentialActions,
     filteredCredentials,
     credentialStats,
     isLoading,
     error,
-  } from "../stores/credentialStore";
-  import { credentialService } from "../services/credentialService";
-  import { logger } from "$lib/domains/shared";
-  import { toast } from "$lib/utils/toast";
-  import CredentialCard from "./CredentialCard.svelte";
-  import CredentialForm from "./CredentialForm.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Plus, Search, Shield } from "@lucide/svelte";
-  import {
-    PageHeader,
-    PageLoading,
-    PageError,
-    PageEmpty,
-  } from "$lib/components/shell";
-  import type { CredentialType, Credential } from "../types";
+  } from '../stores/credentialStore';
+  import { credentialService } from '../services/credentialService';
+  import { logger } from '$lib/domains/shared';
+  import { toast } from '$lib/utils/toast';
+  import CredentialCard from './CredentialCard.svelte';
+  import CredentialForm from './CredentialForm.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Plus, Search, Shield } from '@lucide/svelte';
+  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import type { CredentialType, Credential } from '../types';
 
-  let searchQuery = $state("");
+  let searchQuery = $state('');
   let selectedType = $state<CredentialType | null>(null);
   let selectedTags = $state<string[]>([]);
   let showForm = $state(false);
@@ -56,24 +46,22 @@
       credentialActions.setLoading(true);
       credentialActions.setError(null);
 
-      logger.info("CredentialVault", "Loading credentials");
+      logger.info('CredentialVault', 'Loading credentials');
 
       const credentialList = await credentialService.getCredentials();
       credentialActions.setCredentials(credentialList);
 
-      logger.info("Credentials loaded", {
-        context: "CredentialVault",
+      logger.info('Credentials loaded', {
+        context: 'CredentialVault',
         count: credentialList.length,
       });
     } catch (err) {
-      logger.error("Failed to load credentials", {
-        context: "CredentialVault",
+      logger.error('Failed to load credentials', {
+        context: 'CredentialVault',
         error: err,
       });
-      credentialActions.setError(
-        err instanceof Error ? err.message : "Failed to load credentials",
-      );
-      toast.error("Failed to load credentials");
+      credentialActions.setError(err instanceof Error ? err.message : 'Failed to load credentials');
+      toast.error('Failed to load credentials');
     } finally {
       credentialActions.setLoading(false);
     }
@@ -111,17 +99,17 @@
   function handleFormSave(credential: Credential) {
     if (editingCredential) {
       credentialActions.updateCredential(credential.id, credential);
-      toast.success("Credential updated");
+      toast.success('Credential updated');
     } else {
       credentialActions.addCredential(credential);
-      toast.success("Credential created");
+      toast.success('Credential created');
     }
     handleFormClose();
   }
 
   function handleDeleteCredential(credentialId: string) {
     credentialActions.removeCredential(credentialId);
-    toast.success("Credential deleted");
+    toast.success('Credential deleted');
   }
 </script>
 
@@ -141,9 +129,7 @@
   <!-- Stats Cards -->
   <div class="grid gap-4 md:grid-cols-4">
     <Card>
-      <CardHeader
-        class="flex flex-row items-center justify-between space-y-0 pb-2"
-      >
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle class="text-sm font-medium">Total Credentials</CardTitle>
         <Shield class="h-4 w-4 text-muted-foreground" />
       </CardHeader>
@@ -152,9 +138,7 @@
       </CardContent>
     </Card>
     <Card>
-      <CardHeader
-        class="flex flex-row items-center justify-between space-y-0 pb-2"
-      >
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle class="text-sm font-medium">Active</CardTitle>
         <Badge variant="default">{stats.active}</Badge>
       </CardHeader>
@@ -163,9 +147,7 @@
       </CardContent>
     </Card>
     <Card>
-      <CardHeader
-        class="flex flex-row items-center justify-between space-y-0 pb-2"
-      >
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle class="text-sm font-medium">Expired</CardTitle>
         <Badge variant="destructive">{stats.expired}</Badge>
       </CardHeader>
@@ -174,9 +156,7 @@
       </CardContent>
     </Card>
     <Card>
-      <CardHeader
-        class="flex flex-row items-center justify-between space-y-0 pb-2"
-      >
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle class="text-sm font-medium">Types</CardTitle>
         <Badge variant="outline">{Object.keys(stats.byType).length}</Badge>
       </CardHeader>
@@ -203,19 +183,18 @@
     </div>
     <Select
       options={[
-        { value: "", label: "All Types" },
-        { value: "ssh_key", label: "SSH Keys" },
-        { value: "api_token", label: "API Tokens" },
-        { value: "env_var", label: "Environment Variables" },
-        { value: "database", label: "Database" },
-        { value: "cloud_provider", label: "Cloud Provider" },
-        { value: "registry", label: "Registry" },
-        { value: "other", label: "Other" },
+        { value: '', label: 'All Types' },
+        { value: 'ssh_key', label: 'SSH Keys' },
+        { value: 'api_token', label: 'API Tokens' },
+        { value: 'env_var', label: 'Environment Variables' },
+        { value: 'database', label: 'Database' },
+        { value: 'cloud_provider', label: 'Cloud Provider' },
+        { value: 'registry', label: 'Registry' },
+        { value: 'other', label: 'Other' },
       ]}
-      defaultValue={selectedType || ""}
+      defaultValue={selectedType || ''}
       placeholder="Filter by type"
-      onSelect={(value) =>
-        handleTypeFilter(value ? (value as CredentialType) : null)}
+      onSelect={(value) => handleTypeFilter(value ? (value as CredentialType) : null)}
       class="w-[200px]"
     />
   </div>

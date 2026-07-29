@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Plus, Wrench } from "@lucide/svelte";
-  import { cn } from "$lib/utils.js";
-  import AIComposerShell from "./AIComposerShell.svelte";
-  import type { ContextUsage } from "../../types/index.js";
+  import type { Snippet } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Plus, Wrench } from '@lucide/svelte';
+  import { cn } from '$lib/utils.js';
+  import AIComposerShell from './AIComposerShell.svelte';
+  import type { ContextUsage } from '../../types/index.js';
 
   interface Props {
     value: string;
@@ -14,7 +14,7 @@
     running?: boolean;
     placeholder?: string;
     disabled?: boolean;
-    submitOn?: "enter" | "modifier-enter";
+    submitOn?: 'enter' | 'modifier-enter';
     rows?: number;
     class?: string;
     toolbar?: Snippet;
@@ -27,16 +27,16 @@
   }
 
   let {
-    value = $bindable(""),
+    value = $bindable(''),
     onValueChange,
     onSend,
     onStop,
     running = false,
-    placeholder = "Type your message...",
+    placeholder = 'Type your message...',
     disabled = false,
-    submitOn = "enter",
+    submitOn = 'enter',
     rows = 2,
-    class: className = "",
+    class: className = '',
     toolbar,
     hint = null,
     contextUsage = null,
@@ -46,15 +46,15 @@
 
   const hintText = $derived(
     hint ??
-      (submitOn === "modifier-enter"
-        ? "Ctrl/Cmd+Enter to send, Enter for new line"
-        : "Enter to send, Shift+Enter for new line"),
+      (submitOn === 'modifier-enter'
+        ? 'Ctrl/Cmd+Enter to send, Enter for new line'
+        : 'Enter to send, Shift+Enter for new line')
   );
 
   const tokenCounter = $derived(
     contextUsage
       ? `${contextUsage.total_estimated.toLocaleString()}/${contextUsage.context_window.toLocaleString()}`
-      : null,
+      : null
   );
 
   $effect(() => {
@@ -92,8 +92,8 @@
         variant="ghost"
         size="icon"
         class={cn(
-          "h-7 w-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted",
-          settingsOpen && "bg-muted text-foreground",
+          'h-7 w-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted',
+          settingsOpen && 'bg-muted text-foreground'
         )}
         title="Model parameters"
         onclick={onOpenSettings}

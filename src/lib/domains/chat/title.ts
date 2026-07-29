@@ -1,4 +1,4 @@
-export type ChatPlaceholderTitle = "New chat" | "New session";
+export type ChatPlaceholderTitle = 'New chat' | 'New session';
 
 export interface ThreadTitleEvent {
   thread_id: string;
@@ -13,15 +13,15 @@ export interface ChatDonePayload {
 
 export function isPlaceholderTitle(title: string | null | undefined): boolean {
   if (!title?.trim()) return true;
-  return title === "New chat" || title === "New session";
+  return title === 'New chat' || title === 'New session';
 }
 
 /** Client-side optimistic fallback (matches server). */
 export function fallbackTitleFromMessage(
   message: string,
-  defaultTitle: ChatPlaceholderTitle = "New chat",
+  defaultTitle: ChatPlaceholderTitle = 'New chat'
 ): string {
-  const text = message.trim().replace(/\s+/g, " ");
+  const text = message.trim().replace(/\s+/g, ' ');
   if (!text) return defaultTitle;
   if (text.length <= 48) return text;
   return `${text.slice(0, 45)}...`;
@@ -31,7 +31,7 @@ export function fallbackTitleFromMessage(
 export function reconcileThreadTitle(
   current: string | null | undefined,
   incoming: string,
-  fallback?: string,
+  fallback?: string
 ): string {
   if (!incoming.trim()) return current?.trim() || incoming;
   if (isPlaceholderTitle(incoming) && !isPlaceholderTitle(current)) {

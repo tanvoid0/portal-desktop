@@ -4,43 +4,33 @@
 -->
 
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { goto } from "$app/navigation";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { FolderOpen, CheckCircle, Database, Code } from "@lucide/svelte";
-  import ProjectCard from "$lib/domains/projects/components/ProjectCard.svelte";
-  import Select from "$lib/components/ui/select.svelte";
-  import { projectService } from "$lib/domains/projects";
-  import { createProjectsQuery } from "$lib/domains/projects/queries/projectQueries";
-  import type { Project } from "$lib/domains/projects/types";
-  import { projectIconRegistry } from "$lib/domains/projects/utils/iconRegistry";
-  import { logger } from "$lib/domains/shared/services/logger";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { formatBytes } from "$lib/domains/shared/utils";
-  import { getProjectFramework } from "$lib/domains/projects/utils/display";
-  import { breadcrumbActions } from "$lib/domains/shared/stores/breadcrumbStore";
-  import { WorkflowTrigger, WorkflowResults } from "$lib/domains/automation";
-  import type { WorkflowResult } from "$lib/domains/automation/types";
-  import {
-    PageHeader,
-    PageLoading,
-    PageError,
-    PageEmpty,
-  } from "$lib/components/shell";
-  import { Plus } from "@lucide/svelte";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { FolderOpen, CheckCircle, Database, Code } from '@lucide/svelte';
+  import ProjectCard from '$lib/domains/projects/components/ProjectCard.svelte';
+  import Select from '$lib/components/ui/select.svelte';
+  import { projectService } from '$lib/domains/projects';
+  import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
+  import type { Project } from '$lib/domains/projects/types';
+  import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
+  import { logger } from '$lib/domains/shared/services/logger';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { formatBytes } from '$lib/domains/shared/utils';
+  import { getProjectFramework } from '$lib/domains/projects/utils/display';
+  import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
+  import { WorkflowTrigger, WorkflowResults } from '$lib/domains/automation';
+  import type { WorkflowResult } from '$lib/domains/automation/types';
+  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import { Plus } from '@lucide/svelte';
 
-  const log = logger.createScoped("ProjectsPage");
+  const log = logger.createScoped('ProjectsPage');
 
   const projectsQuery = createProjectsQuery();
 
-  let searchQuery = $state("");
+  let searchQuery = $state('');
   let selectedProject = $state<any>(null);
   let showAutomation = $state(false);
   let workflowResult = $state<WorkflowResult | null>(null);
@@ -51,16 +41,14 @@
   let filterPackageManager = $state<string | null>(null);
 
   // Sort state
-  type SortOption = "name" | "last_opened" | "size" | "created_at";
-  let sortBy = $state<SortOption>("name");
-  let sortDirection = $state<"asc" | "desc">("asc");
+  type SortOption = 'name' | 'last_opened' | 'size' | 'created_at';
+  let sortBy = $state<SortOption>('name');
+  let sortDirection = $state<'asc' | 'desc'>('asc');
   let registryReady = $state(false);
 
   const projects = $derived(projectsQuery.data ?? []);
   const isLoading = $derived(projectsQuery.isPending);
-  const pageError = $derived(
-    projectsQuery.isError ? "Failed to load projects" : null,
-  );
+  const pageError = $derived(projectsQuery.isError ? 'Failed to load projects' : null);
 
   $effect(() => {
     if (projectsQuery.isSuccess) {
@@ -72,15 +60,10 @@
   });
 
   function projectHasFramework(project: Project, framework: string): boolean {
-    return projectIconRegistry
-      .resolveFrameworks(project)
-      .some((item) => item.name === framework);
+    return projectIconRegistry.resolveFrameworks(project).some((item) => item.name === framework);
   }
 
-  function projectHasPackageManager(
-    project: Project,
-    packageManager: string,
-  ): boolean {
+  function projectHasPackageManager(project: Project, packageManager: string): boolean {
     return projectIconRegistry
       .resolvePackageManagers(project)
       .some((item) => item.name === packageManager);
@@ -105,10 +88,7 @@
         if (filterStatus && project.status !== filterStatus) {
           return false;
         }
-        if (
-          filterPackageManager &&
-          !projectHasPackageManager(project, filterPackageManager)
-        ) {
+        if (filterPackageManager && !projectHasPackageManager(project, filterPackageManager)) {
           return false;
         }
         return true;
@@ -117,26 +97,26 @@
         let comparison = 0;
 
         switch (sortBy) {
-          case "name":
+          case 'name':
             comparison = a.name.localeCompare(b.name);
             break;
-          case "last_opened":
+          case 'last_opened':
             comparison =
               (a.last_opened ? new Date(a.last_opened).getTime() : 0) -
               (b.last_opened ? new Date(b.last_opened).getTime() : 0);
             break;
-          case "size":
+          case 'size':
             comparison = a.size - b.size;
             break;
-          case "created_at":
+          case 'created_at':
             comparison =
               (a.created_at ? new Date(a.created_at).getTime() : 0) -
               (b.created_at ? new Date(b.created_at).getTime() : 0);
             break;
         }
 
-        return sortDirection === "asc" ? comparison : -comparison;
-      }),
+        return sortDirection === 'asc' ? comparison : -comparison;
+      })
   );
 
   const uniqueFrameworks = $derived.by(() => {
@@ -178,7 +158,7 @@
 
   function handleWorkflowComplete(result: WorkflowResult) {
     workflowResult = result;
-    log.info("Workflow completed", { result });
+    log.info('Workflow completed', { result });
   }
 
   function closeAutomation() {
@@ -189,15 +169,13 @@
 
   // Handle project delete
   const handleProjectDelete = async (project: any) => {
-    const confirmed = await confirmAction(
-      `Are you sure you want to delete "${project.name}"?`,
-    );
+    const confirmed = await confirmAction(`Are you sure you want to delete "${project.name}"?`);
     if (confirmed) {
       try {
         await projectService.deleteProject(project.id);
-        log.info("Project deleted", { id: project.id, name: project.name });
+        log.info('Project deleted', { id: project.id, name: project.name });
       } catch (error) {
-        log.error("Failed to delete project", error);
+        log.error('Failed to delete project', error);
       }
     }
   };
@@ -211,10 +189,10 @@
   <!-- Header -->
   <PageHeader title="Projects" description="Manage your development projects">
     {#snippet actions()}
-    <Button onclick={() => goto("/projects/create")}>
-      <Plus class="mr-2 h-4 w-4" />
-      New Project
-    </Button>
+      <Button onclick={() => goto('/projects/create')}>
+        <Plus class="mr-2 h-4 w-4" />
+        New Project
+      </Button>
     {/snippet}
   </PageHeader>
 
@@ -241,7 +219,7 @@
       </CardHeader>
       <CardContent class="px-4 py-3">
         <div class="text-xl font-bold leading-none">
-          {projects.filter((p) => p.status === "active").length}
+          {projects.filter((p) => p.status === 'active').length}
         </div>
       </CardContent>
     </Card>
@@ -255,9 +233,7 @@
       </CardHeader>
       <CardContent class="px-4 py-3">
         <div class="text-xl font-bold leading-none">
-          {formatBytes(
-            projects.reduce((sum, p) => sum + p.size, 0),
-          )}
+          {formatBytes(projects.reduce((sum, p) => sum + p.size, 0))}
         </div>
       </CardContent>
     </Card>
@@ -274,14 +250,13 @@
           {Object.entries(
             projects.reduce(
               (acc, p) => {
-                const framework = getProjectFramework(p) || "Unknown";
+                const framework = getProjectFramework(p) || 'Unknown';
                 acc[framework] = (acc[framework] || 0) + 1;
                 return acc;
               },
-              {} as Record<string, number>,
-            ),
-          ).sort(([, a], [, b]) => (b as number) - (a as number))[0]?.[0] ||
-            "none"}
+              {} as Record<string, number>
+            )
+          ).sort(([, a], [, b]) => (b as number) - (a as number))[0]?.[0] || 'none'}
         </div>
       </CardContent>
     </Card>
@@ -289,14 +264,10 @@
 
   <!-- Filters -->
   <div class="flex flex-wrap items-center gap-4">
-    <Input
-      placeholder="Search projects..."
-      bind:value={searchQuery}
-      class="max-w-sm"
-    />
+    <Input placeholder="Search projects..." bind:value={searchQuery} class="max-w-sm" />
 
     <Select
-      defaultValue={filterFramework || ""}
+      defaultValue={filterFramework || ''}
       placeholder="All Frameworks"
       options={uniqueFrameworks.map((f) => ({ value: f, label: f }))}
       onSelect={(value) => (filterFramework = value || null)}
@@ -304,19 +275,19 @@
     />
 
     <Select
-      defaultValue={filterStatus || ""}
+      defaultValue={filterStatus || ''}
       placeholder="All Statuses"
       options={[
-        { value: "active", label: "Active" },
-        { value: "archived", label: "Archived" },
-        { value: "deleted", label: "Deleted" },
+        { value: 'active', label: 'Active' },
+        { value: 'archived', label: 'Archived' },
+        { value: 'deleted', label: 'Deleted' },
       ]}
       onSelect={(value) => (filterStatus = value || null)}
       class="min-w-[130px]"
     />
 
     <Select
-      defaultValue={filterPackageManager || ""}
+      defaultValue={filterPackageManager || ''}
       placeholder="All Package Managers"
       options={uniquePackageManagers.map((m) => ({ value: m, label: m }))}
       onSelect={(value) => (filterPackageManager = value || null)}
@@ -327,10 +298,10 @@
       defaultValue={sortBy}
       placeholder="Sort by"
       options={[
-        { value: "name", label: "Name" },
-        { value: "last_opened", label: "Last Opened" },
-        { value: "size", label: "Size" },
-        { value: "created_at", label: "Created Date" },
+        { value: 'name', label: 'Name' },
+        { value: 'last_opened', label: 'Last Opened' },
+        { value: 'size', label: 'Size' },
+        { value: 'created_at', label: 'Created Date' },
       ]}
       onSelect={(value) => (sortBy = value as SortOption)}
       class="min-w-[140px]"
@@ -339,9 +310,9 @@
     <Button
       variant="outline"
       size="sm"
-      onclick={() => (sortDirection = sortDirection === "asc" ? "desc" : "asc")}
+      onclick={() => (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')}
       class="flex items-center gap-1"
-      title={`Sort ${sortDirection === "asc" ? "Ascending" : "Descending"}`}
+      title={`Sort ${sortDirection === 'asc' ? 'Ascending' : 'Descending'}`}
     >
       <svg
         class="h-4 w-4 {sortDirection === 'desc' ? 'rotate-180' : ''}"
@@ -349,14 +320,9 @@
         stroke="currentColor"
         viewBox="0 0 24 24"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M5 15l7-7 7 7"
-        />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
       </svg>
-      {sortDirection === "asc" ? "Asc" : "Desc"}
+      {sortDirection === 'asc' ? 'Asc' : 'Desc'}
     </Button>
 
     {#if filterFramework || filterStatus || filterPackageManager}
@@ -389,10 +355,12 @@
       title="No projects found"
       description="Create your first project to get started"
       filteredDescription="Try adjusting your search criteria"
-      isFiltered={Boolean(searchQuery.trim() || filterFramework || filterStatus || filterPackageManager)}
+      isFiltered={Boolean(
+        searchQuery.trim() || filterFramework || filterStatus || filterPackageManager
+      )}
       icon={FolderOpen}
       actionLabel="Create Project"
-      onAction={() => goto("/projects/create")}
+      onAction={() => goto('/projects/create')}
     />
   {:else}
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -423,10 +391,7 @@
       {#if workflowResult}
         <WorkflowResults result={workflowResult} />
       {:else if selectedProject}
-        <WorkflowTrigger
-          project={selectedProject}
-          onWorkflowComplete={handleWorkflowComplete}
-        />
+        <WorkflowTrigger project={selectedProject} onWorkflowComplete={handleWorkflowComplete} />
       {/if}
     </Dialog.Content>
   </Dialog.Root>

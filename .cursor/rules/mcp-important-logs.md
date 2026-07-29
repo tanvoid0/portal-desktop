@@ -34,4 +34,3 @@ When the agent uses `cursor-ide-browser` MCP tools (especially `browser_console_
 
 7. End with an action
    - Conclude with the single most likely next step to verify/fix the issue (e.g., “check X request payload” or “confirm Y element renders”).
-

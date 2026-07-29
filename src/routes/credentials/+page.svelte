@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import { CredentialVault } from "$lib/domains/credentials";
+  import { CredentialVault } from '$lib/domains/credentials';
 </script>
 
 <svelte:head>

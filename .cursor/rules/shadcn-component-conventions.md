@@ -4,15 +4,15 @@ Use shadcn-svelte primitives from `$lib/components/ui` for interactive UI. See [
 
 ## Required imports
 
-| Control | Import |
-|---------|--------|
-| Actions | `{ Button } from "$lib/components/ui/button"` |
-| Text fields | `{ Input }`, `{ Textarea }`, `{ Label }` |
-| Selection | `import Select from "$lib/components/ui/select.svelte"` — **not** raw `<select>` |
-| Toggles | `{ Checkbox }`, `{ Switch }` |
-| Overlays | `{ Dialog, DialogContent, ... }`, `{ Sheet, ... }`, `{ AlertDialog, ... }` |
-| Layout/data | `{ Card, ... }`, `{ Table, ... }`, `{ Badge }` |
-| Command palettes | `Dialog` + `Command` — see `k8s-navigation/components/CommandPalette.svelte` |
+| Control          | Import                                                                           |
+| ---------------- | -------------------------------------------------------------------------------- |
+| Actions          | `{ Button } from "$lib/components/ui/button"`                                    |
+| Text fields      | `{ Input }`, `{ Textarea }`, `{ Label }`                                         |
+| Selection        | `import Select from "$lib/components/ui/select.svelte"` — **not** raw `<select>` |
+| Toggles          | `{ Checkbox }`, `{ Switch }`                                                     |
+| Overlays         | `{ Dialog, DialogContent, ... }`, `{ Sheet, ... }`, `{ AlertDialog, ... }`       |
+| Layout/data      | `{ Card, ... }`, `{ Table, ... }`, `{ Badge }`                                   |
+| Command palettes | `Dialog` + `Command` — see `k8s-navigation/components/CommandPalette.svelte`     |
 
 ## Do not
 

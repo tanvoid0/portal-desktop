@@ -13,7 +13,7 @@ export interface Pipeline {
   executionContext: ExecutionContext;
   enabled: boolean;
   presetKey?: string;
-  category?: "install" | "dev" | "build";
+  category?: 'install' | 'dev' | 'build';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,7 +36,7 @@ export interface PipelineStep {
 }
 
 export interface ExecutionContext {
-  type: "sdk" | "docker";
+  type: 'sdk' | 'docker';
   sdkType?: string; // node, python, rust, go, etc.
   sdkVersion?: string;
   dockerImage?: string;
@@ -49,20 +49,20 @@ export interface ExecutionContext {
 export interface PipelineVariable {
   name: string;
   value: string;
-  type: "string" | "number" | "boolean";
+  type: 'string' | 'number' | 'boolean';
   description?: string;
-  scope: "project" | "pipeline"; // Project-level or pipeline-specific
+  scope: 'project' | 'pipeline'; // Project-level or pipeline-specific
 }
 
 export interface Block {
   id: string;
   name: string;
   description: string;
-  category: "build" | "test" | "deploy" | "utility" | "custom";
+  category: 'build' | 'test' | 'deploy' | 'utility' | 'custom';
   version: string;
   parameters: BlockParameter[];
   command: string; // Template with ${param} placeholders
-  executionType: "command" | "script" | "docker";
+  executionType: 'command' | 'script' | 'docker';
   defaultConfig: Record<string, any>;
   tags: string[];
   icon?: string;
@@ -73,7 +73,7 @@ export interface Block {
 
 export interface BlockParameter {
   name: string;
-  type: "string" | "number" | "boolean" | "select" | "file" | "directory";
+  type: 'string' | 'number' | 'boolean' | 'select' | 'file' | 'directory';
   description: string;
   required: boolean;
   defaultValue?: any;
@@ -105,12 +105,12 @@ export interface PipelineExecutionListItem extends PipelineExecution {
 }
 
 export type ExecutionStatus =
-  | "pending"
-  | "running"
-  | "success"
-  | "failed"
-  | "cancelled"
-  | "skipped";
+  | 'pending'
+  | 'running'
+  | 'success'
+  | 'failed'
+  | 'cancelled'
+  | 'skipped';
 
 export interface StepExecution {
   id: string;
@@ -131,13 +131,13 @@ export interface CreatePipelineRequest {
   name: string;
   description?: string;
   projectId: string;
-  steps: Omit<PipelineStep, "id">[] | PipelineStep[];
+  steps: Omit<PipelineStep, 'id'>[] | PipelineStep[];
   variables?: PipelineVariable[];
   secrets?: string[];
   executionContext: ExecutionContext;
   enabled?: boolean;
   presetKey?: string;
-  category?: "install" | "dev" | "build";
+  category?: 'install' | 'dev' | 'build';
 }
 
 export interface UpdatePipelineRequest {
@@ -153,10 +153,10 @@ export interface UpdatePipelineRequest {
 export interface CreateBlockRequest {
   name: string;
   description: string;
-  category: Block["category"];
+  category: Block['category'];
   parameters: BlockParameter[];
   command: string;
-  executionType: Block["executionType"];
+  executionType: Block['executionType'];
   defaultConfig?: Record<string, any>;
   tags?: string[];
 }
@@ -168,10 +168,10 @@ export interface ExecutePipelineRequest {
 }
 
 export enum PipelineStepType {
-  COMMAND = "command",
-  SDK_COMMAND = "sdk_command",
-  DOCKER_COMMAND = "docker_command",
-  MANUAL_APPROVAL = "manual_approval",
+  COMMAND = 'command',
+  SDK_COMMAND = 'sdk_command',
+  DOCKER_COMMAND = 'docker_command',
+  MANUAL_APPROVAL = 'manual_approval',
 }
 
 export interface PipelineTemplate {
@@ -180,7 +180,7 @@ export interface PipelineTemplate {
   name: string; // Human-readable display name (e.g., 'React Build Pipeline')
   description: string;
   framework?: string;
-  category?: "build" | "test" | "deploy" | "ci-cd" | "full-stack";
+  category?: 'build' | 'test' | 'deploy' | 'ci-cd' | 'full-stack';
   packageManager?: string;
   steps: Array<{
     key: string; // Unique key for this step within the template (e.g., 'install-deps', 'build')
@@ -194,7 +194,7 @@ export interface PipelineTemplate {
   }>;
   variables?: Array<{
     name: string;
-    type: "string" | "number" | "boolean";
+    type: 'string' | 'number' | 'boolean';
     defaultValue?: string | number | boolean;
     description?: string;
   }>;

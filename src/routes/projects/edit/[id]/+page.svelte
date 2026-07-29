@@ -4,19 +4,16 @@
 -->
 
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import ProjectForm from "$lib/components/projects/ProjectForm.svelte";
-  import {
-    projectService,
-    createProjectQuery,
-  } from "$lib/domains/projects";
-  import { logger } from "$lib/domains/shared/services/logger";
-  import type { CreateProjectRequest } from "$lib/domains/projects/types";
-  import { breadcrumbActions } from "$lib/domains/shared/stores/breadcrumbStore";
-  import { PageHeader, PageLoading, PageError } from "$lib/components/shell";
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import ProjectForm from '$lib/components/projects/ProjectForm.svelte';
+  import { projectService, createProjectQuery } from '$lib/domains/projects';
+  import { logger } from '$lib/domains/shared/services/logger';
+  import type { CreateProjectRequest } from '$lib/domains/projects/types';
+  import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
+  import { PageHeader, PageLoading, PageError } from '$lib/components/shell';
 
-  const log = logger.createScoped("ProjectEditPage");
+  const log = logger.createScoped('ProjectEditPage');
 
   const projectId = $derived($page.params.id);
   const projectQuery = createProjectQuery(() => projectId);
@@ -27,10 +24,10 @@
   const loading = $derived(projectQuery.isPending);
   const loadError = $derived(
     projectQuery.isError
-      ? "Failed to load project"
+      ? 'Failed to load project'
       : projectQuery.isSuccess && !projectQuery.data
-        ? "Project not found"
-        : null,
+        ? 'Project not found'
+        : null
   );
 
   const initialData = $derived<Partial<CreateProjectRequest>>(
@@ -49,7 +46,7 @@
           dev_port: project.dev_port,
           prod_port: project.prod_port,
         }
-      : {},
+      : {}
   );
 
   $effect(() => {
@@ -60,16 +57,16 @@
 
   async function handleSubmit(data: CreateProjectRequest) {
     if (!projectId) {
-      log.error("Project ID is required for update");
+      log.error('Project ID is required for update');
       return;
     }
 
     try {
       isLoading = true;
       await projectService.updateProject(projectId, data);
-      goto("/projects");
+      goto('/projects');
     } catch (err) {
-      log.error("Failed to update project", err);
+      log.error('Failed to update project', err);
       throw err;
     } finally {
       isLoading = false;
@@ -77,7 +74,7 @@
   }
 
   function handleCancel() {
-    goto("/projects");
+    goto('/projects');
   }
 
   function reloadProject() {
@@ -94,11 +91,7 @@
   {#if loading}
     <PageLoading message="Loading project..." />
   {:else if loadError}
-    <PageError
-      title="Failed to load project"
-      message={loadError}
-      onRetry={reloadProject}
-    />
+    <PageError title="Failed to load project" message={loadError} onRetry={reloadProject} />
   {:else if project && projectId}
     <ProjectForm
       projectId={parseInt(projectId)}

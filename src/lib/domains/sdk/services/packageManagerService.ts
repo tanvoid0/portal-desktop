@@ -4,7 +4,7 @@
  * TypeScript service for interacting with package managers via Tauri commands
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 
 export interface Package {
   id: string;
@@ -62,9 +62,9 @@ export interface PackageManagerInfo {
  */
 export async function getAvailablePackageManagers(): Promise<string[]> {
   try {
-    return await invoke<string[]>("get_available_package_managers");
+    return await invoke<string[]>('get_available_package_managers');
   } catch (error) {
-    console.error("Failed to get available package managers:", error);
+    console.error('Failed to get available package managers:', error);
     throw error;
   }
 }
@@ -72,17 +72,14 @@ export async function getAvailablePackageManagers(): Promise<string[]> {
 /**
  * Search for packages using a specific package manager
  */
-export async function searchPackages(
-  managerName: string,
-  query: string,
-): Promise<Package[]> {
+export async function searchPackages(managerName: string, query: string): Promise<Package[]> {
   try {
-    return await invoke<Package[]>("package_manager_search", {
+    return await invoke<Package[]>('package_manager_search', {
       managerName,
       query,
     });
   } catch (error) {
-    console.error("Failed to search packages:", error);
+    console.error('Failed to search packages:', error);
     throw error;
   }
 }
@@ -90,15 +87,13 @@ export async function searchPackages(
 /**
  * List installed packages from a specific package manager
  */
-export async function listInstalledPackages(
-  managerName: string,
-): Promise<InstalledPackage[]> {
+export async function listInstalledPackages(managerName: string): Promise<InstalledPackage[]> {
   try {
-    return await invoke<InstalledPackage[]>("package_manager_list_installed", {
+    return await invoke<InstalledPackage[]>('package_manager_list_installed', {
       managerName,
     });
   } catch (error) {
-    console.error("Failed to list installed packages:", error);
+    console.error('Failed to list installed packages:', error);
     throw error;
   }
 }
@@ -108,15 +103,15 @@ export async function listInstalledPackages(
  */
 export async function getPackageDetails(
   managerName: string,
-  packageId: string,
+  packageId: string
 ): Promise<PackageDetails> {
   try {
-    return await invoke<PackageDetails>("package_manager_get_details", {
+    return await invoke<PackageDetails>('package_manager_get_details', {
       managerName,
       packageId,
     });
   } catch (error) {
-    console.error("Failed to get package details:", error);
+    console.error('Failed to get package details:', error);
     throw error;
   }
 }
@@ -127,16 +122,16 @@ export async function getPackageDetails(
 export async function installPackage(
   managerName: string,
   packageId: string,
-  version?: string,
+  version?: string
 ): Promise<string> {
   try {
-    return await invoke<string>("package_manager_install", {
+    return await invoke<string>('package_manager_install', {
       managerName,
       packageId,
       version,
     });
   } catch (error) {
-    console.error("Failed to install package:", error);
+    console.error('Failed to install package:', error);
     throw error;
   }
 }
@@ -144,17 +139,14 @@ export async function installPackage(
 /**
  * Upgrade a package using a specific package manager
  */
-export async function upgradePackage(
-  managerName: string,
-  packageId: string,
-): Promise<string> {
+export async function upgradePackage(managerName: string, packageId: string): Promise<string> {
   try {
-    return await invoke<string>("package_manager_upgrade", {
+    return await invoke<string>('package_manager_upgrade', {
       managerName,
       packageId,
     });
   } catch (error) {
-    console.error("Failed to upgrade package:", error);
+    console.error('Failed to upgrade package:', error);
     throw error;
   }
 }
@@ -162,17 +154,14 @@ export async function upgradePackage(
 /**
  * Uninstall a package using a specific package manager
  */
-export async function uninstallPackage(
-  managerName: string,
-  packageId: string,
-): Promise<string> {
+export async function uninstallPackage(managerName: string, packageId: string): Promise<string> {
   try {
-    return await invoke<string>("package_manager_uninstall", {
+    return await invoke<string>('package_manager_uninstall', {
       managerName,
       packageId,
     });
   } catch (error) {
-    console.error("Failed to uninstall package:", error);
+    console.error('Failed to uninstall package:', error);
     throw error;
   }
 }
@@ -180,15 +169,13 @@ export async function uninstallPackage(
 /**
  * Check for available updates using a specific package manager
  */
-export async function checkUpdates(
-  managerName: string,
-): Promise<PackageUpdate[]> {
+export async function checkUpdates(managerName: string): Promise<PackageUpdate[]> {
   try {
-    return await invoke<PackageUpdate[]>("package_manager_check_updates", {
+    return await invoke<PackageUpdate[]>('package_manager_check_updates', {
       managerName,
     });
   } catch (error) {
-    console.error("Failed to check updates:", error);
+    console.error('Failed to check updates:', error);
     throw error;
   }
 }
@@ -196,15 +183,13 @@ export async function checkUpdates(
 /**
  * Get information about a package manager
  */
-export async function getPackageManagerInfo(
-  managerName: string,
-): Promise<PackageManagerInfo> {
+export async function getPackageManagerInfo(managerName: string): Promise<PackageManagerInfo> {
   try {
-    return await invoke<PackageManagerInfo>("package_manager_info", {
+    return await invoke<PackageManagerInfo>('package_manager_info', {
       managerName,
     });
   } catch (error) {
-    console.error("Failed to get package manager info:", error);
+    console.error('Failed to get package manager info:', error);
     throw error;
   }
 }

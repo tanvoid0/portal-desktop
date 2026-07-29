@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import type { AuditEntry } from "../types";
-  import { fmtBytes, fmtDate, DISK_STAT_GRID } from "../utils";
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
+  import { invoke } from '@tauri-apps/api/core';
+  import type { AuditEntry } from '../types';
+  import { fmtBytes, fmtDate, DISK_STAT_GRID } from '../utils';
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     Table,
     TableBody,
@@ -12,19 +12,19 @@
     TableHead,
     TableHeader,
     TableRow,
-  } from "$lib/components/ui/table";
+  } from '$lib/components/ui/table';
 
   let { active }: { active: boolean } = $props();
 
   let entries = $state<AuditEntry[]>([]);
-  let status = $state("Loading…");
+  let status = $state('Loading…');
 
   async function load() {
-    status = "Loading…";
+    status = 'Loading…';
     try {
-      const log = await invoke<AuditEntry[]>("get_audit_log");
+      const log = await invoke<AuditEntry[]>('get_audit_log');
       entries = log;
-      status = log.length === 0 ? "No actions recorded yet." : `${log.length} action(s) recorded.`;
+      status = log.length === 0 ? 'No actions recorded yet.' : `${log.length} action(s) recorded.`;
     } catch (e) {
       status = `Failed to load history: ${String(e)}`;
     }
@@ -37,7 +37,7 @@
   });
 
   const hstats = $derived.by(() => {
-    const moved = entries.filter((e) => e.status === "moved");
+    const moved = entries.filter((e) => e.status === 'moved');
     return {
       reclaimed: moved.reduce((a, e) => a + e.sizeBytes, 0),
       movedN: moved.length,
@@ -47,7 +47,7 @@
 
   async function openBin() {
     try {
-      await invoke("open_recycle_bin");
+      await invoke('open_recycle_bin');
     } catch (e) {
       status = String(e);
     }
@@ -57,21 +57,33 @@
 <div class="{DISK_STAT_GRID} mb-4">
   <Card class="gap-0 py-4">
     <CardContent class="px-4">
-      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Total reclaimed</div>
-      <div class="text-2xl font-semibold tabular-nums tracking-tight text-status-success">{fmtBytes(hstats.reclaimed)}</div>
+      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+        Total reclaimed
+      </div>
+      <div class="text-2xl font-semibold tabular-nums tracking-tight text-status-success">
+        {fmtBytes(hstats.reclaimed)}
+      </div>
     </CardContent>
   </Card>
   <Card class="gap-0 py-4">
     <CardContent class="px-4">
       <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Moved</div>
-      <div class="text-2xl font-semibold tabular-nums tracking-tight text-foreground">{hstats.movedN}</div>
+      <div class="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+        {hstats.movedN}
+      </div>
       <div class="mt-1 text-xs text-muted-foreground">to Recycle Bin</div>
     </CardContent>
   </Card>
   <Card class="gap-0 py-4">
     <CardContent class="px-4">
       <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Failed</div>
-      <div class="text-2xl font-semibold tabular-nums tracking-tight {hstats.failedN ? 'text-status-error' : 'text-foreground'}">{hstats.failedN}</div>
+      <div
+        class="text-2xl font-semibold tabular-nums tracking-tight {hstats.failedN
+          ? 'text-status-error'
+          : 'text-foreground'}"
+      >
+        {hstats.failedN}
+      </div>
     </CardContent>
   </Card>
 </div>
@@ -103,9 +115,9 @@
           <TableCell>
             <Badge
               variant="outline"
-              class={e.status === "moved"
-                ? "bg-status-success-bg text-status-success border-status-success/30"
-                : "bg-status-error-bg text-status-error border-status-error/30"}
+              class={e.status === 'moved'
+                ? 'bg-status-success-bg text-status-success border-status-success/30'
+                : 'bg-status-error-bg text-status-error border-status-error/30'}
             >
               {e.status}
             </Badge>

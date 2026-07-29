@@ -1,16 +1,11 @@
 <script lang="ts">
-  import TrainingDataTable from "./TrainingDataTable.svelte";
-  import TrainingDataFilters from "./TrainingDataFilters.svelte";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
-  import { Button } from "$lib/components/ui/button";
-  import type { TrainingData } from "../../types/index.js";
+  import TrainingDataTable from './TrainingDataTable.svelte';
+  import TrainingDataFilters from './TrainingDataFilters.svelte';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+  import { Button } from '$lib/components/ui/button';
+  import type { TrainingData } from '../../types/index.js';
 
   interface Props {
     data: TrainingData[];
@@ -19,15 +14,10 @@
     onDelete?: (data: TrainingData) => void;
   }
 
-  let {
-    data = $bindable<TrainingData[]>([]),
-    onView,
-    onEdit,
-    onDelete,
-  }: Props = $props();
+  let { data = $bindable<TrainingData[]>([]), onView, onEdit, onDelete }: Props = $props();
 
-  let searchQuery = $state("");
-  let typeFilter = $state("");
+  let searchQuery = $state('');
+  let typeFilter = $state('');
   let selectedData = $state<TrainingData | null>(null);
   let showViewDialog = $state(false);
 
@@ -38,7 +28,7 @@
         item.content.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = !typeFilter || item.type === typeFilter;
       return matchesSearch && matchesType;
-    }),
+    })
   );
 
   function handleView(data: TrainingData) {
@@ -48,29 +38,20 @@
   }
 
   function handleClearFilters() {
-    searchQuery = "";
-    typeFilter = "";
+    searchQuery = '';
+    typeFilter = '';
   }
 </script>
 
 <div class="space-y-4">
-  <TrainingDataFilters
-    bind:searchQuery
-    bind:typeFilter
-    onClear={handleClearFilters}
-  />
-  <TrainingDataTable
-    data={filteredData}
-    onView={handleView}
-    {onEdit}
-    {onDelete}
-  />
+  <TrainingDataFilters bind:searchQuery bind:typeFilter onClear={handleClearFilters} />
+  <TrainingDataTable data={filteredData} onView={handleView} {onEdit} {onDelete} />
 </div>
 
 <Dialog.Root bind:open={showViewDialog}>
   <Dialog.Content class="max-h-[90vh] max-w-3xl">
     <Dialog.Header>
-      <Dialog.Title>{selectedData?.name || "Training Data"}</Dialog.Title>
+      <Dialog.Title>{selectedData?.name || 'Training Data'}</Dialog.Title>
     </Dialog.Header>
     {#if selectedData}
       <ScrollArea class="max-h-[70vh]">
@@ -83,8 +64,7 @@
             <p class="mb-1 text-sm font-medium">Content</p>
             <Card>
               <CardContent class="p-4">
-                <pre
-                  class="whitespace-pre-wrap text-sm">{selectedData.content}</pre>
+                <pre class="whitespace-pre-wrap text-sm">{selectedData.content}</pre>
               </CardContent>
             </Card>
           </div>
@@ -93,11 +73,7 @@
               <p class="mb-1 text-sm font-medium">Metadata</p>
               <Card>
                 <CardContent class="p-4">
-                  <pre class="text-sm">{JSON.stringify(
-                      selectedData.metadata,
-                      null,
-                      2,
-                    )}</pre>
+                  <pre class="text-sm">{JSON.stringify(selectedData.metadata, null, 2)}</pre>
                 </CardContent>
               </Card>
             </div>
@@ -106,9 +82,7 @@
       </ScrollArea>
     {/if}
     <Dialog.Footer>
-      <Button variant="outline" onclick={() => (showViewDialog = false)}>
-        Close
-      </Button>
+      <Button variant="outline" onclick={() => (showViewDialog = false)}>Close</Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>

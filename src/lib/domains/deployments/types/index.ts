@@ -3,39 +3,39 @@
  */
 
 export enum DeploymentType {
-  DOCKER = "docker",
-  CLI = "cli",
+  DOCKER = 'docker',
+  CLI = 'cli',
 }
 
 export enum DeploymentStatus {
-  CREATING = "creating",
-  RUNNING = "running",
-  STOPPED = "stopped",
-  FAILED = "failed",
-  RESTARTING = "restarting",
-  REMOVING = "removing",
-  BUILDING = "building",
+  CREATING = 'creating',
+  RUNNING = 'running',
+  STOPPED = 'stopped',
+  FAILED = 'failed',
+  RESTARTING = 'restarting',
+  REMOVING = 'removing',
+  BUILDING = 'building',
 }
 
 export enum ContainerStatus {
-  CREATED = "created",
-  RUNNING = "running",
-  PAUSED = "paused",
-  RESTARTING = "restarting",
-  REMOVING = "removing",
-  DEAD = "dead",
-  EXITED = "exited",
+  CREATED = 'created',
+  RUNNING = 'running',
+  PAUSED = 'paused',
+  RESTARTING = 'restarting',
+  REMOVING = 'removing',
+  DEAD = 'dead',
+  EXITED = 'exited',
 }
 
 export enum ProjectType {
-  NODE = "node",
-  RUST = "rust",
-  PYTHON = "python",
-  JAVA = "java",
-  GO = "go",
-  PHP = "php",
-  RUBY = "ruby",
-  STATIC = "static",
+  NODE = 'node',
+  RUST = 'rust',
+  PYTHON = 'python',
+  JAVA = 'java',
+  GO = 'go',
+  PHP = 'php',
+  RUBY = 'ruby',
+  STATIC = 'static',
 }
 
 export interface DockerStatus {
@@ -67,13 +67,13 @@ export interface DockerContainer {
 export interface PortMapping {
   hostPort: number;
   containerPort: number;
-  protocol: "tcp" | "udp";
+  protocol: 'tcp' | 'udp';
 }
 
 export interface VolumeMapping {
   hostPath: string;
   containerPath: string;
-  mode: "ro" | "rw";
+  mode: 'ro' | 'rw';
 }
 
 export interface ResourceUsage {
@@ -139,7 +139,7 @@ export interface Deployment {
 }
 
 export interface HealthStatus {
-  status: "healthy" | "unhealthy" | "unknown";
+  status: 'healthy' | 'unhealthy' | 'unknown';
   lastCheck: Date;
   responseTime?: number;
   error?: string;
@@ -148,13 +148,13 @@ export interface HealthStatus {
 
 export interface HealthCheck {
   name: string;
-  type: "http" | "tcp" | "command";
+  type: 'http' | 'tcp' | 'command';
   endpoint?: string;
   command?: string;
   interval: number; // seconds
   timeout: number; // seconds
   retries: number;
-  status: "passing" | "failing" | "unknown";
+  status: 'passing' | 'failing' | 'unknown';
   lastCheck: Date;
   responseTime?: number;
   error?: string;
@@ -170,7 +170,7 @@ export interface DeploymentMetadata {
   notes?: string;
   createdBy: string;
   team?: string;
-  environment: "development" | "staging" | "production";
+  environment: 'development' | 'staging' | 'production';
   sdkVersion?: string;
 }
 
@@ -210,9 +210,9 @@ export interface DeploymentLogs {
 
 export interface LogEntry {
   timestamp: Date;
-  level: "info" | "warn" | "error" | "debug";
+  level: 'info' | 'warn' | 'error' | 'debug';
   message: string;
-  source: "stdout" | "stderr" | "system";
+  source: 'stdout' | 'stderr' | 'system';
   containerId?: string;
 }
 
@@ -281,7 +281,7 @@ export interface DeploymentTemplate {
 }
 
 export interface DeploymentAction {
-  type: "start" | "stop" | "restart" | "remove" | "rebuild";
+  type: 'start' | 'stop' | 'restart' | 'remove' | 'rebuild';
   deploymentId: string;
   reason?: string;
   force?: boolean;

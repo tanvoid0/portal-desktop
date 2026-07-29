@@ -18,24 +18,24 @@
  *   --no-notes    Skip RELEASE_NOTES.md stub
  *   --message/-m  Custom one-line note for RELEASE_NOTES (repeatable)
  */
-import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { execSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL("../", import.meta.url));
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 const FILES = {
-  packageJson: join(ROOT, "package.json"),
-  tauriConf: join(ROOT, "src-tauri/tauri.conf.json"),
-  cargoToml: join(ROOT, "src-tauri/Cargo.toml"),
-  cargoLock: join(ROOT, "src-tauri/Cargo.lock"),
-  releaseNotes: join(ROOT, "docs/status/RELEASE_NOTES.md"),
+  packageJson: join(ROOT, 'package.json'),
+  tauriConf: join(ROOT, 'src-tauri/tauri.conf.json'),
+  cargoToml: join(ROOT, 'src-tauri/Cargo.toml'),
+  cargoLock: join(ROOT, 'src-tauri/Cargo.lock'),
+  releaseNotes: join(ROOT, 'docs/status/RELEASE_NOTES.md'),
 };
 
 /** @param {string} cmd */
 function run(cmd) {
-  return execSync(cmd, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  return execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
 /** @param {string} version */
@@ -51,11 +51,11 @@ function bump(version, part) {
   if (!match) throw new Error(`Cannot bump version: ${version}`);
 
   let [major, minor, patch] = match.slice(1).map(Number);
-  if (part === "major") {
+  if (part === 'major') {
     major += 1;
     minor = 0;
     patch = 0;
-  } else if (part === "minor") {
+  } else if (part === 'minor') {
     minor += 1;
     patch = 0;
   } else {
@@ -66,9 +66,9 @@ function bump(version, part) {
 }
 
 function readVersions() {
-  const pkg = JSON.parse(readFileSync(FILES.packageJson, "utf8"));
-  const tauri = JSON.parse(readFileSync(FILES.tauriConf, "utf8"));
-  const cargo = readFileSync(FILES.cargoToml, "utf8");
+  const pkg = JSON.parse(readFileSync(FILES.packageJson, 'utf8'));
+  const tauri = JSON.parse(readFileSync(FILES.tauriConf, 'utf8'));
+  const cargo = readFileSync(FILES.cargoToml, 'utf8');
   const cargoMatch = cargo.match(/^version\s*=\s*"([^"]+)"/m);
 
   return {
@@ -80,21 +80,18 @@ function readVersions() {
 
 /** @param {string} version */
 function writeVersions(version) {
-  const pkg = JSON.parse(readFileSync(FILES.packageJson, "utf8"));
+  const pkg = JSON.parse(readFileSync(FILES.packageJson, 'utf8'));
   pkg.version = version;
   writeFileSync(FILES.packageJson, `${JSON.stringify(pkg, null, 2)}\n`);
 
-  const tauri = JSON.parse(readFileSync(FILES.tauriConf, "utf8"));
+  const tauri = JSON.parse(readFileSync(FILES.tauriConf, 'utf8'));
   tauri.version = version;
   writeFileSync(FILES.tauriConf, `${JSON.stringify(tauri, null, 2)}\n`);
 
-  const cargo = readFileSync(FILES.cargoToml, "utf8");
-  const updatedCargo = cargo.replace(
-    /^version\s*=\s*"[^"]+"/m,
-    `version = "${version}"`,
-  );
+  const cargo = readFileSync(FILES.cargoToml, 'utf8');
+  const updatedCargo = cargo.replace(/^version\s*=\s*"[^"]+"/m, `version = "${version}"`);
   if (updatedCargo === cargo) {
-    throw new Error("Could not update version in src-tauri/Cargo.toml");
+    throw new Error('Could not update version in src-tauri/Cargo.toml');
   }
   writeFileSync(FILES.cargoToml, updatedCargo);
 }
@@ -110,23 +107,23 @@ function writeVersions(version) {
  * @param {string} version
  */
 function syncCargoLock(version) {
-  run("cargo update -p portal_desktop --offline --manifest-path src-tauri/Cargo.toml");
+  run('cargo update -p portal_desktop --offline --manifest-path src-tauri/Cargo.toml');
 
-  const lock = readFileSync(FILES.cargoLock, "utf8");
+  const lock = readFileSync(FILES.cargoLock, 'utf8');
   const entry = lock.match(/name = "portal_desktop"\nversion = "([^"]+)"/);
   if (entry?.[1] !== version) {
     throw new Error(
-      `Cargo.lock still reports portal_desktop ${entry?.[1] ?? "?"} after update; expected ${version}. ` +
-        `Release smoke (\`cargo check --locked\`) would fail.`,
+      `Cargo.lock still reports portal_desktop ${entry?.[1] ?? '?'} after update; expected ${version}. ` +
+        `Release smoke (\`cargo check --locked\`) would fail.`
     );
   }
 
-  console.log("Synced Cargo.lock");
+  console.log('Synced Cargo.lock');
 }
 
 /** @param {string} version @param {string[]} notes */
 function prependReleaseNotes(version, notes) {
-  const current = readFileSync(FILES.releaseNotes, "utf8");
+  const current = readFileSync(FILES.releaseNotes, 'utf8');
   const marker = `## Version ${version}`;
 
   if (current.includes(marker)) {
@@ -134,10 +131,7 @@ function prependReleaseNotes(version, notes) {
     return false;
   }
 
-  const bullets =
-    notes.length > 0
-      ? notes.map((line) => `- ${line}`).join("\n")
-      : "- ";
+  const bullets = notes.length > 0 ? notes.map((line) => `- ${line}`).join('\n') : '- ';
 
   const section = `## Version ${version}
 
@@ -149,10 +143,8 @@ ${bullets}
 
 `;
 
-  const header = "# Portal Desktop - Release Notes\n\n";
-  const body = current.startsWith(header)
-    ? current.slice(header.length)
-    : current;
+  const header = '# Portal Desktop - Release Notes\n\n';
+  const body = current.startsWith(header) ? current.slice(header.length) : current;
 
   writeFileSync(FILES.releaseNotes, `${header}${section}${body}`);
   return true;
@@ -195,14 +187,14 @@ function parseArgs(argv) {
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === "--dry-run") flags.dryRun = true;
-    else if (arg === "--no-tag") flags.noTag = true;
-    else if (arg === "--no-notes") flags.noNotes = true;
-    else if (arg === "--message" || arg === "-m") {
+    if (arg === '--dry-run') flags.dryRun = true;
+    else if (arg === '--no-tag') flags.noTag = true;
+    else if (arg === '--no-notes') flags.noNotes = true;
+    else if (arg === '--message' || arg === '-m') {
       const value = argv[++i];
       if (!value) throw new Error(`${arg} requires a value`);
       flags.notes.push(value);
-    } else if (arg.startsWith("-")) {
+    } else if (arg.startsWith('-')) {
       throw new Error(`Unknown flag: ${arg}`);
     } else {
       positional.push(arg);
@@ -235,17 +227,15 @@ After running:
   const current = readVersions();
   const unique = new Set(Object.values(current).filter(Boolean));
   if (unique.size > 1) {
-    throw new Error(
-      `Version mismatch before release prep: ${JSON.stringify(current)}`,
-    );
+    throw new Error(`Version mismatch before release prep: ${JSON.stringify(current)}`);
   }
 
   const fromVersion = current.packageJson;
   let nextVersion = fromVersion;
 
-  if (bumpArg === "current") {
+  if (bumpArg === 'current') {
     console.log(`Using current version ${fromVersion}`);
-  } else if (["patch", "minor", "major"].includes(bumpArg)) {
+  } else if (['patch', 'minor', 'major'].includes(bumpArg)) {
     nextVersion = bump(fromVersion, /** @type {"patch"|"minor"|"major"} */ (bumpArg));
   } else {
     assertSemver(bumpArg);
@@ -259,19 +249,19 @@ After running:
 
   if (nextVersion !== fromVersion) {
     if (flags.dryRun) {
-      console.log("[dry-run] would update package.json, tauri.conf.json, Cargo.toml, Cargo.lock");
+      console.log('[dry-run] would update package.json, tauri.conf.json, Cargo.toml, Cargo.lock');
     } else {
       writeVersions(nextVersion);
-      console.log("Updated version files");
+      console.log('Updated version files');
       syncCargoLock(nextVersion);
     }
   } else {
-    console.log("Version files already at target version");
+    console.log('Version files already at target version');
   }
 
   if (!flags.noNotes) {
     if (flags.dryRun) {
-      console.log("[dry-run] would prepend RELEASE_NOTES.md stub if missing");
+      console.log('[dry-run] would prepend RELEASE_NOTES.md stub if missing');
     } else {
       prependReleaseNotes(nextVersion, flags.notes);
     }
@@ -281,24 +271,30 @@ After running:
     createTag(tag, nextVersion, flags.dryRun);
   }
 
-  console.log("");
-  console.log("Next steps:");
+  console.log('');
+  console.log('Next steps:');
   if (nextVersion !== fromVersion || !flags.noNotes) {
-    console.log("  1. Review docs/status/RELEASE_NOTES.md");
-    console.log("  2. git add -A");
+    console.log('  1. Review docs/status/RELEASE_NOTES.md');
+    console.log('  2. git add -A');
     console.log(`  3. git commit -m "release: v${nextVersion}"`);
   } else {
-    console.log("  1. git add -A");
+    console.log('  1. git add -A');
     console.log(`  2. git commit -m "release: v${nextVersion}"`);
   }
   if (!flags.noTag && !flags.dryRun) {
-    console.log(`  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git push origin main --tags`);
+    console.log(
+      `  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git push origin main --tags`
+    );
   } else {
-    console.log(`  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git tag -a ${tag} -m "Portal Desktop v${nextVersion}"`);
-    console.log(`  ${nextVersion !== fromVersion || !flags.noNotes ? 5 : 4}. git push origin main --tags`);
+    console.log(
+      `  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git tag -a ${tag} -m "Portal Desktop v${nextVersion}"`
+    );
+    console.log(
+      `  ${nextVersion !== fromVersion || !flags.noNotes ? 5 : 4}. git push origin main --tags`
+    );
   }
-  console.log("");
-  console.log("GitHub Actions will build and publish the release when the tag is pushed.");
+  console.log('');
+  console.log('GitHub Actions will build and publish the release when the tag is pushed.');
 }
 
 try {

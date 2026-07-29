@@ -3,31 +3,24 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount } from 'svelte';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Input } from "$lib/components/ui/input";
-  import { Button } from "$lib/components/ui/button";
-  import { Switch } from "$lib/components/ui/switch";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-  } from "$lib/components/ui/alert";
-  import { Separator } from "$lib/components/ui/separator";
-  import { toastActions } from "$lib/utils/toast";
-  import { aiProviderService } from "../../services/aiProviderService.js";
-  import {
-    formatModelMetadata,
-    flattenCatalogModels,
-  } from "../../utils/catalog.js";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
+  import { Button } from '$lib/components/ui/button';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
+  import { Separator } from '$lib/components/ui/separator';
+  import { toastActions } from '$lib/utils/toast';
+  import { aiProviderService } from '../../services/aiProviderService.js';
+  import { formatModelMetadata, flattenCatalogModels } from '../../utils/catalog.js';
   import type {
     ProviderConfig,
     ProviderType,
@@ -35,7 +28,7 @@
     PlatformCatalog,
     CatalogProvider,
     CatalogModel,
-  } from "../../types/index.js";
+  } from '../../types/index.js';
   import {
     Brain,
     CheckCircle2,
@@ -45,9 +38,9 @@
     Sparkles,
     Loader2,
     Key,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
-  const providerType: ProviderType = "AgentPlatform";
+  const providerType: ProviderType = 'AgentPlatform';
 
   let providerConfig = $state<ProviderConfig | null>(null);
   let defaultProvider = $state<ProviderType | null>(null);
@@ -75,8 +68,8 @@
       defaultProvider = defaultProviderType;
       configStatus = status;
     } catch (error) {
-      console.error("Failed to load Agent Platform configuration:", error);
-      toastActions.error("Failed to load configuration", error);
+      console.error('Failed to load Agent Platform configuration:', error);
+      toastActions.error('Failed to load configuration', error);
     } finally {
       isLoading = false;
     }
@@ -102,10 +95,10 @@
         defaultProvider = providerType;
       }
 
-      toastActions.success("Configuration saved");
+      toastActions.success('Configuration saved');
     } catch (error) {
-      console.error("Failed to save config:", error);
-      toastActions.error("Failed to save configuration", error);
+      console.error('Failed to save config:', error);
+      toastActions.error('Failed to save configuration', error);
     }
   }
 
@@ -113,9 +106,9 @@
     try {
       await aiProviderService.setDefaultProvider(providerType);
       defaultProvider = providerType;
-      toastActions.success("Agent Platform set as default provider");
+      toastActions.success('Agent Platform set as default provider');
     } catch (error) {
-      toastActions.error("Failed to set default provider", error);
+      toastActions.error('Failed to set default provider', error);
     }
   }
 
@@ -135,11 +128,11 @@
 
       await new Promise((resolve) => setTimeout(resolve, 100));
       await aiProviderService.testProvider(providerType);
-      toastActions.success("Connection successful");
+      toastActions.success('Connection successful');
 
       configStatus = await aiProviderService.getConfigStatus(providerType);
     } catch (error) {
-      toastActions.error("Connection test failed", error);
+      toastActions.error('Connection test failed', error);
     } finally {
       testingProvider = false;
     }
@@ -165,24 +158,21 @@
 
       if (catalogModels.length === 0) {
         toastActions.info(
-          "No models found",
-          "Check that agent-platform is running and has models configured in /config",
+          'No models found',
+          'Check that agent-platform is running and has models configured in /config'
         );
       } else {
-        const liveNote = live ? " (live upstream)" : " (aliases)";
+        const liveNote = live ? ' (live upstream)' : ' (aliases)';
         toastActions.success(
-          `Loaded ${catalogModels.length} model(s) from ${catalogProviders.length} provider(s)${liveNote}`,
+          `Loaded ${catalogModels.length} model(s) from ${catalogProviders.length} provider(s)${liveNote}`
         );
 
-        if (
-          !providerConfig.model &&
-          catalog.resolved_defaults?.model
-        ) {
+        if (!providerConfig.model && catalog.resolved_defaults?.model) {
           await updateConfig({ model: catalog.resolved_defaults.model });
         }
       }
     } catch (error) {
-      toastActions.error("Failed to load catalog", error);
+      toastActions.error('Failed to load catalog', error);
     } finally {
       loadingCatalog = false;
     }
@@ -196,10 +186,10 @@
       AI Provider Configuration
     </h2>
     <p class="mt-1 text-muted-foreground">
-      Connect to agent-platform for all AI features. Backend providers (Ollama,
-      Gemini, LM Studio, …) and model aliases are configured on the platform at
-      <code class="rounded bg-muted px-1">/config</code> — Portal only needs the
-      platform URL, token, and a default model alias.
+      Connect to agent-platform for all AI features. Backend providers (Ollama, Gemini, LM Studio,
+      …) and model aliases are configured on the platform at
+      <code class="rounded bg-muted px-1">/config</code> — Portal only needs the platform URL, token,
+      and a default model alias.
     </p>
   </div>
 
@@ -230,9 +220,9 @@
           {/if}
         </CardTitle>
         <CardDescription>
-          OpenAI-compatible proxy at <code>http://127.0.0.1:18410</code> by
-          default. Use <strong>Load catalog</strong> to fetch providers and
-          models from <code>/v1/catalog</code>.
+          OpenAI-compatible proxy at <code>http://127.0.0.1:18410</code> by default. Use
+          <strong>Load catalog</strong>
+          to fetch providers and models from <code>/v1/catalog</code>.
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
@@ -241,7 +231,7 @@
             <AlertTriangle class="h-4 w-4" />
             <AlertTitle>Configuration incomplete</AlertTitle>
             <AlertDescription>
-              Missing: {configStatus.missing_fields.join(", ")}
+              Missing: {configStatus.missing_fields.join(', ')}
             </AlertDescription>
           </Alert>
         {/if}
@@ -269,8 +259,7 @@
           </div>
           <Switch
             checked={providerConfig.enabled}
-            onCheckedChange={(checked: boolean) =>
-              updateConfig({ enabled: checked })}
+            onCheckedChange={(checked: boolean) => updateConfig({ enabled: checked })}
           />
         </div>
 
@@ -284,7 +273,7 @@
           <Input
             id="base-url"
             placeholder="http://127.0.0.1:18410"
-            value={providerConfig.base_url || ""}
+            value={providerConfig.base_url || ''}
             oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
               updateConfig({ base_url: e.currentTarget.value || null })}
           />
@@ -302,14 +291,14 @@
             spellcheck={false}
             class="font-mono text-sm"
             placeholder="agp_… workspace token from agent-platform /config"
-            value={providerConfig.api_key || ""}
+            value={providerConfig.api_key || ''}
             oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
               updateConfig({ api_key: e.currentTarget.value || null })}
           />
           <p class="text-xs text-muted-foreground">
             Shown in plain text for verification. Paste a scoped
-            <code class="rounded bg-muted px-1">agp_</code> token from
-            agent-platform — not the platform master key.
+            <code class="rounded bg-muted px-1">agp_</code> token from agent-platform — not the platform
+            master key.
           </p>
         </div>
 
@@ -359,13 +348,9 @@
           {#if catalog}
             <p class="text-xs text-muted-foreground">
               Platform defaults:
-              <code class="rounded bg-muted px-1"
-                >{catalog.resolved_defaults.provider}</code
-              >
+              <code class="rounded bg-muted px-1">{catalog.resolved_defaults.provider}</code>
               /
-              <code class="rounded bg-muted px-1"
-                >{catalog.resolved_defaults.model}</code
-              >
+              <code class="rounded bg-muted px-1">{catalog.resolved_defaults.model}</code>
             </p>
           {/if}
 
@@ -377,13 +362,9 @@
                     <span class="text-sm font-medium">{provider.label}</span>
                     <Badge variant="outline" class="text-xs">{provider.id}</Badge>
                     {#if provider.configured}
-                      <Badge class="bg-green-500 text-xs hover:bg-green-600"
-                        >configured</Badge
-                      >
+                      <Badge class="bg-green-500 text-xs hover:bg-green-600">configured</Badge>
                     {:else}
-                      <Badge variant="secondary" class="text-xs"
-                        >not configured</Badge
-                      >
+                      <Badge variant="secondary" class="text-xs">not configured</Badge>
                     {/if}
                     {#if provider.reachable}
                       <Badge variant="secondary" class="text-xs">reachable</Badge>
@@ -402,24 +383,19 @@
                           size="sm"
                           onclick={() => updateConfig({ model: model.id })}
                           class={providerConfig.model === model.id
-                            ? "bg-primary text-primary-foreground"
-                            : ""}
+                            ? 'bg-primary text-primary-foreground'
+                            : ''}
                           title={formatModelMetadata(model)}
                         >
                           {model.id}
-                          {#if model.source === "alias"}
-                            <Badge
-                              variant="secondary"
-                              class="ml-1 text-[10px]">alias</Badge
-                            >
+                          {#if model.source === 'alias'}
+                            <Badge variant="secondary" class="ml-1 text-[10px]">alias</Badge>
                           {/if}
                         </Button>
                       {/each}
                     </div>
                   {:else}
-                    <p class="text-xs text-muted-foreground">
-                      No models listed for this provider.
-                    </p>
+                    <p class="text-xs text-muted-foreground">No models listed for this provider.</p>
                   {/if}
                 </div>
               {/each}
@@ -432,8 +408,8 @@
                   size="sm"
                   onclick={() => updateConfig({ model: model.id })}
                   class={providerConfig.model === model.id
-                    ? "bg-primary text-primary-foreground"
-                    : ""}
+                    ? 'bg-primary text-primary-foreground'
+                    : ''}
                   title={formatModelMetadata(model)}
                 >
                   {model.id}
@@ -442,20 +418,15 @@
             </div>
           {/if}
           <p class="text-xs text-muted-foreground">
-            Model alias from the platform's <code class="rounded bg-muted px-1"
-              >config.yaml</code
-            >, or a raw backend model id.
+            Model alias from the platform's <code class="rounded bg-muted px-1">config.yaml</code>,
+            or a raw backend model id.
           </p>
         </div>
 
         <Separator />
 
         <div class="flex items-center justify-end gap-2">
-          <Button
-            variant="outline"
-            onclick={testConnection}
-            disabled={testingProvider}
-          >
+          <Button variant="outline" onclick={testConnection} disabled={testingProvider}>
             {#if testingProvider}
               <Loader2 class="mr-2 h-4 w-4 animate-spin" />
             {:else}
@@ -464,9 +435,7 @@
             Test connection
           </Button>
           {#if defaultProvider !== providerType && configStatus?.is_configured}
-            <Button variant="default" onclick={setAsDefault}>
-              Set as default
-            </Button>
+            <Button variant="default" onclick={setAsDefault}>Set as default</Button>
           {/if}
         </div>
       </CardContent>

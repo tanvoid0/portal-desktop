@@ -4,15 +4,10 @@
 -->
 
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
+  import { goto } from '$app/navigation';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     CheckCircle,
     XCircle,
@@ -21,17 +16,17 @@
     RefreshCw,
     ArrowRight,
     Loader2,
-  } from "@lucide/svelte";
-  import Devicon from "$lib/components/ui/devicon.svelte";
-  import { PageLoading, PageError, PageEmpty } from "$lib/components/shell";
-  import { toast } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
+  } from '@lucide/svelte';
+  import Devicon from '$lib/components/ui/devicon.svelte';
+  import { PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
   import {
     listSDKManagers,
     installSDKManager,
     uninstallSDKManager,
     type SDKManagerInfo,
-  } from "$lib/domains/sdk/services/sdkManagerService";
+  } from '$lib/domains/sdk/services/sdkManagerService';
 
   // State
   let loading = $state(true);
@@ -50,9 +45,8 @@
     try {
       managers = await listSDKManagers();
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to load SDK managers";
-      console.error("Failed to load SDK managers:", err);
+      error = err instanceof Error ? err.message : 'Failed to load SDK managers';
+      console.error('Failed to load SDK managers:', err);
     } finally {
       loading = false;
     }
@@ -66,26 +60,25 @@
     if (!manager.install_available) {
       installError[manager.id] =
         manager.install_unavailable_reason ||
-        "Automatic installation is not available for this manager.";
-      toast.error("Install unavailable", {
+        'Automatic installation is not available for this manager.';
+      toast.error('Install unavailable', {
         description: installError[manager.id],
       });
       return;
     }
 
     installingManager = manager.id;
-    installError[manager.id] = "";
+    installError[manager.id] = '';
 
     try {
       const result = await installSDKManager(manager.id);
-      toast.success("Manager installed", {
+      toast.success('Manager installed', {
         description: result,
       });
       await loadManagers();
     } catch (err) {
-      installError[manager.id] =
-        err instanceof Error ? err.message : "Installation failed";
-      toast.error("Installation failed", {
+      installError[manager.id] = err instanceof Error ? err.message : 'Installation failed';
+      toast.error('Installation failed', {
         description: installError[manager.id],
       });
     } finally {
@@ -97,8 +90,8 @@
     if (!manager.uninstall_available) {
       installError[manager.id] =
         manager.uninstall_unavailable_reason ||
-        "Automatic uninstall is not available for this manager.";
-      toast.error("Uninstall unavailable", {
+        'Automatic uninstall is not available for this manager.';
+      toast.error('Uninstall unavailable', {
         description: installError[manager.id],
       });
       return;
@@ -106,23 +99,22 @@
 
     const confirmed = await confirmAction(
       `Are you sure you want to uninstall ${manager.display_name}?`,
-      "Uninstall SDK manager",
+      'Uninstall SDK manager'
     );
     if (!confirmed) return;
 
     uninstallingManager = manager.id;
-    installError[manager.id] = "";
+    installError[manager.id] = '';
 
     try {
       const result = await uninstallSDKManager(manager.id);
-      toast.success("Manager uninstalled", {
+      toast.success('Manager uninstalled', {
         description: result,
       });
       await loadManagers();
     } catch (err) {
-      installError[manager.id] =
-        err instanceof Error ? err.message : "Failed to uninstall manager";
-      toast.error("Uninstall failed", {
+      installError[manager.id] = err instanceof Error ? err.message : 'Failed to uninstall manager';
+      toast.error('Uninstall failed', {
         description: installError[manager.id],
       });
     } finally {
@@ -132,16 +124,16 @@
 
   function getManagerIcon(managerId: string): string {
     const iconMap: Record<string, string> = {
-      nvm: "devicon-nodejs-plain",
-      pyenv: "devicon-python-plain",
-      rustup: "devicon-rust-plain",
-      sdkman: "devicon-sdkman-plain",
-      goenv: "devicon-go-plain",
-      rbenv: "devicon-ruby-plain",
-      phpenv: "devicon-php-plain",
-      fnm: "devicon-nodejs-plain",
+      nvm: 'devicon-nodejs-plain',
+      pyenv: 'devicon-python-plain',
+      rustup: 'devicon-rust-plain',
+      sdkman: 'devicon-sdkman-plain',
+      goenv: 'devicon-go-plain',
+      rbenv: 'devicon-ruby-plain',
+      phpenv: 'devicon-php-plain',
+      fnm: 'devicon-nodejs-plain',
     };
-    return iconMap[managerId.toLowerCase()] || "devicon-devicon-plain";
+    return iconMap[managerId.toLowerCase()] || 'devicon-devicon-plain';
   }
 
   function navigateToManagerDetails(managerId: string) {
@@ -159,8 +151,7 @@
     <div class="flex-1">
       <h1 class="text-3xl font-bold">SDK Managers</h1>
       <p class="text-muted-foreground">
-        Install and manage SDK version managers for different programming
-        languages
+        Install and manage SDK version managers for different programming languages
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -195,8 +186,7 @@
                 variant="ghost"
                 class="h-auto flex-1 justify-start gap-3 px-0 text-left hover:opacity-80"
                 onclick={() => navigateToManagerDetails(manager.id)}
-                onkeydown={(e) =>
-                  e.key === "Enter" && navigateToManagerDetails(manager.id)}
+                onkeydown={(e) => e.key === 'Enter' && navigateToManagerDetails(manager.id)}
               >
                 <Devicon icon={getManagerIcon(manager.id)} class="h-10 w-10" />
                 <div>
@@ -228,13 +218,10 @@
             <div class="mb-4">
               <div class="flex flex-wrap gap-1">
                 {#if manager.supports_installation}
-                  <Badge variant="secondary" class="text-xs">Installation</Badge
-                  >
+                  <Badge variant="secondary" class="text-xs">Installation</Badge>
                 {/if}
                 {#if manager.supports_version_switching}
-                  <Badge variant="secondary" class="text-xs"
-                    >Version Switching</Badge
-                  >
+                  <Badge variant="secondary" class="text-xs">Version Switching</Badge>
                 {/if}
               </div>
             </div>
@@ -256,11 +243,9 @@
                   variant="outline"
                   size="sm"
                   onclick={() => uninstallManager(manager)}
-                  disabled={
-                    uninstallingManager === manager.id ||
+                  disabled={uninstallingManager === manager.id ||
                     installingManager === manager.id ||
-                    !manager.uninstall_available
-                  }
+                    !manager.uninstall_available}
                 >
                   {#if uninstallingManager === manager.id}
                     <Loader2 class="mr-1 h-4 w-4 animate-spin" />
@@ -275,9 +260,7 @@
                   variant="outline"
                   size="sm"
                   onclick={() => installManager(manager)}
-                  disabled={
-                    installingManager === manager.id || !manager.install_available
-                  }
+                  disabled={installingManager === manager.id || !manager.install_available}
                 >
                   {#if installingManager === manager.id}
                     <Loader2 class="mr-1 h-4 w-4 animate-spin" />
@@ -293,7 +276,7 @@
                 <Button
                   variant="ghost"
                   size="sm"
-                  onclick={() => window.open(manager.website!, "_blank")}
+                  onclick={() => window.open(manager.website!, '_blank')}
                 >
                   <ExternalLink class="mr-1 h-4 w-4" />
                   Website
@@ -304,12 +287,8 @@
             <!-- Installation Command -->
             {#if manager.install_command && !manager.installed}
               <div class="mt-4">
-                <p class="mb-1 text-xs font-medium text-muted-foreground">
-                  Installation Command:
-                </p>
-                <code
-                  class="block break-all rounded bg-muted p-2 font-mono text-xs"
-                >
+                <p class="mb-1 text-xs font-medium text-muted-foreground">Installation Command:</p>
+                <code class="block break-all rounded bg-muted p-2 font-mono text-xs">
                   {manager.install_command}
                 </code>
               </div>

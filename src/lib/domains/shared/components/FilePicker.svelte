@@ -1,6 +1,6 @@
 <!-- Compatibility wrapper: keep domain import path while using canonical UI atom -->
 <script lang="ts">
-  import FilePicker from "$lib/components/ui/file-picker.svelte";
+  import FilePicker from '$lib/components/ui/file-picker.svelte';
 
   interface Props {
     value?: string;
@@ -15,11 +15,11 @@
   }
 
   let {
-    value = "",
-    placeholder = "/path/to/file",
+    value = '',
+    placeholder = '/path/to/file',
     disabled = false,
     required = false,
-    label = "File Path",
+    label = 'File Path',
     description,
     filters = [],
     selectFolder = false,

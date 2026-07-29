@@ -1,15 +1,9 @@
 // Hook for command palette state and logic
 
-import {
-  writable,
-  derived,
-  get,
-  type Readable,
-  type Writable,
-} from "svelte/store";
-import { fuzzySearch } from "../utils/fuzzySearch";
-import { NAVIGATION_SHORTCUTS } from "../utils/keyboardConstants";
-import type { Command } from "../types";
+import { writable, derived, get, type Readable, type Writable } from 'svelte/store';
+import { fuzzySearch } from '../utils/fuzzySearch';
+import { NAVIGATION_SHORTCUTS } from '../utils/keyboardConstants';
+import type { Command } from '../types';
 
 // Re-export Command type for convenience
 export type { Command };
@@ -23,7 +17,7 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
   const { commands, maxResults = 10 } = options;
 
   const isOpen = writable(false);
-  const query = writable("");
+  const query = writable('');
   const selectedIndex = writable(0);
 
   const filteredCommands: Readable<Command[]> = derived([query], ([$query]) => {
@@ -35,7 +29,7 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
       $query,
       commands,
       (cmd) => cmd.label,
-      (cmd) => cmd.keywords || [],
+      (cmd) => cmd.keywords || []
     );
 
     return results.slice(0, maxResults).map((result) => result.item);
@@ -48,18 +42,18 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
         return $filteredCommands[$selectedIndex];
       }
       return null;
-    },
+    }
   );
 
   function open() {
     isOpen.set(true);
-    query.set("");
+    query.set('');
     selectedIndex.set(0);
   }
 
   function close() {
     isOpen.set(false);
-    query.set("");
+    query.set('');
     selectedIndex.set(0);
   }
 
@@ -95,13 +89,10 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
     const $isOpen = get(isOpen);
 
     // Open command palette
-    if (
-      NAVIGATION_SHORTCUTS.COMMAND_PALETTE.includes(event.key as "/" | ":") &&
-      !$isOpen
-    ) {
+    if (NAVIGATION_SHORTCUTS.COMMAND_PALETTE.includes(event.key as '/' | ':') && !$isOpen) {
       // Only if not in input
       const target = event.target as HTMLElement;
-      if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
         event.preventDefault();
         open();
         return true;
@@ -111,22 +102,22 @@ export function useCommandPalette(options: UseCommandPaletteOptions) {
     if (!$isOpen) return false;
 
     switch (event.key) {
-      case "Escape":
+      case 'Escape':
         event.preventDefault();
         close();
         return true;
 
-      case "ArrowDown":
+      case 'ArrowDown':
         event.preventDefault();
         selectNext();
         return true;
 
-      case "ArrowUp":
+      case 'ArrowUp':
         event.preventDefault();
         selectPrevious();
         return true;
 
-      case "Enter":
+      case 'Enter':
         event.preventDefault();
         executeSelected();
         return true;

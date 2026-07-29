@@ -3,11 +3,11 @@
  * Provides centralized breadcrumb management across the application
  */
 
-import { writable, derived } from "svelte/store";
-import { page } from "$app/stores";
-import { logger } from "../services/logger";
+import { writable, derived } from 'svelte/store';
+import { page } from '$app/stores';
+import { logger } from '../services/logger';
 
-const log = logger.createScoped("BreadcrumbStore");
+const log = logger.createScoped('BreadcrumbStore');
 
 export interface BreadcrumbItem {
   label: string;
@@ -37,16 +37,16 @@ export const breadcrumbItems = derived(
 
     // Generate breadcrumbs based on current page including query parameters
     return generateBreadcrumbsFromPath($page.url.pathname, $page.url.search);
-  },
+  }
 );
 
 // Derived store for home item based on current path
 export const homeItem = derived(page, ($page) => {
   // Always use default home
   return {
-    label: "Home",
-    href: "/",
-    icon: "home",
+    label: 'Home',
+    href: '/',
+    icon: 'home',
   };
 });
 
@@ -66,15 +66,12 @@ export const breadcrumbSettings = derived(breadcrumbConfig, ($config) => ({
 /**
  * Generate breadcrumbs from URL path and query parameters
  */
-function generateBreadcrumbsFromPath(
-  pathname: string,
-  search: string,
-): BreadcrumbItem[] {
-  const segments = pathname.split("/").filter(Boolean);
+function generateBreadcrumbsFromPath(pathname: string, search: string): BreadcrumbItem[] {
+  const segments = pathname.split('/').filter(Boolean);
   const breadcrumbs: BreadcrumbItem[] = [];
 
   // Build breadcrumbs from path segments
-  let currentPath = "";
+  let currentPath = '';
 
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
@@ -84,7 +81,7 @@ function generateBreadcrumbsFromPath(
     const label = segment.toUpperCase();
 
     // Use a generic icon for all segments
-    const icon = "file";
+    const icon = 'file';
 
     breadcrumbs.push({
       label,
@@ -100,15 +97,13 @@ function generateBreadcrumbsFromPath(
 
     if (paramEntries.length > 0) {
       // Create a label showing the query parameters
-      const paramLabels = paramEntries
-        .map(([key, value]) => `${key}=${value}`)
-        .join("&");
+      const paramLabels = paramEntries.map(([key, value]) => `${key}=${value}`).join('&');
       const queryLabel = `?${paramLabels}`;
 
       breadcrumbs.push({
         label: queryLabel,
         href: `${pathname}${search}`,
-        icon: "search",
+        icon: 'search',
       });
     }
   }
@@ -120,7 +115,7 @@ function generateBreadcrumbsFromPath(
  * Set custom breadcrumbs for current page
  */
 export function setBreadcrumbs(items: BreadcrumbItem[]) {
-  log.debug("Setting custom breadcrumbs", { items });
+  log.debug('Setting custom breadcrumbs', { items });
   customBreadcrumbs.set(items);
 }
 
@@ -128,7 +123,7 @@ export function setBreadcrumbs(items: BreadcrumbItem[]) {
  * Clear custom breadcrumbs (will fall back to auto-generated ones)
  */
 export function clearBreadcrumbs() {
-  log.debug("Clearing custom breadcrumbs");
+  log.debug('Clearing custom breadcrumbs');
   customBreadcrumbs.set([]);
 }
 
@@ -140,7 +135,7 @@ export function setBreadcrumbConfig(config: {
   homeIcon?: boolean;
   items?: BreadcrumbItem[];
 }) {
-  log.debug("Setting breadcrumb config", { config });
+  log.debug('Setting breadcrumb config', { config });
   breadcrumbConfig.set(config);
 }
 
@@ -148,7 +143,7 @@ export function setBreadcrumbConfig(config: {
  * Reset breadcrumb configuration to defaults
  */
 export function resetBreadcrumbConfig() {
-  log.debug("Resetting breadcrumb config");
+  log.debug('Resetting breadcrumb config');
   breadcrumbConfig.set({});
 }
 
@@ -175,8 +170,8 @@ export const breadcrumbActions = {
    */
   setTaskBreadcrumbs(taskTitle: string, taskId: string) {
     setBreadcrumbs([
-      { label: "Tasks", href: "/tasks", icon: "clipboard" },
-      { label: taskTitle, href: `/tasks/${taskId}`, icon: "clipboard-text" },
+      { label: 'Tasks', href: '/tasks', icon: 'clipboard' },
+      { label: taskTitle, href: `/tasks/${taskId}`, icon: 'clipboard-text' },
     ]);
   },
 
@@ -185,9 +180,9 @@ export const breadcrumbActions = {
    */
   setTaskEditBreadcrumbs(taskTitle: string, taskId: string) {
     setBreadcrumbs([
-      { label: "Tasks", href: "/tasks", icon: "clipboard" },
-      { label: taskTitle, href: `/tasks/${taskId}`, icon: "clipboard-text" },
-      { label: "Edit", icon: "edit" },
+      { label: 'Tasks', href: '/tasks', icon: 'clipboard' },
+      { label: taskTitle, href: `/tasks/${taskId}`, icon: 'clipboard-text' },
+      { label: 'Edit', icon: 'edit' },
     ]);
   },
 
@@ -195,7 +190,7 @@ export const breadcrumbActions = {
    * Set breadcrumbs for projects page
    */
   setProjectBreadcrumbs() {
-    setBreadcrumbs([{ label: "Projects", href: "/projects", icon: "folder" }]);
+    setBreadcrumbs([{ label: 'Projects', href: '/projects', icon: 'folder' }]);
   },
 
   /**
@@ -203,8 +198,8 @@ export const breadcrumbActions = {
    */
   setProjectDetailsBreadcrumbs(projectName: string) {
     setBreadcrumbs([
-      { label: "Projects", href: "/projects", icon: "folder" },
-      { label: projectName, icon: "folder-open" },
+      { label: 'Projects', href: '/projects', icon: 'folder' },
+      { label: projectName, icon: 'folder-open' },
     ]);
   },
 
@@ -213,8 +208,8 @@ export const breadcrumbActions = {
    */
   setCreateProjectBreadcrumbs() {
     setBreadcrumbs([
-      { label: "Projects", href: "/projects", icon: "folder" },
-      { label: "Create Project", icon: "plus" },
+      { label: 'Projects', href: '/projects', icon: 'folder' },
+      { label: 'Create Project', icon: 'plus' },
     ]);
   },
 
@@ -223,13 +218,13 @@ export const breadcrumbActions = {
    */
   setProjectEditBreadcrumbs(projectName: string) {
     setBreadcrumbs([
-      { label: "Projects", href: "/projects", icon: "folder" },
+      { label: 'Projects', href: '/projects', icon: 'folder' },
       {
         label: projectName,
         href: `/projects/${projectName}`,
-        icon: "folder-open",
+        icon: 'folder-open',
       },
-      { label: "Edit", icon: "edit" },
+      { label: 'Edit', icon: 'edit' },
     ]);
   },
 
@@ -237,8 +232,6 @@ export const breadcrumbActions = {
    * Set breadcrumbs for terminal page
    */
   setTerminalBreadcrumbs() {
-    setBreadcrumbs([
-      { label: "Terminal", href: "/terminal", icon: "terminal" },
-    ]);
+    setBreadcrumbs([{ label: 'Terminal', href: '/terminal', icon: 'terminal' }]);
   },
 };

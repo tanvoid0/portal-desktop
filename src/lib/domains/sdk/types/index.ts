@@ -3,24 +3,24 @@
  */
 
 export enum SDKManager {
-  NVM = "nvm",
-  RUSTUP = "rustup",
-  PYENV = "pyenv",
-  SDKMAN = "sdkman",
-  GOENV = "goenv",
-  MANUAL = "manual",
+  NVM = 'nvm',
+  RUSTUP = 'rustup',
+  PYENV = 'pyenv',
+  SDKMAN = 'sdkman',
+  GOENV = 'goenv',
+  MANUAL = 'manual',
 }
 
 export enum SDKType {
-  NODE = "node",
-  RUST = "rust",
-  PYTHON = "python",
-  JAVA = "java",
-  GO = "go",
-  PHP = "php",
-  RUBY = "ruby",
-  KOTLIN = "kotlin",
-  SCALA = "scala",
+  NODE = 'node',
+  RUST = 'rust',
+  PYTHON = 'python',
+  JAVA = 'java',
+  GO = 'go',
+  PHP = 'php',
+  RUBY = 'ruby',
+  KOTLIN = 'kotlin',
+  SCALA = 'scala',
 }
 
 export interface SDKVersion {
@@ -117,12 +117,12 @@ export interface SDKVersionSource {
 /**
  * Version source type
  */
-export type VersionSource = "static" | "sdk_manager" | "system" | "custom";
+export type VersionSource = 'static' | 'sdk_manager' | 'system' | 'custom';
 
 /**
  * Environment scope
  */
-export type EnvironmentScope = "global" | "project" | "session";
+export type EnvironmentScope = 'global' | 'project' | 'session';
 
 /**
  * SDK Installation from detection
@@ -182,7 +182,7 @@ export interface EnvironmentConfig {
   pathEntries: PathEntry[];
   environmentVariables: EnvironmentVariable[];
   aliases: VersionAlias[];
-  pathManagedBy: "app" | "system" | "none";
+  pathManagedBy: 'app' | 'system' | 'none';
   lastUpdated: string;
 }
 
@@ -216,7 +216,7 @@ export interface VersionAlias {
 export interface EnvironmentStatus {
   sdkType: string;
   currentVersion?: string;
-  pathManagedBy: "app" | "system" | "none";
+  pathManagedBy: 'app' | 'system' | 'none';
   binariesInPath: string[];
   environmentVariables: EnvironmentVariable[];
   lastUpdated: string;

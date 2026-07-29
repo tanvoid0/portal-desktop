@@ -4,10 +4,10 @@
 -->
 
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Plus } from "@lucide/svelte";
-  import ParameterEditor from "./ParameterEditor.svelte";
-  import type { ScriptParameter } from "$lib/domains/custom_scripts/services/customScriptService";
+  import { Button } from '$lib/components/ui/button';
+  import { Plus } from '@lucide/svelte';
+  import ParameterEditor from './ParameterEditor.svelte';
+  import type { ScriptParameter } from '$lib/domains/custom_scripts/services/customScriptService';
 
   interface Props {
     parameters: ScriptParameter[];
@@ -22,7 +22,7 @@
       {
         name: `param${parameters.length + 1}`,
         label: `Parameter ${parameters.length + 1}`,
-        parameter_type: "string",
+        parameter_type: 'string',
         required: false,
       },
     ]);
@@ -34,9 +34,7 @@
 
   function updateParameter(index: number, updates: Partial<ScriptParameter>) {
     onParametersChange(
-      parameters.map((param, i) =>
-        i === index ? { ...param, ...updates } : param,
-      ),
+      parameters.map((param, i) => (i === index ? { ...param, ...updates } : param))
     );
   }
 </script>

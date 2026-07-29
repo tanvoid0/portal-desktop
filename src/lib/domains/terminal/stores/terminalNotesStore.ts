@@ -1,5 +1,5 @@
-import { writable } from "svelte/store";
-import { invokeClient } from "$lib/utils/invokeClient";
+import { writable } from 'svelte/store';
+import { invokeClient } from '$lib/utils/invokeClient';
 
 type NotesByTabId = Record<string, string>;
 
@@ -17,25 +17,24 @@ function createTerminalNotesStore() {
   return {
     subscribe,
 
-    getNote: (tabId: string): string => cache[tabId] ?? "",
+    getNote: (tabId: string): string => cache[tabId] ?? '',
 
     loadNote: async (tabId: string): Promise<void> => {
       if (loadedTabs.has(tabId)) return;
       try {
-        const markdown = await invokeClient.request<string>(
-          "load_terminal_note",
-          { data: { tabId } },
-        );
+        const markdown = await invokeClient.request<string>('load_terminal_note', {
+          data: { tabId },
+        });
 
         update((state) => ({
           ...state,
-          [tabId]: markdown || "",
+          [tabId]: markdown || '',
         }));
       } catch (e) {
         // If no row exists yet, treat as empty note.
         update((state) => ({
           ...state,
-          [tabId]: "",
+          [tabId]: '',
         }));
       } finally {
         loadedTabs.add(tabId);
@@ -50,7 +49,7 @@ function createTerminalNotesStore() {
       }));
 
       try {
-        await invokeClient.request("save_terminal_note", {
+        await invokeClient.request('save_terminal_note', {
           data: { tabId, markdown },
         });
         loadedTabs.add(tabId);
@@ -66,4 +65,3 @@ function createTerminalNotesStore() {
 }
 
 export const terminalNotesStore = createTerminalNotesStore();
-

@@ -1,7 +1,7 @@
 export interface EnvVariable {
   name: string;
   value: string;
-  scope: "user" | "system" | "session";
+  scope: 'user' | 'system' | 'session';
 }
 
 export interface EnvPermissions {
@@ -12,10 +12,10 @@ export interface EnvPermissions {
 }
 
 export interface EnvChange {
-  action: "set" | "delete";
+  action: 'set' | 'delete';
   name: string;
   value?: string;
-  scope: "user" | "system" | "session";
+  scope: 'user' | 'system' | 'session';
 }
 
 export interface EnvApplyResult {
@@ -28,7 +28,7 @@ export interface EnvRow {
   id: string;
   name: string;
   value: string;
-  scope: EnvVariable["scope"];
+  scope: EnvVariable['scope'];
   isNew?: boolean;
   isDeleted?: boolean;
   isDirty?: boolean;

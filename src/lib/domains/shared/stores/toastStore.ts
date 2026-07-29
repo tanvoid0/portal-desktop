@@ -1,11 +1,11 @@
-import { writable } from "svelte/store";
-import { createLogger } from "../services/logger";
+import { writable } from 'svelte/store';
+import { createLogger } from '../services/logger';
 
 export interface Toast {
   id: string;
   title?: string;
   description?: string;
-  type?: "success" | "error" | "warning" | "info";
+  type?: 'success' | 'error' | 'warning' | 'info';
   duration?: number;
   action?: {
     label: string;
@@ -24,7 +24,7 @@ const initialState: ToastStore = {
 export const toastStore = writable<ToastStore>(initialState);
 
 // Create a scoped logger for toast operations
-const toastLogger = createLogger("ToastStore");
+const toastLogger = createLogger('ToastStore');
 
 /**
  * Extract error message from various error types
@@ -33,17 +33,17 @@ function extractErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) {
     return error.message || fallback;
   }
-  if (typeof error === "string") {
+  if (typeof error === 'string') {
     return error || fallback;
   }
-  if (error && typeof error === "object" && "message" in error) {
+  if (error && typeof error === 'object' && 'message' in error) {
     return String(error.message) || fallback;
   }
   return fallback;
 }
 
 export const toastActions = {
-  show(toast: Omit<Toast, "id">) {
+  show(toast: Omit<Toast, 'id'>) {
     const id = Math.random().toString(36).slice(2, 11);
     const newToast: Toast = {
       ...toast,
@@ -67,14 +67,14 @@ export const toastActions = {
 
   success(title: string, description?: string, options?: Partial<Toast>) {
     toastLogger.info(`Toast: ${title}`, {
-      type: "success",
+      type: 'success',
       description,
       ...options,
     });
     return this.show({
       title,
       description,
-      type: "success",
+      type: 'success',
       ...options,
     });
   },
@@ -84,7 +84,7 @@ export const toastActions = {
     const description = errorOrDescription
       ? extractErrorMessage(
           errorOrDescription,
-          typeof errorOrDescription === "string" ? errorOrDescription : "",
+          typeof errorOrDescription === 'string' ? errorOrDescription : ''
         )
       : undefined;
 
@@ -98,7 +98,7 @@ export const toastActions = {
     return this.show({
       title,
       description,
-      type: "error",
+      type: 'error',
       duration: 0, // Don't auto-dismiss errors
       ...options,
     });
@@ -106,34 +106,34 @@ export const toastActions = {
 
   warning(title: string, description?: string, options?: Partial<Toast>) {
     toastLogger.warn(`Toast: ${title}`, {
-      type: "warning",
+      type: 'warning',
       description,
       ...options,
     });
     return this.show({
       title,
       description,
-      type: "warning",
+      type: 'warning',
       ...options,
     });
   },
 
   info(title: string, description?: string, options?: Partial<Toast>) {
     toastLogger.info(`Toast: ${title}`, {
-      type: "info",
+      type: 'info',
       description,
       ...options,
     });
     return this.show({
       title,
       description,
-      type: "info",
+      type: 'info',
       ...options,
     });
   },
 
   clear() {
-    toastLogger.info("Toasts cleared");
+    toastLogger.info('Toasts cleared');
     toastStore.set({ toasts: [] });
   },
 };

@@ -1,18 +1,8 @@
 // Base provider implementation with common functionality
 // All provider implementations should extend this class
 
-import type {
-  ICloudProvider,
-  ICluster,
-  ICloudResource,
-  ResourceEvent,
-} from "../../core/types";
-import {
-  ResourceType,
-  ClusterStatus,
-  CloudProviderType,
-  ResourceStatus,
-} from "../../core/types";
+import type { ICloudProvider, ICluster, ICloudResource, ResourceEvent } from '../../core/types';
+import { ResourceType, ClusterStatus, CloudProviderType, ResourceStatus } from '../../core/types';
 
 export abstract class BaseProvider implements ICloudProvider {
   abstract readonly name: string;
@@ -28,19 +18,13 @@ export abstract class BaseProvider implements ICloudProvider {
 
   abstract listClusters(): Promise<ICluster[]>;
   abstract getCluster(id: string): Promise<ICluster | null>;
-  abstract listResources(
-    type: ResourceType,
-    namespace?: string,
-  ): Promise<ICloudResource[]>;
+  abstract listResources(type: ResourceType, namespace?: string): Promise<ICloudResource[]>;
   abstract getResource(
     type: ResourceType,
     id: string,
-    namespace: string,
+    namespace: string
   ): Promise<ICloudResource | null>;
-  abstract watchResources(
-    type: ResourceType,
-    namespace?: string,
-  ): AsyncIterable<ResourceEvent>;
+  abstract watchResources(type: ResourceType, namespace?: string): AsyncIterable<ResourceEvent>;
   abstract listNamespaces(): Promise<string[]>;
 
   // Common implementations
@@ -55,26 +39,23 @@ export abstract class BaseProvider implements ICloudProvider {
 
   // Common utility methods
   protected validateCluster(cluster: ICluster): boolean {
-    return (
-      cluster.status === ClusterStatus.CONNECTED ||
-      cluster.status === ClusterStatus.READY
-    );
+    return cluster.status === ClusterStatus.CONNECTED || cluster.status === ClusterStatus.READY;
   }
 
   protected mapResourceStatus(status: string): ResourceStatus {
     const statusLower = status.toLowerCase();
     switch (statusLower) {
-      case "running":
+      case 'running':
         return ResourceStatus.RUNNING;
-      case "pending":
+      case 'pending':
         return ResourceStatus.PENDING;
-      case "failed":
-      case "error":
-      case "crashloopbackoff":
+      case 'failed':
+      case 'error':
+      case 'crashloopbackoff':
         return ResourceStatus.FAILED;
-      case "succeeded":
+      case 'succeeded':
         return ResourceStatus.SUCCEEDED;
-      case "terminating":
+      case 'terminating':
         return ResourceStatus.TERMINATING;
       default:
         return ResourceStatus.UNKNOWN;
@@ -82,18 +63,18 @@ export abstract class BaseProvider implements ICloudProvider {
   }
 
   protected mapClusterStatus(status: string | ClusterStatus): ClusterStatus {
-    if (typeof status === "string") {
+    if (typeof status === 'string') {
       const statusLower = status.toLowerCase();
       switch (statusLower) {
-        case "connected":
+        case 'connected':
           return ClusterStatus.CONNECTED;
-        case "disconnected":
+        case 'disconnected':
           return ClusterStatus.DISCONNECTED;
-        case "connecting":
+        case 'connecting':
           return ClusterStatus.CONNECTING;
-        case "ready":
+        case 'ready':
           return ClusterStatus.READY;
-        case "error":
+        case 'error':
           return ClusterStatus.ERROR;
         default:
           return ClusterStatus.DISCONNECTED;

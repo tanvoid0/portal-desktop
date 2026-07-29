@@ -4,27 +4,22 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
   import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from "$lib/components/ui/dialog";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import Select from "$lib/components/ui/select.svelte";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
+  } from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import {
     Settings,
     Save,
@@ -35,20 +30,20 @@
     CheckCircle,
     FileText,
     Code,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface ConfigFile {
     name: string;
     path: string;
     content: string;
-    format: "json" | "yaml" | "toml" | "ini" | "xml" | "text";
+    format: 'json' | 'yaml' | 'toml' | 'ini' | 'xml' | 'text';
     lastModified: string;
   }
 
   interface EnvironmentVariable {
     name: string;
     value: string;
-    scope: "global" | "session" | "project";
+    scope: 'global' | 'session' | 'project';
   }
 
   interface Props {
@@ -63,9 +58,9 @@
   // State
   let configFiles = $state<ConfigFile[]>([]);
   let environmentVars = $state<EnvironmentVariable[]>([]);
-  let activeTab = $state("files");
+  let activeTab = $state('files');
   let selectedFile = $state<ConfigFile | null>(null);
-  let editedContent = $state("");
+  let editedContent = $state('');
   let hasChanges = $state(false);
   let loading = $state(false);
   let error = $state<string | null>(null);
@@ -93,8 +88,8 @@
       // Mock config files - in real implementation, this would load from the service
       configFiles = [
         {
-          name: "nginx.conf",
-          path: "/etc/nginx/nginx.conf",
+          name: 'nginx.conf',
+          path: '/etc/nginx/nginx.conf',
           content: `server {
     listen 80;
     server_name localhost;
@@ -105,12 +100,12 @@
         proxy_set_header X-Real-IP $remote_addr;
     }
 }`,
-          format: "text",
+          format: 'text',
           lastModified: new Date().toISOString(),
         },
         {
-          name: "config.json",
-          path: "/path/to/service/config.json",
+          name: 'config.json',
+          path: '/path/to/service/config.json',
           content: `{
     "port": 3000,
     "host": "localhost",
@@ -124,25 +119,24 @@
         "file": "/var/log/service.log"
     }
 }`,
-          format: "json",
+          format: 'json',
           lastModified: new Date().toISOString(),
         },
       ];
 
       // Mock environment variables
       environmentVars = [
-        { name: "NODE_ENV", value: "development", scope: "project" },
-        { name: "PORT", value: "3000", scope: "session" },
+        { name: 'NODE_ENV', value: 'development', scope: 'project' },
+        { name: 'PORT', value: '3000', scope: 'session' },
         {
-          name: "DATABASE_URL",
-          value: "postgres://localhost:5432/myapp",
-          scope: "project",
+          name: 'DATABASE_URL',
+          value: 'postgres://localhost:5432/myapp',
+          scope: 'project',
         },
       ];
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to load configuration";
-      console.error("Failed to load service config:", err);
+      error = err instanceof Error ? err.message : 'Failed to load configuration';
+      console.error('Failed to load service config:', err);
     } finally {
       loading = false;
     }
@@ -166,7 +160,7 @@
     success = null;
 
     try {
-      await invoke("update_service_config", {
+      await invoke('update_service_config', {
         serviceId,
         config: {
           [selectedFile.name]: editedContent,
@@ -177,15 +171,14 @@
       selectedFile.content = editedContent;
       selectedFile.lastModified = new Date().toISOString();
       hasChanges = false;
-      success = "Configuration saved successfully";
+      success = 'Configuration saved successfully';
 
       // Clear success message after 3 seconds
       setTimeout(() => {
         success = null;
       }, 3000);
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to save configuration";
+      error = err instanceof Error ? err.message : 'Failed to save configuration';
     } finally {
       loading = false;
     }
@@ -202,9 +195,9 @@
     if (!selectedFile) return;
 
     try {
-      const blob = new Blob([editedContent], { type: "text/plain" });
+      const blob = new Blob([editedContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
       a.download = selectedFile.name;
       document.body.appendChild(a);
@@ -212,60 +205,53 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      error = "Failed to download configuration file";
+      error = 'Failed to download configuration file';
     }
   }
 
   function addEnvironmentVar() {
-    environmentVars = [
-      ...environmentVars,
-      { name: "", value: "", scope: "project" },
-    ];
+    environmentVars = [...environmentVars, { name: '', value: '', scope: 'project' }];
   }
 
   function removeEnvironmentVar(index: number) {
     environmentVars = environmentVars.filter((_, i) => i !== index);
   }
 
-  function updateEnvironmentVar(
-    index: number,
-    field: keyof EnvironmentVariable,
-    value: string,
-  ) {
+  function updateEnvironmentVar(index: number, field: keyof EnvironmentVariable, value: string) {
     environmentVars[index] = { ...environmentVars[index], [field]: value };
   }
 
   function getFileIcon(format: string) {
     switch (format) {
-      case "json":
-        return "{}";
-      case "yaml":
-        return "Y";
-      case "toml":
-        return "T";
-      case "ini":
-        return "I";
-      case "xml":
-        return "X";
+      case 'json':
+        return '{}';
+      case 'yaml':
+        return 'Y';
+      case 'toml':
+        return 'T';
+      case 'ini':
+        return 'I';
+      case 'xml':
+        return 'X';
       default:
-        return "T";
+        return 'T';
     }
   }
 
   function getFileLanguage(format: string) {
     switch (format) {
-      case "json":
-        return "json";
-      case "yaml":
-        return "yaml";
-      case "toml":
-        return "toml";
-      case "ini":
-        return "ini";
-      case "xml":
-        return "xml";
+      case 'json':
+        return 'json';
+      case 'yaml':
+        return 'yaml';
+      case 'toml':
+        return 'toml';
+      case 'ini':
+        return 'ini';
+      case 'xml':
+        return 'xml';
       default:
-        return "text";
+        return 'text';
     }
   }
 </script>
@@ -319,7 +305,7 @@
           <div class="space-y-1">
             {#each configFiles as file}
               <Button
-                variant={selectedFile?.name === file.name ? "default" : "ghost"}
+                variant={selectedFile?.name === file.name ? 'default' : 'ghost'}
                 class="w-full justify-start"
                 onclick={() => selectFile(file)}
               >
@@ -339,9 +325,7 @@
                 <p class="text-sm text-muted-foreground">{selectedFile.path}</p>
               </div>
               <div class="flex items-center gap-2">
-                <Badge variant="outline"
-                  >{getFileLanguage(selectedFile.format)}</Badge
-                >
+                <Badge variant="outline">{getFileLanguage(selectedFile.format)}</Badge>
                 <Button variant="outline" size="sm" onclick={downloadConfig}>
                   <Download class="mr-2 h-4 w-4" />
                   Download
@@ -363,11 +347,7 @@
                 {/if}
               </div>
               <div class="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onclick={resetChanges}
-                  disabled={!hasChanges}
-                >
+                <Button variant="outline" onclick={resetChanges} disabled={!hasChanges}>
                   <RotateCcw class="mr-2 h-4 w-4" />
                   Reset
                 </Button>
@@ -378,9 +358,7 @@
               </div>
             </div>
           {:else}
-            <div
-              class="flex flex-1 items-center justify-center text-muted-foreground"
-            >
+            <div class="flex flex-1 items-center justify-center text-muted-foreground">
               <div class="text-center">
                 <FileText class="mx-auto mb-4 h-12 w-12 opacity-50" />
                 <p>Select a configuration file to edit</p>
@@ -395,9 +373,7 @@
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <h3 class="font-medium">Environment Variables</h3>
-            <Button variant="outline" onclick={addEnvironmentVar}>
-              Add Variable
-            </Button>
+            <Button variant="outline" onclick={addEnvironmentVar}>Add Variable</Button>
           </div>
 
           <div class="space-y-3">
@@ -409,11 +385,7 @@
                     id="env-name-{index}"
                     bind:value={envVar.name}
                     oninput={(e) =>
-                      updateEnvironmentVar(
-                        index,
-                        "name",
-                        (e.target as HTMLInputElement).value,
-                      )}
+                      updateEnvironmentVar(index, 'name', (e.target as HTMLInputElement).value)}
                     placeholder="VARIABLE_NAME"
                   />
                 </div>
@@ -425,8 +397,8 @@
                     oninput={(e) =>
                       updateEnvironmentVar(
                         index,
-                        "value",
-                        (e.target as HTMLInputElement)?.value || "",
+                        'value',
+                        (e.target as HTMLInputElement)?.value || ''
                       )}
                     placeholder="variable_value"
                   />
@@ -435,20 +407,15 @@
                   <Label for="env-scope-{index}" class="text-xs">Scope</Label>
                   <Select
                     options={[
-                      { value: "project", label: "Project" },
-                      { value: "session", label: "Session" },
-                      { value: "global", label: "Global" },
+                      { value: 'project', label: 'Project' },
+                      { value: 'session', label: 'Session' },
+                      { value: 'global', label: 'Global' },
                     ]}
                     defaultValue={envVar.scope}
-                    onSelect={(value: string) =>
-                      updateEnvironmentVar(index, "scope", value)}
+                    onSelect={(value: string) => updateEnvironmentVar(index, 'scope', value)}
                   />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onclick={() => removeEnvironmentVar(index)}
-                >
+                <Button variant="ghost" size="sm" onclick={() => removeEnvironmentVar(index)}>
                   Remove
                 </Button>
               </div>

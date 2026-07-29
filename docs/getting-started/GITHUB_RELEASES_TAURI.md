@@ -47,7 +47,7 @@ name: Build and Release
 on:
   push:
     branches: [main]
-    tags: ["v*.*.*"]
+    tags: ['v*.*.*']
   workflow_dispatch:
 
 jobs:
@@ -61,7 +61,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
       - name: Extract version
         id: version
         run: |
@@ -174,15 +174,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         with:
           tagName: v__VERSION__
-          releaseName: "Release v__VERSION__"
-          releaseBody: "See the assets to download this version."
+          releaseName: 'Release v__VERSION__'
+          releaseBody: 'See the assets to download this version.'
           releaseDraft: true
           prerelease: false
         env:

@@ -1,6 +1,6 @@
-import { TerminalService } from "../services/terminalService";
-import type { TerminalOutput, TerminalProcess } from "../types";
-import { isTauriEnvironment } from "$lib/utils/tauri";
+import { TerminalService } from '../services/terminalService';
+import type { TerminalOutput, TerminalProcess } from '../types';
+import { isTauriEnvironment } from '$lib/utils/tauri';
 
 export interface ProcessConfig {
   tabId: string;
@@ -15,7 +15,7 @@ export interface ProcessConfig {
 }
 
 export async function createTerminalProcess(
-  config: ProcessConfig,
+  config: ProcessConfig
 ): Promise<TerminalProcess | null> {
   if (!isTauriEnvironment()) return null;
 
@@ -29,16 +29,14 @@ export async function createTerminalProcess(
   });
 }
 
-export async function getProcessExitCode(
-  processId: string,
-): Promise<number | null> {
+export async function getProcessExitCode(processId: string): Promise<number | null> {
   if (!isTauriEnvironment()) return null;
   return TerminalService.getProcessExitCode(processId);
 }
 
 export async function subscribeProcessOutput(
   processId: string,
-  callback: (output: TerminalOutput) => void,
+  callback: (output: TerminalOutput) => void
 ): Promise<() => void> {
   return TerminalService.subscribeToOutput(processId, callback);
 }
@@ -46,7 +44,7 @@ export async function subscribeProcessOutput(
 export async function resizeTerminalProcess(
   processId: string,
   cols: number,
-  rows: number,
+  rows: number
 ): Promise<void> {
   await TerminalService.resizeTerminal(processId, cols, rows);
 }
@@ -54,7 +52,7 @@ export async function resizeTerminalProcess(
 export async function sendProcessInput(
   processId: string,
   input: string,
-  tabId?: string,
+  tabId?: string
 ): Promise<void> {
   await TerminalService.sendInput(processId, input, tabId);
 }

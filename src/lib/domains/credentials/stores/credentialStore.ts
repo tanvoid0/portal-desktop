@@ -2,16 +2,16 @@
  * Credentials Store - State management for encrypted credentials
  */
 
-import { writable, derived } from "svelte/store";
-import { logger } from "$lib/domains/shared";
-import type { Credential, CredentialType, SecureVault } from "../types";
+import { writable, derived } from 'svelte/store';
+import { logger } from '$lib/domains/shared';
+import type { Credential, CredentialType, SecureVault } from '../types';
 
 // Core state
 export const credentials = writable<Credential[]>([]);
 export const vaults = writable<SecureVault[]>([]);
 export const activeVault = writable<SecureVault | null>(null);
 export const isVaultUnlocked = writable<boolean>(false);
-export const searchQuery = writable<string>("");
+export const searchQuery = writable<string>('');
 export const selectedCredentialType = writable<CredentialType | null>(null);
 export const selectedTags = writable<string[]>([]);
 
@@ -29,9 +29,7 @@ export const filteredCredentials = derived(
       if (
         $searchQuery &&
         !credential.name.toLowerCase().includes($searchQuery.toLowerCase()) &&
-        !credential.description
-          ?.toLowerCase()
-          .includes($searchQuery.toLowerCase())
+        !credential.description?.toLowerCase().includes($searchQuery.toLowerCase())
       ) {
         return false;
       }
@@ -42,16 +40,13 @@ export const filteredCredentials = derived(
       }
 
       // Tags filter
-      if (
-        $selectedTags.length > 0 &&
-        !$selectedTags.some((tag) => credential.tags.includes(tag))
-      ) {
+      if ($selectedTags.length > 0 && !$selectedTags.some((tag) => credential.tags.includes(tag))) {
         return false;
       }
 
       return true;
     });
-  },
+  }
 );
 
 export const credentialsByType = derived(credentials, ($credentials) => {
@@ -76,8 +71,8 @@ export const allTags = derived(credentials, ($credentials) => {
 export const credentialStats = derived(credentials, ($credentials) => {
   const stats = {
     total: $credentials.length,
-    active: $credentials.filter((c) => c.status === "active").length,
-    expired: $credentials.filter((c) => c.status === "expired").length,
+    active: $credentials.filter((c) => c.status === 'active').length,
+    expired: $credentials.filter((c) => c.status === 'expired').length,
     byType: {} as Record<CredentialType, number>,
   };
 
@@ -94,10 +89,7 @@ export const credentialActions = {
    * Set credentials list
    */
   setCredentials(credentialList: Credential[]): void {
-    logger.info(
-      "CredentialStore",
-      `Setting credentials: ${credentialList.length} items`,
-    );
+    logger.info('CredentialStore', `Setting credentials: ${credentialList.length} items`);
     credentials.set(credentialList);
   },
 
@@ -105,10 +97,7 @@ export const credentialActions = {
    * Add new credential
    */
   addCredential(credential: Credential): void {
-    logger.info(
-      "CredentialStore",
-      `Adding credential: ${credential.id} (${credential.type})`,
-    );
+    logger.info('CredentialStore', `Adding credential: ${credential.id} (${credential.type})`);
     credentials.update((list) => [...list, credential]);
   },
 
@@ -116,13 +105,11 @@ export const credentialActions = {
    * Update existing credential
    */
   updateCredential(credentialId: string, updates: Partial<Credential>): void {
-    logger.info("CredentialStore", `Updating credential: ${credentialId}`);
+    logger.info('CredentialStore', `Updating credential: ${credentialId}`);
     credentials.update((list) =>
       list.map((credential) =>
-        credential.id === credentialId
-          ? { ...credential, ...updates }
-          : credential,
-      ),
+        credential.id === credentialId ? { ...credential, ...updates } : credential
+      )
     );
   },
 
@@ -130,17 +117,15 @@ export const credentialActions = {
    * Remove credential
    */
   removeCredential(credentialId: string): void {
-    logger.info("CredentialStore", `Removing credential: ${credentialId}`);
-    credentials.update((list) =>
-      list.filter((credential) => credential.id !== credentialId),
-    );
+    logger.info('CredentialStore', `Removing credential: ${credentialId}`);
+    credentials.update((list) => list.filter((credential) => credential.id !== credentialId));
   },
 
   /**
    * Set vaults
    */
   setVaults(vaultList: SecureVault[]): void {
-    logger.info("CredentialStore", `Setting vaults: ${vaultList.length} items`);
+    logger.info('CredentialStore', `Setting vaults: ${vaultList.length} items`);
     vaults.set(vaultList);
   },
 
@@ -148,10 +133,7 @@ export const credentialActions = {
    * Set active vault
    */
   setActiveVault(vault: SecureVault | null): void {
-    logger.info(
-      "CredentialStore",
-      `Setting active vault: ${vault?.id || "none"}`,
-    );
+    logger.info('CredentialStore', `Setting active vault: ${vault?.id || 'none'}`);
     activeVault.set(vault);
   },
 
@@ -160,8 +142,8 @@ export const credentialActions = {
    */
   setVaultUnlocked(unlocked: boolean): void {
     logger.info(
-      "CredentialStore",
-      `Setting vault unlock state: ${unlocked ? "unlocked" : "locked"}`,
+      'CredentialStore',
+      `Setting vault unlock state: ${unlocked ? 'unlocked' : 'locked'}`
     );
     isVaultUnlocked.set(unlocked);
   },
@@ -206,8 +188,8 @@ export const credentialActions = {
    */
   setError(errorMessage: string | null): void {
     if (errorMessage) {
-      logger.error("Credential store error", {
-        context: "CredentialStore",
+      logger.error('Credential store error', {
+        context: 'CredentialStore',
         error: errorMessage,
       });
     }
@@ -218,12 +200,12 @@ export const credentialActions = {
    * Clear all data
    */
   clear(): void {
-    logger.info("CredentialStore", "Clearing credential store");
+    logger.info('CredentialStore', 'Clearing credential store');
     credentials.set([]);
     vaults.set([]);
     activeVault.set(null);
     isVaultUnlocked.set(false);
-    searchQuery.set("");
+    searchQuery.set('');
     selectedCredentialType.set(null);
     selectedTags.set([]);
     isLoading.set(false);
@@ -235,18 +217,18 @@ export const credentialActions = {
 // Utility functions
 export const getCredentialById = (id: string) => {
   return derived(credentials, ($credentials) =>
-    $credentials.find((credential) => credential.id === id),
+    $credentials.find((credential) => credential.id === id)
   );
 };
 
 export const getCredentialsByType = (type: CredentialType) => {
   return derived(credentials, ($credentials) =>
-    $credentials.filter((credential) => credential.type === type),
+    $credentials.filter((credential) => credential.type === type)
   );
 };
 
 export const getCredentialsByTag = (tag: string) => {
   return derived(credentials, ($credentials) =>
-    $credentials.filter((credential) => credential.tags.includes(tag)),
+    $credentials.filter((credential) => credential.tags.includes(tag))
   );
 };

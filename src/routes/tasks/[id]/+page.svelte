@@ -1,101 +1,84 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Separator } from "$lib/components/ui/separator";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import Select from "$lib/components/ui/select.svelte";
-  import Icon from "@iconify/svelte";
-  import MarkdownView from "$lib/components/ui/markdown-view.svelte";
-  import { taskActions, createTasksQuery } from "$lib/domains/tasks";
-  import { toastActions } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { documentActions, documents } from "$lib/domains/documents";
-  import { ResourceType } from "$lib/domains/shared/types/resourceType";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import LoadingSpinner from "$lib/components/ui/loading-spinner.svelte";
-  import type {
-    Task,
-    TaskStatus,
-    TaskPriority,
-    UpdateTaskRequest,
-  } from "$lib/domains/tasks/types";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Separator } from '$lib/components/ui/separator';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import Select from '$lib/components/ui/select.svelte';
+  import Icon from '@iconify/svelte';
+  import MarkdownView from '$lib/components/ui/markdown-view.svelte';
+  import { taskActions, createTasksQuery } from '$lib/domains/tasks';
+  import { toastActions } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { documentActions, documents } from '$lib/domains/documents';
+  import { ResourceType } from '$lib/domains/shared/types/resourceType';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
+  import type { Task, TaskStatus, TaskPriority, UpdateTaskRequest } from '$lib/domains/tasks/types';
   import {
     TASK_STATUS_OPTIONS,
     TASK_PRIORITY_OPTIONS,
     TASK_TYPE_OPTIONS,
-  } from "$lib/domains/tasks/types";
+  } from '$lib/domains/tasks/types';
 
   const taskId = $derived($page.params.id);
   const tasksQuery = createTasksQuery();
 
   const allTasks = $derived(tasksQuery.data ?? []);
   const task = $derived(allTasks.find((t: Task) => t.id === taskId) ?? null);
-  const subtasks = $derived(
-    task ? allTasks.filter((t: Task) => t.parentId === task.id) : [],
-  );
+  const subtasks = $derived(task ? allTasks.filter((t: Task) => t.parentId === task.id) : []);
   const isLoading = $derived(tasksQuery.isPending);
   const error = $derived(
     tasksQuery.isError
       ? tasksQuery.error instanceof Error
         ? tasksQuery.error.message
-        : "Failed to load task"
+        : 'Failed to load task'
       : tasksQuery.isSuccess && !task
-        ? "Task not found"
-        : null,
+        ? 'Task not found'
+        : null
   );
   let isEditing = $state(false);
   let isSaving = $state(false);
 
   // Edit form state
-  let editTitle = $state("");
-  let editDescription = $state("");
-  let editStatus = $state<TaskStatus>("pending");
-  let editPriority = $state<TaskPriority>("medium");
-  let editType = $state("");
-  let editDueDate = $state("");
+  let editTitle = $state('');
+  let editDescription = $state('');
+  let editStatus = $state<TaskStatus>('pending');
+  let editPriority = $state<TaskPriority>('medium');
+  let editType = $state('');
+  let editDueDate = $state('');
 
   // Subtask management
   let showAddSubtask = $state(false);
-  let newSubtaskTitle = $state("");
-  let newSubtaskDescription = $state("");
-  let newSubtaskPriority = $state<TaskPriority>("medium");
-  let newSubtaskType = $state("");
+  let newSubtaskTitle = $state('');
+  let newSubtaskDescription = $state('');
+  let newSubtaskPriority = $state<TaskPriority>('medium');
+  let newSubtaskType = $state('');
   let isAddingSubtask = $state(false);
   let editingSubtaskId = $state<string | null>(null);
-  let editSubtaskTitle = $state("");
-  let editSubtaskDescription = $state("");
-  let editSubtaskPriority = $state<TaskPriority>("medium");
-  let editSubtaskType = $state("");
-  let editSubtaskStatus = $state<TaskStatus>("pending");
+  let editSubtaskTitle = $state('');
+  let editSubtaskDescription = $state('');
+  let editSubtaskPriority = $state<TaskPriority>('medium');
+  let editSubtaskType = $state('');
+  let editSubtaskStatus = $state<TaskStatus>('pending');
 
   async function reloadTaskData() {
     const result = await tasksQuery.refetch();
     if (result.isError) {
       toastActions.error(
-        "Failed to load task",
-        result.error instanceof Error
-          ? result.error.message
-          : "Unknown error",
+        'Failed to load task',
+        result.error instanceof Error ? result.error.message : 'Unknown error'
       );
       return;
     }
     const loaded = result.data?.find((t: Task) => t.id === taskId);
     if (!loaded) {
-      toastActions.error(
-        "Task not found",
-        "The requested task could not be found",
-      );
+      toastActions.error('Task not found', 'The requested task could not be found');
     }
   }
 
@@ -107,13 +90,11 @@
   $effect(() => {
     if (task) {
       editTitle = task.title;
-      editDescription = task.description || "";
+      editDescription = task.description || '';
       editStatus = task.status;
       editPriority = task.priority;
-      editType = task.type || "";
-      editDueDate = task.dueDate
-        ? task.dueDate.toISOString().split("T")[0]
-        : "";
+      editType = task.type || '';
+      editDueDate = task.dueDate ? task.dueDate.toISOString().split('T')[0] : '';
     }
   });
 
@@ -132,12 +113,12 @@
       };
 
       await taskActions.updateTask(task.id, updateData);
-      toastActions.success("Task updated successfully");
+      toastActions.success('Task updated successfully');
       isEditing = false;
     } catch (err) {
       toastActions.error(
-        "Failed to update task",
-        err instanceof Error ? err.message : "An unexpected error occurred",
+        'Failed to update task',
+        err instanceof Error ? err.message : 'An unexpected error occurred'
       );
     } finally {
       isSaving = false;
@@ -151,13 +132,11 @@
   function handleCancel() {
     if (task) {
       editTitle = task.title;
-      editDescription = task.description || "";
+      editDescription = task.description || '';
       editStatus = task.status;
       editPriority = task.priority;
-      editType = task.type || "";
-      editDueDate = task.dueDate
-        ? task.dueDate.toISOString().split("T")[0]
-        : "";
+      editType = task.type || '';
+      editDueDate = task.dueDate ? task.dueDate.toISOString().split('T')[0] : '';
     }
     isEditing = false;
   }
@@ -171,27 +150,24 @@
       await taskActions.createTask({
         title: newSubtaskTitle,
         description: newSubtaskDescription,
-        status: "pending",
+        status: 'pending',
         priority: newSubtaskPriority,
         type: newSubtaskType,
         parentId: task.id,
       });
 
       // Reset form
-      newSubtaskTitle = "";
-      newSubtaskDescription = "";
-      newSubtaskPriority = "medium";
-      newSubtaskType = "";
+      newSubtaskTitle = '';
+      newSubtaskDescription = '';
+      newSubtaskPriority = 'medium';
+      newSubtaskType = '';
       showAddSubtask = false;
 
-      toastActions.success(
-        "Subtask created",
-        "Subtask has been created successfully",
-      );
+      toastActions.success('Subtask created', 'Subtask has been created successfully');
     } catch (err) {
       toastActions.error(
-        "Failed to create subtask",
-        err instanceof Error ? err.message : "Unknown error",
+        'Failed to create subtask',
+        err instanceof Error ? err.message : 'Unknown error'
       );
     } finally {
       isAddingSubtask = false;
@@ -201,9 +177,9 @@
   function startEditSubtask(subtask: Task) {
     editingSubtaskId = subtask.id;
     editSubtaskTitle = subtask.title;
-    editSubtaskDescription = subtask.description || "";
+    editSubtaskDescription = subtask.description || '';
     editSubtaskPriority = subtask.priority;
-    editSubtaskType = subtask.type || "";
+    editSubtaskType = subtask.type || '';
     editSubtaskStatus = subtask.status;
   }
 
@@ -220,44 +196,38 @@
       });
 
       editingSubtaskId = null;
-      toastActions.success(
-        "Subtask updated",
-        "Subtask has been updated successfully",
-      );
+      toastActions.success('Subtask updated', 'Subtask has been updated successfully');
     } catch (err) {
       toastActions.error(
-        "Failed to update subtask",
-        err instanceof Error ? err.message : "Unknown error",
+        'Failed to update subtask',
+        err instanceof Error ? err.message : 'Unknown error'
       );
     }
   }
 
   function cancelEditSubtask() {
     editingSubtaskId = null;
-    editSubtaskTitle = "";
-    editSubtaskDescription = "";
-    editSubtaskPriority = "medium";
-    editSubtaskType = "";
-    editSubtaskStatus = "pending";
+    editSubtaskTitle = '';
+    editSubtaskDescription = '';
+    editSubtaskPriority = 'medium';
+    editSubtaskType = '';
+    editSubtaskStatus = 'pending';
   }
 
   async function handleDeleteSubtask(subtaskId: string) {
     const confirmed = await confirmAction(
-      "Are you sure you want to delete this subtask?",
-      "Delete subtask",
+      'Are you sure you want to delete this subtask?',
+      'Delete subtask'
     );
     if (!confirmed) return;
 
     try {
       await taskActions.deleteTask(subtaskId);
-      toastActions.success(
-        "Subtask deleted",
-        "Subtask has been deleted successfully",
-      );
+      toastActions.success('Subtask deleted', 'Subtask has been deleted successfully');
     } catch (err) {
       toastActions.error(
-        "Failed to delete subtask",
-        err instanceof Error ? err.message : "Unknown error",
+        'Failed to delete subtask',
+        err instanceof Error ? err.message : 'Unknown error'
       );
     }
   }
@@ -267,84 +237,84 @@
 
     const confirmed = await confirmAction(
       `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
-      "Delete task",
+      'Delete task'
     );
     if (!confirmed) return;
 
     try {
       await taskActions.deleteTask(task.id);
-      toastActions.success("Task deleted successfully");
-      goto("/tasks");
+      toastActions.success('Task deleted successfully');
+      goto('/tasks');
     } catch (err) {
       toastActions.error(
-        "Failed to delete task",
-        err instanceof Error ? err.message : "An unexpected error occurred",
+        'Failed to delete task',
+        err instanceof Error ? err.message : 'An unexpected error occurred'
       );
     }
   }
 
   function getTaskStatusColor(status: string) {
     switch (status) {
-      case "completed":
-        return "text-green-500";
-      case "in-progress":
-        return "text-blue-500";
-      case "cancelled":
-        return "text-red-500";
+      case 'completed':
+        return 'text-green-500';
+      case 'in-progress':
+        return 'text-blue-500';
+      case 'cancelled':
+        return 'text-red-500';
       default:
-        return "text-gray-400";
+        return 'text-gray-400';
     }
   }
 
   function getStatusBadgeColor(status: string) {
     switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300";
-      case "in-progress":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300";
-      case "cancelled":
-        return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300";
+      case 'completed':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+      case 'in-progress':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   }
 
   function getPriorityColor(priority: string) {
     switch (priority) {
-      case "high":
-        return "text-red-500";
-      case "medium":
-        return "text-yellow-500";
-      case "low":
-        return "text-green-500";
+      case 'high':
+        return 'text-red-500';
+      case 'medium':
+        return 'text-yellow-500';
+      case 'low':
+        return 'text-green-500';
       default:
-        return "text-gray-400";
+        return 'text-gray-400';
     }
   }
 
   function getTaskIcon(task: Task) {
     switch (task.status) {
-      case "completed":
-        return "mdi:check-circle";
-      case "in-progress":
-        return "mdi:progress-clock";
-      case "cancelled":
-        return "mdi:cancel";
+      case 'completed':
+        return 'mdi:check-circle';
+      case 'in-progress':
+        return 'mdi:progress-clock';
+      case 'cancelled':
+        return 'mdi:cancel';
       default:
-        return "mdi:circle-outline";
+        return 'mdi:circle-outline';
     }
   }
 
   // Keyboard shortcuts
   function handleKeydown(event: KeyboardEvent) {
     if (event.ctrlKey || event.metaKey) {
-      if (event.key === "e") {
+      if (event.key === 'e') {
         event.preventDefault();
         if (!isEditing) handleEdit();
-      } else if (event.key === "s" && isEditing) {
+      } else if (event.key === 's' && isEditing) {
         event.preventDefault();
         handleSave();
-      } else if (event.key === "Escape") {
+      } else if (event.key === 'Escape') {
         event.preventDefault();
         if (isEditing) handleCancel();
       }
@@ -358,54 +328,35 @@
   {#if isLoading}
     <PageLoading message="Loading task..." />
   {:else if error}
-    <PageError
-      title="Failed to load task"
-      message={error}
-      onRetry={reloadTaskData}
-    />
+    <PageError title="Failed to load task" message={error} onRetry={reloadTaskData} />
   {:else if task}
     <div class="container mx-auto p-6">
       <!-- Header -->
       <div class="mb-6 flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onclick={() => goto("/tasks")}
-            class="flex items-center gap-2"
-          >
+          <Button variant="ghost" onclick={() => goto('/tasks')} class="flex items-center gap-2">
             <Icon icon="mdi:arrow-left" class="h-4 w-4" />
             Back to Tasks
           </Button>
           <Separator orientation="vertical" class="h-6" />
           <div class="flex items-center gap-2">
-            <Icon
-              icon={getTaskIcon(task)}
-              class="h-5 w-5 {getTaskStatusColor(task.status)}"
-            />
+            <Icon icon={getTaskIcon(task)} class="h-5 w-5 {getTaskStatusColor(task.status)}" />
             <Badge class={getStatusBadgeColor(task.status)}>
-              {task.status === "pending"
-                ? "To Do"
-                : task.status === "in-progress"
-                  ? "In Progress"
-                  : task.status === "completed"
-                    ? "Completed"
-                    : "Cancelled"}
+              {task.status === 'pending'
+                ? 'To Do'
+                : task.status === 'in-progress'
+                  ? 'In Progress'
+                  : task.status === 'completed'
+                    ? 'Completed'
+                    : 'Cancelled'}
             </Badge>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
           {#if isEditing}
-            <Button
-              variant="outline"
-              onclick={handleCancel}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button onclick={handleSave} disabled={isSaving}>
-              Save Changes
-            </Button>
+            <Button variant="outline" onclick={handleCancel} disabled={isSaving}>Cancel</Button>
+            <Button onclick={handleSave} disabled={isSaving}>Save Changes</Button>
           {:else}
             <Button
               variant="outline"
@@ -415,19 +366,11 @@
               <Icon icon="lucide:sparkles" class="h-4 w-4" />
               Generate Tasks with AI
             </Button>
-            <Button
-              variant="outline"
-              onclick={handleEdit}
-              class="flex items-center gap-2"
-            >
+            <Button variant="outline" onclick={handleEdit} class="flex items-center gap-2">
               <Icon icon="mdi:pencil" class="h-4 w-4" />
               Edit
             </Button>
-            <Button
-              variant="destructive"
-              onclick={handleDelete}
-              class="flex items-center gap-2"
-            >
+            <Button variant="destructive" onclick={handleDelete} class="flex items-center gap-2">
               <Icon icon="mdi:delete" class="h-4 w-4" />
               Delete
             </Button>
@@ -482,8 +425,7 @@
                         options={TASK_PRIORITY_OPTIONS}
                         defaultValue={editPriority}
                         placeholder="Select priority..."
-                        onSelect={(value) =>
-                          (editPriority = value as TaskPriority)}
+                        onSelect={(value) => (editPriority = value as TaskPriority)}
                       />
                     </div>
                   </div>
@@ -498,11 +440,7 @@
                     </div>
                     <div>
                       <Label for="edit-due-date">Due Date</Label>
-                      <Input
-                        id="edit-due-date"
-                        type="date"
-                        bind:value={editDueDate}
-                      />
+                      <Input id="edit-due-date" type="date" bind:value={editDueDate} />
                     </div>
                   </div>
                 </div>
@@ -514,49 +452,37 @@
                     </h2>
                     {#if task.description}
                       <div class="mt-3">
-                        <MarkdownView
-                          content={task.description}
-                          truncateAt={500}
-                        />
+                        <MarkdownView content={task.description} truncateAt={500} />
                       </div>
                     {:else}
-                      <p class="mt-2 italic text-muted-foreground">
-                        No description provided
-                      </p>
+                      <p class="mt-2 italic text-muted-foreground">No description provided</p>
                     {/if}
                   </div>
 
                   <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <Label class="text-sm font-medium text-muted-foreground"
-                        >Status</Label
-                      >
+                      <Label class="text-sm font-medium text-muted-foreground">Status</Label>
                       <div class="mt-1 flex items-center gap-2">
                         <Icon
                           icon={getTaskIcon(task)}
                           class="h-4 w-4 {getTaskStatusColor(task.status)}"
                         />
                         <Badge class={getStatusBadgeColor(task.status)}>
-                          {task.status === "pending"
-                            ? "To Do"
-                            : task.status === "in-progress"
-                              ? "In Progress"
-                              : task.status === "completed"
-                                ? "Completed"
-                                : "Cancelled"}
+                          {task.status === 'pending'
+                            ? 'To Do'
+                            : task.status === 'in-progress'
+                              ? 'In Progress'
+                              : task.status === 'completed'
+                                ? 'Completed'
+                                : 'Cancelled'}
                         </Badge>
                       </div>
                     </div>
 
                     <div>
-                      <Label class="text-sm font-medium text-muted-foreground"
-                        >Priority</Label
-                      >
+                      <Label class="text-sm font-medium text-muted-foreground">Priority</Label>
                       <div class="mt-1 flex items-center gap-2">
-                        <Icon
-                          icon="mdi:flag"
-                          class="h-4 w-4 {getPriorityColor(task.priority)}"
-                        />
+                        <Icon icon="mdi:flag" class="h-4 w-4 {getPriorityColor(task.priority)}" />
                         <Badge variant="outline" class="uppercase">
                           {task.priority}
                         </Badge>
@@ -566,9 +492,7 @@
 
                   {#if task.type}
                     <div>
-                      <Label class="text-sm font-medium text-muted-foreground"
-                        >Type</Label
-                      >
+                      <Label class="text-sm font-medium text-muted-foreground">Type</Label>
                       <div class="mt-1">
                         <Badge variant="outline">{task.type}</Badge>
                       </div>
@@ -577,17 +501,10 @@
 
                   {#if task.dueDate}
                     <div>
-                      <Label class="text-sm font-medium text-muted-foreground"
-                        >Due Date</Label
-                      >
+                      <Label class="text-sm font-medium text-muted-foreground">Due Date</Label>
                       <div class="mt-1 flex items-center gap-2">
-                        <Icon
-                          icon="mdi:calendar"
-                          class="h-4 w-4 text-muted-foreground"
-                        />
-                        <span class="text-sm"
-                          >{new Date(task.dueDate).toLocaleDateString()}</span
-                        >
+                        <Icon icon="mdi:calendar" class="h-4 w-4 text-muted-foreground" />
+                        <span class="text-sm">{new Date(task.dueDate).toLocaleDateString()}</span>
                       </div>
                     </div>
                   {/if}
@@ -611,16 +528,14 @@
                     onclick={() => (showAddSubtask = !showAddSubtask)}
                   >
                     <Icon icon="mdi:plus" class="mr-1 h-4 w-4" />
-                    {showAddSubtask ? "Cancel" : "Add Subtask"}
+                    {showAddSubtask ? 'Cancel' : 'Add Subtask'}
                   </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <!-- Add Subtask Form -->
                 {#if showAddSubtask}
-                  <div
-                    class="mb-4 rounded-lg border border-border bg-muted/20 p-4"
-                  >
+                  <div class="mb-4 rounded-lg border border-border bg-muted/20 p-4">
                     <h4 class="mb-3 font-medium">Add New Subtask</h4>
                     <div class="space-y-3">
                       <div>
@@ -647,8 +562,7 @@
                             options={TASK_PRIORITY_OPTIONS}
                             defaultValue={newSubtaskPriority}
                             placeholder="Select priority..."
-                            onSelect={(value) =>
-                              (newSubtaskPriority = value as TaskPriority)}
+                            onSelect={(value) => (newSubtaskPriority = value as TaskPriority)}
                           />
                         </div>
                         <div>
@@ -676,10 +590,10 @@
                           variant="outline"
                           onclick={() => {
                             showAddSubtask = false;
-                            newSubtaskTitle = "";
-                            newSubtaskDescription = "";
-                            newSubtaskPriority = "medium";
-                            newSubtaskType = "";
+                            newSubtaskTitle = '';
+                            newSubtaskDescription = '';
+                            newSubtaskPriority = 'medium';
+                            newSubtaskType = '';
                           }}
                         >
                           Cancel
@@ -695,9 +609,7 @@
                     {#each subtasks as subtask}
                       {#if editingSubtaskId === subtask.id}
                         <!-- Edit Subtask Form -->
-                        <div
-                          class="rounded-lg border border-primary bg-primary/5 p-4"
-                        >
+                        <div class="rounded-lg border border-primary bg-primary/5 p-4">
                           <h4 class="mb-3 font-medium">Edit Subtask</h4>
                           <div class="space-y-3">
                             <div>
@@ -709,9 +621,7 @@
                               />
                             </div>
                             <div>
-                              <Label for="edit-subtask-description"
-                                >Description</Label
-                              >
+                              <Label for="edit-subtask-description">Description</Label>
                               <Textarea
                                 id="edit-subtask-description"
                                 bind:value={editSubtaskDescription}
@@ -726,21 +636,17 @@
                                   options={TASK_STATUS_OPTIONS}
                                   defaultValue={editSubtaskStatus}
                                   placeholder="Select status..."
-                                  onSelect={(value) =>
-                                    (editSubtaskStatus = value as TaskStatus)}
+                                  onSelect={(value) => (editSubtaskStatus = value as TaskStatus)}
                                 />
                               </div>
                               <div>
-                                <Label for="edit-subtask-priority"
-                                  >Priority</Label
-                                >
+                                <Label for="edit-subtask-priority">Priority</Label>
                                 <Select
                                   options={TASK_PRIORITY_OPTIONS}
                                   defaultValue={editSubtaskPriority}
                                   placeholder="Select priority..."
                                   onSelect={(value) =>
-                                    (editSubtaskPriority =
-                                      value as TaskPriority)}
+                                    (editSubtaskPriority = value as TaskPriority)}
                                 />
                               </div>
                               <div>
@@ -749,24 +655,15 @@
                                   options={TASK_TYPE_OPTIONS}
                                   defaultValue={editSubtaskType}
                                   placeholder="Select type..."
-                                  onSelect={(value) =>
-                                    (editSubtaskType = value)}
+                                  onSelect={(value) => (editSubtaskType = value)}
                                 />
                               </div>
                             </div>
                             <div class="flex gap-2">
-                              <Button
-                                onclick={handleSaveSubtask}
-                                class="flex-1"
-                              >
+                              <Button onclick={handleSaveSubtask} class="flex-1">
                                 Save Changes
                               </Button>
-                              <Button
-                                variant="outline"
-                                onclick={cancelEditSubtask}
-                              >
-                                Cancel
-                              </Button>
+                              <Button variant="outline" onclick={cancelEditSubtask}>Cancel</Button>
                             </div>
                           </div>
                         </div>
@@ -779,9 +676,7 @@
                             <div class="flex flex-1 items-center gap-2">
                               <Icon
                                 icon={getTaskIcon(subtask)}
-                                class="h-4 w-4 {getTaskStatusColor(
-                                  subtask.status,
-                                )}"
+                                class="h-4 w-4 {getTaskStatusColor(subtask.status)}"
                               />
                               <Button
                                 variant="link"
@@ -792,22 +687,18 @@
                                 {subtask.title}
                               </Button>
                               {#if subtask.type}
-                                <Badge variant="outline" class="text-xs"
-                                  >{subtask.type}</Badge
-                                >
+                                <Badge variant="outline" class="text-xs">{subtask.type}</Badge>
                               {/if}
                             </div>
                             <div class="flex items-center gap-2">
-                              <Badge
-                                class={getStatusBadgeColor(subtask.status)}
-                              >
-                                {subtask.status === "pending"
-                                  ? "To Do"
-                                  : subtask.status === "in-progress"
-                                    ? "In Progress"
-                                    : subtask.status === "completed"
-                                      ? "Completed"
-                                      : "Cancelled"}
+                              <Badge class={getStatusBadgeColor(subtask.status)}>
+                                {subtask.status === 'pending'
+                                  ? 'To Do'
+                                  : subtask.status === 'in-progress'
+                                    ? 'In Progress'
+                                    : subtask.status === 'completed'
+                                      ? 'Completed'
+                                      : 'Cancelled'}
                               </Badge>
                               <div class="flex gap-1">
                                 <Button
@@ -829,8 +720,7 @@
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onclick={() =>
-                                    handleDeleteSubtask(subtask.id)}
+                                  onclick={() => handleDeleteSubtask(subtask.id)}
                                   title="Delete subtask"
                                   class="text-destructive hover:text-destructive"
                                 >
@@ -880,57 +770,34 @@
             </CardHeader>
             <CardContent class="space-y-4">
               <div>
-                <Label class="text-sm font-medium text-muted-foreground"
-                  >Created</Label
-                >
+                <Label class="text-sm font-medium text-muted-foreground">Created</Label>
                 <div class="mt-1 flex items-center gap-2">
-                  <Icon
-                    icon="mdi:calendar-plus"
-                    class="h-4 w-4 text-muted-foreground"
-                  />
-                  <span class="text-sm"
-                    >{new Date(task.createdAt).toLocaleDateString()}</span
-                  >
+                  <Icon icon="mdi:calendar-plus" class="h-4 w-4 text-muted-foreground" />
+                  <span class="text-sm">{new Date(task.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
 
               <div>
-                <Label class="text-sm font-medium text-muted-foreground"
-                  >Last Updated</Label
-                >
+                <Label class="text-sm font-medium text-muted-foreground">Last Updated</Label>
                 <div class="mt-1 flex items-center gap-2">
-                  <Icon
-                    icon="mdi:calendar-edit"
-                    class="h-4 w-4 text-muted-foreground"
-                  />
-                  <span class="text-sm"
-                    >{new Date(task.updatedAt).toLocaleDateString()}</span
-                  >
+                  <Icon icon="mdi:calendar-edit" class="h-4 w-4 text-muted-foreground" />
+                  <span class="text-sm">{new Date(task.updatedAt).toLocaleDateString()}</span>
                 </div>
               </div>
 
               {#if task.completedAt}
                 <div>
-                  <Label class="text-sm font-medium text-muted-foreground"
-                    >Completed</Label
-                  >
+                  <Label class="text-sm font-medium text-muted-foreground">Completed</Label>
                   <div class="mt-1 flex items-center gap-2">
-                    <Icon
-                      icon="mdi:check-circle"
-                      class="h-4 w-4 text-green-500"
-                    />
-                    <span class="text-sm"
-                      >{new Date(task.completedAt).toLocaleDateString()}</span
-                    >
+                    <Icon icon="mdi:check-circle" class="h-4 w-4 text-green-500" />
+                    <span class="text-sm">{new Date(task.completedAt).toLocaleDateString()}</span>
                   </div>
                 </div>
               {/if}
 
               {#if task.parentId}
                 <div>
-                  <Label class="text-sm font-medium text-muted-foreground"
-                    >Parent Task</Label
-                  >
+                  <Label class="text-sm font-medium text-muted-foreground">Parent Task</Label>
                   <div class="mt-1">
                     <Button
                       variant="outline"
@@ -938,10 +805,7 @@
                       onclick={() => task && goto(`/tasks/${task.parentId}`)}
                       class="w-full justify-start"
                     >
-                      <Icon
-                        icon="mdi:subdirectory-arrow-left"
-                        class="mr-2 h-4 w-4"
-                      />
+                      <Icon icon="mdi:subdirectory-arrow-left" class="mr-2 h-4 w-4" />
                       View Parent Task
                     </Button>
                   </div>
@@ -952,9 +816,7 @@
 
           <!-- Linked Document -->
           {#if task && task.resourceType === ResourceType.DOCUMENT && task.resourceId}
-            {@const linkedDoc = $documents.find(
-              (d) => d.id === parseInt(task.resourceId!),
-            )}
+            {@const linkedDoc = $documents.find((d) => d.id === parseInt(task.resourceId!))}
             {#if linkedDoc}
               <Card>
                 <CardHeader>
@@ -968,7 +830,7 @@
                     <h4 class="font-medium">{linkedDoc.title}</h4>
                     <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">
                       {linkedDoc.content.substring(0, 100)}
-                      {linkedDoc.content.length > 100 ? "..." : ""}
+                      {linkedDoc.content.length > 100 ? '...' : ''}
                     </p>
                   </div>
                   <div class="flex gap-2">
@@ -1005,7 +867,7 @@
                   variant="outline"
                   onclick={() =>
                     goto(
-                      `/documents/create?taskId=${task.id}&taskTitle=${encodeURIComponent(task.title)}`,
+                      `/documents/create?taskId=${task.id}&taskTitle=${encodeURIComponent(task.title)}`
                     )}
                   class="w-full"
                 >
@@ -1038,7 +900,7 @@
                   class="w-full justify-start"
                 >
                   <Icon icon="mdi:plus" class="mr-2 h-4 w-4" />
-                  {showAddSubtask ? "Cancel Add Subtask" : "Add Subtask"}
+                  {showAddSubtask ? 'Cancel Add Subtask' : 'Add Subtask'}
                 </Button>
               {/if}
 
@@ -1057,10 +919,8 @@
 
       <!-- Keyboard shortcuts hint -->
       <div class="mt-6 text-center text-xs text-muted-foreground">
-        <kbd class="rounded bg-muted px-1.5 py-0.5 text-xs">Ctrl+E</kbd> to
-        edit,
-        <kbd class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs">Ctrl+S</kbd> to
-        save,
+        <kbd class="rounded bg-muted px-1.5 py-0.5 text-xs">Ctrl+E</kbd> to edit,
+        <kbd class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs">Ctrl+S</kbd> to save,
         <kbd class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs">Esc</kbd> to cancel
       </div>
     </div>

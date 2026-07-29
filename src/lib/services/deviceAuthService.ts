@@ -27,15 +27,15 @@ export interface AuthState {
 }
 
 class DeviceAuthService {
-  private static readonly STORAGE_KEY = "device_auth_state";
-  private static readonly DEVICE_ID_KEY = "device_id";
+  private static readonly STORAGE_KEY = 'device_auth_state';
+  private static readonly DEVICE_ID_KEY = 'device_id';
 
   /**
    * Generate or retrieve device ID
    */
   static getDeviceId(): string {
-    if (typeof window === "undefined") {
-      return "unknown";
+    if (typeof window === 'undefined') {
+      return 'unknown';
     }
 
     let deviceId = localStorage.getItem(this.DEVICE_ID_KEY);
@@ -51,17 +51,17 @@ class DeviceAuthService {
    * Get device name (user-friendly)
    */
   static getDeviceName(): string {
-    if (typeof window === "undefined") {
-      return "Unknown Device";
+    if (typeof window === 'undefined') {
+      return 'Unknown Device';
     }
 
     const ua = navigator.userAgent;
-    if (ua.includes("Mobile")) {
-      return "Mobile Device";
-    } else if (ua.includes("Tablet")) {
-      return "Tablet";
+    if (ua.includes('Mobile')) {
+      return 'Mobile Device';
+    } else if (ua.includes('Tablet')) {
+      return 'Tablet';
     } else {
-      return "Browser";
+      return 'Browser';
     }
   }
 
@@ -73,10 +73,8 @@ class DeviceAuthService {
       device_id: this.getDeviceId(),
       device_name: this.getDeviceName(),
       device_info: {
-        userAgent:
-          typeof navigator !== "undefined" ? navigator.userAgent : "Unknown",
-        platform:
-          typeof navigator !== "undefined" ? navigator.platform : "Unknown",
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown',
+        platform: typeof navigator !== 'undefined' ? navigator.platform : 'Unknown',
       },
     };
   }
@@ -85,7 +83,7 @@ class DeviceAuthService {
    * Get current auth state
    */
   static getAuthState(): AuthState {
-    if (typeof window === "undefined") {
+    if (typeof window === 'undefined') {
       return {
         device_id: null,
         access_token: null,
@@ -138,7 +136,7 @@ class DeviceAuthService {
    * Save auth state
    */
   static saveAuthState(state: Partial<AuthState>): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     const current = this.getAuthState();
     const updated = { ...current, ...state };
@@ -149,7 +147,7 @@ class DeviceAuthService {
    * Clear auth state
    */
   static clearAuthState(): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
     localStorage.removeItem(this.STORAGE_KEY);
   }
 
@@ -160,10 +158,10 @@ class DeviceAuthService {
     const deviceInfo = this.getDeviceInfo();
 
     // Use InvokeClient with requireAuth: false since this is a public command
-    const { invokeClient } = await import("$lib/utils/invokeClient");
+    const { invokeClient } = await import('$lib/utils/invokeClient');
 
     const result = await invokeClient.post<{ passcode: string }>(
-      "generate_device_passcode",
+      'generate_device_passcode',
       {
         device_id: deviceInfo.device_id,
         device_name: deviceInfo.device_name,
@@ -171,7 +169,7 @@ class DeviceAuthService {
       },
       {
         requireAuth: false,
-      },
+      }
     );
 
     return result.passcode;
@@ -182,12 +180,12 @@ class DeviceAuthService {
    */
   static async verifyPasscode(
     passcode: string,
-    approvalType: "temporary" | "long_term" = "temporary",
+    approvalType: 'temporary' | 'long_term' = 'temporary'
   ): Promise<void> {
     const deviceInfo = this.getDeviceInfo();
 
     // Use InvokeClient with requireAuth: false since this is a public command
-    const { invokeClient } = await import("$lib/utils/invokeClient");
+    const { invokeClient } = await import('$lib/utils/invokeClient');
 
     // First verify the passcode
     const verifyResult = await invokeClient.post<{
@@ -197,7 +195,7 @@ class DeviceAuthService {
       expires_at: string | null;
       message: string;
     }>(
-      "verify_device_passcode",
+      'verify_device_passcode',
       {
         device_id: deviceInfo.device_id,
         passcode,
@@ -207,13 +205,13 @@ class DeviceAuthService {
       },
       {
         requireAuth: false,
-      },
+      }
     );
 
     // Reject early if the passcode was wrong/expired so the caller can show an
     // error instead of polling forever.
     if (!verifyResult.verified) {
-      throw new Error(verifyResult.message || "Invalid or expired passcode");
+      throw new Error(verifyResult.message || 'Invalid or expired passcode');
     }
 
     // Passcode is verified, now wait for host approval
@@ -231,10 +229,10 @@ class DeviceAuthService {
   private static async pollForApproval(
     deviceId: string,
     approvalType: string,
-    maxAttempts: number = 60,
+    maxAttempts: number = 60
   ): Promise<void> {
     // Poll every 2 seconds for up to 2 minutes
-    const { invokeClient } = await import("$lib/utils/invokeClient");
+    const { invokeClient } = await import('$lib/utils/invokeClient');
 
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -247,13 +245,13 @@ class DeviceAuthService {
           expires_at: string | null;
           message: string;
         }>(
-          "get_device_status",
+          'get_device_status',
           {
             device_id: deviceId,
           },
           {
             requireAuth: false,
-          },
+          }
         );
 
         if (status.approved && status.access_token) {
@@ -266,12 +264,12 @@ class DeviceAuthService {
           return;
         }
       } catch (error) {
-        console.error("Error polling for approval:", error);
+        console.error('Error polling for approval:', error);
       }
     }
 
     throw new Error(
-      "Device approval timeout. The host device may not have approved your request. Please request a new passcode.",
+      'Device approval timeout. The host device may not have approved your request. Please request a new passcode.'
     );
   }
 

@@ -1,11 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import type {
-  ChatMessage,
-  ContextUsage,
-  LlmUsage,
-  ProviderType,
-} from "../types/index.js";
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import type { ChatMessage, ContextUsage, LlmUsage, ProviderType } from '../types/index.js';
 
 export interface ConversationTitleEvent {
   conversation_id: string;
@@ -54,7 +49,7 @@ function toWireHistory(history: ChatMessage[], systemPrompt?: string) {
     content: msg.content,
   }));
   const trimmed = systemPrompt?.trim();
-  if (trimmed) wire.unshift({ role: "system", content: trimmed });
+  if (trimmed) wire.unshift({ role: 'system', content: trimmed });
   return wire;
 }
 
@@ -65,9 +60,9 @@ export class AIChatService {
   async sendMessage(
     message: string,
     history: ChatMessage[] = [],
-    options: SendMessageOptions = {},
+    options: SendMessageOptions = {}
   ): Promise<string> {
-    return invoke<string>("ai_send_message", {
+    return invoke<string>('ai_send_message', {
       message,
       history: toWireHistory(history, options.system_prompt),
       provider: options.provider || null,
@@ -86,7 +81,7 @@ export class AIChatService {
   async streamMessage(
     message: string,
     history: ChatMessage[] = [],
-    options: StreamMessageOptions = {},
+    options: StreamMessageOptions = {}
   ): Promise<string> {
     const streamId = `stream-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     options.onStreamId?.(streamId);
@@ -95,7 +90,7 @@ export class AIChatService {
     const completeEventName = `ai-stream-complete-${streamId}`;
     const titleEventName = `ai-stream-title-${streamId}`;
 
-    let fullResponse = "";
+    let fullResponse = '';
     let isComplete = false;
     let completePayload: StreamCompletePayload | undefined;
     let streamError: Error | null = null;
@@ -106,30 +101,27 @@ export class AIChatService {
       options.onChunk?.(chunk);
     });
 
-    const titleUnlisten = await listen<ConversationTitleEvent>(
-      titleEventName,
-      (event) => {
-        options.onTitleUpdated?.(event.payload);
-      },
-    );
+    const titleUnlisten = await listen<ConversationTitleEvent>(titleEventName, (event) => {
+      options.onTitleUpdated?.(event.payload);
+    });
 
     const completeUnlisten = await listen<StreamCompletePayload | string>(
       completeEventName,
       (event) => {
         isComplete = true;
         const payload = event.payload;
-        if (typeof payload === "string") {
+        if (typeof payload === 'string') {
           completePayload = { content: payload };
           options.onComplete?.(payload);
         } else {
           completePayload = payload;
           options.onComplete?.(payload.content, payload);
         }
-      },
+      }
     );
 
     try {
-      const result = await invoke<string>("ai_send_message_stream", {
+      const result = await invoke<string>('ai_send_message_stream', {
         message,
         history: toWireHistory(history, options.system_prompt),
         provider: options.provider || null,
@@ -150,9 +142,7 @@ export class AIChatService {
       }
 
       if (!isComplete) {
-        console.warn(
-          "Stream completion event not received, using accumulated response",
-        );
+        console.warn('Stream completion event not received, using accumulated response');
       }
 
       await chunkUnlisten();
@@ -177,7 +167,7 @@ export class AIChatService {
 
   /** Stop an in-flight stream; the backend completes it with partial content. */
   async cancelStream(streamId: string): Promise<void> {
-    await invoke("ai_cancel_stream", { streamId });
+    await invoke('ai_cancel_stream', { streamId });
   }
 
   clearChat(): void {

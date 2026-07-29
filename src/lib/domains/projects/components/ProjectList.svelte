@@ -4,9 +4,9 @@
 -->
 
 <script lang="ts">
-  import type { Project } from "$lib/domains/projects/types";
-  import { confirmAction } from "$lib/utils/confirm";
-  import ProjectCard from "./ProjectCard.svelte";
+  import type { Project } from '$lib/domains/projects/types';
+  import { confirmAction } from '$lib/utils/confirm';
+  import ProjectCard from './ProjectCard.svelte';
 
   interface Props {
     projects: Project[];
@@ -20,12 +20,12 @@
 
   let {
     projects = $bindable(),
-    searchQuery = "",
+    searchQuery = '',
     onProjectClick = () => {},
     onProjectEdit = () => {},
     onProjectDelete = () => {},
     showActions = true,
-    emptyMessage = "No projects found",
+    emptyMessage = 'No projects found',
   }: Props = $props();
 
   // Filter projects based on type and search query
@@ -39,7 +39,7 @@
         (project) =>
           project.name.toLowerCase().includes(query) ||
           project.description?.toLowerCase().includes(query) ||
-          project.path.toLowerCase().includes(query),
+          project.path.toLowerCase().includes(query)
       );
     }
 
@@ -47,9 +47,7 @@
   });
 
   const handleProjectDelete = async (project: Project) => {
-    const confirmed = await confirmAction(
-      `Are you sure you want to delete "${project.name}"?`,
-    );
+    const confirmed = await confirmAction(`Are you sure you want to delete "${project.name}"?`);
     if (confirmed) {
       onProjectDelete(project);
     }
@@ -60,12 +58,7 @@
   {#if filteredProjects.length === 0}
     <div class="py-12 text-center">
       <div class="mb-2 text-neutral-400 dark:text-neutral-500">
-        <svg
-          class="mx-auto h-12 w-12"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -74,9 +67,7 @@
           />
         </svg>
       </div>
-      <h3
-        class="mb-1 text-lg font-medium text-neutral-900 dark:text-neutral-100"
-      >
+      <h3 class="mb-1 text-lg font-medium text-neutral-900 dark:text-neutral-100">
         {emptyMessage}
       </h3>
       {#if searchQuery}

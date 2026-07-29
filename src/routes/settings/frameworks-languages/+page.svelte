@@ -3,29 +3,20 @@
 -->
 
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import {
-    Tabs,
-    TabsList,
-    TabsTrigger,
-    TabsContent,
-  } from "$lib/components/ui/tabs";
-  import LanguagesSettings from "$lib/domains/settings/components/LanguagesSettings.svelte";
-  import PackageManagersSettings from "$lib/domains/settings/components/PackageManagersSettings.svelte";
-  import FrameworksSettings from "$lib/domains/settings/components/FrameworksSettings.svelte";
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
+  import LanguagesSettings from '$lib/domains/settings/components/LanguagesSettings.svelte';
+  import PackageManagersSettings from '$lib/domains/settings/components/PackageManagersSettings.svelte';
+  import FrameworksSettings from '$lib/domains/settings/components/FrameworksSettings.svelte';
 
   // Get active tab from URL params or default to languages
   const activeTab = $derived.by(() => {
-    const tab = $page.url.searchParams.get("tab");
-    if (
-      tab === "languages" ||
-      tab === "package-managers" ||
-      tab === "frameworks"
-    ) {
+    const tab = $page.url.searchParams.get('tab');
+    if (tab === 'languages' || tab === 'package-managers' || tab === 'frameworks') {
       return tab;
     }
-    return "languages"; // default
+    return 'languages'; // default
   });
 
   function handleTabChange(value: string) {
@@ -44,20 +35,14 @@
   <div>
     <h2 class="text-2xl font-bold tracking-tight">Frameworks & Languages</h2>
     <p class="text-muted-foreground">
-      Manage your languages, frameworks, and package managers with intelligent
-      recommendations
+      Manage your languages, frameworks, and package managers with intelligent recommendations
     </p>
   </div>
 
   <Tabs value={activeTab} onValueChange={handleTabChange} class="w-full">
     <TabsList class="grid w-full grid-cols-3">
       <TabsTrigger value="languages" class="flex items-center gap-2">
-        <svg
-          class="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -68,12 +53,7 @@
         Languages
       </TabsTrigger>
       <TabsTrigger value="package-managers" class="flex items-center gap-2">
-        <svg
-          class="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -84,12 +64,7 @@
         Package Managers
       </TabsTrigger>
       <TabsTrigger value="frameworks" class="flex items-center gap-2">
-        <svg
-          class="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"

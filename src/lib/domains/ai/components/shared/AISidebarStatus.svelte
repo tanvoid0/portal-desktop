@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { Cpu, MemoryStick } from "@lucide/svelte";
+  import { invoke } from '@tauri-apps/api/core';
+  import { Cpu, MemoryStick } from '@lucide/svelte';
 
   interface HostStats {
     cpuPercent: number;
@@ -12,19 +12,15 @@
   /** One failure is enough — outside the desktop shell it will never work. */
   let unavailable = $state(false);
 
-  const memoryLabel = $derived(
-    stats ? `${(stats.memoryUsedBytes / 1024 ** 3).toFixed(1)} GB` : "",
-  );
-  const cpuLabel = $derived(stats ? `${stats.cpuPercent.toFixed(1)}%` : "");
+  const memoryLabel = $derived(stats ? `${(stats.memoryUsedBytes / 1024 ** 3).toFixed(1)} GB` : '');
+  const cpuLabel = $derived(stats ? `${stats.cpuPercent.toFixed(1)}%` : '');
   const memoryTitle = $derived(
-    stats
-      ? `${memoryLabel} of ${(stats.memoryTotalBytes / 1024 ** 3).toFixed(1)} GB used`
-      : "",
+    stats ? `${memoryLabel} of ${(stats.memoryTotalBytes / 1024 ** 3).toFixed(1)} GB used` : ''
   );
 
   async function poll() {
     try {
-      stats = await invoke<HostStats>("host_stats");
+      stats = await invoke<HostStats>('host_stats');
     } catch {
       unavailable = true;
     }

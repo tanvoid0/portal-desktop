@@ -4,14 +4,14 @@ Use shared shell components from `$lib/components/shell` for list and management
 
 ## Required components
 
-| State | Component | Import |
-|-------|-----------|--------|
-| Page title + actions | `PageHeader` | `$lib/components/shell` |
-| Metric row | `PageStats` | `$lib/components/shell` |
-| Search + filters | `PageFilters` | `$lib/components/shell` |
-| Loading | `PageLoading` | `$lib/components/shell` |
-| Error + retry | `PageError` | `$lib/components/shell` |
-| Empty + CTA | `PageEmpty` | `$lib/components/shell` |
+| State                | Component     | Import                  |
+| -------------------- | ------------- | ----------------------- |
+| Page title + actions | `PageHeader`  | `$lib/components/shell` |
+| Metric row           | `PageStats`   | `$lib/components/shell` |
+| Search + filters     | `PageFilters` | `$lib/components/shell` |
+| Loading              | `PageLoading` | `$lib/components/shell` |
+| Error + retry        | `PageError`   | `$lib/components/shell` |
+| Empty + CTA          | `PageEmpty`   | `$lib/components/shell` |
 
 ## Standard page structure
 

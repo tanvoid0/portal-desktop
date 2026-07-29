@@ -1,7 +1,7 @@
 <script lang="ts">
-  import ModelCard from "./ModelCard.svelte";
-  import ProgressIndicator from "./ProgressIndicator.svelte";
-  import { Button } from "./ui/button";
+  import ModelCard from './ModelCard.svelte';
+  import ProgressIndicator from './ProgressIndicator.svelte';
+  import { Button } from './ui/button';
 
   export let models: any[] = [];
   export let isInstalled: boolean = false;
@@ -9,7 +9,7 @@
   export let error: string | null = null;
   export let installingModel: string | null = null;
   export let installationProgress: number = 0;
-  export let installationStatus: string = "";
+  export let installationStatus: string = '';
 
   export let onInstall: ((modelName: string) => void) | undefined = undefined;
   export let onRemove: ((modelName: string) => void) | undefined = undefined;
@@ -20,9 +20,7 @@
 
 {#if loading}
   <div class="flex items-center justify-center p-8">
-    <div
-      class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
-    ></div>
+    <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
     <span class="ml-2">Loading models...</span>
   </div>
 {:else if error}
@@ -51,12 +49,10 @@
     {#if models.length === 0 && !installingModel}
       <div class="p-8 text-center">
         <p class="text-muted-foreground">
-          {isInstalled ? "No models installed yet." : "No models available."}
+          {isInstalled ? 'No models installed yet.' : 'No models available.'}
         </p>
         {#if isInstalled && onBrowseAvailable}
-          <Button onclick={onBrowseAvailable} class="mt-4">
-            Browse Available Models
-          </Button>
+          <Button onclick={onBrowseAvailable} class="mt-4">Browse Available Models</Button>
         {/if}
       </div>
     {/if}

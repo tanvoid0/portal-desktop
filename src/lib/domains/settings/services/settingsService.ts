@@ -2,15 +2,15 @@
  * Settings Service - Frontend business logic for settings management
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { logger } from "$lib/domains/shared";
+import { invoke } from '@tauri-apps/api/core';
+import { logger } from '$lib/domains/shared';
 import type {
   AppSettings,
   EditorSettings,
   GitHubIntegrationSettings,
   TerminalSettings,
   ThemeSettings,
-} from "../types";
+} from '../types';
 
 // Define missing types
 export interface Settings {
@@ -29,29 +29,29 @@ export interface SettingsUpdate {
 }
 
 const DEFAULT_THEME_SETTINGS: ThemeSettings = {
-  primaryColor: "#3b82f6",
-  secondaryColor: "#64748b",
-  accentColor: "#f59e0b",
-  backgroundColor: "#ffffff",
-  surfaceColor: "#f8fafc",
-  textColor: "#1e293b",
+  primaryColor: '#3b82f6',
+  secondaryColor: '#64748b',
+  accentColor: '#f59e0b',
+  backgroundColor: '#ffffff',
+  surfaceColor: '#f8fafc',
+  textColor: '#1e293b',
   borderRadius: 8,
   shadowIntensity: 0.1,
-  animationSpeed: "normal",
+  animationSpeed: 'normal',
   customThemes: [],
-  activeTheme: "default",
+  activeTheme: 'default',
 };
 
 const DEFAULT_GITHUB_INTEGRATION_SETTINGS: GitHubIntegrationSettings = {
-  clientId: "",
+  clientId: '',
 };
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
-  theme: "system",
-  language: "en",
-  timezone: "UTC",
-  dateFormat: "%Y-%m-%d",
-  timeFormat: "24h",
+  theme: 'system',
+  language: 'en',
+  timezone: 'UTC',
+  dateFormat: '%Y-%m-%d',
+  timeFormat: '24h',
   windowState: {
     width: 1200,
     height: 800,
@@ -91,7 +91,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     autoDownload: false,
     autoInstall: false,
     checkInterval: 24,
-    channel: "stable",
+    channel: 'stable',
     notifyOnUpdate: true,
   },
   integrations: {
@@ -102,37 +102,29 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
 type RawThemeSettings = Partial<ThemeSettings> & Record<string, unknown>;
 type RawAppSettings = Partial<AppSettings> & Record<string, unknown>;
 
-function normalizeAppSettings(
-  raw: RawAppSettings | null | undefined,
-): AppSettings {
+function normalizeAppSettings(raw: RawAppSettings | null | undefined): AppSettings {
   const app = raw ?? {};
 
   return {
-    theme:
-      (app.theme as AppSettings["theme"] | undefined) ??
-      DEFAULT_APP_SETTINGS.theme,
-    language:
-      (app.language as string | undefined) ?? DEFAULT_APP_SETTINGS.language,
-    timezone:
-      (app.timezone as string | undefined) ?? DEFAULT_APP_SETTINGS.timezone,
+    theme: (app.theme as AppSettings['theme'] | undefined) ?? DEFAULT_APP_SETTINGS.theme,
+    language: (app.language as string | undefined) ?? DEFAULT_APP_SETTINGS.language,
+    timezone: (app.timezone as string | undefined) ?? DEFAULT_APP_SETTINGS.timezone,
     dateFormat:
       (app.dateFormat as string | undefined) ??
       (app.date_format as string | undefined) ??
       DEFAULT_APP_SETTINGS.dateFormat,
     timeFormat:
-      (app.timeFormat as AppSettings["timeFormat"] | undefined) ??
-      (app.time_format as AppSettings["timeFormat"] | undefined) ??
+      (app.timeFormat as AppSettings['timeFormat'] | undefined) ??
+      (app.time_format as AppSettings['timeFormat'] | undefined) ??
       DEFAULT_APP_SETTINGS.timeFormat,
     windowState: {
       ...DEFAULT_APP_SETTINGS.windowState,
       ...((app.windowState as Record<string, unknown> | undefined) ?? {}),
       ...((app.window_state as Record<string, unknown> | undefined) ?? {}),
       rememberPosition: Boolean(
-        (app.windowState as Record<string, unknown> | undefined)
-          ?.rememberPosition ??
-          (app.window_state as Record<string, unknown> | undefined)
-            ?.remember_position ??
-          DEFAULT_APP_SETTINGS.windowState.rememberPosition,
+        (app.windowState as Record<string, unknown> | undefined)?.rememberPosition ??
+        (app.window_state as Record<string, unknown> | undefined)?.remember_position ??
+        DEFAULT_APP_SETTINGS.windowState.rememberPosition
       ),
     },
     startupBehavior: {
@@ -140,76 +132,63 @@ function normalizeAppSettings(
       ...((app.startupBehavior as Record<string, unknown> | undefined) ?? {}),
       ...((app.startup_behavior as Record<string, unknown> | undefined) ?? {}),
       openLastSession: Boolean(
-        (app.startupBehavior as Record<string, unknown> | undefined)
-          ?.openLastSession ??
-          (app.startup_behavior as Record<string, unknown> | undefined)
-            ?.open_last_session ??
-          DEFAULT_APP_SETTINGS.startupBehavior.openLastSession,
+        (app.startupBehavior as Record<string, unknown> | undefined)?.openLastSession ??
+        (app.startup_behavior as Record<string, unknown> | undefined)?.open_last_session ??
+        DEFAULT_APP_SETTINGS.startupBehavior.openLastSession
       ),
       restoreWindows: Boolean(
-        (app.startupBehavior as Record<string, unknown> | undefined)
-          ?.restoreWindows ??
-          (app.startup_behavior as Record<string, unknown> | undefined)
-            ?.restore_windows ??
-          DEFAULT_APP_SETTINGS.startupBehavior.restoreWindows,
+        (app.startupBehavior as Record<string, unknown> | undefined)?.restoreWindows ??
+        (app.startup_behavior as Record<string, unknown> | undefined)?.restore_windows ??
+        DEFAULT_APP_SETTINGS.startupBehavior.restoreWindows
       ),
       showWelcomeScreen: Boolean(
-        (app.startupBehavior as Record<string, unknown> | undefined)
-          ?.showWelcomeScreen ??
-          (app.startup_behavior as Record<string, unknown> | undefined)
-            ?.show_welcome_screen ??
-          DEFAULT_APP_SETTINGS.startupBehavior.showWelcomeScreen,
+        (app.startupBehavior as Record<string, unknown> | undefined)?.showWelcomeScreen ??
+        (app.startup_behavior as Record<string, unknown> | undefined)?.show_welcome_screen ??
+        DEFAULT_APP_SETTINGS.startupBehavior.showWelcomeScreen
       ),
       minimizeToTray: Boolean(
-        (app.startupBehavior as Record<string, unknown> | undefined)
-          ?.minimizeToTray ??
-          (app.startup_behavior as Record<string, unknown> | undefined)
-            ?.minimize_to_tray ??
-          DEFAULT_APP_SETTINGS.startupBehavior.minimizeToTray,
+        (app.startupBehavior as Record<string, unknown> | undefined)?.minimizeToTray ??
+        (app.startup_behavior as Record<string, unknown> | undefined)?.minimize_to_tray ??
+        DEFAULT_APP_SETTINGS.startupBehavior.minimizeToTray
       ),
       startMinimized: Boolean(
-        (app.startupBehavior as Record<string, unknown> | undefined)
-          ?.startMinimized ??
-          (app.startup_behavior as Record<string, unknown> | undefined)
-            ?.start_minimized ??
-          DEFAULT_APP_SETTINGS.startupBehavior.startMinimized,
+        (app.startupBehavior as Record<string, unknown> | undefined)?.startMinimized ??
+        (app.startup_behavior as Record<string, unknown> | undefined)?.start_minimized ??
+        DEFAULT_APP_SETTINGS.startupBehavior.startMinimized
       ),
     },
     notifications:
-      (app.notifications as AppSettings["notifications"] | undefined) ??
+      (app.notifications as AppSettings['notifications'] | undefined) ??
       DEFAULT_APP_SETTINGS.notifications,
-    privacy:
-      (app.privacy as AppSettings["privacy"] | undefined) ??
-      DEFAULT_APP_SETTINGS.privacy,
-    updates:
-      (app.updates as AppSettings["updates"] | undefined) ??
-      DEFAULT_APP_SETTINGS.updates,
+    privacy: (app.privacy as AppSettings['privacy'] | undefined) ?? DEFAULT_APP_SETTINGS.privacy,
+    updates: (app.updates as AppSettings['updates'] | undefined) ?? DEFAULT_APP_SETTINGS.updates,
     integrations: {
       github: {
         clientId:
-          ((app.integrations as Record<string, unknown> | undefined)?.github as
-            | Record<string, unknown>
-            | undefined)?.clientId?.toString?.() ??
-          ((app.integrations as Record<string, unknown> | undefined)?.github as
-            | Record<string, unknown>
-            | undefined)?.client_id?.toString?.() ??
-          ((app.integrations as Record<string, unknown> | undefined)
-            ?.github_client_id as string | undefined) ??
+          (
+            (app.integrations as Record<string, unknown> | undefined)?.github as
+              | Record<string, unknown>
+              | undefined
+          )?.clientId?.toString?.() ??
+          (
+            (app.integrations as Record<string, unknown> | undefined)?.github as
+              | Record<string, unknown>
+              | undefined
+          )?.client_id?.toString?.() ??
+          ((app.integrations as Record<string, unknown> | undefined)?.github_client_id as
+            | string
+            | undefined) ??
           DEFAULT_GITHUB_INTEGRATION_SETTINGS.clientId,
       },
     },
   };
 }
 
-function normalizeThemeSettings(
-  raw: RawThemeSettings | null | undefined,
-): ThemeSettings {
+function normalizeThemeSettings(raw: RawThemeSettings | null | undefined): ThemeSettings {
   const theme = raw ?? {};
   const animationSpeed = theme.animationSpeed ?? theme.animation_speed;
   const normalizedSpeed =
-    animationSpeed === "slow" ||
-    animationSpeed === "normal" ||
-    animationSpeed === "fast"
+    animationSpeed === 'slow' || animationSpeed === 'normal' || animationSpeed === 'fast'
       ? animationSpeed
       : DEFAULT_THEME_SETTINGS.animationSpeed;
 
@@ -239,17 +218,15 @@ function normalizeThemeSettings(
       (theme.text_color as string | undefined) ??
       DEFAULT_THEME_SETTINGS.textColor,
     borderRadius: Number(
-      theme.borderRadius ?? theme.border_radius ?? DEFAULT_THEME_SETTINGS.borderRadius,
+      theme.borderRadius ?? theme.border_radius ?? DEFAULT_THEME_SETTINGS.borderRadius
     ),
     shadowIntensity: Number(
-      theme.shadowIntensity ??
-        theme.shadow_intensity ??
-        DEFAULT_THEME_SETTINGS.shadowIntensity,
+      theme.shadowIntensity ?? theme.shadow_intensity ?? DEFAULT_THEME_SETTINGS.shadowIntensity
     ),
     animationSpeed: normalizedSpeed,
     customThemes:
-      (theme.customThemes as ThemeSettings["customThemes"] | undefined) ??
-      (theme.custom_themes as ThemeSettings["customThemes"] | undefined) ??
+      (theme.customThemes as ThemeSettings['customThemes'] | undefined) ??
+      (theme.custom_themes as ThemeSettings['customThemes'] | undefined) ??
       DEFAULT_THEME_SETTINGS.customThemes,
     activeTheme:
       (theme.activeTheme as string | undefined) ??
@@ -293,7 +270,7 @@ function serializeAppSettings(app: AppSettings): Record<string, unknown> {
     updates: app.updates,
     integrations: {
       github: {
-        client_id: app.integrations?.github?.clientId ?? "",
+        client_id: app.integrations?.github?.clientId ?? '',
       },
     },
   };
@@ -304,9 +281,7 @@ function serializeAppSettings(app: AppSettings): Record<string, unknown> {
  * always passed a `Partial<ThemeSettings>` at runtime. Absent keys serialize to
  * `undefined` and are dropped from the payload rather than sent as nulls.
  */
-function serializeThemeSettings(
-  theme: Partial<ThemeSettings>,
-): Record<string, unknown> {
+function serializeThemeSettings(theme: Partial<ThemeSettings>): Record<string, unknown> {
   return {
     primary_color: theme.primaryColor,
     secondary_color: theme.secondaryColor,
@@ -336,7 +311,7 @@ function serializeThemeSettings(
 }
 
 function serializeSettingsForRust(
-  settings: Settings & Record<string, unknown>,
+  settings: Settings & Record<string, unknown>
 ): Record<string, unknown> {
   const now = new Date().toISOString();
   return {
@@ -348,9 +323,7 @@ function serializeSettingsForRust(
   };
 }
 
-function serializeSettingsUpdateForRust(
-  updates: SettingsUpdate,
-): Record<string, unknown> {
+function serializeSettingsUpdateForRust(updates: SettingsUpdate): Record<string, unknown> {
   const serialized: Record<string, unknown> = { ...updates };
   if (updates.theme) {
     serialized.theme = serializeThemeSettings(updates.theme);
@@ -373,19 +346,19 @@ export class SettingsService {
    */
   async getSettings(): Promise<Settings> {
     try {
-      logger.info("Getting settings", { context: "SettingsService" });
+      logger.info('Getting settings', { context: 'SettingsService' });
 
-      const settings = await invoke<Settings>("get_settings_command");
+      const settings = await invoke<Settings>('get_settings_command');
 
-      logger.info("Settings retrieved successfully", {
-        context: "SettingsService",
+      logger.info('Settings retrieved successfully', {
+        context: 'SettingsService',
         data: { settingsId: settings.id },
       });
 
       return normalizeSettings(settings);
     } catch (error) {
-      logger.error("Failed to get settings", {
-        context: "SettingsService",
+      logger.error('Failed to get settings', {
+        context: 'SettingsService',
         error,
       });
       throw error;
@@ -397,24 +370,22 @@ export class SettingsService {
    */
   async saveSettings(settings: Settings): Promise<void> {
     try {
-      logger.info("Saving settings", {
-        context: "SettingsService",
+      logger.info('Saving settings', {
+        context: 'SettingsService',
         data: { settingsId: settings.id },
       });
 
-      await invoke("save_settings_command", {
-        settings: serializeSettingsForRust(
-          settings as Settings & Record<string, unknown>,
-        ),
+      await invoke('save_settings_command', {
+        settings: serializeSettingsForRust(settings as Settings & Record<string, unknown>),
       });
 
-      logger.info("Settings saved successfully", {
-        context: "SettingsService",
+      logger.info('Settings saved successfully', {
+        context: 'SettingsService',
         data: { settingsId: settings.id },
       });
     } catch (error) {
-      logger.error("Failed to save settings", {
-        context: "SettingsService",
+      logger.error('Failed to save settings', {
+        context: 'SettingsService',
         error,
         data: { settingsId: settings.id },
       });
@@ -425,35 +396,27 @@ export class SettingsService {
   /**
    * Update settings
    */
-  async updateSettings(
-    currentSettings: Settings,
-    updates: SettingsUpdate,
-  ): Promise<Settings> {
+  async updateSettings(currentSettings: Settings, updates: SettingsUpdate): Promise<Settings> {
     try {
-      logger.info("Updating settings", {
-        context: "SettingsService",
+      logger.info('Updating settings', {
+        context: 'SettingsService',
         data: { settingsId: currentSettings.id, updates },
       });
 
-      const updatedSettings = await invoke<Settings>(
-        "update_settings_command",
-        {
-          settings: serializeSettingsForRust(
-            currentSettings as Settings & Record<string, unknown>,
-          ),
-          updates: serializeSettingsUpdateForRust(updates),
-        },
-      );
+      const updatedSettings = await invoke<Settings>('update_settings_command', {
+        settings: serializeSettingsForRust(currentSettings as Settings & Record<string, unknown>),
+        updates: serializeSettingsUpdateForRust(updates),
+      });
 
-      logger.info("Settings updated successfully", {
-        context: "SettingsService",
+      logger.info('Settings updated successfully', {
+        context: 'SettingsService',
         data: { settingsId: updatedSettings.id },
       });
 
       return normalizeSettings(updatedSettings);
     } catch (error) {
-      logger.error("Failed to update settings", {
-        context: "SettingsService",
+      logger.error('Failed to update settings', {
+        context: 'SettingsService',
         error,
         data: { settingsId: currentSettings.id },
       });
@@ -466,19 +429,19 @@ export class SettingsService {
    */
   async resetSettings(): Promise<Settings> {
     try {
-      logger.info("Resetting settings", { context: "SettingsService" });
+      logger.info('Resetting settings', { context: 'SettingsService' });
 
-      const defaultSettings = await invoke<Settings>("reset_settings_command");
+      const defaultSettings = await invoke<Settings>('reset_settings_command');
 
-      logger.info("Settings reset successfully", {
-        context: "SettingsService",
+      logger.info('Settings reset successfully', {
+        context: 'SettingsService',
         data: { settingsId: defaultSettings.id },
       });
 
       return normalizeSettings(defaultSettings);
     } catch (error) {
-      logger.error("Failed to reset settings", {
-        context: "SettingsService",
+      logger.error('Failed to reset settings', {
+        context: 'SettingsService',
         error,
       });
       throw error;
@@ -490,26 +453,24 @@ export class SettingsService {
    */
   async exportSettings(settings: Settings): Promise<string> {
     try {
-      logger.info("Exporting settings", {
-        context: "SettingsService",
+      logger.info('Exporting settings', {
+        context: 'SettingsService',
         data: { settingsId: settings.id },
       });
 
-      const exportedSettings = await invoke<string>("export_settings_command", {
-        settings: serializeSettingsForRust(
-          settings as Settings & Record<string, unknown>,
-        ),
+      const exportedSettings = await invoke<string>('export_settings_command', {
+        settings: serializeSettingsForRust(settings as Settings & Record<string, unknown>),
       });
 
-      logger.info("Settings exported successfully", {
-        context: "SettingsService",
+      logger.info('Settings exported successfully', {
+        context: 'SettingsService',
         data: { settingsId: settings.id },
       });
 
       return exportedSettings;
     } catch (error) {
-      logger.error("Failed to export settings", {
-        context: "SettingsService",
+      logger.error('Failed to export settings', {
+        context: 'SettingsService',
         error,
         data: { settingsId: settings.id },
       });
@@ -522,24 +483,21 @@ export class SettingsService {
    */
   async importSettings(settingsJson: string): Promise<Settings> {
     try {
-      logger.info("Importing settings", { context: "SettingsService" });
+      logger.info('Importing settings', { context: 'SettingsService' });
 
-      const importedSettings = await invoke<Settings>(
-        "import_settings_command",
-        {
-          settingsJson,
-        },
-      );
+      const importedSettings = await invoke<Settings>('import_settings_command', {
+        settingsJson,
+      });
 
-      logger.info("Settings imported successfully", {
-        context: "SettingsService",
+      logger.info('Settings imported successfully', {
+        context: 'SettingsService',
         data: { settingsId: importedSettings.id },
       });
 
       return normalizeSettings(importedSettings);
     } catch (error) {
-      logger.error("Failed to import settings", {
-        context: "SettingsService",
+      logger.error('Failed to import settings', {
+        context: 'SettingsService',
         error,
       });
       throw error;
@@ -554,20 +512,17 @@ export class SettingsService {
 
     // Validate app settings
     if (settings.app) {
-      if (
-        !settings.app.theme ||
-        !["light", "dark", "system"].includes(settings.app.theme)
-      ) {
-        errors.push("Invalid theme value");
+      if (!settings.app.theme || !['light', 'dark', 'system'].includes(settings.app.theme)) {
+        errors.push('Invalid theme value');
       }
       if (!settings.app.language || settings.app.language.length !== 2) {
-        errors.push("Invalid language code");
+        errors.push('Invalid language code');
       }
       if (settings.app.windowState && settings.app.windowState.width < 400) {
-        errors.push("Window width must be at least 400px");
+        errors.push('Window width must be at least 400px');
       }
       if (settings.app.windowState && settings.app.windowState.height < 300) {
-        errors.push("Window height must be at least 300px");
+        errors.push('Window height must be at least 300px');
       }
     }
 
@@ -577,13 +532,10 @@ export class SettingsService {
         settings.editor.fontSize &&
         (settings.editor.fontSize < 8 || settings.editor.fontSize > 72)
       ) {
-        errors.push("Font size must be between 8 and 72");
+        errors.push('Font size must be between 8 and 72');
       }
-      if (
-        settings.editor.tabSize &&
-        (settings.editor.tabSize < 1 || settings.editor.tabSize > 8)
-      ) {
-        errors.push("Tab size must be between 1 and 8");
+      if (settings.editor.tabSize && (settings.editor.tabSize < 1 || settings.editor.tabSize > 8)) {
+        errors.push('Tab size must be between 1 and 8');
       }
     }
 
@@ -593,14 +545,13 @@ export class SettingsService {
         settings.terminal.fontSize &&
         (settings.terminal.fontSize < 8 || settings.terminal.fontSize > 72)
       ) {
-        errors.push("Terminal font size must be between 8 and 72");
+        errors.push('Terminal font size must be between 8 and 72');
       }
       if (
         settings.terminal.scrollback &&
-        (settings.terminal.scrollback < 100 ||
-          settings.terminal.scrollback > 10000)
+        (settings.terminal.scrollback < 100 || settings.terminal.scrollback > 10000)
       ) {
-        errors.push("Terminal scrollback must be between 100 and 10000");
+        errors.push('Terminal scrollback must be between 100 and 10000');
       }
     }
 
@@ -613,31 +564,31 @@ export class SettingsService {
   getThemeColors(theme: string): Record<string, string> {
     const themes: Record<string, Record<string, string>> = {
       light: {
-        primary: "#3b82f6",
-        secondary: "#64748b",
-        accent: "#f59e0b",
-        background: "#ffffff",
-        surface: "#f8fafc",
-        text: "#1e293b",
-        border: "#e2e8f0",
+        primary: '#3b82f6',
+        secondary: '#64748b',
+        accent: '#f59e0b',
+        background: '#ffffff',
+        surface: '#f8fafc',
+        text: '#1e293b',
+        border: '#e2e8f0',
       },
       dark: {
-        primary: "#3b82f6",
-        secondary: "#64748b",
-        accent: "#f59e0b",
-        background: "#0f172a",
-        surface: "#1e293b",
-        text: "#f1f5f9",
-        border: "#334155",
+        primary: '#3b82f6',
+        secondary: '#64748b',
+        accent: '#f59e0b',
+        background: '#0f172a',
+        surface: '#1e293b',
+        text: '#f1f5f9',
+        border: '#334155',
       },
       system: {
-        primary: "#3b82f6",
-        secondary: "#64748b",
-        accent: "#f59e0b",
-        background: "var(--background)",
-        surface: "var(--surface)",
-        text: "var(--text)",
-        border: "var(--border)",
+        primary: '#3b82f6',
+        secondary: '#64748b',
+        accent: '#f59e0b',
+        background: 'var(--background)',
+        surface: 'var(--surface)',
+        text: 'var(--text)',
+        border: 'var(--border)',
       },
     };
 
@@ -654,15 +605,15 @@ export class SettingsService {
   }> {
     return [
       {
-        id: "light",
-        name: "Light",
-        description: "Light theme with bright colors",
+        id: 'light',
+        name: 'Light',
+        description: 'Light theme with bright colors',
       },
-      { id: "dark", name: "Dark", description: "Dark theme with dark colors" },
+      { id: 'dark', name: 'Dark', description: 'Dark theme with dark colors' },
       {
-        id: "system",
-        name: "System",
-        description: "Follow system theme preference",
+        id: 'system',
+        name: 'System',
+        description: 'Follow system theme preference',
       },
     ];
   }
@@ -672,16 +623,16 @@ export class SettingsService {
    */
   getAvailableLanguages(): Array<{ id: string; name: string; native: string }> {
     return [
-      { id: "en", name: "English", native: "English" },
-      { id: "es", name: "Spanish", native: "Español" },
-      { id: "fr", name: "French", native: "Français" },
-      { id: "de", name: "German", native: "Deutsch" },
-      { id: "it", name: "Italian", native: "Italiano" },
-      { id: "pt", name: "Portuguese", native: "Português" },
-      { id: "ru", name: "Russian", native: "Русский" },
-      { id: "ja", name: "Japanese", native: "日本語" },
-      { id: "ko", name: "Korean", native: "한국어" },
-      { id: "zh", name: "Chinese", native: "中文" },
+      { id: 'en', name: 'English', native: 'English' },
+      { id: 'es', name: 'Spanish', native: 'Español' },
+      { id: 'fr', name: 'French', native: 'Français' },
+      { id: 'de', name: 'German', native: 'Deutsch' },
+      { id: 'it', name: 'Italian', native: 'Italiano' },
+      { id: 'pt', name: 'Portuguese', native: 'Português' },
+      { id: 'ru', name: 'Russian', native: 'Русский' },
+      { id: 'ja', name: 'Japanese', native: '日本語' },
+      { id: 'ko', name: 'Korean', native: '한국어' },
+      { id: 'zh', name: 'Chinese', native: '中文' },
     ];
   }
 
@@ -690,14 +641,14 @@ export class SettingsService {
    */
   getAvailableFonts(): Array<{ id: string; name: string; category: string }> {
     return [
-      { id: "monaco", name: "Monaco", category: "Monospace" },
-      { id: "consolas", name: "Consolas", category: "Monospace" },
-      { id: "courier-new", name: "Courier New", category: "Monospace" },
-      { id: "fira-code", name: "Fira Code", category: "Monospace" },
-      { id: "jetbrains-mono", name: "JetBrains Mono", category: "Monospace" },
-      { id: "source-code-pro", name: "Source Code Pro", category: "Monospace" },
-      { id: "roboto-mono", name: "Roboto Mono", category: "Monospace" },
-      { id: "ubuntu-mono", name: "Ubuntu Mono", category: "Monospace" },
+      { id: 'monaco', name: 'Monaco', category: 'Monospace' },
+      { id: 'consolas', name: 'Consolas', category: 'Monospace' },
+      { id: 'courier-new', name: 'Courier New', category: 'Monospace' },
+      { id: 'fira-code', name: 'Fira Code', category: 'Monospace' },
+      { id: 'jetbrains-mono', name: 'JetBrains Mono', category: 'Monospace' },
+      { id: 'source-code-pro', name: 'Source Code Pro', category: 'Monospace' },
+      { id: 'roboto-mono', name: 'Roboto Mono', category: 'Monospace' },
+      { id: 'ubuntu-mono', name: 'Ubuntu Mono', category: 'Monospace' },
     ];
   }
 
@@ -711,43 +662,43 @@ export class SettingsService {
   }> {
     return [
       {
-        id: "default",
-        name: "Default",
+        id: 'default',
+        name: 'Default',
         colors: {
-          background: "#1e1e1e",
-          foreground: "#d4d4d4",
-          cursor: "#ffffff",
-          selection: "#264f78",
+          background: '#1e1e1e',
+          foreground: '#d4d4d4',
+          cursor: '#ffffff',
+          selection: '#264f78',
         },
       },
       {
-        id: "solarized-dark",
-        name: "Solarized Dark",
+        id: 'solarized-dark',
+        name: 'Solarized Dark',
         colors: {
-          background: "#002b36",
-          foreground: "#839496",
-          cursor: "#93a1a1",
-          selection: "#073642",
+          background: '#002b36',
+          foreground: '#839496',
+          cursor: '#93a1a1',
+          selection: '#073642',
         },
       },
       {
-        id: "solarized-light",
-        name: "Solarized Light",
+        id: 'solarized-light',
+        name: 'Solarized Light',
         colors: {
-          background: "#fdf6e3",
-          foreground: "#586e75",
-          cursor: "#93a1a1",
-          selection: "#eee8d5",
+          background: '#fdf6e3',
+          foreground: '#586e75',
+          cursor: '#93a1a1',
+          selection: '#eee8d5',
         },
       },
       {
-        id: "monokai",
-        name: "Monokai",
+        id: 'monokai',
+        name: 'Monokai',
         colors: {
-          background: "#272822",
-          foreground: "#f8f8f2",
-          cursor: "#f8f8f0",
-          selection: "#49483e",
+          background: '#272822',
+          foreground: '#f8f8f2',
+          cursor: '#f8f8f0',
+          selection: '#49483e',
         },
       },
     ];

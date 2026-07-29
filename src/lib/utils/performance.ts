@@ -45,9 +45,7 @@ class PerformanceMonitor {
 
     // Log slow operations
     if (metric.duration > 100) {
-      console.warn(
-        `Slow operation detected: ${name} took ${metric.duration.toFixed(2)}ms`,
-      );
+      console.warn(`Slow operation detected: ${name} took ${metric.duration.toFixed(2)}ms`);
     }
 
     return metric.duration;
@@ -71,21 +69,19 @@ class PerformanceMonitor {
    * Setup performance observer for automatic monitoring
    */
   private setupPerformanceObserver(): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     // Monitor long tasks
-    if ("PerformanceObserver" in window) {
+    if ('PerformanceObserver' in window) {
       try {
         const longTaskObserver = new PerformanceObserver((list) => {
           for (const entry of list.getEntries()) {
             if (entry.duration > 50) {
-              console.warn(
-                `Long task detected: ${entry.duration.toFixed(2)}ms`,
-              );
+              console.warn(`Long task detected: ${entry.duration.toFixed(2)}ms`);
             }
           }
         });
-        longTaskObserver.observe({ entryTypes: ["longtask"] });
+        longTaskObserver.observe({ entryTypes: ['longtask'] });
         this.observers.push(longTaskObserver);
       } catch (e) {
         // Long task observer not supported
@@ -96,24 +92,19 @@ class PerformanceMonitor {
         const layoutShiftObserver = new PerformanceObserver((list) => {
           for (const entry of list.getEntries()) {
             // Check if entry has hadRecentInput property (LayoutShiftEntry)
-            if (
-              "hadRecentInput" in entry &&
-              (entry as { hadRecentInput: boolean }).hadRecentInput
-            )
+            if ('hadRecentInput' in entry && (entry as { hadRecentInput: boolean }).hadRecentInput)
               continue;
 
             // Check if entry has value property (LayoutShiftEntry)
-            if ("value" in entry) {
+            if ('value' in entry) {
               const layoutShift = entry as { value: number };
               if (layoutShift.value > 0.1) {
-                console.warn(
-                  `Layout shift detected: ${layoutShift.value.toFixed(3)}`,
-                );
+                console.warn(`Layout shift detected: ${layoutShift.value.toFixed(3)}`);
               }
             }
           }
         });
-        layoutShiftObserver.observe({ entryTypes: ["layout-shift"] });
+        layoutShiftObserver.observe({ entryTypes: ['layout-shift'] });
         this.observers.push(layoutShiftObserver);
       } catch (e) {
         // Layout shift observer not supported
@@ -138,10 +129,10 @@ export const performanceMonitor = new PerformanceMonitor();
  */
 export function measurePerformance<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  name?: string,
+  name?: string
 ): T {
   return ((...args: Parameters<T>) => {
-    const metricName = name || fn.name || "anonymous";
+    const metricName = name || fn.name || 'anonymous';
     performanceMonitor.start(metricName);
 
     try {
@@ -181,7 +172,7 @@ export function getMemoryUsage(): {
   total: number;
   percentage: number;
 } | null {
-  if (typeof window === "undefined" || !("memory" in performance)) {
+  if (typeof window === 'undefined' || !('memory' in performance)) {
     return null;
   }
 
@@ -201,7 +192,7 @@ export function getNetworkInfo(): {
   downlink: number;
   rtt: number;
 } | null {
-  if (typeof window === "undefined" || !("connection" in navigator)) {
+  if (typeof window === 'undefined' || !('connection' in navigator)) {
     return null;
   }
 
@@ -221,27 +212,27 @@ export function getBundleSize(): {
   styles: number;
   total: number;
 } {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return { scripts: 0, styles: 0, total: 0 };
   }
 
-  const scripts = document.querySelectorAll("script[src]");
+  const scripts = document.querySelectorAll('script[src]');
   const styles = document.querySelectorAll('link[rel="stylesheet"]');
 
   let scriptSize = 0;
   let styleSize = 0;
 
   scripts.forEach((script) => {
-    const src = script.getAttribute("src");
-    if (src && !src.startsWith("data:")) {
+    const src = script.getAttribute('src');
+    if (src && !src.startsWith('data:')) {
       // Estimate size based on URL length (rough approximation)
       scriptSize += src.length * 10;
     }
   });
 
   styles.forEach((style) => {
-    const href = style.getAttribute("href");
-    if (href && !href.startsWith("data:")) {
+    const href = style.getAttribute('href');
+    if (href && !href.startsWith('data:')) {
       styleSize += href.length * 10;
     }
   });

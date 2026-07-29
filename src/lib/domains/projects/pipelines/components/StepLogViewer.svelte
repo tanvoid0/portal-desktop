@@ -2,13 +2,13 @@
 	Step Log Viewer - Monospace log panel with live streaming
 -->
 <script lang="ts">
-  import { tick } from "svelte";
-  import { Copy, Check } from "@lucide/svelte";
-  import { ScrollArea } from "$lib/components/ui/scroll-area";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import { toast } from "$lib/utils/toast";
-  import type { StepExecution } from "../types";
+  import { tick } from 'svelte';
+  import { Copy, Check } from '@lucide/svelte';
+  import { ScrollArea } from '$lib/components/ui/scroll-area';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import { toast } from '$lib/utils/toast';
+  import type { StepExecution } from '../types';
 
   interface Props {
     step: StepExecution | null;
@@ -16,11 +16,7 @@
     autoScroll?: boolean;
   }
 
-  let {
-    step,
-    liveLines = [],
-    autoScroll = true,
-  }: Props = $props();
+  let { step, liveLines = [], autoScroll = true }: Props = $props();
 
   let scrollContainer = $state<HTMLElement | null>(null);
   let userAutoScroll = $state(true);
@@ -34,7 +30,7 @@
       return step.logs;
     }
     if (step?.output) {
-      return step.output.split("\n").filter((l) => l.length > 0);
+      return step.output.split('\n').filter((l) => l.length > 0);
     }
     return [];
   });
@@ -52,11 +48,11 @@
   });
 
   function isStderrLine(line: string): boolean {
-    return line.startsWith("[stderr]");
+    return line.startsWith('[stderr]');
   }
 
   function formatDuration(ms: number | undefined): string {
-    if (!ms) return "";
+    if (!ms) return '';
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   }
@@ -65,25 +61,23 @@
     if (displayLines.length === 0) return;
 
     try {
-      await navigator.clipboard.writeText(displayLines.join("\n"));
+      await navigator.clipboard.writeText(displayLines.join('\n'));
       copied = true;
-      toast.success("Logs copied to clipboard");
+      toast.success('Logs copied to clipboard');
       setTimeout(() => {
         copied = false;
       }, 2000);
     } catch {
-      toast.error("Failed to copy logs");
+      toast.error('Failed to copy logs');
     }
   }
 </script>
 
 <div class="flex h-full min-h-[400px] flex-col rounded-lg border bg-zinc-950">
-  <div
-    class="divider-edge-b divider-edge-full flex items-center justify-between px-4 py-2"
-  >
+  <div class="divider-edge-b divider-edge-full flex items-center justify-between px-4 py-2">
     <div class="flex items-center gap-2">
       <span class="text-sm font-medium text-zinc-100">
-        {step?.stepName ?? "Select a step"}
+        {step?.stepName ?? 'Select a step'}
       </span>
       {#if step}
         <Badge variant="outline" class="border-zinc-700 text-zinc-300">
@@ -124,7 +118,7 @@
         class="h-7 text-zinc-400 hover:text-zinc-100"
         onclick={() => (userAutoScroll = !userAutoScroll)}
       >
-        {userAutoScroll ? "Auto-scroll on" : "Auto-scroll off"}
+        {userAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
       </Button>
     </div>
   </div>
@@ -138,9 +132,7 @@
         <p class="text-zinc-500">Select a step to view logs</p>
       {:else if displayLines.length === 0}
         <p class="text-zinc-500">
-          {step.status === "running"
-            ? "Waiting for output..."
-            : "No log output for this step"}
+          {step.status === 'running' ? 'Waiting for output...' : 'No log output for this step'}
         </p>
       {:else}
         {#each displayLines as line, i (i)}

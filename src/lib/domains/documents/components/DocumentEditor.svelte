@@ -1,22 +1,17 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Separator } from "$lib/components/ui/separator";
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import Select from "$lib/components/ui/select.svelte";
-  import Icon from "@iconify/svelte";
-  import { documentActions } from "../stores/documentStore";
-  import { toastActions } from "$lib/utils/toast";
-  import type { Document } from "../types";
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Separator } from '$lib/components/ui/separator';
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import Select from '$lib/components/ui/select.svelte';
+  import Icon from '@iconify/svelte';
+  import { documentActions } from '../stores/documentStore';
+  import { toastActions } from '$lib/utils/toast';
+  import type { Document } from '../types';
 
   interface Props {
     document?: Document | null;
@@ -26,20 +21,19 @@
     initialContent?: string;
   }
 
-  let { document, onSave, onCancel, initialTitle, initialContent }: Props =
-    $props();
+  let { document, onSave, onCancel, initialTitle, initialContent }: Props = $props();
 
   // Form state
-  let title = $state(document?.title || initialTitle || "");
-  let content = $state(document?.content || initialContent || "");
-  let contentDraft = $state(document?.contentDraft || "");
+  let title = $state(document?.title || initialTitle || '');
+  let content = $state(document?.content || initialContent || '');
+  let contentDraft = $state(document?.contentDraft || '');
   let isArchived = $state(document?.isArchived || false);
   let tags = $state<string[]>(document?.tags || []);
   let isDraft = $state(document?.isDraft || false);
 
   // UI state
   let isSaving = $state(false);
-  let newTag = $state("");
+  let newTag = $state('');
   let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   const isCreateMode = $derived(document === null);
@@ -52,12 +46,9 @@
     autoSaveTimer = setTimeout(async () => {
       if (!isCreateMode && document) {
         try {
-          await documentActions.updateDraft(
-            document.id,
-            contentDraft || content,
-          );
+          await documentActions.updateDraft(document.id, contentDraft || content);
         } catch (error) {
-          console.error("Auto-save failed:", error);
+          console.error('Auto-save failed:', error);
         }
       }
     }, 2000);
@@ -66,7 +57,7 @@
   function addTag() {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       tags = [...tags, newTag.trim()];
-      newTag = "";
+      newTag = '';
     }
   }
 
@@ -76,7 +67,7 @@
 
   async function handleSave() {
     if (!title.trim()) {
-      toastActions.error("Document title is required");
+      toastActions.error('Document title is required');
       return;
     }
 
@@ -85,29 +76,24 @@
       let savedDoc: Document;
 
       if (isCreateMode) {
-        savedDoc = await documentActions.createDocument(
-          title.trim(),
-          content,
-          tags,
-          isArchived,
-        );
-        toastActions.success("Document created successfully");
+        savedDoc = await documentActions.createDocument(title.trim(), content, tags, isArchived);
+        toastActions.success('Document created successfully');
       } else {
         savedDoc = await documentActions.saveDocument(
           document!.id,
           title.trim(),
           content,
           tags,
-          isArchived,
+          isArchived
         );
-        toastActions.success("Document saved successfully");
+        toastActions.success('Document saved successfully');
       }
 
       onSave?.(savedDoc);
     } catch (error) {
       toastActions.error(
-        `Failed to ${isCreateMode ? "create" : "save"} document`,
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        `Failed to ${isCreateMode ? 'create' : 'save'} document`,
+        error instanceof Error ? error.message : 'An unexpected error occurred'
       );
     } finally {
       isSaving = false;
@@ -128,27 +114,19 @@
 
 <Card class="mx-auto max-w-4xl">
   <CardHeader>
-    <CardTitle
-      >{isCreateMode ? "Create New Document" : "Edit Document"}</CardTitle
-    >
+    <CardTitle>{isCreateMode ? 'Create New Document' : 'Edit Document'}</CardTitle>
   </CardHeader>
   <CardContent class="space-y-6">
     <!-- Title -->
     <div class="space-y-2">
       <Label for="title">Title *</Label>
-      <Input
-        id="title"
-        bind:value={title}
-        placeholder="Enter document title..."
-      />
+      <Input id="title" bind:value={title} placeholder="Enter document title..." />
     </div>
 
     <!-- Archived Toggle -->
     <div class="flex items-center space-x-2">
       <Checkbox id="isArchived" bind:checked={isArchived} />
-      <Label for="isArchived" class="cursor-pointer"
-        >Archived (soft delete)</Label
-      >
+      <Label for="isArchived" class="cursor-pointer">Archived (soft delete)</Label>
     </div>
 
     <!-- Content -->
@@ -177,7 +155,7 @@
           placeholder="Add a tag..."
           bind:value={newTag}
           onkeydown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === 'Enter') {
               e.preventDefault();
               addTag();
             }
@@ -211,11 +189,9 @@
 
     <!-- Actions -->
     <div class="flex justify-end gap-3">
-      <Button variant="outline" onclick={onCancel} disabled={isSaving}>
-        Cancel
-      </Button>
+      <Button variant="outline" onclick={onCancel} disabled={isSaving}>Cancel</Button>
       <Button onclick={handleSave} disabled={isSaving}>
-        {isCreateMode ? "Create Document" : "Save Document"}
+        {isCreateMode ? 'Create Document' : 'Save Document'}
       </Button>
     </div>
   </CardContent>

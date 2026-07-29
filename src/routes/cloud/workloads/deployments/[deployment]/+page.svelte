@@ -1,27 +1,14 @@
 <!-- Deployment Detail Page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { page } from "$app/stores";
-  import { goto, replaceState } from "$app/navigation";
-  import { cloudStore, loadResources } from "$lib/domains/cloud/stores";
-  import {
-    ResourceType,
-    type ICloudResource,
-  } from "$lib/domains/cloud/core/types";
-  import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-  } from "$lib/components/ui/tabs";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto, replaceState } from '$app/navigation';
+  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
+  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
   import {
     Dialog,
     DialogContent,
@@ -29,26 +16,24 @@
     DialogFooter,
     DialogHeader,
     DialogTitle,
-  } from "$lib/components/ui/dialog";
-  import { Label } from "$lib/components/ui/label";
-  import { Input } from "$lib/components/ui/input";
-  import { ArrowLeft, RefreshCw, FileCode, RotateCcw } from "@lucide/svelte";
-  import { k8sResourceService } from "$lib/domains/cloud/services/k8sResourceService";
-  import Loading from "$lib/components/ui/loading.svelte";
-  import { PageLoading, PageError } from "$lib/components/shell";
-  import { toastActions } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import YamlEditor from "$lib/domains/cloud/components/YamlEditor.svelte";
+  } from '$lib/components/ui/dialog';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
+  import { ArrowLeft, RefreshCw, FileCode, RotateCcw } from '@lucide/svelte';
+  import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
+  import Loading from '$lib/components/ui/loading.svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { toastActions } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
 
   const deploymentName = $derived($page.params.deployment);
   const namespace = $derived(
-    $page.url.searchParams.get("namespace") ||
-      $cloudStore.selectedNamespace ||
-      "default",
+    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get("tab") || "overview");
+  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
 
-  let activeTab = $state("overview");
+  let activeTab = $state('overview');
 
   // Sync activeTab with tabParam when it changes
   $effect(() => {
@@ -59,7 +44,7 @@
   let error = $state<string | null>(null);
 
   // YAML state
-  let yaml = $state("");
+  let yaml = $state('');
   let yamlLoading = $state(false);
   let yamlError = $state<string | null>(null);
 
@@ -73,20 +58,20 @@
 
   onMount(async () => {
     await loadDeployment();
-    if (activeTab === "yaml") {
+    if (activeTab === 'yaml') {
       await loadYAML();
     }
   });
 
   $effect(() => {
-    if (activeTab === "yaml" && !yaml && !yamlLoading) {
+    if (activeTab === 'yaml' && !yaml && !yamlLoading) {
       loadYAML();
     }
   });
 
   async function loadDeployment() {
     if (!deploymentName || !$cloudStore.connection.isConnected) {
-      error = "Deployment name or connection required";
+      error = 'Deployment name or connection required';
       isLoading = false;
       return;
     }
@@ -103,8 +88,8 @@
         error = `Deployment "${deploymentName}" not found in namespace "${namespace}".`;
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load deployment";
-      console.error("Failed to load deployment:", err);
+      error = err instanceof Error ? err.message : 'Failed to load deployment';
+      console.error('Failed to load deployment:', err);
     } finally {
       isLoading = false;
     }
@@ -117,12 +102,16 @@
       yamlLoading = true;
       yamlError = null;
 
-      const yamlContent = await k8sResourceService.getResourceYaml("Deployment", deployment.namespace, deployment.name);
+      const yamlContent = await k8sResourceService.getResourceYaml(
+        'Deployment',
+        deployment.namespace,
+        deployment.name
+      );
 
       yaml = yamlContent;
     } catch (err) {
-      yamlError = err instanceof Error ? err.message : "Failed to load YAML";
-      console.error("Failed to load YAML:", err);
+      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
+      console.error('Failed to load YAML:', err);
     } finally {
       yamlLoading = false;
     }
@@ -140,8 +129,7 @@
       await loadDeployment();
       await loadYAML();
     } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to apply YAML";
+      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
       toastActions.error(errorMsg);
       throw err;
     }
@@ -150,7 +138,7 @@
   function handleTabChange(tab: string) {
     activeTab = tab;
     const url = new URL($page.url);
-    url.searchParams.set("tab", tab);
+    url.searchParams.set('tab', tab);
     replaceState(url, {});
   }
 
@@ -165,16 +153,18 @@
 
     try {
       isScaling = true;
-      await k8sResourceService.scaleDeployment(deployment.namespace, deployment.name, scaleReplicas);
-
-      toastActions.success(
-        `Scaled ${deployment.name} to ${scaleReplicas} replicas`,
+      await k8sResourceService.scaleDeployment(
+        deployment.namespace,
+        deployment.name,
+        scaleReplicas
       );
+
+      toastActions.success(`Scaled ${deployment.name} to ${scaleReplicas} replicas`);
       showScaleDialog = false;
       await loadDeployment();
     } catch (error) {
       toastActions.error(
-        `Failed to scale deployment: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to scale deployment: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     } finally {
       isScaling = false;
@@ -186,19 +176,22 @@
 
     const confirmed = await confirmAction(
       `Are you sure you want to rollback deployment "${deployment.name}" to the previous revision?`,
-      "Rollback deployment",
+      'Rollback deployment'
     );
     if (!confirmed) return;
 
     try {
       isRollingBack = true;
-      const result = await k8sResourceService.rollbackDeployment(deployment.namespace, deployment.name);
+      const result = await k8sResourceService.rollbackDeployment(
+        deployment.namespace,
+        deployment.name
+      );
 
       toastActions.success(result);
       await loadDeployment();
     } catch (error) {
       toastActions.error(
-        `Failed to rollback deployment: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to rollback deployment: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     } finally {
       isRollingBack = false;
@@ -215,11 +208,7 @@
   {#if isLoading}
     <PageLoading message="Loading deployment..." />
   {:else if error}
-    <PageError
-      title="Failed to load deployment"
-      message={error}
-      onRetry={loadDeployment}
-    />
+    <PageError title="Failed to load deployment" message={error} onRetry={loadDeployment} />
   {:else if deployment}
     <div class="flex items-center justify-between">
       <div>
@@ -232,12 +221,7 @@
           Refresh
         </Button>
         <Button variant="outline" size="sm" onclick={handleScale}>Scale</Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={handleRollback}
-          disabled={isRollingBack}
-        >
+        <Button variant="outline" size="sm" onclick={handleRollback} disabled={isRollingBack}>
           {#if isRollingBack}
             <span class="i-lucide-loader-2 mr-2 h-4 w-4 animate-spin"></span>
           {:else}
@@ -245,11 +229,7 @@
           {/if}
           Rollback
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={() => goto("/cloud/workloads/deployments")}
-        >
+        <Button variant="outline" size="sm" onclick={() => goto('/cloud/workloads/deployments')}>
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back to Deployments
         </Button>
@@ -273,8 +253,7 @@
             <CardContent class="space-y-3">
               <div>
                 <p class="text-sm text-muted-foreground">Status</p>
-                <Badge class="mt-1" variant="default">{deployment.status}</Badge
-                >
+                <Badge class="mt-1" variant="default">{deployment.status}</Badge>
               </div>
               <div>
                 <p class="text-sm text-muted-foreground">Desired Replicas</p>
@@ -287,8 +266,7 @@
               <div>
                 <p class="text-sm text-muted-foreground">Available Replicas</p>
                 <p class="font-medium">
-                  {deployment.metadata?.available || 0}/{deployment.metadata
-                    ?.desired || 0}
+                  {deployment.metadata?.available || 0}/{deployment.metadata?.desired || 0}
                 </p>
               </div>
               <div>
@@ -299,7 +277,7 @@
               </div>
               <div>
                 <p class="text-sm text-muted-foreground">Age</p>
-                <p class="font-medium">{deployment.metadata?.age || "N/A"}</p>
+                <p class="font-medium">{deployment.metadata?.age || 'N/A'}</p>
               </div>
             </CardContent>
           </Card>
@@ -314,17 +292,15 @@
                   <div class="mb-2 flex justify-between">
                     <span class="text-sm">Ready</span>
                     <span class="font-medium"
-                      >{deployment.metadata?.available || 0}/{deployment
-                        .metadata?.desired || 0}</span
+                      >{deployment.metadata?.available || 0}/{deployment.metadata?.desired ||
+                        0}</span
                     >
                   </div>
                   <div class="h-2 w-full rounded-full bg-muted">
                     <div
                       class="h-2 rounded-full bg-green-600 transition-all"
                       style="width: {deployment.metadata?.desired
-                        ? (deployment.metadata.available /
-                            deployment.metadata.desired) *
-                          100
+                        ? (deployment.metadata.available / deployment.metadata.desired) * 100
                         : 0}%"
                     ></div>
                   </div>
@@ -333,17 +309,15 @@
                   <div class="mb-2 flex justify-between">
                     <span class="text-sm">Up-to-date</span>
                     <span class="font-medium"
-                      >{deployment.metadata?.up_to_date || 0}/{deployment
-                        .metadata?.desired || 0}</span
+                      >{deployment.metadata?.up_to_date || 0}/{deployment.metadata?.desired ||
+                        0}</span
                     >
                   </div>
                   <div class="h-2 w-full rounded-full bg-muted">
                     <div
                       class="h-2 rounded-full bg-blue-600 transition-all"
                       style="width: {deployment.metadata?.desired
-                        ? (deployment.metadata.up_to_date /
-                            deployment.metadata.desired) *
-                          100
+                        ? (deployment.metadata.up_to_date / deployment.metadata.desired) * 100
                         : 0}%"
                     ></div>
                   </div>
@@ -383,9 +357,7 @@
                 <Loading text="Loading YAML..." />
               </div>
             {:else if yamlError}
-              <div
-                class="flex h-full items-center justify-center text-center text-destructive"
-              >
+              <div class="flex h-full items-center justify-center text-center text-destructive">
                 <p>{yamlError}</p>
               </div>
             {:else if yaml}
@@ -430,13 +402,11 @@
           </div>
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onclick={() => (showScaleDialog = false)}
-            disabled={isScaling}>Cancel</Button
+          <Button variant="outline" onclick={() => (showScaleDialog = false)} disabled={isScaling}
+            >Cancel</Button
           >
           <Button onclick={confirmScale} disabled={isScaling}>
-            {isScaling ? "Scaling..." : "Scale"}
+            {isScaling ? 'Scaling...' : 'Scale'}
           </Button>
         </DialogFooter>
       </DialogContent>

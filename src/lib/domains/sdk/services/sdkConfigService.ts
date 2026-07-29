@@ -5,8 +5,8 @@
  * Backend processes configs and returns formatted data.
  */
 
-import { invoke } from "@tauri-apps/api/core";
-import { logger } from "../../shared";
+import { invoke } from '@tauri-apps/api/core';
+import { logger } from '../../shared';
 
 export interface ProcessedSDKConfig {
   id: string;
@@ -72,24 +72,24 @@ export class SDKConfigService {
    */
   async getSDKConfig(sdkId: string): Promise<ProcessedSDKConfig | null> {
     try {
-      logger.info("Getting SDK config", {
-        context: "SDKConfigService",
+      logger.info('Getting SDK config', {
+        context: 'SDKConfigService',
         data: { sdkId },
       });
 
-      const config = await invoke<ProcessedSDKConfig | null>("get_sdk_config", {
+      const config = await invoke<ProcessedSDKConfig | null>('get_sdk_config', {
         sdkId,
       });
 
-      logger.info("SDK config retrieved", {
-        context: "SDKConfigService",
+      logger.info('SDK config retrieved', {
+        context: 'SDKConfigService',
         data: { sdkId, found: !!config },
       });
 
       return config;
     } catch (error) {
-      logger.error("Failed to get SDK config", {
-        context: "SDKConfigService",
+      logger.error('Failed to get SDK config', {
+        context: 'SDKConfigService',
         error,
         data: { sdkId },
       });
@@ -102,19 +102,19 @@ export class SDKConfigService {
    */
   async getAllSDKConfigs(): Promise<ProcessedSDKConfig[]> {
     try {
-      logger.info("Getting all SDK configs", { context: "SDKConfigService" });
+      logger.info('Getting all SDK configs', { context: 'SDKConfigService' });
 
-      const configs = await invoke<ProcessedSDKConfig[]>("get_all_sdk_configs");
+      const configs = await invoke<ProcessedSDKConfig[]>('get_all_sdk_configs');
 
-      logger.info("All SDK configs retrieved", {
-        context: "SDKConfigService",
+      logger.info('All SDK configs retrieved', {
+        context: 'SDKConfigService',
         data: { count: configs.length },
       });
 
       return configs;
     } catch (error) {
-      logger.error("Failed to get all SDK configs", {
-        context: "SDKConfigService",
+      logger.error('Failed to get all SDK configs', {
+        context: 'SDKConfigService',
         error,
       });
       throw error;
@@ -126,25 +126,22 @@ export class SDKConfigService {
    */
   async getSDKsByCategory(category: string): Promise<ProcessedSDKConfig[]> {
     try {
-      logger.info("Getting SDKs by category", {
-        context: "SDKConfigService",
+      logger.info('Getting SDKs by category', {
+        context: 'SDKConfigService',
         data: { category },
       });
 
-      const configs = await invoke<ProcessedSDKConfig[]>(
-        "get_sdks_by_category",
-        { category },
-      );
+      const configs = await invoke<ProcessedSDKConfig[]>('get_sdks_by_category', { category });
 
-      logger.info("SDKs by category retrieved", {
-        context: "SDKConfigService",
+      logger.info('SDKs by category retrieved', {
+        context: 'SDKConfigService',
         data: { category, count: configs.length },
       });
 
       return configs;
     } catch (error) {
-      logger.error("Failed to get SDKs by category", {
-        context: "SDKConfigService",
+      logger.error('Failed to get SDKs by category', {
+        context: 'SDKConfigService',
         error,
         data: { category },
       });

@@ -2,18 +2,13 @@
  * Build a ProjectAutomationProfile from a Project (or cwd-only context).
  */
 
-import type { Project } from "$lib/domains/projects/types";
-import {
-  getProjectFramework,
-  getProjectPackageManager,
-} from "$lib/domains/projects/utils/display";
-import { projectIconRegistry } from "$lib/domains/projects/utils/iconRegistry";
-import type { ProjectAutomationProfile } from "./types";
+import type { Project } from '$lib/domains/projects/types';
+import { getProjectFramework, getProjectPackageManager } from '$lib/domains/projects/utils/display';
+import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
+import type { ProjectAutomationProfile } from './types';
 
 export function resolveFrameworkNames(project: Project): string[] {
-  const fromRegistry = projectIconRegistry
-    .resolveFrameworks(project)
-    .map((f) => f.name);
+  const fromRegistry = projectIconRegistry.resolveFrameworks(project).map((f) => f.name);
   if (fromRegistry.length > 0) return fromRegistry;
 
   const legacy = getProjectFramework(project);
@@ -28,7 +23,7 @@ export function resolvePackageManagerName(project: Project): string {
   return (
     getProjectPackageManager(project)?.toLowerCase() ??
     (project as Project & { package_manager?: string }).package_manager?.toLowerCase() ??
-    "npm"
+    'npm'
   );
 }
 
@@ -49,9 +44,9 @@ export function profileFromProject(project: Project): ProjectAutomationProfile {
 
 export function profileFromDirectory(
   cwd: string,
-  packageManager = "npm",
+  packageManager = 'npm'
 ): ProjectAutomationProfile {
-  const name = cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? cwd;
+  const name = cwd.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? cwd;
   return {
     name,
     path: cwd,
@@ -61,10 +56,8 @@ export function profileFromDirectory(
 }
 
 /** Builtin template variables for action command substitution */
-export function profileVariables(
-  profile: ProjectAutomationProfile,
-): Record<string, string> {
-  const cwd = profile.path.replace(/\\/g, "/");
+export function profileVariables(profile: ProjectAutomationProfile): Record<string, string> {
+  const cwd = profile.path.replace(/\\/g, '/');
   const vars: Record<string, string> = {
     CWD: cwd,
     PROJECT_PATH: cwd,
@@ -80,10 +73,7 @@ export function profileVariables(
   return vars;
 }
 
-export function substituteVars(
-  template: string,
-  variables: Record<string, string>,
-): string {
+export function substituteVars(template: string, variables: Record<string, string>): string {
   return template.replace(/\$\{([A-Z0-9_]+)\}/gi, (match, key: string) => {
     const upper = key.toUpperCase();
     return variables[upper] ?? variables[key] ?? match;

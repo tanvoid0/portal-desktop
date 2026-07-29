@@ -3,37 +3,25 @@
 -->
 
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { onMount } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { onMount } from 'svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
   import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-  } from "$lib/components/ui/card";
-  import { Label } from "$lib/components/ui/label";
-  import { Badge } from "$lib/components/ui/badge";
-  import Select from "$lib/components/ui/select.svelte";
-  import {
-    Link2,
-    Plus,
-    Edit,
-    Trash2,
-    ArrowRight,
-    RefreshCw,
-    Loader2,
-  } from "@lucide/svelte";
-  import { toast } from "$lib/utils/toast";
-  import { confirmAction } from "$lib/utils/confirm";
-  import { logger } from "$lib/domains/shared";
-  import {
-    ideService,
-    type IdeConfig,
-    type FrameworkIdeMapping,
-  } from "$lib/domains/ide";
+  } from '$lib/components/ui/card';
+  import { Label } from '$lib/components/ui/label';
+  import { Badge } from '$lib/components/ui/badge';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Link2, Plus, Edit, Trash2, ArrowRight, RefreshCw, Loader2 } from '@lucide/svelte';
+  import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { logger } from '$lib/domains/shared';
+  import { ideService, type IdeConfig, type FrameworkIdeMapping } from '$lib/domains/ide';
 
   let mappings = $state<FrameworkIdeMapping[]>([]);
   let ides = $state<IdeConfig[]>([]);
@@ -41,8 +29,8 @@
   let isLoadingIdes = $state(false);
   let showModal = $state(false);
   let editingMapping = $state<FrameworkIdeMapping | null>(null);
-  let mappingFramework = $state("");
-  let mappingIdeId = $state<string>("");
+  let mappingFramework = $state('');
+  let mappingIdeId = $state<string>('');
 
   onMount(async () => {
     await Promise.all([loadMappings(), loadIdes()]);
@@ -52,12 +40,12 @@
     try {
       isLoadingMappings = true;
       mappings = await ideService.getAllFrameworkIdeMappings();
-      logger.info("Framework IDE mappings loaded", {
-        context: "FrameworkIdeSettings",
+      logger.info('Framework IDE mappings loaded', {
+        context: 'FrameworkIdeSettings',
         count: mappings.length,
       });
     } catch (error: any) {
-      toast.error("Failed to load framework IDE mappings", error);
+      toast.error('Failed to load framework IDE mappings', error);
     } finally {
       isLoadingMappings = false;
     }
@@ -68,7 +56,7 @@
       isLoadingIdes = true;
       ides = await ideService.getAllIdes();
     } catch (error: any) {
-      toast.error("Failed to load IDEs", error);
+      toast.error('Failed to load IDEs', error);
     } finally {
       isLoadingIdes = false;
     }
@@ -81,8 +69,8 @@
 
   function startAdding() {
     editingMapping = null;
-    mappingFramework = "";
-    mappingIdeId = "";
+    mappingFramework = '';
+    mappingIdeId = '';
     showModal = true;
   }
 
@@ -96,19 +84,19 @@
   function closeModal() {
     showModal = false;
     editingMapping = null;
-    mappingFramework = "";
-    mappingIdeId = "";
+    mappingFramework = '';
+    mappingIdeId = '';
   }
 
   function handleModalKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
+    if (e.key === 'Escape') {
       closeModal();
     }
   }
 
   async function saveMapping() {
     if (!mappingFramework.trim() || !mappingIdeId) {
-      toast.error("Framework name and IDE selection are required");
+      toast.error('Framework name and IDE selection are required');
       return;
     }
 
@@ -117,29 +105,29 @@
       await ideService.setFrameworkIdeMapping(mappingFramework.trim(), ideId);
       toast.success(
         editingMapping
-          ? "Framework IDE mapping updated successfully"
-          : "Framework IDE mapping created successfully",
+          ? 'Framework IDE mapping updated successfully'
+          : 'Framework IDE mapping created successfully'
       );
       closeModal();
       await loadMappings();
     } catch (error: any) {
-      toast.error("Failed to save framework IDE mapping", error);
+      toast.error('Failed to save framework IDE mapping', error);
     }
   }
 
   async function deleteMapping(mapping: FrameworkIdeMapping) {
     const confirmed = await confirmAction(
       `Are you sure you want to delete the mapping for "${mapping.framework}"?`,
-      "Delete mapping",
+      'Delete mapping'
     );
     if (!confirmed) return;
 
     try {
       await ideService.deleteFrameworkIdeMapping(mapping.framework);
-      toast.success("Framework IDE mapping deleted successfully");
+      toast.success('Framework IDE mapping deleted successfully');
       await loadMappings();
     } catch (error: any) {
-      toast.error("Failed to delete framework IDE mapping", error);
+      toast.error('Failed to delete framework IDE mapping', error);
     }
   }
 </script>
@@ -157,12 +145,7 @@
       </p>
     </div>
     <div class="flex gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={loadMappings}
-        disabled={isLoadingMappings}
-      >
+      <Button variant="outline" size="sm" onclick={loadMappings} disabled={isLoadingMappings}>
         <RefreshCw class="mr-2 h-4 w-4" />
         Refresh
       </Button>
@@ -181,9 +164,7 @@
         Framework IDE Mappings
         <Badge variant="outline">{mappings.length}</Badge>
       </CardTitle>
-      <CardDescription>
-        Configure which IDE should open for each framework
-      </CardDescription>
+      <CardDescription>Configure which IDE should open for each framework</CardDescription>
     </CardHeader>
     <CardContent>
       {#if isLoadingMappings}
@@ -194,9 +175,7 @@
       {:else if mappings.length === 0}
         <div class="py-8 text-center">
           <Link2 class="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <p class="mb-4 text-muted-foreground">
-            No framework IDE mappings configured
-          </p>
+          <p class="mb-4 text-muted-foreground">No framework IDE mappings configured</p>
           <Button onclick={startAdding}>
             <Plus class="mr-2 h-4 w-4" />
             Create Your First Mapping
@@ -209,21 +188,13 @@
               class="flex items-center justify-between rounded-md border p-4 transition-colors hover:bg-accent"
             >
               <div class="flex items-center gap-4">
-                <Badge variant="secondary" class="font-medium"
-                  >{mapping.framework}</Badge
-                >
+                <Badge variant="secondary" class="font-medium">{mapping.framework}</Badge>
                 <ArrowRight class="h-4 w-4 text-muted-foreground" />
-                <span class="text-sm font-medium"
-                  >{getIdeName(mapping.ide_id)}</span
-                >
+                <span class="text-sm font-medium">{getIdeName(mapping.ide_id)}</span>
               </div>
 
               <div class="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onclick={() => startEditing(mapping)}
-                >
+                <Button variant="ghost" size="sm" onclick={() => startEditing(mapping)}>
                   <Edit class="h-4 w-4" />
                 </Button>
                 <Button
@@ -268,48 +239,40 @@
   <Dialog.Content class="max-w-md">
     <Dialog.Header>
       <Dialog.Title>
-        {editingMapping
-          ? "Edit Framework IDE Mapping"
-          : "Add Framework IDE Mapping"}
+        {editingMapping ? 'Edit Framework IDE Mapping' : 'Add Framework IDE Mapping'}
       </Dialog.Title>
     </Dialog.Header>
 
     <div class="space-y-4">
-        <div class="space-y-2">
-          <Label for="mapping-framework">Framework</Label>
-          <Input
-            id="mapping-framework"
-            bind:value={mappingFramework}
-            placeholder="e.g., React, Vue, Angular, Node.js"
-            required
-          />
-          <p class="text-xs text-muted-foreground">
-            The framework name that will trigger this IDE
-          </p>
-        </div>
+      <div class="space-y-2">
+        <Label for="mapping-framework">Framework</Label>
+        <Input
+          id="mapping-framework"
+          bind:value={mappingFramework}
+          placeholder="e.g., React, Vue, Angular, Node.js"
+          required
+        />
+        <p class="text-xs text-muted-foreground">The framework name that will trigger this IDE</p>
+      </div>
 
-        <div class="space-y-2">
-          <Label for="mapping-ide">IDE</Label>
-          <Select
-            defaultValue={mappingIdeId || ""}
-            options={ides.map((ide) => ({
-              value: String(ide.id || ""),
-              label: ide.name,
-            }))}
-            onSelect={(value) => (mappingIdeId = value || "")}
-            placeholder="Select an IDE..."
-          />
-          <p class="text-xs text-muted-foreground">
-            The IDE that will open for this framework
-          </p>
-        </div>
+      <div class="space-y-2">
+        <Label for="mapping-ide">IDE</Label>
+        <Select
+          defaultValue={mappingIdeId || ''}
+          options={ides.map((ide) => ({
+            value: String(ide.id || ''),
+            label: ide.name,
+          }))}
+          onSelect={(value) => (mappingIdeId = value || '')}
+          placeholder="Select an IDE..."
+        />
+        <p class="text-xs text-muted-foreground">The IDE that will open for this framework</p>
+      </div>
 
-        <div class="divider-edge-t divider-edge-full flex justify-end gap-3 pt-4">
-          <Button variant="outline" onclick={closeModal}>Cancel</Button>
-          <Button onclick={saveMapping}
-            >{editingMapping ? "Update" : "Create"} Mapping</Button
-          >
-        </div>
+      <div class="divider-edge-t divider-edge-full flex justify-end gap-3 pt-4">
+        <Button variant="outline" onclick={closeModal}>Cancel</Button>
+        <Button onclick={saveMapping}>{editingMapping ? 'Update' : 'Create'} Mapping</Button>
+      </div>
     </div>
   </Dialog.Content>
 </Dialog.Root>

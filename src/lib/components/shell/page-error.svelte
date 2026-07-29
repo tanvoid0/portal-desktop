@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { AlertCircle, RotateCw } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Card, CardContent } from "$lib/components/ui/card";
+  import { AlertCircle, RotateCw } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Card, CardContent } from '$lib/components/ui/card';
 
   interface Props {
     title?: string;
@@ -9,11 +9,7 @@
     onRetry?: () => void;
   }
 
-  let {
-    title = "Something went wrong",
-    message,
-    onRetry,
-  }: Props = $props();
+  let { title = 'Something went wrong', message, onRetry }: Props = $props();
 </script>
 
 <Card>

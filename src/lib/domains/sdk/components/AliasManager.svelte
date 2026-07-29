@@ -4,26 +4,16 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import { confirmAction } from "$lib/utils/confirm";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-  } from "$lib/components/ui/dialog";
-  import { Alert, AlertDescription } from "$lib/components/ui/alert";
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import {
     Plus,
     Trash2,
@@ -34,7 +24,7 @@
     Search,
     Tag,
     X,
-  } from "@lucide/svelte";
+  } from '@lucide/svelte';
 
   interface Alias {
     name: string;
@@ -53,13 +43,13 @@
   let showAddDialog = $state(false);
   let showEditDialog = $state(false);
   let selectedAlias: Alias | null = $state(null);
-  let searchTerm = $state("");
+  let searchTerm = $state('');
 
   // Form state
-  let newAliasName = $state("");
-  let newAliasTarget = $state("");
-  let editAliasName = $state("");
-  let editAliasTarget = $state("");
+  let newAliasName = $state('');
+  let newAliasTarget = $state('');
+  let editAliasName = $state('');
+  let editAliasTarget = $state('');
 
   // Initialize
   onMount(() => {
@@ -71,11 +61,11 @@
     error = null;
 
     try {
-      const result = await invoke("list_aliases", { sdkType });
+      const result = await invoke('list_aliases', { sdkType });
       aliases = Array.isArray(result) ? result : [];
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load aliases";
-      console.error("Failed to load aliases:", err);
+      error = err instanceof Error ? err.message : 'Failed to load aliases';
+      console.error('Failed to load aliases:', err);
     } finally {
       loading = false;
     }
@@ -83,7 +73,7 @@
 
   async function createAlias() {
     if (!newAliasName.trim() || !newAliasTarget.trim()) {
-      error = "Alias name and target version are required";
+      error = 'Alias name and target version are required';
       return;
     }
 
@@ -91,22 +81,22 @@
     error = null;
 
     try {
-      await invoke("create_alias", {
+      await invoke('create_alias', {
         sdkType,
         aliasName: newAliasName,
         targetVersion: newAliasTarget,
       });
 
       // Reset form
-      newAliasName = "";
-      newAliasTarget = "";
+      newAliasName = '';
+      newAliasTarget = '';
       showAddDialog = false;
 
       // Reload aliases
       await loadAliases();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to create alias";
-      console.error("Failed to create alias:", err);
+      error = err instanceof Error ? err.message : 'Failed to create alias';
+      console.error('Failed to create alias:', err);
     } finally {
       loading = false;
     }
@@ -115,7 +105,7 @@
   async function removeAlias(aliasName: string) {
     const confirmed = await confirmAction(
       `Are you sure you want to remove the alias "${aliasName}"?`,
-      "Remove alias",
+      'Remove alias'
     );
     if (!confirmed) return;
 
@@ -123,11 +113,11 @@
     error = null;
 
     try {
-      await invoke("remove_alias", { aliasName });
+      await invoke('remove_alias', { aliasName });
       await loadAliases();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to remove alias";
-      console.error("Failed to remove alias:", err);
+      error = err instanceof Error ? err.message : 'Failed to remove alias';
+      console.error('Failed to remove alias:', err);
     } finally {
       loading = false;
     }
@@ -142,29 +132,29 @@
 
   function closeEditDialog() {
     selectedAlias = null;
-    editAliasName = "";
-    editAliasTarget = "";
+    editAliasName = '';
+    editAliasTarget = '';
     showEditDialog = false;
   }
 
   function getSdkTypeColor(sdkType: string) {
     switch (sdkType.toLowerCase()) {
-      case "nodejs":
-        return "bg-green-100 text-green-800";
-      case "python":
-        return "bg-blue-100 text-blue-800";
-      case "java":
-        return "bg-orange-100 text-orange-800";
-      case "rust":
-        return "bg-red-100 text-red-800";
-      case "go":
-        return "bg-cyan-100 text-cyan-800";
-      case "php":
-        return "bg-purple-100 text-purple-800";
-      case "ruby":
-        return "bg-pink-100 text-pink-800";
+      case 'nodejs':
+        return 'bg-green-100 text-green-800';
+      case 'python':
+        return 'bg-blue-100 text-blue-800';
+      case 'java':
+        return 'bg-orange-100 text-orange-800';
+      case 'rust':
+        return 'bg-red-100 text-red-800';
+      case 'go':
+        return 'bg-cyan-100 text-cyan-800';
+      case 'php':
+        return 'bg-purple-100 text-purple-800';
+      case 'ruby':
+        return 'bg-pink-100 text-pink-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   }
 
@@ -179,8 +169,7 @@
     const term = searchTerm.toLowerCase();
     return aliases.filter(
       (alias) =>
-        alias.name.toLowerCase().includes(term) ||
-        alias.target_version.toLowerCase().includes(term),
+        alias.name.toLowerCase().includes(term) || alias.target_version.toLowerCase().includes(term)
     );
   });
 </script>
@@ -204,11 +193,7 @@
       <Search
         class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
       />
-      <Input
-        placeholder="Search aliases..."
-        bind:value={searchTerm}
-        class="pl-10"
-      />
+      <Input placeholder="Search aliases..." bind:value={searchTerm} class="pl-10" />
     </div>
     <Button variant="outline" onclick={loadAliases} disabled={loading}>
       <RefreshCw class="mr-2 h-4 w-4" />
@@ -227,9 +212,7 @@
   <!-- Loading State -->
   {#if loading && aliases.length === 0}
     <div class="flex items-center justify-center py-8">
-      <div
-        class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
-      ></div>
+      <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
       <span class="ml-2">Loading aliases...</span>
     </div>
   {:else if filteredAliases.length === 0}
@@ -253,9 +236,7 @@
                 <div class="flex items-center gap-3">
                   <div class="flex items-center gap-2">
                     <Tag class="h-4 w-4 text-muted-foreground" />
-                    <code class="font-mono text-sm font-medium"
-                      >{alias.name}</code
-                    >
+                    <code class="font-mono text-sm font-medium">{alias.name}</code>
                   </div>
                   <span class="text-muted-foreground">→</span>
                   <Badge variant="outline" class="text-sm">
@@ -264,10 +245,7 @@
                 </div>
 
                 <div class="mt-2 flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    class={getSdkTypeColor(alias.sdk_type)}
-                  >
+                  <Badge variant="outline" class={getSdkTypeColor(alias.sdk_type)}>
                     {alias.sdk_type}
                   </Badge>
                   <span class="text-xs text-muted-foreground">
@@ -313,11 +291,7 @@
     <div class="space-y-4">
       <div>
         <Label for="alias-name">Alias Name</Label>
-        <Input
-          id="alias-name"
-          placeholder="stable, latest, lts"
-          bind:value={newAliasName}
-        />
+        <Input id="alias-name" placeholder="stable, latest, lts" bind:value={newAliasName} />
         <p class="mt-1 text-xs text-muted-foreground">
           This will be the shortcut name for the version
         </p>
@@ -330,18 +304,14 @@
           placeholder="18.17.0, 3.11.0, 1.70.0"
           bind:value={newAliasTarget}
         />
-        <p class="mt-1 text-xs text-muted-foreground">
-          The actual version this alias points to
-        </p>
+        <p class="mt-1 text-xs text-muted-foreground">The actual version this alias points to</p>
       </div>
     </div>
 
     <div class="mt-6 flex justify-end gap-2">
-      <Button variant="outline" onclick={() => (showAddDialog = false)}>
-        Cancel
-      </Button>
+      <Button variant="outline" onclick={() => (showAddDialog = false)}>Cancel</Button>
       <Button onclick={createAlias} disabled={loading}>
-        {loading ? "Creating..." : "Create Alias"}
+        {loading ? 'Creating...' : 'Create Alias'}
       </Button>
     </div>
   </DialogContent>

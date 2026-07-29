@@ -1,19 +1,14 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { Label } from "$lib/components/ui/label";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import Select from "$lib/components/ui/select.svelte";
-  import { TaskPriorityEnum } from "../types";
-  import type { GeneratedTask } from "../services/aiTaskService";
-  import Icon from "@iconify/svelte";
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Label } from '$lib/components/ui/label';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import Select from '$lib/components/ui/select.svelte';
+  import { TaskPriorityEnum } from '../types';
+  import type { GeneratedTask } from '../services/aiTaskService';
+  import Icon from '@iconify/svelte';
 
   interface Props {
     task: GeneratedTask;
@@ -108,10 +103,10 @@
             disabled={isAddingAll || !task.title.trim()}
           >
             <Icon
-              icon={isUpdateMode ? "lucide:save-all" : "lucide:plus-circle"}
+              icon={isUpdateMode ? 'lucide:save-all' : 'lucide:plus-circle'}
               class="mr-1 h-4 w-4"
             />
-            {isUpdateMode ? "Update All" : "Add All"}
+            {isUpdateMode ? 'Update All' : 'Add All'}
           </Button>
         {/if}
         {#if showAddButton && onAdd}
@@ -120,11 +115,8 @@
             onclick={handleAdd}
             disabled={isAdding || isAddingAll || !task.title.trim()}
           >
-            <Icon
-              icon={isUpdateMode ? "lucide:save" : "lucide:plus"}
-              class="mr-1 h-4 w-4"
-            />
-            {isUpdateMode ? "Update Task" : "Add Task"}
+            <Icon icon={isUpdateMode ? 'lucide:save' : 'lucide:plus'} class="mr-1 h-4 w-4" />
+            {isUpdateMode ? 'Update Task' : 'Add Task'}
           </Button>
         {/if}
       </div>
@@ -193,20 +185,16 @@
         {#each suggestedLabels as tag, index}
           <Badge variant="secondary" class="cursor-pointer">
             {tag}
-            <Icon
-              icon="lucide:x"
-              class="ml-1 h-3 w-3"
-              onclick={() => removeTag(tag)}
-            />
+            <Icon icon="lucide:x" class="ml-1 h-3 w-3" onclick={() => removeTag(tag)} />
           </Badge>
         {/each}
         <Input
           placeholder="Add tag..."
           class="w-auto min-w-[120px]"
           onkeydown={(e) => {
-            if (e.key === "Enter" && e.currentTarget.value.trim()) {
+            if (e.key === 'Enter' && e.currentTarget.value.trim()) {
               addTag(e.currentTarget.value.trim());
-              e.currentTarget.value = "";
+              e.currentTarget.value = '';
             }
           }}
         />
