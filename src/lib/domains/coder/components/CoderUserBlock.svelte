@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
+  import ChatUserBubble from '$lib/domains/ai/components/chat/ChatUserBubble.svelte';
   import { Undo2, Check, X } from '@lucide/svelte';
   import type { ChatMessage } from '../types.js';
 
@@ -48,15 +49,30 @@
   }
 </script>
 
-<div class="group relative rounded-md border border-border/40 bg-muted/10">
-  <div class="flex items-start justify-between gap-2 px-3 py-2">
-    {#if editing}
-      <div class="min-w-0 flex-1 space-y-2">
+<div class="group flex items-start justify-end gap-1.5">
+  {#if canEdit && onEdit && !editing}
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      class="mt-1 h-7 w-7 shrink-0 opacity-60 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+      title="Edit message and rerun from here"
+      onclick={startEdit}
+    >
+      <Undo2 class="h-3.5 w-3.5" />
+    </Button>
+  {/if}
+
+  <ChatUserBubble density="compact" class={editing ? 'w-full max-w-[85%]' : ''}>
+    {#if !editing}
+      <p class="whitespace-pre-wrap">{message.content}</p>
+    {:else}
+      <div class="space-y-2">
         <Textarea
           bind:value={draft}
           rows={3}
           onkeydown={handleKeydown}
-          class="min-h-[60px] resize-y text-xs leading-relaxed"
+          class="min-h-[60px] resize-y bg-background text-xs leading-relaxed"
           placeholder="Edit your message…"
         />
         <div class="flex items-center gap-2">
@@ -77,22 +93,6 @@
           <span class="text-[11px] text-muted-foreground">Ctrl+Enter to save</span>
         </div>
       </div>
-    {:else}
-      <p class="min-w-0 flex-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground">
-        {message.content}
-      </p>
-      {#if canEdit && onEdit}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          class="h-7 w-7 shrink-0 opacity-60 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
-          title="Edit message and rerun from here"
-          onclick={startEdit}
-        >
-          <Undo2 class="h-3.5 w-3.5" />
-        </Button>
-      {/if}
     {/if}
-  </div>
+  </ChatUserBubble>
 </div>

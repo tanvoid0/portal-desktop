@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { splitThinking } from './thinking.js';
+import { splitThinking, formatThoughtLabel } from './thinking.js';
 
 describe('splitThinking', () => {
   it('leaves plain answers untouched', () => {
@@ -30,5 +30,19 @@ describe('splitThinking', () => {
     const mid = 'Answer first <think>late</think>';
     expect(splitThinking(mid).reasoning).toBeNull();
     expect(splitThinking(mid).answer).toBe(mid);
+  });
+});
+
+describe('formatThoughtLabel', () => {
+  it('falls back when the duration is unknown or sub-second', () => {
+    expect(formatThoughtLabel(null)).toBe('Thought briefly');
+    expect(formatThoughtLabel(-1)).toBe('Thought briefly');
+    expect(formatThoughtLabel(400)).toBe('Thought briefly');
+  });
+
+  it('formats seconds and minutes', () => {
+    expect(formatThoughtLabel(4200)).toBe('Thought for 4s');
+    expect(formatThoughtLabel(120_000)).toBe('Thought for 2m');
+    expect(formatThoughtLabel(125_000)).toBe('Thought for 2m 5s');
   });
 });
