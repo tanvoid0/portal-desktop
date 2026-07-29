@@ -73,14 +73,16 @@ impl DatabaseManager {
             return;
         }
 
-        // Data dir of the pre-rename identifier. Copy the whole directory so the
-        // disk-utility DB and any sibling state come across with the main DB.
-        if let Some(legacy_dir) =
-            dirs::data_dir().map(|d| d.join(crate::app_paths::LEGACY_APP_IDENTIFIER))
-        {
-            if legacy_dir.join("portal_desktop.db").exists() {
-                crate::app_paths::copy_files_into(&legacy_dir, data_dir);
-                return;
+        // Data dirs of the pre-rename identifiers, newest first. Copy the whole
+        // directory so the disk-utility DB and any sibling state come across with the
+        // main DB.
+        if let Some(base) = dirs::data_dir() {
+            for identifier in crate::app_paths::LEGACY_APP_IDENTIFIERS {
+                let legacy_dir = base.join(identifier);
+                if legacy_dir.join("portal_desktop.db").exists() {
+                    crate::app_paths::copy_files_into(&legacy_dir, data_dir);
+                    return;
+                }
             }
         }
 

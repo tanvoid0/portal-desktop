@@ -1,5 +1,14 @@
 # Portal Desktop - Release Notes
 
+## Version 0.10.1
+
+### Highlights
+
+- Fix the bundle identifier so release builds actually produce binaries: Tauri rejects underscores, which failed every platform build for v0.9.0 and v0.10.0.
+- App data and keychain entries created under the previous identifiers are migrated forward on first run.
+
+---
+
 ## Version 0.10.0
 
 ### Highlights

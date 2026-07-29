@@ -291,15 +291,19 @@ impl CredentialService {
         }
     }
 
-    /// Master key stored under the pre-rename bundle identifier, if one is there.
-    /// Drop this once no pre-rename installs remain in the wild.
+    /// Master key stored under a pre-rename bundle identifier, newest first.
+    /// Drop an identifier once no install remains on it.
     fn legacy_master_key(key_name: &str) -> Option<[u8; 32]> {
-        keyring::Entry::new(crate::app_paths::LEGACY_APP_IDENTIFIER, key_name)
-            .ok()?
-            .get_secret()
-            .ok()?
-            .try_into()
-            .ok()
+        crate::app_paths::LEGACY_APP_IDENTIFIERS
+            .iter()
+            .find_map(|identifier| {
+                keyring::Entry::new(identifier, key_name)
+                    .ok()?
+                    .get_secret()
+                    .ok()?
+                    .try_into()
+                    .ok()
+            })
     }
 }
 
