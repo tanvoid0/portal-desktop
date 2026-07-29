@@ -5,6 +5,7 @@
 <script lang="ts">
   import { Check, Copy, Play } from '@lucide/svelte';
   import { Button } from '$lib/components/ui/button';
+  import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
   import { parseAiResponse } from '../../services/terminalAiContext';
 
   interface Props {
@@ -31,9 +32,7 @@
 <div class="space-y-2">
   {#each segments as seg, i}
     {#if seg.type === 'text'}
-      <p class="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-        {seg.content}
-      </p>
+      <ChatMarkdown content={seg.content} variant="assistant" density="compact" />
     {:else}
       <div class="chat-code-block">
         <div class="chat-code-header">

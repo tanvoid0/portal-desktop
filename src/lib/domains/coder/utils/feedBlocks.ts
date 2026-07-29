@@ -333,12 +333,5 @@ export function formatWorkedDuration(ms: number | null): string {
   return seconds === 0 ? `Worked for ${minutes}m` : `Worked for ${minutes}m ${seconds}s`;
 }
 
-export function formatThoughtDuration(ms: number | null): string {
-  if (ms == null || ms < 0) return 'Thought briefly';
-  if (ms < 1000) return 'Thought briefly';
-  const totalSeconds = Math.round(ms / 1000);
-  if (totalSeconds < 60) return `Thought for ${totalSeconds}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return seconds === 0 ? `Thought for ${minutes}m` : `Thought for ${minutes}m ${seconds}s`;
-}
+/** Same wording as the chat page's inline reasoning block. */
+export { formatThoughtLabel as formatThoughtDuration } from '$lib/domains/ai/utils/thinking.js';

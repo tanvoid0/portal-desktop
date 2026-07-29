@@ -6,6 +6,8 @@
   import { commandBlockStore } from '../../stores/commandBlockStore';
   import { buildTerminalContext } from '../../services/terminalAiContext';
   import AiResponse from '../ai/AiResponse.svelte';
+  import ChatUserBubble from '$lib/domains/ai/components/chat/ChatUserBubble.svelte';
+  import TypingIndicator from '$lib/components/ui/typing-indicator.svelte';
 
   interface Props {
     tabId: string;
@@ -96,20 +98,16 @@
       </p>
     {:else}
       {#each messages as msg (msg.timestamp.getTime() + msg.role)}
-        <div
-          class="rounded-lg p-2 text-sm {msg.role === 'user'
-            ? 'bg-primary text-primary-foreground'
-            : 'border border-border bg-muted/60 text-foreground'}"
-        >
-          {#if msg.role === 'assistant'}
-            <AiResponse content={msg.content} {onRunCommand} />
-          {:else}
-            {msg.content}
-          {/if}
-        </div>
+        {#if msg.role === 'assistant'}
+          <AiResponse content={msg.content} {onRunCommand} />
+        {:else}
+          <div class="flex justify-end">
+            <ChatUserBubble content={msg.content} density="compact" />
+          </div>
+        {/if}
       {/each}
       {#if isLoading}
-        <p class="animate-pulse text-xs text-primary">Thinking…</p>
+        <TypingIndicator size="sm" label="Thinking…" />
       {/if}
     {/if}
   </div>

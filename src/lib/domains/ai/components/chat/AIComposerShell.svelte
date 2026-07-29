@@ -96,7 +96,7 @@
 </script>
 
 <div class={cn('px-4 pb-3 pt-2', className)}>
-  <div class="mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
+  <div class="mx-auto w-full max-w-chat">
     {#if above}
       {@render above()}
     {/if}

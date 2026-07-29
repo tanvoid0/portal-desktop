@@ -185,7 +185,7 @@
   <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
     <ScrollArea class="min-h-0 flex-1" bind:viewportRef={scrollViewport}>
       <div
-        class="mx-auto w-full max-w-3xl space-y-6 px-4 py-6 lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl"
+        class="mx-auto w-full max-w-chat space-y-6 px-[var(--content-gutter)] py-6"
         bind:this={messagesContainer}
       >
         {#if messages.length === 0}

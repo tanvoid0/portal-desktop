@@ -20,3 +20,13 @@ export function splitThinking(content: string): ThinkingSplit {
     closed: /<\/think(?:ing)?>/.test(match[0]),
   };
 }
+
+/** Summary line for a collapsed reasoning block, shared by chat and coder. */
+export function formatThoughtLabel(ms: number | null | undefined): string {
+  if (ms == null || ms < 1000) return 'Thought briefly';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `Thought for ${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds === 0 ? `Thought for ${minutes}m` : `Thought for ${minutes}m ${seconds}s`;
+}
