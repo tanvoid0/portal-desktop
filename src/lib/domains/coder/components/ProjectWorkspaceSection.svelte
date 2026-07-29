@@ -98,7 +98,6 @@
       {#each threads as t (t.id)}
         <CoderSessionCard
           thread={t}
-          compact
           hideProject
           onClick={() => onThreadClick?.(t)}
           onDelete={onDeleteThread}

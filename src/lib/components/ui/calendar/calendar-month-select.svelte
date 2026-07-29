@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Calendar as CalendarPrimitive } from "bits-ui";
-  import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
-  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import { Calendar as CalendarPrimitive } from 'bits-ui';
+  import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
   let {
     ref = $bindable(null),
@@ -14,13 +14,13 @@
 
 <span
   class={cn(
-    "has-focus:border-ring shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] relative flex rounded-md border border-input",
-    className,
+    'has-focus:border-ring border-input has-focus:ring-ring/50 relative flex rounded-md border shadow-xs has-focus:ring-[3px]',
+    className
   )}
 >
   <CalendarPrimitive.MonthSelect
     bind:ref
-    class="absolute inset-0 opacity-0"
+    class="dark:bg-popover dark:text-popover-foreground absolute inset-0 opacity-0"
     {...restProps}
   >
     {#snippet child({ props, monthItems, selectedMonthItem })}
@@ -37,11 +37,10 @@
         {/each}
       </select>
       <span
-        class="flex h-8 select-none items-center gap-1 rounded-md pl-2 pr-1 text-sm font-medium [&>svg]:size-3.5 [&>svg]:text-muted-foreground"
+        class="[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md ps-2 pe-1 text-sm font-medium select-none [&>svg]:size-3.5"
         aria-hidden="true"
       >
-        {monthItems.find((item) => item.value === value)?.label ||
-          selectedMonthItem.label}
+        {monthItems.find((item) => item.value === value)?.label || selectedMonthItem.label}
         <ChevronDownIcon class="size-4" />
       </span>
     {/snippet}

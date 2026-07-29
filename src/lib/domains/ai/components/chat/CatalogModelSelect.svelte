@@ -23,7 +23,7 @@
     value = $bindable<string | null>(null),
     onSelect,
     placeholder = "Select model",
-    searchPlaceholder = "Search models…",
+    searchPlaceholder = "Type to filter models…",
     disabled = false,
     class: className = "",
   }: Props = $props();
@@ -58,9 +58,9 @@
         aria-expanded={open}
         {disabled}
         class={cn(
-          "h-10 w-full justify-between px-3 font-normal",
+          "w-full justify-between px-3 font-normal",
           !selectedModel && "text-muted-foreground",
-          open && "ring-2 ring-ring ring-offset-2",
+          open && "border-ring",
         )}
       >
         <span class="min-w-0 flex-1 truncate text-left">
@@ -80,7 +80,7 @@
     </Popover.Trigger>
 
     <Popover.Content
-      class="w-[min(100vw-2rem,24rem)] p-0 shadow-md"
+      class="w-[min(100vw-2rem,46rem)] p-0 shadow-md"
       align="start"
       sideOffset={4}
     >
@@ -94,7 +94,7 @@
           No models found.
         </Command.Empty>
         <Command.List class="max-h-72 overflow-y-auto p-1">
-          <Command.Group>
+          <Command.Group heading="Your models">
             {#each filteredModels as model (model.id)}
               <Command.Item
                 value={model.id}

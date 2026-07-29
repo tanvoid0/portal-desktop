@@ -21,10 +21,24 @@ export interface ConfigurationStatus {
   warnings: string[];
 }
 
+/**
+ * Per-turn generation stats shown under an assistant reply. In-memory only —
+ * they are not persisted with the conversation.
+ */
+export interface MessageStats {
+  tokensPerSecond?: number | null;
+  completionTokens?: number | null;
+  durationMs?: number | null;
+  /** Time spent inside a `<think>` block, when the model emits one. */
+  thinkingMs?: number | null;
+  stopReason?: string | null;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp?: Date | string;
+  stats?: MessageStats | null;
 }
 
 export interface Conversation {
@@ -129,6 +143,13 @@ export interface PlatformCatalog {
   object: string;
   resolved_defaults: CatalogResolvedDefaults;
   providers: CatalogProvider[];
+}
+
+/** Reachability of agent-platform, derived from the catalog fetch. */
+export interface CatalogStatus {
+  checking: boolean;
+  online: boolean;
+  error: string | null;
 }
 
 export interface CatalogQuery {

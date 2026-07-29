@@ -1,5 +1,17 @@
 # Portal Desktop - Release Notes
 
+## Version 0.10.0
+
+### Highlights
+
+- AI chat: stop button cancels an in-flight stream mid-generation.
+- AI chat: reasoning models render their scratchpad as a collapsible think block.
+- AI chat: per-chat sampling settings panel (system prompt, temperature, top_k/top_p/min_p, penalties, stop strings) and context/token usage readout.
+- AI chat: local folders for grouping conversations, plus a sidebar CPU/memory status bar.
+- UI: drop the gradient overlays and restore neutral shadcn surfaces; custom themes no longer recolour borders and hairlines.
+
+---
+
 ## Version 0.9.0
 
 ### Highlights

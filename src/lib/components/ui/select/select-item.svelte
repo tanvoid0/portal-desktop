@@ -1,42 +1,38 @@
 <script lang="ts">
-	import { Select as SelectPrimitive } from "bits-ui";
-	import { cn, type WithoutChild } from "$lib/utils.js";
-	import CheckIcon from '@lucide/svelte/icons/check';
+  import CheckIcon from '@lucide/svelte/icons/check';
+  import { Select as SelectPrimitive } from 'bits-ui';
+  import { cn, type WithoutChild } from '$lib/utils.js';
 
-	let {
-		ref = $bindable(null),
-		class: className,
-		value,
-		label,
-		multiline = false,
-		children: childrenProp,
-		...restProps
-	}: WithoutChild<SelectPrimitive.ItemProps> & { multiline?: boolean } = $props();
+  let {
+    ref = $bindable(null),
+    class: className,
+    value,
+    label,
+    children: childrenProp,
+    ...restProps
+  }: WithoutChild<SelectPrimitive.ItemProps> = $props();
 </script>
 
 <SelectPrimitive.Item
-	bind:ref
-	{value}
-	data-slot="select-item"
-	class={cn(
-		"focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:gap-2 focus:bg-accent data-highlighted:bg-accent data-highlighted:text-accent-foreground focus:text-accent-foreground relative flex w-full cursor-default outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-		multiline ? "items-start *:[span]:last:items-start" : "items-center *:[span]:last:items-center",
-		className
-	)}
-	{...restProps}
+  bind:ref
+  {value}
+  data-slot="select-item"
+  class={cn(
+    "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 ps-2 pe-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+    className
+  )}
+  {...restProps}
 >
-	{#snippet children({ selected, highlighted })}
-		<span class="absolute end-2 flex size-3.5 items-center justify-center">
-			{#if selected}
-				<CheckIcon class="cn-select-item-indicator-icon" />
-			{/if}
-		</span>
-		<span class={cn("flex min-w-0 flex-1 gap-2", multiline ? "whitespace-normal" : "shrink-0 whitespace-nowrap")}>
-			{#if childrenProp}
-				{@render childrenProp({ selected, highlighted })}
-			{:else}
-				{label || value}
-			{/if}
-		</span>
-	{/snippet}
+  {#snippet children({ selected, highlighted })}
+    <span class="absolute end-2 flex size-3.5 items-center justify-center">
+      {#if selected}
+        <CheckIcon class="size-4" />
+      {/if}
+    </span>
+    {#if childrenProp}
+      {@render childrenProp({ selected, highlighted })}
+    {:else}
+      {label || value}
+    {/if}
+  {/snippet}
 </SelectPrimitive.Item>

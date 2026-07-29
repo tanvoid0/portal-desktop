@@ -3,10 +3,10 @@
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-  } from "$lib/components/ui/collapsible";
-  import { Button } from "$lib/components/ui/button";
-  import Icon from "@iconify/svelte";
-  import ChatMarkdown from "$lib/components/ui/chat-markdown/ChatMarkdown.svelte";
+  } from '$lib/components/ui/collapsible';
+  import { Button } from '$lib/components/ui/button';
+  import Icon from '@iconify/svelte';
+  import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
 
   interface Props {
     content: string;
@@ -22,16 +22,14 @@
     content,
     truncateAt = 500,
     defaultExpanded = false,
-    class: className = "",
+    class: className = '',
   }: Props = $props();
 
   let isExpanded = $state(defaultExpanded);
   let shouldTruncate = $derived(content.length > truncateAt);
 
   const truncatedContent = $derived(
-    shouldTruncate && !isExpanded
-      ? content.substring(0, truncateAt) + "..."
-      : content,
+    shouldTruncate && !isExpanded ? content.substring(0, truncateAt) + '...' : content
   );
 </script>
 

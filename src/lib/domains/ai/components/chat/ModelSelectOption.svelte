@@ -1,75 +1,99 @@
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
+  import { Eye, Wrench, Binary } from "@lucide/svelte";
   import { cn } from "$lib/utils";
   import type { CatalogModel } from "../../types/index.js";
-  import {
-    getModelDisplayParts,
-    type ModelDisplayBadge,
-  } from "../../utils/catalog.js";
+  import { getModelRow } from "../../utils/catalog.js";
 
   interface Props {
     model: CatalogModel;
+    /** Trigger view: name plus quant only, on one line. */
     compact?: boolean;
     class?: string;
   }
 
   let { model, compact = false, class: className = "" }: Props = $props();
 
-  const parts = $derived(getModelDisplayParts(model));
+  const row = $derived(getModelRow(model));
 </script>
 
-{#snippet metadataBadge(badge: ModelDisplayBadge, showTitle = true)}
-  <Badge
-    variant="outline"
-    title="{badge.title}: {badge.label}"
-    class={cn(
-      "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-4 shadow-none",
-      badge.className,
-    )}
-  >
-    {#if showTitle}
-      <span class="text-[9px] font-normal uppercase tracking-wide text-muted-foreground/80">
-        {badge.title}
+<!--
+LM Studio-style row: identity on the left, then aligned metadata columns so
+models line up against each other. Columns collapse for providers that report
+no metadata (most cloud backends).
+-->
+<div
+  class={cn(
+    "flex min-w-0 items-center gap-2 text-xs",
+    compact ? "" : "w-full",
+    className,
+  )}
+>
+  <div class="flex min-w-0 flex-1 items-center gap-1.5">
+    <span class="truncate text-sm font-medium text-foreground">{row.name}</span>
+    {#if row.quant}
+      <span
+        class="shrink-0 rounded border border-border bg-muted/60 px-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground"
+        title="Quantization"
+      >
+        {row.quant}
       </span>
     {/if}
-    <span class={cn("font-semibold", badge.valueClassName)}>{badge.label}</span>
-  </Badge>
-{/snippet}
-
-<div class={cn("flex min-w-0 flex-col", compact ? "gap-0" : "gap-1.5", className)}>
-  <div class="flex min-w-0 items-start justify-between gap-2">
-    <div class="min-w-0">
-      <span class="block truncate text-sm font-semibold text-foreground">
-        {parts.id}
-      </span>
-      {#if !compact && parts.displayName}
-        <span class="mt-0.5 block truncate text-xs text-muted-foreground">
-          {parts.displayName}
-        </span>
+    {#if !compact}
+      {#if row.vision}
+        <Eye class="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
       {/if}
-    </div>
-
-    {#if !compact && parts.statusBadges.length > 0}
-      <div class="flex shrink-0 flex-wrap justify-end gap-1">
-        {#each parts.statusBadges as badge (badge.key)}
-          {@render metadataBadge(badge, false)}
-        {/each}
-      </div>
+      {#if row.tools}
+        <Wrench class="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+      {/if}
+      {#if row.embeddings}
+        <Binary
+          class="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+        />
+      {/if}
     {/if}
   </div>
 
-  {#if !compact && parts.backendId}
-    <p class="text-[11px] text-muted-foreground">
-      <span class="text-muted-foreground/70">Resolves to</span>
-      <span class="ms-1 font-mono text-xs text-foreground/80">{parts.backendId}</span>
-    </p>
-  {/if}
-
-  {#if !compact && parts.specBadges.length > 0}
-    <div class="flex flex-wrap items-center gap-1">
-      {#each parts.specBadges as badge (badge.key)}
-        {@render metadataBadge(badge, true)}
-      {/each}
-    </div>
+  {#if !compact}
+    <span class="w-20 shrink-0 truncate text-muted-foreground" title="Publisher">
+      {row.publisher ?? ""}
+    </span>
+    <span class="w-16 shrink-0 truncate tabular-nums text-muted-foreground" title="Parameters">
+      {row.params ?? ""}
+    </span>
+    <span class="w-24 shrink-0">
+      {#if row.family}
+        <span
+          class="block truncate rounded border border-border px-1 py-px text-[10px] text-muted-foreground"
+          title="Architecture"
+        >
+          {row.family}
+        </span>
+      {/if}
+    </span>
+    <span class="w-14 shrink-0">
+      {#if row.source}
+        <span
+          class={cn(
+            "block rounded px-1 py-px text-center text-[10px] font-semibold uppercase text-white",
+            row.source === "live" ? "bg-indigo-600" : "bg-orange-500",
+          )}
+          title={row.source === "live" ? "Discovered live" : "Config alias"}
+        >
+          {row.source}
+        </span>
+      {/if}
+    </span>
+    <span
+      class="w-20 shrink-0 text-right tabular-nums text-muted-foreground"
+      title="On-disk size"
+    >
+      {row.sizeLabel ?? ""}
+    </span>
   {/if}
 </div>
+
+{#if !compact && row.backendId}
+  <p class="mt-0.5 text-[10px] text-muted-foreground/70">
+    Resolves to <span class="font-mono">{row.backendId}</span>
+  </p>
+{/if}

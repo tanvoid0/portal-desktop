@@ -21,16 +21,22 @@
     saveChatCatalogPrefs,
   } from "../../utils/chatCatalogPrefs.js";
 
+  import type { CatalogStatus } from "../../types/index.js";
+
   interface Props {
     selectedProvider?: ProviderType | null;
     selectedBackendProvider?: string | null;
     selectedModel?: string | null;
     onBackendProviderChange?: (providerId: string) => void;
     onModelChange?: (model: string) => void;
+    /** Fires on every catalog load so callers can gate actions when offline. */
+    onStatusChange?: (status: CatalogStatus) => void;
     disabled?: boolean;
     backendSelectClass?: string;
     modelSelectClass?: string;
     showPlatformLabel?: boolean;
+    /** Hide the inline error label when the caller renders its own banner. */
+    showInlineError?: boolean;
   }
 
   let {
@@ -39,10 +45,12 @@
     selectedModel = $bindable<string | null>(null),
     onBackendProviderChange,
     onModelChange,
+    onStatusChange,
     disabled = false,
     backendSelectClass = "w-[140px]",
     modelSelectClass = "w-[280px]",
     showPlatformLabel = true,
+    showInlineError = true,
   }: Props = $props();
 
   let catalog = $state<PlatformCatalog | null>(null);
@@ -90,9 +98,15 @@
     onBackendProviderChange?.(backend);
   }
 
+  /** Re-fetch the catalog. Doubles as the platform reachability check. */
+  export async function reload() {
+    await loadCatalog();
+  }
+
   async function loadCatalog() {
     isLoading = true;
     loadError = null;
+    onStatusChange?.({ checking: true, online: false, error: null });
     try {
       selectedProvider = selectedProvider ?? "AgentPlatform";
       const next = await aiProviderService.getCatalogLive();
@@ -104,11 +118,13 @@
       } else if (selectedModel) {
         persistSelection();
       }
+      onStatusChange?.({ checking: false, online: true, error: null });
     } catch (error) {
       console.error("Failed to load live catalog:", error);
       loadError =
         error instanceof Error ? error.message : "Failed to load catalog";
       catalogProviders = [];
+      onStatusChange?.({ checking: false, online: false, error: loadError });
     } finally {
       isLoading = false;
     }
@@ -231,7 +247,7 @@
     <Loader class="h-4 w-4 animate-spin text-muted-foreground" />
   {/if}
 
-  {#if loadError && !isLoading}
+  {#if loadError && !isLoading && showInlineError}
     <span class="text-xs text-destructive" title={loadError}>Catalog error</span>
   {/if}
 </div>

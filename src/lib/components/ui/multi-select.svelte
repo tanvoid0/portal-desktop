@@ -3,13 +3,13 @@
 	Allows selecting multiple options with checkboxes
 -->
 <script lang="ts">
-  import { cn } from "$lib/utils";
-  import * as Popover from "./popover";
-  import * as Command from "./command";
-  import { Button } from "./button";
-  import { ChevronsUpDown, X } from "@lucide/svelte";
-  import { Checkbox } from "./checkbox";
-  import Icon from "@iconify/svelte";
+  import { cn } from '$lib/utils';
+  import * as Popover from './popover';
+  import * as Command from './command';
+  import { Button } from './button';
+  import { ChevronsUpDown, X } from '@lucide/svelte';
+  import { Checkbox } from './checkbox';
+  import Icon from '@iconify/svelte';
 
   interface SelectOption {
     value: string;
@@ -33,50 +33,44 @@
   let {
     options = [],
     value = $bindable([]),
-    placeholder = "Select options...",
-    searchPlaceholder = "Search...",
+    placeholder = 'Select options...',
+    searchPlaceholder = 'Search...',
     onValueChange,
     disabled = false,
-    class: className = "",
+    class: className = '',
     maxDisplay = 2,
   }: Props = $props();
 
   let open = $state(false);
-  let search = $state("");
+  let search = $state('');
 
-  function filterOptions(
-    opts: SelectOption[],
-    searchQuery: string,
-  ): SelectOption[] {
+  function filterOptions(opts: SelectOption[], searchQuery: string): SelectOption[] {
     if (!searchQuery.trim()) {
       return opts;
     }
     const query = searchQuery.toLowerCase();
     return opts.filter((option) => {
       return (
-        option.label.toLowerCase().includes(query) ||
-        option.value.toLowerCase().includes(query)
+        option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query)
       );
     });
   }
 
   const filteredOptions = $derived(filterOptions(options, search));
 
-  const selectedOptions = $derived(
-    options.filter((opt) => value.includes(opt.value)),
-  );
+  const selectedOptions = $derived(options.filter((opt) => value.includes(opt.value)));
 
   const displayText = $derived.by(() => {
     if (selectedOptions.length === 0) {
       return placeholder;
     }
     if (selectedOptions.length <= maxDisplay) {
-      return selectedOptions.map((opt) => opt.label).join(", ");
+      return selectedOptions.map((opt) => opt.label).join(', ');
     }
     const displayed = selectedOptions
       .slice(0, maxDisplay)
       .map((opt) => opt.label)
-      .join(", ");
+      .join(', ');
     return `${displayed} and ${selectedOptions.length - maxDisplay} more`;
   });
 
@@ -101,7 +95,7 @@
   }
 </script>
 
-<div class={cn("relative", className)}>
+<div class={cn('relative', className)}>
   <Popover.Root bind:open>
     <Popover.Trigger>
       <Button
@@ -111,9 +105,9 @@
         {disabled}
         size="sm"
         class={cn(
-          "w-full justify-between",
-          selectedOptions.length === 0 && "text-muted-foreground",
-          open && "ring-2 ring-ring ring-offset-2",
+          'w-full justify-between',
+          selectedOptions.length === 0 && 'text-muted-foreground',
+          open && 'ring-2 ring-ring ring-offset-2'
         )}
       >
         <div class="flex flex-1 flex-wrap items-center gap-1">
@@ -146,8 +140,8 @@
         </div>
         <ChevronsUpDown
           class={cn(
-            "ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200",
-            open && "rotate-180",
+            'ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200',
+            open && 'rotate-180'
           )}
         />
       </Button>
@@ -158,11 +152,7 @@
       sideOffset={4}
     >
       <Command.Root shouldFilter={false} class="rounded-lg">
-        <Command.Input
-          placeholder={searchPlaceholder}
-          bind:value={search}
-          class="h-9"
-        />
+        <Command.Input placeholder={searchPlaceholder} bind:value={search} class="h-9" />
         <Command.Empty class="py-6 text-center text-sm text-muted-foreground">
           No results found.
         </Command.Empty>
@@ -183,9 +173,9 @@
                 value={option.value}
                 onclick={() => handleToggle(option.value)}
                 class={cn(
-                  "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  value.includes(option.value) && "bg-accent/50",
+                  'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
+                  'hover:bg-accent hover:text-accent-foreground',
+                  value.includes(option.value) && 'bg-accent/50'
                 )}
               >
                 <Checkbox
@@ -193,12 +183,8 @@
                   onCheckedChange={() => handleToggle(option.value)}
                   class="mr-2"
                 />
-                {#if option.icon && option.iconType === "devicon"}
-                  <span
-                    class="mr-2 text-lg"
-                    class:devicon={true}
-                    data-icon={option.icon}
-                  ></span>
+                {#if option.icon && option.iconType === 'devicon'}
+                  <span class="mr-2 text-lg" class:devicon={true} data-icon={option.icon}></span>
                 {:else if option.icon}
                   <Icon icon={option.icon} class="mr-2 h-4 w-4" />
                 {/if}

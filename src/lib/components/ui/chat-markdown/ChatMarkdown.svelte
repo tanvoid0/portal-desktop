@@ -1,66 +1,62 @@
 <script lang="ts">
-  import { renderMarkdown } from "./renderMarkdown.js";
+  import { renderMarkdown } from './renderMarkdown.js';
 
   interface Props {
     content: string;
-    variant?: "user" | "assistant";
+    variant?: 'user' | 'assistant';
     isStreaming?: boolean;
     /** `compact` uses smaller typography for dense agent feeds. */
-    density?: "default" | "compact";
+    density?: 'default' | 'compact';
     class?: string;
   }
 
   let {
     content,
-    variant = "assistant",
+    variant = 'assistant',
     isStreaming = false,
-    density = "default",
-    class: className = "",
+    density = 'default',
+    class: className = '',
   }: Props = $props();
 
   let container: HTMLDivElement | null = $state(null);
 
   const renderedContent = $derived(
-    content
-      ? renderMarkdown(content, { streaming: isStreaming && variant === "assistant" })
-      : "",
+    content ? renderMarkdown(content, { streaming: isStreaming && variant === 'assistant' }) : ''
   );
 
   function attachCopyHandlers(root: HTMLDivElement) {
-    const buttons = root.querySelectorAll<HTMLButtonElement>(".chat-code-copy");
+    const buttons = root.querySelectorAll<HTMLButtonElement>('.chat-code-copy');
     const cleanups: Array<() => void> = [];
 
     buttons.forEach((button) => {
-      const label = button.querySelector<HTMLElement>(".chat-code-copy-label");
-      const code = button
-        .closest(".chat-code-block")
-        ?.querySelector<HTMLElement>("code");
+      const label = button.querySelector<HTMLElement>('.chat-code-copy-label');
+      const code = button.closest('.chat-code-block')?.querySelector<HTMLElement>('code');
       if (!code || !label) return;
 
       let resetTimer: ReturnType<typeof setTimeout> | undefined;
 
       const onClick = async () => {
         try {
-          await navigator.clipboard.writeText(code.textContent ?? "");
-          label.textContent = "Copied!";
-          button.classList.add("chat-code-copy--copied");
+          await navigator.clipboard.writeText(code.textContent ?? '');
+          label.textContent = 'Copied!';
+          button.classList.add('chat-code-copy--copied');
           if (resetTimer) clearTimeout(resetTimer);
           resetTimer = setTimeout(() => {
-            label.textContent = "Copy";
-            button.classList.remove("chat-code-copy--copied");
+            label.textContent = 'Copy';
+            button.classList.remove('chat-code-copy--copied');
           }, 1800);
         } catch {
-          label.textContent = "Failed";
+          label.textContent = 'Failed';
           if (resetTimer) clearTimeout(resetTimer);
           resetTimer = setTimeout(() => {
-            label.textContent = "Copy";
+            label.textContent = 'Copy';
           }, 1800);
         }
       };
 
-      button.addEventListener("click", onClick);
+      button.addEventListener('click', onClick);
       cleanups.push(() => {
-        button.removeEventListener("click", onClick);
+        button.removeEventListener('click', onClick);
         if (resetTimer) clearTimeout(resetTimer);
       });
     });
@@ -69,15 +65,13 @@
   }
 
   function attachPreviewToggleHandlers(root: HTMLDivElement) {
-    const buttons = root.querySelectorAll<HTMLButtonElement>(
-      ".chat-md-preview-toggle",
-    );
+    const buttons = root.querySelectorAll<HTMLButtonElement>('.chat-md-preview-toggle');
     const cleanups: Array<() => void> = [];
 
     buttons.forEach((button) => {
-      const preview = button.closest(".chat-md-preview");
-      const body = preview?.querySelector<HTMLElement>(".chat-md-preview-body");
-      const source = preview?.querySelector<HTMLElement>(".chat-md-preview-source");
+      const preview = button.closest('.chat-md-preview');
+      const body = preview?.querySelector<HTMLElement>('.chat-md-preview-body');
+      const source = preview?.querySelector<HTMLElement>('.chat-md-preview-source');
       if (!body || !source) return;
 
       const onClick = () => {
@@ -85,18 +79,18 @@
         if (showingSource) {
           source.hidden = true;
           body.hidden = false;
-          button.textContent = "Show source";
-          button.setAttribute("data-mode", "source");
+          button.textContent = 'Show source';
+          button.setAttribute('data-mode', 'source');
         } else {
           body.hidden = true;
           source.hidden = false;
-          button.textContent = "Show preview";
-          button.setAttribute("data-mode", "preview");
+          button.textContent = 'Show preview';
+          button.setAttribute('data-mode', 'preview');
         }
       };
 
-      button.addEventListener("click", onClick);
-      cleanups.push(() => button.removeEventListener("click", onClick));
+      button.addEventListener('click', onClick);
+      cleanups.push(() => button.removeEventListener('click', onClick));
     });
 
     return () => cleanups.forEach((cleanup) => cleanup());
@@ -118,12 +112,12 @@
   bind:this={container}
   class="chat-markdown max-w-none {density === 'compact'
     ? 'chat-markdown--compact prose prose-sm text-xs leading-relaxed'
-    : 'prose prose-sm text-xs leading-relaxed'} {variant === 'user'
+    : 'prose prose-sm text-sm leading-relaxed'} {variant === 'user'
     ? 'chat-markdown--user prose-invert'
     : 'dark:prose-invert'} {className}"
 >
   {@html renderedContent}
-  {#if isStreaming && variant === "assistant"}
+  {#if isStreaming && variant === 'assistant'}
     <span
       class="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[2px] animate-cursor-blink rounded-full bg-foreground/80 align-middle"
       aria-hidden="true"

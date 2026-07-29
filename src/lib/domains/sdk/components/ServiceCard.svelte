@@ -4,37 +4,24 @@
 -->
 
 <script lang="ts">
-  import * as Dialog from "$lib/components/ui/dialog";
-  import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import Select from "$lib/components/ui/select.svelte";
-  import { Label } from "$lib/components/ui/label";
-  import { Progress } from "$lib/components/ui/progress";
-  import {
-    Power,
-    Settings,
-    Logs,
-    ExternalLink,
-    RefreshCw,
-    Activity,
-    X,
-  } from "@lucide/svelte";
-  import ServiceLogViewer from "./ServiceLogViewer.svelte";
-  import ServiceConfigEditor from "./ServiceConfigEditor.svelte";
-  import ServiceHealthIndicator from "./ServiceHealthIndicator.svelte";
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import Select from '$lib/components/ui/select.svelte';
+  import { Label } from '$lib/components/ui/label';
+  import { Progress } from '$lib/components/ui/progress';
+  import { Power, Settings, Logs, ExternalLink, RefreshCw, Activity, X } from '@lucide/svelte';
+  import ServiceLogViewer from './ServiceLogViewer.svelte';
+  import ServiceConfigEditor from './ServiceConfigEditor.svelte';
+  import ServiceHealthIndicator from './ServiceHealthIndicator.svelte';
 
   interface ServiceInfo {
     id: string;
     name: string;
     description: string;
     version: string;
-    status: "running" | "stopped" | "error" | "starting" | "stopping";
+    status: 'running' | 'stopped' | 'error' | 'starting' | 'stopping';
     port?: number;
     pid?: number;
     progress?: number;
@@ -68,84 +55,82 @@
   // Derived state
   let statusType = $derived.by(() => {
     switch (service.status) {
-      case "running":
-        return "success";
-      case "stopped":
-        return "info";
-      case "error":
-        return "error";
-      case "starting":
-        return "warning";
-      case "stopping":
-        return "warning";
+      case 'running':
+        return 'success';
+      case 'stopped':
+        return 'info';
+      case 'error':
+        return 'error';
+      case 'starting':
+        return 'warning';
+      case 'stopping':
+        return 'warning';
       default:
-        return "info";
+        return 'info';
     }
   });
 
   let statusColor = $derived.by(() => {
     switch (service.status) {
-      case "running":
-        return "text-green-600";
-      case "stopped":
-        return "text-gray-500";
-      case "error":
-        return "text-red-600";
-      case "starting":
-        return "text-yellow-600";
-      case "stopping":
-        return "text-orange-600";
+      case 'running':
+        return 'text-green-600';
+      case 'stopped':
+        return 'text-gray-500';
+      case 'error':
+        return 'text-red-600';
+      case 'starting':
+        return 'text-yellow-600';
+      case 'stopping':
+        return 'text-orange-600';
       default:
-        return "text-gray-500";
+        return 'text-gray-500';
     }
   });
 
   let statusText = $derived.by(() => {
     switch (service.status) {
-      case "running":
-        return "Running";
-      case "stopped":
-        return "Stopped";
-      case "error":
-        return "Error";
-      case "starting":
-        return "Starting...";
-      case "stopping":
-        return "Stopping...";
+      case 'running':
+        return 'Running';
+      case 'stopped':
+        return 'Stopped';
+      case 'error':
+        return 'Error';
+      case 'starting':
+        return 'Starting...';
+      case 'stopping':
+        return 'Stopping...';
       default:
-        return "Unknown";
+        return 'Unknown';
     }
   });
 
-  let canToggle = $derived(
-    service.status === "running" || service.status === "stopped",
-  );
+  let canToggle = $derived(service.status === 'running' || service.status === 'stopped');
 
   let buttonText = $derived.by(() => {
     switch (service.status) {
-      case "running":
-        return "Stop";
-      case "stopped":
-        return "Start";
-      case "starting":
-        return "Starting...";
-      case "stopping":
-        return "Stopping...";
+      case 'running':
+        return 'Stop';
+      case 'stopped':
+        return 'Start';
+      case 'starting':
+        return 'Starting...';
+      case 'stopping':
+        return 'Stopping...';
       default:
-        return "Start";
+        return 'Start';
     }
   });
 
   // Return type annotated so $derived.by infers the literal union rather than
   // widening it to `string`, which Button's `variant` prop rejects.
-  let buttonVariant = $derived.by((): "destructive" | "default" | "secondary" => {
+  let buttonVariant = $derived.by((): 'destructive' | 'default' | 'secondary' => {
     switch (service.status) {
-      case "running":
-        return "destructive";
-      case "stopped":
-        return "default";
+      case 'running':
+        return 'destructive';
+      case 'stopped':
+        return 'default';
       default:
-        return "secondary";
+        return 'secondary';
     }
   });
 
@@ -183,15 +168,12 @@
   class="w-full"
   variant="default"
   elevation="raised"
-  gradient={service.status === "running"}
-  borderAccent={service.status === "running" ? "left" : "none"}
+  borderAccent={service.status === 'running' ? 'left' : 'none'}
 >
   <CardHeader class="pb-3">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div
-          class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"
-        >
+        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <Power class="h-5 w-5 text-primary" />
         </div>
         <div>
@@ -201,7 +183,7 @@
       </div>
       <div class="flex items-center gap-2">
         <Badge
-          variant={service.status === "running" ? "default" : "secondary"}
+          variant={service.status === 'running' ? 'default' : 'secondary'}
           class="capitalize {statusColor}"
         >
           {statusText}
@@ -223,14 +205,14 @@
         options={availableVersions}
         defaultValue={service.version}
         onSelect={handleVersionChange}
-        disabled={service.status === "running" || service.status === "starting"}
+        disabled={service.status === 'running' || service.status === 'starting'}
         placeholder="Select version"
         class="flex-1"
       />
     </div>
 
     <!-- Progress Bar (for starting/stopping) -->
-    {#if service.status === "starting" || service.status === "stopping"}
+    {#if service.status === 'starting' || service.status === 'stopping'}
       <div class="space-y-2">
         <div class="flex justify-between text-sm">
           <span>{statusText}</span>
@@ -241,7 +223,7 @@
     {/if}
 
     <!-- Service Info -->
-    {#if service.status === "running"}
+    {#if service.status === 'running'}
       <div class="grid grid-cols-2 gap-4 text-sm">
         {#if service.port}
           <div>
@@ -271,42 +253,22 @@
         {buttonText}
       </Button>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={handleConfigure}
-        title="Configure Service"
-      >
+      <Button variant="outline" size="sm" onclick={handleConfigure} title="Configure Service">
         <Settings class="h-4 w-4" />
       </Button>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={handleViewLogs}
-        title="View Logs"
-      >
+      <Button variant="outline" size="sm" onclick={handleViewLogs} title="View Logs">
         <Logs class="h-4 w-4" />
       </Button>
 
-      {#if service.status === "running"}
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={handleShowHealth}
-          title="Health Status"
-        >
+      {#if service.status === 'running'}
+        <Button variant="outline" size="sm" onclick={handleShowHealth} title="Health Status">
           <Activity class="h-4 w-4" />
         </Button>
       {/if}
 
-      {#if service.status === "running" && service.port}
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={handleOpenUrl}
-          title="Open in Browser"
-        >
+      {#if service.status === 'running' && service.port}
+        <Button variant="outline" size="sm" onclick={handleOpenUrl} title="Open in Browser">
           <ExternalLink class="h-4 w-4" />
         </Button>
       {/if}

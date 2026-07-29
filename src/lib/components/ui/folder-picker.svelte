@@ -4,18 +4,13 @@
 -->
 
 <script lang="ts">
-  import { Button } from "./button";
-  import { Input } from "./input";
-  import { Label } from "./label";
-  import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-    TooltipProvider,
-  } from "./tooltip";
-  import { invokeClient } from "$lib/utils/invokeClient";
-  import { FolderOpen, Info } from "@lucide/svelte";
-  import { isTauriEnvironment } from "$lib/utils/tauri";
+  import { Button } from './button';
+  import { Input } from './input';
+  import { Label } from './label';
+  import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './tooltip';
+  import { invokeClient } from '$lib/utils/invokeClient';
+  import { FolderOpen, Info } from '@lucide/svelte';
+  import { isTauriEnvironment } from '$lib/utils/tauri';
 
   interface Props {
     value?: string;
@@ -28,12 +23,12 @@
   }
 
   let {
-    value = $bindable(""),
-    placeholder = "/path/to/your/project",
+    value = $bindable(''),
+    placeholder = '/path/to/your/project',
     disabled = false,
     required = false,
-    label = "Project Path",
-    description = "Select the directory where your project will be located",
+    label = 'Project Path',
+    description = 'Select the directory where your project will be located',
     onChange,
   }: Props = $props();
 
@@ -45,16 +40,14 @@
 
     try {
       isSelecting = true;
-      const selectedPath = await invokeClient.post<string | null>(
-        "select_directory",
-      );
+      const selectedPath = await invokeClient.post<string | null>('select_directory');
 
       if (selectedPath) {
         value = selectedPath;
         onChange?.(selectedPath);
       }
     } catch (error) {
-      console.error("Failed to select directory:", error);
+      console.error('Failed to select directory:', error);
     } finally {
       isSelecting = false;
     }
@@ -108,10 +101,9 @@
         {#if !isTauri}
           <TooltipContent>
             <p class="max-w-xs">
-              File browser is only available in the desktop app. This feature
-              requires access to the file system which is not available in
-              browser mode. Please use the Tauri desktop application to browse
-              and select directories.
+              File browser is only available in the desktop app. This feature requires access to the
+              file system which is not available in browser mode. Please use the Tauri desktop
+              application to browse and select directories.
             </p>
           </TooltipContent>
         {:else}

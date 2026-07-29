@@ -575,6 +575,7 @@ pub fn run() {
             // AI Chat commands
             domains::ai::commands::ai_send_message,
             domains::ai::commands::ai_send_message_stream,
+            domains::ai::commands::ai_cancel_stream,
             // AI Conversation commands
             domains::ai::commands::ai_create_conversation,
             domains::ai::commands::ai_save_conversation,
@@ -633,6 +634,7 @@ pub fn run() {
             domains::disk::commands::remove_protected,
             domains::disk::commands::list_locations,
             domains::disk::commands::disk_usage,
+            domains::disk::commands::host_stats,
             domains::disk::commands::verify_proposals,
             domains::disk::commands::cancel_verify,
             domains::disk::commands::open_recycle_bin,

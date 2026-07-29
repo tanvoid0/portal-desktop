@@ -5,8 +5,11 @@
   import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
   import { Skeleton } from "$lib/components/ui/skeleton/index.js";
   import { Plus, Search, Loader2 } from "@lucide/svelte";
+  import AISidebarStatus from "./AISidebarStatus.svelte";
 
   interface Props {
+    /** Sidebar name, shown on its own row above the search box. */
+    title?: string;
     searchPlaceholder?: string;
     searchValue?: string;
     onCreateNew?: () => void;
@@ -17,6 +20,8 @@
     isEmpty?: boolean;
     /** When false, body manages its own scroll (e.g. nested workspace list). */
     internalScroll?: boolean;
+    /** Overrides the spacing of the scrolled list wrapper. */
+    listClass?: string;
     filters?: Snippet;
     toolbar?: Snippet;
     meta?: Snippet;
@@ -26,6 +31,7 @@
   }
 
   let {
+    title,
     searchPlaceholder = "Search…",
     searchValue = $bindable(""),
     onCreateNew,
@@ -35,6 +41,7 @@
     showLoadingSkeleton = false,
     isEmpty = false,
     internalScroll = true,
+    listClass = "space-y-2 p-2",
     filters,
     toolbar,
     meta,
@@ -50,6 +57,27 @@
       ? 'pointer-events-none opacity-50'
       : ''}"
   >
+    {#if title}
+      <div class="flex items-center justify-between gap-2">
+        <span class="truncate text-sm font-semibold">{title}</span>
+        {#if toolbar}
+          <div class="flex shrink-0 items-center gap-0.5">
+            {@render toolbar()}
+          </div>
+        {:else if onCreateNew}
+          <Button
+            onclick={onCreateNew}
+            size="icon"
+            variant="ghost"
+            class="h-7 w-7 shrink-0"
+            title={createTitle}
+          >
+            <Plus class="h-4 w-4" />
+          </Button>
+        {/if}
+      </div>
+    {/if}
+
     <div class="flex items-center gap-2">
       <div class="relative min-w-0 flex-1">
         <Search
@@ -61,15 +89,17 @@
           class="h-8 pl-8 text-sm"
         />
       </div>
-      {#if toolbar}
-        {@render toolbar()}
-      {:else if onCreateNew}
-        <Button onclick={onCreateNew} size="sm" class="h-8 shrink-0" title={createTitle}>
-          <Plus class="h-3.5 w-3.5" />
-          {#if createLabel}
-            <span class="text-xs">{createLabel}</span>
-          {/if}
-        </Button>
+      {#if !title}
+        {#if toolbar}
+          {@render toolbar()}
+        {:else if onCreateNew}
+          <Button onclick={onCreateNew} size="sm" class="h-8 shrink-0" title={createTitle}>
+            <Plus class="h-3.5 w-3.5" />
+            {#if createLabel}
+              <span class="text-xs">{createLabel}</span>
+            {/if}
+          </Button>
+        {/if}
       {/if}
     </div>
 
@@ -99,7 +129,7 @@
       </div>
     {:else if internalScroll}
       <ScrollArea class="flex-1">
-        <div class="space-y-2 p-2">
+        <div class={listClass}>
           {#if children}
             {@render children()}
           {/if}
@@ -113,4 +143,6 @@
   {#if footer}
     {@render footer()}
   {/if}
+
+  <AISidebarStatus />
 </div>

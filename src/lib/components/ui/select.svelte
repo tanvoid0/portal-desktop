@@ -4,8 +4,8 @@
 	Supports four option formats: string[], { value, label }[], constant arrays, TypeScript enums.
 -->
 <script lang="ts">
-  import { cn } from "$lib/utils";
-  import * as SelectPrimitive from "$lib/components/ui/select";
+  import { cn } from '$lib/utils';
+  import * as SelectPrimitive from '$lib/components/ui/select';
 
   interface SelectOption {
     value: string;
@@ -36,53 +36,48 @@
 
   let {
     options = [],
-    defaultValue = "",
+    defaultValue = '',
     value = $bindable(),
-    placeholder = "Select an option...",
+    placeholder = 'Select an option...',
     onSelect = () => {},
     onValueChange,
     disabled = false,
     required = false,
-    error = "",
-    class: className = "",
+    error = '',
+    class: className = '',
   }: Props = $props();
 
-  let internalValue = $state("");
+  let internalValue = $state('');
 
   $effect(() => {
-    const external =
-      value !== undefined && value !== null ? value : defaultValue;
-    internalValue = external ?? "";
+    const external = value !== undefined && value !== null ? value : defaultValue;
+    internalValue = external ?? '';
   });
 
   let normalizedOptions = $derived.by(() => {
-    if (typeof options === "object" && !Array.isArray(options)) {
+    if (typeof options === 'object' && !Array.isArray(options)) {
       return Object.entries(options).map(([key, val]) => ({
         value: String(val),
-        label: key
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (l) => l.toUpperCase()),
+        label: key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
         disabled: false,
       }));
     }
 
     return options.map((option) =>
-      typeof option === "string"
+      typeof option === 'string'
         ? { value: option, label: option, disabled: false }
-        : { disabled: false, ...option },
+        : { disabled: false, ...option }
     );
   });
 
   let displayValue = $derived.by(() => {
     if (!internalValue) return placeholder;
-    const option = normalizedOptions.find(
-      (opt) => opt.value === internalValue,
-    );
+    const option = normalizedOptions.find((opt) => opt.value === internalValue);
     return option ? option.label : internalValue;
   });
 
   function handleValueChange(newValue: string | undefined) {
-    const selected = newValue ?? "";
+    const selected = newValue ?? '';
     if (value !== undefined) {
       value = selected;
     }
@@ -91,7 +86,7 @@
   }
 </script>
 
-<div class={cn("relative w-full", className)}>
+<div class={cn('relative w-full', className)}>
   <SelectPrimitive.Root
     type="single"
     bind:value={internalValue}
@@ -99,26 +94,18 @@
     {disabled}
   >
     <SelectPrimitive.Trigger
-      class={cn(
-        "h-10 w-full",
-        error && "border-destructive aria-invalid:border-destructive",
-      )}
+      class={cn('w-full', error && 'border-destructive aria-invalid:border-destructive')}
       aria-required={required}
       aria-invalid={!!error}
     >
       <span
         data-slot="select-value"
-        class={cn(
-          "block truncate",
-          !internalValue && "text-muted-foreground",
-        )}
+        class={cn('block truncate', !internalValue && 'text-muted-foreground')}
       >
         {displayValue}
       </span>
     </SelectPrimitive.Trigger>
-    <SelectPrimitive.Content
-      class="max-h-60 w-full min-w-[var(--bits-select-anchor-width)]"
-    >
+    <SelectPrimitive.Content class="max-h-60 w-full min-w-[var(--bits-select-anchor-width)]">
       {#each normalizedOptions as option (option.value)}
         <SelectPrimitive.Item
           value={option.value}

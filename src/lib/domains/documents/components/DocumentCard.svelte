@@ -5,11 +5,11 @@
     CardHeader,
     CardTitle,
     CardActionCard,
-  } from "$lib/components/ui/card";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import Icon from "@iconify/svelte";
-  import type { Document } from "../types";
+  } from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
+  import Icon from '@iconify/svelte';
+  import type { Document } from '../types';
 
   interface Props {
     document: Document;
@@ -20,19 +20,11 @@
   let { document, onClick, onDelete }: Props = $props();
 
   const preview = $derived(
-    document.content.length > 150
-      ? document.content.substring(0, 150) + "..."
-      : document.content,
+    document.content.length > 150 ? document.content.substring(0, 150) + '...' : document.content
   );
 </script>
 
-<CardActionCard
-  title={document.title}
-  description={preview}
-  {onClick}
-  gradient={true}
-  class="h-full"
->
+<CardActionCard title={document.title} description={preview} {onClick} class="h-full">
   <CardContent class="space-y-3">
     <div class="flex items-start justify-between gap-2">
       <div class="flex-1">
@@ -50,9 +42,7 @@
               <Badge variant="secondary" class="text-xs">{tag}</Badge>
             {/each}
             {#if document.tags.length > 3}
-              <Badge variant="outline" class="text-xs"
-                >+{document.tags.length - 3}</Badge
-              >
+              <Badge variant="outline" class="text-xs">+{document.tags.length - 3}</Badge>
             {/if}
           {/if}
         </div>

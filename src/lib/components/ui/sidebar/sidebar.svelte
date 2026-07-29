@@ -1,32 +1,32 @@
 <script lang="ts">
-  import * as Sheet from "$lib/components/ui/sheet/index.js";
-  import { cn, type WithElementRef } from "$lib/utils.js";
-  import type { HTMLAttributes } from "svelte/elements";
-  import { SIDEBAR_WIDTH_MOBILE } from "./constants.js";
-  import { useSidebar } from "./context.svelte.js";
+  import * as Sheet from '$lib/components/ui/sheet/index.js';
+  import { cn, type WithElementRef } from '$lib/utils.js';
+  import type { HTMLAttributes } from 'svelte/elements';
+  import { SIDEBAR_WIDTH_MOBILE } from './constants.js';
+  import { useSidebar } from './context.svelte.js';
 
   let {
     ref = $bindable(null),
-    side = "left",
-    variant = "sidebar",
-    collapsible = "offcanvas",
+    side = 'left',
+    variant = 'sidebar',
+    collapsible = 'offcanvas',
     class: className,
     children,
     ...restProps
   }: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
-    side?: "left" | "right";
-    variant?: "sidebar" | "floating" | "inset";
-    collapsible?: "offcanvas" | "icon" | "none";
+    side?: 'left' | 'right';
+    variant?: 'sidebar' | 'floating' | 'inset';
+    collapsible?: 'offcanvas' | 'icon' | 'none';
   } = $props();
 
   const sidebar = useSidebar();
 </script>
 
-{#if collapsible === "none"}
+{#if collapsible === 'none'}
   <div
     class={cn(
-      "flex h-full w-[var(--sidebar-width)] flex-col bg-sidebar text-sidebar-foreground",
-      className,
+      'flex h-full w-[var(--sidebar-width)] flex-col bg-sidebar text-sidebar-foreground',
+      className
     )}
     bind:this={ref}
     {...restProps}
@@ -34,10 +34,7 @@
     {@render children?.()}
   </div>
 {:else if sidebar.isMobile}
-  <Sheet.Root
-    bind:open={() => sidebar.openMobile, (v) => sidebar.setOpenMobile(v)}
-    {...restProps}
-  >
+  <Sheet.Root bind:open={() => sidebar.openMobile, (v) => sidebar.setOpenMobile(v)} {...restProps}>
     <Sheet.Content
       data-sidebar="sidebar"
       data-slot="sidebar"
@@ -60,7 +57,7 @@
     bind:this={ref}
     class="group peer hidden h-full w-auto text-sidebar-foreground md:flex"
     data-state={sidebar.state}
-    data-collapsible={sidebar.state === "collapsed" ? collapsible : ""}
+    data-collapsible={sidebar.state === 'collapsed' ? collapsible : ''}
     data-variant={variant}
     data-side={side}
     data-slot="sidebar"
@@ -68,23 +65,19 @@
     <div
       data-slot="sidebar-container"
       class={cn(
-        "flex h-full w-[var(--sidebar-width)] flex-col overflow-hidden bg-sidebar text-sidebar-foreground",
-        "transition-[width] duration-200 ease-linear",
-        "group-data-[collapsible=icon]:w-[var(--sidebar-width-icon)]",
-        side === "left"
-          ? "divider-edge-r divider-edge-sidebar"
-          : "divider-edge-l divider-edge-sidebar",
+        'flex h-full w-[var(--sidebar-width)] flex-col overflow-hidden bg-sidebar text-sidebar-foreground',
+        'transition-[width] duration-200 ease-linear',
+        'group-data-[collapsible=icon]:w-[var(--sidebar-width-icon)]',
+        side === 'left'
+          ? 'divider-edge-r divider-edge-sidebar'
+          : 'divider-edge-l divider-edge-sidebar',
         // Adjust the padding for floating and inset variants (keep it minimal in flow).
-        variant === "floating" || variant === "inset" ? "p-2" : "",
-        className,
+        variant === 'floating' || variant === 'inset' ? 'p-2' : '',
+        className
       )}
       {...restProps}
     >
-      <div
-        data-sidebar="sidebar"
-        data-slot="sidebar-inner"
-        class="flex h-full w-full flex-col"
-      >
+      <div data-sidebar="sidebar" data-slot="sidebar-inner" class="flex h-full w-full flex-col">
         {@render children?.()}
       </div>
     </div>

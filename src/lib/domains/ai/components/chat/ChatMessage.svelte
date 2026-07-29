@@ -1,17 +1,18 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { Card } from "$lib/components/ui/card";
-  import { Bot, User } from "@lucide/svelte";
+  import { ChevronRight } from "@lucide/svelte";
   import TypingIndicator from "$lib/components/ui/typing-indicator.svelte";
   import ChatMarkdown from "$lib/components/ui/chat-markdown/ChatMarkdown.svelte";
   import type { ChatMessage as ChatMessageType } from "../../types/index.js";
+  import { splitThinking } from "../../utils/thinking.js";
 
   interface Props {
     message: ChatMessageType;
     showLoader?: boolean;
     /** Show a blinking cursor after streamed content. */
     isStreaming?: boolean;
-    responseLatencyMs?: number | null;
+    /** Label above an assistant turn, e.g. the model id. */
+    modelLabel?: string | null;
     children?: Snippet;
   }
 
@@ -19,106 +20,111 @@
     message,
     showLoader = false,
     isStreaming = false,
-    responseLatencyMs = null,
+    modelLabel = null,
     children,
   }: Props = $props();
 
   const isAssistant = $derived(message.role === "assistant");
   const isUser = $derived(message.role === "user");
-  const formattedTimestamp = $derived(formatTimestamp(message.timestamp));
-  const formattedLatency = $derived(formatLatency(responseLatencyMs));
+  const parts = $derived(splitThinking(message.content));
+  const stats = $derived(message.stats ?? null);
   const showTypingBubble = $derived(
     showLoader && isAssistant && !message.content,
   );
-  const hasBubbleContent = $derived(!!message.content || showTypingBubble);
+  /** Open while the model is still inside the think block, collapsed after. */
+  const thinkingOpen = $derived(parts.reasoning != null && !parts.closed);
 
-  function formatTimestamp(value: Date | string | undefined): string {
-    if (!value) return "";
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
+  const statChips = $derived(buildChips());
 
-    const now = new Date();
-    const sameDay = now.toDateString() === date.toDateString();
-    if (sameDay) {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    }
-    return date.toLocaleString([], {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  function buildChips(): string[] {
+    if (!stats) return [];
+    const chips: string[] = [];
+    if (stats.tokensPerSecond != null)
+      chips.push(`${stats.tokensPerSecond.toFixed(2)} tok/sec`);
+    if (stats.completionTokens != null)
+      chips.push(`${stats.completionTokens} tokens`);
+    if (stats.durationMs != null)
+      chips.push(`${(stats.durationMs / 1000).toFixed(2)}s`);
+    if (stats.stopReason) chips.push(`Stop reason: ${stats.stopReason}`);
+    return chips;
   }
 
-  function formatLatency(ms: number | null): string {
-    if (ms == null || ms < 0) return "";
-    if (ms < 1000) return "< 1s";
-    const totalSeconds = Math.round(ms / 1000);
-    if (totalSeconds < 60) return `${totalSeconds}s`;
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  function formatSeconds(ms: number): string {
+    return `${(ms / 1000).toFixed(2)} seconds`;
   }
 </script>
 
-<div class="flex flex-col {isUser ? 'items-end' : 'items-start'}">
+<!--
+Assistant turns render unboxed so long answers read as a document; only user
+turns get a bubble. Model id, stats and actions stay visible (LM Studio style).
+-->
+<div class="group/msg flex flex-col gap-1.5 {isUser ? 'items-end' : 'items-stretch'}">
+  {#if isAssistant && modelLabel}
+    <div class="font-mono text-[11px] text-muted-foreground">{modelLabel}</div>
+  {/if}
+
   {#if showTypingBubble}
     <TypingIndicator size="sm" label="Thinking…" />
-  {:else if hasBubbleContent}
-    <Card
-      class="max-w-[90%] px-3 py-2 {isUser
-        ? 'bg-primary text-primary-foreground'
-        : 'border-border/40 bg-muted/30 shadow-none'} {isStreaming && isAssistant
-        ? 'ring-1 ring-primary/15'
-        : ''}"
-    >
-      {#if formattedTimestamp || formattedLatency}
-        <div
-          class="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] {isUser
-            ? 'text-primary-foreground/75'
-            : 'text-muted-foreground'}"
-        >
-          {#if formattedTimestamp}
-            <time datetime={typeof message.timestamp === 'string' ? message.timestamp : message.timestamp?.toISOString()}>
-              {formattedTimestamp}
-            </time>
-          {/if}
-          {#if formattedLatency}
-            {#if formattedTimestamp}
-              <span aria-hidden="true">•</span>
-            {/if}
-            <span>Replied in {formattedLatency}</span>
-          {/if}
-        </div>
-      {/if}
-      <div class="flex items-start gap-1.5">
-        {#if isAssistant}
-          <Bot class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        {:else}
-          <User class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        {/if}
-        {#if message.content}
-          {#if isUser}
-            <p class="flex-1 whitespace-pre-wrap text-xs leading-relaxed">
-              {message.content}
-            </p>
-          {:else}
-            <ChatMarkdown
-              content={message.content}
-              variant="assistant"
-              {isStreaming}
-              density="compact"
-              class="flex-1"
-            />
-          {/if}
-        {/if}
+  {:else if message.content}
+    {#if isUser}
+      <div
+        class="max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground"
+      >
+        <p class="whitespace-pre-wrap">{message.content}</p>
       </div>
-    </Card>
+    {:else}
+      {#if parts.reasoning != null}
+        <details
+          class="group/think rounded-lg border border-border/60 open:bg-muted/20 [&:not([open])]:border-transparent"
+          open={thinkingOpen}
+        >
+          <summary
+            class="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1.5 text-xs text-muted-foreground marker:content-none hover:text-foreground"
+          >
+            <ChevronRight
+              class="h-3.5 w-3.5 transition-transform group-open/think:rotate-90"
+            />
+            {#if !parts.closed}
+              Thinking…
+            {:else if stats?.thinkingMs != null}
+              Thought for {formatSeconds(stats.thinkingMs)}
+            {:else}
+              Thoughts
+            {/if}
+          </summary>
+          <div class="px-3 pb-2 text-muted-foreground/70">
+            <ChatMarkdown
+              content={parts.reasoning}
+              variant="assistant"
+              density="compact"
+            />
+          </div>
+        </details>
+      {/if}
+
+      {#if parts.answer}
+        <ChatMarkdown
+          content={parts.answer}
+          variant="assistant"
+          {isStreaming}
+        />
+      {/if}
+    {/if}
   {/if}
-  {#if children}
-    <div class="mt-1.5 w-full max-w-[90%] space-y-1.5">
-      {@render children()}
+
+  {#if isAssistant && statChips.length}
+    <div class="flex flex-wrap items-center gap-1.5">
+      {#each statChips as chip}
+        <span
+          class="rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground"
+        >
+          {chip}
+        </span>
+      {/each}
     </div>
+  {/if}
+
+  {#if children}
+    {@render children()}
   {/if}
 </div>

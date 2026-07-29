@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
   import Select from "$lib/components/ui/select.svelte";
-  import { Plus, X, LayoutGrid } from "@lucide/svelte";
+  import { Plus, X, LayoutGrid, SlidersHorizontal } from "@lucide/svelte";
   import { formatCount } from "$lib/domains/shared/utils";
   import AISessionSidebar from "$lib/domains/ai/components/shared/AISessionSidebar.svelte";
   import ProjectWorkspaceList from "./ProjectWorkspaceList.svelte";
@@ -51,6 +51,8 @@
   }: Props = $props();
 
   let searchValue = $state("");
+  /** Filters stay folded away until asked for — the list is the point. */
+  let filtersOpen = $state(false);
   let statusFilter = $state<SessionStatusFilter>(DEFAULT_SESSION_FILTERS.status);
   let sortFilter = $state<SessionSortKey>(DEFAULT_SESSION_FILTERS.sort);
   let providerFilter = $state(DEFAULT_SESSION_FILTERS.provider);
@@ -128,12 +130,35 @@
 </script>
 
 <AISessionSidebar
+  title="Sessions"
   searchPlaceholder="Search sessions..."
   bind:searchValue={searchValue}
   {showLoadingSkeleton}
   internalScroll={false}
 >
+  {#snippet toolbar()}
+    <Button
+      onclick={() => (filtersOpen = !filtersOpen)}
+      size="icon"
+      variant={filtersOpen || filtersActive ? "secondary" : "ghost"}
+      class="h-7 w-7 shrink-0"
+      title="Filters"
+    >
+      <SlidersHorizontal class="h-4 w-4" />
+    </Button>
+    <Button
+      onclick={onCreateNew}
+      size="icon"
+      variant="ghost"
+      class="h-7 w-7 shrink-0"
+      title="New session"
+    >
+      <Plus class="h-4 w-4" />
+    </Button>
+  {/snippet}
+
   {#snippet filters()}
+    {#if filtersOpen}
     <div class="grid grid-cols-2 gap-2">
       <Select
         options={[...STATUS_OPTIONS]}
@@ -159,6 +184,7 @@
         placeholder="All providers"
         class="h-8 text-xs"
       />
+    {/if}
     {/if}
   {/snippet}
 
@@ -195,10 +221,6 @@
             <X class="h-3 w-3" />
           </Button>
         {/if}
-        <Button onclick={onCreateNew} size="sm" class="h-7 gap-1 px-2" title="New session">
-          <Plus class="h-3.5 w-3.5" />
-          <span class="text-xs">New</span>
-        </Button>
       </div>
     </div>
   {/snippet}

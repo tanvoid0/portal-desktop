@@ -1,4 +1,7 @@
 use crate::domains::ai::catalog::{CatalogQuery, PlatformCatalog};
+use crate::domains::ai::context_usage::{
+    parse_context_usage, parse_llm_usage, ContextUsage, LlmUsage,
+};
 use crate::domains::ai::message::ChatMessage;
 use crate::domains::ai::platform_config::DEFAULT_PLATFORM_BASE;
 use crate::domains::ai::providers::{
@@ -9,6 +12,16 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::time::Instant;
+
+/// What a consumed SSE completion stream yielded.
+struct StreamOutcome {
+    content: String,
+    model: String,
+    tokens_used: Option<u32>,
+    context_usage: Option<ContextUsage>,
+    llm_usage: Option<LlmUsage>,
+    finish_reason: Option<String>,
+}
 
 #[derive(Debug, Clone)]
 pub struct AgentPlatformProvider {
@@ -148,6 +161,16 @@ impl AgentPlatformProvider {
         {
             body["provider"] = json!(provider);
         }
+        if stream {
+            // OpenAI-compatible upstreams only report usage when asked to.
+            body["stream_options"] = json!({ "include_usage": true });
+        }
+        // Sampling knobs the UI sends verbatim (top_k, min_p, stop, …).
+        if let Some(Value::Object(extra)) = options.extra_options.as_ref() {
+            for (key, value) in extra {
+                body[key.as_str()] = value.clone();
+            }
+        }
 
         let timeout = std::time::Duration::from_millis(options.timeout_ms.unwrap_or(120_000));
         let response = self
@@ -213,9 +236,15 @@ impl AgentPlatformProvider {
         &self,
         response: reqwest::Response,
         mut on_chunk: Option<Box<dyn FnMut(String) -> Result<(), AIError> + Send>>,
-    ) -> Result<(String, String, Option<u32>), AIError> {
+    ) -> Result<StreamOutcome, AIError> {
         let mut content = String::new();
         let mut model = String::new();
+        let mut context_usage = None;
+        let mut llm_usage = None;
+        let mut finish_reason = None;
+        // Reasoning arrives on its own delta field; fold it into the text as a
+        // `<think>` block so the UI has one stream to render.
+        let mut in_reasoning = false;
         let mut buf: Vec<u8> = Vec::new();
         let mut stream = response.bytes_stream();
 
@@ -240,24 +269,74 @@ impl AgentPlatformProvider {
                 if let Some(m) = value.get("model").and_then(Value::as_str) {
                     model = m.to_string();
                 }
-                if let Some(delta) = value
-                    .get("choices")
-                    .and_then(|c| c.get(0))
-                    .and_then(|c| c.get("delta"))
-                    .and_then(|d| d.get("content"))
+                // Usage arrives on a trailing frame, if the platform sends it.
+                if let Some(usage) = value.get("context_usage").and_then(parse_context_usage) {
+                    context_usage = Some(usage);
+                }
+                if let Some(usage) = value.get("usage").and_then(parse_llm_usage) {
+                    llm_usage = Some(usage);
+                }
+                let choice = value.get("choices").and_then(|c| c.get(0));
+                if let Some(reason) = choice
+                    .and_then(|c| c.get("finish_reason"))
                     .and_then(Value::as_str)
                 {
-                    if !delta.is_empty() {
-                        content.push_str(delta);
-                        if let Some(cb) = on_chunk.as_mut() {
-                            cb(delta.to_string())?;
-                        }
+                    finish_reason = Some(reason.to_string());
+                }
+
+                let delta = choice.and_then(|c| c.get("delta"));
+                if let Some(reasoning) = delta
+                    .and_then(|d| d.get("reasoning_content").or_else(|| d.get("reasoning")))
+                    .and_then(Value::as_str)
+                    .filter(|s| !s.is_empty())
+                {
+                    let mut piece = String::new();
+                    if !in_reasoning {
+                        in_reasoning = true;
+                        piece.push_str("<think>");
+                    }
+                    piece.push_str(reasoning);
+                    content.push_str(&piece);
+                    if let Some(cb) = on_chunk.as_mut() {
+                        cb(piece)?;
+                    }
+                }
+
+                if let Some(text) = delta
+                    .and_then(|d| d.get("content"))
+                    .and_then(Value::as_str)
+                    .filter(|s| !s.is_empty())
+                {
+                    let mut piece = String::new();
+                    if in_reasoning {
+                        in_reasoning = false;
+                        piece.push_str("</think>");
+                    }
+                    piece.push_str(text);
+                    content.push_str(&piece);
+                    if let Some(cb) = on_chunk.as_mut() {
+                        cb(piece)?;
                     }
                 }
             }
         }
 
-        Ok((content, model, None))
+        // A stream that ended mid-thought still needs the block closed.
+        if in_reasoning {
+            content.push_str("</think>");
+            if let Some(cb) = on_chunk.as_mut() {
+                cb("</think>".to_string())?;
+            }
+        }
+
+        Ok(StreamOutcome {
+            content,
+            model,
+            tokens_used: llm_usage.as_ref().map(|u| u.total_tokens as u32),
+            context_usage,
+            llm_usage,
+            finish_reason,
+        })
     }
 }
 
@@ -338,6 +417,9 @@ impl AIProvider for AgentPlatformProvider {
             model,
             tokens_used,
             generation_time_ms: Some(start.elapsed().as_millis() as u64),
+            context_usage: None,
+            llm_usage: None,
+            finish_reason: None,
         })
     }
 
@@ -350,13 +432,15 @@ impl AIProvider for AgentPlatformProvider {
         let start = Instant::now();
         let messages = vec![json!({"role": "user", "content": prompt})];
         let response = self.chat_completion(messages, options, true).await?;
-        let (content, model, tokens_used) =
-            self.consume_sse_stream(response, Some(on_chunk)).await?;
+        let outcome = self.consume_sse_stream(response, Some(on_chunk)).await?;
         Ok(GenerationResult {
-            content,
-            model,
-            tokens_used,
+            content: outcome.content,
+            model: outcome.model,
+            tokens_used: outcome.tokens_used,
             generation_time_ms: Some(start.elapsed().as_millis() as u64),
+            context_usage: outcome.context_usage,
+            llm_usage: outcome.llm_usage,
+            finish_reason: outcome.finish_reason,
         })
     }
 
@@ -382,6 +466,9 @@ impl AIProvider for AgentPlatformProvider {
             model,
             tokens_used,
             generation_time_ms: Some(start.elapsed().as_millis() as u64),
+            context_usage: None,
+            llm_usage: None,
+            finish_reason: None,
         })
     }
 
@@ -406,6 +493,9 @@ impl AIProvider for AgentPlatformProvider {
             model,
             tokens_used,
             generation_time_ms: Some(start.elapsed().as_millis() as u64),
+            context_usage: None,
+            llm_usage: None,
+            finish_reason: None,
         })
     }
 
@@ -421,13 +511,15 @@ impl AIProvider for AgentPlatformProvider {
             .map(|m| json!({"role": m.role, "content": m.content}))
             .collect();
         let response = self.chat_completion(api_messages, options, true).await?;
-        let (content, model, tokens_used) =
-            self.consume_sse_stream(response, Some(on_chunk)).await?;
+        let outcome = self.consume_sse_stream(response, Some(on_chunk)).await?;
         Ok(GenerationResult {
-            content,
-            model,
-            tokens_used,
+            content: outcome.content,
+            model: outcome.model,
+            tokens_used: outcome.tokens_used,
             generation_time_ms: Some(start.elapsed().as_millis() as u64),
+            context_usage: outcome.context_usage,
+            llm_usage: outcome.llm_usage,
+            finish_reason: outcome.finish_reason,
         })
     }
 

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { taskUi } from "../state/taskUi.svelte";
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { taskUi } from '../state/taskUi.svelte';
 </script>
 
 <Card class="h-full">
@@ -12,9 +12,9 @@
           >{taskUi.taskStats.completionPercentage}%</span
         >
       </div>
-      <div class="h-2 w-full rounded-full bg-muted">
+      <div class="h-1.5 w-full rounded-full bg-muted">
         <div
-          class="h-2 rounded-full bg-gradient-to-r from-primary to-success-500 transition-all duration-300"
+          class="h-1.5 rounded-full bg-primary transition-all"
           style="width: {taskUi.taskStats.completionPercentage}%"
         ></div>
       </div>

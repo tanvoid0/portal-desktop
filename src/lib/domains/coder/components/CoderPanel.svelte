@@ -33,6 +33,7 @@
   import CoderWorkspaceSidebar from './CoderWorkspaceSidebar.svelte';
   import CoderWorkspacePanel from './CoderWorkspacePanel.svelte';
   import GitCommitDialog from './GitCommitDialog.svelte';
+  import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
   import { withMessageTimestamps } from '../utils/messageTimestamps.js';
   import ResponsivePanel from '$lib/components/shell/responsive-panel.svelte';
@@ -46,6 +47,14 @@
   let copied = $state(false);
   let gitStats = $state<GitDiffStats | null>(null);
   let showCommitDialog = $state(false);
+
+  // Hand the action row to the AI layout's tab bar row — it has the width.
+  $effect(() => {
+    aiTopbar.actions = topbarActions;
+    return () => {
+      aiTopbar.actions = null;
+    };
+  });
 
   const showWorkspace = $derived(coderWorkspaceStore.activePanel !== 'chat');
   let sessionsPanelOpen = $state(false);
@@ -119,7 +128,6 @@
     coderSession.runtimeRevision;
     return coderSession.runningThreadIds;
   });
-  const runningCount = $derived(runningThreadIds.size);
   const changesRevision = $derived(
     coderSession.changes.map((c) => `${c.id}:${c.status}`).join('|'),
   );
@@ -434,28 +442,124 @@
   }
 </script>
 
+{#snippet topbarActions()}
+    <ProviderModelSelector
+      bind:selectedProvider={coderSession.selectedProvider}
+      bind:selectedBackendProvider={coderSession.selectedBackendProvider}
+      bind:selectedModel={coderSession.selectedModel}
+      onModelChange={(m) => coderSession.handleModelChange(m)}
+      onBackendProviderChange={(p) =>
+        coderSession.handleBackendProviderChange(p)}
+      modelSelectClass="w-[180px]"
+    />
+    {#if showRetry && thread && !running}
+      <Button
+        size="sm"
+        variant="outline"
+        class="h-8 gap-1"
+        title="Retry the last message"
+        onclick={() => coderSession.retry()}
+      >
+        <RotateCcw class="h-3.5 w-3.5" />
+        Retry
+      </Button>
+    {/if}
+    <Button
+      size="sm"
+      variant={coderWorkspaceStore.sidebarOpen ? 'secondary' : 'ghost'}
+      class="h-8 gap-1"
+      title="Workspace sidebar"
+      onclick={() => {
+        coderWorkspaceStore.sidebarOpen = !coderWorkspaceStore.sidebarOpen;
+      }}
+    >
+      <PanelRightOpen class="h-3.5 w-3.5" />
+    </Button>
+    <Button
+      size="sm"
+      variant={terminalOpen ? 'secondary' : 'ghost'}
+      class="h-8 gap-1"
+      title="Session terminal"
+      disabled={!activeThreadId}
+      onclick={() => {
+        if (!activeThreadId || !activeTerminalThread) return;
+        const tab = coderTerminalStore.ensureDefault(
+          activeThreadId,
+          activeTerminalThread.workspace_root,
+        );
+        coderWorkspaceStore.openTerminal(activeThreadId, tab.id, tab.label);
+        coderSession.terminalOpen = true;
+      }}
+    >
+      <TerminalIcon class="h-3.5 w-3.5" />
+      Terminal
+    </Button>
+    <Button
+      size="icon"
+      variant="ghost"
+      class="h-8 w-8"
+      title="Copy conversation for debugging"
+      disabled={!canCopyConversation}
+      onclick={copyConversation}
+    >
+      {#if copied}
+        <Check class="h-3.5 w-3.5 text-green-500" />
+      {:else}
+        <Copy class="h-3.5 w-3.5" />
+      {/if}
+    </Button>
+    <Button
+      size="sm"
+      variant={showChanges ? 'secondary' : 'ghost'}
+      class="h-8 gap-1"
+      title="Review agent file changes"
+      onclick={() => {
+        coderWorkspaceStore.openChanges();
+        coderSession.refreshChanges(thread?.id);
+      }}
+    >
+      <Bot class="h-3.5 w-3.5" />
+      {#if pendingChangeCount > 0}
+        <span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">
+          {pendingChangeCount}
+        </span>
+      {/if}
+    </Button>
+    <Button
+      size="sm"
+      variant={showGitChanges ? 'secondary' : 'ghost'}
+      class="h-8 gap-1"
+      title="View git working tree changes"
+      onclick={() => coderWorkspaceStore.openGitChanges()}
+    >
+      <GitBranch class="h-3.5 w-3.5" />
+      {#if gitStats?.hasChanges}
+        <span class="font-mono text-[10px] text-green-600 dark:text-green-400">
+          {#if gitStats.additions > 0}+{gitStats.additions}{/if}
+          {#if gitStats.deletions > 0}-{gitStats.deletions}{/if}
+        </span>
+      {/if}
+    </Button>
+    <Button
+      size="sm"
+      variant="outline"
+      class="h-8 gap-1"
+      title="Review and commit git changes"
+      disabled={!gitStats?.hasChanges}
+      onclick={() => (showCommitDialog = true)}
+    >
+      <GitCommitHorizontal class="h-3.5 w-3.5" />
+      Commit
+    </Button>
+{/snippet}
+
+
 <div class="flex h-full w-full overflow-hidden">
   <ResponsivePanel
     bind:open={sessionsPanelOpen}
     side="left"
     desktopClass="w-80 bg-muted/20"
   >
-    {#snippet header()}
-      <div class="divider-edge-b divider-edge-full bg-background px-3 py-2.5">
-        <h2 class="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <Bot class="h-4 w-4 text-primary" />
-          Sessions
-          {#if runningCount > 0}
-            <span
-              class="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary"
-              title="{runningCount} session(s) running"
-            >
-              {runningCount} running
-            </span>
-          {/if}
-        </h2>
-      </div>
-    {/snippet}
     <CoderSessionList
       threads={sessionThreads}
       loading={sessionsLoading}
@@ -485,7 +589,7 @@
     <div
       class="divider-edge-b divider-edge-full flex shrink-0 flex-wrap items-center justify-between gap-2 bg-background px-4 py-2.5"
     >
-      <div class="flex min-w-0 items-center gap-2">
+      <div class="flex min-w-0 flex-1 items-center gap-2">
         <Button
           size="icon"
           variant="ghost"
@@ -533,123 +637,12 @@
         {/if}
       </div>
 
-      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:max-w-md">
+      <div class="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:max-w-md sm:shrink-0">
         <CoderProjectSelector
           bind:value={coderSession.workspaceRoot}
           disabled={!!thread}
           onSelect={handleProjectSelect}
         />
-      </div>
-
-      <div class="flex flex-wrap items-center gap-1.5">
-        <ProviderModelSelector
-          bind:selectedProvider={coderSession.selectedProvider}
-          bind:selectedBackendProvider={coderSession.selectedBackendProvider}
-          bind:selectedModel={coderSession.selectedModel}
-          onModelChange={(m) => coderSession.handleModelChange(m)}
-          onBackendProviderChange={(p) =>
-            coderSession.handleBackendProviderChange(p)}
-          modelSelectClass="w-[180px]"
-        />
-        {#if showRetry && thread && !running}
-          <Button
-            size="sm"
-            variant="outline"
-            class="h-8 gap-1"
-            title="Retry the last message"
-            onclick={() => coderSession.retry()}
-          >
-            <RotateCcw class="h-3.5 w-3.5" />
-            Retry
-          </Button>
-        {/if}
-        <Button
-          size="sm"
-          variant={coderWorkspaceStore.sidebarOpen ? 'secondary' : 'ghost'}
-          class="h-8 gap-1"
-          title="Workspace sidebar"
-          onclick={() => {
-            coderWorkspaceStore.sidebarOpen = !coderWorkspaceStore.sidebarOpen;
-          }}
-        >
-          <PanelRightOpen class="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant={terminalOpen ? 'secondary' : 'ghost'}
-          class="h-8 gap-1"
-          title="Session terminal"
-          disabled={!activeThreadId}
-          onclick={() => {
-            if (!activeThreadId || !activeTerminalThread) return;
-            const tab = coderTerminalStore.ensureDefault(
-              activeThreadId,
-              activeTerminalThread.workspace_root,
-            );
-            coderWorkspaceStore.openTerminal(activeThreadId, tab.id, tab.label);
-            coderSession.terminalOpen = true;
-          }}
-        >
-          <TerminalIcon class="h-3.5 w-3.5" />
-          Terminal
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          class="h-8 w-8"
-          title="Copy conversation for debugging"
-          disabled={!canCopyConversation}
-          onclick={copyConversation}
-        >
-          {#if copied}
-            <Check class="h-3.5 w-3.5 text-green-500" />
-          {:else}
-            <Copy class="h-3.5 w-3.5" />
-          {/if}
-        </Button>
-        <Button
-          size="sm"
-          variant={showChanges ? 'secondary' : 'ghost'}
-          class="h-8 gap-1"
-          title="Review agent file changes"
-          onclick={() => {
-            coderWorkspaceStore.openChanges();
-            coderSession.refreshChanges(thread?.id);
-          }}
-        >
-          <Bot class="h-3.5 w-3.5" />
-          {#if pendingChangeCount > 0}
-            <span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">
-              {pendingChangeCount}
-            </span>
-          {/if}
-        </Button>
-        <Button
-          size="sm"
-          variant={showGitChanges ? 'secondary' : 'ghost'}
-          class="h-8 gap-1"
-          title="View git working tree changes"
-          onclick={() => coderWorkspaceStore.openGitChanges()}
-        >
-          <GitBranch class="h-3.5 w-3.5" />
-          {#if gitStats?.hasChanges}
-            <span class="font-mono text-[10px] text-green-600 dark:text-green-400">
-              {#if gitStats.additions > 0}+{gitStats.additions}{/if}
-              {#if gitStats.deletions > 0}-{gitStats.deletions}{/if}
-            </span>
-          {/if}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          class="h-8 gap-1"
-          title="Review and commit git changes"
-          disabled={!gitStats?.hasChanges}
-          onclick={() => (showCommitDialog = true)}
-        >
-          <GitCommitHorizontal class="h-3.5 w-3.5" />
-          Commit
-        </Button>
       </div>
     </div>
 

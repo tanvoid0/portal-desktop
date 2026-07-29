@@ -3,7 +3,8 @@
 //! deletes nothing — purely informational.
 
 use serde::Serialize;
-use sysinfo::Disks;
+use std::sync::{Mutex, OnceLock};
+use sysinfo::{Disks, System};
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -43,4 +44,32 @@ pub fn disk_usage() -> Vec<DiskUsage> {
     // Biggest volumes first — the ones worth cleaning.
     out.sort_by(|a, b| b.total_bytes.cmp(&a.total_bytes));
     out
+}
+
+/// Host CPU / memory snapshot for the sidebar status chips. Read-only.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HostStats {
+    /// Whole-machine CPU load, 0-100.
+    pub cpu_percent: f32,
+    pub memory_used_bytes: u64,
+    pub memory_total_bytes: u64,
+}
+
+/// CPU load is a delta between refreshes, so the `System` is kept alive across
+/// calls — the first call after startup reports 0 until the second poll.
+fn host_system() -> &'static Mutex<System> {
+    static SYSTEM: OnceLock<Mutex<System>> = OnceLock::new();
+    SYSTEM.get_or_init(|| Mutex::new(System::new()))
+}
+
+pub fn host_stats() -> HostStats {
+    let mut sys = host_system().lock().unwrap_or_else(|e| e.into_inner());
+    sys.refresh_cpu();
+    sys.refresh_memory();
+    HostStats {
+        cpu_percent: sys.global_cpu_info().cpu_usage(),
+        memory_used_bytes: sys.used_memory(),
+        memory_total_bytes: sys.total_memory(),
+    }
 }

@@ -49,6 +49,15 @@ pub struct GenerationResult {
     pub tokens_used: Option<u32>,
     /// Generation time in milliseconds
     pub generation_time_ms: Option<u64>,
+    /// Estimated input context breakdown, when the platform reports it
+    #[serde(default)]
+    pub context_usage: Option<crate::domains::ai::context_usage::ContextUsage>,
+    /// Token/cost usage for this turn, when the platform reports it
+    #[serde(default)]
+    pub llm_usage: Option<crate::domains::ai::context_usage::LlmUsage>,
+    /// Why generation stopped, as reported upstream (`stop`, `length`, …)
+    #[serde(default)]
+    pub finish_reason: Option<String>,
 }
 
 /// Provider configuration

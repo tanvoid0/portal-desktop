@@ -4,22 +4,16 @@
 -->
 
 <script lang="ts">
-  import { cn } from "$lib/utils";
-  import { Button } from "./button";
-  import {
-    X,
-    CheckCircle,
-    AlertCircle,
-    Info,
-    AlertTriangle,
-  } from "@lucide/svelte";
-  import { onMount } from "svelte";
+  import { cn } from '$lib/utils';
+  import { Button } from './button';
+  import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from '@lucide/svelte';
+  import { onMount } from 'svelte';
 
   interface ToastProps {
     id: string;
     title?: string;
     description?: string;
-    variant?: "default" | "success" | "error" | "warning" | "info";
+    variant?: 'default' | 'success' | 'error' | 'warning' | 'info';
     duration?: number;
     action?: {
       label: string;
@@ -32,11 +26,11 @@
   let {
     title,
     description,
-    variant = "default",
+    variant = 'default',
     duration = 5000,
     action,
     onClose,
-    class: className = "",
+    class: className = '',
   }: ToastProps = $props();
   let isRemoving = $state(false);
   let isVisible = $state(false);
@@ -45,28 +39,28 @@
   const variantConfig = {
     default: {
       icon: Info,
-      className: "bg-card border-border text-card-foreground",
-      iconClassName: "text-muted-foreground",
+      className: 'bg-card border-border text-card-foreground',
+      iconClassName: 'text-muted-foreground',
     },
     success: {
       icon: CheckCircle,
-      className: "bg-card border-border text-card-foreground",
-      iconClassName: "text-green-600 dark:text-green-400",
+      className: 'bg-card border-border text-card-foreground',
+      iconClassName: 'text-green-600 dark:text-green-400',
     },
     error: {
       icon: AlertCircle,
-      className: "bg-card border-border text-card-foreground",
-      iconClassName: "text-destructive",
+      className: 'bg-card border-border text-card-foreground',
+      iconClassName: 'text-destructive',
     },
     warning: {
       icon: AlertTriangle,
-      className: "bg-card border-border text-card-foreground",
-      iconClassName: "text-yellow-600 dark:text-yellow-400",
+      className: 'bg-card border-border text-card-foreground',
+      iconClassName: 'text-yellow-600 dark:text-yellow-400',
     },
     info: {
       icon: Info,
-      className: "bg-card border-border text-card-foreground",
-      iconClassName: "text-primary",
+      className: 'bg-card border-border text-card-foreground',
+      iconClassName: 'text-primary',
     },
   };
 
@@ -115,19 +109,17 @@
 
 <div
   class={cn(
-    "group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-lg border px-4 py-3 transition-all",
-    isVisible ? "translate-x-0 opacity-100" : "translate-x-full opacity-0",
-    isRemoving ? "translate-x-full opacity-0" : "",
+    'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-lg border px-4 py-3 transition-all',
+    isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0',
+    isRemoving ? 'translate-x-full opacity-0' : '',
     config.className,
-    className,
+    className
   )}
   role="alert"
   aria-live="assertive"
   aria-atomic="true"
 >
-  <Icon
-    class={cn("h-4 w-4 flex-shrink-0 translate-y-0.5", config.iconClassName)}
-  />
+  <Icon class={cn('h-4 w-4 flex-shrink-0 translate-y-0.5', config.iconClassName)} />
   <div class="min-w-0 flex-1 space-y-0.5">
     {#if title}
       <div class="text-sm leading-none">{title}</div>
@@ -140,12 +132,7 @@
   </div>
 
   {#if action}
-    <Button
-      variant="outline"
-      size="sm"
-      onclick={action.onClick}
-      class="ml-2 shrink-0"
-    >
+    <Button variant="outline" size="sm" onclick={action.onClick} class="ml-2 shrink-0">
       {action.label}
     </Button>
   {/if}
@@ -163,9 +150,7 @@
   <!-- Progress bar — CSS-driven so it costs no main-thread work and can't
        outlive the component the way a setInterval handle could. -->
   {#if duration > 0}
-    <div
-      class="absolute bottom-0 left-0 h-[2px] w-full overflow-hidden bg-border"
-    >
+    <div class="absolute bottom-0 left-0 h-[2px] w-full overflow-hidden bg-border">
       <div
         class="toast-progress h-full w-full bg-muted-foreground/30"
         style="animation-duration: {duration}ms"

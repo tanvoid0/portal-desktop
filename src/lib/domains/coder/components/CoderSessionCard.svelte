@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { FolderOpen } from "@lucide/svelte";
   import AISessionCard from "$lib/domains/ai/components/shared/AISessionCard.svelte";
   import type { CoderThread } from "../types.js";
 
@@ -12,7 +11,6 @@
     queuedCount?: number;
     subAgentRunning?: number;
     hideProject?: boolean;
-    compact?: boolean;
   }
 
   let {
@@ -24,7 +22,6 @@
     queuedCount = 0,
     subAgentRunning = 0,
     hideProject = false,
-    compact = false,
   }: Props = $props();
 
   const messageCount = $derived(
@@ -33,12 +30,6 @@
         .length,
   );
 
-  const workspaceName = $derived(
-    (thread.workspace_root ?? "")
-      .split(/[/\\]/)
-      .filter(Boolean)
-      .pop() ?? thread.workspace_root ?? "",
-  );
 
   const inlineBadges = $derived(
     thread.thread_kind === "coordinator"
@@ -74,14 +65,10 @@
   title={thread.title}
   {isActive}
   {isRunning}
-  {compact}
   {queuedCount}
   updatedAt={thread.updated_at}
   messageCount={messageCount}
-  subtitle={workspaceName || null}
-  subtitleTitle={thread.workspace_root}
-  subtitleIcon={FolderOpen}
-  hideSubtitle={hideProject || !workspaceName}
+  subtitle={hideProject ? null : thread.workspace_root || null}
   {inlineBadges}
   {trailingBadges}
   deleteTitle="Delete session"

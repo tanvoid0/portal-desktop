@@ -21,7 +21,8 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Set,
 };
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{Emitter, State};
 // Use the centralized logger from utils
 use crate::domains::ai::entities::ai_conversation::Column as ConversationColumn;
@@ -210,6 +211,7 @@ pub async fn ai_send_message(
     max_tokens: Option<u32>,
     model: Option<String>,
     llm_provider: Option<String>,
+    extra_options: Option<serde_json::Value>,
     ai_service: State<'_, Arc<AIService>>,
 ) -> Result<String, String> {
     let request = chat::SendMessageRequest {
@@ -221,8 +223,35 @@ pub async fn ai_send_message(
         max_tokens,
         model,
         llm_provider,
+        extra_options,
     };
     chat::send_message(request, ai_service).await
+}
+
+/// Marker error used to unwind a stream that the user stopped.
+const STREAM_CANCELLED: &str = "__portal_stream_cancelled__";
+
+/// Stream ids the UI has asked to stop mid-generation.
+fn cancelled_streams() -> &'static Mutex<HashSet<String>> {
+    static CANCELLED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    CANCELLED.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn take_cancelled(stream_id: &str) -> bool {
+    let mut set = cancelled_streams()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    set.remove(stream_id)
+}
+
+/// Stop an in-flight streaming response. The next chunk aborts the SSE read.
+#[tauri::command]
+pub async fn ai_cancel_stream(stream_id: String) -> Result<(), String> {
+    cancelled_streams()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(stream_id);
+    Ok(())
 }
 
 /// Send a message to AI (chat) with streaming support
@@ -236,6 +265,7 @@ pub async fn ai_send_message_stream(
     max_tokens: Option<u32>,
     model: Option<String>,
     llm_provider: Option<String>,
+    extra_options: Option<serde_json::Value>,
     stream_id: String, // Unique ID for this stream
     app_handle: tauri::AppHandle,
     ai_service: State<'_, Arc<AIService>>,
@@ -308,7 +338,7 @@ pub async fn ai_send_message_stream(
         timeout_ms: None,
         model,
         llm_provider,
-        extra_options: None,
+        extra_options,
     };
 
     let mut messages = history;
@@ -319,7 +349,9 @@ pub async fn ai_send_message_stream(
 
     let provider_type = provider;
 
-    let mut full_response = String::new();
+    // Shared so the partial text survives a cancelled stream.
+    let full_response = Arc::new(Mutex::new(String::new()));
+    let response_sink = full_response.clone();
     let app_handle_clone = app_handle.clone();
     let stream_id_clone = stream_id.clone();
     let result = ai_service
@@ -328,7 +360,13 @@ pub async fn ai_send_message_stream(
             Some(options),
             provider_type,
             Box::new(move |chunk: String| {
-                full_response.push_str(&chunk);
+                if take_cancelled(&stream_id_clone) {
+                    return Err(AIError::GenericError(STREAM_CANCELLED.to_string()));
+                }
+                response_sink
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .push_str(&chunk);
                 app_handle_clone
                     .emit(&format!("ai-stream-chunk-{}", stream_id_clone), &chunk)
                     .map_err(|e| AIError::GenericError(format!("Failed to emit event: {}", e)))?;
@@ -336,6 +374,9 @@ pub async fn ai_send_message_stream(
             }),
         )
         .await;
+
+    // Drop a cancel that landed after the stream already finished.
+    take_cancelled(&stream_id);
 
     let final_title = if let Some(conv_id) = &conversation_id {
         let db = db_manager.get_connection();
@@ -349,23 +390,43 @@ pub async fn ai_send_message_stream(
         None
     };
 
-    match result {
-        Ok(gen_result) => {
-            let complete_payload = if let Some(title) = final_title {
-                serde_json::json!({ "content": gen_result.content, "title": title })
-            } else {
-                serde_json::json!({ "content": gen_result.content })
-            };
-            app_handle
-                .emit(
-                    &format!("ai-stream-complete-{}", stream_id),
-                    &complete_payload,
-                )
-                .map_err(|e| format!("Failed to emit completion event: {}", e))?;
-            Ok(gen_result.content)
-        }
-        Err(e) => Err(format!("AI generation error: {}", e)),
+    let (content, cancelled, usage) = match result {
+        Ok(gen_result) => (
+            gen_result.content,
+            false,
+            Some((
+                gen_result.context_usage,
+                gen_result.llm_usage,
+                gen_result.finish_reason,
+            )),
+        ),
+        Err(e) if e.to_string().contains(STREAM_CANCELLED) => (
+            full_response
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
+            true,
+            None,
+        ),
+        Err(e) => return Err(format!("AI generation error: {}", e)),
+    };
+
+    let mut complete_payload = serde_json::json!({ "content": content, "cancelled": cancelled });
+    if let Some(title) = final_title {
+        complete_payload["title"] = serde_json::json!(title);
     }
+    if let Some((context_usage, llm_usage, finish_reason)) = usage {
+        complete_payload["context_usage"] = serde_json::json!(context_usage);
+        complete_payload["llm_usage"] = serde_json::json!(llm_usage);
+        complete_payload["finish_reason"] = serde_json::json!(finish_reason);
+    }
+    app_handle
+        .emit(
+            &format!("ai-stream-complete-{}", stream_id),
+            &complete_payload,
+        )
+        .map_err(|e| format!("Failed to emit completion event: {}", e))?;
+    Ok(content)
 }
 
 /// Create a new conversation

@@ -16,6 +16,7 @@ pub struct SendMessageRequest {
     pub max_tokens: Option<u32>,
     pub model: Option<String>,
     pub llm_provider: Option<String>,
+    pub extra_options: Option<serde_json::Value>,
 }
 
 /// Send a message to the AI provider
@@ -30,7 +31,7 @@ pub async fn send_message(
         timeout_ms: None,
         model: request.model,
         llm_provider: request.llm_provider,
-        extra_options: None,
+        extra_options: request.extra_options,
     };
 
     let mut messages = request.history;

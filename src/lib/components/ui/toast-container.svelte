@@ -4,34 +4,31 @@
 -->
 
 <script lang="ts">
-  import {
-    toastStore,
-    toastActions,
-  } from "$lib/domains/shared/stores/toastStore";
-  import { cn } from "$lib/utils";
-  import Toast from "./toast.svelte";
+  import { toastStore, toastActions } from '$lib/domains/shared/stores/toastStore';
+  import { cn } from '$lib/utils';
+  import Toast from './toast.svelte';
 
   interface Props {
     position?:
-      | "top-left"
-      | "top-center"
-      | "top-right"
-      | "bottom-left"
-      | "bottom-center"
-      | "bottom-right";
+      | 'top-left'
+      | 'top-center'
+      | 'top-right'
+      | 'bottom-left'
+      | 'bottom-center'
+      | 'bottom-right';
     class?: string;
   }
 
-  let { position = "top-right", class: className = "" }: Props = $props();
+  let { position = 'top-right', class: className = '' }: Props = $props();
 
   // Position configurations
   const positionConfig = {
-    "top-left": "top-4 left-4",
-    "top-center": "top-4 left-1/2 -translate-x-1/2",
-    "top-right": "top-4 right-4",
-    "bottom-left": "bottom-4 left-4",
-    "bottom-center": "bottom-4 left-1/2 -translate-x-1/2",
-    "bottom-right": "bottom-4 right-4",
+    'top-left': 'top-4 left-4',
+    'top-center': 'top-4 left-1/2 -translate-x-1/2',
+    'top-right': 'top-4 right-4',
+    'bottom-left': 'bottom-4 left-4',
+    'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
+    'bottom-right': 'bottom-4 right-4',
   };
 
   const positionClasses = positionConfig[position];
@@ -39,11 +36,7 @@
 
 <!-- Toast Container -->
 <div
-  class={cn(
-    "fixed z-50 flex w-full max-w-sm flex-col gap-2",
-    positionClasses,
-    className,
-  )}
+  class={cn('fixed z-50 flex w-full max-w-sm flex-col gap-2', positionClasses, className)}
   aria-live="polite"
   aria-label="Notifications"
 >
@@ -52,7 +45,7 @@
       id={toast.id}
       title={toast.title}
       description={toast.description}
-      variant={toast.type || "default"}
+      variant={toast.type || 'default'}
       duration={toast.duration}
       action={toast.action}
       onClose={() => toastActions.dismiss(toast.id)}

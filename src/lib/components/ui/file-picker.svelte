@@ -4,11 +4,11 @@
 -->
 
 <script lang="ts">
-  import { Button } from "./button";
-  import { Input } from "./input";
-  import { Label } from "./label";
-  import { invoke } from "@tauri-apps/api/core";
-  import { FileUp } from "@lucide/svelte";
+  import { Button } from './button';
+  import { Input } from './input';
+  import { Label } from './label';
+  import { invoke } from '@tauri-apps/api/core';
+  import { FileUp } from '@lucide/svelte';
 
   interface Props {
     value?: string;
@@ -23,11 +23,11 @@
   }
 
   let {
-    value: valueProp = "",
-    placeholder = "/path/to/file",
+    value: valueProp = '',
+    placeholder = '/path/to/file',
     disabled = false,
     required = false,
-    label = "File Path",
+    label = 'File Path',
     description: descriptionProp,
     filters = [],
     selectFolder = false,
@@ -37,7 +37,7 @@
   let value = $state(valueProp);
 
   const description = $derived(
-    descriptionProp || (selectFolder ? "Select a folder" : "Select a file"),
+    descriptionProp || (selectFolder ? 'Select a folder' : 'Select a file')
   );
 
   let isSelecting = $state(false);
@@ -52,7 +52,7 @@
           ? filters.map((f) => [f.name, f.extensions] as [string, string[]])
           : undefined;
 
-      const selectedPath = await invoke<string | null>("select_file", {
+      const selectedPath = await invoke<string | null>('select_file', {
         title: label,
         filters: filterArray,
         defaultPath: value || undefined,
@@ -64,7 +64,7 @@
         onChange?.(selectedPath);
       }
     } catch (error) {
-      console.error("Failed to select file:", error);
+      console.error('Failed to select file:', error);
     } finally {
       isSelecting = false;
     }
@@ -104,7 +104,7 @@
       disabled={disabled || isSelecting}
     >
       <FileUp class="mr-2 h-4 w-4" />
-      {isSelecting ? "Selecting..." : "Browse"}
+      {isSelecting ? 'Selecting...' : 'Browse'}
     </Button>
   </div>
   {#if description}

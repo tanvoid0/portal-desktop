@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Checkbox } from "$lib/components/ui/checkbox";
-  import { Card, CardContent } from "$lib/components/ui/card";
-  import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import Icon from "@iconify/svelte";
-  import { taskUi } from "../state/taskUi.svelte";
-  import type { Task } from "../types";
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import Icon from '@iconify/svelte';
+  import { taskUi } from '../state/taskUi.svelte';
+  import type { Task } from '../types';
 
   interface Props {
     task: Task;
@@ -29,40 +29,40 @@
 
   function getTaskStatusColor(status: string) {
     switch (status) {
-      case "completed":
-        return "text-green-500";
-      case "in-progress":
-        return "text-blue-500";
-      case "cancelled":
-        return "text-red-500";
+      case 'completed':
+        return 'text-green-500';
+      case 'in-progress':
+        return 'text-blue-500';
+      case 'cancelled':
+        return 'text-red-500';
       default:
-        return "text-gray-400";
+        return 'text-gray-400';
     }
   }
 
   function getPriorityColor(priority: string) {
     switch (priority) {
-      case "high":
-        return "text-red-500";
-      case "medium":
-        return "text-yellow-500";
-      case "low":
-        return "text-green-500";
+      case 'high':
+        return 'text-red-500';
+      case 'medium':
+        return 'text-yellow-500';
+      case 'low':
+        return 'text-green-500';
       default:
-        return "text-gray-400";
+        return 'text-gray-400';
     }
   }
 
   function getTaskIcon(task: Task) {
     switch (task.status) {
-      case "completed":
-        return "mdi:check-circle";
-      case "in-progress":
-        return "mdi:progress-clock";
-      case "cancelled":
-        return "mdi:cancel";
+      case 'completed':
+        return 'mdi:check-circle';
+      case 'in-progress':
+        return 'mdi:progress-clock';
+      case 'cancelled':
+        return 'mdi:cancel';
       default:
-        return "mdi:circle-outline";
+        return 'mdi:circle-outline';
     }
   }
 
@@ -76,8 +76,8 @@
     return (
       !!task.dueDate &&
       task.dueDate < new Date() &&
-      task.status !== "completed" &&
-      task.status !== "cancelled"
+      task.status !== 'completed' &&
+      task.status !== 'cancelled'
     );
   }
 
@@ -103,7 +103,7 @@
   }
 
   function getTimeEstimateText(task: Task): string {
-    if (!task.estimatedTime) return "";
+    if (!task.estimatedTime) return '';
     const hours = Math.floor(task.estimatedTime / 60);
     const minutes = task.estimatedTime % 60;
     if (hours > 0) {
@@ -113,7 +113,7 @@
   }
 
   function getActualTimeText(task: Task): string {
-    if (!task.actualTime) return "";
+    if (!task.actualTime) return '';
     const hours = Math.floor(task.actualTime / 60);
     const minutes = task.actualTime % 60;
     if (hours > 0) {
@@ -132,12 +132,11 @@
 </script>
 
 <Card
-  class="cursor-pointer transition-all duration-200 ease-out {isSelected
-    ? 'bg-warning-50 shadow-lg ring-2 ring-warning-500 dark:bg-warning-900/20'
+  class="cursor-pointer transition-colors {isSelected
+    ? 'bg-warning-50 ring-2 ring-warning-500 dark:bg-warning-900/20'
     : ''}"
-  elevation={isSelected ? "elevated" : "raised"}
-  gradient={task.status === "in-progress"}
-  borderAccent={task.priority === "high" ? "left" : "none"}
+  elevation={isSelected ? 'elevated' : 'raised'}
+  borderAccent={task.priority === 'high' ? 'left' : 'none'}
   onclick={onClick}
 >
   <CardContent class="p-4">
@@ -228,13 +227,8 @@
             <span>{getSubtaskCount(task.id)}</span>
           </div>
         {/if}
-        <Icon
-          icon="mdi:flag"
-          class="h-3 w-3 {getPriorityColor(task.priority)}"
-        />
-        <span class="text-xs uppercase text-muted-foreground"
-          >{task.priority}</span
-        >
+        <Icon icon="mdi:flag" class="h-3 w-3 {getPriorityColor(task.priority)}" />
+        <span class="text-xs uppercase text-muted-foreground">{task.priority}</span>
       </div>
     </div>
 
@@ -310,10 +304,7 @@
           size="sm"
           class="h-8 w-8 p-0"
         >
-          <Icon
-            icon={getTaskIcon(task)}
-            class="h-4 w-4 {getTaskStatusColor(task.status)}"
-          />
+          <Icon icon={getTaskIcon(task)} class="h-4 w-4 {getTaskStatusColor(task.status)}" />
         </Button>
       </div>
     </div>

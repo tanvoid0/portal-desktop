@@ -1,8 +1,6 @@
 <script lang="ts">
-  import type { Component } from "svelte";
-  import { Button, buttonVariants } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
-  import { Clock, MessageSquare, Trash2 } from "@lucide/svelte";
+  import { Button } from "$lib/components/ui/button";
+  import { Trash2 } from "@lucide/svelte";
   import { cn } from "$lib/utils";
   import {
     formatCount,
@@ -20,16 +18,13 @@
     title: string;
     isActive?: boolean;
     isRunning?: boolean;
-    compact?: boolean;
     onClick?: () => void;
     onDelete?: () => void;
     deleteTitle?: string;
     updatedAt?: string | Date | null;
     messageCount?: number;
+    /** Context for the row tooltip — model, workspace, whatever fits. */
     subtitle?: string | null;
-    subtitleTitle?: string;
-    subtitleIcon?: Component<{ class?: string }>;
-    hideSubtitle?: boolean;
     inlineBadges?: SessionCardBadge[];
     trailingBadges?: SessionCardBadge[];
     queuedCount?: number;
@@ -39,35 +34,39 @@
     title,
     isActive = false,
     isRunning = false,
-    compact = false,
     onClick,
     onDelete,
     deleteTitle = "Delete",
     updatedAt = null,
     messageCount = 0,
     subtitle = null,
-    subtitleTitle,
-    subtitleIcon,
-    hideSubtitle = false,
     inlineBadges = [],
     trailingBadges = [],
     queuedCount = 0,
   }: Props = $props();
 
-  function handleDelete(e: MouseEvent) {
-    e.stopPropagation();
-    onDelete?.();
-  }
-
   const updatedIso = $derived(
     updatedAt instanceof Date ? updatedAt.toISOString() : updatedAt,
   );
-  const updatedLabel = $derived(formatSessionDateTime(updatedIso));
-  const updatedFull = $derived(formatSessionDateTimeFull(updatedIso));
-  const SubtitleIcon = $derived(subtitleIcon);
+  const updatedLabel = $derived(
+    updatedIso ? formatSessionDateTime(updatedIso) : "",
+  );
 
-  function handleActivate() {
-    onClick?.();
+  /** Everything that used to take a second line now lives in the tooltip. */
+  const tooltip = $derived(
+    [title, subtitle, updatedIso ? formatSessionDateTimeFull(updatedIso) : null]
+      .filter(Boolean)
+      .join("\n"),
+  );
+
+  /** Right-hand metric, mirroring LM Studio's per-row token count. */
+  const metric = $derived(
+    messageCount > 0 ? formatCount(messageCount, "message") : updatedLabel,
+  );
+
+  function handleDelete(e: MouseEvent) {
+    e.stopPropagation();
+    onDelete?.();
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -78,111 +77,92 @@
   }
 </script>
 
+<!-- One flat line per session: title left, metric right, actions on hover. -->
 <div
   role="button"
   tabindex="0"
+  title={tooltip}
   class={cn(
-    buttonVariants({ variant: "ghost" }),
-    "group relative h-auto w-full justify-start rounded-lg border bg-background text-left shadow-sm transition-colors",
-    compact ? "px-2.5 py-2" : "px-3 py-2.5",
+    "group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
     isActive
-      ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
-      : "border-border/60 hover:border-border hover:bg-muted/40",
+      ? "bg-primary font-medium text-primary-foreground"
+      : "text-foreground hover:bg-muted/60",
   )}
-  onclick={handleActivate}
+  onclick={() => onClick?.()}
   onkeydown={handleKeydown}
 >
-  {#if isActive}
+  {#if isRunning}
     <span
-      class="absolute bottom-2 left-0 top-2 w-0.5 rounded-full bg-primary"
-      aria-hidden="true"
+      class={cn(
+        "h-1.5 w-1.5 shrink-0 animate-pulse rounded-full",
+        isActive ? "bg-primary-foreground" : "bg-primary",
+      )}
+      aria-label="Running"
     ></span>
   {/if}
 
-  <div class="flex items-start gap-2">
-    <div class="min-w-0 flex-1 space-y-1.5">
-      <div class="flex items-start gap-1.5">
-        {#if isRunning}
-          <span
-            class="mt-1.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-primary"
-            title="Running"
-          ></span>
-        {/if}
-        <p
-          class="line-clamp-2 min-w-0 flex-1 font-medium leading-snug text-foreground {compact
-            ? 'text-xs'
-            : 'text-[13px]'}"
-          {title}
-        >
-          {title}
-        </p>
-        {#each inlineBadges as badge (badge.label)}
-          <Badge
-            variant={badge.variant ?? "secondary"}
-            class="shrink-0 text-[10px] {badge.class ?? ''}"
-          >
-            {badge.label}
-          </Badge>
-        {/each}
-      </div>
+  <span class="min-w-0 flex-1 truncate">{title}</span>
 
-      {#if !hideSubtitle && subtitle}
-        <div
-          class="flex items-center gap-1 text-xs text-muted-foreground"
-          title={subtitleTitle ?? subtitle}
-        >
-          {#if SubtitleIcon}
-            <SubtitleIcon class="h-3.5 w-3.5 shrink-0 opacity-70" />
-          {/if}
-          <span class="truncate">{subtitle}</span>
-        </div>
-      {/if}
+  {#each inlineBadges as badge (badge.label)}
+    <span
+      class={cn(
+        "shrink-0 rounded px-1 text-[10px]",
+        isActive ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground",
+      )}
+    >
+      {badge.label}
+    </span>
+  {/each}
 
-      <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-        {#if updatedLabel}
-          <span class="inline-flex items-center gap-1" title={updatedFull}>
-            <Clock class="h-3.5 w-3.5 shrink-0 opacity-70" />
-            <span class="tabular-nums">{updatedLabel}</span>
-          </span>
-        {/if}
-        <span class="inline-flex items-center gap-1">
-          <MessageSquare class="h-3.5 w-3.5 shrink-0 opacity-70" />
-          <span>{formatCount(messageCount, "message")}</span>
-        </span>
-      </div>
-    </div>
+  {#if queuedCount > 0}
+    <span
+      class={cn(
+        "shrink-0 rounded px-1 text-[10px] tabular-nums",
+        isActive ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground",
+      )}
+      title="{formatCount(queuedCount, 'message')} queued"
+    >
+      {queuedCount} queued
+    </span>
+  {/if}
 
-    <div class="flex shrink-0 flex-col items-end gap-1">
-      {#if queuedCount > 0}
-        <Badge
-          variant="secondary"
-          class="h-5 px-1.5 text-[10px] font-normal tabular-nums"
-          title="{formatCount(queuedCount, 'message')} queued"
-        >
-          {queuedCount} queued
-        </Badge>
-      {/if}
-      {#each trailingBadges as badge (badge.label)}
-        <Badge
-          variant={badge.variant ?? "outline"}
-          class="h-5 px-1.5 text-[10px] {badge.class ?? ''}"
-        >
-          {badge.label}
-        </Badge>
-      {/each}
-      {#if onDelete}
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 {isActive
-            ? 'opacity-100'
-            : ''}"
-          onclick={handleDelete}
-          title={deleteTitle}
-        >
-          <Trash2 class="h-3.5 w-3.5" />
-        </Button>
-      {/if}
-    </div>
-  </div>
+  {#each trailingBadges as badge (badge.label)}
+    <span
+      class={cn(
+        "shrink-0 rounded px-1 text-[10px]",
+        isActive ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground",
+      )}
+    >
+      {badge.label}
+    </span>
+  {/each}
+
+  {#if metric}
+    <span
+      class={cn(
+        "shrink-0 text-[11px] tabular-nums",
+        isActive ? "text-primary-foreground/70" : "text-muted-foreground",
+        onDelete && "group-hover:hidden",
+      )}
+    >
+      {metric}
+    </span>
+  {/if}
+
+  {#if onDelete}
+    <Button
+      variant="ghost"
+      size="icon"
+      class={cn(
+        "hidden h-5 w-5 shrink-0 group-hover:flex",
+        isActive
+          ? "text-primary-foreground hover:bg-primary-foreground/20"
+          : "text-muted-foreground hover:text-destructive",
+      )}
+      onclick={handleDelete}
+      title={deleteTitle}
+    >
+      <Trash2 class="h-3 w-3" />
+    </Button>
+  {/if}
 </div>

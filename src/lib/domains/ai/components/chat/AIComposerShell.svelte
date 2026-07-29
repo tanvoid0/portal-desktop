@@ -23,6 +23,8 @@
     trailing?: Snippet;
     above?: Snippet;
     footer?: Snippet;
+    /** Right-aligned status in the control row, e.g. a token counter. */
+    meta?: Snippet;
   }
 
   let {
@@ -41,6 +43,7 @@
     trailing,
     above,
     footer,
+    meta,
     onModeCycle,
   }: Props = $props();
 
@@ -98,13 +101,13 @@
       {@render above()}
     {/if}
 
+    <!--
+    LM Studio layout: the prompt owns the full width, every control sits on a
+    second row underneath, with status and send pinned right.
+    -->
     <div
-      class="flex items-end gap-1 rounded-[26px] border border-border/80 bg-background px-2 py-2 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+      class="rounded-xl border border-border/70 bg-muted/40 px-2.5 py-2 transition-colors focus-within:border-border dark:bg-muted/20"
     >
-      {#if leading}
-        {@render leading()}
-      {/if}
-
       <Textarea
         bind:ref={textareaEl}
         bind:value
@@ -113,41 +116,50 @@
         {disabled}
         onkeydown={handleKeydown}
         oninput={autoResize}
-        class="max-h-40 min-h-[36px] flex-1 resize-none border-0 bg-transparent px-1 py-1.5 text-xs leading-relaxed shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0"
+        class="max-h-40 min-h-[36px] w-full resize-none border-0 bg-transparent px-1 py-1 text-xs leading-relaxed shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0"
       />
 
-      <div class="mb-0.5 flex shrink-0 items-center gap-1">
+      <div class="mt-1 flex items-center gap-1">
+        {#if leading}
+          {@render leading()}
+        {/if}
         {#if trailing}
           {@render trailing()}
         {/if}
 
-        {#if running && !value.trim() && onStop}
-          <Button
-            type="button"
-            onclick={onStop}
-            size="icon"
-            variant="destructive"
-            class="h-8 w-8 rounded-full"
-            title="Stop agent"
-          >
-            <Square class="h-3.5 w-3.5 fill-current" />
-          </Button>
-        {:else}
-          <Button
-            type="button"
-            onclick={onSend}
-            disabled={!value.trim() || disabled}
-            size="icon"
-            class="h-8 w-8 rounded-full"
-            title={resolvedSendTitle}
-          >
-            {#if queueSend && running && value.trim()}
-              <ListOrdered class="h-4 w-4" />
-            {:else}
-              <ArrowUp class="h-4 w-4" />
-            {/if}
-          </Button>
-        {/if}
+        <div class="ml-auto flex shrink-0 items-center gap-2">
+          {#if meta}
+            {@render meta()}
+          {/if}
+
+          {#if running && !value.trim() && onStop}
+            <Button
+              type="button"
+              onclick={onStop}
+              size="icon"
+              variant="destructive"
+              class="h-8 w-8 rounded-full"
+              title="Stop agent"
+            >
+              <Square class="h-3.5 w-3.5 fill-current" />
+            </Button>
+          {:else}
+            <Button
+              type="button"
+              onclick={onSend}
+              disabled={!value.trim() || disabled}
+              size="icon"
+              class="h-8 w-8 rounded-full"
+              title={resolvedSendTitle}
+            >
+              {#if queueSend && running && value.trim()}
+                <ListOrdered class="h-4 w-4" />
+              {:else}
+                <ArrowUp class="h-4 w-4" />
+              {/if}
+            </Button>
+          {/if}
+        </div>
       </div>
     </div>
 

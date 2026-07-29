@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { ChatMessage, ProviderType } from "../types/index.js";
+import type {
+  ChatMessage,
+  ContextUsage,
+  LlmUsage,
+  ProviderType,
+} from "../types/index.js";
 
 export interface ConversationTitleEvent {
   conversation_id: string;
@@ -10,6 +15,13 @@ export interface ConversationTitleEvent {
 export interface StreamCompletePayload {
   content: string;
   title?: string;
+  /** True when the user stopped generation — content is partial. */
+  cancelled?: boolean;
+  /** Present only when agent-platform reports usage on the stream. */
+  context_usage?: ContextUsage | null;
+  llm_usage?: LlmUsage | null;
+  /** Upstream `choices[0].finish_reason`, when the provider reports one. */
+  finish_reason?: string | null;
 }
 
 export interface SendMessageOptions {
@@ -20,6 +32,10 @@ export interface SendMessageOptions {
   temperature?: number;
   max_tokens?: number;
   model?: string;
+  /** Prepended to the history as a `system` turn; not stored in the thread. */
+  system_prompt?: string;
+  /** Extra sampling fields merged into the OpenAI-compatible request body. */
+  extra_options?: Record<string, unknown>;
 }
 
 export interface StreamMessageOptions extends SendMessageOptions {
@@ -27,6 +43,19 @@ export interface StreamMessageOptions extends SendMessageOptions {
   onComplete?: (fullMessage: string, payload?: StreamCompletePayload) => void;
   onTitleUpdated?: (event: ConversationTitleEvent) => void;
   onError?: (error: Error) => void;
+  /** Receives the stream id so the caller can pass it to `cancelStream`. */
+  onStreamId?: (streamId: string) => void;
+}
+
+/** Backend `ChatMessage` takes any role string, so `system` passes through. */
+function toWireHistory(history: ChatMessage[], systemPrompt?: string) {
+  const wire = history.map((msg) => ({
+    role: msg.role as string,
+    content: msg.content,
+  }));
+  const trimmed = systemPrompt?.trim();
+  if (trimmed) wire.unshift({ role: "system", content: trimmed });
+  return wire;
 }
 
 export class AIChatService {
@@ -40,16 +69,14 @@ export class AIChatService {
   ): Promise<string> {
     return invoke<string>("ai_send_message", {
       message,
-      history: history.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
+      history: toWireHistory(history, options.system_prompt),
       provider: options.provider || null,
       llmProvider: options.llm_provider || null,
       conversationId: options.conversation_id || null,
       temperature: options.temperature || null,
       maxTokens: options.max_tokens || null,
       model: options.model || null,
+      extraOptions: options.extra_options || null,
     });
   }
 
@@ -62,6 +89,7 @@ export class AIChatService {
     options: StreamMessageOptions = {},
   ): Promise<string> {
     const streamId = `stream-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    options.onStreamId?.(streamId);
 
     const chunkEventName = `ai-stream-chunk-${streamId}`;
     const completeEventName = `ai-stream-complete-${streamId}`;
@@ -103,16 +131,14 @@ export class AIChatService {
     try {
       const result = await invoke<string>("ai_send_message_stream", {
         message,
-        history: history.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
+        history: toWireHistory(history, options.system_prompt),
         provider: options.provider || null,
         llmProvider: options.llm_provider || null,
         conversationId: options.conversation_id || null,
         temperature: options.temperature || null,
         maxTokens: options.max_tokens || null,
         model: options.model || null,
+        extraOptions: options.extra_options || null,
         streamId: streamId,
       });
 
@@ -147,6 +173,11 @@ export class AIChatService {
       options.onError?.(err);
       throw err;
     }
+  }
+
+  /** Stop an in-flight stream; the backend completes it with partial content. */
+  async cancelStream(streamId: string): Promise<void> {
+    await invoke("ai_cancel_stream", { streamId });
   }
 
   clearChat(): void {

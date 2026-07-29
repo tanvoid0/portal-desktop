@@ -235,16 +235,17 @@ export function applyCustomTheme(settings: ThemeSettings): void {
     return;
   }
 
+  // Surfaces and brand colors only. Structural tokens (--border, --input,
+  // --muted*) stay on the neutral scale from app.css: mapping them to the
+  // palette's `secondary` turned every hairline into a solid dark outline.
+  // Clear first so structural vars set by an earlier call are dropped.
+  clearSurfaceOverrides(html);
   html.style.setProperty("--background", background);
   html.style.setProperty("--foreground", foreground);
   html.style.setProperty("--card", surface);
   html.style.setProperty("--card-foreground", foreground);
-  html.style.setProperty("--muted", secondary);
-  html.style.setProperty("--muted-foreground", foreground);
   html.style.setProperty("--popover", surface);
   html.style.setProperty("--popover-foreground", foreground);
-  html.style.setProperty("--border", secondary);
-  html.style.setProperty("--input", secondary);
   html.style.setProperty("--ring", primary);
   html.style.setProperty(
     "--radius",

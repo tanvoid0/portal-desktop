@@ -6,6 +6,7 @@
   import { setBreadcrumbs, clearBreadcrumbs } from "$lib/domains/shared/stores/breadcrumbStore";
   import { getAiTabBreadcrumb, isAiSectionRoute } from "$lib/config/ai-tabs";
   import { AI_CHAT_PATH } from "$lib/config/ai-nav";
+  import { aiTopbar } from "$lib/domains/ai/state/aiTopbarStore.svelte.js";
 
   let { children }: { children: Snippet<[]> } = $props();
 
@@ -30,8 +31,16 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  <div class="divider-edge-b divider-edge-full shrink-0 bg-background px-3 py-2 md:px-4">
-    <AITabBar class="max-w-xs" />
+  <!-- Pages park their action controls here so their own header stays readable. -->
+  <div
+    class="divider-edge-b divider-edge-full flex shrink-0 items-center gap-3 bg-background px-3 py-2 md:px-4"
+  >
+    <AITabBar class="w-[220px] shrink-0" />
+    {#if aiTopbar.actions}
+      <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5">
+        {@render aiTopbar.actions()}
+      </div>
+    {/if}
   </div>
   <div class="min-h-0 flex-1 overflow-hidden">
     {@render children()}

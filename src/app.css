@@ -1,15 +1,24 @@
 /* Fonts and icon fonts are bundled, never fetched. This is a desktop app: a
    remote @import here blocks first paint on a network round-trip and leaves
    the UI unstyled when offline. */
-@import "@fontsource-variable/inter";
-@import "tailwindcss";
-@config "../tailwind.config.js";
-@plugin "@tailwindcss/typography";
-@import "tw-animate-css";
+@import '@fontsource-variable/inter';
+@import 'tailwindcss';
+@config '../tailwind.config.js';
+@plugin '@tailwindcss/typography';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
+  /* Tailwind v4 preflight leaves border-color at `currentColor`, so a bare
+     `class="border"` renders a near-black outline. Default it to the neutral
+     border token instead — v3's behaviour, and what shadcn assumes. */
+  *,
+  ::before,
+  ::after {
+    border-color: hsl(var(--border));
+  }
+
   html,
   body {
     height: 100%;
@@ -18,35 +27,9 @@
     padding: 0;
     color: hsl(var(--foreground));
     background: hsl(var(--background));
-    background-image:
-      radial-gradient(
-        at 0% 0%,
-        hsl(var(--primary) / 0.05) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 100% 0%,
-        hsl(var(--primary) / 0.08) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 100% 100%,
-        hsl(var(--primary) / 0.05) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 0% 100%,
-        hsl(var(--primary) / 0.08) 0px,
-        transparent 50%
-      ),
-      linear-gradient(
-        to bottom,
-        hsl(var(--gradient-from)),
-        hsl(var(--gradient-to))
-      );
     font-feature-settings:
-      "rlig" 1,
-      "calt" 1;
+      'rlig' 1,
+      'calt' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -66,65 +49,42 @@
     width: 100%;
     min-height: 100vh;
     background: hsl(var(--background));
-    background-image:
-      radial-gradient(
-        at 0% 0%,
-        hsl(var(--primary) / 0.05) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 100% 0%,
-        hsl(var(--primary) / 0.08) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 100% 100%,
-        hsl(var(--primary) / 0.05) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 0% 100%,
-        hsl(var(--primary) / 0.08) 0px,
-        transparent 50%
-      ),
-      linear-gradient(
-        to bottom,
-        hsl(var(--gradient-from)),
-        hsl(var(--gradient-to))
-      );
   }
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Neutral grays (shadcn "neutral" base color) with a blue accent.
+       Every surface token is achromatic — only --primary/--ring carry hue. */
+    /* Page sits one step below card/popover so surfaces read without outlines. */
+    --background: 0 0% 97.6%;
+    --foreground: 0 0% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --card-elevated: 0 0% 99%;
-    --card-surface: 0 0% 98%;
-    --card-accent: 210 40% 96.1%;
+    --card-foreground: 0 0% 9%;
+    --card-elevated: 0 0% 100%;
+    --card-surface: 0 0% 100%;
+    --card-accent: 0 0% 96.1%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 9%;
     --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 92.2%;
+    --input: 0 0% 89.8%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
-    --sidebar: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar: 0 0% 97.6%;
+    --sidebar-foreground: 0 0% 25%;
+    --sidebar-primary: 0 0% 9%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 0 0% 94.5%;
+    --sidebar-accent-foreground: 0 0% 9%;
+    --sidebar-border: 0 0% 92.2%;
+    --sidebar-ring: 221.2 83.2% 53.3%;
 
     /* Layout variables */
     --header-height: 3.5rem;
@@ -137,11 +97,11 @@
 
     /* Gradient variables */
     --gradient-from: 0 0% 100%;
-    --gradient-to: 210 40% 96.1%;
+    --gradient-to: 0 0% 96.1%;
     --card-gradient-from: 0 0% 100%;
-    --card-gradient-to: 210 40% 98%;
+    --card-gradient-to: 0 0% 98%;
     --surface-gradient-from: 0 0% 100%;
-    --surface-gradient-to: 210 40% 96.1%;
+    --surface-gradient-to: 0 0% 96.1%;
 
     /* Status colors */
     --status-success: 142 76% 36%;
@@ -155,45 +115,45 @@
 
     /* Terminal canvas (xterm) */
     --terminal-background: hsl(0 0% 98%);
-    --terminal-foreground: hsl(222.2 84% 4.9%);
-    --terminal-cursor: hsl(222.2 84% 4.9%);
+    --terminal-foreground: hsl(0 0% 9%);
+    --terminal-cursor: hsl(0 0% 9%);
     --terminal-cursor-accent: hsl(0 0% 100%);
     --terminal-selection: hsl(221.2 83.2% 53.3% / 0.2);
   }
 
   .dark {
-    --sidebar: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar: 0 0% 7%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 0 0% 9%;
+    --sidebar-accent: 0 0% 14.9%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 16%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* App surfaces — match sidebar neutral palette (not blue-tinted shadcn defaults) */
+    /* App surfaces — achromatic; only --primary/--ring carry hue */
     --background: var(--sidebar);
     --foreground: var(--sidebar-foreground);
-    --card: var(--sidebar);
+    --card: 0 0% 10.5%;
     --card-foreground: var(--sidebar-foreground);
-    --card-elevated: var(--sidebar-accent);
-    --card-surface: var(--sidebar);
+    --card-elevated: 0 0% 12.5%;
+    --card-surface: 0 0% 10.5%;
     --card-accent: var(--sidebar-accent);
-    --popover: var(--sidebar);
+    --popover: 0 0% 10.5%;
     --popover-foreground: var(--sidebar-foreground);
     --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary-foreground: 0 0% 9%;
     --secondary: var(--sidebar-accent);
     --secondary-foreground: var(--sidebar-foreground);
     --muted: var(--sidebar-accent);
-    --muted-foreground: 240 5% 64.9%;
+    --muted-foreground: 0 0% 63.9%;
     --accent: var(--sidebar-accent);
     --accent-foreground: var(--sidebar-accent-foreground);
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: var(--sidebar-foreground);
     --border: var(--sidebar-border);
     --input: var(--sidebar-border);
-    --ring: 224.3 76.3% 48%;
+    --ring: 217.2 91.2% 59.8%;
 
     /* Gradient variables (dark mode) */
     --gradient-from: var(--sidebar);
@@ -214,10 +174,10 @@
     --status-info-bg: 217 91% 20%;
 
     /* Terminal canvas (xterm) */
-    --terminal-background: hsl(240 5.9% 10%);
-    --terminal-foreground: hsl(240 4.8% 95.9%);
-    --terminal-cursor: hsl(240 4.8% 95.9%);
-    --terminal-cursor-accent: hsl(240 5.9% 10%);
+    --terminal-background: hsl(0 0% 7%);
+    --terminal-foreground: hsl(0 0% 95%);
+    --terminal-cursor: hsl(0 0% 95%);
+    --terminal-cursor-accent: hsl(0 0% 7%);
     --terminal-selection: hsl(217.2 91.2% 59.8% / 0.35);
   }
 
@@ -267,11 +227,11 @@
 }
 
 /* K8s Navigation Styles */
-.k8s-navigable-table tbody tr[data-selected="true"] {
+.k8s-navigable-table tbody tr[data-selected='true'] {
   background-color: hsl(var(--accent));
 }
 
-.k8s-navigable-table tbody tr[data-selected="true"]:hover {
+.k8s-navigable-table tbody tr[data-selected='true']:hover {
   background-color: hsl(var(--accent) / 0.8);
 }
 
@@ -284,24 +244,22 @@
     background: transparent;
   }
 
-  .divider-soft[data-orientation="horizontal"] {
+  .divider-soft[data-orientation='horizontal'] {
     background: linear-gradient(
       90deg,
       transparent,
       hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
-      hsl(var(--divider-color) / var(--divider-opacity))
-        calc(100% - var(--divider-fade)),
+      hsl(var(--divider-color) / var(--divider-opacity)) calc(100% - var(--divider-fade)),
       transparent
     );
   }
 
-  .divider-soft[data-orientation="vertical"] {
+  .divider-soft[data-orientation='vertical'] {
     background: linear-gradient(
       180deg,
       transparent,
       hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
-      hsl(var(--divider-color) / var(--divider-opacity))
-        calc(100% - var(--divider-fade)),
+      hsl(var(--divider-color) / var(--divider-opacity)) calc(100% - var(--divider-fade)),
       transparent
     );
   }
@@ -333,7 +291,7 @@
   .divider-edge-t::after,
   .divider-edge-r::after,
   .divider-edge-l::after {
-    content: "";
+    content: '';
     position: absolute;
     pointer-events: none;
   }
@@ -347,8 +305,7 @@
       90deg,
       transparent,
       hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
-      hsl(var(--divider-color) / var(--divider-opacity))
-        calc(100% - var(--divider-fade)),
+      hsl(var(--divider-color) / var(--divider-opacity)) calc(100% - var(--divider-fade)),
       transparent
     );
   }
@@ -362,8 +319,7 @@
       90deg,
       transparent,
       hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
-      hsl(var(--divider-color) / var(--divider-opacity))
-        calc(100% - var(--divider-fade)),
+      hsl(var(--divider-color) / var(--divider-opacity)) calc(100% - var(--divider-fade)),
       transparent
     );
   }
@@ -408,8 +364,7 @@
       90deg,
       transparent,
       hsl(var(--divider-color) / var(--divider-opacity)) var(--divider-fade),
-      hsl(var(--divider-color) / var(--divider-opacity))
-        calc(100% - var(--divider-fade)),
+      hsl(var(--divider-color) / var(--divider-opacity)) calc(100% - var(--divider-fade)),
       transparent
     );
   }
@@ -426,11 +381,7 @@
   }
 
   .bg-gradient-subtle {
-    background: linear-gradient(
-      to bottom,
-      hsl(var(--gradient-from)),
-      hsl(var(--gradient-to))
-    );
+    background: linear-gradient(to bottom, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
   }
 
   .bg-gradient-surface {
@@ -442,121 +393,7 @@
   }
 }
 
-/* Modern Glassmorphism and Elevation System */
 @layer components {
-  /* Glassmorphism effect */
-  .glass {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-  }
-
-  .dark .glass {
-    background: hsl(var(--sidebar) / 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .glass-strong {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-  }
-
-  .dark .glass-strong {
-    background: hsl(var(--sidebar) / 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-  }
-
-  /* Premium multi-layered shadows with more elevation */
-  .card-elevation-flat {
-    box-shadow:
-      0 1px 3px 0 rgba(0, 0, 0, 0.08),
-      0 1px 2px 0 rgba(0, 0, 0, 0.12);
-  }
-
-  .card-elevation-raised {
-    box-shadow:
-      0 6px 12px -2px rgba(0, 0, 0, 0.12),
-      0 4px 8px -3px rgba(0, 0, 0, 0.15),
-      0 0 0 1px rgba(0, 0, 0, 0.08);
-  }
-
-  .card-elevation-elevated {
-    box-shadow:
-      0 12px 24px -4px rgba(0, 0, 0, 0.15),
-      0 8px 16px -6px rgba(0, 0, 0, 0.18),
-      0 0 0 1px rgba(0, 0, 0, 0.08),
-      0 24px 48px -8px rgba(0, 0, 0, 0.12);
-  }
-
-  .card-elevation-hover {
-    box-shadow:
-      0 20px 40px -6px rgba(0, 0, 0, 0.18),
-      0 12px 24px -8px rgba(0, 0, 0, 0.15),
-      0 0 0 1px rgba(0, 0, 0, 0.1),
-      0 32px 64px -12px rgba(0, 0, 0, 0.2);
-  }
-
-  .dark .card-elevation-flat {
-    box-shadow:
-      0 1px 3px 0 rgba(0, 0, 0, 0.4),
-      0 1px 2px 0 rgba(0, 0, 0, 0.5);
-  }
-
-  .dark .card-elevation-raised {
-    box-shadow:
-      0 6px 12px -2px rgba(0, 0, 0, 0.5),
-      0 4px 8px -3px rgba(0, 0, 0, 0.6),
-      0 0 0 1px rgba(255, 255, 255, 0.08);
-  }
-
-  .dark .card-elevation-elevated {
-    box-shadow:
-      0 12px 24px -4px rgba(0, 0, 0, 0.6),
-      0 8px 16px -6px rgba(0, 0, 0, 0.7),
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      0 24px 48px -8px rgba(0, 0, 0, 0.5);
-  }
-
-  .dark .card-elevation-hover {
-    box-shadow:
-      0 20px 40px -6px rgba(0, 0, 0, 0.7),
-      0 12px 24px -8px rgba(0, 0, 0, 0.6),
-      0 0 0 1px rgba(255, 255, 255, 0.12),
-      0 32px 64px -12px rgba(0, 0, 0, 0.8);
-  }
-
-  /* Modern gradient backgrounds */
-  .gradient-modern {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--primary) / 0.1) 0%,
-      hsl(var(--primary) / 0.05) 50%,
-      transparent 100%
-    );
-  }
-
-  .gradient-premium {
-    background:
-      radial-gradient(
-        circle at 20% 50%,
-        hsl(var(--primary) / 0.15) 0%,
-        transparent 50%
-      ),
-      radial-gradient(
-        circle at 80% 80%,
-        hsl(var(--primary) / 0.1) 0%,
-        transparent 50%
-      ),
-      linear-gradient(
-        135deg,
-        hsl(var(--card-gradient-from)),
-        hsl(var(--card-gradient-to))
-      );
-  }
-
   /* Chat markdown rendering */
   .chat-markdown {
     --chat-code-bg: hsl(var(--background) / 0.85);
@@ -872,7 +709,7 @@
     border: 1px solid hsl(var(--border));
   }
 
-  .chat-markdown :where(input[type="checkbox"]) {
+  .chat-markdown :where(input[type='checkbox']) {
     margin-right: 0.35rem;
     accent-color: hsl(var(--primary));
     pointer-events: none;

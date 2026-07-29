@@ -4,12 +4,12 @@
 -->
 
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { ChevronRight, Home } from "@lucide/svelte";
-  import { Button } from "./button";
-  import { cn } from "$lib/utils";
-  import type { BreadcrumbItem } from "$lib/domains/shared";
-  import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
+  import { goto } from '$app/navigation';
+  import { ChevronRight, Home } from '@lucide/svelte';
+  import { Button } from './button';
+  import { cn } from '$lib/utils';
+  import type { BreadcrumbItem } from '$lib/domains/shared';
+  import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 
   interface Props {
     items: BreadcrumbItem[];
@@ -24,14 +24,14 @@
     showHome = true,
     homeIcon = true,
     homeItem,
-    class: className = "",
+    class: className = '',
   }: Props = $props();
 
   // Default home item (fallback)
   const defaultHomeItem: BreadcrumbItem = {
-    label: "Home",
-    href: "/",
-    icon: "home",
+    label: 'Home',
+    href: '/',
+    icon: 'home',
   };
 
   // Use custom home item if provided, otherwise use default
@@ -42,9 +42,7 @@
 
   const isMobile = new IsMobile();
   let visibleItems = $derived(
-    isMobile.current && allItems.length > 1
-      ? [allItems[allItems.length - 1]]
-      : allItems,
+    isMobile.current && allItems.length > 1 ? [allItems[allItems.length - 1]] : allItems
   );
 
   function handleClick(item: BreadcrumbItem) {
@@ -58,10 +56,7 @@
   }
 </script>
 
-<nav
-  class={cn("flex items-center space-x-1 text-sm", className)}
-  aria-label="Breadcrumb"
->
+<nav class={cn('flex items-center space-x-1 text-sm', className)} aria-label="Breadcrumb">
   <ol class="flex min-w-0 items-center space-x-1 overflow-hidden">
     {#each visibleItems as item, index (index)}
       <li class="flex items-center">
@@ -76,24 +71,20 @@
             class="h-auto p-1 text-muted-foreground hover:text-foreground"
             onclick={() => handleClick(item)}
           >
-            {#if item.icon === "home" && homeIcon}
+            {#if item.icon === 'home' && homeIcon}
               <Home class="mr-1 h-3 w-3" />
             {/if}
-            <span class={item.label.startsWith("?") ? "text-xs" : ""}
-              >{item.label}</span
-            >
+            <span class={item.label.startsWith('?') ? 'text-xs' : ''}>{item.label}</span>
           </Button>
         {:else}
           <span
             class="flex items-center px-1 py-0.5 font-medium text-foreground"
             class:opacity-50={item.disabled}
           >
-            {#if item.icon === "home" && homeIcon}
+            {#if item.icon === 'home' && homeIcon}
               <Home class="mr-1 h-3 w-3" />
             {/if}
-            <span class={item.label.startsWith("?") ? "text-xs" : ""}
-              >{item.label}</span
-            >
+            <span class={item.label.startsWith('?') ? 'text-xs' : ''}>{item.label}</span>
           </span>
         {/if}
       </li>

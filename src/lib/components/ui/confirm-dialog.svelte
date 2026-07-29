@@ -12,13 +12,10 @@
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-  } from "$lib/components/ui/alert-dialog";
-  import { buttonVariants } from "$lib/components/ui/button";
-  import { cn } from "$lib/utils";
-  import {
-    confirmActions,
-    confirmStore,
-  } from "$lib/domains/shared/stores/confirmStore";
+  } from '$lib/components/ui/alert-dialog';
+  import { buttonVariants } from '$lib/components/ui/button';
+  import { cn } from '$lib/utils';
+  import { confirmActions, confirmStore } from '$lib/domains/shared/stores/confirmStore';
 
   let request = $derived($confirmStore);
   let open = $state(false);
@@ -44,9 +41,7 @@
       <AlertDialogFooter>
         <AlertDialogCancel>{request.cancelLabel}</AlertDialogCancel>
         <AlertDialogAction
-          class={request.destructive
-            ? cn(buttonVariants({ variant: "destructive" }))
-            : undefined}
+          class={request.destructive ? cn(buttonVariants({ variant: 'destructive' })) : undefined}
           onclick={() => confirmActions.confirm()}
         >
           {request.confirmLabel}

@@ -17,7 +17,7 @@ use crate::domains::disk::dev_cleaners::{
     self, DevCleaner, DevCleanerCleanItem, DevCleanerCleanResult, DevCleanerScan,
     DevCleanerScanContext, DevCleanerWalkHooks,
 };
-use crate::domains::disk::disk::{self, DiskUsage};
+use crate::domains::disk::disk::{self, DiskUsage, HostStats};
 use crate::domains::disk::locations::{self, Location};
 use crate::domains::disk::projects::{to_project_scan, ProjectScan};
 use crate::domains::disk::quarantine::{self, QuarantineItem, QuarantineResult};
@@ -273,6 +273,12 @@ pub fn list_locations() -> Vec<Location> {
 #[tauri::command]
 pub fn disk_usage() -> Vec<DiskUsage> {
     disk::disk_usage()
+}
+
+/// CPU / memory readout for the AI sidebar status bar. Read-only.
+#[tauri::command]
+pub fn host_stats() -> HostStats {
+    disk::host_stats()
 }
 
 /// Advisory: asks the configured AI provider (via the desktop `ai` domain) for a

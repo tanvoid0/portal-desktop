@@ -7,26 +7,17 @@
     onClick?: () => void;
     onDelete?: (conversation: Conversation) => void;
     isActive?: boolean;
-    compact?: boolean;
   }
 
-  let {
-    conversation,
-    onClick,
-    onDelete,
-    isActive = false,
-    compact = false,
-  }: Props = $props();
+  let { conversation, onClick, onDelete, isActive = false }: Props = $props();
 
-  const subtitle = $derived(
-    [conversation.provider, conversation.model].filter(Boolean).join(" · "),
-  );
+  // Provider is the same for every thread, so only the model is worth showing.
+  const subtitle = $derived(conversation.model ?? conversation.provider);
 </script>
 
 <AISessionCard
   title={conversation.title}
   {isActive}
-  {compact}
   updatedAt={conversation.updated_at}
   messageCount={conversation.message_count ?? 0}
   subtitle={subtitle || null}

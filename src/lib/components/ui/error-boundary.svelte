@@ -4,12 +4,12 @@
 -->
 
 <script lang="ts">
-  import { onMount } from "svelte";
-  import type { Snippet } from "svelte";
-  import { Button } from "./button";
-  import { Alert, AlertDescription, AlertTitle } from "./alert";
-  import { TriangleAlert, RefreshCw } from "@lucide/svelte";
-  import { cn } from "$lib/utils";
+  import { onMount } from 'svelte';
+  import type { Snippet } from 'svelte';
+  import { Button } from './button';
+  import { Alert, AlertDescription, AlertTitle } from './alert';
+  import { TriangleAlert, RefreshCw } from '@lucide/svelte';
+  import { cn } from '$lib/utils';
 
   interface Props {
     fallback?: Snippet;
@@ -19,13 +19,7 @@
     class?: string;
   }
 
-  let {
-    fallback,
-    children,
-    onError,
-    showDetails = false,
-    class: className = "",
-  }: Props = $props();
+  let { fallback, children, onError, showDetails = false, class: className = '' }: Props = $props();
 
   let hasError = $state(false);
   let error = $state<Error | null>(null);
@@ -49,7 +43,7 @@
     errorInfo = customEvent.detail.errorInfo;
 
     // Log error for debugging
-    console.error("Component Error:", error, errorInfo);
+    console.error('Component Error:', error, errorInfo);
 
     // Call custom error handler
     if (error) {
@@ -67,19 +61,16 @@
 
   onMount(() => {
     // Listen for component errors
-    window.addEventListener("component-error", handleError as EventListener);
+    window.addEventListener('component-error', handleError as EventListener);
 
     return () => {
-      window.removeEventListener(
-        "component-error",
-        handleError as EventListener,
-      );
+      window.removeEventListener('component-error', handleError as EventListener);
     };
   });
 </script>
 
 {#if hasError}
-  <div class={cn("p-4", className)}>
+  <div class={cn('p-4', className)}>
     {#if fallback}
       {@render fallback()}
     {:else}
@@ -87,8 +78,8 @@
         <TriangleAlert class="h-4 w-4" />
         <AlertTitle>Something went wrong</AlertTitle>
         <AlertDescription>
-          An unexpected error occurred. Please try refreshing the page or
-          contact support if the problem persists.
+          An unexpected error occurred. Please try refreshing the page or contact support if the
+          problem persists.
         </AlertDescription>
       </Alert>
 
@@ -97,20 +88,14 @@
           <RefreshCw class="mr-2 h-4 w-4" />
           Try Again
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={() => window.location.reload()}
-        >
+        <Button variant="outline" size="sm" onclick={() => window.location.reload()}>
           Refresh Page
         </Button>
       </div>
 
       {#if showDetails && error}
         <details class="mt-4">
-          <summary class="cursor-pointer text-sm text-muted-foreground">
-            Error Details
-          </summary>
+          <summary class="cursor-pointer text-sm text-muted-foreground"> Error Details </summary>
           <pre class="mt-2 overflow-auto rounded bg-muted p-2 text-xs">
 						{error.message}
 						{#if error.stack}

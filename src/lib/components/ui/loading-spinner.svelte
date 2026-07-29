@@ -1,34 +1,24 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from '$lib/utils.js';
 
   interface Props {
-    size?: "sm" | "md" | "lg";
+    size?: 'sm' | 'md' | 'lg';
     text?: string;
     class?: string;
   }
 
-  let { size = "md", text, class: className }: Props = $props();
+  let { size = 'md', text, class: className }: Props = $props();
 
   const sizeClasses = {
-    sm: "h-4 w-4",
-    md: "h-6 w-6",
-    lg: "h-8 w-8",
+    sm: 'h-4 w-4',
+    md: 'h-6 w-6',
+    lg: 'h-8 w-8',
   };
 </script>
 
-<div class={cn("flex items-center justify-center gap-2", className)}>
-  <svg
-    class={cn("animate-spin", sizeClasses[size])}
-    fill="none"
-    viewBox="0 0 24 24"
-  >
-    <circle
-      class="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      stroke-width="4"
+<div class={cn('flex items-center justify-center gap-2', className)}>
+  <svg class={cn('animate-spin', sizeClasses[size])} fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
     ></circle>
     <path
       class="opacity-75"

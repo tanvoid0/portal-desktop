@@ -338,7 +338,10 @@ export function getModelDisplayParts(model: CatalogModel): ModelDisplayParts {
 
   return {
     id: model.id,
-    provider: model.provider !== "unknown" ? model.provider : undefined,
+    provider:
+      model.provider && model.provider !== "unknown"
+        ? model.provider
+        : undefined,
     backendId,
     displayName:
       typeof displayName === "string" &&
@@ -348,6 +351,54 @@ export function getModelDisplayParts(model: CatalogModel): ModelDisplayParts {
         : undefined,
     specBadges,
     statusBadges,
+  };
+}
+
+/**
+ * Flat, column-shaped view of a model for table-style selector rows. Every
+ * field is optional — the catalog only carries rich metadata for local
+ * backends (Ollama, LM Studio); cloud providers report little more than an id.
+ */
+export interface ModelRow {
+  id: string;
+  name: string;
+  quant?: string;
+  params?: string;
+  family?: string;
+  publisher?: string;
+  sizeLabel?: string;
+  /** `live` or `alias`. */
+  source?: string;
+  backendId?: string;
+  tools?: boolean;
+  vision?: boolean;
+  embeddings?: boolean;
+}
+
+export function getModelRow(model: CatalogModel): ModelRow {
+  const meta = model.metadata ?? {};
+  const str = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim() : undefined;
+  const size = typeof meta.size === "number" && meta.size > 0 ? meta.size : null;
+  const displayName = str(meta.display_name);
+
+  return {
+    id: model.id,
+    name: displayName ?? model.id,
+    quant: str(meta.quantization_level),
+    params: str(meta.parameter_size),
+    family: str(meta.family),
+    publisher:
+      model.provider && model.provider !== "unknown" ? model.provider : undefined,
+    sizeLabel: size ? formatBytes(size) : undefined,
+    source: model.source === "alias" || model.source === "live" ? model.source : undefined,
+    backendId:
+      model.source === "alias" && model.backend_id && model.backend_id !== model.id
+        ? model.backend_id
+        : undefined,
+    tools: model.capabilities?.tools,
+    vision: model.capabilities?.vision_input,
+    embeddings: model.capabilities?.embeddings,
   };
 }
 
