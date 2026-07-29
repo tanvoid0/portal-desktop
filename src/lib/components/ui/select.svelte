@@ -23,6 +23,8 @@
 
   interface Props {
     options: string[] | SelectOption[] | ConstantArray | EnumType;
+    /** Lands on the trigger, so a sibling `<Label for=…>` has something to point at. */
+    id?: string;
     defaultValue?: string;
     value?: string;
     placeholder?: string;
@@ -36,6 +38,7 @@
 
   let {
     options = [],
+    id,
     defaultValue = '',
     value = $bindable(),
     placeholder = 'Select an option...',
@@ -94,6 +97,7 @@
     {disabled}
   >
     <SelectPrimitive.Trigger
+      {id}
       class={cn('w-full', error && 'border-destructive aria-invalid:border-destructive')}
       aria-required={required}
       aria-invalid={!!error}

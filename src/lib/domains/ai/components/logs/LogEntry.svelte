@@ -6,7 +6,7 @@
 		CollapsibleContent,
 		CollapsibleTrigger
 	} from '$lib/components/ui/collapsible';
-	import { ChevronUp, ChevronDown } from 'lucide-svelte';
+	import { ChevronUp, ChevronDown } from '@lucide/svelte';
 	import type { AILog } from '../../types/index.js';
 
 	interface Props {

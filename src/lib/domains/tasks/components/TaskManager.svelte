@@ -34,7 +34,6 @@
   import KanbanBoard from "./KanbanBoard.svelte";
   import TaskList from "./TaskList.svelte";
   import QuickActions from "./QuickActions.svelte";
-  import SmartFilters from "./SmartFilters.svelte";
   import SavedViews from "./SavedViews.svelte";
   import TimeTracker from "./TimeTracker.svelte";
   import TemplateManager from "./TemplateManager.svelte";

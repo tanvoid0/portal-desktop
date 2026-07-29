@@ -223,35 +223,40 @@
     }
   }
 
-  onMount(async () => {
+  // Svelte ignores anything an async onMount returns, so the cleanup has to be
+  // returned synchronously — otherwise the notification handler outlives the
+  // component and fires against a destroyed panel.
+  onMount(() => {
     coderSession.setSubAgentNotificationHandler(handleSubAgentNotification);
     coderUi.initFromStorage();
     if (coderUi.activeProjectPath && !coderSession.workspaceRoot) {
       coderSession.workspaceRoot = coderUi.activeProjectPath;
     }
 
-    try {
-      await coderSession.ensureInit();
-    } catch (e) {
-      console.error("coder: ensureInit failed", e);
-    }
-
-    const urlId = $page.url.searchParams.get('id');
-    if (urlId) {
-      const exists = coderSession.threads.find((t) => t.id === urlId);
-      if (exists) await selectThread(exists.id);
-      else {
-        try {
-          await coderSession.selectThread(urlId);
-          syncUrl(urlId);
-        } catch {
-          /* ignore */
-        }
+    void (async () => {
+      try {
+        await coderSession.ensureInit();
+      } catch (e) {
+        console.error("coder: ensureInit failed", e);
       }
-    } else if (!coderSession.activeThreadId) {
-      const attached = await coderSession.attachToRunningThread();
-      if (attached) syncUrl(attached);
-    }
+
+      const urlId = $page.url.searchParams.get('id');
+      if (urlId) {
+        const exists = coderSession.threads.find((t) => t.id === urlId);
+        if (exists) await selectThread(exists.id);
+        else {
+          try {
+            await coderSession.selectThread(urlId);
+            syncUrl(urlId);
+          } catch {
+            /* ignore */
+          }
+        }
+      } else if (!coderSession.activeThreadId) {
+        const attached = await coderSession.attachToRunningThread();
+        if (attached) syncUrl(attached);
+      }
+    })();
 
     return () => {
       coderSession.setSubAgentNotificationHandler(null);

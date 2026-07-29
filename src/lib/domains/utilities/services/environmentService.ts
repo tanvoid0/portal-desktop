@@ -5,7 +5,7 @@ import type {
   EnvChange,
   EnvPermissions,
   EnvVariable,
-} from "./types";
+} from "../types";
 
 function requireTauri(): void {
   if (!isTauriEnvironment()) {

@@ -90,11 +90,14 @@
           </span>
         </div>
         {#if deployment.container?.ports && deployment.container.ports.length > 0}
+          <!-- ports is PortMapping[] | string[]; the string form is already "host:container". -->
+          {@const port = deployment.container.ports[0]}
           <div class="flex items-center justify-between">
             <span class="text-sm text-muted-foreground">Port:</span>
             <span class="text-sm"
-              >{deployment.container.ports[0].hostPort}:{deployment.container
-                .ports[0].containerPort}</span
+              >{typeof port === "string"
+                ? port
+                : `${port.hostPort}:${port.containerPort}`}</span
             >
           </div>
         {/if}

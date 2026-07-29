@@ -299,7 +299,14 @@ function serializeAppSettings(app: AppSettings): Record<string, unknown> {
   };
 }
 
-function serializeThemeSettings(theme: ThemeSettings): Record<string, unknown> {
+/**
+ * Partial because settings updates carry only the changed keys — the update path has
+ * always passed a `Partial<ThemeSettings>` at runtime. Absent keys serialize to
+ * `undefined` and are dropped from the payload rather than sent as nulls.
+ */
+function serializeThemeSettings(
+  theme: Partial<ThemeSettings>,
+): Record<string, unknown> {
   return {
     primary_color: theme.primaryColor,
     secondary_color: theme.secondaryColor,
@@ -310,7 +317,7 @@ function serializeThemeSettings(theme: ThemeSettings): Record<string, unknown> {
     border_radius: theme.borderRadius,
     shadow_intensity: theme.shadowIntensity,
     animation_speed: theme.animationSpeed,
-    custom_themes: theme.customThemes.map((customTheme) => ({
+    custom_themes: theme.customThemes?.map((customTheme) => ({
       id: customTheme.id,
       name: customTheme.name,
       description: customTheme.description,

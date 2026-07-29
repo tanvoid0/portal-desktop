@@ -21,8 +21,11 @@ export const ollamaApi = {
     return invokeClient.post<unknown[]>("get_ollama_models");
   },
 
+  /** Model families keyed by category — the Rust side returns a map, not a list. */
   getAvailableModels() {
-    return invokeClient.post<unknown[]>("get_available_ollama_models");
+    return invokeClient.post<Record<string, unknown[]>>(
+      "get_available_ollama_models",
+    );
   },
 
   installModel(modelName: string) {

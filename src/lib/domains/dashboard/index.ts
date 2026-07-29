@@ -1,2 +1,7 @@
 export { createDashboardOverviewQuery } from "./queries/dashboardQueries";
-export { dashboardService } from "./services/dashboardService";
+export {
+  fetchDashboardOverview,
+  getDashboardOverview,
+  invalidateDashboardOverview,
+  primeDashboardOverview,
+} from "./services/dashboardService";

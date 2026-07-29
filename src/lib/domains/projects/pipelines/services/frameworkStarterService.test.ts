@@ -82,7 +82,8 @@ describe("frameworkStarterService", () => {
       framework_ids: [],
       language_ids: [],
       metadata: { dependencies: { packageManager: "pnpm" } },
-    } as Project;
+      // Only the fields resolveCommands reads; the rest of Project is irrelevant here.
+    } as unknown as Project;
 
     expect(
       resolveCommands(project, {

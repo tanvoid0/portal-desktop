@@ -14,8 +14,8 @@ export function createProjectQuery(
 ) {
   return createQuery(() => {
     const id = projectId();
-    const enabled =
-      Boolean(id) && id !== undefined && !Number.isNaN(parseInt(id, 10));
+    // `!!id` narrows away null/undefined; Boolean(id) does not.
+    const enabled = !!id && !Number.isNaN(parseInt(id, 10));
 
     return {
       queryKey: queryKeys.projects.detail(id ?? ""),

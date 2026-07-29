@@ -184,7 +184,7 @@
 
       // Available models can be loaded without service running - they're from online library
       // Get available models from Ollama library
-      const availableModelsData = (await ollamaApi.getAvailableModels()) as Record<string, any[]>;
+      const availableModelsData = await ollamaApi.getAvailableModels();
       availableModels = availableModelsData;
 
       const totalModels = Object.values(availableModelsData).flat().length;
