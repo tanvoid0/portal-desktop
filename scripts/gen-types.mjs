@@ -11,7 +11,12 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const GENERATED = ['src/lib/domains/coder/generated', 'src/lib/domains/disk/generated'];
+const GENERATED = [
+  'src/lib/domains/coder/generated',
+  'src/lib/domains/disk/generated',
+  'src/lib/domains/github/generated',
+  'src/lib/domains/projects/generated',
+];
 
 execFileSync(
   'cargo',

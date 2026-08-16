@@ -1,10 +1,12 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use crate::database::ProjectModel;
 
 /// API response for projects including many-to-many relationship IDs.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/projects/generated/")]
 pub struct ProjectResponse {
     pub id: i32,
     pub name: String,
@@ -20,6 +22,7 @@ pub struct ProjectResponse {
     pub starred: bool,
     pub open_count: i32,
     pub last_opened: Option<DateTime<Utc>>,
+    #[ts(type = "number")]
     pub size: i64,
     pub file_count: i32,
     pub git_repository: Option<String>,

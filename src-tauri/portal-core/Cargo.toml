@@ -69,7 +69,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 # Disk-cleanup domain
 jwalk = "0.8"
 trash = "5"
-ts-rs = { version = "12.0.1", features = ["serde-json-impl"] }
+ts-rs = { version = "12.0.1", features = ["chrono-impl", "serde-json-impl"] }
 
 [dev-dependencies]
 tempfile = "3"
