@@ -124,6 +124,29 @@ pub fn platform_tool_specs() -> Vec<Value> {
     )]
 }
 
+/// Web search, run by the platform's `/api/v1/search`.
+///
+/// Separate from [`platform_tool_specs`] because it needs no team template —
+/// only a reachable platform, which the coder already requires for its turn
+/// loop. Read-only, so it is offered in Ask mode too.
+pub fn web_search_tool_specs() -> Vec<Value> {
+    vec![spec(
+        "web_search",
+        "Search the web for current information — documentation, error messages,          library versions, anything outside the workspace or your training data.          Returns titles, URLs and snippets.",
+        json!({
+            "type": "object",
+            "properties": {
+                "query": { "type": "string", "description": "What to search for, in plain words." },
+                "limit": {
+                    "type": "integer",
+                    "description": "How many results to return, 1-10. Defaults to 5."
+                }
+            },
+            "required": ["query"]
+        }),
+    )]
+}
+
 pub fn multitask_tool_specs() -> Vec<Value> {
     vec![spec(
         "spawn_parallel_tasks",
@@ -159,7 +182,7 @@ pub fn multitask_tool_specs() -> Vec<Value> {
 
 /// A tool routed to the platform over HTTP rather than executed locally.
 pub fn is_platform_tool(tool: &str) -> bool {
-    matches!(tool, "delegate_task")
+    matches!(tool, "delegate_task" | "web_search")
 }
 
 /// The relative path a file-mutating tool targets, for change tracking.
@@ -192,7 +215,7 @@ pub fn write_raw(root: &str, rel: &str, content: &str) -> Result<(), String> {
 pub fn is_read_only(tool: &str) -> bool {
     matches!(
         tool,
-        "read_file" | "list_dir" | "search_files" | "list_terminals"
+        "read_file" | "list_dir" | "search_files" | "list_terminals" | "web_search"
     )
 }
 

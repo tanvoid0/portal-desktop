@@ -23,7 +23,9 @@ use sea_orm::{
 };
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::{Emitter, State};
+use tauri::State;
+
+use crate::events::{EventSinkExt, Events};
 // Use the centralized logger from utils
 use crate::domains::ai::entities::ai_conversation::Column as ConversationColumn;
 use crate::domains::ai::entities::ai_conversation_message::Column as ConversationMessageColumn;
@@ -267,11 +269,12 @@ pub async fn ai_send_message_stream(
     llm_provider: Option<String>,
     extra_options: Option<serde_json::Value>,
     stream_id: String, // Unique ID for this stream
-    app_handle: tauri::AppHandle,
+    events: State<'_, Events>,
     ai_service: State<'_, Arc<AIService>>,
     db_manager: State<'_, Arc<DatabaseManager>>,
     settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<String, String> {
+    let sink = events.sink();
     let is_first_user = history.iter().filter(|m| m.role == "user").count() == 0;
     let fallback_title = if is_first_user {
         Some(fallback_title_from_message(&message, PLACEHOLDER_CHAT))
@@ -287,13 +290,13 @@ pub async fn ai_send_message_stream(
                 conversation.title = Set(fb.clone());
                 conversation.updated_at = Set(chrono::Utc::now().to_rfc3339());
                 let _ = conversation.update(db).await;
-                let _ = app_handle.emit(
+                sink.emit(
                     &format!("ai-stream-title-{stream_id}"),
                     serde_json::json!({ "conversation_id": conv_id, "title": fb }),
                 );
 
                 if smart_titles_enabled() {
-                    let app = app_handle.clone();
+                    let title_sink = sink.clone();
                     let sid = stream_id.clone();
                     let cid = conv_id.clone();
                     let fb_clone = fb.clone();
@@ -321,7 +324,7 @@ pub async fn ai_send_message_stream(
                         conversation.title = Set(smart.clone());
                         conversation.updated_at = Set(chrono::Utc::now().to_rfc3339());
                         if conversation.update(db).await.is_ok() {
-                            let _ = app.emit(
+                            title_sink.emit(
                                 &format!("ai-stream-title-{sid}"),
                                 serde_json::json!({ "conversation_id": cid, "title": smart }),
                             );
@@ -352,7 +355,7 @@ pub async fn ai_send_message_stream(
     // Shared so the partial text survives a cancelled stream.
     let full_response = Arc::new(Mutex::new(String::new()));
     let response_sink = full_response.clone();
-    let app_handle_clone = app_handle.clone();
+    let chunk_sink = sink.clone();
     let stream_id_clone = stream_id.clone();
     let result = ai_service
         .generate_chat_stream(
@@ -367,9 +370,11 @@ pub async fn ai_send_message_stream(
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .push_str(&chunk);
-                app_handle_clone
-                    .emit(&format!("ai-stream-chunk-{}", stream_id_clone), &chunk)
-                    .map_err(|e| AIError::GenericError(format!("Failed to emit event: {}", e)))?;
+                if !chunk_sink.emit(&format!("ai-stream-chunk-{}", stream_id_clone), &chunk) {
+                    return Err(AIError::GenericError(
+                        "no client is receiving this stream".to_string(),
+                    ));
+                }
                 Ok(())
             }),
         )
@@ -420,12 +425,12 @@ pub async fn ai_send_message_stream(
         complete_payload["llm_usage"] = serde_json::json!(llm_usage);
         complete_payload["finish_reason"] = serde_json::json!(finish_reason);
     }
-    app_handle
-        .emit(
-            &format!("ai-stream-complete-{}", stream_id),
-            &complete_payload,
-        )
-        .map_err(|e| format!("Failed to emit completion event: {}", e))?;
+    if !sink.emit(
+        &format!("ai-stream-complete-{}", stream_id),
+        &complete_payload,
+    ) {
+        return Err("no client is receiving this stream".to_string());
+    }
     Ok(content)
 }
 

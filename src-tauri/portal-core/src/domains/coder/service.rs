@@ -234,6 +234,16 @@ impl CoderService {
         {
             specs.extend(tools::multitask_tool_specs());
         }
+        // Needs no team template, only a reachable platform — which every turn
+        // already needs. Mode-filtered like the rest, and `is_read_only` lists
+        // it, so Ask mode keeps it.
+        specs.extend(tools::web_search_tool_specs().into_iter().filter(|spec| {
+            spec.get("function")
+                .and_then(|f| f.get("name"))
+                .and_then(Value::as_str)
+                .map(|name| agent_mode::includes_tool(mode, name))
+                .unwrap_or(false)
+        }));
         if self.delegation_team_template_id.is_some() && mode != CoderAgentMode::Ask {
             specs.extend(tools::platform_tool_specs().into_iter().filter(|spec| {
                 spec.get("function")
@@ -246,10 +256,37 @@ impl CoderService {
         specs
     }
 
-    /// Execute a platform-delegated tool over HTTP. Currently `delegate_task`:
-    /// start a multi-agent process, poll to completion, return its status.
+    /// Execute a platform-delegated tool over HTTP: `delegate_task` starts a
+    /// multi-agent process and polls it to completion; `web_search` runs a query
+    /// through the platform's search route.
     async fn execute_platform_tool(&self, tool: &str, args: &Value) -> Result<String, String> {
         match tool {
+            "web_search" => {
+                let query = args
+                    .get("query")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|q| !q.is_empty())
+                    .ok_or("missing arg: query")?;
+                // The route caps at 10 and never paginates.
+                let limit = args
+                    .get("limit")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(5)
+                    .clamp(1, 10);
+
+                let cfg = self.platform_config();
+                let base = cfg.base_url.trim_end_matches('/');
+                // reqwest's own encoder rather than a hand-rolled one: a query
+                // with `&`, `#` or a space is the normal case here, not an edge.
+                let url = reqwest::Url::parse_with_params(
+                    &format!("{base}/api/v1/search"),
+                    &[("q", query), ("limit", &limit.to_string())],
+                )
+                .map_err(|e| format!("bad search url: {e}"))?;
+                let body = self.platform_get(url.as_str()).await?;
+                Ok(format_search_results(&body))
+            }
             "delegate_task" => {
                 let team_id = self
                     .delegation_team_template_id
@@ -2558,4 +2595,96 @@ fn truncate(text: &str, max: usize) -> String {
         end -= 1;
     }
     format!("{}… [truncated {} bytes]", &text[..end], text.len() - end)
+}
+
+/// Render `GET /api/v1/search` for a model to read.
+///
+/// The route answers `configured: false` with an empty `results` list when no
+/// `SEARCH_API_KEY` is set on the platform — never a 503. That has to read as
+/// "search is switched off", not as "the web has nothing", or the model will
+/// conclude the thing it searched for does not exist.
+fn format_search_results(body: &Value) -> String {
+    let query = body.get("query").and_then(Value::as_str).unwrap_or("");
+
+    if body.get("configured").and_then(Value::as_bool) == Some(false) {
+        return "Web search is not configured on the agent-platform (no SEARCH_API_KEY). \
+                This is not a result — treat the web as unavailable, not as empty."
+            .to_string();
+    }
+
+    let results = body.get("results").and_then(Value::as_array);
+    let Some(results) = results.filter(|r| !r.is_empty()) else {
+        return format!("No results for `{query}`.");
+    };
+
+    let mut out = format!("Results for `{query}`:\n");
+    for (i, r) in results.iter().enumerate() {
+        let field = |k: &str| {
+            r.get(k)
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim()
+                .to_string()
+        };
+        out.push_str(&format!(
+            "\n{}. {}\n   {}\n",
+            i + 1,
+            field("title"),
+            field("url")
+        ));
+        let snippet = field("snippet");
+        if !snippet.is_empty() {
+            out.push_str(&format!("   {snippet}\n"));
+        }
+    }
+    if let Some(total) = body.get("total_estimate").and_then(Value::as_i64) {
+        out.push_str(&format!(
+            "\n({total} estimated matches; showing the top ones.)"
+        ));
+    }
+    out
+}
+
+#[cfg(test)]
+mod search_format_tests {
+    use super::format_search_results;
+    use serde_json::json;
+
+    /// The whole reason this function exists: the platform answers an
+    /// unconfigured search with `configured: false` and `results: []`, which is
+    /// byte-for-byte what "nothing matched" looks like. They must not read the
+    /// same to the model.
+    #[test]
+    fn unconfigured_does_not_read_as_no_results() {
+        let unconfigured = format_search_results(
+            &json!({ "query": "axum sse", "configured": false, "results": [] }),
+        );
+        let empty = format_search_results(
+            &json!({ "query": "axum sse", "configured": true, "results": [] }),
+        );
+
+        assert!(unconfigured.contains("not configured"));
+        assert!(!unconfigured.contains("No results"));
+        assert!(empty.contains("No results"));
+        assert_ne!(unconfigured, empty);
+    }
+
+    #[test]
+    fn results_render_title_url_and_snippet() {
+        let out = format_search_results(&json!({
+            "query": "axum sse",
+            "configured": true,
+            "total_estimate": 42,
+            "results": [
+                { "title": "Axum SSE", "url": "https://example.test/sse", "snippet": "Server-sent events." },
+                { "title": "No snippet", "url": "https://example.test/2", "snippet": "" }
+            ]
+        }));
+
+        assert!(out.contains("1. Axum SSE"));
+        assert!(out.contains("https://example.test/sse"));
+        assert!(out.contains("Server-sent events."));
+        assert!(out.contains("2. No snippet"));
+        assert!(out.contains("42 estimated matches"));
+    }
 }

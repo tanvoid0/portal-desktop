@@ -10,8 +10,10 @@
 //! an all-accepted rebuild reproduces the `after` content byte-for-byte.
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct Hunk {
     /// Position in this hunk's ordering (stable id for accept/reject calls).
     pub index: usize,

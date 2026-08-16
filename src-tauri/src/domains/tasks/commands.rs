@@ -4,11 +4,11 @@ use crate::domains::ai::services::AIService;
 use crate::domains::tasks::repositories::task_repository::{
     CreateTaskRequest, TaskFilters, UpdateTaskRequest,
 };
+use crate::domains::tasks::services::ai_task_generator::{AITaskGenerator, GeneratedTaskStructure};
+use crate::domains::tasks::services::task_service::TaskService;
 use crate::domains::tasks::types::{
     ChildTaskInfo, ConversationMessage, ParentTaskInfo, SiblingTaskInfo, TaskContext,
 };
-use crate::domains::tasks::services::ai_task_generator::{AITaskGenerator, GeneratedTaskStructure};
-use crate::domains::tasks::services::task_service::TaskService;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;

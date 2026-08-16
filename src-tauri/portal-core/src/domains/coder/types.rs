@@ -2,13 +2,15 @@
 
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
+use ts_rs::TS;
 
 use super::diff::Hunk;
 
 /// A single chat message in a thread transcript. This mirrors the OpenAI
 /// chat-completions message shape so it can be sent to the platform `/v1`
 /// proxy verbatim.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct ChatMessage {
     /// `system` | `user` | `assistant` | `tool`.
     pub role: String,
@@ -158,7 +160,8 @@ pub fn with_message_timestamps(
 }
 
 /// An OpenAI-format tool call emitted by the model.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct ToolCall {
     pub id: String,
     #[serde(default = "default_tool_type")]
@@ -170,7 +173,8 @@ fn default_tool_type() -> String {
     "function".into()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct FunctionCall {
     pub name: String,
     /// Raw JSON string of arguments (OpenAI encodes this as a string).
@@ -179,7 +183,8 @@ pub struct FunctionCall {
 }
 
 /// A coder session/thread.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct CoderThread {
     pub id: String,
     pub title: String,
@@ -189,6 +194,9 @@ pub struct CoderThread {
     pub project_id: Option<i32>,
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    // serde_json writes this as a JSON number and JS parses it as `number`;
+    // ts-rs would default it to `bigint`, a type that never arrives.
+    #[ts(type = "number")]
     pub platform_thread_id: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub llm_provider: Option<String>,
@@ -202,7 +210,8 @@ pub struct CoderThread {
 }
 
 /// Lightweight thread row for the sessions sidebar (no message payload).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct CoderThreadSummary {
     pub id: String,
     pub title: String,
@@ -211,6 +220,9 @@ pub struct CoderThreadSummary {
     pub project_id: Option<i32>,
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    // serde_json writes this as a JSON number and JS parses it as `number`;
+    // ts-rs would default it to `bigint`, a type that never arrives.
+    #[ts(type = "number")]
     pub platform_thread_id: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub llm_provider: Option<String>,
@@ -224,8 +236,9 @@ pub struct CoderThreadSummary {
     pub is_running: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, TS)]
 #[serde(rename_all = "kebab-case")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub enum CoderThreadKind {
     #[default]
     Session,
@@ -235,11 +248,13 @@ pub enum CoderThreadKind {
 
 /// A tool call awaiting a human decision because the current permission mode +
 /// allowlist did not auto-grant it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct PendingApproval {
     pub call_id: String,
     pub tool: String,
     /// Parsed arguments, for display.
+    #[ts(type = "unknown")]
     pub arguments: serde_json::Value,
     /// The allowlist pattern that *would* be stored if the user picks
     /// "accept and remember" (e.g. `git status` or `src/**`).
@@ -250,7 +265,8 @@ pub struct PendingApproval {
 
 /// Returned by `send` / `approve`: either the run finished (final assistant
 /// text present) or it paused on an approval.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct CoderRunResult {
     pub thread_id: String,
     pub messages: Vec<ChatMessage>,
@@ -263,8 +279,9 @@ pub struct CoderRunResult {
 }
 
 /// Cursor-style agent operating mode for a coder session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "kebab-case")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub enum CoderAgentMode {
     /// Explore codebase, ask questions, write `.cursor/plans/*.plan.md`.
     Plan,
@@ -285,8 +302,9 @@ impl Default for CoderAgentMode {
 }
 
 /// How aggressively mutating tools are auto-approved (independent of agent mode).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "kebab-case")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub enum PermissionMode {
     /// Mutating tools prompt unless matched by the allowlist.
     Review,
@@ -301,8 +319,9 @@ impl Default for PermissionMode {
 }
 
 /// Review status of a file change produced by the agent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "kebab-case")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub enum ChangeStatus {
     /// Applied to disk, awaiting the user's accept/reject decision.
     Pending,
@@ -315,7 +334,8 @@ pub enum ChangeStatus {
 /// A single file edit made by the agent, tracked for Cursor-style review.
 /// The edit is already on disk; `before` + `hunks` let the user accept/reject
 /// the whole change or individual hunks (which rewrites the file on disk).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct FileChange {
     pub id: String,
     pub thread_id: String,
@@ -336,7 +356,8 @@ pub struct FileChange {
 }
 
 /// A persisted allow/deny rule for a tool.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct PermissionRule {
     pub tool: String,
     /// Glob (for paths) or command prefix (for run_command). Empty = any.
@@ -346,15 +367,17 @@ pub struct PermissionRule {
 }
 
 /// Workspace file explorer entry (relative path under thread root).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct WorkspaceDirEntry {
     pub name: String,
     pub path: String,
     pub is_dir: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "kebab-case")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub enum CoderSubAgentStatus {
     Pending,
     Running,
@@ -363,16 +386,21 @@ pub enum CoderSubAgentStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct GitHubIssueRef {
     pub owner: String,
     pub repo: String,
+    // serde_json writes this as a JSON number and JS parses it as `number`;
+    // ts-rs would default it to `bigint`, a type that never arrives.
+    #[ts(type = "number")]
     pub number: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct SpawnSubAgentTask {
     pub title: String,
     #[serde(default)]
@@ -383,8 +411,9 @@ pub struct SpawnSubAgentTask {
     pub github_issue_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct MultitaskSpawnRequest {
     pub coordinator_thread_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -395,8 +424,9 @@ pub struct MultitaskSpawnRequest {
     pub issue_urls: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct MultitaskCleanupRequest {
     pub coordinator_thread_id: String,
     #[serde(default)]
@@ -405,16 +435,18 @@ pub struct MultitaskCleanupRequest {
     pub force: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct MultitaskCancelRequest {
     pub coordinator_thread_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_agent_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/coder/generated/")]
 pub struct CoderSubAgent {
     pub id: String,
     pub coordinator_thread_id: String,
@@ -428,6 +460,9 @@ pub struct CoderSubAgent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub github_repo: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    // serde_json writes this as a JSON number and JS parses it as `number`;
+    // ts-rs would default it to `bigint`, a type that never arrives.
+    #[ts(type = "number")]
     pub github_issue_number: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub github_issue_url: Option<String>,

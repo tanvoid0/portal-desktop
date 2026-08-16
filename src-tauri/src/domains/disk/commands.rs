@@ -8,7 +8,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::State;
+
+use crate::events::{EventSinkExt, Events};
 
 use crate::domains::ai::services::AIService;
 use crate::domains::disk::classify::{self, Proposal};
@@ -66,10 +68,11 @@ pub struct VerifyControl {
 #[portal_rpc_macro::rpc]
 pub async fn scan_directory(
     root: String,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
     control: State<'_, ScanControl>,
 ) -> Result<ScanSummary, String> {
+    let sink = events.sink();
     let started = Instant::now();
     let extra_protected = db.list_protected()?;
     let root_clone = root.clone();
@@ -89,7 +92,7 @@ pub async fn scan_directory(
             &root_clone,
             &cancel,
             |p| {
-                let _ = app.emit("scan://progress", p);
+                let _ = sink.emit("scan://progress", p);
             },
             |files, total_files, _bytes, elapsed_ms| {
                 // Classify what we have so far and persist it as a partial
@@ -154,10 +157,11 @@ pub async fn scan_directory(
 #[portal_rpc_macro::rpc]
 pub async fn scan_projects(
     root: String,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
     control: State<'_, ScanControl>,
 ) -> Result<ProjectScan, String> {
+    let sink = events.sink();
     let extra_protected = db.list_protected()?;
     let cancel = control.cancel.clone();
     cancel.store(false, Ordering::Relaxed);
@@ -171,7 +175,7 @@ pub async fn scan_projects(
         let hooks = DevCleanerWalkHooks {
             cancel: &cancel,
             on_progress: &|p| {
-                let _ = app.emit("scan://progress", p);
+                let _ = sink.emit("scan://progress", p);
             },
         };
         let cleaner = dev_cleaners::projects::ProjectDevCleaner;
@@ -221,12 +225,13 @@ pub fn remove_cached_scan(root: String, db: State<'_, Arc<Db>>) -> Result<(), St
 #[portal_rpc_macro::rpc]
 pub async fn quarantine_paths(
     items: Vec<QuarantineItem>,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
 ) -> Result<QuarantineResult, String> {
+    let sink = events.sink();
     let result = tauri::async_runtime::spawn_blocking(move || {
         quarantine::quarantine(items, |p| {
-            let _ = app.emit("quarantine://progress", p);
+            let _ = sink.emit("quarantine://progress", p);
         })
     })
     .await
@@ -289,10 +294,11 @@ pub fn host_stats() -> HostStats {
 pub async fn verify_proposals(
     root: String,
     proposals: Vec<Proposal>,
-    app: AppHandle,
+    events: State<'_, Events>,
     ai: State<'_, Arc<AIService>>,
     control: State<'_, VerifyControl>,
 ) -> Result<VerificationResult, String> {
+    let sink = events.sink();
     // Fresh flag for this run — clears any leftover request from a prior verify.
     let cancel = control.cancel.clone();
     cancel.store(false, Ordering::Relaxed);
@@ -303,7 +309,7 @@ pub async fn verify_proposals(
     if cancel.load(Ordering::Relaxed) {
         return Err("cancelled".to_string());
     }
-    let _ = app.emit(
+    let _ = sink.emit(
         "verify://progress",
         VerifyProgress {
             process_id: 0,
@@ -311,7 +317,7 @@ pub async fn verify_proposals(
             tasks: vec![],
         },
     );
-    let _ = app.emit(
+    let _ = sink.emit(
         "verify://progress",
         VerifyProgress {
             process_id: 0,
@@ -338,10 +344,11 @@ pub fn cancel_verify(control: State<'_, VerifyControl>) {
 #[portal_rpc_macro::rpc]
 pub async fn scan_dev_cleaners(
     roots: Option<Vec<String>>,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
     control: State<'_, ScanControl>,
 ) -> Result<DevCleanerScan, String> {
+    let sink = events.sink();
     let extra_protected = db.list_protected()?;
     let cancel = control.cancel.clone();
     cancel.store(false, Ordering::Relaxed);
@@ -354,7 +361,7 @@ pub async fn scan_dev_cleaners(
         let hooks = DevCleanerWalkHooks {
             cancel: &cancel,
             on_progress: &|p| {
-                let _ = app.emit("scan://progress", p);
+                let _ = sink.emit("scan://progress", p);
             },
         };
         let walk = if ctx.roots.is_empty() {
@@ -374,12 +381,13 @@ pub async fn scan_dev_cleaners(
 #[portal_rpc_macro::rpc]
 pub async fn clean_dev_items(
     items: Vec<DevCleanerCleanItem>,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
 ) -> Result<DevCleanerCleanResult, String> {
+    let sink = events.sink();
     let result = tauri::async_runtime::spawn_blocking(move || {
         dev_cleaners::clean_items(items, |p| {
-            let _ = app.emit("dev-clean://progress", p);
+            let _ = sink.emit("dev-clean://progress", p);
         })
     })
     .await

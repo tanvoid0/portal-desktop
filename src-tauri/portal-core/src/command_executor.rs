@@ -46,7 +46,7 @@ pub struct CommandExecutor;
 
 /// Run a prepared command to completion, honouring `timeout_seconds`.
 ///
-/// These all run inside `#[tauri::command]` async fns. A blocking
+/// These all run inside async fns on the tokio runtime. A blocking
 /// `std::process::Command::output()` parks a tokio worker thread for the whole
 /// subprocess, so a handful of concurrent slow commands (git, docker, winget)
 /// is enough to stall every other IPC call behind them — the UI freezes.
