@@ -111,10 +111,11 @@ jobs:
       - name: Generated types are current
         run: |
           node scripts/gen-types.mjs
-          STALE=$(git status --porcelain -uall -- src/lib | grep '/generated/' || true)
-          if [ -n "$STALE" ]; then
+          UNTRACKED=$(git ls-files --others --exclude-standard -- src/lib | grep '/generated/' || true)
+          if ! git diff --quiet -- src/lib || [ -n "$UNTRACKED" ]; then
             echo "::error::Generated types are stale. Run 'pnpm gen:types' and commit."
-            echo "$STALE"
+            git diff --stat -- src/lib
+            echo "$UNTRACKED"
             exit 1
           fi
 
