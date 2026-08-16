@@ -1,13 +1,21 @@
-mod app_paths;
-mod command_executor;
-mod database;
+mod daemon;
 mod domains;
-mod entities;
-mod error;
+mod events;
 mod invoke_handler;
-mod migrations;
-mod process_ext;
-mod utils;
+mod rpc;
+
+// Everything below now lives in portal-core (phase 1 of
+// docs/development/REMOTE_ARCHITECTURE.md), re-exported under its old path so
+// no call site has to name the split. Drop a line here once nothing in
+// `src-tauri` refers to that module any more.
+pub(crate) use portal_core::{
+    app_paths, command_executor, database, entities, error, process_ext, utils,
+};
+
+// The `log_*!` macros are `#[macro_export]`, so they land at portal-core's root.
+// Re-exporting them here is what keeps every `use crate::{log_info, ...}` in the
+// tree resolving unchanged.
+pub(crate) use portal_core::{log_debug, log_error, log_info, log_warn};
 
 // Re-export error types for use throughout the codebase
 pub use error::{AppError, AppResult};
@@ -27,8 +35,10 @@ use std::sync::Arc;
 use tauri::Manager;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
+// Owned rather than `&str`: a borrowed parameter cannot be deserialised from an
+// HTTP request body, so `#[rpc]` rejects it.
+#[portal_rpc_macro::rpc]
+fn greet(name: String) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
@@ -55,8 +65,22 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(updater_builder.build())
         .setup(|app| {
-            // Set app handle for logger to emit events to frontend
-            utils::logger::set_app_handle(app.handle().clone());
+            // The one place transports are chosen. Everything downstream takes
+            // `Arc<dyn EventSink>` and never sees Tauri. See `events.rs`.
+            //
+            // Both get every event: the webview because it is the UI, the daemon
+            // so anything else attached — a phone, a script — sees the same
+            // stream rather than a summary of it.
+            let daemon_port = std::env::var("PORTAL_DAEMON_PORT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(daemon::DEFAULT_PORT);
+            let sink: Arc<dyn events::EventSink> = Arc::new(events::FanoutSink::new(vec![
+                Arc::new(events::TauriSink::new(app.handle().clone())),
+                daemon::spawn(daemon_port, app.handle().clone()),
+            ]));
+            app.manage(events::Events::new(sink.clone()));
+            utils::logger::set_event_sink(sink.clone());
 
             log_info!("Tauri", "Starting setup function...");
 
@@ -141,8 +165,11 @@ pub fn run() {
             let coder_service = tauri::async_runtime::block_on(async {
                 domains::coder::CoderService::new(db_manager_arc.clone()).await
             });
-            coder_service.init_app_handle(app.handle().clone());
-            app.manage(std::sync::Arc::new(coder_service));
+            // `init_events` needs the owning `Arc` — it stores a `Weak` back to
+            // itself for the runs the loop spawns.
+            let coder_service = std::sync::Arc::new(coder_service);
+            coder_service.init_events(sink.clone());
+            app.manage(coder_service);
 
             // Initialize pipeline services
             let pipeline_service = PipelineService::new(db_manager_arc.clone());
