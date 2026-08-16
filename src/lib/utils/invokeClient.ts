@@ -334,22 +334,21 @@ export class InvokeClient {
       // Localhost browser - handle based on strategy
       return this.handleLocalhostStrategy<T>(command, config);
     } else {
-      // Remote browser - HTTP API
-      // Check if auth is required (defaults to true unless explicitly set to false)
-      const requiresAuth = config.requireAuth !== false && this.config.requireAuth !== false;
-
-      if (requiresAuth) {
-        const accessToken = DeviceAuthService.getAccessToken();
-        if (!accessToken) {
-          throw new Error('Authentication required');
-        }
-      }
-
-      // Route through HTTP API proxy
-      return await this.httpRequest<T>(`/api/tauri/${command}`, {
-        ...config,
-        requireAuth: requiresAuth,
-      });
+      // Remote browser. There is no transport for this yet.
+      //
+      // This used to POST `/api/tauri/{command}`, a SvelteKit route that
+      // returned 501 and was never in the build at all — `adapter-static` in
+      // SPA mode drops `src/routes/api/` — so the call could only ever fail
+      // with an HTML parse error. The route is deleted; this says so plainly.
+      //
+      // The real transport is the daemon's `POST /rpc/{command}`, but it binds
+      // loopback and refuses any request carrying an `Origin` header, so a
+      // browser cannot reach it by design. Pairing, LAN binding and per-route
+      // capabilities are phase 4 of docs/development/REMOTE_ARCHITECTURE.md.
+      throw new Error(
+        `Command '${command}' is not reachable from a remote browser yet: the daemon ` +
+          `binds loopback and refuses browser origins. See REMOTE_ARCHITECTURE.md phase 4.`
+      );
     }
   }
 
@@ -361,16 +360,11 @@ export class InvokeClient {
 
     switch (strategy) {
       case 'http':
-        // Try HTTP API first, fallback to empty
-        try {
-          return await this.httpRequest<T>(`/api/tauri/${command}`, {
-            ...config,
-            requireAuth: false,
-          });
-        } catch {
-          // Fallback to empty value
-          return this.getEmptyValue<T>(command);
-        }
+        // Kept as a strategy name so callers do not have to change, but there is
+        // nothing to call: the SvelteKit proxy is deleted and the daemon refuses
+        // browser origins (see `tauriRequest`). Behaves as 'empty' until phase 4
+        // gives the browser a real transport.
+        return this.getEmptyValue<T>(command);
 
       case 'empty':
         // Return empty/default values
