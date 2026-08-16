@@ -307,7 +307,13 @@
   );
   const verifyCounts = $derived.by(() => {
     const c = { safe: 0, review: 0, dangerous: 0 };
-    verification?.verdicts.forEach((v) => c[v.verdict]++);
+    verification?.verdicts.forEach((v) => {
+      // `verdict` is a plain String on the Rust side — the synthesizer's output
+      // is model text, so the parser stays tolerant and normalizes anything it
+      // does not recognise to "review". The type cannot say that, so do it here.
+      if (v.verdict in c) c[v.verdict as keyof typeof c]++;
+      else c.review++;
+    });
     return c;
   });
 </script>

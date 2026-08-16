@@ -39,7 +39,7 @@ pub struct ExecuteScriptParams {
 }
 
 /// Execute a script
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn execute_script(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -58,7 +58,7 @@ pub async fn execute_script(
 }
 
 /// Get execution details
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_script_execution(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -69,7 +69,7 @@ pub async fn get_script_execution(
 }
 
 /// Get live output for a running execution
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_script_execution_live_output(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -80,7 +80,7 @@ pub async fn get_script_execution_live_output(
 }
 
 /// Cancel a running execution
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn cancel_script_execution(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -91,7 +91,7 @@ pub async fn cancel_script_execution(
 }
 
 /// Get executions for a specific block/script
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_script_executions_by_block(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -103,7 +103,7 @@ pub async fn get_script_executions_by_block(
 }
 
 /// Get all currently running executions
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_running_script_executions(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -113,7 +113,7 @@ pub async fn get_running_script_executions(
 }
 
 /// Get recent executions
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_recent_script_executions(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -124,7 +124,7 @@ pub async fn get_recent_script_executions(
 }
 
 /// Sync running executions on app startup
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn sync_script_executions(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -134,7 +134,7 @@ pub async fn sync_script_executions(
 }
 
 /// Delete an execution record
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_script_execution(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,

@@ -1,48 +1,46 @@
-// Types mirror the Rust `domains::coder::types` wire shapes.
+// UI-only shapes for the coder domain.
+//
+// Everything that also exists in Rust is generated from it — see `./generated/`,
+// produced by ts-rs from `portal_core::domains::coder::{types, diff}` and
+// refreshed by `pnpm gen:types`. These types used to be hand-written mirrors,
+// which is exactly the drift the generator removes; what is left below has no
+// Rust counterpart (event payloads and the git-commit panel's own shapes).
 
-export interface ToolCall {
-  id: string;
-  type: string;
-  function: { name: string; arguments: string };
-}
+export type {
+  ChangeStatus,
+  ChatMessage,
+  CoderAgentMode,
+  CoderRunResult,
+  CoderSubAgent,
+  CoderSubAgentStatus,
+  CoderThreadKind,
+  CoderThreadSummary,
+  FileChange,
+  GitHubIssueRef,
+  Hunk,
+  MultitaskCancelRequest,
+  MultitaskCleanupRequest,
+  MultitaskSpawnRequest,
+  PendingApproval,
+  PermissionMode,
+  PermissionRule,
+  SpawnSubAgentTask,
+  ToolCall,
+} from './generated';
 
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content?: string | null;
-  tool_calls?: ToolCall[] | null;
-  tool_call_id?: string | null;
-  timestamp?: string | null;
-}
+import type { CoderThread as CoderThreadWire, CoderThreadSummary } from './generated';
 
-export interface CoderThread {
-  id: string;
-  title: string;
-  workspace_root: string;
-  project_id?: number | null;
-  model?: string | null;
-  llm_provider?: string | null;
-  platform_thread_id?: number | null;
-  messages: ChatMessage[];
-  thread_kind?: CoderThreadKind;
-  created_at: string;
-  updated_at: string;
-  /** Present on sidebar rows loaded from summaries. */
+/**
+ * The wire thread plus the one field only the UI has.
+ *
+ * `message_count` is not on the Rust struct: a sidebar row is built from a
+ * `CoderThreadSummary`, which carries the count because the row has no
+ * `messages` to count. Declared as an extension rather than folded into the
+ * generated type so every *other* field stays checked against Rust.
+ */
+export interface CoderThread extends CoderThreadWire {
+  /** Present on rows built from a summary; a real thread counts `messages`. */
   message_count?: number;
-}
-
-export interface CoderThreadSummary {
-  id: string;
-  title: string;
-  workspace_root: string;
-  project_id?: number | null;
-  model?: string | null;
-  llm_provider?: string | null;
-  platform_thread_id?: number | null;
-  created_at: string;
-  updated_at: string;
-  thread_kind?: CoderThreadKind;
-  message_count: number;
-  is_running: boolean;
 }
 
 export function summaryToThread(summary: CoderThreadSummary): CoderThread {
@@ -60,16 +58,6 @@ export function summaryToThread(summary: CoderThreadSummary): CoderThread {
     updated_at: summary.updated_at,
     message_count: summary.message_count,
   };
-}
-
-export type CoderThreadKind = 'session' | 'coordinator' | 'sub-agent';
-
-export interface PendingApproval {
-  call_id: string;
-  tool: string;
-  arguments: Record<string, unknown>;
-  suggested_rule: string;
-  summary: string;
 }
 
 export interface RunCommandEvent {
@@ -98,48 +86,6 @@ export interface CoderDoneEvent {
   title?: string;
 }
 
-export interface CoderRunResult {
-  thread_id: string;
-  messages: ChatMessage[];
-  pending: PendingApproval | null;
-  final_text: string | null;
-  exhausted: boolean;
-}
-
-export interface Hunk {
-  index: number;
-  before_start: number;
-  before_lines: string[];
-  after_lines: string[];
-  accepted: boolean;
-}
-
-export type ChangeStatus = 'pending' | 'accepted' | 'rejected';
-
-export interface FileChange {
-  id: string;
-  thread_id: string;
-  path: string;
-  tool: string;
-  before: string;
-  original_after: string;
-  hunks: Hunk[];
-  created: boolean;
-  status: ChangeStatus;
-  created_at: string;
-}
-
-export type CoderAgentMode = 'plan' | 'debug' | 'multitask' | 'ask' | 'auto';
-
-/** Review vs auto-approve for mutating tools (orthogonal to agent mode). */
-export type PermissionMode = 'review' | 'auto-accept-all';
-
-export interface PermissionRule {
-  tool: string;
-  pattern: string;
-  allow: boolean;
-}
-
 export interface GitDiffStats {
   isRepo: boolean;
   branch?: string | null;
@@ -163,56 +109,4 @@ export interface GitCommitDraft {
   summary: string;
   changes: GitFileChange[];
   aiGenerated: boolean;
-}
-
-export type CoderSubAgentStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-
-export interface GitHubIssueRef {
-  owner: string;
-  repo: string;
-  number: number;
-  url?: string | null;
-}
-
-export interface SpawnSubAgentTask {
-  title: string;
-  prompt: string;
-  github_issue?: GitHubIssueRef | null;
-  github_issue_url?: string | null;
-}
-
-export interface MultitaskSpawnRequest {
-  coordinatorThreadId: string;
-  baseRef?: string | null;
-  tasks: SpawnSubAgentTask[];
-  issueUrls?: string[] | null;
-}
-
-export interface MultitaskCancelRequest {
-  coordinatorThreadId: string;
-  subAgentId?: string | null;
-}
-
-export interface MultitaskCleanupRequest {
-  coordinatorThreadId: string;
-  subAgentIds: string[];
-  force?: boolean;
-}
-
-export interface CoderSubAgent {
-  id: string;
-  coordinator_thread_id: string;
-  child_thread_id: string;
-  title: string;
-  workspace_root: string;
-  branch: string;
-  status: CoderSubAgentStatus;
-  github_owner?: string | null;
-  github_repo?: string | null;
-  github_issue_number?: number | null;
-  github_issue_url?: string | null;
-  result_summary?: string | null;
-  error?: string | null;
-  created_at: string;
-  updated_at: string;
 }

@@ -1,15 +1,11 @@
-//! System environment variable management with elevation support.
+//! Tauri adapter for the `environment` domain.
 //!
-//! Reads and writes persistent user/system environment variables without
-//! requiring an app restart. System-scoped writes trigger OS elevation
-//! (UAC on Windows, pkexec/sudo on Linux, osascript on macOS).
+//! The domain itself lives in `portal_core::domains::environment`; this module glob
+//! re-exports it so every `crate::domains::environment::…` path in the tree still
+//! resolves, and adds the `commands` module, which cannot move because `#[rpc]`
+//! expands to `#[tauri::command]`. Phase 1 of
+//! `docs/development/REMOTE_ARCHITECTURE.md`.
+
+pub use portal_core::domains::environment::*;
 
 pub mod commands;
-mod platform;
-mod types;
-
-#[cfg(target_os = "windows")]
-mod windows;
-
-#[cfg(not(target_os = "windows"))]
-mod unix;

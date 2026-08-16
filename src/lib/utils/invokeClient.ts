@@ -334,22 +334,21 @@ export class InvokeClient {
       // Localhost browser - handle based on strategy
       return this.handleLocalhostStrategy<T>(command, config);
     } else {
-      // Remote browser - HTTP API
-      // Check if auth is required (defaults to true unless explicitly set to false)
-      const requiresAuth = config.requireAuth !== false && this.config.requireAuth !== false;
-
-      if (requiresAuth) {
-        const accessToken = DeviceAuthService.getAccessToken();
-        if (!accessToken) {
-          throw new Error('Authentication required');
-        }
-      }
-
-      // Route through HTTP API proxy
-      return await this.httpRequest<T>(`/api/tauri/${command}`, {
-        ...config,
-        requireAuth: requiresAuth,
-      });
+      // Remote browser. There is no transport for this yet.
+      //
+      // This used to POST `/api/tauri/{command}`, a SvelteKit route that
+      // returned 501 and was never in the build at all — `adapter-static` in
+      // SPA mode drops `src/routes/api/` — so the call could only ever fail
+      // with an HTML parse error. The route is deleted; this says so plainly.
+      //
+      // The real transport is the daemon's `POST /rpc/{command}`, but it binds
+      // loopback and refuses any request carrying an `Origin` header, so a
+      // browser cannot reach it by design. Pairing, LAN binding and per-route
+      // capabilities are phase 4 of docs/development/REMOTE_ARCHITECTURE.md.
+      throw new Error(
+        `Command '${command}' is not reachable from a remote browser yet: the daemon ` +
+          `binds loopback and refuses browser origins. See REMOTE_ARCHITECTURE.md phase 4.`
+      );
     }
   }
 
@@ -361,16 +360,11 @@ export class InvokeClient {
 
     switch (strategy) {
       case 'http':
-        // Try HTTP API first, fallback to empty
-        try {
-          return await this.httpRequest<T>(`/api/tauri/${command}`, {
-            ...config,
-            requireAuth: false,
-          });
-        } catch {
-          // Fallback to empty value
-          return this.getEmptyValue<T>(command);
-        }
+        // Kept as a strategy name so callers do not have to change, but there is
+        // nothing to call: the SvelteKit proxy is deleted and the daemon refuses
+        // browser origins (see `tauriRequest`). Behaves as 'empty' until phase 4
+        // gives the browser a real transport.
+        return this.getEmptyValue<T>(command);
 
       case 'empty':
         // Return empty/default values
@@ -535,16 +529,15 @@ export class InvokeClient {
         onError,
         onClose,
       });
-    } else {
-      // Browser: Use WebSocket or SSE
-      return this.browserLive<T>(endpoint, {
-        ...requestConfig,
-        streamId: uniqueStreamId,
-        onData,
-        onError,
-        onClose,
-      });
     }
+
+    // There is no browser transport for streaming. This used to route to
+    // `/api/stream/{cmd}` (SSE) and `/ws/{cmd}` (WebSocket) — neither endpoint
+    // has ever existed: both would have had to be SvelteKit server routes, and
+    // `adapter-static` never built those. The daemon's `GET /events` WebSocket
+    // is the replacement when a non-webview client needs a live stream, but it
+    // refuses browser origins by design. See REMOTE_ARCHITECTURE.md phase 3.
+    throw new Error(`Streaming '${endpoint}' is not available in a browser. Use the desktop app.`);
   }
 
   /**
@@ -620,243 +613,6 @@ export class InvokeClient {
     } catch (error) {
       if (onError) {
         onError(error instanceof Error ? error : new Error(String(error)));
-      }
-      return () => {}; // Return no-op cleanup
-    }
-  }
-
-  /**
-   * Browser live streaming using WebSocket or SSE
-   * Follows the same routing logic as regular requests (localhost vs remote)
-   */
-  private async browserLive<T>(
-    endpoint: string,
-    config: RequestConfig & {
-      streamId: string;
-      onData?: (data: T) => void;
-      onError?: (error: Error) => void;
-      onClose?: () => void;
-    }
-  ): Promise<() => void> {
-    const { streamId, onData, onError, onClose, ...requestConfig } = config;
-
-    // Use SSE (Server-Sent Events) for browser streaming as it's more reliable
-    // and works better with HTTP proxies/firewalls than WebSocket
-    // For localhost, try WebSocket first, then fall back to SSE
-    if (InvokeClient.isLocalhost()) {
-      // Try WebSocket first for localhost (better for bidirectional)
-      try {
-        return await this.browserWebSocket<T>(endpoint, {
-          streamId,
-          onData,
-          onError,
-          onClose,
-          ...requestConfig,
-        });
-      } catch (error) {
-        // Fall back to SSE if WebSocket fails
-        console.warn('WebSocket failed, falling back to SSE:', error);
-      }
-    }
-
-    // Use SSE for remote or as fallback
-    return await this.browserSSE<T>(endpoint, {
-      streamId,
-      onData,
-      onError,
-      onClose,
-      ...requestConfig,
-    });
-  }
-
-  /**
-   * Browser WebSocket streaming (for localhost)
-   */
-  private async browserWebSocket<T>(
-    endpoint: string,
-    config: RequestConfig & {
-      streamId: string;
-      onData?: (data: T) => void;
-      onError?: (error: Error) => void;
-      onClose?: () => void;
-    }
-  ): Promise<() => void> {
-    const { streamId, onData, onError, onClose, ...requestConfig } = config;
-
-    // Convert HTTP URL to WebSocket URL
-    const baseUrl = getApiBaseUrl();
-    const wsUrl =
-      baseUrl.replace(/^http/, 'ws') + `/ws/${endpoint}?streamId=${encodeURIComponent(streamId)}`;
-
-    return new Promise<() => void>((resolve, reject) => {
-      const ws = new WebSocket(wsUrl);
-      let isResolved = false;
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'data' && onData) {
-            onData(data.payload as T);
-          } else if (data.type === 'error' && onError) {
-            onError(new Error(data.message || 'Stream error'));
-          } else if (data.type === 'close' && onClose) {
-            onClose();
-          }
-        } catch (error) {
-          if (onError) {
-            onError(error instanceof Error ? error : new Error('Failed to parse stream data'));
-          }
-        }
-      };
-
-      ws.onerror = () => {
-        if (!isResolved) {
-          isResolved = true;
-          reject(new Error('WebSocket connection error'));
-        } else if (onError) {
-          onError(new Error('WebSocket connection error'));
-        }
-      };
-
-      ws.onclose = () => {
-        if (onClose) {
-          onClose();
-        }
-      };
-
-      ws.onopen = () => {
-        if (!isResolved) {
-          isResolved = true;
-
-          // Send initial data if provided
-          if (requestConfig.data) {
-            ws.send(JSON.stringify(requestConfig.data));
-          }
-
-          // Return cleanup function
-          resolve(() => {
-            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-              ws.close();
-            }
-          });
-        }
-      };
-
-      // Timeout after 5 seconds
-      setTimeout(() => {
-        if (!isResolved) {
-          isResolved = true;
-          ws.close();
-          reject(new Error('WebSocket connection timeout'));
-        }
-      }, 5000);
-    });
-  }
-
-  /**
-   * Browser SSE (Server-Sent Events) streaming
-   * Works for both localhost and remote, more reliable than WebSocket
-   */
-  private async browserSSE<T>(
-    endpoint: string,
-    config: RequestConfig & {
-      streamId: string;
-      onData?: (data: T) => void;
-      onError?: (error: Error) => void;
-      onClose?: () => void;
-    }
-  ): Promise<() => void> {
-    const { streamId, onData, onError, onClose, ...requestConfig } = config;
-
-    // Build SSE URL following the same pattern as HTTP requests
-    let sseUrl: string;
-    const baseUrl = getApiBaseUrl();
-
-    if (InvokeClient.isLocalhost()) {
-      // Localhost: direct SSE endpoint
-      sseUrl = `${baseUrl}/api/stream/${endpoint}?streamId=${encodeURIComponent(streamId)}`;
-    } else {
-      // Remote: use authenticated endpoint
-      const accessToken = DeviceAuthService.getAccessToken();
-      if (!accessToken) {
-        throw new Error('Authentication required for remote streaming');
-      }
-      sseUrl = `${baseUrl}/api/stream/${endpoint}?streamId=${encodeURIComponent(streamId)}&token=${encodeURIComponent(accessToken)}`;
-    }
-
-    // Add request data as query params for SSE (since SSE is GET-only)
-    if (requestConfig.data) {
-      const params = new URLSearchParams();
-      Object.entries(requestConfig.data).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, String(value));
-        }
-      });
-      if (params.toString()) {
-        sseUrl += `&${params.toString()}`;
-      }
-    }
-
-    try {
-      const eventSource = new EventSource(sseUrl);
-
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'data' && onData) {
-            onData(data.payload as T);
-          } else if (data.type === 'error' && onError) {
-            onError(new Error(data.message || 'Stream error'));
-          } else if (data.type === 'close' && onClose) {
-            onClose();
-            eventSource.close();
-          }
-        } catch (error) {
-          if (onError) {
-            onError(error instanceof Error ? error : new Error('Failed to parse stream data'));
-          }
-        }
-      };
-
-      // Listen for custom event types
-      eventSource.addEventListener('error', (event: any) => {
-        if (onError) {
-          try {
-            const data = JSON.parse(event.data);
-            onError(new Error(data.message || 'Stream error'));
-          } catch {
-            onError(new Error('Stream error'));
-          }
-        }
-      });
-
-      eventSource.addEventListener('close', () => {
-        if (onClose) {
-          onClose();
-        }
-        eventSource.close();
-      });
-
-      eventSource.onerror = (error) => {
-        if (eventSource.readyState === EventSource.CLOSED) {
-          if (onClose) {
-            onClose();
-          }
-        } else if (onError) {
-          onError(new Error('SSE connection error'));
-        }
-      };
-
-      // Return cleanup function
-      return () => {
-        if (eventSource.readyState !== EventSource.CLOSED) {
-          eventSource.close();
-        }
-      };
-    } catch (error) {
-      if (onError) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        onError(err);
       }
       return () => {}; // Return no-op cleanup
     }

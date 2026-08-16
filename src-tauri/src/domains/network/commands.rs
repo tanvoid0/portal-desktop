@@ -17,7 +17,7 @@ use crate::{log_debug, log_error, log_info, log_warn};
 
 /// Get the local network IP address (non-loopback, private network preferred)
 /// Returns the first available IPv4 address that is not loopback
-#[command]
+#[portal_rpc_macro::rpc]
 pub fn get_local_network_ip() -> Result<String, String> {
     // Try to get network interfaces
     let interfaces = get_network_interfaces();
@@ -82,7 +82,7 @@ pub struct GeneratePasscodeResponse {
 }
 
 /// Generate a 6-digit passcode for device authentication
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn generate_device_passcode(
     _request: GeneratePasscodeRequest,
     _db: tauri::State<'_, Arc<DatabaseManager>>,
@@ -126,7 +126,7 @@ pub struct VerifyPasscodeResponse {
 
 /// Verify the shared passcode and register the requesting device as pending.
 /// The actual approval happens later via the approve_device command (host UI).
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn verify_device_passcode(
     request: VerifyPasscodeRequest,
     db: tauri::State<'_, Arc<DatabaseManager>>,
@@ -225,7 +225,7 @@ pub struct ApproveDeviceResponse {
 }
 
 /// Approve a device (called after user confirms in UI)
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn approve_device(
     request: ApproveDeviceRequest,
     db: tauri::State<'_, Arc<DatabaseManager>>,
@@ -328,7 +328,7 @@ pub struct VerifyTokenResponse {
 }
 
 /// Verify access token for API requests
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn verify_access_token(
     request: VerifyTokenRequest,
     db: tauri::State<'_, Arc<DatabaseManager>>,
@@ -388,7 +388,7 @@ pub struct GetDeviceStatusResponse {
 }
 
 /// Get device approval status (allows device to poll for approval)
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_device_status(
     request: GetDeviceStatusRequest,
     db: tauri::State<'_, Arc<DatabaseManager>>,
@@ -439,7 +439,7 @@ pub async fn get_device_status(
 }
 
 /// Get pending device approvals (for UI display)
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_pending_device_approvals(
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<serde_json::Value>, String> {

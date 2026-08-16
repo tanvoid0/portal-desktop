@@ -4,24 +4,25 @@ use crate::domains::terminal::types::*;
 use crate::entities::terminal_command_history as terminal_command_history_entity;
 use crate::entities::terminal_note as terminal_note_entity;
 use crate::entities::terminal_session as terminal_session_entity;
+use crate::events::Events;
 use crate::process_ext::NoWindowExt;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
 use std::sync::Arc;
-use tauri::{command, State, Window};
+use tauri::{command, State};
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn create_terminal_process(
     request: CreateProcessRequest,
     manager: State<'_, TerminalManager>,
-    window: Window,
+    events: State<'_, Events>,
 ) -> Result<TerminalProcess, String> {
-    manager.create_process(request, window).await
+    manager.create_process(request, events.sink()).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn send_terminal_input(
     process_id: String,
     input: String,
@@ -30,16 +31,16 @@ pub async fn send_terminal_input(
     manager.send_input(process_id, input).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn execute_command(
     request: ExecuteCommandRequest,
     manager: State<'_, TerminalManager>,
-    window: Window,
+    events: State<'_, Events>,
 ) -> Result<String, String> {
-    manager.execute_command(request, window).await
+    manager.execute_command(request, events.sink()).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn kill_terminal_process(
     process_id: String,
     manager: State<'_, TerminalManager>,
@@ -47,14 +48,14 @@ pub async fn kill_terminal_process(
     manager.kill_process(process_id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_terminal_processes(
     manager: State<'_, TerminalManager>,
 ) -> Result<Vec<TerminalProcess>, String> {
     manager.get_all_processes().await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_terminal_process(
     process_id: String,
     manager: State<'_, TerminalManager>,
@@ -62,7 +63,7 @@ pub async fn get_terminal_process(
     manager.get_process(process_id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_process_exit_code(
     process_id: String,
     manager: State<'_, TerminalManager>,
@@ -76,7 +77,7 @@ pub async fn get_process_exit_code(
     }
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn resize_terminal(
     process_id: String,
     cols: u32,
@@ -86,7 +87,7 @@ pub async fn resize_terminal(
     manager.resize_terminal(process_id, cols, rows).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn add_command_interceptor(
     interceptor: CommandInterceptor,
     manager: State<'_, TerminalManager>,
@@ -95,7 +96,7 @@ pub async fn add_command_interceptor(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn remove_command_interceptor(
     pattern: String,
     manager: State<'_, TerminalManager>,
@@ -104,7 +105,7 @@ pub async fn remove_command_interceptor(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn add_output_parser(
     parser: OutputParser,
     manager: State<'_, TerminalManager>,
@@ -113,7 +114,7 @@ pub async fn add_output_parser(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn remove_output_parser(
     pattern: String,
     manager: State<'_, TerminalManager>,
@@ -122,7 +123,7 @@ pub async fn remove_output_parser(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_system_info() -> Result<serde_json::Value, String> {
     let available_shells = get_available_shells().await;
     let default_shell = get_default_shell().await;
@@ -444,7 +445,7 @@ pub struct CommandHistoryEntry {
     pub intercepted: Option<bool>,
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn save_command_history(
     tab_id: String,
     entries: Vec<CommandHistoryEntry>,
@@ -481,7 +482,7 @@ pub async fn save_command_history(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn load_command_history(
     tab_id: String,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -518,7 +519,7 @@ pub async fn load_command_history(
     Ok(entries)
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn clear_command_history(
     tab_id: Option<String>,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -558,7 +559,7 @@ pub struct TerminalSession {
     pub process_id: Option<String>,
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn save_terminal_session(
     session: TerminalSession,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -599,7 +600,7 @@ pub async fn save_terminal_session(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn load_terminal_session(
     tab_id: String,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -634,7 +635,7 @@ pub async fn load_terminal_session(
     }
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn list_terminal_sessions(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<String>, String> {
@@ -646,7 +647,7 @@ pub async fn list_terminal_sessions(
     Ok(rows.into_iter().map(|r| r.tab_id).collect())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_terminal_session(
     tab_id: String,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -661,7 +662,7 @@ pub async fn delete_terminal_session(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn clear_all_sessions(db_manager: State<'_, Arc<DatabaseManager>>) -> Result<(), String> {
     let db = db_manager.get_connection();
     terminal_session_entity::Entity::delete_many()
@@ -680,7 +681,7 @@ pub struct TerminalNote {
     pub updated_at: String,
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn save_terminal_note(
     tab_id: String,
     markdown: String,
@@ -709,7 +710,7 @@ pub async fn save_terminal_note(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn load_terminal_note(
     tab_id: String,
     db_manager: State<'_, Arc<DatabaseManager>>,

@@ -100,6 +100,24 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+      # portal-core is a path dependency, not a workspace member, so `cargo test`
+      # above never touches it — including the ts-rs export tests.
+      - name: Cargo test (portal-core)
+        working-directory: src-tauri
+        run: cargo test --manifest-path portal-core/Cargo.toml
+
+      # The generated TypeScript is checked in so the frontend builds without a
+      # Rust toolchain. That only stays honest if regenerating is a no-op.
+      - name: Generated types are current
+        run: |
+          node scripts/gen-types.mjs
+          STALE=$(git status --porcelain -uall -- src/lib | grep '/generated/' || true)
+          if [ -n "$STALE" ]; then
+            echo "::error::Generated types are stale. Run 'pnpm gen:types' and commit."
+            echo "$STALE"
+            exit 1
+          fi
+
       # Informational: clippy warnings surfaced but not gated (pre-existing debt).
       - name: Cargo clippy
         working-directory: src-tauri

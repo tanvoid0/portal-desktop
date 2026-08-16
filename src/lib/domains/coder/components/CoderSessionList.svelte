@@ -79,6 +79,8 @@
         title: 'Running session',
         workspace_root: coderUi.activeProjectPath ?? '',
         project_id: coderUi.activeProjectId ? Number.parseInt(coderUi.activeProjectId, 10) : null,
+        model: null,
+        thread_kind: 'session',
         messages: [],
         created_at: '',
         updated_at: new Date().toISOString(),

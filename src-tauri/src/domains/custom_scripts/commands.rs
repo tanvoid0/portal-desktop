@@ -15,7 +15,7 @@ pub struct ScriptParameter {
     pub file_filters: Option<Vec<String>>, // For file type: e.g., ["*.ovpn", "*.txt"]
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_custom_scripts(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<crate::entities::custom_script::Model>, String> {
@@ -23,7 +23,7 @@ pub async fn get_all_custom_scripts(
     service.get_all_scripts().await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_custom_script(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -32,7 +32,7 @@ pub async fn get_custom_script(
     service.get_script(id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn create_custom_script(
     name: String,
     description: Option<String>,
@@ -59,7 +59,7 @@ pub async fn create_custom_script(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn update_custom_script(
     id: i32,
     name: Option<String>,
@@ -88,7 +88,7 @@ pub async fn update_custom_script(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_custom_script(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -97,7 +97,7 @@ pub async fn delete_custom_script(
     service.delete_script(id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn record_script_run(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -106,7 +106,7 @@ pub async fn record_script_run(
     service.record_script_run(id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn select_file(
     app_handle: tauri::AppHandle,
     title: Option<String>,

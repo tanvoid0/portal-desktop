@@ -9,7 +9,7 @@ use crate::domains::sdk::traits::package_manager::{
 };
 
 /// Get list of available package managers on the system
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_available_package_managers() -> Result<Vec<String>, String> {
     let factory = PackageManagerFactory::new();
     let available = factory.detect_available_managers().await;
@@ -17,7 +17,7 @@ pub async fn get_available_package_managers() -> Result<Vec<String>, String> {
 }
 
 /// Search for packages using a specific package manager
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn package_manager_search(
     manager_name: String,
     query: String,
@@ -35,7 +35,7 @@ pub async fn package_manager_search(
 }
 
 /// List installed packages from a specific package manager
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn package_manager_list_installed(
     manager_name: String,
 ) -> Result<Vec<InstalledPackage>, String> {
@@ -52,7 +52,7 @@ pub async fn package_manager_list_installed(
 }
 
 /// Get detailed information about a package
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn package_manager_get_details(
     manager_name: String,
     package_id: String,
@@ -70,7 +70,7 @@ pub async fn package_manager_get_details(
 }
 
 /// Install a package using a specific package manager
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn package_manager_install(
     manager_name: String,
     package_id: String,
@@ -95,7 +95,7 @@ pub async fn package_manager_install(
 }
 
 /// Upgrade a package using a specific package manager
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn package_manager_upgrade(
     manager_name: String,
     package_id: String,
@@ -116,7 +116,7 @@ pub async fn package_manager_upgrade(
 }
 
 /// Uninstall a package using a specific package manager
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn package_manager_uninstall(
     manager_name: String,
     package_id: String,
@@ -137,7 +137,7 @@ pub async fn package_manager_uninstall(
 }
 
 /// Check for available updates using a specific package manager
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn package_manager_check_updates(
     manager_name: String,
 ) -> Result<Vec<PackageUpdate>, String> {
@@ -154,7 +154,7 @@ pub async fn package_manager_check_updates(
 }
 
 /// Get information about a package manager
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn package_manager_info(manager_name: String) -> Result<serde_json::Value, String> {
     let factory = PackageManagerFactory::new();
 

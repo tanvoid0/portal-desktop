@@ -6,6 +6,9 @@ use crate::domains::tasks::repositories::task_repository::{
 };
 use crate::domains::tasks::services::ai_task_generator::{AITaskGenerator, GeneratedTaskStructure};
 use crate::domains::tasks::services::task_service::TaskService;
+use crate::domains::tasks::types::{
+    ChildTaskInfo, ConversationMessage, ParentTaskInfo, SiblingTaskInfo, TaskContext,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
@@ -127,7 +130,7 @@ pub struct TaskFiltersCommand {
     pub resource_type: Option<String>,
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn create_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
     command: CreateTaskCommand,
@@ -214,7 +217,7 @@ pub async fn create_task(
         })
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -311,7 +314,7 @@ pub async fn update_task(
         })
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -336,7 +339,7 @@ pub async fn delete_task(
     }
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -357,7 +360,7 @@ pub async fn get_task(
         })
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
     filters: Option<TaskFiltersCommand>,
@@ -383,7 +386,7 @@ pub async fn get_tasks(
         })
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_subtasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
     parent_id: i32,
@@ -404,7 +407,7 @@ pub async fn get_subtasks(
         })
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_main_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
@@ -420,7 +423,7 @@ pub async fn get_main_tasks(
         })
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_task_count(db_manager: State<'_, Arc<DatabaseManager>>) -> Result<u64, String> {
     let task_service = TaskService::new(db_manager.get_connection_clone());
 
@@ -432,7 +435,7 @@ pub async fn get_task_count(db_manager: State<'_, Arc<DatabaseManager>>) -> Resu
 
 // New advanced commands
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_overdue_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
@@ -448,7 +451,7 @@ pub async fn get_overdue_tasks(
         })
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_due_today_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
@@ -464,7 +467,7 @@ pub async fn get_due_today_tasks(
         })
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_unestimated_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
@@ -490,45 +493,7 @@ pub struct GenerateTasksFromStoryCommand {
     pub instruction: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConversationMessage {
-    pub role: String, // "user" or "assistant"
-    pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskContext {
-    pub parent_task: Option<ParentTaskInfo>,
-    pub existing_children: Option<Vec<ChildTaskInfo>>,
-    pub existing_siblings: Option<Vec<SiblingTaskInfo>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParentTaskInfo {
-    pub id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub priority: Option<String>,
-    pub type_: Option<String>,
-    pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChildTaskInfo {
-    pub id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub status: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SiblingTaskInfo {
-    pub id: String,
-    pub title: String,
-    pub description: Option<String>,
-}
-
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn generate_tasks_from_story(
     ai_service: State<'_, Arc<AIService>>,
     command: GenerateTasksFromStoryCommand,

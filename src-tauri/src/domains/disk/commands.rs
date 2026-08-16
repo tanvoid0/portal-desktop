@@ -8,7 +8,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::State;
+
+use crate::events::{EventSinkExt, Events};
 
 use crate::domains::ai::services::AIService;
 use crate::domains::disk::classify::{self, Proposal};
@@ -63,13 +65,14 @@ pub struct VerifyControl {
 
 /// Read-only: walks the tree and returns cleanup proposals. Deletes nothing.
 /// Custom protected paths are applied, and the result is cached for instant reload.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn scan_directory(
     root: String,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
     control: State<'_, ScanControl>,
 ) -> Result<ScanSummary, String> {
+    let sink = events.sink();
     let started = Instant::now();
     let extra_protected = db.list_protected()?;
     let root_clone = root.clone();
@@ -89,7 +92,7 @@ pub async fn scan_directory(
             &root_clone,
             &cancel,
             |p| {
-                let _ = app.emit("scan://progress", p);
+                let _ = sink.emit("scan://progress", p);
             },
             |files, total_files, _bytes, elapsed_ms| {
                 // Classify what we have so far and persist it as a partial
@@ -151,13 +154,14 @@ pub async fn scan_directory(
 
 /// Read-only project-aware scan via the unified `DevCleaner` pipeline. Walks the
 /// chosen root, detects project markers, groups regenerable temp dirs.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn scan_projects(
     root: String,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
     control: State<'_, ScanControl>,
 ) -> Result<ProjectScan, String> {
+    let sink = events.sink();
     let extra_protected = db.list_protected()?;
     let cancel = control.cancel.clone();
     cancel.store(false, Ordering::Relaxed);
@@ -171,7 +175,7 @@ pub async fn scan_projects(
         let hooks = DevCleanerWalkHooks {
             cancel: &cancel,
             on_progress: &|p| {
-                let _ = app.emit("scan://progress", p);
+                let _ = sink.emit("scan://progress", p);
             },
         };
         let cleaner = dev_cleaners::projects::ProjectDevCleaner;
@@ -185,13 +189,13 @@ pub async fn scan_projects(
 
 /// Requests cancellation of the in-flight scan. The walker stops at its next
 /// per-entry check and `scan_directory` returns an `Err("cancelled")`.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn cancel_scan(control: State<'_, ScanControl>) {
     control.cancel.store(true, Ordering::Relaxed);
 }
 
 /// Returns the last cached scan for a root, if any — instant reload without re-walking.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn get_cached_scan(root: String, db: State<'_, Arc<Db>>) -> Result<Option<CachedScan>, String> {
     match db.cached_scan(&root)? {
         Some(row) => {
@@ -210,7 +214,7 @@ pub fn get_cached_scan(root: String, db: State<'_, Arc<Db>>) -> Result<Option<Ca
 }
 
 /// Drops a root's cached scan — backs the restore card's "Discard" button.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn remove_cached_scan(root: String, db: State<'_, Arc<Db>>) -> Result<(), String> {
     db.remove_cached_scan(&root)
 }
@@ -218,15 +222,16 @@ pub fn remove_cached_scan(root: String, db: State<'_, Arc<Db>>) -> Result<(), St
 /// Destructive but reversible: moves the given items to the Recycle Bin.
 /// Only ever called with items the user explicitly ticked and confirmed.
 /// Every outcome is recorded in the audit log.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn quarantine_paths(
     items: Vec<QuarantineItem>,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
 ) -> Result<QuarantineResult, String> {
+    let sink = events.sink();
     let result = tauri::async_runtime::spawn_blocking(move || {
         quarantine::quarantine(items, |p| {
-            let _ = app.emit("quarantine://progress", p);
+            let _ = sink.emit("quarantine://progress", p);
         })
     })
     .await
@@ -242,41 +247,41 @@ pub async fn quarantine_paths(
 }
 
 /// Full history of every quarantine action, newest first.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn get_audit_log(db: State<'_, Arc<Db>>) -> Result<Vec<AuditEntry>, String> {
     db.audit_log(500)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn list_protected(db: State<'_, Arc<Db>>) -> Result<Vec<String>, String> {
     db.list_protected()
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn add_protected(path: String, db: State<'_, Arc<Db>>) -> Result<(), String> {
     db.add_protected(&path)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn remove_protected(path: String, db: State<'_, Arc<Db>>) -> Result<(), String> {
     db.remove_protected(&path)
 }
 
 /// Suggested scan starting points — mounted drives and common user folders.
 /// Read-only enumeration; lets the UI propose targets instead of forcing a pick.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn list_locations() -> Vec<Location> {
     locations::suggested_locations()
 }
 
 /// Mounted-volume capacity readout for the Dashboard. Read-only.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn disk_usage() -> Vec<DiskUsage> {
     disk::disk_usage()
 }
 
 /// CPU / memory readout for the AI sidebar status bar. Read-only.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn host_stats() -> HostStats {
     disk::host_stats()
 }
@@ -285,14 +290,15 @@ pub fn host_stats() -> HostStats {
 /// second opinion on the current proposals. Deletes nothing and never changes a
 /// proposal's risk — the returned notes/verdicts inform the user's own review.
 /// Provider is configured under Settings → AI Providers.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn verify_proposals(
     root: String,
     proposals: Vec<Proposal>,
-    app: AppHandle,
+    events: State<'_, Events>,
     ai: State<'_, Arc<AIService>>,
     control: State<'_, VerifyControl>,
 ) -> Result<VerificationResult, String> {
+    let sink = events.sink();
     // Fresh flag for this run — clears any leftover request from a prior verify.
     let cancel = control.cancel.clone();
     cancel.store(false, Ordering::Relaxed);
@@ -303,7 +309,7 @@ pub async fn verify_proposals(
     if cancel.load(Ordering::Relaxed) {
         return Err("cancelled".to_string());
     }
-    let _ = app.emit(
+    let _ = sink.emit(
         "verify://progress",
         VerifyProgress {
             process_id: 0,
@@ -311,7 +317,7 @@ pub async fn verify_proposals(
             tasks: vec![],
         },
     );
-    let _ = app.emit(
+    let _ = sink.emit(
         "verify://progress",
         VerifyProgress {
             process_id: 0,
@@ -328,20 +334,21 @@ pub async fn verify_proposals(
 
 /// Requests cancellation of the in-flight AI verification. The poll loop stops
 /// at its next check and `verify_proposals` returns `Err("cancelled")`.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn cancel_verify(control: State<'_, VerifyControl>) {
     control.cancel.store(true, Ordering::Relaxed);
 }
 
 /// Read-only scan of all registered dev cleaners. Pass `roots` to include the
 /// project cleaner (filesystem walk on drives/folders); omit for CLI-only cleaners.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn scan_dev_cleaners(
     roots: Option<Vec<String>>,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
     control: State<'_, ScanControl>,
 ) -> Result<DevCleanerScan, String> {
+    let sink = events.sink();
     let extra_protected = db.list_protected()?;
     let cancel = control.cancel.clone();
     cancel.store(false, Ordering::Relaxed);
@@ -354,7 +361,7 @@ pub async fn scan_dev_cleaners(
         let hooks = DevCleanerWalkHooks {
             cancel: &cancel,
             on_progress: &|p| {
-                let _ = app.emit("scan://progress", p);
+                let _ = sink.emit("scan://progress", p);
             },
         };
         let walk = if ctx.roots.is_empty() {
@@ -371,15 +378,16 @@ pub async fn scan_dev_cleaners(
 /// Removes user-confirmed dev-cleaner items. Unlike `quarantine_paths`, container
 /// resources are removed via the runtime CLI (not the Recycle Bin). Every outcome
 /// is recorded in the audit log.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn clean_dev_items(
     items: Vec<DevCleanerCleanItem>,
-    app: AppHandle,
+    events: State<'_, Events>,
     db: State<'_, Arc<Db>>,
 ) -> Result<DevCleanerCleanResult, String> {
+    let sink = events.sink();
     let result = tauri::async_runtime::spawn_blocking(move || {
         dev_cleaners::clean_items(items, |p| {
-            let _ = app.emit("dev-clean://progress", p);
+            let _ = sink.emit("dev-clean://progress", p);
         })
     })
     .await
@@ -396,7 +404,7 @@ pub async fn clean_dev_items(
 
 /// Opens the OS Recycle Bin so the user can restore anything moved. This is the
 /// undo path — the app never force-restores; the user decides in their trash.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn open_recycle_bin() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {

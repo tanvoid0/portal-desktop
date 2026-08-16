@@ -1,7 +1,7 @@
 //! Tauri command surface for the coder agent.
 
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use reqwest::Client;
 use tauri::State;
@@ -11,12 +11,12 @@ use crate::domains::ai::services::AISettingsService;
 
 use super::service::{AgentTurn, CoderService};
 use super::types::{
-    CoderSubAgent, CoderThread, CoderThreadKind, CoderThreadSummary, FileChange,
-    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, CoderAgentMode,
-    PermissionMode, PermissionRule,
+    CoderAgentMode, CoderSubAgent, CoderThread, CoderThreadKind, CoderThreadSummary, FileChange,
+    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PermissionMode,
+    PermissionRule,
 };
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_create_thread(
     service: State<'_, Arc<CoderService>>,
     workspace_root: String,
@@ -30,21 +30,21 @@ pub async fn coder_create_thread(
         .await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_list_threads(
     service: State<'_, Arc<CoderService>>,
 ) -> Result<Vec<CoderThread>, String> {
     Ok(service.list_threads().await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_list_thread_summaries(
     service: State<'_, Arc<CoderService>>,
 ) -> Result<Vec<CoderThreadSummary>, String> {
     Ok(service.list_thread_summaries().await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_get_thread(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -52,7 +52,7 @@ pub async fn coder_get_thread(
     Ok(service.get_thread(&thread_id).await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_delete_thread(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -60,7 +60,7 @@ pub async fn coder_delete_thread(
     Ok(service.delete_thread(&thread_id).await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_update_thread_model(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -72,7 +72,7 @@ pub async fn coder_update_thread_model(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_set_thread_kind(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -81,7 +81,7 @@ pub async fn coder_set_thread_kind(
     service.set_thread_kind(&thread_id, thread_kind).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_send(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -92,7 +92,7 @@ pub async fn coder_send(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_retry(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -102,7 +102,7 @@ pub async fn coder_retry(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_edit_message(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -116,7 +116,7 @@ pub async fn coder_edit_message(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_approve(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -150,7 +150,7 @@ pub async fn coder_approve(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_stop(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -158,7 +158,7 @@ pub async fn coder_stop(
     Ok(service.stop(&thread_id).await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_get_context_usage(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -166,21 +166,21 @@ pub async fn coder_get_context_usage(
     service.get_context_usage(&thread_id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_list_running(
     service: State<'_, Arc<CoderService>>,
 ) -> Result<Vec<String>, String> {
     Ok(service.list_running().await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_get_mode(
     service: State<'_, Arc<CoderService>>,
 ) -> Result<CoderAgentMode, String> {
     Ok(service.get_mode().await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_set_mode(
     service: State<'_, Arc<CoderService>>,
     mode: CoderAgentMode,
@@ -189,14 +189,14 @@ pub async fn coder_set_mode(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_get_permission_mode(
     service: State<'_, Arc<CoderService>>,
 ) -> Result<PermissionMode, String> {
     Ok(service.get_permission_mode().await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_set_permission_mode(
     service: State<'_, Arc<CoderService>>,
     mode: PermissionMode,
@@ -205,14 +205,14 @@ pub async fn coder_set_permission_mode(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_list_rules(
     service: State<'_, Arc<CoderService>>,
 ) -> Result<Vec<PermissionRule>, String> {
     Ok(service.list_rules().await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_add_rule(
     service: State<'_, Arc<CoderService>>,
     rule: PermissionRule,
@@ -221,7 +221,7 @@ pub async fn coder_add_rule(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_remove_rule(
     service: State<'_, Arc<CoderService>>,
     tool: String,
@@ -233,7 +233,7 @@ pub async fn coder_remove_rule(
 
 // ---- change review ----------------------------------------------------
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_list_changes(
     service: State<'_, Arc<CoderService>>,
     thread_id: Option<String>,
@@ -241,7 +241,7 @@ pub async fn coder_list_changes(
     Ok(service.list_changes(thread_id.as_deref()).await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_accept_change(
     service: State<'_, Arc<CoderService>>,
     change_id: String,
@@ -249,7 +249,7 @@ pub async fn coder_accept_change(
     service.accept_change(&change_id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_reject_change(
     service: State<'_, Arc<CoderService>>,
     change_id: String,
@@ -257,7 +257,7 @@ pub async fn coder_reject_change(
     service.reject_change(&change_id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_set_hunk(
     service: State<'_, Arc<CoderService>>,
     change_id: String,
@@ -267,7 +267,7 @@ pub async fn coder_set_hunk(
     service.set_hunk(&change_id, hunk_index, accepted).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_modify_change(
     service: State<'_, Arc<CoderService>>,
     change_id: String,
@@ -276,7 +276,7 @@ pub async fn coder_modify_change(
     service.modify_change(&change_id, content).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn coder_list_dir(
     workspace_root: String,
     path: Option<String>,
@@ -285,18 +285,22 @@ pub fn coder_list_dir(
     super::tools::list_dir_entries(&workspace_root, &rel)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn coder_read_file(workspace_root: String, path: String) -> Result<String, String> {
     super::tools::read_file(&workspace_root, &path)
 }
 
-#[tauri::command]
-pub fn coder_write_file(workspace_root: String, path: String, content: String) -> Result<(), String> {
+#[portal_rpc_macro::rpc]
+pub fn coder_write_file(
+    workspace_root: String,
+    path: String,
+    content: String,
+) -> Result<(), String> {
     super::tools::write_file(&workspace_root, &path, &content)?;
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn coder_open_in_explorer(workspace_root: String, path: String) -> Result<(), String> {
     let root = PathBuf::from(&workspace_root);
     let joined = root.join(path);
@@ -349,19 +353,17 @@ pub fn coder_open_in_explorer(workspace_root: String, path: String) -> Result<()
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn coder_get_git_diff_stats(workspace_root: String) -> super::git_status::GitDiffStats {
     super::git_status::git_diff_stats(&workspace_root)
 }
 
-#[tauri::command]
-pub fn coder_list_git_changes(
-    workspace_root: String,
-) -> Vec<super::git_status::GitFileChange> {
+#[portal_rpc_macro::rpc]
+pub fn coder_list_git_changes(workspace_root: String) -> Vec<super::git_status::GitFileChange> {
     super::git_status::git_list_changes(&workspace_root)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_prepare_git_commit(
     workspace_root: String,
     use_ai: Option<bool>,
@@ -382,7 +384,7 @@ pub async fn coder_prepare_git_commit(
     Ok(draft)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub fn coder_git_commit(
     workspace_root: String,
     title: String,
@@ -391,7 +393,7 @@ pub fn coder_git_commit(
     super::git_commit::git_commit(&workspace_root, &title, summary.as_deref())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_submit_command_result(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -403,7 +405,7 @@ pub async fn coder_submit_command_result(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_submit_terminal_list(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -415,7 +417,7 @@ pub async fn coder_submit_terminal_list(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_multitask_spawn(
     service: State<'_, Arc<CoderService>>,
     request: MultitaskSpawnRequest,
@@ -423,7 +425,7 @@ pub async fn coder_multitask_spawn(
     service.inner().multitask_spawn(request).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_multitask_list(
     service: State<'_, Arc<CoderService>>,
     coordinator_thread_id: String,
@@ -431,7 +433,7 @@ pub async fn coder_multitask_list(
     Ok(service.list_sub_agents(&coordinator_thread_id).await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_multitask_cancel(
     service: State<'_, Arc<CoderService>>,
     request: MultitaskCancelRequest,
@@ -439,7 +441,7 @@ pub async fn coder_multitask_cancel(
     service.multitask_cancel(request).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn coder_multitask_cleanup(
     service: State<'_, Arc<CoderService>>,
     request: MultitaskCleanupRequest,

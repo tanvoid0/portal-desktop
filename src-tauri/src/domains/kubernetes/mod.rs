@@ -1,9 +1,11 @@
-pub mod commands;
-pub mod manager;
-pub mod services;
-pub mod types;
+//! Tauri adapter for the `kubernetes` domain.
+//!
+//! The domain itself lives in `portal_core::domains::kubernetes`; this module glob
+//! re-exports it so every `crate::domains::kubernetes::…` path in the tree still
+//! resolves, and adds the `commands` module, which cannot move because `#[rpc]`
+//! expands to `#[tauri::command]`. Phase 1 of
+//! `docs/development/REMOTE_ARCHITECTURE.md`.
 
-// KubernetesManager is used via State in commands, not directly imported
-// pub use manager::KubernetesManager;
-// Types are imported directly where needed, not re-exported here
-// pub use types::*;
+pub use portal_core::domains::kubernetes::*;
+
+pub mod commands;

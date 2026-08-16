@@ -36,17 +36,32 @@ pnpm dev:server
 ```
 
 Default API: `http://127.0.0.1:18410`  
-Config UI: `http://127.0.0.1:18410/config`  
-API docs: `http://127.0.0.1:18410/docs`
+OpenAPI spec: `http://127.0.0.1:18410/openapi.json`
 
-See the [agent-platform README](https://github.com/tanvoid0/agent-platform#quick-start) for Docker, Flow UI, and workspace token setup.
+There is no browser UI on the platform any more — the `/config`, `/tokens` and
+`/docs` pages went with the Python server. Configuration is the agent-platform
+desktop app (`pnpm dev` in that repo) or the REST routes below.
+
+See the [agent-platform README](https://github.com/tanvoid0/agent-platform#quick-start) for Docker and workspace token setup.
 
 ### 2. Configure providers on the platform
 
-1. Open `http://127.0.0.1:18410/config`
-2. Add at least one backend (Ollama, Gemini, LM Studio, etc.)
-3. Set default provider and model alias
-4. If authentication is enabled, mint a workspace token at `/tokens` (`agp_…`)
+Either open the agent-platform desktop app and use its **Providers** screen, or
+drive the same routes directly:
+
+1. `GET /api/v1/llm-proxy/env` / `POST /api/v1/llm-proxy/env` — API keys and base URLs
+2. `GET /api/v1/llm-proxy/config-yaml` / `POST /api/v1/llm-proxy/config-yaml` — provider and alias definitions
+3. `GET /api/v1/llm-proxy/ui/providers` — what is configured and reachable
+4. If authentication is enabled, mint a workspace token with the master key:
+
+```bash
+curl -X POST http://127.0.0.1:18410/api/v1/workspaces/1/api-tokens/ \
+  -H "Authorization: Bearer $AGENT_PLATFORM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "portal-desktop"}'
+```
+
+The response carries the `agp_…` token once; it is not retrievable afterwards.
 
 ### 3. Connect Portal Desktop
 
@@ -57,6 +72,20 @@ See the [agent-platform README](https://github.com/tanvoid0/agent-platform#quick
    - **API token** — workspace token from agent-platform (if required)
    - **Default model** — alias from the catalog (use **Load catalog**)
 4. Click **Test connection**
+
+### 4. Optional: web search for the Coder
+
+The Coder's `web_search` tool runs through the platform's `GET /api/v1/search`,
+so Portal needs no search provider of its own. The route always answers — with
+`configured: false` and no results — until the platform has a key:
+
+```bash
+SEARCH_API_KEY=<google-custom-search-key> SEARCH_CX=<engine-id> agent-platformd
+```
+
+Without one the tool still appears and still answers, telling the model that
+search is switched off rather than that the web had nothing. That distinction is
+deliberate: an empty result list would read as "this does not exist".
 
 ## Environment variables (optional)
 
@@ -71,12 +100,13 @@ API tokens are **not** read from env vars — set them in **AI → Providers** i
 
 ## Troubleshooting
 
-| Symptom                        | Fix                                                                                                  |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| "Can't reach agent-platform"   | Start agent-platform (`pnpm dev:server` or Docker). Confirm `http://127.0.0.1:18410/docs` loads.     |
-| "Invalid catalog response"     | Update agent-platform to the latest version; catalog format is defined in its `/v1/catalog` API.     |
-| "Invalid or missing API token" | Add a workspace token in AI → Providers, or disable auth on the platform for local dev.              |
-| Coder agent fails              | Ensure agent-platform exposes `/api/v1/coder/chat/stream` and your model supports tools if required. |
+| Symptom                            | Fix                                                                                                        |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| "Can't reach agent-platform"       | Start agent-platform (`pnpm dev:server` or Docker). Confirm `http://127.0.0.1:18410/health` returns `200`. |
+| "Invalid catalog response"         | Update agent-platform to the latest version; catalog format is defined in its `/v1/catalog` API.           |
+| "Invalid or missing API token"     | Add a workspace token in AI → Providers, or disable auth on the platform for local dev.                    |
+| Coder agent fails                  | Ensure agent-platform exposes `/api/v1/coder/chat/stream` and your model supports tools if required.       |
+| `web_search` says "not configured" | Set `SEARCH_API_KEY` and `SEARCH_CX` on the platform, not in Portal.                                       |
 
 ## Links
 

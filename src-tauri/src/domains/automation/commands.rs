@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 use tauri::State;
 use tokio::sync::Mutex;
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn trigger_n8n_workflow(
     workflow_id: String,
     project_data: Value,
@@ -22,7 +22,7 @@ pub async fn trigger_n8n_workflow(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_workflow_status(
     execution_id: String,
     automation_service: State<'_, Arc<AutomationService>>,
@@ -30,14 +30,14 @@ pub async fn get_workflow_status(
     automation_service.get_workflow_status(&execution_id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn list_available_workflows(
     automation_service: State<'_, Arc<AutomationService>>,
 ) -> Result<Vec<AvailableWorkflow>, String> {
     automation_service.list_available_workflows().await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_suggested_workflows(
     framework: Option<String>,
     package_manager: Option<String>,
@@ -48,7 +48,7 @@ pub async fn get_suggested_workflows(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn check_n8n_health(
     automation_service: State<'_, Arc<AutomationService>>,
 ) -> Result<bool, String> {
@@ -64,7 +64,7 @@ fn get_workflow_engines() -> Arc<Mutex<HashMap<String, WorkflowEngine>>> {
         .clone()
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn register_embedded_workflow(workflow_json: String) -> Result<String, String> {
     // Extract workflow ID from JSON first
     let workflow: Workflow = serde_json::from_str(&workflow_json)
@@ -85,7 +85,7 @@ pub async fn register_embedded_workflow(workflow_json: String) -> Result<String,
     Ok(workflow_id)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn execute_embedded_workflow(
     workflow_id: String,
     project_path: Option<String>,
@@ -106,7 +106,7 @@ pub async fn execute_embedded_workflow(
     engine.execute_workflow(&workflow_id, context).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn list_embedded_workflows() -> Result<Vec<Value>, String> {
     let engines = get_workflow_engines();
     let engines_guard = engines.lock().await;
@@ -131,7 +131,7 @@ pub async fn list_embedded_workflows() -> Result<Vec<Value>, String> {
     Ok(result)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn check_workflow_trigger(
     workflow_id: String,
     trigger_data: Value,

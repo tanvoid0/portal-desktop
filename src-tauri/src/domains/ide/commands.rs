@@ -15,14 +15,14 @@ pub fn init_ide_storage<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     app.manage(Arc::new(IdeService::new()));
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn detect_installed_ides(
     ide_service: State<'_, Arc<IdeService>>,
 ) -> Result<Vec<String>, String> {
     Ok(ide_service.detect_installed_ides())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_ides(db: State<'_, Arc<DatabaseManager>>) -> Result<Vec<IdeConfig>, String> {
     let conn = db.get_connection_clone();
     let ide_models = IdeRepository::get_all(&conn)
@@ -42,7 +42,7 @@ pub async fn get_all_ides(db: State<'_, Arc<DatabaseManager>>) -> Result<Vec<Ide
         .collect())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn add_ide(
     name: String,
     executable: String,
@@ -56,7 +56,7 @@ pub async fn add_ide(
     Ok(ide.id as i64)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_ide(
     id: i64,
     name: String,
@@ -71,7 +71,7 @@ pub async fn update_ide(
     Ok(id)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_ide(id: i64, db: State<'_, Arc<DatabaseManager>>) -> Result<i64, String> {
     let conn = db.get_connection_clone();
 
@@ -83,7 +83,7 @@ pub async fn delete_ide(id: i64, db: State<'_, Arc<DatabaseManager>>) -> Result<
     Ok(id)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn set_default_ide(id: i64, db: State<'_, Arc<DatabaseManager>>) -> Result<i64, String> {
     let conn = db.get_connection_clone();
     IdeRepository::update(&conn, id as i32, None, None, Some(true))
@@ -93,7 +93,7 @@ pub async fn set_default_ide(id: i64, db: State<'_, Arc<DatabaseManager>>) -> Re
     Ok(id)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_default_ide(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Option<IdeConfig>, String> {
@@ -112,7 +112,7 @@ pub async fn get_default_ide(
     }))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_framework_ide_mappings(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<FrameworkIdeMapping>, String> {
@@ -133,7 +133,7 @@ pub async fn get_all_framework_ide_mappings(
         .collect())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn set_framework_ide_mapping(
     framework: String,
     ide_id: i64,
@@ -154,7 +154,7 @@ pub async fn set_framework_ide_mapping(
     Ok(mapping.id as i64)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_framework_ide_mapping(
     framework: String,
     db: State<'_, Arc<DatabaseManager>>,
@@ -183,7 +183,7 @@ pub async fn get_framework_ide_mapping(
     }
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_framework_ide_mapping(
     framework: String,
     db: State<'_, Arc<DatabaseManager>>,
@@ -204,7 +204,7 @@ pub async fn delete_framework_ide_mapping(
     Ok(id)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_suggested_frameworks(
     db_manager: tauri::State<'_, std::sync::Arc<crate::database::DatabaseManager>>,
 ) -> Result<Vec<FrameworkGroup>, String> {
@@ -471,7 +471,7 @@ pub async fn get_suggested_frameworks(
     Ok(groups)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_frameworks(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<crate::entities::framework::Model>, String> {
@@ -481,7 +481,7 @@ pub async fn get_all_frameworks(
         .map_err(|e| format!("Failed to get frameworks: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn create_framework(
     name: String,
     icon: String,
@@ -501,7 +501,7 @@ pub async fn create_framework(
         .map_err(|e| format!("Failed to create framework: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_framework(
     id: i32,
     name: Option<String>,
@@ -526,7 +526,7 @@ pub async fn update_framework(
         .map_err(|e| format!("Failed to update framework: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_framework(id: i32, db: State<'_, Arc<DatabaseManager>>) -> Result<(), String> {
     let conn = db.get_connection_clone();
     FrameworkRepository::delete(&conn, id)

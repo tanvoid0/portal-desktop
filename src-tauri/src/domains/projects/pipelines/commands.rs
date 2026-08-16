@@ -1,11 +1,12 @@
 use crate::domains::projects::pipelines::services::{
     ExecutionRequestData, ExecutionService, PipelineService,
 };
+use crate::events::Events;
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::State;
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_pipeline_executions(
     pipeline_id: String,
     limit: Option<u64>,
@@ -19,7 +20,7 @@ pub async fn get_pipeline_executions(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_project_pipeline_executions(
     project_id: i32,
     limit: Option<u64>,
@@ -28,7 +29,7 @@ pub async fn get_project_pipeline_executions(
     service.get_executions_by_project(project_id, limit).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_pipeline_executions(
     limit: Option<u64>,
     service: State<'_, Arc<ExecutionService>>,
@@ -36,7 +37,7 @@ pub async fn get_all_pipeline_executions(
     service.get_all_executions(limit).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_pipeline_variables(
     _scope: Value,
     _service: State<'_, Arc<PipelineService>>,
@@ -47,7 +48,7 @@ pub async fn get_pipeline_variables(
     )
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn set_pipeline_variable(
     _scope: Value,
     variable: Value,
@@ -58,7 +59,7 @@ pub async fn set_pipeline_variable(
     Ok(variable)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_pipeline_variable(
     _scope: Value,
     _variable_name: String,
@@ -69,7 +70,7 @@ pub async fn delete_pipeline_variable(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_pipeline_secrets(
     _scope: Value,
     _service: State<'_, Arc<PipelineService>>,
@@ -80,7 +81,7 @@ pub async fn get_pipeline_secrets(
     )
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn add_pipeline_secret(
     _scope: Value,
     _secret_id: String,
@@ -91,7 +92,7 @@ pub async fn add_pipeline_secret(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn remove_pipeline_secret(
     _scope: Value,
     _secret_id: String,
@@ -102,12 +103,12 @@ pub async fn remove_pipeline_secret(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_blocks(service: State<'_, Arc<PipelineService>>) -> Result<Vec<Value>, String> {
     service.get_blocks().await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn create_block(
     request: Value,
     service: State<'_, Arc<PipelineService>>,
@@ -115,7 +116,7 @@ pub async fn create_block(
     service.create_block(request).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_block(
     block_id: String,
     request: Value,
@@ -124,7 +125,7 @@ pub async fn update_block(
     service.update_block(&block_id, request).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_block(
     block_id: String,
     service: State<'_, Arc<PipelineService>>,
@@ -132,7 +133,7 @@ pub async fn delete_block(
     service.delete_block(&block_id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_step_execution_logs(
     execution_id: String,
     step_id: String,
@@ -141,7 +142,7 @@ pub async fn get_step_execution_logs(
     service.get_step_logs(&execution_id, &step_id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn retry_step_execution(
     _execution_id: String,
     _step_id: String,
@@ -152,7 +153,7 @@ pub async fn retry_step_execution(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn create_pipeline(
     request: Value,
     service: State<'_, Arc<PipelineService>>,
@@ -168,7 +169,7 @@ pub async fn create_pipeline(
         .ok_or_else(|| "Pipeline not found after create".to_string())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_pipeline(
     pipeline_id: String,
     service: State<'_, Arc<PipelineService>>,
@@ -179,7 +180,7 @@ pub async fn get_pipeline(
     service.get_pipeline(pipeline_id_int).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_pipelines(
     project_id: i32,
     service: State<'_, Arc<PipelineService>>,
@@ -187,7 +188,7 @@ pub async fn get_pipelines(
     service.get_pipelines(project_id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_pipeline(
     pipeline_id: String,
     request: Value,
@@ -209,7 +210,7 @@ pub async fn update_pipeline(
         .ok_or_else(|| "Pipeline not found after update".to_string())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_pipeline(
     pipeline_id: String,
     service: State<'_, Arc<PipelineService>>,
@@ -220,21 +221,23 @@ pub async fn delete_pipeline(
     service.delete_pipeline(pipeline_id_int).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn execute_pipeline(
     request: Value,
-    app: tauri::AppHandle,
+    events: State<'_, Events>,
     service: State<'_, Arc<ExecutionService>>,
 ) -> Result<Value, String> {
     let execution_request = parse_execution_request(request)?;
-    let execution_id = service.execute_pipeline(execution_request, app).await?;
+    let execution_id = service
+        .execute_pipeline(execution_request, events.sink())
+        .await?;
     service
         .get_execution(&execution_id)
         .await?
         .ok_or_else(|| "Execution not found after start".to_string())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_pipeline_execution(
     execution_id: String,
     service: State<'_, Arc<ExecutionService>>,
@@ -242,13 +245,15 @@ pub async fn get_pipeline_execution(
     service.get_execution(&execution_id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn cancel_pipeline_execution(
     execution_id: String,
-    app: tauri::AppHandle,
+    events: State<'_, Events>,
     service: State<'_, Arc<ExecutionService>>,
 ) -> Result<(), String> {
-    service.cancel_execution(&execution_id, Some(app)).await
+    service
+        .cancel_execution(&execution_id, Some(events.sink()))
+        .await
 }
 
 fn parse_execution_request(value: Value) -> Result<ExecutionRequestData, String> {

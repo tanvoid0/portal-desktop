@@ -1,15 +1,11 @@
-pub mod catalog;
-pub mod chat;
-pub mod chat_title;
-pub mod commands;
-pub mod context_usage;
-pub mod conversation;
-pub mod entities;
-pub mod logging;
-pub mod message;
-pub mod platform_config;
-pub mod providers;
-pub mod services;
+//! Tauri adapter for the `ai` domain.
+//!
+//! The domain itself lives in `portal_core::domains::ai`; this module glob
+//! re-exports it so every `crate::domains::ai::…` path in the tree still
+//! resolves, and adds the `commands` module, which cannot move because `#[rpc]`
+//! expands to `#[tauri::command]`. Phase 1 of
+//! `docs/development/REMOTE_ARCHITECTURE.md`.
 
-// Commands are registered in lib.rs, not re-exported here
-// pub use commands::*;
+pub use portal_core::domains::ai::*;
+
+pub mod commands;

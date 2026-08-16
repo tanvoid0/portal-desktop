@@ -1,6 +1,11 @@
-pub mod commands;
-pub mod repositories;
-pub mod services;
+//! Tauri adapter for the `custom_scripts` domain.
+//!
+//! The domain itself lives in `portal_core::domains::custom_scripts`; this module glob
+//! re-exports it so every `crate::domains::custom_scripts::…` path in the tree still
+//! resolves, and adds the `commands` module, which cannot move because `#[rpc]`
+//! expands to `#[tauri::command]`. Phase 1 of
+//! `docs/development/REMOTE_ARCHITECTURE.md`.
 
-// Commands are registered in lib.rs, not re-exported here
-// pub use commands::*;
+pub use portal_core::domains::custom_scripts::*;
+
+pub mod commands;

@@ -2,7 +2,7 @@ use super::services::settings_service::{Settings, SettingsService, SettingsUpdat
 use std::sync::Arc;
 use tauri::State;
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_settings_command(
     _app_handle: tauri::AppHandle,
     _state: State<'_, Arc<SettingsService>>,
@@ -10,7 +10,7 @@ pub async fn get_settings_command(
     _state.load_settings()
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn save_settings_command(
     _app_handle: tauri::AppHandle,
     _state: State<'_, Arc<SettingsService>>,
@@ -19,7 +19,7 @@ pub async fn save_settings_command(
     _state.save_settings(&settings)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_settings_command(
     _app_handle: tauri::AppHandle,
     _state: State<'_, Arc<SettingsService>>,
@@ -29,7 +29,7 @@ pub async fn update_settings_command(
     _state.update_settings(settings, updates)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn reset_settings_command(
     _app_handle: tauri::AppHandle,
     _state: State<'_, Arc<SettingsService>>,
@@ -37,7 +37,7 @@ pub async fn reset_settings_command(
     _state.reset_settings()
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn export_settings_command(
     _app_handle: tauri::AppHandle,
     _state: State<'_, Arc<SettingsService>>,
@@ -46,7 +46,7 @@ pub async fn export_settings_command(
     _state.export_settings(&settings)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn import_settings_command(
     _app_handle: tauri::AppHandle,
     _state: State<'_, Arc<SettingsService>>,

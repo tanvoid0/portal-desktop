@@ -6,17 +6,18 @@ use crate::domains::kubernetes::types::{
     ConfigMapInfo, CronJobInfo, DaemonSetInfo, EventInfo, IngressInfo, JobInfo, ResourceMetrics,
     SecretInfo, StatefulSetInfo, *,
 };
+use crate::events::Events;
 use tauri::State;
 use tokio::sync::Mutex;
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_initialize_manager(
     _manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<(), String> {
     KubernetesManager::initialize().await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_load_clusters(
     _manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<Vec<KubernetesCluster>, String> {
@@ -24,7 +25,7 @@ pub async fn k8s_load_clusters(
     mgr.load_clusters().await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_connect_cluster(
     manager: State<'_, Mutex<KubernetesManager>>,
     cluster_name: String,
@@ -41,7 +42,7 @@ pub async fn k8s_connect_cluster(
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_pods(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -51,7 +52,7 @@ pub async fn k8s_list_pods(
     mgr.list_pods(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_get_pod_logs(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -71,7 +72,7 @@ pub async fn k8s_get_pod_logs(
     .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_services(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -80,7 +81,7 @@ pub async fn k8s_list_services(
     mgr.list_services(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_deployments(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -89,7 +90,7 @@ pub async fn k8s_list_deployments(
     mgr.list_deployments(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_statefulsets(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -98,7 +99,7 @@ pub async fn k8s_list_statefulsets(
     mgr.list_statefulsets(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_daemonsets(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -107,7 +108,7 @@ pub async fn k8s_list_daemonsets(
     mgr.list_daemonsets(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_jobs(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -116,7 +117,7 @@ pub async fn k8s_list_jobs(
     mgr.list_jobs(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_events(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -125,7 +126,7 @@ pub async fn k8s_list_events(
     mgr.list_events(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_cronjobs(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -134,7 +135,7 @@ pub async fn k8s_list_cronjobs(
     mgr.list_cronjobs(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_ingresses(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -143,7 +144,7 @@ pub async fn k8s_list_ingresses(
     mgr.list_ingresses(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_configmaps(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -152,7 +153,7 @@ pub async fn k8s_list_configmaps(
     mgr.list_configmaps(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_secrets(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -161,7 +162,7 @@ pub async fn k8s_list_secrets(
     mgr.list_secrets(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_get_resource_yaml(
     _manager: State<'_, Mutex<KubernetesManager>>,
     kind: String,
@@ -172,7 +173,7 @@ pub async fn k8s_get_resource_yaml(
     mgr.get_resource_yaml(&kind, &namespace, &name).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_apply_resource_yaml(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -182,7 +183,7 @@ pub async fn k8s_apply_resource_yaml(
     mgr.apply_resource_yaml(&namespace, &yaml_content).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_delete_configmap(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -192,7 +193,7 @@ pub async fn k8s_delete_configmap(
     mgr.delete_configmap(&namespace, &name).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_delete_secret(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -202,7 +203,7 @@ pub async fn k8s_delete_secret(
     mgr.delete_secret(&namespace, &name).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_rollback_deployment(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -212,7 +213,7 @@ pub async fn k8s_rollback_deployment(
     mgr.rollback_deployment(&namespace, &name).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_get_pod_metrics(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -222,7 +223,7 @@ pub async fn k8s_get_pod_metrics(
     mgr.get_pod_metrics(&namespace, &pod_name).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_get_all_pods_metrics(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: Option<String>,
@@ -231,7 +232,7 @@ pub async fn k8s_get_all_pods_metrics(
     mgr.get_all_pods_metrics(namespace.as_deref()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_namespaces(
     _manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<Vec<NamespaceInfo>, String> {
@@ -239,7 +240,7 @@ pub async fn k8s_list_namespaces(
     mgr.list_namespaces().await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_get_current_cluster(
     manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<Option<KubernetesCluster>, String> {
@@ -247,7 +248,7 @@ pub async fn k8s_get_current_cluster(
     Ok(mgr.get_current_cluster().cloned())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_is_connected(
     manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<bool, String> {
@@ -255,7 +256,7 @@ pub async fn k8s_is_connected(
     Ok(mgr.is_connected())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_detect_setup_tools(
     _manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<KubeSetupDetectionResult, String> {
@@ -263,7 +264,7 @@ pub async fn k8s_detect_setup_tools(
     Ok(mgr.detect_setup_tools().await)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_generate_kubeconfig(
     _manager: State<'_, Mutex<KubernetesManager>>,
     request: GenerateKubeconfigRequest,
@@ -272,7 +273,7 @@ pub async fn k8s_generate_kubeconfig(
     mgr.generate_kubeconfig(request).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_get_pod_yaml(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -282,7 +283,7 @@ pub async fn k8s_get_pod_yaml(
     mgr.get_pod_yaml(&namespace, &pod_name).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_delete_pod(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -292,7 +293,7 @@ pub async fn k8s_delete_pod(
     mgr.delete_pod(&namespace, &pod_name).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_scale_deployment(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -304,41 +305,41 @@ pub async fn k8s_scale_deployment(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_start_watching_pods(
     _manager: State<'_, Mutex<KubernetesManager>>,
-    window: tauri::Window,
+    events: State<'_, Events>,
     namespace: Option<String>,
 ) -> Result<(), String> {
     // Create a temporary manager instance - it uses static client internally
     let mgr = KubernetesManager::new();
     let namespace = namespace.as_deref().unwrap_or("default");
-    mgr.watch_pods(namespace, window).await
+    mgr.watch_pods(namespace, events.sink()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_start_watching_services(
     _manager: State<'_, Mutex<KubernetesManager>>,
-    window: tauri::Window,
+    events: State<'_, Events>,
     namespace: Option<String>,
 ) -> Result<(), String> {
     let mgr = KubernetesManager::new();
     let namespace = namespace.as_deref().unwrap_or("default");
-    mgr.watch_services(namespace, window).await
+    mgr.watch_services(namespace, events.sink()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_start_watching_deployments(
     _manager: State<'_, Mutex<KubernetesManager>>,
-    window: tauri::Window,
+    events: State<'_, Events>,
     namespace: Option<String>,
 ) -> Result<(), String> {
     let mgr = KubernetesManager::new();
     let namespace = namespace.as_deref().unwrap_or("default");
-    mgr.watch_deployments(namespace, window).await
+    mgr.watch_deployments(namespace, events.sink()).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_exec_pod(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -351,7 +352,7 @@ pub async fn k8s_exec_pod(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_start_port_forward(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,
@@ -364,7 +365,7 @@ pub async fn k8s_start_port_forward(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_list_port_forwards(
     _manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<Vec<crate::domains::kubernetes::types::PortForwardInfo>, String> {
@@ -372,7 +373,7 @@ pub async fn k8s_list_port_forwards(
     mgr.list_port_forwards().await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_stop_port_forward(
     _manager: State<'_, Mutex<KubernetesManager>>,
     id: String,
@@ -381,7 +382,7 @@ pub async fn k8s_stop_port_forward(
     mgr.stop_port_forward(&id).await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn k8s_stop_all_watches(
     _manager: State<'_, Mutex<KubernetesManager>>,
 ) -> Result<(), String> {

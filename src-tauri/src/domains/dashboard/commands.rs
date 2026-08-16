@@ -14,7 +14,7 @@ pub struct DashboardOverview {
     pub running_services_count: u32,
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_dashboard_overview(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<DashboardOverview, String> {

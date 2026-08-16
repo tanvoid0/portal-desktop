@@ -55,6 +55,16 @@ kube = { version = "0.87", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.20", features = ["v1_28"] }
 tokio-tungstenite = "0.21"
 futures = "0.3"
+# Local HTTP/WS surface (daemon.rs). hyper 1.x + tower 0.5 are already in the
+# tree via reqwest, so this is a thin addition rather than a second stack.
+axum = { version = "0.8", features = ["ws"] }
+# Command registry: `#[rpc]` submits entries at the definition site, inventory
+# collects them at link time, so there is no central list to drift.
+inventory = "0.3"
+portal-rpc-macro = { path = "rpc-macro" }
+# The tauri-free core (phase 1). Slices move here one at a time; `src/events.rs`
+# re-exports what came across so no call site has to name the split.
+portal-core = { path = "portal-core" }
 serde_yaml = "0.9"
 rand = "0.8"
 # OS keychain (Windows Credential Manager / macOS Keychain / Linux Secret Service)

@@ -29,7 +29,7 @@ pub struct SDKVersion {
     pub lts: bool,
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_version_sources(sdk_type: String) -> Result<Vec<VersionSource>, String> {
     println!("[SDK] Getting version sources for: {}", sdk_type);
 
@@ -133,7 +133,7 @@ pub async fn get_version_sources(sdk_type: String) -> Result<Vec<VersionSource>,
     Ok(sources)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn refresh_version_status(sdk_type: String) -> Result<(), String> {
     println!("[SDK] Refreshing version status for: {}", sdk_type);
 
@@ -159,7 +159,7 @@ pub async fn refresh_version_status(sdk_type: String) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn uninstall_sdk_version(
     sdk_type: String,
     version: String,

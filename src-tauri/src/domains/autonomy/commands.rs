@@ -22,7 +22,7 @@ fn get_services_map() -> Arc<Mutex<HashMap<String, AutonomyService>>> {
 // Note: We can't clone AutonomyService easily, so we'll manage it through the mutex directly
 // Functions will get mutable access when needed
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn evaluate_autonomous_action(
     action_type: String,
     action_data: Value,
@@ -77,7 +77,7 @@ pub async fn evaluate_autonomous_action(
     }))
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn record_autonomous_action_outcome(
     action_id: String,
     action_type: String,
@@ -101,7 +101,7 @@ pub async fn record_autonomous_action_outcome(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_autonomy_level() -> Result<String, String> {
     let service_map = get_services_map();
     let services = service_map.lock().await;
@@ -111,7 +111,7 @@ pub async fn get_autonomy_level() -> Result<String, String> {
     Ok(format!("{:?}", service.get_autonomy_level()))
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn set_autonomy_level(level: String) -> Result<(), String> {
     let level = match level.to_lowercase().as_str() {
         "observation" => {
@@ -137,7 +137,7 @@ pub async fn set_autonomy_level(level: String) -> Result<(), String> {
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_autonomy_enabled() -> Result<bool, String> {
     let service_map = get_services_map();
     let services = service_map.lock().await;
@@ -147,7 +147,7 @@ pub async fn get_autonomy_enabled() -> Result<bool, String> {
     Ok(service.is_enabled())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn set_autonomy_enabled(enabled: bool) -> Result<(), String> {
     let service_map = get_services_map();
     let mut services = service_map.lock().await;
@@ -159,7 +159,7 @@ pub async fn set_autonomy_enabled(enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_approval_stats() -> Result<Value, String> {
     let service_map = get_services_map();
     let services = service_map.lock().await;

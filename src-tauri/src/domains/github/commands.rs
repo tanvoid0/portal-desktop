@@ -7,14 +7,14 @@ use crate::database::DatabaseManager;
 use super::service::GitHubService;
 use super::types::{
     GitHubCloneRepositoryRequest, GitHubConnectionStatus, GitHubCreateIssueRequest,
-    GitHubDeviceFlowPollResult, GitHubDeviceFlowStart, GitHubDispatchWorkflowRequest,
-    GitHubIssue, GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest,
-    GitHubListWorkflowRunsRequest, GitHubListWorkflowsRequest, GitHubLocalRepositoryDetection,
-    GitHubProjectLink, GitHubProjectLinkResult, GitHubRepoProjects, GitHubRepository,
-    GitHubUpdateIssueRequest, GitHubWorkflow, GitHubWorkflowRun, GitHubWorkflowRunDetail,
+    GitHubDeviceFlowPollResult, GitHubDeviceFlowStart, GitHubDispatchWorkflowRequest, GitHubIssue,
+    GitHubLinkExistingRepositoryRequest, GitHubListIssuesRequest, GitHubListWorkflowRunsRequest,
+    GitHubListWorkflowsRequest, GitHubLocalRepositoryDetection, GitHubProjectLink,
+    GitHubProjectLinkResult, GitHubRepoProjects, GitHubRepository, GitHubUpdateIssueRequest,
+    GitHubWorkflow, GitHubWorkflowRun, GitHubWorkflowRunDetail,
 };
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_get_connection_status(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<GitHubConnectionStatus, String> {
@@ -23,7 +23,7 @@ pub async fn github_get_connection_status(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_start_device_flow(
     scope: Option<String>,
     db: State<'_, Arc<DatabaseManager>>,
@@ -33,7 +33,7 @@ pub async fn github_start_device_flow(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_poll_device_flow(
     device_code: String,
     db: State<'_, Arc<DatabaseManager>>,
@@ -43,14 +43,14 @@ pub async fn github_poll_device_flow(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_disconnect(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<GitHubConnectionStatus, String> {
     GitHubService::new(db.inner().clone()).disconnect().await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_list_repositories(
     search: Option<String>,
     page: Option<u32>,
@@ -62,7 +62,7 @@ pub async fn github_list_repositories(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_list_linked_repos(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<String>, String> {
@@ -71,7 +71,7 @@ pub async fn github_list_linked_repos(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_get_repository(
     owner: String,
     repo: String,
@@ -82,7 +82,7 @@ pub async fn github_get_repository(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_list_issues(
     request: GitHubListIssuesRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -92,7 +92,7 @@ pub async fn github_list_issues(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_get_issue(
     owner: String,
     repo: String,
@@ -104,7 +104,7 @@ pub async fn github_get_issue(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_create_issue(
     request: GitHubCreateIssueRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -114,7 +114,7 @@ pub async fn github_create_issue(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_update_issue(
     request: GitHubUpdateIssueRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -124,7 +124,7 @@ pub async fn github_update_issue(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_clone_repository(
     request: GitHubCloneRepositoryRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -134,7 +134,7 @@ pub async fn github_clone_repository(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_link_existing_repository(
     request: GitHubLinkExistingRepositoryRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -144,7 +144,7 @@ pub async fn github_link_existing_repository(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_get_project_link(
     project_id: i32,
     db: State<'_, Arc<DatabaseManager>>,
@@ -154,7 +154,7 @@ pub async fn github_get_project_link(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_detect_local_repository(
     path: String,
     db: State<'_, Arc<DatabaseManager>>,
@@ -164,7 +164,7 @@ pub async fn github_detect_local_repository(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_list_workflow_runs(
     request: GitHubListWorkflowRunsRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -174,7 +174,7 @@ pub async fn github_list_workflow_runs(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_list_workflows(
     request: GitHubListWorkflowsRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -184,7 +184,7 @@ pub async fn github_list_workflows(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_dispatch_workflow(
     request: GitHubDispatchWorkflowRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -194,7 +194,7 @@ pub async fn github_dispatch_workflow(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_get_workflow_run(
     owner: String,
     repo: String,
@@ -206,7 +206,7 @@ pub async fn github_get_workflow_run(
         .await
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn github_get_workflow_job_logs(
     owner: String,
     repo: String,

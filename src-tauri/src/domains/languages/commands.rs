@@ -5,7 +5,7 @@ use crate::domains::learning::repositories::learned_pattern_repository::LearnedP
 use std::sync::Arc;
 use tauri::State;
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_suggested_languages(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<LanguageGroup>, String> {
@@ -200,7 +200,7 @@ pub async fn get_suggested_languages(
     Ok(groups)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_languages(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<crate::entities::language::Model>, String> {
@@ -210,7 +210,7 @@ pub async fn get_all_languages(
         .map_err(|e| format!("Failed to get languages: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn create_language(
     name: String,
     icon: String,
@@ -230,7 +230,7 @@ pub async fn create_language(
         .map_err(|e| format!("Failed to create language: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_language(
     id: i32,
     name: Option<String>,
@@ -255,7 +255,7 @@ pub async fn update_language(
         .map_err(|e| format!("Failed to update language: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_language(id: i32, db: State<'_, Arc<DatabaseManager>>) -> Result<(), String> {
     let conn = db.get_connection_clone();
     LanguageRepository::delete(&conn, id)

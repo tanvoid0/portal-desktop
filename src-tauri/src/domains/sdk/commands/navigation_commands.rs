@@ -9,7 +9,7 @@ use crate::domains::sdk::services::navigation_service::{
 use tauri::State;
 
 /// Get SDK navigation items with installation status
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_sdk_navigation_items(
     navigation_service: State<'_, NavigationService>,
 ) -> Result<NavigationResponse, String> {
@@ -20,7 +20,7 @@ pub async fn get_sdk_navigation_items(
 }
 
 /// Get detailed information about a specific SDK
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_sdk_details(
     navigation_service: State<'_, NavigationService>,
     sdk_type: String,

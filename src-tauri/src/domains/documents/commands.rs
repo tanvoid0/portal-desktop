@@ -74,7 +74,7 @@ pub struct ConversationMessage {
     pub content: String,
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn create_document(
     db_manager: State<'_, Arc<DatabaseManager>>,
     command: CreateDocumentCommand,
@@ -96,7 +96,7 @@ pub async fn create_document(
         .map_err(|e| format!("Failed to create document: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_document(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -111,7 +111,7 @@ pub async fn get_document(
         .map_err(|e| format!("Failed to get document: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_documents(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<DocumentResponse>, String> {
@@ -125,7 +125,7 @@ pub async fn get_documents(
         .map_err(|e| format!("Failed to get documents: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_document(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -148,7 +148,7 @@ pub async fn update_document(
         .map_err(|e| format!("Failed to update document: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_document_draft(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -164,7 +164,7 @@ pub async fn update_document_draft(
         .map_err(|e| format!("Failed to update document draft: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn save_document(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -183,7 +183,7 @@ pub async fn save_document(
         .map_err(|e| format!("Failed to save document: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_document(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -197,7 +197,7 @@ pub async fn delete_document(
         .map_err(|e| format!("Failed to delete document: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn search_documents(
     db_manager: State<'_, Arc<DatabaseManager>>,
     query: String,
@@ -212,7 +212,7 @@ pub async fn search_documents(
         .map_err(|e| format!("Failed to search documents: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn generate_document_with_ai(
     ai_service: State<'_, Arc<AIService>>,
     command: GenerateDocumentCommand,

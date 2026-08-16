@@ -98,24 +98,12 @@
           },
         });
       } else {
-        // Use API endpoint (for browser access)
-        const response = await fetch('/api/tauri/generate_device_passcode', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            device_id: deviceInfo.device_id,
-            device_name: deviceInfo.device_name,
-            device_info: JSON.stringify(deviceInfo.device_info),
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to generate passcode');
-        }
-
-        result = await response.json();
+        // Browser access has no transport for this. `/api/tauri/…` was a
+        // SvelteKit route that `adapter-static` never built and that returned
+        // 501 anyway; it is deleted. The daemon's `/rpc` refuses browser
+        // origins by design, so pairing has to be started from the desktop app
+        // until phase 4 of docs/development/REMOTE_ARCHITECTURE.md lands.
+        throw new Error('Generate the pairing passcode from the desktop app.');
       }
 
       passcode = result.passcode;

@@ -1,5 +1,6 @@
 import { invokeClient } from '$lib/utils/invokeClient';
 import { logger } from '$lib/domains/shared/services/logger';
+import type { Project } from '$lib/domains/projects/types';
 import { normalizeProject } from '$lib/domains/projects/utils/normalizeProject';
 import { queryClient } from '$lib/domains/shared/query';
 import { invalidateProjectsList } from '$lib/domains/shared/query/invalidateProjects';
@@ -63,6 +64,15 @@ function formatDeviceFlowError(error: unknown): Error {
   }
   return new Error(`GitHub authorization check failed: ${message}`);
 }
+
+/**
+ * The wire shapes with their `ProjectResponse`s swapped for the normalized UI
+ * `Project`. The generated types describe what Rust sends; these describe what
+ * this service returns after `normalizeProject` has run over it.
+ */
+type WithUiProjects<T, K extends keyof T> = Omit<T, K> & {
+  [P in K]: T[P] extends readonly unknown[] ? Project[] : Project;
+};
 
 class GitHubService {
   async getConnectionStatus(): Promise<GitHubConnectionStatus> {
@@ -151,7 +161,10 @@ class GitHubService {
     return invokeClient.post<string[]>('github_list_linked_repos');
   }
 
-  async getRepository(owner: string, repo: string): Promise<GitHubRepoProjects> {
+  async getRepository(
+    owner: string,
+    repo: string
+  ): Promise<WithUiProjects<GitHubRepoProjects, 'linkedProjects'>> {
     const raw = await invokeClient.post<GitHubRepoProjects>('github_get_repository', {
       owner,
       repo,
@@ -204,7 +217,9 @@ class GitHubService {
     });
   }
 
-  async cloneRepository(request: GitHubCloneRepositoryRequest): Promise<GitHubProjectLinkResult> {
+  async cloneRepository(
+    request: GitHubCloneRepositoryRequest
+  ): Promise<WithUiProjects<GitHubProjectLinkResult, 'project'>> {
     log.info('Cloning GitHub repository', request);
     const raw = await invokeClient.post<
       Omit<GitHubProjectLinkResult, 'project'> & { project: Record<string, unknown> }
@@ -219,7 +234,7 @@ class GitHubService {
 
   async linkExistingRepository(
     request: GitHubLinkExistingRepositoryRequest
-  ): Promise<GitHubProjectLinkResult> {
+  ): Promise<WithUiProjects<GitHubProjectLinkResult, 'project'>> {
     log.info('Linking local repository to GitHub', request);
     const raw = await invokeClient.post<
       Omit<GitHubProjectLinkResult, 'project'> & { project: Record<string, unknown> }

@@ -1,7 +1,11 @@
-pub mod commands;
-pub mod repositories;
-pub mod services;
+//! Tauri adapter for the `learning` domain.
+//!
+//! The domain itself lives in `portal_core::domains::learning`; this module glob
+//! re-exports it so every `crate::domains::learning::…` path in the tree still
+//! resolves, and adds the `commands` module, which cannot move because `#[rpc]`
+//! expands to `#[tauri::command]`. Phase 1 of
+//! `docs/development/REMOTE_ARCHITECTURE.md`.
 
-// Repositories and services are used via commands, not directly imported
-// pub use repositories::*;
-// pub use services::*;
+pub use portal_core::domains::learning::*;
+
+pub mod commands;

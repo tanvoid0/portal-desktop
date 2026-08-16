@@ -1,19 +1,17 @@
 use crate::domains::environment::platform::platform_env;
-use crate::domains::environment::types::{
-    EnvApplyResult, EnvChange, EnvPermissions, EnvVariable,
-};
+use crate::domains::environment::types::{EnvApplyResult, EnvChange, EnvPermissions, EnvVariable};
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn env_list_variables() -> Result<Vec<EnvVariable>, String> {
     platform_env().list_variables()
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn env_get_permissions() -> Result<EnvPermissions, String> {
     platform_env().get_permissions()
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn env_set_variable(name: String, value: String, scope: String) -> Result<(), String> {
     if name.trim().is_empty() {
         return Err("Variable name cannot be empty".into());
@@ -21,7 +19,7 @@ pub async fn env_set_variable(name: String, value: String, scope: String) -> Res
     platform_env().set_variable(&name, &value, &scope)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn env_delete_variable(name: String, scope: String) -> Result<(), String> {
     if name.trim().is_empty() {
         return Err("Variable name cannot be empty".into());
@@ -29,7 +27,7 @@ pub async fn env_delete_variable(name: String, scope: String) -> Result<(), Stri
     platform_env().delete_variable(&name, &scope)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn env_apply_changes(changes: Vec<EnvChange>) -> Result<EnvApplyResult, String> {
     let platform = platform_env();
     let permissions = platform.get_permissions()?;
@@ -90,12 +88,12 @@ pub async fn env_apply_changes(changes: Vec<EnvChange>) -> Result<EnvApplyResult
     Ok(elevated_result)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn env_refresh_process() -> Result<(), String> {
     platform_env().refresh_process_environment()
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn env_request_elevation() -> Result<EnvPermissions, String> {
     // Re-check permissions after the user may have approved elevation in a prior action.
     platform_env().get_permissions()

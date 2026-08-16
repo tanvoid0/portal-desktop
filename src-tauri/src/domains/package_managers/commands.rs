@@ -5,7 +5,7 @@ use crate::domains::package_managers::repositories::PackageManagerRepository;
 use std::sync::Arc;
 use tauri::State;
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_suggested_package_managers(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<PackageManagerGroup>, String> {
@@ -196,7 +196,7 @@ pub async fn get_suggested_package_managers(
     Ok(groups)
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_package_managers(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<crate::entities::package_manager::Model>, String> {
@@ -206,7 +206,7 @@ pub async fn get_all_package_managers(
         .map_err(|e| format!("Failed to get package managers: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn create_package_manager(
     name: String,
     icon: String,
@@ -229,7 +229,7 @@ pub async fn create_package_manager(
         .map_err(|e| format!("Failed to create package manager: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_package_manager(
     id: i32,
     name: Option<String>,
@@ -257,7 +257,7 @@ pub async fn update_package_manager(
         .map_err(|e| format!("Failed to update package manager: {}", e))
 }
 
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_package_manager(
     id: i32,
     db: State<'_, Arc<DatabaseManager>>,

@@ -4,7 +4,7 @@ use crate::domains::projects::services::ProjectService;
 use std::sync::Arc;
 use tauri::command;
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_projects(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<crate::domains::projects::entities::ProjectResponse>, String> {
@@ -12,7 +12,7 @@ pub async fn get_all_projects(
     service.get_all_projects().await.map_err(|e| e.to_string())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_project(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -21,7 +21,7 @@ pub async fn get_project(
     service.get_project(id).await.map_err(|e| e.to_string())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn create_project(
     name: String,
     description: Option<String>,
@@ -56,7 +56,7 @@ pub async fn create_project(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn update_project(
     id: i32,
     name: Option<String>,
@@ -95,7 +95,7 @@ pub async fn update_project(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_project(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -104,7 +104,7 @@ pub async fn delete_project(
     service.delete_project(id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn toggle_project_star(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -113,7 +113,7 @@ pub async fn toggle_project_star(
     service.toggle_project_star(id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn open_project(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -122,7 +122,7 @@ pub async fn open_project(
     service.open_project(id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn refresh_project_metadata(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -131,7 +131,7 @@ pub async fn refresh_project_metadata(
     service.refresh_project_metadata(id).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_projects_with_filters(
     status_filter: Option<String>,
     sort_by: String,
@@ -144,7 +144,7 @@ pub async fn get_projects_with_filters(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_frameworks(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<String>, String> {
@@ -152,7 +152,7 @@ pub async fn get_frameworks(
     service.get_frameworks().await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_project_stats(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<crate::domains::projects::services::ProjectStats, String> {
@@ -160,7 +160,7 @@ pub async fn get_project_stats(
     service.get_project_stats().await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn validate_project_path(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -173,7 +173,7 @@ pub async fn validate_project_path(
         .or_else(|e| Err(e))
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn generate_project_name(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -182,7 +182,7 @@ pub async fn generate_project_name(
     service.generate_project_name(&path).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn detect_framework(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -191,7 +191,7 @@ pub async fn detect_framework(
     service.detect_frameworks(&path).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn analyze_project_directory(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -200,7 +200,7 @@ pub async fn analyze_project_directory(
     service.analyze_project_directory(&path).await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn open_project_in_explorer(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -232,7 +232,7 @@ pub async fn open_project_in_explorer(path: String) -> Result<(), String> {
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn select_directory(app_handle: tauri::AppHandle) -> Result<Option<String>, String> {
     use std::sync::mpsc;
     use tauri_plugin_dialog::DialogExt;
@@ -255,7 +255,7 @@ pub async fn select_directory(app_handle: tauri::AppHandle) -> Result<Option<Str
     }
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn execute_command_in_directory(
     command: String,
     args: Vec<String>,

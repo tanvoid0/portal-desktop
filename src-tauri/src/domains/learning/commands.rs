@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tauri::command;
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn record_learning_event(
     event_type: String,
     event_data: Value,
@@ -19,7 +19,7 @@ pub async fn record_learning_event(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn learn_pattern(
     pattern_type: String,
     pattern_data: Value,
@@ -33,7 +33,7 @@ pub async fn learn_pattern(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn record_pattern_outcome(
     pattern_id: i32,
     success: bool,
@@ -46,7 +46,7 @@ pub async fn record_pattern_outcome(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_suggestions(
     pattern_type: String,
     context: Option<String>,
@@ -59,7 +59,7 @@ pub async fn get_suggestions(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn learn_preference(
     preference_type: String,
     context: Option<String>,
@@ -80,7 +80,7 @@ pub async fn learn_preference(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_preference(
     preference_type: String,
     context: Option<String>,
@@ -93,7 +93,7 @@ pub async fn get_preference(
         .await
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_ml_intensity(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<String, String> {
@@ -118,7 +118,7 @@ pub async fn get_ml_intensity(
     Ok(MLIntensity::default().to_string().to_string())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn set_ml_intensity(
     intensity: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -143,7 +143,7 @@ pub async fn set_ml_intensity(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_ml_enabled(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<bool, String> {
@@ -166,7 +166,7 @@ pub async fn get_ml_enabled(
     Ok(true)
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn set_ml_enabled(
     enabled: bool,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -189,7 +189,7 @@ pub async fn set_ml_enabled(
     Ok(())
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_patterns(
     limit: Option<u64>,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -228,7 +228,7 @@ pub async fn get_all_patterns(
     Ok(result)
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_recent_events(
     limit: u64,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -258,7 +258,7 @@ pub async fn get_recent_events(
     Ok(result)
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_all_preferences(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<Value>, String> {
@@ -290,7 +290,7 @@ pub async fn get_all_preferences(
     Ok(result)
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn cleanup_learning_data(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Value, String> {
@@ -309,7 +309,7 @@ pub async fn cleanup_learning_data(
     }))
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_memory_stats(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Value, String> {
@@ -332,7 +332,7 @@ pub async fn get_memory_stats(
     }))
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn get_cleanup_preview(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Value, String> {
@@ -351,7 +351,7 @@ pub async fn get_cleanup_preview(
     }))
 }
 
-#[command]
+#[portal_rpc_macro::rpc]
 pub async fn mark_pattern_important(
     pattern_id: i32,
     is_important: bool,

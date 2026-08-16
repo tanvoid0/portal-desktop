@@ -71,7 +71,7 @@
     return {
       id,
       title: `#${issue.number} ${issue.title}`,
-      description: issue.body,
+      description: issue.body ?? undefined,
       status: issue.state === 'closed' ? 'completed' : 'pending',
       priority: 'medium',
       type: issue.labels[0] ?? 'Bug',

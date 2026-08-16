@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tauri::State;
 
 /// Create a new credential
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn create_credential(
     name: String,
     credential_type: String,
@@ -40,7 +40,7 @@ pub async fn create_credential(
 }
 
 /// Get all credentials
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_credentials(
     db: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<serde_json::Value>, String> {
@@ -59,7 +59,7 @@ pub async fn get_credentials(
 }
 
 /// Get credential by ID
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_credential(
     id: String,
     db: State<'_, Arc<DatabaseManager>>,
@@ -73,7 +73,7 @@ pub async fn get_credential(
 }
 
 /// Update credential
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn update_credential(
     id: String,
     name: Option<String>,
@@ -107,7 +107,7 @@ pub async fn update_credential(
 }
 
 /// Delete credential
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn delete_credential(
     id: String,
     db: State<'_, Arc<DatabaseManager>>,
@@ -121,7 +121,7 @@ pub async fn delete_credential(
 }
 
 /// Decrypt credential value
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn decrypt_credential(
     id: String,
     db: State<'_, Arc<DatabaseManager>>,
@@ -135,7 +135,7 @@ pub async fn decrypt_credential(
 }
 
 /// Search credentials
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn search_credentials(
     query: String,
     db: State<'_, Arc<DatabaseManager>>,

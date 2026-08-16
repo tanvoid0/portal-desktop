@@ -23,7 +23,9 @@ use sea_orm::{
 };
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::{Emitter, State};
+use tauri::State;
+
+use crate::events::{EventSinkExt, Events};
 // Use the centralized logger from utils
 use crate::domains::ai::entities::ai_conversation::Column as ConversationColumn;
 use crate::domains::ai::entities::ai_conversation_message::Column as ConversationMessageColumn;
@@ -36,7 +38,7 @@ use crate::domains::ai::entities::{
 use crate::{log_debug, log_error, log_info};
 
 /// Get configuration status for a provider
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_ai_provider_config_status(
     provider_type: ProviderType,
     ai_service: State<'_, Arc<AIService>>,
@@ -48,7 +50,7 @@ pub async fn get_ai_provider_config_status(
 }
 
 /// Get all configured AI providers
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_ai_providers(
     settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<Vec<ProviderConfig>, String> {
@@ -56,7 +58,7 @@ pub async fn get_ai_providers(
 }
 
 /// Get default AI provider
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_default_ai_provider(
     settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<Option<ProviderType>, String> {
@@ -64,7 +66,7 @@ pub async fn get_default_ai_provider(
 }
 
 /// Set default AI provider
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn set_default_ai_provider(
     provider_type: ProviderType,
     settings_service: State<'_, Arc<AISettingsService>>,
@@ -81,7 +83,7 @@ pub async fn set_default_ai_provider(
 }
 
 /// Save provider configuration
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn save_ai_provider_config(
     config: ProviderConfig,
     settings_service: State<'_, Arc<AISettingsService>>,
@@ -98,7 +100,7 @@ pub async fn save_ai_provider_config(
 }
 
 /// Get provider configuration
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_ai_provider_config(
     provider_type: ProviderType,
     settings_service: State<'_, Arc<AISettingsService>>,
@@ -107,7 +109,7 @@ pub async fn get_ai_provider_config(
 }
 
 /// Test provider connection
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn test_ai_provider(
     provider_type: ProviderType,
     ai_service: State<'_, Arc<AIService>>,
@@ -119,7 +121,7 @@ pub async fn test_ai_provider(
 }
 
 /// Get available models for a provider (installed models)
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_ai_provider_models(
     provider_type: Option<ProviderType>,
     ai_service: State<'_, Arc<AIService>>,
@@ -131,7 +133,7 @@ pub async fn get_ai_provider_models(
 }
 
 /// Fetch agent-platform provider/model catalog (`GET /v1/catalog`).
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn get_ai_platform_catalog(
     providers: Option<Vec<String>>,
     live: Option<bool>,
@@ -154,7 +156,7 @@ pub async fn get_ai_platform_catalog(
 }
 
 /// Generate text using AI
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn generate_ai_text(
     prompt: String,
     options: Option<GenerationOptions>,
@@ -177,7 +179,7 @@ pub async fn generate_ai_text(
 }
 
 /// Generate text with system message
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn generate_ai_text_with_system(
     system_message: String,
     user_message: String,
@@ -201,7 +203,7 @@ pub async fn generate_ai_text_with_system(
 }
 
 /// Send a message to AI (chat) - non-streaming
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_send_message(
     message: String,
     history: Vec<ChatMessage>,
@@ -225,7 +227,7 @@ pub async fn ai_send_message(
         llm_provider,
         extra_options,
     };
-    chat::send_message(request, ai_service).await
+    chat::send_message(request, &ai_service).await
 }
 
 /// Marker error used to unwind a stream that the user stopped.
@@ -245,7 +247,7 @@ fn take_cancelled(stream_id: &str) -> bool {
 }
 
 /// Stop an in-flight streaming response. The next chunk aborts the SSE read.
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_cancel_stream(stream_id: String) -> Result<(), String> {
     cancelled_streams()
         .lock()
@@ -255,7 +257,7 @@ pub async fn ai_cancel_stream(stream_id: String) -> Result<(), String> {
 }
 
 /// Send a message to AI (chat) with streaming support
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_send_message_stream(
     message: String,
     history: Vec<ChatMessage>,
@@ -267,11 +269,12 @@ pub async fn ai_send_message_stream(
     llm_provider: Option<String>,
     extra_options: Option<serde_json::Value>,
     stream_id: String, // Unique ID for this stream
-    app_handle: tauri::AppHandle,
+    events: State<'_, Events>,
     ai_service: State<'_, Arc<AIService>>,
     db_manager: State<'_, Arc<DatabaseManager>>,
     settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<String, String> {
+    let sink = events.sink();
     let is_first_user = history.iter().filter(|m| m.role == "user").count() == 0;
     let fallback_title = if is_first_user {
         Some(fallback_title_from_message(&message, PLACEHOLDER_CHAT))
@@ -287,13 +290,13 @@ pub async fn ai_send_message_stream(
                 conversation.title = Set(fb.clone());
                 conversation.updated_at = Set(chrono::Utc::now().to_rfc3339());
                 let _ = conversation.update(db).await;
-                let _ = app_handle.emit(
+                sink.emit(
                     &format!("ai-stream-title-{stream_id}"),
                     serde_json::json!({ "conversation_id": conv_id, "title": fb }),
                 );
 
                 if smart_titles_enabled() {
-                    let app = app_handle.clone();
+                    let title_sink = sink.clone();
                     let sid = stream_id.clone();
                     let cid = conv_id.clone();
                     let fb_clone = fb.clone();
@@ -321,7 +324,7 @@ pub async fn ai_send_message_stream(
                         conversation.title = Set(smart.clone());
                         conversation.updated_at = Set(chrono::Utc::now().to_rfc3339());
                         if conversation.update(db).await.is_ok() {
-                            let _ = app.emit(
+                            title_sink.emit(
                                 &format!("ai-stream-title-{sid}"),
                                 serde_json::json!({ "conversation_id": cid, "title": smart }),
                             );
@@ -352,7 +355,7 @@ pub async fn ai_send_message_stream(
     // Shared so the partial text survives a cancelled stream.
     let full_response = Arc::new(Mutex::new(String::new()));
     let response_sink = full_response.clone();
-    let app_handle_clone = app_handle.clone();
+    let chunk_sink = sink.clone();
     let stream_id_clone = stream_id.clone();
     let result = ai_service
         .generate_chat_stream(
@@ -367,9 +370,11 @@ pub async fn ai_send_message_stream(
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .push_str(&chunk);
-                app_handle_clone
-                    .emit(&format!("ai-stream-chunk-{}", stream_id_clone), &chunk)
-                    .map_err(|e| AIError::GenericError(format!("Failed to emit event: {}", e)))?;
+                if !chunk_sink.emit(&format!("ai-stream-chunk-{}", stream_id_clone), &chunk) {
+                    return Err(AIError::GenericError(
+                        "no client is receiving this stream".to_string(),
+                    ));
+                }
                 Ok(())
             }),
         )
@@ -420,17 +425,17 @@ pub async fn ai_send_message_stream(
         complete_payload["llm_usage"] = serde_json::json!(llm_usage);
         complete_payload["finish_reason"] = serde_json::json!(finish_reason);
     }
-    app_handle
-        .emit(
-            &format!("ai-stream-complete-{}", stream_id),
-            &complete_payload,
-        )
-        .map_err(|e| format!("Failed to emit completion event: {}", e))?;
+    if !sink.emit(
+        &format!("ai-stream-complete-{}", stream_id),
+        &complete_payload,
+    ) {
+        return Err("no client is receiving this stream".to_string());
+    }
     Ok(content)
 }
 
 /// Create a new conversation
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_create_conversation(
     title: String,
     provider: ProviderType,
@@ -518,7 +523,7 @@ pub async fn ai_create_conversation(
 }
 
 /// Save conversation messages
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_save_conversation(
     id: String,
     messages: Vec<ConversationMessage>,
@@ -598,7 +603,7 @@ pub async fn ai_save_conversation(
 }
 
 /// Load conversation by ID
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_load_conversation(
     id: String,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -628,7 +633,7 @@ pub async fn ai_load_conversation(
 }
 
 /// List all conversations
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_list_conversations(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<Conversation>, String> {
@@ -658,7 +663,7 @@ pub async fn ai_list_conversations(
 }
 
 /// Delete conversation
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_delete_conversation(
     id: String,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -675,7 +680,7 @@ pub async fn ai_delete_conversation(
 }
 
 /// Update conversation title
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_update_conversation_title(
     id: String,
     title: String,
@@ -702,7 +707,7 @@ pub async fn ai_update_conversation_title(
 }
 
 /// Update the model used for a conversation (allows mid-thread switching).
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_update_conversation_model(
     id: String,
     model: Option<String>,
@@ -729,7 +734,7 @@ pub async fn ai_update_conversation_model(
 }
 
 /// Get AI logs with filters
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_get_logs(
     filters: LogFilters,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -762,7 +767,7 @@ pub async fn ai_get_logs(
 }
 
 /// Search AI logs
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_search_logs(
     query: String,
     filters: LogFilters,
@@ -802,7 +807,7 @@ pub async fn ai_search_logs(
 }
 
 /// Export logs to file
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_export_logs(
     filters: LogFilters,
     db_manager: State<'_, Arc<DatabaseManager>>,
@@ -816,7 +821,7 @@ pub async fn ai_export_logs(
 }
 
 /// List training data
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_list_training_data(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<serde_json::Value>, String> {
@@ -844,7 +849,7 @@ pub async fn ai_list_training_data(
 }
 
 /// Delete training data
-#[tauri::command]
+#[portal_rpc_macro::rpc]
 pub async fn ai_delete_training_data(
     id: String,
     db_manager: State<'_, Arc<DatabaseManager>>,

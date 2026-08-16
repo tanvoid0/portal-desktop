@@ -67,7 +67,7 @@ runs:
           All AI features require [**agent-platform**](https://github.com/tanvoid0/agent-platform/) running separately.
 
           1. Clone and start: `git clone https://github.com/tanvoid0/agent-platform.git && cd agent-platform && pnpm install && pnpm dev:server`
-          2. Configure providers at `http://127.0.0.1:18410/config`
+          2. Configure providers in the agent-platform desktop app (`pnpm dev`), or over `POST /api/v1/llm-proxy/env`
           3. In Portal Desktop: **AI → Providers** → set base URL and workspace token
 
           Setup guide: [docs/getting-started/AGENT_PLATFORM.md](https://github.com/tanvoid0/portal-desktop/blob/main/docs/getting-started/AGENT_PLATFORM.md)
