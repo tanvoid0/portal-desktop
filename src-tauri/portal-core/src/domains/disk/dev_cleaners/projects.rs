@@ -5,6 +5,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+use ts_rs::TS;
 
 use super::{
     CleanedItem, DevCleaner, DevCleanerGroup, DevCleanerItem, DevCleanerScanContext,
@@ -320,32 +321,41 @@ fn project_kind_label(
 
 // ── Legacy view types (Projects tab IPC) ────────────────────────────────────
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct ProjectTemp {
     pub id: String,
     pub path: String,
     pub temp_kind: String,
+    #[ts(type = "number")]
     pub size_bytes: u64,
+    #[ts(type = "number")]
     pub file_count: u64,
     pub risk: Risk,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct Project {
     pub root: String,
     pub kind: String,
+    #[ts(type = "number")]
     pub total_bytes: u64,
+    #[ts(type = "number")]
     pub file_count: u64,
     pub temps: Vec<ProjectTemp>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct ProjectScan {
     pub root: String,
+    #[ts(type = "number")]
     pub project_count: usize,
+    #[ts(type = "number")]
     pub total_bytes: u64,
     pub projects: Vec<Project>,
 }

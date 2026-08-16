@@ -19,6 +19,7 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use ts_rs::TS;
 
 use crate::domains::ai::platform_project;
 use crate::domains::disk::classify::Proposal;
@@ -53,9 +54,11 @@ pub struct AiConfig {
 }
 
 /// One team template as shown in the Settings picker.
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct TeamOption {
+    #[ts(type = "number")]
     pub id: i64,
     pub name: String,
     pub description: String,
@@ -64,9 +67,11 @@ pub struct TeamOption {
 }
 
 /// One agent task's contribution to the verdict.
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct AgentNote {
+    #[ts(type = "number")]
     pub task_id: i64,
     pub role: String,
     pub status: String,
@@ -75,8 +80,9 @@ pub struct AgentNote {
 
 /// A structured per-item verdict parsed from the Lead Synthesizer's output, so
 /// the UI can badge each proposal inline instead of showing prose only.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct ItemVerdict {
     pub path: String,
     /// One of "safe" | "review" | "dangerous". Anything else is normalized to "review".
@@ -86,25 +92,30 @@ pub struct ItemVerdict {
 
 /// One agent task's live state, forwarded to the UI while the process runs so
 /// the user sees which reviewers are working rather than a frozen spinner.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct VerifyTask {
     pub role: String,
     pub status: String,
 }
 
 /// Streamed progress snapshot emitted on every poll of the running process.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct VerifyProgress {
+    #[ts(type = "number")]
     pub process_id: i64,
     pub status: String,
     pub tasks: Vec<VerifyTask>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct VerificationResult {
+    #[ts(type = "number")]
     pub process_id: i64,
     pub status: String,
     pub notes: Vec<AgentNote>,

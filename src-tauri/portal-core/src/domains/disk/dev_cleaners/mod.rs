@@ -8,6 +8,7 @@ pub mod projects;
 use std::sync::atomic::AtomicBool;
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use crate::domains::disk::classify::Risk;
 use crate::domains::disk::scan;
@@ -26,15 +27,18 @@ pub struct DevCleanerWalkHooks<'a> {
 }
 
 /// One reclaimable resource surfaced for human review.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct DevCleanerItem {
     pub id: String,
     pub cleaner_id: String,
     pub path: String,
     pub kind: String,
     pub reason: String,
+    #[ts(type = "number")]
     pub size_bytes: u64,
+    #[ts(type = "number")]
     pub file_count: u64,
     pub risk: Risk,
     /// Parent grouping key — e.g. project root for nested UI.
@@ -43,22 +47,27 @@ pub struct DevCleanerItem {
 }
 
 /// Scan result from a single cleaner implementation.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct DevCleanerGroup {
     pub cleaner_id: String,
     pub label: String,
     pub available: bool,
     pub unavailable_reason: Option<String>,
+    #[ts(type = "number")]
     pub total_bytes: u64,
     pub items: Vec<DevCleanerItem>,
 }
 
 /// Combined scan across every registered cleaner.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct DevCleanerScan {
+    #[ts(type = "number")]
     pub total_bytes: u64,
+    #[ts(type = "number")]
     pub item_count: usize,
     pub groups: Vec<DevCleanerGroup>,
 }
@@ -72,35 +81,43 @@ pub struct DevCleanerCleanItem {
     pub kind: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct CleanedItem {
     pub path: String,
     pub kind: String,
+    #[ts(type = "number")]
     pub size_bytes: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct FailedCleanItem {
     pub path: String,
     pub kind: String,
     pub error: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct DevCleanerCleanResult {
     pub cleaned: Vec<CleanedItem>,
     pub failed: Vec<FailedCleanItem>,
+    #[ts(type = "number")]
     pub reclaimed_bytes: u64,
 }
 
 /// Live progress while dev-cleaner items are removed.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct DevCleanerCleanProgress {
+    #[ts(type = "number")]
     pub done: usize,
+    #[ts(type = "number")]
     pub total: usize,
     pub current_path: String,
 }

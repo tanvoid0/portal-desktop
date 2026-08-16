@@ -1,17 +1,37 @@
+// UI-only shapes for the disk domain.
+//
+// Everything that also exists in Rust is generated from it — see `./generated/`,
+// produced by ts-rs from `portal_core::domains::disk` and refreshed by
+// `pnpm gen:types`. What is left below has no Rust counterpart.
+
+export type {
+  AgentNote,
+  AuditEntry,
+  DevCleanerCleanProgress,
+  DevCleanerCleanResult,
+  DevCleanerGroup,
+  DevCleanerItem,
+  DevCleanerScan,
+  DiskUsage,
+  ItemVerdict,
+  Location,
+  MovedItem,
+  Project,
+  ProjectScan,
+  ProjectTemp,
+  Proposal,
+  QuarantineProgress,
+  QuarantineResult,
+  Risk,
+  VerificationResult,
+  VerifyProgress,
+  VerifyTask,
+} from './generated';
+
+import type { Proposal } from './generated';
+
 // Mirrors the Rust structs returned across the Tauri bridge by the `disk`
 // domain (src-tauri/src/domains/disk). Ported from portal_disk_utility.
-
-export type Risk = 'Safe' | 'Review' | 'Danger';
-
-export interface Proposal {
-  id: string;
-  path: string;
-  kind: string;
-  reason: string;
-  sizeBytes: number;
-  fileCount: number;
-  risk: Risk;
-}
 
 export interface ScanSummary {
   root: string;
@@ -31,148 +51,10 @@ export interface ScanProgress {
   elapsedMs: number;
 }
 
-export interface QuarantineProgress {
-  done: number;
-  total: number;
-  currentPath: string;
-}
-
-export interface ProjectTemp {
-  id: string;
-  path: string;
-  tempKind: string;
-  sizeBytes: number;
-  fileCount: number;
-  risk: Risk;
-}
-
-export interface Project {
-  root: string;
-  kind: string;
-  totalBytes: number;
-  fileCount: number;
-  temps: ProjectTemp[];
-}
-
-export interface ProjectScan {
-  root: string;
-  projectCount: number;
-  totalBytes: number;
-  projects: Project[];
-}
-
-export interface DevCleanerItem {
-  id: string;
-  cleanerId: string;
-  path: string;
-  kind: string;
-  reason: string;
-  sizeBytes: number;
-  fileCount: number;
-  risk: Risk;
-  groupLabel?: string;
-}
-
-export interface DevCleanerGroup {
-  cleanerId: string;
-  label: string;
-  available: boolean;
-  unavailableReason?: string;
-  totalBytes: number;
-  items: DevCleanerItem[];
-}
-
-export interface DevCleanerScan {
-  totalBytes: number;
-  itemCount: number;
-  groups: DevCleanerGroup[];
-}
-
-export interface DevCleanerCleanProgress {
-  done: number;
-  total: number;
-  currentPath: string;
-}
-
-export interface DevCleanerCleanResult {
-  cleaned: { path: string; kind: string; sizeBytes: number }[];
-  failed: { path: string; kind: string; error: string }[];
-  reclaimedBytes: number;
-}
-
 export interface CachedScan {
   ts: number;
   status: 'complete' | 'partial';
   scannedFiles: number;
   totalFiles: number;
   summary: ScanSummary;
-}
-
-export interface MovedItem {
-  path: string;
-  kind: string;
-  sizeBytes: number;
-}
-
-export interface QuarantineResult {
-  moved: MovedItem[];
-  failed: { path: string; kind: string; error: string }[];
-  reclaimedBytes: number;
-}
-
-export interface Location {
-  path: string;
-  label: string;
-  kind: 'drive' | 'folder';
-}
-
-export interface DiskUsage {
-  mountPoint: string;
-  name: string;
-  fsKind: string;
-  totalBytes: number;
-  availableBytes: number;
-  isRemovable: boolean;
-}
-
-export interface AuditEntry {
-  id: number;
-  ts: number;
-  action: string;
-  path: string;
-  sizeBytes: number;
-  kind: string;
-  status: string;
-}
-
-export interface AgentNote {
-  taskId: number;
-  role: string;
-  status: string;
-  output: string;
-}
-
-export interface ItemVerdict {
-  path: string;
-  verdict: 'safe' | 'review' | 'dangerous';
-  reason: string;
-}
-
-export interface VerificationResult {
-  processId: number;
-  status: string;
-  notes: AgentNote[];
-  verdicts: ItemVerdict[];
-  gated: boolean;
-}
-
-export interface VerifyTask {
-  role: string;
-  status: string;
-}
-
-export interface VerifyProgress {
-  processId: number;
-  status: string;
-  tasks: VerifyTask[];
 }

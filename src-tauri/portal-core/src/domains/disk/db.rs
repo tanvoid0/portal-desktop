@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection};
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::domains::disk::scan::now_secs;
 
@@ -16,13 +17,17 @@ pub struct Db {
     conn: Mutex<Connection>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct AuditEntry {
+    #[ts(type = "number")]
     pub id: i64,
+    #[ts(type = "number")]
     pub ts: i64,
     pub action: String,
     pub path: String,
+    #[ts(type = "number")]
     pub size_bytes: i64,
     pub kind: String,
     pub status: String,

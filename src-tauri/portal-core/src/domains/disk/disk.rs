@@ -5,9 +5,11 @@
 use serde::Serialize;
 use std::sync::{Mutex, OnceLock};
 use sysinfo::{Disks, System};
+use ts_rs::TS;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct DiskUsage {
     /// Mount point / drive root, e.g. "C:\\" or "/".
     pub mount_point: String,
@@ -15,7 +17,9 @@ pub struct DiskUsage {
     pub name: String,
     /// Filesystem, e.g. "NTFS" | "ext4".
     pub fs_kind: String,
+    #[ts(type = "number")]
     pub total_bytes: u64,
+    #[ts(type = "number")]
     pub available_bytes: u64,
     pub is_removable: bool,
 }
@@ -47,12 +51,15 @@ pub fn disk_usage() -> Vec<DiskUsage> {
 }
 
 /// Host CPU / memory snapshot for the sidebar status chips. Read-only.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct HostStats {
     /// Whole-machine CPU load, 0-100.
     pub cpu_percent: f32,
+    #[ts(type = "number")]
     pub memory_used_bytes: u64,
+    #[ts(type = "number")]
     pub memory_total_bytes: u64,
 }
 

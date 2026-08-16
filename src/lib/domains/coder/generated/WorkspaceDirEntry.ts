@@ -3,4 +3,4 @@
 /**
  * Workspace file explorer entry (relative path under thread root).
  */
-export type WorkspaceDirEntry = { name: string, path: string, is_dir: boolean, };
+export type WorkspaceDirEntry = { name: string; path: string; is_dir: boolean };

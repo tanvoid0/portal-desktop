@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const GENERATED = ['src/lib/domains/coder/generated'];
+const GENERATED = ['src/lib/domains/coder/generated', 'src/lib/domains/disk/generated'];
 
 execFileSync(
   'cargo',
@@ -35,3 +35,12 @@ for (const dir of GENERATED) {
   writeFileSync(join(dir, 'index.ts'), barrel);
   console.log(`${dir}/index.ts — ${types.length} types`);
 }
+
+// ts-rs emits its own formatting, which `prettier --check .` rejects. Formatting
+// here rather than ignoring the directory keeps the output canonical: CI asserts
+// that regenerating is a no-op, and that only holds if what the generator writes
+// is byte-identical to what is committed.
+execFileSync('npx', ['prettier', '--write', ...GENERATED], {
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});

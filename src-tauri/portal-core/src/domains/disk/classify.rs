@@ -2,24 +2,29 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use crate::domains::disk::scan::{now_secs, FileEntry};
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub enum Risk {
     Safe,
     Review,
     Danger,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct Proposal {
     pub id: String,
     pub path: String,
     pub kind: String,
     pub reason: String,
+    #[ts(type = "number")]
     pub size_bytes: u64,
+    #[ts(type = "number")]
     pub file_count: u64,
     pub risk: Risk,
 }

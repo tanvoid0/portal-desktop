@@ -4,9 +4,11 @@
 
 use serde::Serialize;
 use std::path::Path;
+use ts_rs::TS;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct Location {
     /// Absolute path to scan.
     pub path: String,

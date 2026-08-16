@@ -3,4 +3,4 @@
 /**
  * Review status of a file change produced by the agent.
  */
-export type ChangeStatus = "pending" | "accepted" | "rejected";
+export type ChangeStatus = 'pending' | 'accepted' | 'rejected';

@@ -3,12 +3,14 @@
 /**
  * A persisted allow/deny rule for a tool.
  */
-export type PermissionRule = { tool: string, 
-/**
- * Glob (for paths) or command prefix (for run_command). Empty = any.
- */
-pattern: string, 
-/**
- * true = allow, false = deny.
- */
-allow: boolean, };
+export type PermissionRule = {
+  tool: string;
+  /**
+   * Glob (for paths) or command prefix (for run_command). Empty = any.
+   */
+  pattern: string;
+  /**
+   * true = allow, false = deny.
+   */
+  allow: boolean;
+};

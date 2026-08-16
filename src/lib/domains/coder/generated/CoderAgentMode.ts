@@ -3,4 +3,4 @@
 /**
  * Cursor-style agent operating mode for a coder session.
  */
-export type CoderAgentMode = "plan" | "debug" | "multitask" | "ask" | "auto";
+export type CoderAgentMode = 'plan' | 'debug' | 'multitask' | 'ask' | 'auto';

@@ -4,6 +4,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use jwalk::WalkDir;
 use serde::Serialize;
+use ts_rs::TS;
 
 /// A single file discovered during a scan.
 pub struct FileEntry {
@@ -12,12 +13,16 @@ pub struct FileEntry {
     pub modified_secs: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct RawScan {
+    #[ts(type = "number")]
     pub total_bytes: u64,
+    #[ts(type = "number")]
     pub scanned_files: u64,
     /// Files counted in pass 1 — the denominator for a partial snapshot's pct.
+    #[ts(type = "number")]
     pub total_files: u64,
     /// True if the walk stopped early because the caller requested cancellation.
     pub cancelled: bool,
@@ -28,15 +33,21 @@ pub struct RawScan {
 /// Live progress emitted during a walk so the UI can show a bar + ETA.
 /// `counting` = fast first pass (total unknown, bar indeterminate);
 /// `scanning`  = metadata pass (percent + ETA are meaningful).
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct Progress {
     pub phase: &'static str,
+    #[ts(type = "number")]
     pub scanned_files: u64,
+    #[ts(type = "number")]
     pub total_files: u64,
+    #[ts(type = "number")]
     pub total_bytes: u64,
     pub current_path: String,
+    #[ts(type = "number")]
     pub eta_ms: u64,
+    #[ts(type = "number")]
     pub elapsed_ms: u128,
 }
 

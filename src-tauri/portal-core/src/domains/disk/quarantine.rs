@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 /// One item the user ticked for removal. `kind` is carried through purely so the
 /// audit log can record what class of thing was moved.
@@ -9,36 +10,44 @@ pub struct QuarantineItem {
     pub kind: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct MovedItem {
     pub path: String,
     pub kind: String,
+    #[ts(type = "number")]
     pub size_bytes: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct FailedItem {
     pub path: String,
     pub kind: String,
     pub error: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct QuarantineResult {
     pub moved: Vec<MovedItem>,
     pub failed: Vec<FailedItem>,
+    #[ts(type = "number")]
     pub reclaimed_bytes: u64,
 }
 
 /// Live progress emitted once per item as the batch is moved to the trash.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/disk/generated/")]
 pub struct QuarantineProgress {
     /// Items processed so far (moved + failed).
+    #[ts(type = "number")]
     pub done: usize,
+    #[ts(type = "number")]
     pub total: usize,
     pub current_path: String,
 }
