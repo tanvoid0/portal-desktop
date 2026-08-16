@@ -21,7 +21,17 @@
     rule = pending.suggested_rule;
   });
 
-  const display = $derived(getToolCallDisplay(pending.tool, pending.arguments));
+  // `arguments` is `serde_json::Value` on the Rust side, so it arrives as
+  // `unknown`. Tool arguments are always a JSON object in practice; anything
+  // else renders as no arguments rather than throwing.
+  const display = $derived(
+    getToolCallDisplay(
+      pending.tool,
+      (typeof pending.arguments === 'object' && pending.arguments !== null
+        ? pending.arguments
+        : {}) as Record<string, unknown>
+    )
+  );
 </script>
 
 <div class="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">

@@ -577,7 +577,7 @@ class CoderSessionState {
     subAgent?: CoderSubAgent | null
   ): boolean {
     if (this.activeThreadId === coordinatorId) return false;
-    if (subAgent && this.activeThreadId === subAgent.child_thread_id) return false;
+    if (subAgent && this.activeThreadId === subAgent.childThreadId) return false;
     return true;
   }
 
@@ -646,6 +646,8 @@ class CoderSessionState {
       id: threadId,
       title: 'Running session',
       workspace_root: this.workspaceRoot,
+      model: null,
+      thread_kind: 'session',
       messages: rt?.messages ?? [],
       created_at: '',
       updated_at: new Date().toISOString(),
@@ -840,7 +842,7 @@ class CoderSessionState {
 
   private findCoordinatorForSubAgent(childThreadId: string): string | null {
     for (const [coordId, rt] of Object.entries(this.runtimes)) {
-      if (rt.subAgents.some((s) => s.child_thread_id === childThreadId)) {
+      if (rt.subAgents.some((s) => s.childThreadId === childThreadId)) {
         return coordId;
       }
     }

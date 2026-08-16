@@ -31,7 +31,8 @@
     "run:install": "node scripts/install.js",
     "postrun:install": "echo 'Installation complete - no build tools required'",
     "postupdate": "cargo update --manifest-path src-tauri/Cargo.toml",
-    "release:prepare": "node scripts/prepare-release.mjs"
+    "release:prepare": "node scripts/prepare-release.mjs",
+    "gen:types": "node scripts/gen-types.mjs"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.0",

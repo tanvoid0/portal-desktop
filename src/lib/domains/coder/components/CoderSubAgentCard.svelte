@@ -31,7 +31,7 @@
 
   function openSession() {
     if (!onOpen) return;
-    onOpen(subAgent.child_thread_id, coordinatorId || subAgent.coordinator_thread_id);
+    onOpen(subAgent.childThreadId, coordinatorId || subAgent.coordinatorThreadId);
   }
 </script>
 
@@ -61,9 +61,9 @@
         <FolderGit2 class="h-3 w-3" />
         <span class="truncate">{subAgent.branch}</span>
       </div>
-      {#if subAgent.result_summary}
+      {#if subAgent.resultSummary}
         <p class="mt-1 line-clamp-2 text-xs text-muted-foreground">
-          {subAgent.result_summary}
+          {subAgent.resultSummary}
         </p>
       {:else if subAgent.error}
         <p class="mt-1 line-clamp-2 text-xs text-destructive">

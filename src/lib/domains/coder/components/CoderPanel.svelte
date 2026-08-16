@@ -193,7 +193,7 @@
           description: sa.title,
           action: {
             label: 'View',
-            onClick: () => void openSubAgent(sa.child_thread_id, event.coordinatorId),
+            onClick: () => void openSubAgent(sa.childThreadId, event.coordinatorId),
           },
         });
         break;

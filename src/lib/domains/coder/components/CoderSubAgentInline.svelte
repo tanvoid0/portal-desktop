@@ -50,7 +50,7 @@
           {onOpen}
           {onCancel}
           {onCleanup}
-          coordinatorId={coordinatorId || subAgent.coordinator_thread_id}
+          coordinatorId={coordinatorId || subAgent.coordinatorThreadId}
         />
       {/each}
     </div>
