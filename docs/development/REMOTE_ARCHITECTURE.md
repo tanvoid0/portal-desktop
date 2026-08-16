@@ -1,6 +1,7 @@
 # Remote architecture — making Portal Desktop's features reachable from anywhere
 
-**Status:** phases 0, 1 and 2 done. Phases 3, 4, 5 not started.
+**Status:** phases 0, 1, 2 and 3 done — phase 3 with one part deliberately not
+done, see it below. Phases 4 and 5 not started.
 
 **Phase 2 ran before phase 1.** The crate split only buys a compiler-enforced
 boundary and the option of a headless binary — the daemon works inside
@@ -49,9 +50,9 @@ The listener now exists (phase 2), and `src/routes/api/` is deleted — all thre
 request body; unreachable under `adapter-static`, but one adapter change away from
 being remote code execution, which is reason enough not to leave it lying there.
 
-The browser branches that pointed at the deleted proxy now throw a message naming
-phase 4 instead of failing on an HTML parse error. They cannot be repointed at the
-daemon yet — see the note under phase 3.
+The browser branches that pointed at the deleted proxy now throw a message saying
+so, rather than failing on an HTML parse error. Repointing them at the daemon was
+considered and decided against — see phase 3.
 
 ## The shape
 
@@ -285,19 +286,27 @@ succeed. It is the same call the pty reader makes, and continuing to burn tokens
 into an audience of nobody is not worth preserving. But it does mean a client
 that reconnects mid-stream has lost the turn, not just the frames it missed.
 
-### Phase 3 — collapse `invokeClient` `[partly done]`
+### Phase 3 — collapse `invokeClient` `[done, except the part we decided against]`
 
-Delete the three-way branch; always HTTP to the daemon. `invoke()` stays only for
-genuinely window-bound plugins (dialog, updater, opener).
+The goal was: delete the three-way branch, always HTTP to the daemon, `invoke()`
+only for window-bound plugins.
 
-**Done:** the `501` handler and the dead `src/routes/api/` tree are deleted, and
-the client branches that pointed at them now throw an explicit error rather than
-fetching a URL that cannot answer.
+**Done, by deletion rather than unification.** The `501` handler and the whole
+`src/routes/api/` tree are gone; so are the browser streaming transports, which
+routed to `/api/stream/{cmd}` (SSE) and `/ws/{cmd}` (WebSocket) — neither endpoint
+ever existed, both would have had to be SvelteKit server routes, and
+`adapter-static` never built those. That was ~230 lines of `invokeClient`
+addressing URLs that could not answer. What remains of the branch is a guard that
+says so.
 
-**Blocked, and this needs a decision before the rest proceeds.** "Always HTTP to
-the daemon" cannot include any browser today, and that includes the Tauri webview.
-`daemon.rs::browser_origin` refuses **any** request carrying an `Origin` header, on
-both `/events` and `/rpc`:
+`src/hooks.server.ts` went with them. It advertised itself as "blocks unauthorized
+browser access at the server level" and both of its branches returned
+`resolve(event)` unchanged — it blocked nothing, and `isLocalhostRequest` was
+imported and never called. A file claiming a control nobody has is worse than no
+file. `src/lib/utils/serverUtils.ts` was its last consumer.
+
+**Decided against: routing the webview over HTTP.** `daemon.rs::browser_origin`
+refuses any request carrying an `Origin` header, on both `/events` and `/rpc`:
 
 ```rust
 if headers.contains_key(axum::http::header::ORIGIN) {
@@ -305,22 +314,32 @@ if headers.contains_key(axum::http::header::ORIGIN) {
 }
 ```
 
-That is deliberate — it is what stops any web page the user has open from reaching
-a port that exposes terminal execution and the credential vault, and WebSockets
-ignore CORS so a same-origin check is the only lever. But the webview is served
-from `http://tauri.localhost`, so a `fetch` from it to `127.0.0.1:18420` is
-cross-origin and the browser will attach `Origin` whether the page wants to or not.
-The refusal catches it too.
+That is what stops any web page the user has open from reaching a port exposing
+terminal execution and the credential vault, and WebSockets ignore CORS so a
+same-origin check is the only lever available. The webview is served from
+`http://tauri.localhost`, so its `fetch` to `127.0.0.1:18420` is cross-origin and
+the browser attaches `Origin` whether the page wants to or not — the refusal
+catches the webview along with everything else.
 
-So collapsing the last branch requires the allowlist that
-[`daemon.rs`](../../src-tauri/src/daemon.rs)'s own comment already anticipates
-("that origin gets allowlisted explicitly when it does"): permit exactly the
-webview origin, keep refusing every other. Worth designing alongside phase 4's
-capability scoping rather than bolted on before it, because "which origins may
-call which routes" and "which tokens may call which routes" are the same question.
+Lifting it would need an explicit allowlist. We are not doing that, because the
+reasons for it got smaller on inspection:
 
-Until then IPC stays the webview's transport, which costs nothing — it is faster
-than a loopback round trip and it is not the path that was broken.
+- **The stated goal is already met.** "No client gets a curated subset" is true
+  today: `/rpc` serves all 422 commands to any non-browser client — a script, CI,
+  agent-platform. The webview using IPC restricts nothing.
+- **The remaining benefit was tidiness in one file**, and most of that arrived
+  through deletion instead.
+- **The cost is permanent.** IPC is faster than a loopback round trip, so this
+  would be a small regression on every command forever, for no user-visible gain.
+- **The allowlist is platform-dependent** — `http://tauri.localhost` on
+  Windows and Linux, `tauri://localhost` on macOS — so it is three strings that
+  must stay correct indefinitely on the one port where being wrong is expensive.
+- **Phase 4 does not need it.** A phone is not a page on `tauri.localhost`; it
+  needs pairing and tokens regardless, and origin-vs-token policy should be
+  settled there as one question rather than pre-empted here.
+
+So IPC stays the webview's transport. Revisit only if running Portal's UI in a
+real browser becomes a requirement; nothing else is blocked on it.
 
 Type contract: generate the TS types from the Rust structs so the client cannot
 drift. `ts-rs` is the intended pick — build-time only, no runtime dependency, no
