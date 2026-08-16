@@ -1,0 +1,10 @@
+# The ts-rs bindings are rewritten in full by `pnpm gen:types`, which always
+# writes LF. Without this, `core.autocrlf=true` checks them out as CRLF and git
+# then reports all ~80 as modified after every regeneration even though the
+# content is identical — noise on exactly the workflow the CI freshness gate
+# polices.
+#
+# Deliberately scoped to the generated directories rather than `* text=auto
+# eol=lf`, which would be correct but renormalizes every tracked file in the
+# repo and belongs in its own change.
+src/lib/domains/*/generated/** text eol=lf
