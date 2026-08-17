@@ -26,6 +26,32 @@ pub struct Model {
     pub git_commit: Option<String>,
     pub has_uncommitted_changes: bool,
     pub last_commit: Option<DateTimeWithTimeZone>,
+    /// Logical id from discovery: `<root>/<category>/<name>`. Survives folder
+    /// moves, which is why triage decisions key off it rather than `path`.
+    pub discovery_path: Option<String>,
+    /// active | recent | dormant | stale
+    pub activity_status: Option<String>,
+    /// Newest source-file mtime or commit, whichever is later. Excludes `.git`
+    /// internals and build output.
+    pub last_activity: Option<DateTimeWithTimeZone>,
+    /// none | low | med | high — see `discovery::analysis::score_risk`.
+    pub risk_level: Option<String>,
+    pub unpushed_commits: i32,
+    pub stash_count: i32,
+    pub has_remote: bool,
+    /// Project roots folded into this project (monorepo packages, course modules).
+    pub module_count: i32,
+    /// Comma-separated cluster keys shared with a probable duplicate.
+    pub duplicate_group: Option<String>,
+    /// Comma-separated regenerable directories present (node_modules, target, …).
+    pub regenerable_dirs: Option<String>,
+    pub discovered_at: Option<DateTimeWithTimeZone>,
+    /// keep | archive | delete | review
+    pub triage_decision: Option<String>,
+    pub triage_note: Option<String>,
+    /// Path of the project that replaces this one.
+    pub triage_successor: Option<String>,
+    pub triage_updated_at: Option<DateTimeWithTimeZone>,
     pub created_at: Option<DateTimeWithTimeZone>,
     pub updated_at: Option<DateTimeWithTimeZone>,
 }

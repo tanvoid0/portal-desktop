@@ -149,6 +149,7 @@ pub fn run() {
             app.manage(std::sync::Arc::new(disk_db));
             app.manage(domains::disk::commands::ScanControl::default());
             app.manage(domains::disk::commands::VerifyControl::default());
+            app.manage(domains::projects::discovery_commands::DiscoveryControl::default());
             log_info!("Tauri", "Disk utility domain initialized");
 
             // Initialize IDE storage
@@ -294,6 +295,13 @@ pub fn run() {
             domains::projects::open_project_in_explorer,
             domains::projects::select_directory,
             domains::projects::execute_command_in_directory,
+            // Project discovery / audit
+            domains::projects::discovery_commands::discover_projects,
+            domains::projects::discovery_commands::discover_and_import_projects,
+            domains::projects::discovery_commands::import_discovered_projects,
+            domains::projects::discovery_commands::cancel_discovery,
+            domains::projects::discovery_commands::set_project_triage,
+            domains::projects::discovery_commands::set_project_triage_bulk,
             // Pipeline commands
             domains::projects::pipelines::create_pipeline,
             domains::projects::pipelines::get_pipeline,

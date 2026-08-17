@@ -9,5 +9,7 @@
 pub use portal_core::domains::projects::*;
 
 pub mod commands;
+pub mod discovery_commands;
 pub mod pipelines;
 pub use commands::*;
+pub use discovery_commands::*;
