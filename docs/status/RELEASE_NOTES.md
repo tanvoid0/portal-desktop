@@ -1,5 +1,24 @@
 # Portal Desktop - Release Notes
 
+## Version 0.11.0
+
+### Highlights
+
+- Project audit: a new **Projects → Audit** view that walks your drives, finds every project, and shows what is alive and what is not. Dates each project from its newest source file or last commit, groups monorepo packages and course modules into one row, and flags probable duplicates.
+- Project audit: risk scoring is about where work lives, not how messy it is — unpushed commits or history with no remote are called out as high risk, because that work exists only on that disk.
+- Project audit: triage decisions (keep, archive, delete, review) key off a logical discovery path rather than the folder location, so moving a project on disk keeps its decision attached. Nothing is ever deleted from disk here; use the Disk tab to reclaim space.
+- Types: the TypeScript that mirrors Rust is now generated from the Rust types for the coder, disk, github and projects domains, so the two can no longer drift. CI fails if regenerating changes anything.
+- Internals: the Rust backend is split into a reusable `portal-core` crate, and the dead SvelteKit API routes and browser transports that never had endpoints behind them are gone.
+- AI chat, coder and terminal now share one chat turn treatment instead of three near-copies.
+
+### Upgrade note
+
+This release adds database columns for project discovery. The migration runs
+automatically on first launch and is additive — existing projects keep working
+and simply show no discovery data until the first audit scan.
+
+---
+
 ## Version 0.10.1
 
 ### Highlights
