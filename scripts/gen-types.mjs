@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const GENERATED = [
   'src/lib/domains/coder/generated',
@@ -45,7 +46,10 @@ for (const dir of GENERATED) {
 // here rather than ignoring the directory keeps the output canonical: CI asserts
 // that regenerating is a no-op, and that only holds if what the generator writes
 // is byte-identical to what is committed.
-execFileSync('npx', ['prettier', '--write', ...GENERATED], {
-  stdio: 'inherit',
-  shell: process.platform === 'win32',
-});
+//
+// Resolved and run directly rather than through `npx`: on a pnpm CI runner npx
+// does not see the workspace's nested node_modules, so it downloads a bare
+// prettier that has no `prettier-plugin-svelte` and dies on this repo's config.
+// That failed every CI run from v0.11.0 onward.
+const prettierBin = fileURLToPath(import.meta.resolve('prettier/bin/prettier.cjs'));
+execFileSync(process.execPath, [prettierBin, '--write', ...GENERATED], { stdio: 'inherit' });
