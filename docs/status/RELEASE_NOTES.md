@@ -1,5 +1,19 @@
 # Portal Desktop - Release Notes
 
+## Version 0.12.1
+
+### Highlights
+
+- **Projects → Audit is reachable.** The view shipped in 0.11.0 with nothing linking to it — the only way in was to type the URL. It now has a sidebar entry under Projects and an **Audit** button beside **New Project**.
+- **Settings reports the real version.** The version shown in the app was read from the `portal-core` library crate, which is pinned at `0.1.0`, so every release since the crate split reported `0.1.0` regardless of what was installed. It now reads the version the installer ships. The update check compared releases against that same wrong number.
+
+### Upgrade note
+
+No migration. An existing install showing `0.1.0` in Settings is this bug, not a
+failed upgrade.
+
+---
+
 ## Version 0.12.0
 
 ### Highlights
