@@ -75,6 +75,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The generated-types step below runs a node script that writes the type
+      # barrels and formats them with the workspace's prettier, so this job needs
+      # node_modules despite being the Rust one. Without it the script had no
+      # prettier to find, which is what made this gate fail from v0.11.0 on.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
