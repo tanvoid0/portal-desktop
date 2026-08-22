@@ -1,5 +1,27 @@
 # Portal Desktop - Release Notes
 
+## Version 0.12.0
+
+### Highlights
+
+- Project audit: roots, the last scan and a change log now persist to disk, so the view opens where you left it instead of demanding a fresh walk of every drive.
+- Project audit: a **Changes** tab showing what was added, removed or moved since the previous scan. A disappearance is paired with an appearance before either is reported, so moving a project reads as one move rather than a delete plus an unrelated add.
+- Project audit: optional sizing of build output, with a reclaimable total and a sort-by-size view. Off by default — walking a few hundred `node_modules` trees costs minutes.
+- Project audit: "archive projects no longer on disk" is now a real setting. Rows are only archived under roots the scan actually walked, so an unplugged drive never archives its projects.
+- Project audit: keyboard triage — `j`/`k` to move, `1`–`4` to decide, `o` to open, `x` to tick for a bulk decision — plus CSV export of the current list.
+- Disk Utility: seven tabs became five. **Projects** and **Dev tools** ran the same scan under two names and are now one **Developer** tab; **Protected** and **Settings** merged into **Rules**.
+- Disk Utility: every tab says what it scans, the selection bar is sticky over long lists, and one wording is used throughout — actions say where files go (the Recycle Bin), except for Docker and Podman resources, which are removed for good.
+
+### Upgrade note
+
+No migration this time. The audit keeps its roots, last scan and change log in a
+new `discovery-state.json` beside `settings.json`, created on the first scan —
+the first scan after upgrading is the baseline, so the Changes tab fills in from
+the second one onward. The Disk Utility's tabs were renamed and merged; old
+links and bookmarks still resolve to where each tab went.
+
+---
+
 ## Version 0.11.0
 
 ### Highlights
