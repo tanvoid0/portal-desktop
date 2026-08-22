@@ -1,7 +1,8 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import type { AuditEntry, DiskUsage, Location } from '../types';
-  import { fmtBytes, fmtDate, DISK_DRIVE_GRID, DISK_PANEL_GRID, DISK_STAT_GRID } from '../utils';
+  import { fmtBytes, fmtDate, DISK_DRIVE_GRID, DISK_PANEL_GRID } from '../utils';
+  import StatTiles from './shared/StatTiles.svelte';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Progress } from '$lib/components/ui/progress';
@@ -108,10 +109,6 @@
 </script>
 
 <div class="mb-4 flex items-center gap-3">
-  <p class="max-w-2xl text-sm text-muted-foreground">
-    Overview of your drives and cleanup history. Jump straight into a scan from any drive or quick
-    action below.
-  </p>
   <Button
     variant="outline"
     size="sm"
@@ -190,8 +187,8 @@
       <Recycle class="size-4" /> Clear Temp files
     </Button>
   {/if}
-  <Button variant="secondary" onclick={() => go('projects', quick.home?.path)}>
-    <Boxes class="size-4" /> Find project junk
+  <Button variant="secondary" onclick={() => go('devtools', quick.home?.path)}>
+    <Boxes class="size-4" /> Clear build output
   </Button>
   <Button variant="secondary" onclick={() => go('devtools')}>
     <Container class="size-4" /> Docker / Podman
@@ -202,41 +199,22 @@
 </div>
 
 <div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Cleanup summary</div>
-<div class="{DISK_STAT_GRID} mb-4">
-  <Card class="gap-0 py-4">
-    <CardContent class="px-4">
-      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">
-        Lifetime reclaimed
-      </div>
-      <div class="text-2xl font-semibold tabular-nums tracking-tight text-status-success">
-        {fmtBytes(reclaimed.total)}
-      </div>
-      <div class="mt-1 text-xs text-muted-foreground">
-        {reclaimed.movedN} item{reclaimed.movedN === 1 ? '' : 's'} moved
-      </div>
-    </CardContent>
-  </Card>
-  <Card class="gap-0 py-4">
-    <CardContent class="px-4">
-      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Actions logged</div>
-      <div class="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-        {audit.length}
-      </div>
-      <div class="mt-1 text-xs text-muted-foreground">
-        {audit.length ? `last ${fmtDate(audit[0].ts)}` : 'none yet'}
-      </div>
-    </CardContent>
-  </Card>
-  <Card class="gap-0 py-4">
-    <CardContent class="px-4">
-      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Drives</div>
-      <div class="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-        {disks.length}
-      </div>
-      <div class="mt-1 text-xs text-muted-foreground">{fmtBytes(freeTotal)} free total</div>
-    </CardContent>
-  </Card>
-</div>
+<StatTiles
+  tiles={[
+    {
+      label: 'Lifetime reclaimed',
+      value: fmtBytes(reclaimed.total),
+      sub: `${reclaimed.movedN} item${reclaimed.movedN === 1 ? '' : 's'} moved`,
+      accent: 'text-status-success',
+    },
+    {
+      label: 'Actions logged',
+      value: String(audit.length),
+      sub: audit.length ? `last ${fmtDate(audit[0].ts)}` : 'none yet',
+    },
+    { label: 'Drives', value: String(disks.length), sub: `${fmtBytes(freeTotal)} free total` },
+  ]}
+/>
 
 <div class="{DISK_PANEL_GRID} mb-6">
   <Card class="gap-0 overflow-hidden py-0">

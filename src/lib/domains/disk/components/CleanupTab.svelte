@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { open } from '@tauri-apps/plugin-dialog';
   import type {
     CachedScan,
     ItemVerdict,
@@ -20,7 +19,6 @@
     folderPaths,
     fmtBytes,
     fmtDate,
-    fmtDuration,
     fmtAgo,
     leafIds,
     RISK_BADGE,
@@ -29,9 +27,13 @@
     DISK_STAT_GRID_FOUR,
     type TreeNode,
   } from '../utils';
+  import ScanProgressCard from './shared/ScanProgressCard.svelte';
+  import TaskProgressCard from './shared/TaskProgressCard.svelte';
+  import StatTiles from './shared/StatTiles.svelte';
+  import TargetPicker from './shared/TargetPicker.svelte';
+  import SelectionBar from './shared/SelectionBar.svelte';
   import { confirmAction } from '$lib/utils/confirm';
   import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Checkbox } from '$lib/components/ui/checkbox';
@@ -144,11 +146,6 @@
     } catch {
       cached = null;
     }
-  }
-
-  async function pickFolder() {
-    const dir = await open({ directory: true, multiple: false });
-    if (typeof dir === 'string') root = dir;
   }
 
   function loadCached() {
@@ -292,11 +289,6 @@
     }
   }
 
-  const scanPct = $derived(
-    progress && progress.phase !== 'counting' && progress.totalFiles > 0
-      ? Math.min(100, (progress.scannedFiles / progress.totalFiles) * 100)
-      : 0
-  );
   const restorePct = $derived(
     cached && cached.status === 'partial' && cached.totalFiles > 0
       ? Math.min(100, Math.round((cached.scannedFiles / cached.totalFiles) * 100))
@@ -318,30 +310,15 @@
   });
 </script>
 
-<div class="mb-4 flex items-center gap-2">
-  <Button variant="outline" onclick={pickFolder}>Choose folder</Button>
-  <Input bind:value={root} placeholder="C:\Users\you\Downloads" class="flex-1" />
-  <Button onclick={() => scan()} disabled={busy || !root}>{busy ? 'Working…' : 'Scan'}</Button>
-  {#if busy}
-    <Button variant="destructive" onclick={cancelScan}>Stop</Button>
-  {/if}
-</div>
-
-{#if !summary && locations.length > 0}
-  <div class="mb-6">
-    <div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
-      Suggested — drives &amp; common folders
-    </div>
-    <div class="flex flex-wrap gap-2">
-      {#each locations as loc (loc.path)}
-        <Button variant="outline" onclick={() => scan(loc.path)} disabled={busy} title={loc.path}>
-          <span class="text-muted-foreground">{loc.kind === 'drive' ? '▮' : '▸'}</span>
-          {loc.label}
-        </Button>
-      {/each}
-    </div>
-  </div>
-{/if}
+<TargetPicker
+  bind:value={root}
+  {locations}
+  {busy}
+  placeholder="C:\Users\you\Downloads"
+  showSuggestions={!summary}
+  onscan={(p) => scan(p)}
+  oncancel={cancelScan}
+/>
 
 {#if cached && !summary && !busy}
   {@const partial = cached.status === 'partial'}
@@ -400,87 +377,43 @@
   </Card>
 {/if}
 
-{#if busy && progress}
-  {@const counting = progress.phase === 'counting'}
-  <Card class="mb-4 gap-0 py-4">
-    <CardContent class="px-4">
-      <div class="mb-2 flex items-center justify-between text-sm">
-        <span class="text-foreground">
-          {counting ? 'Counting files…' : 'Scanning'}
-          {#if !counting}
-            <span class="text-muted-foreground">
-              · {progress.scannedFiles.toLocaleString()} / {progress.totalFiles.toLocaleString()} · {fmtBytes(
-                progress.totalBytes
-              )}</span
-            >
-          {:else}
-            <span class="text-muted-foreground">
-              · {progress.scannedFiles.toLocaleString()} found</span
-            >
-          {/if}
-        </span>
-        <span class="tabular-nums text-muted-foreground">
-          {counting
-            ? fmtDuration(progress.elapsedMs)
-            : `${scanPct.toFixed(0)}% · ETA ${fmtDuration(progress.etaMs)}`}
-        </span>
-      </div>
-      {#if counting}
-        <Progress value={33} class="h-2 animate-pulse" />
-      {:else}
-        <Progress value={scanPct} class="h-2" />
-      {/if}
-      <div
-        class="mt-1.5 truncate font-mono text-xs text-muted-foreground"
-        title={progress.currentPath}
-      >
-        {progress.currentPath}
-      </div>
-    </CardContent>
-  </Card>
-{/if}
+<ScanProgressCard progress={busy ? progress : null} />
 
-{#if qProgress}
-  {@const qpct = qProgress.total > 0 ? Math.min(100, (qProgress.done / qProgress.total) * 100) : 0}
-  <Card class="mb-4 gap-0 py-4">
-    <CardContent class="px-4">
-      <div class="mb-2 flex items-center justify-between text-sm">
-        <span class="text-foreground"
-          >Moving to Recycle Bin<span class="text-muted-foreground">
-            · {qProgress.done} / {qProgress.total}</span
-          ></span
-        >
-        <span class="tabular-nums text-muted-foreground">{qpct.toFixed(0)}%</span>
-      </div>
-      <Progress value={qpct} class="h-2" />
-      <div
-        class="mt-1.5 truncate font-mono text-xs text-muted-foreground"
-        title={qProgress.currentPath}
-      >
-        {qProgress.currentPath}
-      </div>
-    </CardContent>
-  </Card>
-{/if}
+<TaskProgressCard progress={qProgress} />
 
 {#if status && !(busy && progress) && !qProgress}
   <div class="mb-4 text-sm text-muted-foreground">{status}</div>
 {/if}
 
 {#if summary && stats}
-  <div class="{DISK_STAT_GRID_FOUR} mb-4">
-    {#each [['Reclaimable', stats.total, `${stats.count} proposal${stats.count === 1 ? '' : 's'}`, 'text-foreground'], ['Safe', stats.byRisk.Safe.b, `${stats.byRisk.Safe.n} items`, 'text-status-success'], ['Review', stats.byRisk.Review.b, `${stats.byRisk.Review.n} items`, 'text-status-warning'], ['Danger', stats.byRisk.Danger.b, `${stats.byRisk.Danger.n} items`, 'text-status-error']] as [label, bytes, sub, accent]}
-      <Card class="gap-0 py-4">
-        <CardContent class="px-4">
-          <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-          <div class="text-2xl font-semibold tabular-nums tracking-tight {accent}">
-            {fmtBytes(bytes as number)}
-          </div>
-          <div class="mt-1 text-xs text-muted-foreground">{sub}</div>
-        </CardContent>
-      </Card>
-    {/each}
-  </div>
+  <StatTiles
+    grid={DISK_STAT_GRID_FOUR}
+    tiles={[
+      {
+        label: 'Reclaimable',
+        value: fmtBytes(stats.total),
+        sub: `${stats.count} proposal${stats.count === 1 ? '' : 's'}`,
+      },
+      {
+        label: 'Safe',
+        value: fmtBytes(stats.byRisk.Safe.b),
+        sub: `${stats.byRisk.Safe.n} items — rebuilt or re-downloadable`,
+        accent: 'text-status-success',
+      },
+      {
+        label: 'Review',
+        value: fmtBytes(stats.byRisk.Review.b),
+        sub: `${stats.byRisk.Review.n} items — check before ticking`,
+        accent: 'text-status-warning',
+      },
+      {
+        label: 'Danger',
+        value: fmtBytes(stats.byRisk.Danger.b),
+        sub: `${stats.byRisk.Danger.n} items — could be the only copy`,
+        accent: 'text-status-error',
+      },
+    ]}
+  />
 
   {#if stats.total > 0}
     <div class="mb-6 flex h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -496,34 +429,28 @@
     </div>
   {/if}
 
-  <div class="mb-3 flex items-center gap-2">
-    <Button variant="outline" size="sm" onclick={selectSafe}>Select all Safe</Button>
-    <Button variant="outline" size="sm" onclick={() => (selected = new Set())}>Clear</Button>
-    <Button variant="outline" size="sm" onclick={() => (expanded = new Set(folderPaths(tree)))}
-      >Expand all</Button
-    >
-    <Button variant="outline" size="sm" onclick={() => (expanded = new Set())}>Collapse all</Button>
-    <Button variant="outline" size="sm" onclick={verifyWithAi} disabled={verifying}>
-      {verifying
-        ? 'Verifying…'
-        : selected.size > 0
-          ? `Verify ${selected.size} selected with AI`
-          : 'Verify with AI'}
-    </Button>
-    {#if verifying}
-      <Button variant="outline" size="sm" onclick={cancelVerify}>Stop</Button>
-    {/if}
-    <div class="ml-auto text-sm text-muted-foreground">
-      {selected.size} selected ·
-      <span class="font-semibold text-foreground">{fmtBytes(selectedBytes)}</span>
-    </div>
-    <Button
-      variant="destructive"
-      size="sm"
-      onclick={quarantine}
-      disabled={busy || selected.size === 0}>Move to Recycle Bin</Button
-    >
-  </div>
+  <SelectionBar count={selected.size} bytes={selectedBytes} disabled={busy} onaction={quarantine}>
+    {#snippet tools()}
+      <Button variant="outline" size="sm" onclick={selectSafe}>Select all Safe</Button>
+      <Button variant="outline" size="sm" onclick={() => (selected = new Set())}>Clear</Button>
+      <Button variant="outline" size="sm" onclick={() => (expanded = new Set(folderPaths(tree)))}>
+        Expand all
+      </Button>
+      <Button variant="outline" size="sm" onclick={() => (expanded = new Set())}>
+        Collapse all
+      </Button>
+      <Button variant="outline" size="sm" onclick={verifyWithAi} disabled={verifying}>
+        {verifying
+          ? 'Verifying…'
+          : selected.size > 0
+            ? `Ask AI about ${selected.size} selected`
+            : 'Ask AI to double-check'}
+      </Button>
+      {#if verifying}
+        <Button variant="outline" size="sm" onclick={cancelVerify}>Stop</Button>
+      {/if}
+    {/snippet}
+  </SelectionBar>
 
   {#if verifying && verifyProgress}
     <Card class="mb-4 gap-0 overflow-hidden py-0">

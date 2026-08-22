@@ -1,8 +1,9 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import type { AuditEntry } from '../types';
-  import { fmtBytes, fmtDate, DISK_STAT_GRID } from '../utils';
-  import { Card, CardContent } from '$lib/components/ui/card';
+  import { fmtBytes, fmtDate } from '../utils';
+  import StatTiles from './shared/StatTiles.svelte';
+  import { Card } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import {
@@ -54,39 +55,23 @@
   }
 </script>
 
-<div class="{DISK_STAT_GRID} mb-4">
-  <Card class="gap-0 py-4">
-    <CardContent class="px-4">
-      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">
-        Total reclaimed
-      </div>
-      <div class="text-2xl font-semibold tabular-nums tracking-tight text-status-success">
-        {fmtBytes(hstats.reclaimed)}
-      </div>
-    </CardContent>
-  </Card>
-  <Card class="gap-0 py-4">
-    <CardContent class="px-4">
-      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Moved</div>
-      <div class="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-        {hstats.movedN}
-      </div>
-      <div class="mt-1 text-xs text-muted-foreground">to Recycle Bin</div>
-    </CardContent>
-  </Card>
-  <Card class="gap-0 py-4">
-    <CardContent class="px-4">
-      <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">Failed</div>
-      <div
-        class="text-2xl font-semibold tabular-nums tracking-tight {hstats.failedN
-          ? 'text-status-error'
-          : 'text-foreground'}"
-      >
-        {hstats.failedN}
-      </div>
-    </CardContent>
-  </Card>
-</div>
+<StatTiles
+  tiles={[
+    {
+      label: 'Total reclaimed',
+      value: fmtBytes(hstats.reclaimed),
+      sub: 'across every scan',
+      accent: 'text-status-success',
+    },
+    { label: 'Moved', value: String(hstats.movedN), sub: 'to the Recycle Bin' },
+    {
+      label: 'Failed',
+      value: String(hstats.failedN),
+      sub: hstats.failedN ? 'in use or permission denied' : 'none',
+      accent: hstats.failedN ? 'text-status-error' : undefined,
+    },
+  ]}
+/>
 
 <div class="mb-4 flex items-center gap-3">
   <div class="text-sm text-muted-foreground">{status}</div>
