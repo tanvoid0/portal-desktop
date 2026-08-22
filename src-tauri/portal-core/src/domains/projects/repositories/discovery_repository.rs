@@ -66,10 +66,7 @@ impl DiscoveryRepository {
         let conn = self.db.get_connection();
         let txn = conn.begin().await.map_err(|e| e.to_string())?;
 
-        let existing = Project::find()
-            .all(&txn)
-            .await
-            .map_err(|e| e.to_string())?;
+        let existing = Project::find().all(&txn).await.map_err(|e| e.to_string())?;
 
         let mut outcome = ImportOutcome::default();
         let now = Utc::now();
@@ -129,12 +126,20 @@ impl DiscoveryRepository {
         if mark_missing {
             let seen: std::collections::HashSet<&str> =
                 report.projects.iter().map(|p| p.path.as_str()).collect();
+            // Only roots this run actually walked. A root whose drive was not
+            // mounted is absent from `roots_scanned`, and archiving everything
+            // under it would punish the user for unplugging a disk.
+            let walked: std::collections::HashSet<&str> =
+                report.roots_scanned.iter().map(String::as_str).collect();
             for row in existing
                 .iter()
                 .filter(|r| r.discovery_path.is_some() && r.status != "archived")
             {
                 let key = row.discovery_path.as_deref().unwrap_or_default();
                 if seen.contains(key) {
+                    continue;
+                }
+                if !walked.contains(key.split('/').next().unwrap_or_default()) {
                     continue;
                 }
                 let mut am: project::ActiveModel = row.clone().into();
@@ -212,25 +217,24 @@ impl DiscoveryRepository {
 /// create a duplicate row for a project the user already added by hand.
 fn paths_equal(a: &str, b: &str) -> bool {
     fn norm(s: &str) -> String {
-        s.replace('\\', "/")
-            .trim_end_matches('/')
-            .to_lowercase()
+        s.replace('\\', "/").trim_end_matches('/').to_lowercase()
     }
     norm(a) == norm(b)
 }
 
 /// Fields discovery owns. Never touches user-authored content.
-fn apply_machine_fields(
-    am: &mut project::ActiveModel,
-    p: &DiscoveredProject,
-    now: DateTime<Utc>,
-) {
+fn apply_machine_fields(am: &mut project::ActiveModel, p: &DiscoveredProject, now: DateTime<Utc>) {
     am.activity_status = Set(Some(p.status.as_str().to_string()));
     am.last_activity = Set(to_dt(p.activity).map(|d| d.into()));
     am.risk_level = Set(Some(p.risk_level.as_str().to_string()));
     am.unpushed_commits = Set(p.git.ahead.max(0) as i32);
     am.stash_count = Set(p.git.stash.max(0) as i32);
-    am.has_remote = Set(p.git.remote.as_deref().map(|r| !r.is_empty()).unwrap_or(false));
+    am.has_remote = Set(p
+        .git
+        .remote
+        .as_deref()
+        .map(|r| !r.is_empty())
+        .unwrap_or(false));
     am.module_count = Set(p.module_count as i32);
     am.duplicate_group = Set(join(&p.duplicate_of));
     am.regenerable_dirs = Set(join(&p.regenerable));

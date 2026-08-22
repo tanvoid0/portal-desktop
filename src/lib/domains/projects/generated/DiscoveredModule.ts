@@ -29,4 +29,10 @@ export type DiscoveredModule = {
   langs: Array<string>;
   markers: Array<string>;
   regenerable: Array<string>;
+  /**
+   * Bytes held by this module's regenerable directories. `-1` when the run
+   * did not measure — never `0`, so "not measured" cannot read as "nothing
+   * to reclaim".
+   */
+  regenerableBytes: number;
 };

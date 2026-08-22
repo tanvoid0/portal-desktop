@@ -14,7 +14,9 @@
 pub mod analysis;
 pub mod git;
 pub mod scan;
+pub mod state;
 
 pub use analysis::*;
 pub use git::*;
 pub use scan::*;
+pub use state::{DiscoveryChange, DiscoveryState};

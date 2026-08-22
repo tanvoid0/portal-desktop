@@ -300,6 +300,9 @@ pub fn run() {
             domains::projects::discovery_commands::discover_and_import_projects,
             domains::projects::discovery_commands::import_discovered_projects,
             domains::projects::discovery_commands::cancel_discovery,
+            domains::projects::discovery_commands::get_discovery_state,
+            domains::projects::discovery_commands::save_discovery_config,
+            domains::projects::discovery_commands::export_discovery_csv,
             domains::projects::discovery_commands::set_project_triage,
             domains::projects::discovery_commands::set_project_triage_bulk,
             // Pipeline commands

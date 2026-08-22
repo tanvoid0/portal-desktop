@@ -13,6 +13,7 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Progress } from '$lib/components/ui/progress';
+  import { Checkbox } from '$lib/components/ui/checkbox';
   import {
     FolderOpen,
     RefreshCw,
@@ -20,42 +21,66 @@
     Copy,
     ChevronRight,
     ChevronDown,
+    HardDrive,
+    Download,
     X,
   } from '@lucide/svelte';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { onDestroy } from 'svelte';
+  import { save as saveDialog } from '@tauri-apps/plugin-dialog';
+  import { onDestroy, onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { logger } from '$lib/domains/shared/services/logger';
   import { confirmAction } from '$lib/utils/confirm';
   import { invokeClient } from '$lib/utils/invokeClient';
+  // The audit reports reclaimable bytes; the Disk utility deletes them. Sharing
+  // its formatter keeps one number reading the same on both pages.
+  import { fmtBytes } from '$lib/domains/disk/utils';
   import {
     cancelDiscovery,
     defaultDiscoveryConfig,
     discoverAndImport,
     DISCOVERY_PROGRESS_EVENT,
+    exportDiscoveryCsv,
+    getDiscoveryState,
+    saveDiscoveryConfig,
     setProjectTriage,
+    setProjectTriageBulk,
     type TriageDecision,
   } from '$lib/domains/projects/api/discoveryApi';
+  import { toCsv } from '$lib/domains/projects/utils/auditCsv';
   import type { DiscoveryProgress } from '$lib/domains/projects/generated/DiscoveryProgress';
   import type { DiscoveredProject } from '$lib/domains/projects/generated/DiscoveredProject';
   import type { DiscoveryReport } from '$lib/domains/projects/generated/DiscoveryReport';
+  import type { DiscoveryChange } from '$lib/domains/projects/generated/DiscoveryChange';
 
   const log = logger.createScoped('ProjectAudit');
 
-  type Tab = 'triage' | 'risk' | 'duplicates' | 'tree';
+  type Tab = 'triage' | 'risk' | 'duplicates' | 'tree' | 'changes';
+
+  const DECISIONS: TriageDecision[] = ['keep', 'archive', 'delete', 'review'];
 
   let roots = $state<{ name: string; path: string }[]>([]);
   let newRootPath = $state('');
   let report = $state<DiscoveryReport | null>(null);
+  let changes = $state<DiscoveryChange[]>([]);
+  let measureSizes = $state(false);
+  let markMissing = $state(false);
   let scanning = $state(false);
   let progress = $state<DiscoveryProgress | null>(null);
   let error = $state<string | null>(null);
   let tab = $state<Tab>('triage');
   let search = $state('');
+  let sortBySize = $state(false);
   let selected = $state<DiscoveredProject | null>(null);
   let decisions = $state<Record<string, TriageDecision | null>>({});
   let idByPath = $state<Record<string, number>>({});
   let expanded = $state<Record<string, boolean>>({});
   let importSummary = $state<string | null>(null);
+  let exportedTo = $state<string | null>(null);
+  /** Keyboard position in `filtered`. */
+  let cursor = $state(0);
+  /** Paths ticked for a bulk decision. */
+  let marked = $state<Set<string>>(new Set());
 
   let unlisten: UnlistenFn | null = null;
   listen<DiscoveryProgress>(DISCOVERY_PROGRESS_EVENT, (e) => {
@@ -66,6 +91,35 @@
 
   onDestroy(() => unlisten?.());
 
+  // The last scan is on disk, so the view opens populated instead of demanding
+  // a fresh walk of every drive before it can show anything.
+  onMount(async () => {
+    try {
+      const state = await getDiscoveryState();
+      roots = state.config.roots ?? [];
+      measureSizes = state.config.measureSizes;
+      markMissing = state.config.markMissing;
+      report = state.report;
+      changes = state.changes;
+      if (state.report) await loadRegistryIds();
+    } catch (e) {
+      log.warn('could not load saved audit state', e);
+    }
+  });
+
+  /** Roots and scan options outlive the session; the report is written by scans. */
+  async function persistConfig() {
+    try {
+      await saveDiscoveryConfig(currentConfig());
+    } catch (e) {
+      log.warn('could not save audit config', e);
+    }
+  }
+
+  function currentConfig() {
+    return { ...defaultDiscoveryConfig(roots), measureSizes, markMissing };
+  }
+
   const projects = $derived(report?.projects ?? []);
 
   const filtered = $derived.by(() => {
@@ -73,10 +127,18 @@
     let list = projects;
     if (tab === 'risk') list = list.filter((p) => p.riskLevel === 'high' || p.riskLevel === 'med');
     if (tab === 'duplicates') list = list.filter((p) => p.duplicateOf.length > 0);
-    if (!q) return list;
-    return list.filter((p) =>
-      `${p.path} ${p.name} ${p.langs.join(' ')} ${p.description ?? ''}`.toLowerCase().includes(q)
-    );
+    if (q) {
+      list = list.filter((p) =>
+        `${p.path} ${p.name} ${p.langs.join(' ')} ${p.description ?? ''}`.toLowerCase().includes(q)
+      );
+    }
+    // Backend order is newest-first; sorting by size answers the other question.
+    return sortBySize ? [...list].sort((a, b) => b.regenerableBytes - a.regenerableBytes) : list;
+  });
+
+  // A filter change can leave the cursor past the end of the list.
+  $effect(() => {
+    if (cursor > filtered.length - 1) cursor = Math.max(0, filtered.length - 1);
   });
 
   const stats = $derived(report?.stats ?? null);
@@ -89,21 +151,29 @@
       const picked =
         newRootPath.trim() || (await invokeClient.post<string | null>('select_directory'));
       if (!picked) return;
-      const name =
+      const base =
         picked
           .replace(/[\\/]+$/, '')
           .split(/[\\/]/)
           .pop() ?? 'root';
       if (roots.some((r) => r.path === picked)) return;
+      // The name prefixes every project id from this root, and archiving
+      // missing projects trusts that prefix to say which root a row came from.
+      // Two folders called `production` on different drives would make one
+      // root's rows look like the other's, so names are kept unique.
+      let name = base;
+      for (let n = 2; roots.some((r) => r.name === name); n++) name = `${base}-${n}`;
       roots = [...roots, { name, path: picked }];
       newRootPath = '';
+      await persistConfig();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
   }
 
-  function removeRoot(path: string) {
+  async function removeRoot(path: string) {
     roots = roots.filter((r) => r.path !== path);
+    await persistConfig();
   }
 
   async function scan() {
@@ -114,14 +184,21 @@
     scanning = true;
     error = null;
     importSummary = null;
+    exportedTo = null;
     progress = null;
+    // A selection made against the previous result set would silently apply to
+    // whatever those paths mean now, or drop out of the batch without saying so.
+    marked = new Set();
+    cursor = 0;
     try {
-      const result = await discoverAndImport(defaultDiscoveryConfig(roots), false);
+      const result = await discoverAndImport(currentConfig(), markMissing);
       report = result.report;
+      changes = [...result.changes, ...changes];
       importSummary =
         `${result.inserted.length} added · ${result.updated.length} refreshed · ` +
         `${result.adopted.length} linked to existing rows` +
-        (result.missing.length ? ` · ${result.missing.length} not found on disk` : '');
+        (result.missing.length ? ` · ${result.missing.length} archived as missing` : '') +
+        (result.changes.length ? ` · ${result.changes.length} changes since last scan` : '');
       await loadRegistryIds();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -177,6 +254,116 @@
     }
   }
 
+  /** Applies one decision to every ticked project in a single round trip. */
+  async function decideMarked(decision: TriageDecision) {
+    const paths = [...marked].filter((p) => idByPath[p]);
+    if (!paths.length) {
+      error = 'None of the selected projects are in the registry yet — run a scan first.';
+      return;
+    }
+    if (decision === 'delete') {
+      const ok = await confirmAction(
+        'This only records the decision — nothing is removed from disk.',
+        `Mark ${paths.length} projects for deletion?`
+      );
+      if (!ok) return;
+    }
+    try {
+      await setProjectTriageBulk(
+        paths.map((p) => idByPath[p]),
+        decision
+      );
+      const next = { ...decisions };
+      for (const p of paths) next[p] = decision;
+      decisions = next;
+      marked = new Set();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  function toggleMark(path: string) {
+    const next = new Set(marked);
+    if (!next.delete(path)) next.add(path);
+    marked = next;
+  }
+
+  /**
+   * The triage loop: `j`/`k` to move, `1`–`4` to decide, `o` to open, `x` to
+   * tick for a bulk decision. Only on the card tabs — the tree and the change
+   * log have no cursor.
+   */
+  function onKeydown(e: KeyboardEvent) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const el = e.target as HTMLElement | null;
+    if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+    if (!report || (tab !== 'triage' && tab !== 'risk')) return;
+    const current = filtered[cursor];
+
+    switch (e.key) {
+      case 'j':
+      case 'ArrowDown':
+        move(1);
+        break;
+      case 'k':
+      case 'ArrowUp':
+        move(-1);
+        break;
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+        if (current) void decide(current, DECISIONS[Number(e.key) - 1]);
+        break;
+      case 'o':
+        if (current) void openFolder(current.abs);
+        break;
+      case 'x':
+        if (current) toggleMark(current.path);
+        break;
+      case 'Escape':
+        marked = new Set();
+        selected = null;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+  }
+
+  function move(delta: number) {
+    if (!filtered.length) return;
+    cursor = Math.min(filtered.length - 1, Math.max(0, cursor + delta));
+    selected = filtered[cursor];
+    document.getElementById(rowId(filtered[cursor].path))?.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** `/` and `.` are legal in a logical id but not in a DOM id. */
+  function rowId(path: string): string {
+    return `audit-${path.replace(/[^a-zA-Z0-9]/g, '-')}`;
+  }
+
+  async function exportCsv() {
+    try {
+      const path = await saveDialog({
+        defaultPath: 'project-audit.csv',
+        filters: [{ name: 'CSV', extensions: ['csv'] }],
+      });
+      if (!path) return;
+      exportedTo = await exportDiscoveryCsv(path, toCsv(filtered, decisions));
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  /**
+   * Hands a project to the Disk utility, which owns measuring and deleting.
+   * This view records what a project *is*; it never removes bytes itself.
+   */
+  function cleanInDisk(p: DiscoveredProject) {
+    void goto(`/utilities/disk?tab=developer&path=${encodeURIComponent(p.abs)}`);
+  }
+
   async function openFolder(path: string) {
     try {
       await invokeClient.post('open_project_in_explorer', { path });
@@ -221,6 +408,8 @@
   );
 </script>
 
+<svelte:window onkeydown={onKeydown} />
+
 <div class="space-y-4">
   <Card>
     <CardHeader class="pb-3">
@@ -233,13 +422,14 @@
         {#each roots as root (root.path)}
           <Badge variant="secondary" class="gap-1 font-mono text-xs">
             {root.path}
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              class="h-auto p-0"
               aria-label={`Remove ${root.path}`}
               onclick={() => removeRoot(root.path)}
             >
               <X class="h-3 w-3" />
-            </button>
+            </Button>
           </Badge>
         {:else}
           <p class="text-muted-foreground text-sm">
@@ -260,12 +450,39 @@
         {/if}
       </div>
 
+      <div class="flex flex-wrap items-center gap-6 text-sm">
+        <label class="flex items-center gap-2">
+          <Checkbox
+            checked={measureSizes}
+            onCheckedChange={(v) => {
+              measureSizes = v === true;
+              void persistConfig();
+            }}
+            disabled={scanning}
+          />
+          <span>Measure reclaimable size</span>
+          <span class="text-muted-foreground text-xs">walks build output — slower</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <Checkbox
+            checked={markMissing}
+            onCheckedChange={(v) => {
+              markMissing = v === true;
+              void persistConfig();
+            }}
+            disabled={scanning}
+          />
+          <span>Archive projects no longer on disk</span>
+          <span class="text-muted-foreground text-xs">roots that failed to open are skipped</span>
+        </label>
+      </div>
+
       {#if scanning && progress}
         <div class="space-y-1">
           <Progress value={percent} />
           <p class="text-muted-foreground truncate font-mono text-xs">
             {progress.phase === 'find' ? 'walking' : `${progress.done}/${progress.total}`}
-            — {progress.path}
+            {progress.phase === 'size' ? ' sizing' : ''} — {progress.path}
           </p>
         </div>
       {/if}
@@ -280,7 +497,7 @@
   </Card>
 
   {#if stats}
-    <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
+    <div class="grid grid-cols-2 gap-3 md:grid-cols-6">
       <Card
         ><CardContent class="p-3">
           <div class="text-2xl font-semibold">{stats.projects}</div>
@@ -318,12 +535,23 @@
           <div class="text-muted-foreground text-xs">of {stats.projects}</div>
         </CardContent></Card
       >
+      <Card
+        ><CardContent class="p-3">
+          <div class="text-2xl font-semibold">
+            {stats.regenerableBytes < 0 ? '—' : fmtBytes(stats.regenerableBytes)}
+          </div>
+          <div class="text-muted-foreground text-xs uppercase">Reclaimable</div>
+          <div class="text-muted-foreground text-xs">
+            {stats.regenerableBytes < 0 ? 'not measured' : 'build output'}
+          </div>
+        </CardContent></Card
+      >
     </div>
   {/if}
 
   {#if report}
     <div class="flex flex-wrap items-center gap-2">
-      {#each [['triage', 'Triage'], ['risk', 'At risk'], ['duplicates', 'Duplicates'], ['tree', 'Tree']] as [key, label] (key)}
+      {#each [['triage', 'Triage'], ['risk', 'At risk'], ['duplicates', 'Duplicates'], ['tree', 'Tree'], ['changes', `Changes${changes.length ? ` (${changes.length})` : ''}`]] as [key, label] (key)}
         <Button
           size="sm"
           variant={tab === key ? 'default' : 'outline'}
@@ -332,10 +560,80 @@
           {label}
         </Button>
       {/each}
+      <Button
+        size="sm"
+        variant={sortBySize ? 'default' : 'outline'}
+        onclick={() => (sortBySize = !sortBySize)}
+        title="Order by reclaimable build output instead of last activity"
+      >
+        <HardDrive class="mr-1 h-3 w-3" /> By size
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onclick={exportCsv}
+        title="Export the current list as CSV"
+      >
+        <Download class="mr-1 h-3 w-3" /> Export
+      </Button>
       <Input bind:value={search} placeholder="Search…" class="ml-auto max-w-xs" />
     </div>
 
-    {#if tab === 'duplicates'}
+    {#if tab === 'triage' || tab === 'risk'}
+      <p class="text-muted-foreground text-xs">
+        <span class="font-mono">j</span>/<span class="font-mono">k</span> move ·
+        <span class="font-mono">1</span>–<span class="font-mono">4</span> keep/archive/delete/review
+        · <span class="font-mono">o</span> open folder · <span class="font-mono">x</span> select ·
+        <span class="font-mono">esc</span> clear
+      </p>
+    {/if}
+
+    {#if exportedTo}
+      <p class="text-muted-foreground font-mono text-xs">Written to {exportedTo}</p>
+    {/if}
+
+    {#if marked.size}
+      <Card>
+        <CardContent class="flex flex-wrap items-center gap-2 p-3">
+          <span class="text-sm font-medium">{marked.size} selected</span>
+          {#each DECISIONS as d (d)}
+            <Button size="sm" variant="outline" onclick={() => decideMarked(d)}>{d} all</Button>
+          {/each}
+          <Button size="sm" variant="ghost" onclick={() => (marked = new Set())}>clear</Button>
+        </CardContent>
+      </Card>
+    {/if}
+
+    {#if tab === 'changes'}
+      <Card>
+        <CardContent class="space-y-1 p-3">
+          {#each changes as c (c.at + c.kind + c.path)}
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <Badge
+                variant={c.kind === 'removed'
+                  ? 'destructive'
+                  : c.kind === 'added'
+                    ? 'default'
+                    : 'secondary'}>{c.kind}</Badge
+              >
+              <span class="flex-1 truncate font-mono text-xs">{c.path}</span>
+              {#if c.from && c.from !== c.path}
+                <span class="text-muted-foreground truncate font-mono text-xs">was {c.from}</span>
+              {:else if c.kind === 'moved' && c.detail}
+                <!-- Same id, new folder: the old absolute path is the whole story. -->
+                <span class="text-muted-foreground truncate font-mono text-xs">was {c.detail}</span>
+              {/if}
+              <span class="text-muted-foreground text-xs">{new Date(c.at).toLocaleString()}</span>
+            </div>
+          {:else}
+            <p class="text-muted-foreground py-8 text-center text-sm">
+              Nothing yet — the first scan is the baseline. Rescan later and what appeared, moved or
+              vanished lands here.
+            </p>
+          {/each}
+        </CardContent>
+      </Card>
+    {:else if tab === 'duplicates'}
       <div class="space-y-3">
         {#each report.clusters as cluster (cluster.kind + cluster.key)}
           {@const members = cluster.members
@@ -372,9 +670,9 @@
         ><CardContent class="p-3 font-mono text-sm">
           {#each [...tree.entries()] as [area, buckets] (area)}
             <div class="py-1">
-              <button
-                type="button"
-                class="hover:bg-muted flex items-center gap-1 rounded px-1"
+              <Button
+                variant="ghost"
+                class="hover:bg-muted h-auto justify-start gap-1 rounded px-1 py-0 font-mono text-sm"
                 onclick={() => (expanded = { ...expanded, [area]: !expanded[area] })}
               >
                 {#if expanded[area]}<ChevronDown class="h-3 w-3" />{:else}<ChevronRight
@@ -384,16 +682,16 @@
                 <span class="text-muted-foreground text-xs">
                   {[...buckets.values()].reduce((a, b) => a + b.length, 0)} projects
                 </span>
-              </button>
+              </Button>
               {#if expanded[area]}
                 <div class="border-muted ml-4 border-l pl-3">
                   {#each [...buckets.entries()] as [bucket, items] (bucket)}
                     <div class="py-1">
                       <div class="text-muted-foreground text-xs">{bucket}</div>
                       {#each items as p (p.path)}
-                        <button
-                          type="button"
-                          class="hover:bg-muted flex w-full items-center gap-2 rounded px-1 text-left"
+                        <Button
+                          variant="ghost"
+                          class="hover:bg-muted h-auto w-full justify-start gap-2 rounded px-1 py-0 text-left font-mono text-sm"
                           onclick={() => (selected = p)}
                         >
                           <span class="flex-1 truncate">{p.name}</span>
@@ -402,7 +700,7 @@
                           {/if}
                           <Badge variant={statusVariant(p.status)}>{p.status}</Badge>
                           <span class="text-muted-foreground text-xs">{ageLabel(p.ageDays)}</span>
-                        </button>
+                        </Button>
                       {/each}
                     </div>
                   {/each}
@@ -414,13 +712,28 @@
       >
     {:else}
       <div class="space-y-2">
-        {#each filtered as p (p.path)}
-          <Card class={selected?.path === p.path ? 'border-primary' : ''}>
+        {#each filtered as p, i (p.path)}
+          <Card
+            id={rowId(p.path)}
+            class={i === cursor
+              ? 'border-primary'
+              : selected?.path === p.path
+                ? 'border-muted'
+                : ''}
+          >
             <CardContent class="flex flex-wrap items-center gap-2 p-3">
-              <button
-                type="button"
-                class="min-w-0 flex-1 text-left"
-                onclick={() => (selected = selected?.path === p.path ? null : p)}
+              <Checkbox
+                checked={marked.has(p.path)}
+                onCheckedChange={() => toggleMark(p.path)}
+                aria-label={`Select ${p.name}`}
+              />
+              <Button
+                variant="ghost"
+                class="h-auto min-w-0 flex-1 flex-col items-start justify-start p-1 text-left whitespace-normal"
+                onclick={() => {
+                  cursor = i;
+                  selected = selected?.path === p.path ? null : p;
+                }}
               >
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="font-medium">{p.name}</span>
@@ -434,9 +747,14 @@
                     <Badge variant="outline">dup: {p.duplicateOf[0]}</Badge>
                   {/if}
                 </div>
-                <div class="text-muted-foreground truncate font-mono text-xs">{p.path}</div>
-              </button>
+                <div class="text-muted-foreground w-full truncate font-mono text-xs">{p.path}</div>
+              </Button>
 
+              {#if p.regenerableBytes > 0}
+                <Badge variant="outline" class="gap-1">
+                  <HardDrive class="h-3 w-3" />{fmtBytes(p.regenerableBytes)}
+                </Badge>
+              {/if}
               {#if p.riskLevel === 'high'}
                 <Badge variant="destructive" class="gap-1">
                   <ShieldAlert class="h-3 w-3" />{p.risk[0]}
@@ -447,11 +765,11 @@
               <Badge variant={statusVariant(p.status)}>{p.status} · {ageLabel(p.ageDays)}</Badge>
 
               <div class="flex gap-1">
-                {#each ['keep', 'archive', 'delete', 'review'] as d (d)}
+                {#each DECISIONS as d (d)}
                   <Button
                     size="sm"
                     variant={decisions[p.path] === d ? 'default' : 'ghost'}
-                    onclick={() => decide(p, d as TriageDecision)}
+                    onclick={() => decide(p, d)}
                   >
                     {d}
                   </Button>
@@ -491,9 +809,15 @@
                     </div>
                   {/if}
                   {#if p.regenerable.length}
-                    <div class="md:col-span-2">
+                    <div class="flex flex-wrap items-center gap-2 md:col-span-2">
                       <span class="text-muted-foreground">Build output:</span>
-                      {p.regenerable.join(', ')} — clean from the Disk tab
+                      <span>{p.regenerable.join(', ')}</span>
+                      {#if p.regenerableBytes >= 0}
+                        <Badge variant="outline">{fmtBytes(p.regenerableBytes)}</Badge>
+                      {/if}
+                      <Button size="sm" variant="outline" onclick={() => cleanInDisk(p)}>
+                        <HardDrive class="mr-1 h-3 w-3" /> Clean in Disk utility
+                      </Button>
                     </div>
                   {/if}
                 </div>

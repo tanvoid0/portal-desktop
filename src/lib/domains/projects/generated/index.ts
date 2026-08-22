@@ -2,11 +2,13 @@
 export type { ActivityStatus } from './ActivityStatus';
 export type { DiscoveredModule } from './DiscoveredModule';
 export type { DiscoveredProject } from './DiscoveredProject';
+export type { DiscoveryChange } from './DiscoveryChange';
 export type { DiscoveryConfig } from './DiscoveryConfig';
 export type { DiscoveryImportResult } from './DiscoveryImportResult';
 export type { DiscoveryProgress } from './DiscoveryProgress';
 export type { DiscoveryReport } from './DiscoveryReport';
 export type { DiscoveryRoot } from './DiscoveryRoot';
+export type { DiscoveryState } from './DiscoveryState';
 export type { DiscoveryStats } from './DiscoveryStats';
 export type { DuplicateCluster } from './DuplicateCluster';
 export type { ProjectGitSummary } from './ProjectGitSummary';

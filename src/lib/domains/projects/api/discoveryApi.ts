@@ -3,6 +3,8 @@ import type { DiscoveryConfig } from '$lib/domains/projects/generated/DiscoveryC
 import type { DiscoveryReport } from '$lib/domains/projects/generated/DiscoveryReport';
 import type { DiscoveryProgress } from '$lib/domains/projects/generated/DiscoveryProgress';
 import type { DiscoveryImportResult } from '$lib/domains/projects/generated/DiscoveryImportResult';
+import type { DiscoveryState } from '$lib/domains/projects/generated/DiscoveryState';
+import type { DiscoveryChange } from '$lib/domains/projects/generated/DiscoveryChange';
 
 export type TriageDecision = 'keep' | 'archive' | 'delete' | 'review';
 
@@ -18,7 +20,24 @@ export function defaultDiscoveryConfig(roots: { name: string; path: string }[]):
     recentDays: 365,
     dormantDays: 730,
     skipGit: false,
+    measureSizes: false,
+    markMissing: false,
   };
+}
+
+/** Roots, last report and change log — the view opens from this, not a scan. */
+export async function getDiscoveryState(): Promise<DiscoveryState> {
+  return invokeClient.post<DiscoveryState>('get_discovery_state');
+}
+
+/** Persists roots and scan options. The stored report is left alone. */
+export async function saveDiscoveryConfig(config: DiscoveryConfig): Promise<DiscoveryState> {
+  return invokeClient.post<DiscoveryState>('save_discovery_config', { config });
+}
+
+/** Writes `csv` to a path the user has already picked. Returns the path. */
+export async function exportDiscoveryCsv(path: string, csv: string): Promise<string> {
+  return invokeClient.post<string>('export_discovery_csv', { path, csv });
 }
 
 /** Walks the roots without writing anything — preview before import. */
@@ -73,4 +92,11 @@ export async function setProjectTriageBulk(
   return invokeClient.post<number>('set_project_triage_bulk', { ids, decision });
 }
 
-export type { DiscoveryConfig, DiscoveryReport, DiscoveryProgress, DiscoveryImportResult };
+export type {
+  DiscoveryConfig,
+  DiscoveryReport,
+  DiscoveryProgress,
+  DiscoveryImportResult,
+  DiscoveryState,
+  DiscoveryChange,
+};

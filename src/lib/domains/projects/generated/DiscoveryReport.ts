@@ -12,4 +12,10 @@ export type DiscoveryReport = {
   projects: Array<DiscoveredProject>;
   clusters: Array<DuplicateCluster>;
   stats: DiscoveryStats;
+  /**
+   * Names of the roots that actually existed and were walked. A root whose
+   * drive was unplugged is absent, and nothing under it may be treated as
+   * missing — see `DiscoveryRepository::import`.
+   */
+  rootsScanned: Array<string>;
 };

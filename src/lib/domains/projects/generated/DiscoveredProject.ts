@@ -21,6 +21,10 @@ export type DiscoveredProject = {
   git: ProjectGitSummary;
   langs: Array<string>;
   regenerable: Array<string>;
+  /**
+   * Sum over the project's modules. `-1` when unmeasured.
+   */
+  regenerableBytes: number;
   description: string | null;
   risk: Array<string>;
   riskLevel: RiskLevel;

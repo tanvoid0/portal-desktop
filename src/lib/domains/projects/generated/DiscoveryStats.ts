@@ -10,4 +10,8 @@ export type DiscoveryStats = {
   recent: number;
   dormant: number;
   stale: number;
+  /**
+   * Total reclaimable bytes across every project. `-1` when unmeasured.
+   */
+  regenerableBytes: number;
 };

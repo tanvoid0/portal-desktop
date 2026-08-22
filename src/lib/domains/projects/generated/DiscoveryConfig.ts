@@ -16,4 +16,14 @@ export type DiscoveryConfig = {
    * Skip git probing — much faster, used for a quick structural refresh.
    */
   skipGit: boolean;
+  /**
+   * Measure the regenerable directories. Off by default: sizing a few hundred
+   * `node_modules` trees costs minutes, and most passes do not need it.
+   */
+  measureSizes: boolean;
+  /**
+   * Archive registry rows the walk did not find. Persisted with the rest of
+   * the config so the preference survives a restart.
+   */
+  markMissing: boolean;
 };

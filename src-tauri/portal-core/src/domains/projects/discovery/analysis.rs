@@ -231,6 +231,7 @@ mod tests {
             },
             langs: vec![],
             regenerable: vec![],
+            regenerable_bytes: -1,
             description: None,
             risk: vec![],
             risk_level: RiskLevel::None,

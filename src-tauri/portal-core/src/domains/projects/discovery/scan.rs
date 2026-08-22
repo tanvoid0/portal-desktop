@@ -153,6 +153,14 @@ pub struct DiscoveryConfig {
     pub dormant_days: i64,
     /// Skip git probing — much faster, used for a quick structural refresh.
     pub skip_git: bool,
+    /// Measure the regenerable directories. Off by default: sizing a few hundred
+    /// `node_modules` trees costs minutes, and most passes do not need it.
+    #[serde(default)]
+    pub measure_sizes: bool,
+    /// Archive registry rows the walk did not find. Persisted with the rest of
+    /// the config so the preference survives a restart.
+    #[serde(default)]
+    pub mark_missing: bool,
 }
 
 impl Default for DiscoveryConfig {
@@ -165,6 +173,8 @@ impl Default for DiscoveryConfig {
             recent_days: 365,
             dormant_days: 730,
             skip_git: false,
+            measure_sizes: false,
+            mark_missing: false,
         }
     }
 }
@@ -202,6 +212,18 @@ pub struct DiscoveredModule {
     pub langs: Vec<String>,
     pub markers: Vec<String>,
     pub regenerable: Vec<String>,
+    /// Bytes held by this module's regenerable directories. `-1` when the run
+    /// did not measure — never `0`, so "not measured" cannot read as "nothing
+    /// to reclaim".
+    #[serde(default = "unmeasured")]
+    #[ts(type = "number")]
+    pub regenerable_bytes: i64,
+}
+
+/// Serde default for the size fields, so a report written before sizing existed
+/// loads as unmeasured rather than as zero.
+fn unmeasured() -> i64 {
+    -1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -310,6 +332,10 @@ pub struct DiscoveredProject {
     pub git: ProjectGitSummary,
     pub langs: Vec<String>,
     pub regenerable: Vec<String>,
+    /// Sum over the project's modules. `-1` when unmeasured.
+    #[serde(default = "unmeasured")]
+    #[ts(type = "number")]
+    pub regenerable_bytes: i64,
     pub description: Option<String>,
     pub risk: Vec<String>,
     pub risk_level: RiskLevel,
@@ -352,6 +378,10 @@ pub struct DiscoveryStats {
     pub dormant: usize,
     #[ts(type = "number")]
     pub stale: usize,
+    /// Total reclaimable bytes across every project. `-1` when unmeasured.
+    #[serde(default = "unmeasured")]
+    #[ts(type = "number")]
+    pub regenerable_bytes: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -374,6 +404,11 @@ pub struct DiscoveryReport {
     pub projects: Vec<DiscoveredProject>,
     pub clusters: Vec<DuplicateCluster>,
     pub stats: DiscoveryStats,
+    /// Names of the roots that actually existed and were walked. A root whose
+    /// drive was unplugged is absent, and nothing under it may be treated as
+    /// missing — see `DiscoveryRepository::import`.
+    #[serde(default)]
+    pub roots_scanned: Vec<String>,
 }
 
 // ── Walk ────────────────────────────────────────────────────────────────────
@@ -520,6 +555,34 @@ fn newest_mtime(dir: &Path, max_depth: usize) -> i64 {
     newest
 }
 
+/// Bytes under `dir`, following no symlinks. Used only on regenerable
+/// directories, which is where the reclaimable space actually is: sizing the
+/// source tree as well would double the walk to answer a question nobody asked.
+fn dir_size(dir: &Path) -> i64 {
+    let mut total = 0i64;
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        let rd = match fs::read_dir(&next) {
+            Ok(rd) => rd,
+            Err(_) => continue,
+        };
+        for e in rd.flatten() {
+            match e.file_type() {
+                // `is_dir()` on a DirEntry file type is already symlink-aware:
+                // a link reports as a symlink, so a loop cannot be walked into.
+                Ok(ft) if ft.is_dir() => stack.push(e.path()),
+                Ok(ft) if ft.is_file() => {
+                    if let Ok(meta) = e.metadata() {
+                        total += meta.len() as i64;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    total
+}
+
 /// First lines of a README with markdown noise stripped, for the registry
 /// description of projects the user never described by hand.
 fn read_description(dir: &Path) -> Option<String> {
@@ -599,12 +662,14 @@ where
 {
     let mut cancelled = false;
     let mut hits: Vec<RootHit> = Vec::new();
+    let mut roots_scanned: Vec<String> = Vec::new();
 
     for root in &config.roots {
         let base = Path::new(&root.path);
         if !base.exists() {
             continue;
         }
+        roots_scanned.push(root.name.clone());
         if !on_progress(DiscoveryProgress {
             phase: "find".into(),
             done: 0,
@@ -663,6 +728,25 @@ where
             .collect();
         regenerable.sort();
 
+        let regenerable_bytes = if !config.measure_sizes {
+            -1
+        } else if regenerable.is_empty() {
+            0
+        } else {
+            // Sizing walks every file in node_modules, so it gets its own tick:
+            // without one the bar looks frozen on a big project.
+            if !on_progress(DiscoveryProgress {
+                phase: "size".into(),
+                done: i + 1,
+                total,
+                path: hit.rel.clone(),
+            }) {
+                cancelled = true;
+                break;
+            }
+            regenerable.iter().map(|r| dir_size(&dir.join(r))).sum()
+        };
+
         let langs: BTreeSet<String> = hit
             .markers
             .iter()
@@ -686,6 +770,7 @@ where
             langs: langs.into_iter().collect(),
             markers: hit.markers.clone(),
             regenerable,
+            regenerable_bytes,
         });
     }
 
@@ -700,6 +785,7 @@ where
         projects,
         clusters,
         stats,
+        roots_scanned,
     }
 }
 
@@ -737,9 +823,15 @@ fn group_into_projects(
         let mut activity = 0i64;
         let mut langs: BTreeSet<String> = BTreeSet::new();
         let mut regen: BTreeSet<String> = BTreeSet::new();
+        // Stays -1 until a measured module contributes, so a project keeps
+        // reading as unmeasured rather than as empty.
+        let mut regen_bytes = -1i64;
 
         for m in &mods {
             activity = activity.max(m.activity);
+            if m.regenerable_bytes >= 0 {
+                regen_bytes = regen_bytes.max(0) + m.regenerable_bytes;
+            }
             for l in &m.langs {
                 langs.insert(l.clone());
             }
@@ -826,6 +918,7 @@ fn group_into_projects(
             git,
             langs: langs.into_iter().collect(),
             regenerable: regen.into_iter().collect(),
+            regenerable_bytes: regen_bytes,
             description,
             risk,
             risk_level,
@@ -848,11 +941,15 @@ fn summarise(projects: &[DiscoveredProject], root_count: usize) -> DiscoveryStat
         recent: 0,
         dormant: 0,
         stale: 0,
+        regenerable_bytes: -1,
     };
     for p in projects {
         s.git_repos += p.git.repos;
         s.unpushed += p.git.ahead;
         s.no_remote += p.git.no_remote;
+        if p.regenerable_bytes >= 0 {
+            s.regenerable_bytes = s.regenerable_bytes.max(0) + p.regenerable_bytes;
+        }
         match p.status {
             ActivityStatus::Active => s.active += 1,
             ActivityStatus::Recent => s.recent += 1,
@@ -934,6 +1031,7 @@ mod tests {
             langs: vec![],
             markers: vec![],
             regenerable: vec![],
+            regenerable_bytes: -1,
         };
         let projects = group_into_projects(
             &cfg,
@@ -949,6 +1047,49 @@ mod tests {
             .find(|p| p.name == "pocket_portal")
             .expect("pocket_portal present");
         assert_eq!(pocket.module_count, 2, "apps/gym folds into its parent");
+    }
+
+    #[test]
+    fn sizes_only_regenerable_dirs_and_only_when_asked() {
+        let base = tmp("size");
+        let p = base.join("proj");
+        fs::create_dir_all(p.join("node_modules").join("dep")).unwrap();
+        fs::write(p.join("package.json"), "{}").unwrap();
+        fs::write(p.join("src.js"), "0123456789").unwrap();
+        fs::write(p.join("node_modules").join("dep").join("a.js"), "0123").unwrap();
+
+        let root = vec![DiscoveryRoot {
+            name: "t".into(),
+            path: base.to_string_lossy().to_string(),
+        }];
+        let off = discover(
+            &DiscoveryConfig {
+                roots: root.clone(),
+                skip_git: true,
+                ..Default::default()
+            },
+            |_| true,
+        );
+        assert_eq!(
+            off.projects[0].regenerable_bytes, -1,
+            "unmeasured must not read as zero"
+        );
+        assert_eq!(off.roots_scanned, vec!["t".to_string()]);
+
+        let on = discover(
+            &DiscoveryConfig {
+                roots: root,
+                skip_git: true,
+                measure_sizes: true,
+                ..Default::default()
+            },
+            |_| true,
+        );
+        assert_eq!(
+            on.projects[0].regenerable_bytes, 4,
+            "source files must not be counted, only node_modules"
+        );
+        assert_eq!(on.stats.regenerable_bytes, 4);
     }
 
     #[test]

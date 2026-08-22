@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use crate::database::DatabaseManager;
 use crate::domains::projects::discovery::{
-    discover, DiscoveryConfig, DiscoveryProgress, DiscoveryReport,
+    discover, state, DiscoveryChange, DiscoveryConfig, DiscoveryProgress, DiscoveryReport,
+    DiscoveryState,
 };
 use crate::domains::projects::repositories::discovery_repository::{
     DiscoveryRepository, ImportOutcome,
@@ -24,6 +25,10 @@ pub struct DiscoveryImportResult {
     pub adopted: Vec<String>,
     /// Previously discovered projects the walk did not find this time.
     pub missing: Vec<String>,
+    /// What this scan changed against the previous one. Empty on a preview
+    /// import, which has no scan of its own to compare.
+    #[serde(default)]
+    pub changes: Vec<DiscoveryChange>,
 }
 
 impl DiscoveryImportResult {
@@ -34,7 +39,13 @@ impl DiscoveryImportResult {
             updated: outcome.updated,
             adopted: outcome.adopted,
             missing: outcome.missing,
+            changes: Vec::new(),
         }
+    }
+
+    pub fn with_changes(mut self, changes: Vec<DiscoveryChange>) -> Self {
+        self.changes = changes;
+        self
     }
 }
 
@@ -66,6 +77,21 @@ impl DiscoveryService {
         mark_missing: bool,
     ) -> Result<ImportOutcome, String> {
         self.repository.import(report, mark_missing).await
+    }
+
+    /// Audit state — roots, last report, change log. Read on view open so the
+    /// page shows the previous scan instead of an empty table.
+    pub fn state() -> DiscoveryState {
+        state::load()
+    }
+
+    pub fn save_config(config: DiscoveryConfig) -> Result<DiscoveryState, String> {
+        state::save_config(config)
+    }
+
+    /// Stores the completed scan and returns what it changed.
+    pub fn record_scan(config: &DiscoveryConfig, report: &DiscoveryReport) -> Vec<DiscoveryChange> {
+        state::record_scan(config, report)
     }
 
     pub async fn set_triage(
@@ -109,7 +135,10 @@ mod tests {
 
     #[test]
     fn accepts_known_decisions_and_clears_on_empty() {
-        assert_eq!(normalise_decision(Some("keep".into())).unwrap(), Some("keep".into()));
+        assert_eq!(
+            normalise_decision(Some("keep".into())).unwrap(),
+            Some("keep".into())
+        );
         assert_eq!(normalise_decision(Some("  ".into())).unwrap(), None);
         assert_eq!(normalise_decision(None).unwrap(), None);
     }

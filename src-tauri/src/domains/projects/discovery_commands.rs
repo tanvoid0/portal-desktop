@@ -11,7 +11,7 @@ use std::time::Instant;
 use tauri::State;
 
 use crate::database::DatabaseManager;
-use crate::domains::projects::discovery::{DiscoveryConfig, DiscoveryReport};
+use crate::domains::projects::discovery::{DiscoveryConfig, DiscoveryReport, DiscoveryState};
 use crate::domains::projects::services::discovery_service::{
     DiscoveryImportResult, DiscoveryService,
 };
@@ -46,12 +46,14 @@ pub async fn discover_and_import_projects(
     control: State<'_, DiscoveryControl>,
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<DiscoveryImportResult, String> {
-    let report = run_scan(config, &events, &control).await?;
+    let mark_missing = mark_missing.unwrap_or(config.mark_missing);
+    let report = run_scan(config.clone(), &events, &control).await?;
     let service = DiscoveryService::new(&db_manager);
-    let outcome = service
-        .import(&report, mark_missing.unwrap_or(false))
-        .await?;
-    Ok(DiscoveryImportResult::new(report, outcome))
+    let outcome = service.import(&report, mark_missing).await?;
+    // Recorded after the import so a failed write to the registry does not
+    // leave a change log claiming work that was never committed.
+    let changes = DiscoveryService::record_scan(&config, &report);
+    Ok(DiscoveryImportResult::new(report, outcome).with_changes(changes))
 }
 
 /// Imports a report produced earlier by `discover_projects`, so the user can
@@ -67,6 +69,42 @@ pub async fn import_discovered_projects(
         .import(&report, mark_missing.unwrap_or(false))
         .await?;
     Ok(DiscoveryImportResult::new(report, outcome))
+}
+
+/// Roots, last report and change log, so the audit view opens populated.
+#[portal_rpc_macro::rpc]
+pub async fn get_discovery_state() -> Result<DiscoveryState, String> {
+    Ok(DiscoveryService::state())
+}
+
+/// Persists the roots and scan options. Leaves the stored report and change log
+/// untouched — only a scan may replace those.
+#[portal_rpc_macro::rpc]
+pub async fn save_discovery_config(config: DiscoveryConfig) -> Result<DiscoveryState, String> {
+    DiscoveryService::save_config(config)
+}
+
+/// Writes an audit export to a path the user picked in the save dialog.
+///
+/// `local_only`: the path is whatever the native save dialog returned, so this
+/// writes caller-controlled bytes to a caller-controlled location. That is fine
+/// for a path a human just chose in a dialog on this machine, and is an
+/// arbitrary-file-write primitive for anyone reaching the daemon over HTTP —
+/// where there is no dialog to have chosen it. The remote surface does not get
+/// this one.
+///
+/// The extension is forced to `.csv` rather than trusted, so a save dialog where
+/// the user typed a bare name does not fail for no good reason. The final path
+/// is returned so the UI can report where the file actually landed.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn export_discovery_csv(path: String, csv: String) -> Result<String, String> {
+    let path = if path.to_lowercase().ends_with(".csv") {
+        path
+    } else {
+        format!("{path}.csv")
+    };
+    std::fs::write(&path, csv).map_err(|e| format!("{path}: {e}"))?;
+    Ok(path)
 }
 
 #[portal_rpc_macro::rpc]
