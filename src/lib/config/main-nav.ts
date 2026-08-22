@@ -81,6 +81,14 @@ export function buildMainNavSections(
           icon: 'folder',
           description: 'Project management',
           badge: projectCount > 0 ? projectCount : null,
+          submenu: [
+            {
+              title: 'Audit',
+              url: '/projects/audit',
+              icon: 'scan-search',
+              description: 'Discover and triage projects across your drives',
+            },
+          ],
         },
         {
           title: 'GitHub',

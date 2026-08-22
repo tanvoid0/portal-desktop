@@ -17,6 +17,7 @@
     Lock,
     MessageSquare,
     Rocket,
+    ScanSearch,
     Settings,
     Sparkles,
     Terminal,
@@ -75,6 +76,8 @@
   <History class={className} />
 {:else if icon === 'hard-drive'}
   <HardDrive class={className} />
+{:else if icon === 'scan-search'}
+  <ScanSearch class={className} />
 {:else if icon === 'variable'}
   <Variable class={className} />
 {:else}

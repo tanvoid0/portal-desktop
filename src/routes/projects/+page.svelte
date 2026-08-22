@@ -24,7 +24,7 @@
   import { WorkflowTrigger, WorkflowResults } from '$lib/domains/automation';
   import type { WorkflowResult } from '$lib/domains/automation/types';
   import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
-  import { Plus } from '@lucide/svelte';
+  import { Plus, ScanSearch } from '@lucide/svelte';
 
   const log = logger.createScoped('ProjectsPage');
 
@@ -189,6 +189,10 @@
   <!-- Header -->
   <PageHeader title="Projects" description="Manage your development projects">
     {#snippet actions()}
+      <Button variant="outline" onclick={() => goto('/projects/audit')}>
+        <ScanSearch class="mr-2 h-4 w-4" />
+        Audit
+      </Button>
       <Button onclick={() => goto('/projects/create')}>
         <Plus class="mr-2 h-4 w-4" />
         New Project
