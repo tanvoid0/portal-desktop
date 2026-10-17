@@ -26,8 +26,11 @@
 </script>
 
 <div class="flex flex-wrap items-center gap-4">
+  <!-- The placeholder doubles as the accessible name; it disappears on the
+       first keystroke, so the label has to outlive it. -->
   <Input
     placeholder={searchPlaceholder}
+    aria-label={searchPlaceholder}
     value={searchQuery}
     oninput={handleSearchInput}
     class="max-w-sm"

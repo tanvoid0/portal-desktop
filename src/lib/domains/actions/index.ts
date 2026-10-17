@@ -10,6 +10,9 @@ export type {
   ActionRunResult,
   ActionPlanPreview,
   PortalPipelineFile,
+  ReleaseSpec,
+  ReleaseDescription,
+  ReleaseRun,
   ProjectAutomationProfile,
 } from './types';
 

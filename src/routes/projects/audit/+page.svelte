@@ -16,7 +16,9 @@
   });
 </script>
 
-<div class="space-y-4 p-4">
+<!-- No padding here: the shell's PageContainer already sets the content gutter,
+     and /projects sits at that same inset. -->
+<div class="space-y-6">
   <PageHeader
     title="Project audit"
     description="Find every project on disk, see what is alive, and catch work that exists nowhere else."

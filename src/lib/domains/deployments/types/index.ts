@@ -95,6 +95,18 @@ export interface EnvironmentConfig {
   networks: string[];
 }
 
+/** One `KEY=value` pair read from a project `.env*` file. */
+export interface EnvFileVar {
+  key: string;
+  value: string;
+}
+
+/** A `.env*` file found in the project, with its parsed contents. */
+export interface EnvFile {
+  name: string;
+  vars: EnvFileVar[];
+}
+
 export interface BuildScript {
   id: string;
   name: string;
@@ -122,6 +134,12 @@ export interface Deployment {
   containerId?: string;
   dockerImageName?: string;
   dockerfilePath?: string;
+  /** Port the app listens on inside the container (detected at create time). */
+  containerPort?: number;
+  /** Hostname the local proxy routes to this app, e.g. `my-app.localhost`. */
+  host?: string;
+  /** Resolved URL to open — includes the proxy port when it is not 80. */
+  url?: string;
   // CLI-specific fields
   command?: string;
   workingDirectory?: string;

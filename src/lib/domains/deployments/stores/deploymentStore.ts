@@ -116,6 +116,16 @@ export const deploymentActions = {
   },
 
   /**
+   * One-click deploy: create (builds the image, persists) then start (runs the
+   * container). Used by the project's Deploy button once a config is remembered,
+   * and by the form's Create button. Errors propagate to the caller to toast.
+   */
+  async deployAndStart(request: DeploymentCreateRequest) {
+    const deployment = await deploymentActions.createDeployment(request);
+    return deploymentActions.startDeployment(deployment.id);
+  },
+
+  /**
    * Start a deployment
    */
   async startDeployment(deploymentId: string) {

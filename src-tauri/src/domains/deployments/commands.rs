@@ -1,6 +1,7 @@
 use super::services::deployment_service::{
     CreateDeploymentRequest, DeploymentService, UpdateDeploymentRequest,
 };
+use super::services::detect::{list_env_files, EnvFile};
 use super::services::docker_service::{
     Deployment, DockerContainer, DockerImageSummary, DockerStatus,
 };
@@ -14,6 +15,17 @@ pub async fn create_deployment_command(
     request: CreateDeploymentRequest,
 ) -> Result<Deployment, String> {
     _state.create_deployment(request).await
+}
+
+/// List the project's `.env*` files with their parsed vars, so the deploy UI
+/// can offer "load env from file" instead of hand-typing variables.
+#[portal_rpc_macro::rpc]
+pub async fn list_project_env_files_command(
+    _app_handle: tauri::AppHandle,
+    _state: State<'_, Arc<DeploymentService>>,
+    project_path: String,
+) -> Result<Vec<EnvFile>, String> {
+    Ok(list_env_files(&project_path))
 }
 
 #[portal_rpc_macro::rpc]

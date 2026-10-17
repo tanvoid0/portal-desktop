@@ -277,3 +277,40 @@ pub async fn execute_command_in_directory(
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
 }
+
+// ── Modules: the apps / services / packages inside a project ─────────────
+
+use crate::domains::projects::modules::ModuleService;
+use crate::entities::project_module::Model as ProjectModule;
+
+#[portal_rpc_macro::rpc]
+pub async fn get_project_modules(
+    project_id: i32,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<ProjectModule>, String> {
+    ModuleService::new(&db_manager).list(project_id).await
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn get_all_project_modules(
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<ProjectModule>, String> {
+    ModuleService::new(&db_manager).list_all().await
+}
+
+/// Rescan one project's folders and return what it now holds.
+#[portal_rpc_macro::rpc]
+pub async fn refresh_project_modules(
+    project_id: i32,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<ProjectModule>, String> {
+    ModuleService::new(&db_manager).refresh(project_id).await
+}
+
+/// Rescan every project; returns all modules when done.
+#[portal_rpc_macro::rpc]
+pub async fn refresh_all_project_modules(
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<ProjectModule>, String> {
+    ModuleService::new(&db_manager).refresh_all().await
+}

@@ -463,6 +463,11 @@ impl ProjectService {
         // Detect multiple package managers
         let package_managers = self.detect_package_managers(path).await;
 
+        // A monorepo's root says little (often just a scripts-only package.json), so
+        // fold in what its modules are made of and drop the root's Node/JS guess when
+        // that package.json has no dependencies of its own.
+        let (frameworks, languages) = self.with_module_stacks(path, frameworks, languages).await;
+
         // For backward compatibility with command detection, use first framework/package manager
         let primary_framework = frameworks.first().cloned();
         let primary_package_manager = package_managers.first().cloned();
@@ -490,6 +495,56 @@ impl ProjectService {
             dev_port,
             prod_port,
         })
+    }
+
+    async fn with_module_stacks(
+        &self,
+        path: &str,
+        mut frameworks: Vec<String>,
+        mut languages: Vec<String>,
+    ) -> (Vec<String>, Vec<String>) {
+        use crate::domains::projects::modules::detect;
+        let root = std::path::PathBuf::from(path);
+        let modules = tokio::task::spawn_blocking(move || detect::scan(&root))
+            .await
+            .unwrap_or_default();
+        if modules.is_empty() {
+            return (frameworks, languages);
+        }
+        let has_own_deps = fs::read_to_string(Path::new(path).join("package.json"))
+            .ok()
+            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+            .is_some_and(|pkg| {
+                ["dependencies", "devDependencies"]
+                    .iter()
+                    .any(|k| pkg.get(k).and_then(|d| d.as_object()).is_some_and(|d| !d.is_empty()))
+            });
+        if !has_own_deps {
+            frameworks.retain(|f| f != "Node.js");
+            languages.retain(|l| l != "JavaScript");
+        }
+        // Most common stack first: the first framework drives command detection.
+        let mut counts: Vec<(String, usize)> = Vec::new();
+        for m in &modules {
+            match counts.iter_mut().find(|(s, _)| *s == m.stack) {
+                Some(c) => c.1 += 1,
+                None => counts.push((m.stack.clone(), 1)),
+            }
+        }
+        counts.sort_by(|a, b| b.1.cmp(&a.1));
+        for (stack, _) in &counts {
+            if let Some(name) = detect::framework_name(stack) {
+                if !frameworks.iter().any(|f| f == name) {
+                    frameworks.push(name.to_string());
+                }
+            }
+            if let Some(name) = detect::language_name(stack) {
+                if !languages.iter().any(|l| l == name) {
+                    languages.push(name.to_string());
+                }
+            }
+        }
+        (frameworks, languages)
     }
 
     fn format_project_name(&self, name: &str) -> String {

@@ -21,6 +21,7 @@
     type ActionSource,
   } from '$lib/domains/actions';
   import { GitHubProjectActionsPanel } from '$lib/domains/github';
+  import ReleaseCard from './ReleaseCard.svelte';
   import {
     scriptExecutionService,
     type ScriptExecutionInfo,
@@ -581,6 +582,8 @@
       </Card>
     </div>
   </div>
+
+  <ReleaseCard {project} />
 
   {#if sourceFilter === 'all' || sourceFilter === 'github'}
     <div class="space-y-3 border-t pt-6">

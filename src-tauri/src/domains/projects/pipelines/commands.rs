@@ -256,6 +256,200 @@ pub async fn cancel_pipeline_execution(
         .await
 }
 
+// ── Releases ─────────────────────────────────────────────────────────────
+// A release is a workflow from the project's `.portal/pipeline.yml` named by its
+// `release:` block. Rehearsing is reachable by any client of the daemon; shipping
+// is `local_only`, so it can only be started from this app's own window.
+
+#[portal_rpc_macro::rpc]
+pub async fn release_describe(
+    project_id: i32,
+    service: State<'_, Arc<ExecutionService>>,
+) -> Result<Option<Value>, String> {
+    service.describe_release(project_id).await
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn release_list(
+    project_id: i32,
+    limit: Option<u64>,
+    service: State<'_, Arc<ExecutionService>>,
+) -> Result<Vec<Value>, String> {
+    service.get_release_executions(project_id, limit).await
+}
+
+async fn start_release(
+    project_id: i32,
+    ship: bool,
+    mut variables: std::collections::HashMap<String, String>,
+    events: &Events,
+    service: &ExecutionService,
+) -> Result<Value, String> {
+    let described = service
+        .describe_release(project_id)
+        .await?
+        .ok_or_else(|| "This project declares no `release:` in .portal/pipeline.yml".to_string())?;
+    let workflow = if ship {
+        described["release"]["ship"].as_str()
+    } else {
+        described["release"]["rehearse"].as_str()
+    }
+    .ok_or_else(|| "No `rehearse` workflow declared; a rehearsal never runs the ship workflow".to_string())?
+    .to_string();
+    variables.insert("RELEASE_DRY_RUN".to_string(), if ship { "0" } else { "1" }.to_string());
+
+    let id = service
+        .execute_file_workflow(project_id, &workflow, variables, events.sink())
+        .await?;
+    service
+        .get_execution(&id)
+        .await?
+        .ok_or_else(|| "Execution not found after start".to_string())
+}
+
+/// Dry run: the project's `rehearse` workflow, with `RELEASE_DRY_RUN=1`.
+#[portal_rpc_macro::rpc]
+pub async fn release_rehearse(
+    project_id: i32,
+    variables: Option<std::collections::HashMap<String, String>>,
+    events: State<'_, Events>,
+    service: State<'_, Arc<ExecutionService>>,
+) -> Result<Value, String> {
+    start_release(project_id, false, variables.unwrap_or_default(), &events, &service).await
+}
+
+/// The real release. `local_only`: the daemon has no auth, and this deploys to
+/// production, so no client of the HTTP port may start it. A Claude session
+/// rehearses and watches; a person clicks Ship in the app.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn release_ship(
+    project_id: i32,
+    variables: Option<std::collections::HashMap<String, String>>,
+    events: State<'_, Events>,
+    service: State<'_, Arc<ExecutionService>>,
+) -> Result<Value, String> {
+    start_release(project_id, true, variables.unwrap_or_default(), &events, &service).await
+}
+
+// ── Release setup: propose, refine with AI, write, and health ────────────
+
+async fn root_and_modules(
+    db: &Arc<crate::database::DatabaseManager>,
+    project_id: i32,
+) -> Result<(std::path::PathBuf, Vec<crate::domains::projects::modules::DetectedModule>), String> {
+    use crate::domains::projects::modules::{DetectedModule, ModuleService};
+    let project = crate::domains::projects::repositories::project_repository::ProjectRepository::new(db.clone())
+        .get_by_id(project_id)
+        .await?
+        .ok_or_else(|| "Project not found".to_string())?;
+    let modules = ModuleService::new(db)
+        .refresh(project_id)
+        .await?
+        .into_iter()
+        .map(|m| DetectedModule { rel_path: m.rel_path, name: m.name, stack: m.stack, role: m.role })
+        .collect();
+    Ok((std::path::PathBuf::from(project.path), modules))
+}
+
+/// A `.portal/pipeline.yml` built from what the project contains. Read-only.
+#[portal_rpc_macro::rpc]
+pub async fn release_propose(
+    project_id: i32,
+    db_manager: State<'_, Arc<crate::database::DatabaseManager>>,
+) -> Result<crate::domains::projects::pipelines::services::release_setup::Proposal, String> {
+    let (root, modules) = root_and_modules(&db_manager, project_id).await?;
+    crate::domains::projects::pipelines::services::release_setup::propose(&root, &modules)
+}
+
+/// Whether `yaml` is a usable pipeline file (parses; references resolve).
+#[portal_rpc_macro::rpc]
+pub async fn release_validate(yaml: String) -> Result<(), String> {
+    use crate::domains::projects::pipelines::services::pipeline_file as pf;
+    let file = pf::parse(&yaml)?;
+    for id in file.workflows.keys() {
+        pf::build_steps(&file, id)?;
+    }
+    Ok(())
+}
+
+/// What would make this project's release fail or quietly skip something.
+#[portal_rpc_macro::rpc]
+pub async fn release_health(
+    project_id: i32,
+    db_manager: State<'_, Arc<crate::database::DatabaseManager>>,
+) -> Result<Vec<crate::domains::projects::pipelines::services::release_setup::Issue>, String> {
+    let (root, modules) = root_and_modules(&db_manager, project_id).await?;
+    tokio::task::spawn_blocking(move || {
+        crate::domains::projects::pipelines::services::release_setup::health(&root, &modules)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Writes `.portal/pipeline.yml`, keeping the old file as `.bak`.
+///
+/// `local_only`: the file's commands are what a release runs, and the daemon has
+/// no auth, so no HTTP client may author them.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn release_write(
+    project_id: i32,
+    yaml: String,
+    db_manager: State<'_, Arc<crate::database::DatabaseManager>>,
+) -> Result<String, String> {
+    release_validate(yaml.clone()).await?;
+    let (root, _) = root_and_modules(&db_manager, project_id).await?;
+    let dir = root.join(".portal");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let path = dir.join("pipeline.yml");
+    if path.is_file() {
+        let _ = std::fs::copy(&path, dir.join("pipeline.yml.bak"));
+    }
+    std::fs::write(&path, yaml).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Asks the AI gateway to change the pipeline file as instructed, and returns the
+/// new YAML once it validates (one retry, telling the model what was wrong).
+/// `local_only`: it sends project details to the model and is a UI flow.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn release_refine(
+    project_id: i32,
+    yaml: String,
+    instruction: String,
+    db_manager: State<'_, Arc<crate::database::DatabaseManager>>,
+    ai_service: State<'_, Arc<portal_core::domains::ai::services::AIService>>,
+) -> Result<String, String> {
+    use crate::domains::ai::providers::GenerationOptions;
+    use crate::domains::projects::pipelines::services::release_setup as rs;
+    let (_, modules) = root_and_modules(&db_manager, project_id).await?;
+    let (system, mut user) = rs::refine_prompt(&yaml, &instruction, &modules);
+    let options = GenerationOptions {
+        temperature: Some(0.2),
+        max_tokens: Some(4096),
+        timeout_ms: Some(120_000),
+        ..Default::default()
+    };
+    let mut last_error = String::new();
+    for _ in 0..2 {
+        let reply = ai_service
+            .generate_with_system(&system, &user, Some(options.clone()), None)
+            .await
+            .map_err(|e| format!("AI request failed: {e}"))?;
+        let candidate = rs::extract_yaml(&reply.content);
+        match release_validate(candidate.clone()).await {
+            Ok(()) => return Ok(candidate),
+            Err(e) => {
+                user = format!("{user}
+
+Your last reply was rejected: {e}
+Reply again with the corrected complete file.");
+                last_error = e;
+            }
+        }
+    }
+    Err(format!("The AI reply was not a valid pipeline file: {last_error}"))
+}
+
 fn parse_execution_request(value: Value) -> Result<ExecutionRequestData, String> {
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]

@@ -373,6 +373,11 @@ impl ProjectRepository {
 
     pub async fn delete(&self, id: i32) -> Result<bool, String> {
         let connection = self.db_manager.get_connection();
+        crate::entities::project_module::Entity::delete_many()
+            .filter(crate::entities::project_module::Column::ProjectId.eq(id))
+            .exec(connection)
+            .await
+            .map_err(|e| format!("Failed to delete project modules: {}", e))?;
         let result = ProjectEntity::delete_by_id(id)
             .exec(connection)
             .await

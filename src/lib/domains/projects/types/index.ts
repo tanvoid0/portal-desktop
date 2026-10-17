@@ -132,3 +132,15 @@ export interface ProjectStats {
   most_used_type: string;
   recent_projects: Project[];
 }
+
+/** An app, service or package found inside a project's folders. */
+export interface ProjectModule {
+  id: number;
+  project_id: number;
+  /** Relative to the project root, forward slashes. */
+  rel_path: string;
+  name: string;
+  /** flutter, nestjs, android, ... see utils/moduleStacks.ts. */
+  stack: string;
+  role: 'app' | 'service' | 'package';
+}

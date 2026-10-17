@@ -5,7 +5,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Project } from '$lib/domains/projects/types';
+  import type { Project, ProjectModule } from '$lib/domains/projects/types';
   import { formatRelativeTime, formatBytes } from '$lib/domains/shared/utils';
   import { Button } from '$lib/components/ui/button';
   import {
@@ -16,7 +16,14 @@
     CardTitle,
   } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
+  import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+  } from '$lib/components/ui/collapsible';
   import TechIcon from '$lib/components/ui/tech-icon.svelte';
+  import ProjectModuleList from './ProjectModuleList.svelte';
+  import { cn } from '$lib/utils';
   import {
     Edit,
     Trash2,
@@ -29,10 +36,8 @@
     Calendar,
     GitBranch,
     GitCommit,
-    CircleDot,
     Globe,
-    Archive,
-    CheckCircle2,
+    ChevronDown,
   } from '@lucide/svelte';
   import {
     getProjectGitBranch,
@@ -45,6 +50,7 @@
     truncatePath,
     shortCommitHash,
   } from '$lib/domains/projects/utils/display';
+  import { describeModules } from '$lib/domains/projects/utils/moduleStacks';
   import {
     projectIconRegistry,
     type ResolvedTechIcon,
@@ -52,6 +58,7 @@
 
   interface Props {
     project: Project;
+    modules?: ProjectModule[];
     onClick?: (project: Project) => void;
     onEdit?: (project: Project) => void;
     onDelete?: (project: Project) => void;
@@ -60,13 +67,17 @@
 
   let {
     project,
+    modules = [],
     onClick = () => {},
     onEdit = () => {},
     onDelete = () => {},
     showActions = true,
   }: Props = $props();
 
+  const MAX_BADGES = 3;
+
   let registryReady = $state(false);
+  let expanded = $state(false);
 
   onMount(async () => {
     await projectIconRegistry.ensureLoaded();
@@ -80,6 +91,9 @@
   const showTechStack = $derived(
     registryReady && (frameworks.length > 0 || packageManagers.length > 0 || languages.length > 0)
   );
+  const isMonorepo = $derived(modules.length > 0);
+  const shownFrameworks = $derived(frameworks.slice(0, MAX_BADGES));
+  const hiddenFrameworks = $derived(frameworks.length - shownFrameworks.length);
   const gitBranch = $derived(getProjectGitBranch(project));
   const gitCommit = $derived(shortCommitHash(getProjectGitCommit(project)));
   const fileCount = $derived(getProjectFileCount(project));
@@ -89,6 +103,13 @@
   );
   const outdatedCount = $derived(project.metadata?.dependencies?.outdated?.length ?? 0);
   const vulnerabilityCount = $derived(project.metadata?.dependencies?.vulnerabilities?.length ?? 0);
+  const statusDot = $derived(
+    project.status === 'active'
+      ? 'bg-green-500'
+      : project.status === 'archived'
+        ? 'bg-amber-500'
+        : 'bg-red-500'
+  );
 
   const handleClick = () => {
     onClick(project);
@@ -104,10 +125,6 @@
     onDelete(project);
   };
 
-  const statusIcon = $derived(
-    project.status === 'active' ? CheckCircle2 : project.status === 'archived' ? Archive : null
-  );
-
   function techBadgeClass(item: ResolvedTechIcon): string {
     return getFrameworkColor(item.name);
   }
@@ -118,144 +135,92 @@
   onclick={handleClick}
   role="button"
   tabindex={0}
-  onkeydown={(e) => e.key === 'Enter' && handleClick()}
+  onkeydown={(e) => e.target === e.currentTarget && e.key === 'Enter' && handleClick()}
 >
   <CardHeader class="pb-3">
-    <div class="flex w-full items-start justify-between gap-3">
-      <div class="flex min-w-0 flex-1 items-start gap-3">
-        <div
-          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg {getFrameworkIconBackground(
-            primaryFramework?.name
-          )}"
-        >
-          {#if primaryFramework}
-            <TechIcon
-              icon={primaryFramework.icon}
-              iconType={primaryFramework.icon_type}
-              size="lg"
-              alt={primaryFramework.name}
-            />
-          {:else}
-            <FolderOpen class="h-6 w-6 text-muted-foreground" />
-          {/if}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5">
-            <CardTitle class="truncate">{project.name}</CardTitle>
-            {#if project.starred}
-              <Star
-                class="h-4 w-4 shrink-0 fill-yellow-400 text-yellow-400"
-                aria-label="Starred project"
-              />
-            {/if}
-          </div>
-          {#if project.description}
-            <CardDescription class="mt-1 line-clamp-2">
-              {project.description}
-            </CardDescription>
-          {/if}
-        </div>
-      </div>
-
-      <Badge variant="outline" class="shrink-0 gap-1 capitalize {getStatusColor(project.status)}">
-        {#if statusIcon}
-          {@const StatusIcon = statusIcon}
-          <StatusIcon class="h-3 w-3" />
+    <div class="flex w-full items-start gap-3">
+      <div
+        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg {getFrameworkIconBackground(
+          primaryFramework?.name
+        )}"
+      >
+        {#if primaryFramework}
+          <TechIcon
+            icon={primaryFramework.icon}
+            iconType={primaryFramework.icon_type}
+            size="lg"
+            alt={primaryFramework.name}
+          />
+        {:else}
+          <FolderOpen class="h-6 w-6 text-muted-foreground" />
         {/if}
-        {project.status}
-      </Badge>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-1.5">
+          <span
+            class="h-2 w-2 shrink-0 rounded-full {statusDot}"
+            title={project.status}
+            aria-label="Status: {project.status}"
+          ></span>
+          <CardTitle class="truncate">{project.name}</CardTitle>
+          {#if project.starred}
+            <Star
+              class="h-4 w-4 shrink-0 fill-yellow-400 text-yellow-400"
+              aria-label="Starred project"
+            />
+          {/if}
+          {#if project.status !== 'active'}
+            <Badge
+              variant="outline"
+              class="ml-auto shrink-0 capitalize {getStatusColor(project.status)}"
+            >
+              {project.status}
+            </Badge>
+          {/if}
+        </div>
+        {#if project.description}
+          <CardDescription class="mt-1 line-clamp-1">
+            {project.description}
+          </CardDescription>
+        {/if}
+      </div>
     </div>
   </CardHeader>
 
   <CardContent>
-    <div class="space-y-3">
-      {#if showTechStack}
+    <div class="space-y-2">
+      {#if isMonorepo}
+        <div class="flex items-center gap-2 text-sm">
+          <span class="truncate">{describeModules(modules)}</span>
+          <Badge variant="secondary" class="shrink-0 text-xs">monorepo</Badge>
+        </div>
+      {:else if registryReady && frameworks.length > 0}
         <div class="flex flex-wrap items-center gap-1.5">
-          {#each frameworks as item (item.name)}
+          {#each shownFrameworks as item (item.name)}
             <Badge variant="outline" class="gap-1.5 {techBadgeClass(item)}">
               <TechIcon icon={item.icon} iconType={item.icon_type} size="xs" alt={item.name} />
               {item.name}
             </Badge>
           {/each}
-
-          {#each packageManagers as item (item.name)}
-            <Badge variant="outline" class="gap-1.5">
-              <TechIcon icon={item.icon} iconType={item.icon_type} size="xs" alt={item.name} />
-              {item.name}
-            </Badge>
-          {/each}
-
-          {#each languages as item (item.name)}
-            <Badge variant="secondary" class="gap-1.5">
-              <TechIcon icon={item.icon} iconType={item.icon_type} size="xs" alt={item.name} />
-              {item.name}
-            </Badge>
-          {/each}
+          {#if hiddenFrameworks > 0}
+            <span class="text-xs text-muted-foreground">+{hiddenFrameworks}</span>
+          {/if}
         </div>
       {/if}
 
-      <div class="flex flex-wrap items-center gap-1.5">
-        {#if gitBranch}
-          <Badge variant="outline" class="gap-1">
-            <GitBranch class="h-3 w-3" />
-            {gitBranch}
-          </Badge>
-        {/if}
-
-        {#if gitCommit}
-          <Badge variant="secondary" class="gap-1 font-mono text-xs">
-            <GitCommit class="h-3 w-3" />
-            {gitCommit}
-          </Badge>
-        {/if}
-
-        {#if hasUncommittedChanges}
-          <Badge variant="outline" class="gap-1 text-amber-700 dark:text-amber-300">
-            <CircleDot class="h-3 w-3" />
-            Uncommitted
-          </Badge>
-        {/if}
-      </div>
-
-      <div class="flex items-center gap-1.5 text-xs text-muted-foreground" title={project.path}>
-        <FolderOpen class="h-3.5 w-3.5 shrink-0" />
-        <span class="truncate font-mono">{truncatePath(project.path)}</span>
-      </div>
-
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
-        <div class="flex items-center gap-1.5">
-          <HardDrive class="h-3.5 w-3.5 shrink-0" />
-          <span>{formatBytes(projectSize)}</span>
+      {#if gitBranch}
+        <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <GitBranch class="h-3.5 w-3.5 shrink-0" />
+          <span class="truncate">{gitBranch}</span>
+          {#if hasUncommittedChanges}
+            <span
+              class="h-2 w-2 shrink-0 rounded-full bg-amber-500"
+              title="Uncommitted changes"
+              aria-label="Uncommitted changes"
+            ></span>
+          {/if}
         </div>
-        <div class="flex items-center gap-1.5">
-          <FileText class="h-3.5 w-3.5 shrink-0" />
-          <span>{fileCount} files</span>
-        </div>
-        {#if project.last_opened}
-          <div class="flex items-center gap-1.5">
-            <Clock class="h-3.5 w-3.5 shrink-0" />
-            <span>{formatRelativeTime(project.last_opened)}</span>
-          </div>
-        {/if}
-        {#if project.open_count > 0}
-          <div class="flex items-center gap-1.5">
-            <Eye class="h-3.5 w-3.5 shrink-0" />
-            <span>{project.open_count} opens</span>
-          </div>
-        {/if}
-        {#if project.dev_port}
-          <div class="flex items-center gap-1.5">
-            <Globe class="h-3.5 w-3.5 shrink-0" />
-            <span>:{project.dev_port}</span>
-          </div>
-        {/if}
-        {#if project.created_at}
-          <div class="flex items-center gap-1.5">
-            <Calendar class="h-3.5 w-3.5 shrink-0" />
-            <span>Created {formatRelativeTime(project.created_at)}</span>
-          </div>
-        {/if}
-      </div>
+      {/if}
 
       {#if outdatedCount > 0 || vulnerabilityCount > 0}
         <div class="flex flex-wrap gap-1.5">
@@ -272,32 +237,147 @@
         </div>
       {/if}
 
-      {#if showActions}
-        <div
-          class="divider-edge-t divider-edge-full flex items-center gap-1 pt-2 opacity-0 transition-opacity group-hover:opacity-100"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            onclick={handleEdit}
-            class="h-8 w-8 p-0"
-            title="Edit project"
-            aria-label="Edit project"
+      <Collapsible bind:open={expanded}>
+        <div class="flex items-center justify-between">
+          <CollapsibleTrigger
+            class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            onclick={(e: Event) => e.stopPropagation()}
           >
-            <Edit class="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onclick={handleDelete}
-            class="h-8 w-8 p-0 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-            title="Delete project"
-            aria-label="Delete project"
-          >
-            <Trash2 class="h-4 w-4" />
-          </Button>
+            <ChevronDown class={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')} />
+            {expanded ? 'Less' : 'Details'}
+          </CollapsibleTrigger>
+
+          {#if showActions}
+            <div
+              class="flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onclick={handleEdit}
+                class="h-8 w-8 p-0"
+                title="Edit project"
+                aria-label="Edit project"
+              >
+                <Edit class="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onclick={handleDelete}
+                class="h-8 w-8 p-0 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                title="Delete project"
+                aria-label="Delete project"
+              >
+                <Trash2 class="h-4 w-4" />
+              </Button>
+            </div>
+          {/if}
         </div>
-      {/if}
+
+        <CollapsibleContent>
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="space-y-3 pt-3" onclick={(e) => e.stopPropagation()}>
+            {#if project.description}
+              <p class="text-sm text-muted-foreground">{project.description}</p>
+            {/if}
+
+            {#if isMonorepo}
+              <ProjectModuleList {modules} />
+            {/if}
+
+            {#if showTechStack}
+              <div class="flex flex-wrap items-center gap-1.5">
+                {#each frameworks as item (item.name)}
+                  <Badge variant="outline" class="gap-1.5 {techBadgeClass(item)}">
+                    <TechIcon
+                      icon={item.icon}
+                      iconType={item.icon_type}
+                      size="xs"
+                      alt={item.name}
+                    />
+                    {item.name}
+                  </Badge>
+                {/each}
+
+                {#each packageManagers as item (item.name)}
+                  <Badge variant="outline" class="gap-1.5">
+                    <TechIcon
+                      icon={item.icon}
+                      iconType={item.icon_type}
+                      size="xs"
+                      alt={item.name}
+                    />
+                    {item.name}
+                  </Badge>
+                {/each}
+
+                {#each languages as item (item.name)}
+                  <Badge variant="secondary" class="gap-1.5">
+                    <TechIcon
+                      icon={item.icon}
+                      iconType={item.icon_type}
+                      size="xs"
+                      alt={item.name}
+                    />
+                    {item.name}
+                  </Badge>
+                {/each}
+              </div>
+            {/if}
+
+            {#if gitCommit}
+              <Badge variant="secondary" class="gap-1 font-mono text-xs">
+                <GitCommit class="h-3 w-3" />
+                {gitCommit}
+              </Badge>
+            {/if}
+
+            <div
+              class="flex items-center gap-1.5 text-xs text-muted-foreground"
+              title={project.path}
+            >
+              <FolderOpen class="h-3.5 w-3.5 shrink-0" />
+              <span class="truncate font-mono">{truncatePath(project.path)}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+              <div class="flex items-center gap-1.5">
+                <HardDrive class="h-3.5 w-3.5 shrink-0" />
+                <span>{formatBytes(projectSize)}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <FileText class="h-3.5 w-3.5 shrink-0" />
+                <span>{fileCount} files</span>
+              </div>
+              {#if project.last_opened}
+                <div class="flex items-center gap-1.5">
+                  <Clock class="h-3.5 w-3.5 shrink-0" />
+                  <span>{formatRelativeTime(project.last_opened)}</span>
+                </div>
+              {/if}
+              {#if project.open_count > 0}
+                <div class="flex items-center gap-1.5">
+                  <Eye class="h-3.5 w-3.5 shrink-0" />
+                  <span>{project.open_count} opens</span>
+                </div>
+              {/if}
+              {#if project.dev_port}
+                <div class="flex items-center gap-1.5">
+                  <Globe class="h-3.5 w-3.5 shrink-0" />
+                  <span>:{project.dev_port}</span>
+                </div>
+              {/if}
+              {#if project.created_at}
+                <div class="flex items-center gap-1.5">
+                  <Calendar class="h-3.5 w-3.5 shrink-0" />
+                  <span>Created {formatRelativeTime(project.created_at)}</span>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   </CardContent>
 </Card>

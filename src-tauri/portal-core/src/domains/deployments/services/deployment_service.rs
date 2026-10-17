@@ -1,6 +1,8 @@
 use super::cli_service::CliService;
+use super::detect;
 use super::docker_service::{
-    Deployment, DeploymentStatus, DeploymentType, DockerService, EnvironmentConfig,
+    find_free_port, Deployment, DeploymentStatus, DeploymentType, DockerService, EnvironmentConfig,
+    PROXY_NETWORK,
 };
 use crate::database::DatabaseManager;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
@@ -10,6 +12,19 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
+
+/// Does a `docker run` error read like the host port could not be published?
+/// Covers Linux "already allocated", a lost probe-then-publish race, and the
+/// Windows reserved-range case where a port binds in user mode but Docker's
+/// publisher is refused — the signal to retry on the next free port.
+fn is_port_unavailable(err: &str) -> bool {
+    let e = err.to_lowercase();
+    e.contains("port is already allocated")
+        || e.contains("address already in use")
+        || e.contains("forbidden by its access permissions")
+        || e.contains("bind for")
+        || e.contains("ports are not available")
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateDeploymentRequest {
@@ -75,6 +90,16 @@ impl DeploymentService {
         let deployment_id = Uuid::new_v4().to_string();
         let now = Utc::now();
 
+        // A missing project path otherwise fails deep in the pipeline with a
+        // baffling message (empty build context, or a process spawn error).
+        // Fail fast with something the user can act on.
+        if !std::path::Path::new(&request.project_path).exists() {
+            return Err(format!(
+                "Project path not found: {}. The project may have moved — update its path and retry.",
+                request.project_path
+            ));
+        }
+
         match request.deployment_type {
             DeploymentType::Docker => {
                 // Check if Docker is available
@@ -82,36 +107,58 @@ impl DeploymentService {
                     return Err("Docker is not available or not running".to_string());
                 }
 
-                // Generate Dockerfile
-                let dockerfile_content = self.docker_service.generate_dockerfile(
-                    &request.project_type,
-                    &request.sdk_version,
-                    &request.project_path,
-                )?;
+                // Detect stack, listen port, existing Dockerfile and host. A
+                // committed portal.yaml overrides any inferred value.
+                let detected = detect::detect(&request.project_path, &request.project_type);
 
-                // Use provided dockerfile path or create one
-                let dockerfile_path = request
-                    .dockerfile_path
-                    .unwrap_or_else(|| format!("{}/Dockerfile", request.project_path));
+                // Use an existing Dockerfile verbatim; otherwise generate one
+                // whose EXPOSE matches the detected port, writing it only when
+                // the project has none of its own.
+                let dockerfile_path = if let Some(existing) = detected.dockerfile.clone() {
+                    existing
+                } else {
+                    let content = self.docker_service.generate_dockerfile(
+                        &detected.stack,
+                        &request.sdk_version,
+                        &request.project_path,
+                        detected.container_port,
+                    )?;
+                    let path = request
+                        .dockerfile_path
+                        .clone()
+                        .unwrap_or_else(|| format!("{}/Dockerfile", request.project_path));
+                    if !std::path::Path::new(&path).exists() {
+                        std::fs::write(&path, content)
+                            .map_err(|e| format!("Failed to write Dockerfile: {}", e))?;
+                    }
+                    path
+                };
 
-                // Write Dockerfile if it doesn't exist
-                if !std::path::Path::new(&dockerfile_path).exists() {
-                    std::fs::write(&dockerfile_path, dockerfile_content)
-                        .map_err(|e| format!("Failed to write Dockerfile: {}", e))?;
+                // Keep the host's node_modules/.next/.git/secrets out of the
+                // build context. Written next to the build, only when the project
+                // has none of its own, so a committed .dockerignore always wins.
+                let dockerignore = format!("{}/.dockerignore", request.project_path);
+                if !std::path::Path::new(&dockerignore).exists() {
+                    let _ = std::fs::write(
+                        &dockerignore,
+                        self.docker_service.generate_dockerignore(),
+                    );
                 }
 
                 // Build Docker image
-                let image_name = request.docker_image_name.unwrap_or_else(|| {
-                    format!(
-                        "{}-{}",
-                        request.name.to_lowercase().replace(' ', "-"),
-                        deployment_id
-                    )
+                let image_name = request.docker_image_name.clone().unwrap_or_else(|| {
+                    format!("{}-{}", detect::sanitize_name(&request.name), deployment_id)
                 });
 
                 self.docker_service
                     .build_image(&request.project_path, &image_name, Some(&dockerfile_path))
                     .await?;
+
+                // Host to route to: portal.yaml host, else <name>.localhost.
+                let host = detected
+                    .host
+                    .clone()
+                    .unwrap_or_else(|| format!("{}.localhost", detect::sanitize_name(&request.name)));
 
                 // Create deployment record
                 let deployment = Deployment {
@@ -128,6 +175,9 @@ impl DeploymentService {
                     container_id: None,
                     exposed_port: request.exposed_port,
                     dockerfile_path: Some(dockerfile_path),
+                    container_port: Some(detected.container_port),
+                    host: Some(host),
+                    url: None,
                     command: None,
                     working_directory: None,
                     process_id: None,
@@ -165,6 +215,9 @@ impl DeploymentService {
                     container_id: None,
                     exposed_port: None,
                     dockerfile_path: None,
+                    container_port: None,
+                    host: None,
+                    url: None,
                     command: Some(command.clone()),
                     working_directory: Some(working_dir.clone()),
                     process_id: None,
@@ -194,8 +247,16 @@ impl DeploymentService {
 
         match deployment_type {
             DeploymentType::Docker => {
-                // Get deployment info and release lock
-                let (docker_image_name, container_name, ports, volumes, environment_variables) = {
+                // Gather everything under a short read lock.
+                let (
+                    docker_image_name,
+                    container_name,
+                    container_port,
+                    requested_host_port,
+                    host,
+                    environment_variables,
+                    existing_container_id,
+                ) = {
                     let deployments = self.cache.read().await;
 
                     let deployment = deployments
@@ -203,44 +264,130 @@ impl DeploymentService {
                         .find(|d| d.id == deployment_id)
                         .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
 
-                    let container_name = format!(
-                        "{}-{}",
-                        deployment.name.to_lowercase().replace(' ', "-"),
-                        deployment.id
-                    );
-                    let ports = if let Some(port) = deployment.exposed_port {
-                        vec![(port, 3000)]
-                    } else {
-                        vec![(3000, 3000)]
-                    };
-                    let volumes = vec![(deployment.project_id.clone(), "/app".to_string())];
+                    let container_name =
+                        format!("{}-{}", detect::sanitize_name(&deployment.name), deployment.id);
+                    // Detected listen port — falls back to 3000 only for rows
+                    // created before detection existed.
+                    let container_port = deployment.container_port.unwrap_or(3000);
+                    let host = deployment.host.clone().unwrap_or_else(|| {
+                        format!("{}.localhost", detect::sanitize_name(&deployment.name))
+                    });
                     let docker_image_name = deployment
                         .docker_image_name
                         .clone()
                         .ok_or_else(|| "Docker image name not found".to_string())?;
-                    let environment_variables = deployment.environment.variables.clone();
 
                     (
                         docker_image_name,
                         container_name,
-                        ports,
-                        volumes,
-                        environment_variables,
+                        container_port,
+                        deployment.exposed_port,
+                        host,
+                        deployment.environment.variables.clone(),
+                        deployment.container_id.clone(),
                     )
                 }; // Lock is released here
 
-                let container_id = self
-                    .docker_service
-                    .run_container(
-                        &docker_image_name,
-                        &container_name,
-                        &ports,
-                        &volumes,
-                        &environment_variables,
-                    )
-                    .await?;
+                // Restart path: a container from a previous start still exists
+                // (stop only stops it; it is not removed). Re-running the same
+                // name would collide, so start the existing container instead.
+                if let Some(cid) = existing_container_id {
+                    if self.docker_service.container_exists(&cid).await {
+                        self.docker_service.start_container(&cid).await?;
 
-                // Update deployment with container_id
+                        let mut deployments = self.cache.write().await;
+                        let deployment = deployments
+                            .iter_mut()
+                            .find(|d| d.id == deployment_id)
+                            .ok_or_else(|| {
+                                format!("Deployment with id {} not found", deployment_id)
+                            })?;
+                        deployment.status = DeploymentStatus::Running;
+                        deployment.updated_at = Utc::now().to_rfc3339();
+                        let updated = deployment.clone();
+                        drop(deployments);
+                        self.persist(&updated).await?;
+                        return Ok(updated);
+                    }
+                }
+
+                // Fresh run. A published host port is the backbone: always
+                // publish one so there is a working URL even when hostname
+                // routing is unavailable. Hostname routing via the proxy is a
+                // bonus layered on top, used only when its docker provider is
+                // actually healthy — on some hosts (Docker Desktop for Windows)
+                // the proxy container runs but its socket API is unusable, so we
+                // verify instead of assuming.
+                let (network, labels, proxy_port): (Option<&str>, Vec<(String, String)>, Option<u16>) =
+                    match self.docker_service.ensure_proxy().await {
+                        Ok(pp) if self.docker_service.proxy_provider_healthy().await => (
+                            Some(PROXY_NETWORK),
+                            vec![
+                                ("traefik.enable".to_string(), "true".to_string()),
+                                (
+                                    format!("traefik.http.routers.{}.rule", container_name),
+                                    format!("Host(`{}`)", host),
+                                ),
+                                (
+                                    format!(
+                                        "traefik.http.services.{}.loadbalancer.server.port",
+                                        container_name
+                                    ),
+                                    container_port.to_string(),
+                                ),
+                            ],
+                            Some(pp),
+                        ),
+                        _ => (None, Vec::new(), None),
+                    };
+
+                // No implicit volume. The old code bind-mounted `project_id` (a
+                // UUID, not a path) over /app, clobbering the image's own code.
+                let volumes: Vec<(String, String)> = Vec::new();
+
+                // Publish a free host port, preferring the requested one (else the
+                // container's own port). Never collide: if Docker refuses the
+                // publish (reserved range, or a lost race), advance to the next
+                // free port and retry.
+                let mut candidate = find_free_port(requested_host_port.unwrap_or(container_port));
+                let mut last_err = String::new();
+                let mut run = None;
+                for _ in 0..5 {
+                    match self
+                        .docker_service
+                        .run_container(
+                            &docker_image_name,
+                            &container_name,
+                            &[(candidate, container_port)],
+                            &volumes,
+                            &environment_variables,
+                            network,
+                            &labels,
+                        )
+                        .await
+                    {
+                        Ok(id) => {
+                            run = Some((id, candidate));
+                            break;
+                        }
+                        Err(e) if is_port_unavailable(&e) => {
+                            last_err = e;
+                            candidate = find_free_port(candidate.saturating_add(1));
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                let (container_id, actual_host_port) =
+                    run.ok_or_else(|| format!("Could not publish a free host port: {}", last_err))?;
+
+                // Prefer the hostname URL when routing is healthy; otherwise the
+                // published port is the reliable address.
+                let url = match proxy_port {
+                    Some(80) => format!("http://{}", host),
+                    Some(p) => format!("http://{}:{}", host, p),
+                    None => format!("http://localhost:{}", actual_host_port),
+                };
+
                 let mut deployments = self.cache.write().await;
                 let deployment = deployments
                     .iter_mut()
@@ -248,6 +395,22 @@ impl DeploymentService {
                     .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
 
                 deployment.container_id = Some(container_id);
+                deployment.exposed_port = Some(actual_host_port);
+                deployment.url = Some(url.clone());
+                deployment.logs.push(format!("Available at {}", url));
+                if proxy_port.is_none() {
+                    deployment.logs.push(
+                        "Hostname routing unavailable (local proxy not healthy); using published port"
+                            .to_string(),
+                    );
+                }
+                if requested_host_port.is_some() && requested_host_port != Some(actual_host_port) {
+                    deployment.logs.push(format!(
+                        "Requested host port {} was unavailable; published {} instead",
+                        requested_host_port.unwrap_or(0),
+                        actual_host_port
+                    ));
+                }
                 deployment.status = DeploymentStatus::Running;
                 deployment.updated_at = Utc::now().to_rfc3339();
                 let updated = deployment.clone();

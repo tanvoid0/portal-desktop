@@ -40,6 +40,7 @@ export function validatePortalPipelineFile(data: unknown): PortalPipelineFile {
 
   return {
     version: 1,
+    release: (obj.release as PortalPipelineFile['release']) ?? undefined,
     actions: (obj.actions as PortalPipelineFile['actions']) ?? undefined,
     workflows: (obj.workflows as PortalPipelineFile['workflows']) ?? undefined,
   };
