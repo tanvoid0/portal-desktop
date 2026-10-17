@@ -82,8 +82,11 @@ pub async fn set_default_ai_provider(
         .map_err(|e| e.to_string())
 }
 
-/// Save provider configuration
-#[portal_rpc_macro::rpc]
+/// Save provider configuration.
+///
+/// `local_only`: the config carries the gateway token, and the daemon has no auth,
+/// so no HTTP client may write or read it. The settings UI reaches it by IPC.
+#[portal_rpc_macro::rpc(local_only)]
 pub async fn save_ai_provider_config(
     config: ProviderConfig,
     settings_service: State<'_, Arc<AISettingsService>>,
@@ -99,8 +102,9 @@ pub async fn save_ai_provider_config(
         .map_err(|e| e.to_string())
 }
 
-/// Get provider configuration
-#[portal_rpc_macro::rpc]
+/// Get provider configuration, including the API key. `local_only` for the same
+/// reason as `save_ai_provider_config`.
+#[portal_rpc_macro::rpc(local_only)]
 pub async fn get_ai_provider_config(
     provider_type: ProviderType,
     settings_service: State<'_, Arc<AISettingsService>>,

@@ -11,6 +11,7 @@
   import type { Deployment } from '../types';
   import { DeploymentStatus, DeploymentType } from '../types';
   import { Container, Terminal } from '@lucide/svelte';
+  import { openExternalUrl } from '$lib/utils/tauri';
 
   interface Props {
     deployment: Deployment;
@@ -89,6 +90,20 @@
             <span class="text-sm"
               >{typeof port === 'string' ? port : `${port.hostPort}:${port.containerPort}`}</span
             >
+          </div>
+        {/if}
+        {#if deployment.status === DeploymentStatus.RUNNING && (deployment.url || deployment.host)}
+          {@const deployUrl = deployment.url ?? `http://${deployment.host}`}
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">URL:</span>
+            <Button
+              variant="link"
+              class="h-auto max-w-[200px] truncate p-0 text-sm"
+              title={deployUrl}
+              onclick={() => openExternalUrl(deployUrl)}
+            >
+              {deployUrl}
+            </Button>
           </div>
         {/if}
       {:else if deployment.type === DeploymentType.CLI && deployment.command}

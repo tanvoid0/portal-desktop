@@ -96,12 +96,16 @@ export interface ActionPlanPreview {
 /** Declarative `.portal/pipeline.yml` schema (version 1) */
 export interface PortalPipelineFile {
   version: 1;
+  release?: ReleaseSpec;
   actions?: Record<
     string,
     {
       name?: string;
       description?: string;
       run: string;
+      /** Relative to the project root. */
+      cwd?: string;
+      env?: Record<string, string>;
       category?: string;
       longRunning?: boolean;
     }
@@ -130,4 +134,28 @@ export interface ProjectAutomationProfile {
   buildCommand?: string;
   startCommand?: string;
   testCommand?: string;
+}
+
+/** `release:` block of `.portal/pipeline.yml`: which workflow ships, which rehearses. */
+export interface ReleaseSpec {
+  kind?: string;
+  ship: string;
+  rehearse?: string;
+  bump?: string;
+  env?: Record<string, string>;
+}
+
+/** Result of the `release_describe` command. */
+export interface ReleaseDescription {
+  release: ReleaseSpec;
+  ship: { id: string; steps: { id: string; name: string; dependsOn: string[]; command: string }[] };
+  rehearse: { id: string; steps: { id: string; name: string }[] } | null;
+}
+
+/** Item from `release_list`. */
+export interface ReleaseRun {
+  id: string;
+  status: string;
+  startedAt: string;
+  pipelineName: string;
 }

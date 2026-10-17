@@ -8,7 +8,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
-  import { Button } from '$lib/components/ui/button';
+  import { Button, buttonVariants } from '$lib/components/ui/button';
   import {
     Card,
     CardContent,
@@ -23,7 +23,6 @@
     Edit,
     FolderOpen,
     Star,
-    Calendar,
     Code,
     Package,
     Terminal,
@@ -32,20 +31,34 @@
     RefreshCw,
     Check,
     X,
-    HardDrive,
-    FileText,
-    Eye,
-    GitBranch,
+    ChevronDown,
+    Ellipsis,
     Layers,
-    Globe,
-    Clock,
     Play,
     Loader2,
     Workflow,
+    Rocket,
   } from '@lucide/svelte';
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+  } from '$lib/components/ui/dropdown-menu';
+  import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+  } from '$lib/components/ui/collapsible';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { ProjectTerminal } from '$lib/domains/terminal';
   import { projectService, createProjectQuery, createProjectsQuery } from '$lib/domains/projects';
+  import { createProjectModulesQuery } from '$lib/domains/projects/queries/moduleQueries';
+  import { refreshProjectModules } from '$lib/domains/projects/api/moduleApi';
+  import { summarizeStacks, stackIcon } from '$lib/domains/projects/utils/moduleStacks';
+  import ProjectSummary from '$lib/domains/projects/components/ProjectSummary.svelte';
+  import ProjectModules from '$lib/domains/projects/components/ProjectModules.svelte';
+  import { queryClient, queryKeys } from '$lib/domains/shared/query';
   import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
   import { logger } from '$lib/domains/shared/services/logger';
   import { confirmAction } from '$lib/utils/confirm';
@@ -60,10 +73,7 @@
   } from '$lib/domains/projects/pipelines';
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
   import ProjectTechStack from '$lib/domains/projects/components/ProjectTechStack.svelte';
-  import {
-    getProjectGitBranch,
-    getProjectPackageManager,
-  } from '$lib/domains/projects/utils/display';
+  import { getProjectPackageManager } from '$lib/domains/projects/utils/display';
   import {
     getProjectCommand,
     findPipelineForCommand,
@@ -71,16 +81,13 @@
     commandKindLabel,
     type ProjectCommandKind,
   } from '$lib/domains/projects/utils/projectCommandRunner';
-  import { formatRelativeTime } from '$lib/domains/shared/utils';
-  import {
-    PageHeader,
-    PageLoading,
-    PageError,
-    PageEmpty,
-    PageStats,
-    type PageStat,
-  } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
   import { toast } from '$lib/utils/toast';
+  import { deploymentActions } from '$lib/domains/deployments/stores/deploymentStore';
+  import {
+    loadDeployConfig,
+    buildCreateRequest,
+  } from '$lib/domains/deployments/utils/deployConfig';
   import { Sparkles } from '@lucide/svelte';
   import { actions } from '$lib/domains/actions';
 
@@ -113,7 +120,7 @@
     return null;
   });
 
-  const PROJECT_TABS = ['overview', 'dependencies', 'actions', 'terminal'] as const;
+  const PROJECT_TABS = ['overview', 'apps', 'dependencies', 'actions', 'terminal'] as const;
   type ProjectTab = (typeof PROJECT_TABS)[number];
 
   const activeTab = $derived(
@@ -151,6 +158,33 @@
     projectQuery.isPending || (resolvedProjectId === null && projectsQuery.isPending)
   );
 
+  const modulesQuery = createProjectModulesQuery(() =>
+    resolvedProjectId ? Number(resolvedProjectId) : null
+  );
+  const modules = $derived(modulesQuery.data ?? []);
+  const hasModules = $derived(modules.length > 0);
+  // An 'apps' deep link on a project without modules falls back to Overview once the scan settles.
+  const displayTab = $derived(
+    activeTab === 'apps' && !hasModules && !modulesQuery.isPending ? 'overview' : activeTab
+  );
+  let rescanningModules = $state(false);
+  let commandsOpen = $state(false);
+  let showAddCommand = $state(false);
+
+  async function handleRescanModules() {
+    if (!resolvedProjectId || rescanningModules) return;
+    rescanningModules = true;
+    try {
+      await refreshProjectModules(Number(resolvedProjectId));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.modules });
+    } catch (err) {
+      log.error('Failed to rescan modules', err);
+      toast.error('Failed to rescan modules');
+    } finally {
+      rescanningModules = false;
+    }
+  }
+
   const hasDependencies = $derived(
     Boolean(
       project?.metadata?.dependencies &&
@@ -159,52 +193,6 @@
         project.metadata.dependencies.packageManager)
     )
   );
-
-  const detailStats = $derived.by((): PageStat[] => {
-    if (!project) return [];
-
-    const stats: PageStat[] = [
-      {
-        label: 'Project Size',
-        value: formatFileSize(project.size),
-        icon: HardDrive,
-      },
-      {
-        label: 'Files',
-        value: project.file_count,
-        icon: FileText,
-      },
-      {
-        label: 'Opens',
-        value: project.open_count,
-        icon: Eye,
-      },
-    ];
-
-    const gitBranch = getProjectGitBranch(project);
-    if (gitBranch) {
-      stats.push({
-        label: 'Git Branch',
-        value: gitBranch,
-        icon: GitBranch,
-      });
-    } else if (project.last_opened) {
-      stats.push({
-        label: 'Last Opened',
-        value: formatRelativeTime(project.last_opened),
-        icon: Clock,
-        description: formatDate(project.last_opened),
-      });
-    } else if (project.dev_port) {
-      stats.push({
-        label: 'Dev Port',
-        value: `:${project.dev_port}`,
-        icon: Globe,
-      });
-    }
-
-    return stats;
-  });
 
   $effect(() => {
     if (projectQuery.data) {
@@ -297,6 +285,46 @@
   function handleEdit() {
     if (project) {
       goto(`/projects/edit/${project.id}`);
+    }
+  }
+
+  let isDeploying = $state(false);
+
+  // Deploy this project. First time (no remembered config): open the New
+  // Deployment form prefilled from the project, so the user picks a .env file
+  // and settings once. After that: one click builds + runs with the remembered
+  // config — no form.
+  async function handleDeploy() {
+    if (!project || isDeploying) return;
+
+    const saved = loadDeployConfig(project.path);
+    if (!saved) {
+      const params = new URLSearchParams({
+        projectPath: project.path,
+        name: project.name,
+      });
+      goto(`/deployments/new?${params.toString()}`);
+      return;
+    }
+
+    isDeploying = true;
+    toast.info('Building & starting deployment…');
+    try {
+      const request = buildCreateRequest(project.name, project.path, saved);
+      await deploymentActions.deployAndStart(request);
+      toast.success('Deployment built and started');
+      goto('/deployments');
+    } catch (error) {
+      logger.error('One-click deploy failed', { context: 'ProjectDetailsPage', error });
+      const raw =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : 'Deploy failed';
+      toast.error(raw.length > 300 ? `${raw.slice(0, 300)}…` : raw);
+    } finally {
+      isDeploying = false;
     }
   }
 
@@ -605,6 +633,15 @@
     );
   }
 
+  function commandCount(proj: Project): number {
+    return [
+      proj.build_command,
+      proj.start_command,
+      proj.test_command,
+      proj.output_directory,
+    ].filter(Boolean).length;
+  }
+
   $effect(() => {
     resolvedProjectId;
     autoProvisionAttempted = false;
@@ -649,63 +686,73 @@
       badge={currentProject.status}
     >
       {#snippet actions()}
-        <Button
-          variant={currentProject.starred ? 'default' : 'outline'}
-          onclick={handleToggleStar}
-          class="gap-2"
-          title={currentProject.starred ? 'Unstar project' : 'Star project'}
-        >
-          <Star class="h-4 w-4 {currentProject.starred ? 'fill-current' : ''}" />
-          {currentProject.starred ? 'Starred' : 'Star'}
-        </Button>
-        <Button
-          variant="outline"
-          onclick={handleRefreshMetadata}
-          disabled={refreshing}
-          class="gap-2"
-          title="Refresh project metadata, commands, size, and git info"
-        >
-          <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
-          Refresh
+        <Button onclick={handleEdit} class="gap-2">
+          <Edit class="h-4 w-4" />
+          Edit
         </Button>
         <Button variant="outline" onclick={handleOpenInExplorer} class="gap-2">
           <ExternalLink class="h-4 w-4" />
           Explorer
         </Button>
-        {#if githubUrl}
-          <a href={githubUrl} target="_blank" rel="noreferrer">
-            <Button variant="outline" class="gap-2">
-              <ExternalLink class="h-4 w-4" />
-              GitHub
-            </Button>
-          </a>
-        {/if}
         <Button variant="outline" onclick={switchToTerminal} class="gap-2">
           <Terminal class="h-4 w-4" />
           Terminal
         </Button>
-        <Button onclick={handleEdit} class="gap-2">
-          <Edit class="h-4 w-4" />
-          Edit
+        <Button variant="outline" onclick={handleDeploy} disabled={isDeploying} class="gap-2">
+          {#if isDeploying}
+            <Loader2 class="h-4 w-4 animate-spin" />
+            Deploying…
+          {:else}
+            <Rocket class="h-4 w-4" />
+            Deploy
+          {/if}
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            class={buttonVariants({ variant: 'outline' })}
+            aria-label="More actions"
+          >
+            <Ellipsis class="h-4 w-4" />
+            More
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={handleToggleStar}>
+              <Star class="h-4 w-4 {currentProject.starred ? 'fill-current' : ''}" />
+              {currentProject.starred ? 'Unstar' : 'Star'}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleRefreshMetadata} disabled={refreshing}>
+              <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
+              Refresh metadata
+            </DropdownMenuItem>
+            {#if githubUrl}
+              <DropdownMenuItem>
+                {#snippet child({ props })}
+                  <a {...props} href={githubUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink class="h-4 w-4" />
+                    GitHub
+                  </a>
+                {/snippet}
+              </DropdownMenuItem>
+            {/if}
+          </DropdownMenuContent>
+        </DropdownMenu>
       {/snippet}
     </PageHeader>
 
-    {#if currentProject.starred}
-      <div class="flex items-center gap-2 text-sm text-muted-foreground">
-        <Star class="h-4 w-4 fill-yellow-400 text-yellow-400" />
-        Starred project
-      </div>
-    {/if}
+    <ProjectSummary project={currentProject} {modules} />
 
-    <PageStats stats={detailStats} columns={4} />
-
-    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ProjectTab)} class="w-full">
-      <TabsList class="grid w-full grid-cols-4">
+    <Tabs value={displayTab} onValueChange={(v) => setActiveTab(v as ProjectTab)} class="w-full">
+      <TabsList class="grid w-full {hasModules ? 'grid-cols-5' : 'grid-cols-4'}">
         <TabsTrigger value="overview" class="gap-2">
           <FolderOpen class="h-4 w-4" />
           Overview
         </TabsTrigger>
+        {#if hasModules}
+          <TabsTrigger value="apps" class="gap-2">
+            <Layers class="h-4 w-4" />
+            Apps ({modules.length})
+          </TabsTrigger>
+        {/if}
         <TabsTrigger value="dependencies" class="gap-2">
           <Package class="h-4 w-4" />
           Dependencies
@@ -727,129 +774,109 @@
               <Layers class="h-5 w-5" />
               Tech Stack
             </CardTitle>
-            <CardDescription>
-              Frameworks, languages, and package managers assigned to this project
-            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ProjectTechStack {project} />
+            {#if hasModules}
+              <div class="flex flex-wrap gap-2">
+                {#each summarizeStacks(modules) as s (s.stack)}
+                  <Badge variant="secondary" class="gap-1.5">
+                    {#if stackIcon(s.stack)}<i class="{stackIcon(s.stack)} text-sm"></i>{/if}
+                    {s.count}
+                    {s.label}
+                  </Badge>
+                {/each}
+              </div>
+            {:else}
+              <ProjectTechStack {project} />
+            {/if}
           </CardContent>
         </Card>
 
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Collapsible>
           <Card>
             <CardHeader>
-              <CardTitle class="flex items-center gap-2">
-                <FolderOpen class="h-5 w-5" />
-                Project Details
-              </CardTitle>
+              <CollapsibleTrigger
+                class="group/details flex w-full items-center justify-between gap-2 text-left"
+              >
+                <CardTitle class="flex items-center gap-2">
+                  <FolderOpen class="h-5 w-5" />
+                  Details
+                </CardTitle>
+                <ChevronDown
+                  class="h-4 w-4 transition-transform group-data-[state=open]/details:rotate-180"
+                />
+              </CollapsibleTrigger>
             </CardHeader>
-            <CardContent class="space-y-4">
-              <div>
-                <p class="text-sm font-medium text-muted-foreground">Project Path</p>
-                <p class="mt-1 break-all rounded-md bg-muted p-2 font-mono text-sm">
-                  {project.path}
-                </p>
-              </div>
-
-              {#if getProjectPackageManager(project)}
+            <CollapsibleContent>
+              <CardContent class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                {#if getProjectPackageManager(project)}
+                  <div>
+                    <p class="text-sm font-medium text-muted-foreground">
+                      Detected Package Manager
+                    </p>
+                    <p class="mt-1 text-sm">{getProjectPackageManager(project)}</p>
+                  </div>
+                {/if}
+                {#if project.created_at}
+                  <div>
+                    <p class="text-sm font-medium text-muted-foreground">Created</p>
+                    <p class="mt-1 text-sm">{formatDate(project.created_at)}</p>
+                  </div>
+                {/if}
+                {#if project.updated_at}
+                  <div>
+                    <p class="text-sm font-medium text-muted-foreground">Last Updated</p>
+                    <p class="mt-1 text-sm">{formatDate(project.updated_at)}</p>
+                  </div>
+                {/if}
+                {#if project.last_opened}
+                  <div>
+                    <p class="text-sm font-medium text-muted-foreground">Last Opened</p>
+                    <p class="mt-1 text-sm">{formatDate(project.last_opened)}</p>
+                  </div>
+                {/if}
                 <div>
-                  <p class="text-sm font-medium text-muted-foreground">Detected Package Manager</p>
-                  <p class="mt-1 text-sm">
-                    {getProjectPackageManager(project)}
-                  </p>
+                  <p class="text-sm font-medium text-muted-foreground">Open Count</p>
+                  <p class="mt-1 text-sm">{project.open_count} times</p>
                 </div>
-              {/if}
-
-              {#if project.created_at}
                 <div>
-                  <p class="text-sm font-medium text-muted-foreground">Created</p>
-                  <p class="mt-1 text-sm">
-                    {formatDate(project.created_at)}
-                  </p>
+                  <p class="text-sm font-medium text-muted-foreground">Project Size</p>
+                  <p class="mt-1 text-sm">{formatFileSize(project.size)}</p>
                 </div>
-              {/if}
-
-              {#if project.updated_at}
                 <div>
-                  <p class="text-sm font-medium text-muted-foreground">Last Updated</p>
-                  <p class="mt-1 text-sm">
-                    {formatDate(project.updated_at)}
-                  </p>
+                  <p class="text-sm font-medium text-muted-foreground">File Count</p>
+                  <p class="mt-1 text-sm">{project.file_count} files</p>
                 </div>
-              {/if}
-            </CardContent>
+              </CardContent>
+            </CollapsibleContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle class="flex items-center gap-2">
-                <Calendar class="h-5 w-5" />
-                Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-4">
-              <div>
-                <p class="text-sm font-medium text-muted-foreground">Open Count</p>
-                <p class="mt-1 text-sm">{project.open_count} times</p>
-              </div>
-
-              <div>
-                <p class="text-sm font-medium text-muted-foreground">Project Size</p>
-                <p class="mt-1 text-sm">{formatFileSize(project.size)}</p>
-              </div>
-
-              <div>
-                <p class="text-sm font-medium text-muted-foreground">File Count</p>
-                <p class="mt-1 text-sm">{project.file_count} files</p>
-              </div>
-
-              {#if project.last_opened}
-                <div>
-                  <p class="text-sm font-medium text-muted-foreground">Last Opened</p>
-                  <p class="mt-1 text-sm">
-                    {formatDate(project.last_opened)}
-                  </p>
-                </div>
-              {/if}
-            </CardContent>
-          </Card>
-        </div>
+        </Collapsible>
 
         <!-- Commands & Configuration -->
-        <Card>
-          <CardHeader>
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle class="flex items-center gap-2">
-                  <Terminal class="h-5 w-5" />
-                  Commands & Configuration
-                </CardTitle>
-                <CardDescription class="mt-1">
-                  Scripts detected from your project. Run via the Actions tab when available, or
-                  directly for build/test.
-                </CardDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={handleRefreshMetadata}
-                disabled={refreshing}
-                class="gap-2"
-              >
-                <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
-                Re-detect
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            {#if !hasAnyCommands(project) && editingField === null}
-              <div class="rounded-md border border-dashed p-6 text-center">
-                <p class="mb-3 text-sm text-muted-foreground">
-                  No commands configured yet. Re-detect from your project folder or add them
-                  manually.
-                </p>
-                <div class="flex flex-wrap justify-center gap-2">
+        <Collapsible bind:open={commandsOpen}>
+          <Card>
+            <CardHeader>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <CollapsibleTrigger class="group/commands flex flex-1 items-center gap-2 text-left">
+                  <CardTitle class="flex items-center gap-2">
+                    <Terminal class="h-5 w-5" />
+                    Commands & Configuration
+                    <Badge variant="secondary">{commandCount(project)}</Badge>
+                  </CardTitle>
+                  <ChevronDown
+                    class="h-4 w-4 transition-transform group-data-[state=open]/commands:rotate-180"
+                  />
+                </CollapsibleTrigger>
+                <div class="flex gap-2">
+                  {#if commandsOpen && hasAnyCommands(project)}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onclick={() => (showAddCommand = !showAddCommand)}
+                    >
+                      Add command
+                    </Button>
+                  {/if}
                   <Button
                     variant="outline"
                     size="sm"
@@ -858,332 +885,358 @@
                     class="gap-2"
                   >
                     <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
-                    Detect from project
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onclick={() => startEditing('build_command', '')}
-                  >
-                    Add manually
+                    Re-detect
                   </Button>
                 </div>
               </div>
-            {/if}
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent class="space-y-4">
+                {#if !hasAnyCommands(project) && editingField === null}
+                  <div class="rounded-md border border-dashed p-6 text-center">
+                    <p class="mb-3 text-sm text-muted-foreground">
+                      No commands configured yet. Re-detect from your project folder or add them
+                      manually.
+                    </p>
+                    <div class="flex flex-wrap justify-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onclick={handleRefreshMetadata}
+                        disabled={refreshing}
+                        class="gap-2"
+                      >
+                        <RefreshCw class="h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
+                        Detect from project
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onclick={() => startEditing('build_command', '')}
+                      >
+                        Add manually
+                      </Button>
+                    </div>
+                  </div>
+                {/if}
 
-            {#if project.build_command || editingField === 'build_command'}
-              <div>
-                <div class="mb-1 flex items-center justify-between gap-2">
-                  <Label class="text-sm font-medium text-muted-foreground">Build Command</Label>
-                  {#if editingField !== 'build_command'}
-                    <div class="flex items-center gap-1">
-                      {#if project.build_command}
+                {#if project.build_command || editingField === 'build_command'}
+                  <div>
+                    <div class="mb-1 flex items-center justify-between gap-2">
+                      <Label class="text-sm font-medium text-muted-foreground">Build Command</Label>
+                      {#if editingField !== 'build_command'}
+                        <div class="flex items-center gap-1">
+                          {#if project.build_command}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onclick={() => handleRunCommand('build')}
+                              disabled={runningCommand !== null}
+                              class="h-7 gap-1 px-2"
+                            >
+                              {#if runningCommand === 'build'}
+                                <Loader2 class="h-3 w-3 animate-spin" />
+                              {:else}
+                                <Play class="h-3 w-3" />
+                              {/if}
+                              Run
+                            </Button>
+                          {/if}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onclick={() =>
+                              project && startEditing('build_command', project.build_command)}
+                            class="h-7 px-2"
+                          >
+                            <Edit class="h-3 w-3" />
+                          </Button>
+                        </div>
+                      {/if}
+                    </div>
+                    {#if editingField === 'build_command'}
+                      <div class="flex items-center gap-2">
+                        <Input
+                          bind:value={editValues.build_command}
+                          class="font-mono text-sm"
+                          placeholder="npm run build"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={() => saveField('build_command')}
+                          disabled={savingField === 'build_command'}
+                          class="h-8"
+                        >
+                          <Check class="h-4 w-4 text-green-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={cancelEditing}
+                          disabled={savingField === 'build_command'}
+                          class="h-8"
+                        >
+                          <X class="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    {:else}
+                      <p class="rounded bg-muted p-2 font-mono text-sm">
+                        {project.build_command}
+                      </p>
+                    {/if}
+                  </div>
+                {/if}
+
+                {#if project.start_command || editingField === 'start_command'}
+                  <div>
+                    <div class="mb-1 flex items-center justify-between gap-2">
+                      <Label class="text-sm font-medium text-muted-foreground">Start Command</Label>
+                      {#if editingField !== 'start_command'}
+                        <div class="flex items-center gap-1">
+                          {#if project.start_command}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onclick={() => handleRunCommand('start')}
+                              disabled={runningCommand !== null}
+                              class="h-7 gap-1 px-2"
+                            >
+                              {#if runningCommand === 'start'}
+                                <Loader2 class="h-3 w-3 animate-spin" />
+                              {:else}
+                                <Play class="h-3 w-3" />
+                              {/if}
+                              Run
+                            </Button>
+                          {/if}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onclick={() =>
+                              project && startEditing('start_command', project.start_command)}
+                            class="h-7 px-2"
+                          >
+                            <Edit class="h-3 w-3" />
+                          </Button>
+                        </div>
+                      {/if}
+                    </div>
+                    {#if editingField === 'start_command'}
+                      <div class="flex items-center gap-2">
+                        <Input
+                          bind:value={editValues.start_command}
+                          class="font-mono text-sm"
+                          placeholder="npm start"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={() => saveField('start_command')}
+                          disabled={savingField === 'start_command'}
+                          class="h-8"
+                        >
+                          <Check class="h-4 w-4 text-green-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={cancelEditing}
+                          disabled={savingField === 'start_command'}
+                          class="h-8"
+                        >
+                          <X class="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    {:else}
+                      <p class="rounded bg-muted p-2 font-mono text-sm">
+                        {project.start_command}
+                      </p>
+                    {/if}
+                  </div>
+                {/if}
+
+                {#if project.test_command || editingField === 'test_command'}
+                  <div>
+                    <div class="mb-1 flex items-center justify-between gap-2">
+                      <Label class="text-sm font-medium text-muted-foreground">Test Command</Label>
+                      {#if editingField !== 'test_command'}
+                        <div class="flex items-center gap-1">
+                          {#if project.test_command}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onclick={() => handleRunCommand('test')}
+                              disabled={runningCommand !== null}
+                              class="h-7 gap-1 px-2"
+                            >
+                              {#if runningCommand === 'test'}
+                                <Loader2 class="h-3 w-3 animate-spin" />
+                              {:else}
+                                <Play class="h-3 w-3" />
+                              {/if}
+                              Run
+                            </Button>
+                          {/if}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onclick={() =>
+                              project && startEditing('test_command', project.test_command)}
+                            class="h-7 px-2"
+                          >
+                            <Edit class="h-3 w-3" />
+                          </Button>
+                        </div>
+                      {/if}
+                    </div>
+                    {#if editingField === 'test_command'}
+                      <div class="flex items-center gap-2">
+                        <Input
+                          bind:value={editValues.test_command}
+                          class="font-mono text-sm"
+                          placeholder="npm test"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={() => saveField('test_command')}
+                          disabled={savingField === 'test_command'}
+                          class="h-8"
+                        >
+                          <Check class="h-4 w-4 text-green-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={cancelEditing}
+                          disabled={savingField === 'test_command'}
+                          class="h-8"
+                        >
+                          <X class="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    {:else}
+                      <p class="rounded bg-muted p-2 font-mono text-sm">
+                        {project.test_command}
+                      </p>
+                    {/if}
+                  </div>
+                {/if}
+
+                {#if project.output_directory || editingField === 'output_directory'}
+                  <div>
+                    <div class="mb-1 flex items-center justify-between">
+                      <Label class="text-sm font-medium text-muted-foreground"
+                        >Output Directory</Label
+                      >
+                      {#if editingField !== 'output_directory'}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={() =>
+                            project && startEditing('output_directory', project.output_directory)}
+                          class="h-6 px-2"
+                        >
+                          <Edit class="h-3 w-3" />
+                        </Button>
+                      {/if}
+                    </div>
+                    {#if editingField === 'output_directory'}
+                      <div class="flex items-center gap-2">
+                        <Input
+                          bind:value={editValues.output_directory}
+                          class="font-mono text-sm"
+                          placeholder="dist"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={() => saveField('output_directory')}
+                          disabled={savingField === 'output_directory'}
+                          class="h-8"
+                        >
+                          <Check class="h-4 w-4 text-green-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onclick={cancelEditing}
+                          disabled={savingField === 'output_directory'}
+                          class="h-8"
+                        >
+                          <X class="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    {:else}
+                      <p class="rounded bg-muted p-2 font-mono text-sm">
+                        {project.output_directory}
+                      </p>
+                    {/if}
+                  </div>
+                {/if}
+
+                <!-- Add New Command Section -->
+                {#if showAddCommand && hasAnyCommands(project) && editingField === null}
+                  <div class="divider-edge-t divider-edge-full pt-2">
+                    <div class="flex flex-wrap gap-2">
+                      {#if !project.build_command && editingField !== 'build_command'}
                         <Button
                           variant="outline"
                           size="sm"
-                          onclick={() => handleRunCommand('build')}
-                          disabled={runningCommand !== null}
-                          class="h-7 gap-1 px-2"
+                          onclick={() => startEditing('build_command', '')}
                         >
-                          {#if runningCommand === 'build'}
-                            <Loader2 class="h-3 w-3 animate-spin" />
-                          {:else}
-                            <Play class="h-3 w-3" />
-                          {/if}
-                          Run
+                          + Build
                         </Button>
                       {/if}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() =>
-                          project && startEditing('build_command', project.build_command)}
-                        class="h-7 px-2"
-                      >
-                        <Edit class="h-3 w-3" />
-                      </Button>
-                    </div>
-                  {/if}
-                </div>
-                {#if editingField === 'build_command'}
-                  <div class="flex items-center gap-2">
-                    <Input
-                      bind:value={editValues.build_command}
-                      class="font-mono text-sm"
-                      placeholder="npm run build"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => saveField('build_command')}
-                      disabled={savingField === 'build_command'}
-                      class="h-8"
-                    >
-                      <Check class="h-4 w-4 text-green-600" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={cancelEditing}
-                      disabled={savingField === 'build_command'}
-                      class="h-8"
-                    >
-                      <X class="h-4 w-4 text-red-600" />
-                    </Button>
-                  </div>
-                {:else}
-                  <p class="rounded bg-muted p-2 font-mono text-sm">
-                    {project.build_command}
-                  </p>
-                {/if}
-              </div>
-            {/if}
-
-            {#if project.start_command || editingField === 'start_command'}
-              <div>
-                <div class="mb-1 flex items-center justify-between gap-2">
-                  <Label class="text-sm font-medium text-muted-foreground">Start Command</Label>
-                  {#if editingField !== 'start_command'}
-                    <div class="flex items-center gap-1">
-                      {#if project.start_command}
+                      {#if !project.start_command && editingField !== 'start_command'}
                         <Button
                           variant="outline"
                           size="sm"
-                          onclick={() => handleRunCommand('start')}
-                          disabled={runningCommand !== null}
-                          class="h-7 gap-1 px-2"
+                          onclick={() => startEditing('start_command', '')}
                         >
-                          {#if runningCommand === 'start'}
-                            <Loader2 class="h-3 w-3 animate-spin" />
-                          {:else}
-                            <Play class="h-3 w-3" />
-                          {/if}
-                          Run
+                          + Start
                         </Button>
                       {/if}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() =>
-                          project && startEditing('start_command', project.start_command)}
-                        class="h-7 px-2"
-                      >
-                        <Edit class="h-3 w-3" />
-                      </Button>
-                    </div>
-                  {/if}
-                </div>
-                {#if editingField === 'start_command'}
-                  <div class="flex items-center gap-2">
-                    <Input
-                      bind:value={editValues.start_command}
-                      class="font-mono text-sm"
-                      placeholder="npm start"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => saveField('start_command')}
-                      disabled={savingField === 'start_command'}
-                      class="h-8"
-                    >
-                      <Check class="h-4 w-4 text-green-600" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={cancelEditing}
-                      disabled={savingField === 'start_command'}
-                      class="h-8"
-                    >
-                      <X class="h-4 w-4 text-red-600" />
-                    </Button>
-                  </div>
-                {:else}
-                  <p class="rounded bg-muted p-2 font-mono text-sm">
-                    {project.start_command}
-                  </p>
-                {/if}
-              </div>
-            {/if}
-
-            {#if project.test_command || editingField === 'test_command'}
-              <div>
-                <div class="mb-1 flex items-center justify-between gap-2">
-                  <Label class="text-sm font-medium text-muted-foreground">Test Command</Label>
-                  {#if editingField !== 'test_command'}
-                    <div class="flex items-center gap-1">
-                      {#if project.test_command}
+                      {#if !project.test_command && editingField !== 'test_command'}
                         <Button
                           variant="outline"
                           size="sm"
-                          onclick={() => handleRunCommand('test')}
-                          disabled={runningCommand !== null}
-                          class="h-7 gap-1 px-2"
+                          onclick={() => startEditing('test_command', '')}
                         >
-                          {#if runningCommand === 'test'}
-                            <Loader2 class="h-3 w-3 animate-spin" />
-                          {:else}
-                            <Play class="h-3 w-3" />
-                          {/if}
-                          Run
+                          + Test
                         </Button>
                       {/if}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() =>
-                          project && startEditing('test_command', project.test_command)}
-                        class="h-7 px-2"
-                      >
-                        <Edit class="h-3 w-3" />
-                      </Button>
+                      {#if !project.output_directory && editingField !== 'output_directory'}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onclick={() => startEditing('output_directory', '')}
+                        >
+                          + Output Dir
+                        </Button>
+                      {/if}
                     </div>
-                  {/if}
-                </div>
-                {#if editingField === 'test_command'}
-                  <div class="flex items-center gap-2">
-                    <Input
-                      bind:value={editValues.test_command}
-                      class="font-mono text-sm"
-                      placeholder="npm test"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => saveField('test_command')}
-                      disabled={savingField === 'test_command'}
-                      class="h-8"
-                    >
-                      <Check class="h-4 w-4 text-green-600" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={cancelEditing}
-                      disabled={savingField === 'test_command'}
-                      class="h-8"
-                    >
-                      <X class="h-4 w-4 text-red-600" />
-                    </Button>
                   </div>
-                {:else}
-                  <p class="rounded bg-muted p-2 font-mono text-sm">
-                    {project.test_command}
-                  </p>
                 {/if}
-              </div>
-            {/if}
 
-            {#if project.output_directory || editingField === 'output_directory'}
-              <div>
-                <div class="mb-1 flex items-center justify-between">
-                  <Label class="text-sm font-medium text-muted-foreground">Output Directory</Label>
-                  {#if editingField !== 'output_directory'}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() =>
-                        project && startEditing('output_directory', project.output_directory)}
-                      class="h-6 px-2"
-                    >
-                      <Edit class="h-3 w-3" />
-                    </Button>
-                  {/if}
-                </div>
-                {#if editingField === 'output_directory'}
-                  <div class="flex items-center gap-2">
-                    <Input
-                      bind:value={editValues.output_directory}
-                      class="font-mono text-sm"
-                      placeholder="dist"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => saveField('output_directory')}
-                      disabled={savingField === 'output_directory'}
-                      class="h-8"
-                    >
-                      <Check class="h-4 w-4 text-green-600" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={cancelEditing}
-                      disabled={savingField === 'output_directory'}
-                      class="h-8"
-                    >
-                      <X class="h-4 w-4 text-red-600" />
-                    </Button>
+                {#if project.dev_port || project.prod_port}
+                  <div>
+                    <p class="text-sm font-medium text-muted-foreground">Ports</p>
+                    <div class="mt-1 flex gap-2">
+                      {#if project.dev_port}
+                        <Badge variant="outline">Dev: {project.dev_port}</Badge>
+                      {/if}
+                      {#if project.prod_port}
+                        <Badge variant="outline">Prod: {project.prod_port}</Badge>
+                      {/if}
+                    </div>
                   </div>
-                {:else}
-                  <p class="rounded bg-muted p-2 font-mono text-sm">
-                    {project.output_directory}
-                  </p>
                 {/if}
-              </div>
-            {/if}
-
-            <!-- Add New Command Section -->
-            {#if hasAnyCommands(project) && editingField === null}
-              <div class="divider-edge-t divider-edge-full pt-2">
-                <div class="flex flex-wrap gap-2">
-                  {#if !project.build_command && editingField !== 'build_command'}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => startEditing('build_command', '')}
-                    >
-                      + Build
-                    </Button>
-                  {/if}
-                  {#if !project.start_command && editingField !== 'start_command'}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => startEditing('start_command', '')}
-                    >
-                      + Start
-                    </Button>
-                  {/if}
-                  {#if !project.test_command && editingField !== 'test_command'}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => startEditing('test_command', '')}
-                    >
-                      + Test
-                    </Button>
-                  {/if}
-                  {#if !project.output_directory && editingField !== 'output_directory'}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => startEditing('output_directory', '')}
-                    >
-                      + Output Dir
-                    </Button>
-                  {/if}
-                </div>
-              </div>
-            {/if}
-
-            {#if project.dev_port || project.prod_port}
-              <div>
-                <p class="text-sm font-medium text-muted-foreground">Ports</p>
-                <div class="mt-1 flex gap-2">
-                  {#if project.dev_port}
-                    <Badge variant="outline">Dev: {project.dev_port}</Badge>
-                  {/if}
-                  {#if project.prod_port}
-                    <Badge variant="outline">Prod: {project.prod_port}</Badge>
-                  {/if}
-                </div>
-              </div>
-            {/if}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         <!-- Git Information -->
         {#if project.git_repository || project.git_branch}
@@ -1243,6 +1296,12 @@
           </Card>
         {/if}
       </TabsContent>
+
+      {#if hasModules}
+        <TabsContent value="apps" class="mt-6">
+          <ProjectModules {modules} rescanning={rescanningModules} onRescan={handleRescanModules} />
+        </TabsContent>
+      {/if}
 
       <TabsContent value="dependencies" class="mt-6 space-y-6">
         {#if hasDependencies && project.metadata?.dependencies}

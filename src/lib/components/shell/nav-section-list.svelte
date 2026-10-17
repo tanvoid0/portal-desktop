@@ -37,13 +37,16 @@
     return item.submenu?.some((sub) => isNavItemActive(sub.url, path)) ?? false;
   }
 
+  /**
+   * Open by default while you are inside the section, but an explicit collapse
+   * wins — pinning it open left the chevron looking operable and doing nothing.
+   * The parent stays highlighted when collapsed, so location is still visible.
+   */
   function isSubmenuExpanded(item: NavItem): boolean {
-    if (isSubmenuActive(item, currentPath)) return true;
-    return submenuExpanded[item.url] ?? false;
+    return submenuExpanded[item.url] ?? isSubmenuActive(item, currentPath);
   }
 
   function handleSubmenuOpenChange(item: NavItem, open: boolean) {
-    if (isSubmenuActive(item, currentPath) && !open) return;
     submenuExpanded = { ...submenuExpanded, [item.url]: open };
   }
 

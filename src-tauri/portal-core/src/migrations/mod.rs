@@ -39,6 +39,7 @@ pub mod m20260708_000036_create_github_tables;
 pub mod m20260708_000037_add_coder_multitask_tables;
 pub mod m20260708_000038_add_project_id_to_coder_threads;
 pub mod m20260817_000039_add_project_discovery_columns;
+pub mod m20261016_000040_create_project_modules_table;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -81,6 +82,7 @@ pub use m20260708_000036_create_github_tables::Migration as createGithubTables;
 pub use m20260708_000037_add_coder_multitask_tables::Migration as addCoderMultitaskTables;
 pub use m20260708_000038_add_project_id_to_coder_threads::Migration as addProjectIdToCoderThreads;
 pub use m20260817_000039_add_project_discovery_columns::Migration as addProjectDiscoveryColumns;
+pub use m20261016_000040_create_project_modules_table::Migration as createProjectModulesTable;
 
 pub struct Migrator;
 
@@ -157,5 +159,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(addCoderMultitaskTables),
         Box::new(addProjectIdToCoderThreads),
         Box::new(addProjectDiscoveryColumns),
+        Box::new(createProjectModulesTable),
     ]
 }

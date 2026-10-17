@@ -5,6 +5,7 @@ export const queryKeys = {
   projects: {
     all: ['projects'] as const,
     detail: (id: number | string) => ['projects', id] as const,
+    modules: ['project-modules'] as const,
   },
   github: {
     status: ['github', 'status'] as const,

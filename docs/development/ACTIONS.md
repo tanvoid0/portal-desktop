@@ -56,6 +56,41 @@ workflows:
         needs: [build]
 ```
 
+## Releases
+
+A `release:` block in `.portal/pipeline.yml` marks two workflows as the project's
+release: the one that **ships** and the one that **rehearses** it. Steps may set
+`cwd` (relative to the project) and `env`; `release.env` applies to every step and
+a step's own `env` wins. Variables (`RELEASE_DRY_RUN`, `BUMP`) reach steps as env.
+
+```yaml
+release:
+  kind: flutter-android # label only; nothing branches on it
+  ship: ship # workflow that really deploys
+  rehearse: ship-dry # required for rehearsing; it never runs `ship`
+  bump: minor # exposed as ${BUMP} / $BUMP
+  env: { PORTAL_PROGRESS: plain }
+actions:
+  deploy: { run: npm run deploy, cwd: server }
+```
+
+Project -> Actions shows a **Release** card (Rehearse / Ship). Commands, all in
+`src-tauri/src/domains/projects/pipelines/commands.rs`:
+
+| command                            | reachable over the daemon | does                                     |
+| ---------------------------------- | ------------------------- | ---------------------------------------- |
+| `release_describe {projectId}`     | yes                       | the `release:` block and resolved steps  |
+| `release_list {projectId, limit?}` | yes                       | recent release executions                |
+| `release_rehearse {projectId}`     | yes                       | runs `rehearse` with `RELEASE_DRY_RUN=1` |
+| `release_ship {projectId}`         | **no** (`local_only`)     | runs `ship` with `RELEASE_DRY_RUN=0`     |
+
+Watch and stop with the existing `get_pipeline_execution` and
+`cancel_pipeline_execution`. Runs are ordinary pipeline executions (the file's
+workflow is written to a `pipelines` row with `preset_key = "release:<workflow>"`
+on each run). Cancel kills the process tree on Windows, but not detached Gradle
+daemons, and a Cloud Run deploy already submitted may still finish. Closing the
+window ends running releases (not yet fixed).
+
 ## Where to look in the UI
 
 - Project → **Actions** tab — catalog, multi-select run, history, GitHub runs

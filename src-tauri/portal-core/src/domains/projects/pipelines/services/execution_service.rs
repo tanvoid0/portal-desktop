@@ -1,6 +1,7 @@
 use crate::database::DatabaseManager;
 use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::pipelines::repositories::{ExecutionRepository, PipelineRepository};
+use crate::domains::projects::pipelines::services::pipeline_file;
 use crate::domains::projects::pipelines::utils::dependency_resolver::resolve_execution_order;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use crate::events::{EventSink, EventSinkExt};
@@ -259,6 +260,28 @@ impl ExecutionService {
                 // build/dev commands with project metadata heuristics.
                 command = normalize_package_manager_command(&command, &detected_pm);
 
+                // Optional per-step `cwd` (relative to the project) and `env`, from
+                // `.portal/pipeline.yml`. Absent for steps built by the UI.
+                let step_dir = match config.get("cwd").and_then(|v| v.as_str()) {
+                    Some(rel) => Path::new(&project_path)
+                        .join(rel)
+                        .to_string_lossy()
+                        .into_owned(),
+                    None => project_path.clone(),
+                };
+                let step_env: HashMap<String, String> = config
+                    .get("env")
+                    .and_then(|v| v.as_object())
+                    .map(|o| {
+                        o.iter()
+                            .filter_map(|(k, v)| {
+                                v.as_str()
+                                    .map(|s| (k.clone(), substitute_variables(s, &variables)))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
                 self.set_step_running(&execution_id, &step_id).await?;
                 if let Ok(Some(exec)) = self.get_execution(&execution_id).await {
                     self.emit_execution_update(&events, exec);
@@ -269,7 +292,8 @@ impl ExecutionService {
                         &execution_id,
                         &step_id,
                         &command,
-                        &project_path,
+                        &step_dir,
+                        &step_env,
                         long_running,
                         Arc::clone(&children),
                         &mut cancel_rx,
@@ -379,6 +403,7 @@ impl ExecutionService {
         step_id: &str,
         command: &str,
         working_directory: &str,
+        env: &HashMap<String, String>,
         long_running: bool,
         children: Arc<Mutex<Vec<Child>>>,
         cancel_rx: &mut watch::Receiver<bool>,
@@ -446,6 +471,7 @@ impl ExecutionService {
         };
 
         cmd.current_dir(working_directory);
+        cmd.envs(env);
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
         cmd.kill_on_drop(true);
@@ -679,6 +705,124 @@ impl ExecutionService {
         }
 
         Ok(item)
+    }
+
+    /// Run a workflow from the project's `.portal/pipeline.yml`.
+    ///
+    /// The runner is keyed to a `pipelines` row, so the workflow is materialised
+    /// as one (`preset_key = "release:<workflow>"`, rewritten on every run so the
+    /// file stays the source of truth) and handed to `execute_pipeline`.
+    /// `variables` reach each step as env vars as well as `${NAME}` substitutions.
+    pub async fn execute_file_workflow(
+        &self,
+        project_id: i32,
+        workflow_id: &str,
+        mut variables: HashMap<String, String>,
+        events: Arc<dyn EventSink>,
+    ) -> Result<String, String> {
+        let project = self
+            .project_repo
+            .get_by_id(project_id)
+            .await?
+            .ok_or_else(|| "Project not found".to_string())?;
+        let file = pipeline_file::load(&project.path)?
+            .ok_or_else(|| "No .portal/pipeline.yml in this project".to_string())?;
+
+        if let Some(bump) = file.release.as_ref().and_then(|r| r.bump.clone()) {
+            variables.entry("BUMP".to_string()).or_insert(bump);
+        }
+        let mut steps = pipeline_file::build_steps(&file, workflow_id)?;
+        for step in &mut steps {
+            if let Some(env) = step["config"]["env"].as_object_mut() {
+                for (k, v) in &variables {
+                    env.entry(k.clone()).or_insert_with(|| json!(v));
+                }
+            }
+        }
+        let steps_json = serde_json::to_string(&steps).map_err(|e| e.to_string())?;
+
+        let key = format!("release:{workflow_id}");
+        let name = format!("Release: {workflow_id}");
+        let pipeline_id = match self.pipeline_repo.get_by_preset_key(project_id, &key).await? {
+            Some(p) => {
+                self.pipeline_repo
+                    .update(p.id, Some(name), None, Some(steps_json), None, None, None, None, None, None)
+                    .await?
+                    .id
+            }
+            None => {
+                self.pipeline_repo
+                    .create(
+                        name,
+                        None,
+                        project_id,
+                        steps_json,
+                        "[]".to_string(),
+                        "[]".to_string(),
+                        "{}".to_string(),
+                        true,
+                        Some(key),
+                        Some("release".to_string()),
+                    )
+                    .await?
+                    .id
+            }
+        };
+
+        self.execute_pipeline(
+            ExecutionRequestData {
+                pipeline_id: pipeline_id.to_string(),
+                variables: Some(variables),
+                secrets: None,
+            },
+            events,
+        )
+        .await
+    }
+
+    /// The project's `release:` block with each workflow's resolved steps, or
+    /// `None` when there is no pipeline file or it declares no release.
+    pub async fn describe_release(&self, project_id: i32) -> Result<Option<Value>, String> {
+        let project = self
+            .project_repo
+            .get_by_id(project_id)
+            .await?
+            .ok_or_else(|| "Project not found".to_string())?;
+        let Some(file) = pipeline_file::load(&project.path)? else {
+            return Ok(None);
+        };
+        let Some(release) = file.release.clone() else {
+            return Ok(None);
+        };
+        let plan = |id: &str| -> Result<Value, String> {
+            let steps = pipeline_file::build_steps(&file, id)?;
+            Ok(json!({ "id": id, "steps": steps.iter().map(|s| json!({
+                "id": s["id"], "name": s["name"], "dependsOn": s["dependsOn"],
+                "command": s["config"]["command"], "cwd": s["config"]["cwd"],
+            })).collect::<Vec<_>>() }))
+        };
+        Ok(Some(json!({
+            "release": release,
+            "ship": plan(&release.ship)?,
+            "rehearse": release.rehearse.as_deref().map(plan).transpose()?,
+        })))
+    }
+
+    /// Executions of the project's release workflows, newest first.
+    pub async fn get_release_executions(
+        &self,
+        project_id: i32,
+        limit: Option<u64>,
+    ) -> Result<Vec<Value>, String> {
+        let mut items = Vec::new();
+        for p in self.pipeline_repo.get_all_by_project(project_id).await? {
+            if p.preset_key.as_deref().is_some_and(|k| k.starts_with("release:")) {
+                items.extend(self.get_executions_by_pipeline(p.id, limit).await?);
+            }
+        }
+        items.sort_by(|a, b| b["startedAt"].as_str().cmp(&a["startedAt"].as_str()));
+        items.truncate(limit.unwrap_or(20) as usize);
+        Ok(items)
     }
 
     pub async fn get_execution(&self, execution_id: &str) -> Result<Option<Value>, String> {

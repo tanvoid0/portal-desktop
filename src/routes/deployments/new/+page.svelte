@@ -21,8 +21,11 @@
     DeploymentType,
     ProjectType,
     type DeploymentCreateRequest,
+    type EnvFile,
   } from '$lib/domains/deployments/types';
   import { deploymentActions } from '$lib/domains/deployments/stores/deploymentStore';
+  import { deploymentService } from '$lib/domains/deployments/services/deploymentService';
+  import { loadDeployConfig, saveDeployConfig } from '$lib/domains/deployments/utils/deployConfig';
   import { toast } from '$lib/utils/toast';
   import { logger } from '$lib/domains/shared';
   import { ArrowLeft, Loader2 } from '@lucide/svelte';
@@ -47,6 +50,54 @@
   // Environment variables
   let envVars = $state<Record<string, string>>({});
   let isSubmitting = $state(false);
+
+  // Project .env* files available to seed env vars, and which one is loaded.
+  let envFiles = $state<EnvFile[]>([]);
+  let selectedEnvFile = $state<string>('');
+
+  // Load env vars from a project .env* file, replacing the current list. "None"
+  // (empty) just clears the selection and leaves any manual edits in place.
+  function applyEnvFile(fileName: string) {
+    selectedEnvFile = fileName;
+    const file = envFiles.find((f) => f.name === fileName);
+    if (!file) return;
+    const next: Record<string, string> = {};
+    for (const { key, value } of file.vars) next[key] = value;
+    envVars = next;
+  }
+
+  // Prefill when opened from a project's Deploy button (?projectPath=&name=),
+  // restore the project's remembered config, then offer its .env files.
+  onMount(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('projectPath');
+    const n = params.get('name');
+    if (p) projectPath = p;
+    if (n) name = n;
+
+    const saved = projectPath ? loadDeployConfig(projectPath) : null;
+    if (saved) {
+      deploymentType = saved.deploymentType ?? deploymentType;
+      projectType = saved.projectType ?? projectType;
+      description = saved.description ?? description;
+      exposedPort = saved.exposedPort ?? exposedPort;
+      dockerImageName = saved.dockerImageName ?? dockerImageName;
+      dockerfilePath = saved.dockerfilePath ?? dockerfilePath;
+      command = saved.command ?? command;
+      workingDirectory = saved.workingDirectory ?? workingDirectory;
+      envVars = saved.envVars ?? envVars;
+      selectedEnvFile = saved.selectedEnvFile ?? '';
+    }
+
+    if (projectPath) {
+      envFiles = await deploymentService.listProjectEnvFiles(projectPath);
+      // First-time setup with nothing entered yet: default to .env.local.
+      if (!saved && Object.keys(envVars).length === 0) {
+        const preferred = envFiles.find((f) => f.name === '.env.local') ?? envFiles[0];
+        if (preferred) applyEnvFile(preferred.name);
+      }
+    }
+  });
 
   async function handleSubmit() {
     if (!name || !projectPath) {
@@ -88,15 +139,38 @@
           deploymentType === DeploymentType.CLI ? workingDirectory || projectPath : undefined,
       };
 
-      await deploymentActions.createDeployment(request);
-      toast.success('Deployment created successfully');
+      // Remember this project's choices so its Deploy button is one-click next time.
+      saveDeployConfig(projectPath, {
+        deploymentType,
+        projectType,
+        description,
+        exposedPort,
+        dockerImageName,
+        dockerfilePath,
+        command,
+        workingDirectory,
+        envVars,
+        selectedEnvFile: selectedEnvFile || undefined,
+      });
+
+      // Create builds the image; start runs the container — one action.
+      await deploymentActions.deployAndStart(request);
+      toast.success('Deployment built and started');
       goto('/deployments');
     } catch (error) {
       logger.error('Failed to create deployment', {
         context: 'CreateDeploymentPage',
         error,
       });
-      toast.error(error instanceof Error ? error.message : 'Failed to create deployment');
+      // Backend errors come back as plain strings (the real docker/build output),
+      // not Error instances — surface them instead of a generic message.
+      const raw =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : 'Failed to create deployment';
+      toast.error(raw.length > 300 ? `${raw.slice(0, 300)}…` : raw);
     } finally {
       isSubmitting = false;
     }
@@ -282,6 +356,26 @@
               Add Variable
             </Button>
           </div>
+          {#if envFiles.length > 0}
+            <div class="mb-3">
+              <Label for="envFile">Load from .env file</Label>
+              <Select
+                options={[
+                  { value: '', label: 'None (manual)' },
+                  ...envFiles.map((f) => ({
+                    value: f.name,
+                    label: `${f.name} — ${f.vars.length} var${f.vars.length === 1 ? '' : 's'}`,
+                  })),
+                ]}
+                defaultValue={selectedEnvFile}
+                onSelect={(value) => applyEnvFile(value)}
+              />
+              <p class="mt-1 text-xs text-muted-foreground">
+                Fills the list below from the chosen file. Injected at run time, not baked into the
+                image.
+              </p>
+            </div>
+          {/if}
           <div class="space-y-2">
             {#each Object.entries(envVars) as [key, value]}
               <div class="flex gap-2">
@@ -327,9 +421,9 @@
           >
             {#if isSubmitting}
               <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-              Creating...
+              Building &amp; starting…
             {:else}
-              Create Deployment
+              Deploy (build &amp; run)
             {/if}
           </Button>
           <Button

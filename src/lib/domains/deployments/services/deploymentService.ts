@@ -10,6 +10,7 @@ import type {
   DockerStatus,
   DeploymentCreateRequest,
   DeploymentUpdateRequest,
+  EnvFile,
 } from '../types';
 import { DeploymentStatus } from '../types';
 
@@ -91,7 +92,28 @@ export class DeploymentService {
       workingDirectory: backendDeployment.working_directory,
       processId: backendDeployment.process_id,
       exposedPort: backendDeployment.exposed_port,
+      containerPort: backendDeployment.container_port,
+      host: backendDeployment.host,
+      url: backendDeployment.url,
     } as Deployment;
+  }
+
+  /**
+   * List the project's `.env*` files with their parsed vars, so the deploy
+   * form can offer "load env from file" instead of hand-typing variables.
+   * Non-fatal: returns [] if the backend errors or the path has none.
+   */
+  async listProjectEnvFiles(projectPath: string): Promise<EnvFile[]> {
+    try {
+      return await invoke<EnvFile[]>('list_project_env_files_command', { projectPath });
+    } catch (error) {
+      logger.warn('Failed to list project env files', {
+        context: 'DeploymentService',
+        error,
+        data: { projectPath },
+      });
+      return [];
+    }
   }
 
   /**
