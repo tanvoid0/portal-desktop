@@ -126,7 +126,7 @@
   });
 </script>
 
-<div class="pipeline-builder">
+<div class="w-full max-w-[1200px] mx-auto">
   <Card>
     <CardHeader>
       <CardTitle>{pipeline ? 'Edit Pipeline' : 'Create Pipeline'}</CardTitle>
@@ -252,11 +252,3 @@
     />
   {/if}
 </div>
-
-<style>
-  .pipeline-builder {
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-</style>

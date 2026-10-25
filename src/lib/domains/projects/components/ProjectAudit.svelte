@@ -960,17 +960,3 @@
     </Tabs.Root>
   {/if}
 </div>
-
-<style>
-  /*
-    ponytail: content-visibility, not a virtualizer. The browser skips layout
-    and paint for off-screen rows while keeping every row in the DOM, so the
-    j/k cursor, getElementById, Ctrl+F and the checkbox state all still work —
-    a windowing library would break all four. Reach for a real virtualizer only
-    if a scan ever returns five figures of projects.
-  */
-  :global(.audit-row) {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 76px;
-  }
-</style>

@@ -2,6 +2,12 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
+import adapter from '@sveltejs/adapter-static';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const host = process.env.TAURI_DEV_HOST;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -28,7 +34,21 @@ function deviconWoffOnly() {
 }
 
 export default defineConfig({
-  plugins: [deviconWoffOnly(), tailwindcss(), sveltekit()],
+  plugins: [
+    deviconWoffOnly(),
+    tailwindcss(),
+    sveltekit({
+      preprocess: vitePreprocess(),
+      adapter: adapter({ fallback: 'index.html' }),
+    }),
+  ],
+
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+      '$lib': resolve(__dirname, 'src/lib'),
+    },
+  },
 
   // Vite options tailored for Tauri development
   clearScreen: false,

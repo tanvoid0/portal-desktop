@@ -721,6 +721,12 @@
   }
 }
 
+/* ponytail: content-visibility, not a virtualizer — keeps cursor/find/checkboxes working */
+.audit-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 76px;
+}
+
 /*
   Reduced motion: honoured globally rather than per-component, because the app
   animates through Tailwind utilities that no single component owns.
