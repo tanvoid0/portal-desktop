@@ -5,7 +5,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { ollamaApi } from '$lib/domains/sdk/api/ollamaApi';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
@@ -30,7 +30,7 @@
   const OLLAMA_TABS = ['service', 'version', 'models', 'configuration', 'log'] as const;
   type OllamaTab = (typeof OLLAMA_TABS)[number];
 
-  const activeTab = $derived(resolveUrlTab($page.url.searchParams, OLLAMA_TABS, 'service'));
+  const activeTab = $derived(resolveUrlTab(page.url.searchParams, OLLAMA_TABS, 'service'));
 
   const log = logger.createScoped('OllamaService');
   let serviceInfo = $state<any>(null);
@@ -617,9 +617,9 @@
   }
 
   function setActiveTab(tab: OllamaTab) {
-    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+    goto(buildTabUrl(page.url.pathname, page.url.searchParams, tab), {
       replaceState: true,
-      noScroll: true,
+      reset: false,
     });
   }
 </script>

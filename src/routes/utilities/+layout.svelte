@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import UtilitiesNavigation from '$lib/domains/utilities/components/UtilitiesNavigation.svelte';
   import ShellSidebarLayout from '$lib/components/shell/shell-sidebar-layout.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
@@ -10,7 +10,7 @@
   let { children }: { children: Snippet<[]> } = $props();
 
   let currentSection = $derived.by(() => {
-    const path = $page.url.pathname;
+    const path = page.url.pathname;
     if (path.startsWith('/utilities/environment')) return 'environment' as const;
     if (path.startsWith('/utilities/disk')) return 'disk' as const;
     return 'disk' as const;

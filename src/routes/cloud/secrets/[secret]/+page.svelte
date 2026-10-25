@@ -1,7 +1,7 @@
 <!-- Secret Detail Page -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto, replaceState } from '$app/navigation';
   import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
   import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
@@ -17,11 +17,11 @@
   import { confirmAction } from '$lib/utils/confirm';
   import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
 
-  const secretName = $derived($page.params.secret);
+  const secretName = $derived(page.params.secret);
   const namespace = $derived(
-    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
+    page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
+  const tabParam = $derived(page.url.searchParams.get('tab') || 'overview');
 
   let activeTab = $state('overview');
 
@@ -139,7 +139,7 @@
 
   function handleTabChange(tab: string) {
     activeTab = tab;
-    const url = new URL($page.url);
+    const url = new URL(page.url.href);
     url.searchParams.set('tab', tab);
     replaceState(url, {});
   }

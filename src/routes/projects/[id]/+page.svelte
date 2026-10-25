@@ -5,7 +5,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
   import { Button, buttonVariants } from '$lib/components/ui/button';
@@ -93,7 +93,7 @@
 
   const log = logger.createScoped('ProjectDetailsPage');
 
-  const projectIdParam = $derived($page.params.id);
+  const projectIdParam = $derived(page.params.id);
   const projectsQuery = createProjectsQuery();
 
   const resolvedProjectId = $derived.by((): string | null => {
@@ -127,7 +127,7 @@
     resolveUrlTab(
       (() => {
         // Legacy tab aliases
-        const params = new URLSearchParams($page.url.searchParams);
+        const params = new URLSearchParams(page.url.search);
         const tab = params.get('tab');
         if (tab === 'pipelines' || tab === 'ci') {
           params.set('tab', 'actions');
@@ -141,9 +141,9 @@
 
   function setActiveTab(tab: ProjectTab) {
     if (tab === activeTab) return;
-    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+    goto(buildTabUrl(page.url.pathname, page.url.searchParams, tab), {
       replaceState: true,
-      noScroll: true,
+      reset: false,
     });
   }
 
@@ -653,7 +653,7 @@
 
   onMount(() => {
     void projectIconRegistry.ensureLoaded();
-    const tabParam = $page.url.searchParams.get('tab');
+    const tabParam = page.url.searchParams.get('tab');
     // Only rewrite legacy aliases — avoid goto when already on a valid tab
     if (tabParam === 'pipelines' || tabParam === 'ci') {
       setActiveTab('actions');

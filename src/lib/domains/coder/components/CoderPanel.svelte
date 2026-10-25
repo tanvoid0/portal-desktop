@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
@@ -232,7 +232,7 @@
         console.error('coder: ensureInit failed', e);
       }
 
-      const urlId = $page.url.searchParams.get('id');
+      const urlId = page.url.searchParams.get('id');
       if (urlId) {
         const exists = coderSession.threads.find((t) => t.id === urlId);
         if (exists) await selectThread(exists.id);
@@ -256,7 +256,7 @@
   });
 
   function syncUrl(id: string | null) {
-    const url = new URL($page.url);
+    const url = new URL(page.url.href);
     if (id) url.searchParams.set('id', id);
     else url.searchParams.delete('id');
     replaceState(url, {});

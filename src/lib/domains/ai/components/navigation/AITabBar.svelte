@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import NavIcon from '$lib/components/shell/nav-icon.svelte';
@@ -11,7 +11,7 @@
 
   let { class: className = '' }: Props = $props();
 
-  const activeTab = $derived(getActiveAiTab($page.url.pathname));
+  const activeTab = $derived(getActiveAiTab(page.url.pathname));
 
   function onTabChange(tabId: string | undefined) {
     if (!tabId) return;

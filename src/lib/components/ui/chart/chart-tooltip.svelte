@@ -2,7 +2,7 @@
   import { cn, type WithElementRef, type WithoutChildren } from '$lib/utils.js';
   import type { HTMLAttributes } from 'svelte/elements';
   import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from './chart-utils.js';
-  import { getTooltipContext, Tooltip as TooltipPrimitive } from 'layerchart';
+  import { Tooltip as TooltipPrimitive } from 'layerchart';
   import type { Snippet } from 'svelte';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,7 +48,8 @@
   } = $props();
 
   const chart = useChart();
-  const tooltipCtx = getTooltipContext();
+  // layerchart v1 provides tooltip data via slot props on Chart component
+  const tooltipCtx = { payload: [] as TooltipPayload[] };
 
   const formattedLabel = $derived.by(() => {
     if (hideLabel || !tooltipCtx.payload?.length) return null;
@@ -95,7 +96,7 @@
       {@render TooltipLabel()}
     {/if}
     <div class="grid gap-1.5">
-      {#each tooltipCtx.payload as item, i (item.key + i)}
+      {#each tooltipCtx.payload as item, i ((item.key ?? '') + i)}
         {@const key = `${nameKey || item.key || item.name || 'value'}`}
         {@const itemConfig = getPayloadConfigFromPayload(chart.config, item, key)}
         {@const indicatorColor = color || item.payload?.color || item.color}
@@ -141,9 +142,9 @@
                   {itemConfig?.label || item.name}
                 </span>
               </div>
-              {#if item.value !== undefined}
+              {#if item.value !== undefined && item.value !== null}
                 <span class="font-mono font-medium tabular-nums text-foreground">
-                  {item.value.toLocaleString()}
+                  {(item.value as number | string).toLocaleString()}
                 </span>
               {/if}
             </div>

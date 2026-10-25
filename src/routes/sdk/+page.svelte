@@ -5,7 +5,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { sdkService } from '$lib/domains/sdk/services/sdkService';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
@@ -48,12 +48,12 @@
   const SDK_OVERVIEW_TABS = ['overview', 'managers', 'services', 'versions'] as const;
   type SdkOverviewTab = (typeof SDK_OVERVIEW_TABS)[number];
 
-  const activeTab = $derived(resolveUrlTab($page.url.searchParams, SDK_OVERVIEW_TABS, 'overview'));
+  const activeTab = $derived(resolveUrlTab(page.url.searchParams, SDK_OVERVIEW_TABS, 'overview'));
 
   function setActiveTab(tab: SdkOverviewTab) {
-    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+    goto(buildTabUrl(page.url.pathname, page.url.searchParams, tab), {
       replaceState: true,
-      noScroll: true,
+      reset: false,
     });
   }
 

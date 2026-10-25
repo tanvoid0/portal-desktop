@@ -4,7 +4,7 @@
 -->
 
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import {
     sdkConfigService,
     type ProcessedSDKConfig,
@@ -25,7 +25,7 @@
   } from '$lib/domains/sdk/services/sdkManagerService';
 
   // Get SDK ID from URL
-  let sdkId = $derived($page.params.sdk);
+  let sdkId = $derived(page.params.sdk);
 
   // State
   let loading = $state(true);

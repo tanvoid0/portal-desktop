@@ -2,7 +2,7 @@
 	Pipeline Builder Page - Dedicated page for building pipelines from templates
 -->
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import {
@@ -30,7 +30,7 @@
   import type { Pipeline } from '$lib/domains/projects/pipelines/types';
   import { toast } from '$lib/utils/toast';
 
-  const projectId = $derived($page.params.id);
+  const projectId = $derived(page.params.id);
   const projectQuery = createProjectQuery(() => projectId);
 
   let selectedTemplate: PipelineTemplate | null = $state(null);

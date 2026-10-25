@@ -1,13 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import TaskForm from '$lib/domains/tasks/components/TaskForm.svelte';
   import { createTaskQuery } from '$lib/domains/tasks/queries/taskQueries';
   import { toastActions } from '$lib/utils/toast';
   import { PageLoading, PageError } from '$lib/components/shell';
   import type { Task } from '$lib/domains/tasks/types';
 
-  const taskId = $derived($page.params.id);
+  const taskId = $derived(page.params.id);
   const taskQuery = createTaskQuery(() => taskId);
 
   const task = $derived(taskQuery.data ?? null);

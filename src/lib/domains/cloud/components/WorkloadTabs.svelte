@@ -1,6 +1,6 @@
 <!-- WorkloadTabs - Provider-agnostic tab navigation for workloads -->
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
 
@@ -59,7 +59,7 @@
   }
 
   function isActiveTab(tabRoute: string): boolean {
-    const currentPath = $page.url.pathname;
+    const currentPath = page.url.pathname;
     // Special handling for overview tab (exact match for /cloud/workloads)
     if (tabRoute === '/cloud/workloads') {
       return currentPath === '/cloud/workloads';

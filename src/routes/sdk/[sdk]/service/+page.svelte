@@ -4,7 +4,7 @@
 -->
 
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { invokeClient } from '$lib/utils/invokeClient';
   import {
     sdkConfigService,
@@ -20,7 +20,7 @@
   import { PageLoading, PageError } from '$lib/components/shell';
 
   // Get SDK ID from URL
-  let sdkId = $derived($page.params.sdk);
+  let sdkId = $derived(page.params.sdk);
 
   interface ServiceInfo {
     id: string;

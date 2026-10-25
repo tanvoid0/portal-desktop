@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { isTauriEnvironment } from '$lib/utils/tauri';
   import { InvokeClient } from '$lib/utils/invokeClient';
   import DeviceAuthService from '$lib/services/deviceAuthService';

@@ -4,7 +4,7 @@
 -->
 
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import ProjectForm from '$lib/components/projects/ProjectForm.svelte';
   import { projectService, createProjectQuery } from '$lib/domains/projects';
@@ -15,7 +15,7 @@
 
   const log = logger.createScoped('ProjectEditPage');
 
-  const projectId = $derived($page.params.id);
+  const projectId = $derived(page.params.id);
   const projectQuery = createProjectQuery(() => projectId);
 
   let isLoading = $state(false);

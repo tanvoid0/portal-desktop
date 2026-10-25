@@ -1,7 +1,7 @@
 <!-- Pod Detail Page -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto, replaceState } from '$app/navigation';
   import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
   import { get } from 'svelte/store';
@@ -34,11 +34,11 @@
   import type { K8sLog } from '$lib/domains/cloud/types/k8s';
   import MetricsDisplay from '$lib/domains/cloud/components/MetricsDisplay.svelte';
 
-  const podName = $derived($page.params.pod);
+  const podName = $derived(page.params.pod);
   const namespace = $derived(
-    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
+    page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
+  const tabParam = $derived(page.url.searchParams.get('tab') || 'overview');
 
   let pod = $state<ICloudResource | null>(null);
   let isLoading = $state(true);
@@ -306,7 +306,7 @@ status:
   function handleTabChange(tab: string) {
     activeTab = tab;
     // Update URL without navigation
-    const url = new URL($page.url);
+    const url = new URL(page.url.href);
     url.searchParams.set('tab', tab);
     replaceState(url, {});
   }

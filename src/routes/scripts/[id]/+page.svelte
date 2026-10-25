@@ -3,7 +3,7 @@
 	Dedicated page for viewing, editing and running scripts
 -->
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { onMount, onDestroy } from 'svelte';
   import { Button } from '$lib/components/ui/button';
@@ -93,12 +93,12 @@
     defaultValue: '',
   });
 
-  const scriptId = $derived($page.params.id);
+  const scriptId = $derived(page.params.id);
 
   onMount(async () => {
     await loadScript();
     // Check if we should auto-start in edit mode from URL query
-    const editParam = $page.url.searchParams.get('edit');
+    const editParam = page.url.searchParams.get('edit');
     if (editParam === 'true') {
       isEditing = true;
     }

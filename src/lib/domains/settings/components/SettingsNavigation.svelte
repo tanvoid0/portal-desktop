@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import {
@@ -55,7 +55,7 @@
 
   // Check if we're in the AI settings section or any of its sub-sections
   const isAiSection = $derived.by(() => {
-    const path = $page.url.pathname;
+    const path = page.url.pathname;
     return path.startsWith('/settings/ai');
   });
 
@@ -84,7 +84,7 @@
 
   // Check if we're in the frameworks-languages section or any of its sub-sections
   const isFrameworksLanguagesSection = $derived.by(() => {
-    const path = $page.url.pathname;
+    const path = page.url.pathname;
     return (
       path.startsWith('/settings/frameworks-languages') ||
       path.startsWith('/settings/frameworks') ||
@@ -210,7 +210,7 @@
       // Map framework-ides to ides
       return currentSection === 'framework-ides' ? 'ides' : currentSection;
     }
-    const path = $page.url.pathname;
+    const path = page.url.pathname;
     if (path === '/settings' || path === '/settings/') return 'general';
     const section = path.replace('/settings/', '').replace(/\/$/, '');
     // Redirect framework-ides to ides
@@ -248,19 +248,19 @@
   // Get active sub-section for frameworks-languages
   const activeSubSection = $derived.by(() => {
     if (isAiSection) {
-      const path = $page.url.pathname;
+      const path = page.url.pathname;
       if (path.startsWith('/settings/ai/training')) return 'training';
       return 'providers';
     }
     if (!isFrameworksLanguagesSection) return null;
-    const path = $page.url.pathname;
+    const path = page.url.pathname;
     if (path.includes('/languages')) return 'languages';
     if (path.includes('/package-managers')) return 'package-managers';
     if (path.includes('/frameworks') && !path.includes('/frameworks-languages'))
       return 'frameworks';
     // If on the main frameworks-languages page, check query param
     if (path.includes('/frameworks-languages')) {
-      const tab = $page.url.searchParams.get('tab');
+      const tab = page.url.searchParams.get('tab');
       if (tab) return tab;
     }
     return null;

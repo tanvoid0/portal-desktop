@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { replaceState } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
   import ConversationList from '$lib/domains/ai/components/conversations/ConversationList.svelte';
   import ProviderModelSelector from '$lib/domains/ai/components/ProviderModelSelector.svelte';
@@ -102,7 +102,7 @@
     await loadConversations();
 
     // Check for conversation ID in URL query params after conversations are loaded
-    const urlConversationId = $page.url.searchParams.get('id');
+    const urlConversationId = page.url.searchParams.get('id');
     if (urlConversationId) {
       const conversation = conversations.find((c) => c.id === urlConversationId);
       if (conversation) {
@@ -158,7 +158,7 @@
       conversationId = conversation.id;
 
       // Update URL without navigation
-      const url = new URL($page.url);
+      const url = new URL(page.url.href);
       url.searchParams.set('id', conversation.id);
       replaceState(url, {});
     } catch (error) {
@@ -222,7 +222,7 @@
     llmUsage = null;
 
     // Clear URL parameter
-    const url = new URL($page.url);
+    const url = new URL(page.url.href);
     url.searchParams.delete('id');
     replaceState(url, {});
   }
@@ -355,7 +355,7 @@
 
         // Update URL if not already set
         if (!conversationId) {
-          const url = new URL($page.url);
+          const url = new URL(page.url.href);
           url.searchParams.set('id', selectedConversation.id);
           replaceState(url, {});
         }
@@ -420,7 +420,7 @@
       conversationId = conversation.id;
       await loadConversations();
 
-      const url = new URL($page.url);
+      const url = new URL(page.url.href);
       url.searchParams.set('id', conversation.id);
       replaceState(url, {});
       toastActions.success('Branched into a new conversation');

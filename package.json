@@ -63,7 +63,7 @@
     "formsnap": "^2.1.0",
     "globals": "^17.13.0",
     "kill-port": "^2.0.1",
-    "layerchart": "^2.9.1",
+    "layerchart": "^1.0.13",
     "mode-watcher": "^1.1.0",
     "paneforge": "^1.0.2",
     "playwright": "^1.64.1",

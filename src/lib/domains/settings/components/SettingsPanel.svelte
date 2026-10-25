@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import {
     settingsActions,
     settings,
@@ -54,7 +54,7 @@
 
   // Derive active section from URL
   const activeSection = $derived.by((): SettingsSection => {
-    const path = $page.url.pathname;
+    const path = page.url.pathname;
     if (path === '/settings' || path === '/settings/') return 'general';
     const section = path.replace('/settings/', '').replace(/\/$/, '');
     if (

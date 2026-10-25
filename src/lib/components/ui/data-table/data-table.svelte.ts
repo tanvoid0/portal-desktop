@@ -1,14 +1,15 @@
 import {
   type RowData,
   type TableOptions,
-  type TableOptionsResolved,
   type TableState,
-  createTable,
+  type StockFeatures,
+  constructTable,
+  stockFeatures,
 } from '@tanstack/table-core';
 
 /**
  * Creates a reactive TanStack table object for Svelte.
- * @param options Table options to create the table with.
+ * @param options Table options to create the table with (features defaults to stockFeatures).
  * @returns A reactive table object.
  * @example
  * ```svelte
@@ -32,37 +33,20 @@ import {
  * </table>
  * ```
  */
-export function createSvelteTable<TData extends RowData>(options: TableOptions<TData>) {
-  const resolvedOptions: TableOptionsResolved<TData> = mergeObjects(
-    {
-      state: {},
-      onStateChange() {},
-      renderFallbackValue: null,
-      mergeOptions: (
-        defaultOptions: TableOptions<TData>,
-        options: Partial<TableOptions<TData>>
-      ) => {
-        return mergeObjects(defaultOptions, options);
-      },
-    },
-    options
-  );
+export function createSvelteTable<TData extends RowData>(
+  options: Omit<TableOptions<StockFeatures, TData>, 'features'>
+) {
+  const table = constructTable<StockFeatures, TData>({
+    features: stockFeatures,
+    ...options,
+  } as TableOptions<StockFeatures, TData>);
 
-  const table = createTable(resolvedOptions);
-  let state = $state<Partial<TableState>>(table.initialState);
+  let state = $state<Partial<TableState<StockFeatures>>>(table.initialState);
 
   function updateOptions() {
     table.setOptions((prev) => {
       return mergeObjects(prev, options, {
-        state: mergeObjects(state, options.state || {}),
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onStateChange: (updater: any) => {
-          if (updater instanceof Function) state = updater(state);
-          else state = mergeObjects(state, updater);
-
-          options.onStateChange?.(updater);
-        },
+        state: mergeObjects(state, options.state ?? {}),
       });
     });
   }

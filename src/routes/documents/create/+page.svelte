@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import DocumentEditor from '$lib/domains/documents/components/DocumentEditor.svelte';
   import type { Document } from '$lib/domains/documents';
@@ -8,8 +8,8 @@
   import { fetchTaskById } from '$lib/domains/tasks/api/taskApi';
   import { ResourceType } from '$lib/domains/shared/types/resourceType';
 
-  let taskId = $derived($page.url.searchParams.get('taskId'));
-  let taskTitle = $derived($page.url.searchParams.get('taskTitle'));
+  let taskId = $derived(page.url.searchParams.get('taskId'));
+  let taskTitle = $derived(page.url.searchParams.get('taskTitle'));
   let taskDescription = $state<string | undefined>(undefined);
 
   $effect(() => {

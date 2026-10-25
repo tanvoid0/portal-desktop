@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 
@@ -18,7 +18,7 @@
   ] as const;
 
   const activeTab = $derived(
-    tabs.find((tab) => $page.url.pathname.startsWith(tab.url))?.id ?? 'run'
+    tabs.find((tab) => page.url.pathname.startsWith(tab.url))?.id ?? 'run'
   );
 </script>
 

@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import {
@@ -43,7 +43,7 @@
 
   // Check if we should auto-open import section from URL query
   onMount(() => {
-    const importParam = $page.url.searchParams.get('import');
+    const importParam = page.url.searchParams.get('import');
     if (importParam === 'true') {
       showJsonImport = true;
     }

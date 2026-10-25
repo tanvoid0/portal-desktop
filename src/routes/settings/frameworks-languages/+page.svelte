@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
   import LanguagesSettings from '$lib/domains/settings/components/LanguagesSettings.svelte';
@@ -12,7 +12,7 @@
 
   // Get active tab from URL params or default to languages
   const activeTab = $derived.by(() => {
-    const tab = $page.url.searchParams.get('tab');
+    const tab = page.url.searchParams.get('tab');
     if (tab === 'languages' || tab === 'package-managers' || tab === 'frameworks') {
       return tab;
     }
@@ -22,7 +22,7 @@
   function handleTabChange(value: string) {
     goto(`/settings/frameworks-languages?tab=${value}`, {
       replaceState: true,
-      noScroll: true,
+      reset: false,
     });
   }
 </script>

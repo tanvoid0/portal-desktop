@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import type { Snippet } from 'svelte';
   import { Button } from '$lib/components/ui/button';
@@ -60,7 +60,7 @@
     isLocalhost = InvokeClient.isLocalhost();
   });
 
-  let isSdkPage = $derived($page.url.pathname.startsWith('/sdk'));
+  let isSdkPage = $derived(page.url.pathname.startsWith('/sdk'));
 
   const dashboardQuery = createDashboardOverviewQuery(() => ({
     enabled: !isSdkPage,
@@ -68,9 +68,9 @@
 
   const dashboardOverview = $derived(dashboardQuery.data ?? null);
 
-  let hideMainSidebar = $derived(shouldHideMainSidebar($page.url.pathname));
-  let isFillViewport = $derived(isViewportFillRoute($page.url.pathname));
-  let isDomainLayout = $derived(isShellSidebarRoute($page.url.pathname));
+  let hideMainSidebar = $derived(shouldHideMainSidebar(page.url.pathname));
+  let isFillViewport = $derived(isViewportFillRoute(page.url.pathname));
+  let isDomainLayout = $derived(isShellSidebarRoute(page.url.pathname));
   let sidebarOpen = $state(true);
   let qrCodeDialogOpen = $state(false);
   let deviceApprovalDialogOpen = $state(false);
@@ -142,7 +142,7 @@
       // Always show sidebar on the app root (`/`) regardless of persisted state.
       // This prevents the sidebar from appearing "missing" when users previously
       // closed it and then return to `/` (especially on mobile/offcanvas mode).
-      if ($page.url.pathname !== '/' && cookieOpen !== null) {
+      if (page.url.pathname !== '/' && cookieOpen !== null) {
         sidebarOpen = cookieOpen;
       }
       // Initialize backend log listener to receive logs from Rust backend
@@ -264,7 +264,7 @@
               variant="ghost"
               size="icon"
               class="h-8 w-8"
-              disabled={$page.url.pathname === '/'}
+              disabled={page.url.pathname === '/'}
               onclick={goHome}
               title="Go to home"
               aria-label="Go to home"
@@ -331,7 +331,7 @@
                    query only supplies badge counts, so there is nothing to
                    wait for. -->
               <div class="min-h-0 flex-1 overflow-y-auto">
-                <NavSectionList sections={navigationSections} currentPath={$page.url.pathname} />
+                <NavSectionList sections={navigationSections} currentPath={page.url.pathname} />
               </div>
 
               <!-- Sidebar Footer -->

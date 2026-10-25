@@ -24,7 +24,7 @@
     type ProcessedSDKConfig,
   } from '$lib/domains/sdk/services/sdkConfigService';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
 
   import SDKCategorySection from './sidebar/SDKCategorySection.svelte';
@@ -63,7 +63,7 @@
   let loading = $state(true);
   let sdkManagers = $state<SDKManager[]>([]);
   let managersLoading = $state(true);
-  let currentPath = $derived($page.url.pathname);
+  let currentPath = $derived(page.url.pathname);
   const sidebar = useSidebar();
   let serviceToggleInFlight = $state<Set<string>>(new Set());
   let openSections = $state<Record<string, boolean>>({

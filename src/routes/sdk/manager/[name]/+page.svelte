@@ -4,7 +4,7 @@
 -->
 
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { invoke } from '@tauri-apps/api/core';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
@@ -29,12 +29,12 @@
   const MANAGER_TABS = ['installed', 'available'] as const;
   type ManagerTab = (typeof MANAGER_TABS)[number];
 
-  const activeTab = $derived(resolveUrlTab($page.url.searchParams, MANAGER_TABS, 'installed'));
+  const activeTab = $derived(resolveUrlTab(page.url.searchParams, MANAGER_TABS, 'installed'));
 
   function setActiveTab(tab: ManagerTab) {
-    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+    goto(buildTabUrl(page.url.pathname, page.url.searchParams, tab), {
       replaceState: true,
-      noScroll: true,
+      reset: false,
     });
   }
 
@@ -51,7 +51,7 @@
   }
 
   // Get manager name from URL
-  let managerName = $derived($page.params.name);
+  let managerName = $derived(page.params.name);
 
   // State
   let loading = $state(true);

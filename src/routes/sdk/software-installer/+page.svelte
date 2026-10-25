@@ -48,19 +48,19 @@
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { PageLoading, PageError } from '$lib/components/shell';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
 
   const INSTALLER_TABS = ['browse', 'installed', 'updates'] as const;
   type InstallerTab = (typeof INSTALLER_TABS)[number];
 
-  const activeTab = $derived(resolveUrlTab($page.url.searchParams, INSTALLER_TABS, 'browse'));
+  const activeTab = $derived(resolveUrlTab(page.url.searchParams, INSTALLER_TABS, 'browse'));
 
   function setActiveTab(tab: InstallerTab) {
-    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+    goto(buildTabUrl(page.url.pathname, page.url.searchParams, tab), {
       replaceState: true,
-      noScroll: true,
+      reset: false,
     });
   }
 

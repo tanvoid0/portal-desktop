@@ -1,7 +1,9 @@
 /** URL-backed tab selection helpers for SvelteKit pages. */
 
+type ReadableSearchParams = Pick<URLSearchParams, 'get' | 'getAll' | 'has' | 'keys' | 'values' | 'entries' | 'forEach' | 'toString' | typeof Symbol.iterator>;
+
 export function resolveUrlTab<T extends string>(
-  searchParams: URLSearchParams,
+  searchParams: ReadableSearchParams,
   allowed: readonly T[],
   defaultTab: T,
   param = 'tab'
@@ -15,11 +17,11 @@ export function resolveUrlTab<T extends string>(
 
 export function buildTabUrl(
   pathname: string,
-  searchParams: URLSearchParams,
+  searchParams: ReadableSearchParams,
   tab: string,
   param = 'tab'
 ): string {
-  const params = new URLSearchParams(searchParams);
+  const params = new URLSearchParams(searchParams.toString());
   params.set(param, tab);
   const query = params.toString();
   return query ? `${pathname}?${query}` : pathname;

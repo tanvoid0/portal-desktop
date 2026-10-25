@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import Icon from '@iconify/svelte';
@@ -15,7 +15,7 @@
   let isLoading = $state(true);
   let error = $state<string | null>(null);
 
-  const documentId = $derived(parseInt($page.params.id));
+  const documentId = $derived(parseInt(page.params.id));
 
   onMount(async () => {
     await loadDocument();

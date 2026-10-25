@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import { PageHeader, PageLoading } from '$lib/components/shell';
@@ -10,9 +10,9 @@
   } from '$lib/domains/github';
   import { ArrowLeft } from '@lucide/svelte';
 
-  const owner = $derived($page.params.owner);
-  const repo = $derived($page.params.repo);
-  const runId = $derived(Number($page.params.runId));
+  const owner = $derived(page.params.owner);
+  const repo = $derived(page.params.repo);
+  const runId = $derived(Number(page.params.runId));
 
   const statusQuery = createGitHubStatusQuery();
   const isConnected = $derived(statusQuery.data?.connected ?? false);

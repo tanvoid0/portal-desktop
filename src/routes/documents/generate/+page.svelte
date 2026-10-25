@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import DocumentGenerationPage from '$lib/domains/documents/components/DocumentGenerationPage.svelte';
 
-  const taskId = $derived($page.url.searchParams.get('taskId'));
-  const taskTitle = $derived($page.url.searchParams.get('taskTitle'));
-  const taskDescription = $derived($page.url.searchParams.get('taskDescription'));
+  const taskId = $derived(page.url.searchParams.get('taskId'));
+  const taskTitle = $derived(page.url.searchParams.get('taskTitle'));
+  const taskDescription = $derived(page.url.searchParams.get('taskDescription'));
 </script>
 
 <svelte:head>

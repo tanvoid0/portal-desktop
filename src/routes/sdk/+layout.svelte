@@ -8,11 +8,11 @@
   import SDKSidebar from '$lib/domains/sdk/components/SDKSidebar.svelte';
   import ShellSidebarLayout from '$lib/components/shell/shell-sidebar-layout.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
   let { children }: { children: Snippet<[]> } = $props();
 
-  let currentPath = $derived($page.url.pathname);
+  let currentPath = $derived(page.url.pathname);
   const navigationItemIds = ['/sdk'];
 </script>
 

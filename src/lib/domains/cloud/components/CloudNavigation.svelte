@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
   import NamespaceSelector from '$lib/domains/cloud/components/NamespaceSelector.svelte';
@@ -127,7 +127,7 @@
   ];
 
   function isActiveTab(tabRoute: string): boolean {
-    const currentPath = $page.url.pathname;
+    const currentPath = page.url.pathname;
     // Special handling for overview tab (exact match for /cloud/workloads)
     if (tabRoute === '/cloud/workloads') {
       return currentPath === '/cloud/workloads';

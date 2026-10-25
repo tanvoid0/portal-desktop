@@ -3,12 +3,12 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { PageLoading } from '$lib/components/shell';
 
   onMount(() => {
-    const id = $page.params.id;
+    const id = page.params.id;
     if (id) {
       void goto(`/projects/${id}?tab=actions`, { replaceState: true });
     } else {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
@@ -26,7 +26,7 @@
     TASK_TYPE_OPTIONS,
   } from '$lib/domains/tasks/types';
 
-  const taskId = $derived($page.params.id);
+  const taskId = $derived(page.params.id);
   const tasksQuery = createTasksQuery();
 
   const allTasks = $derived(tasksQuery.data ?? []);

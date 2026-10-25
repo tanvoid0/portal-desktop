@@ -5,7 +5,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { invoke } from '@tauri-apps/api/core';
   import { goto } from '$app/navigation';
 
@@ -37,17 +37,17 @@
   const MODEL_TABS = ['local', 'library'] as const;
   type ModelTab = (typeof MODEL_TABS)[number];
 
-  const modelTab = $derived(resolveUrlTab($page.url.searchParams, MODEL_TABS, 'local'));
+  const modelTab = $derived(resolveUrlTab(page.url.searchParams, MODEL_TABS, 'local'));
 
   function setModelTab(tab: ModelTab) {
-    goto(buildTabUrl($page.url.pathname, $page.url.searchParams, tab), {
+    goto(buildTabUrl(page.url.pathname, page.url.searchParams, tab), {
       replaceState: true,
-      noScroll: true,
+      reset: false,
     });
   }
 
   // SDK ID from URL
-  const sdkId = $page.params.sdk as string;
+  const sdkId = page.params.sdk as string;
 
   // Config
   let sdkConfig = $state<ProcessedSDKConfig | null>(null);

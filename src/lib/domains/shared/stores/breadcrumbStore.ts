@@ -3,8 +3,8 @@
  * Provides centralized breadcrumb management across the application
  */
 
-import { writable, derived } from 'svelte/store';
-import { page } from '$app/stores';
+import { writable, derived, readable } from 'svelte/store';
+import { page } from '$app/state';
 import { logger } from '../services/logger';
 
 const log = logger.createScoped('BreadcrumbStore');
@@ -28,33 +28,27 @@ const breadcrumbConfig = writable<{
 
 // Derived store that automatically generates breadcrumbs from URL
 export const breadcrumbItems = derived(
-  [page, customBreadcrumbs, breadcrumbConfig],
-  ([$page, $customBreadcrumbs, $config]) => {
+  [customBreadcrumbs, breadcrumbConfig],
+  ([$customBreadcrumbs, _$config]) => {
     // If custom breadcrumbs are set, use them
     if ($customBreadcrumbs.length > 0) {
       return $customBreadcrumbs;
     }
 
     // Generate breadcrumbs based on current page including query parameters
-    return generateBreadcrumbsFromPath($page.url.pathname, $page.url.search);
+    return generateBreadcrumbsFromPath(page.url.pathname, page.url.search);
   }
 );
 
-// Derived store for home item based on current path
-export const homeItem = derived(page, ($page) => {
-  // Always use default home
-  return {
-    label: 'Home',
-    href: '/',
-    icon: 'home',
-  };
+// Home item is always static
+export const homeItem = readable<BreadcrumbItem>({
+  label: 'Home',
+  href: '/',
+  icon: 'home',
 });
 
-// Derived store for showHome setting based on current path
-export const showHome = derived(page, ($page) => {
-  // Always show home
-  return true;
-});
+// Always show home
+export const showHome = readable(true);
 
 // Derived store for breadcrumb configuration
 export const breadcrumbSettings = derived(breadcrumbConfig, ($config) => ({

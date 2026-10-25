@@ -1,7 +1,7 @@
 <!-- DaemonSet Detail Page -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
   import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
@@ -16,11 +16,11 @@
   import { toastActions } from '$lib/utils/toast';
   import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
 
-  const daemonSetName = $derived($page.params.daemonset);
+  const daemonSetName = $derived(page.params.daemonset);
   const namespace = $derived(
-    $page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
+    page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
   );
-  const tabParam = $derived($page.url.searchParams.get('tab') || 'overview');
+  const tabParam = $derived(page.url.searchParams.get('tab') || 'overview');
 
   let activeTab = $state('overview');
 

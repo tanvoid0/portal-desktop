@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
@@ -35,7 +35,7 @@
 
   const activeSection = $derived.by((): UtilitySection => {
     if (currentSection) return currentSection;
-    const path = $page.url.pathname;
+    const path = page.url.pathname;
     if (path.startsWith('/utilities/environment')) return 'environment';
     if (path.startsWith('/utilities/disk')) return 'disk';
     return 'disk';

@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import type { Snippet } from 'svelte';
   import SettingsNavigation from '$lib/domains/settings/components/SettingsNavigation.svelte';
@@ -35,7 +35,7 @@
 
   // Get current section from URL
   let currentSection = $derived.by(() => {
-    const path = $page.url.pathname;
+    const path = page.url.pathname;
     if (path === '/settings' || path === '/settings/') return 'general' as const;
     const section = path.replace('/settings/', '').replace(/\/$/, '');
     // Redirect framework-ides to ides

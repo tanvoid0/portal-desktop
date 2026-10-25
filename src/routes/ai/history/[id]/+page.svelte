@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
 
   onMount(() => {
-    const conversationId = $page.params.id;
+    const conversationId = page.params.id;
     if (conversationId) {
       goto(`/ai/chat?id=${conversationId}`);
     } else {

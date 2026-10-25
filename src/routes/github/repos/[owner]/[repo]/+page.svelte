@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
@@ -28,8 +28,8 @@
     Workflow,
   } from '@lucide/svelte';
 
-  const owner = $derived($page.params.owner);
-  const repo = $derived($page.params.repo);
+  const owner = $derived(page.params.owner);
+  const repo = $derived(page.params.repo);
 
   const statusQuery = createGitHubStatusQuery();
   const isConnected = $derived(statusQuery.data?.connected ?? false);
