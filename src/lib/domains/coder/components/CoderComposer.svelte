@@ -344,7 +344,7 @@
           <span class="truncate">{workspaceName || 'This PC'}</span>
         </span>
 
-        <span class="hidden sm:inline text-muted-foreground/70">Shift+Tab · cycle mode</span>
+        <span class="hidden text-muted-foreground/70 sm:inline">Shift+Tab · cycle mode</span>
       </div>
 
       <AIContextBar variant="ring" {contextUsage} {llmUsage} />

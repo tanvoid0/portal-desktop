@@ -38,7 +38,7 @@
       {#each AGENT_MODES as m (m.value)}
         <DropdownMenu.RadioItem
           value={m.value}
-          class={cn('gap-2 rounded-md py-1.5 pl-7 pr-2 text-xs', m.itemClass)}
+          class={cn('gap-2 rounded-md py-1.5 pr-2 pl-7 text-xs', m.itemClass)}
         >
           {#snippet children({ checked: _checked })}
             <span class={cn('absolute left-2 h-2 w-2 rounded-full', m.dotClass)}></span>

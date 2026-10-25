@@ -64,7 +64,7 @@ turns get a bubble. Model id, stats and actions stay visible (LM Studio style).
         <div class="flex flex-wrap items-center gap-1.5">
           {#each statChips as chip}
             <span
-              class="rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground"
+              class="rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground tabular-nums"
             >
               {chip}
             </span>

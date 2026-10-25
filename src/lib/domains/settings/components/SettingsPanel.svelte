@@ -44,13 +44,7 @@
   import type { SettingsCategory } from '../types';
 
   type SettingsSection =
-    | 'general'
-    | 'editor'
-    | 'terminal'
-    | 'theme'
-    | 'ides'
-    | 'framework-ides'
-    | 'learning';
+    'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'framework-ides' | 'learning';
 
   // Derive active section from URL
   const activeSection = $derived.by((): SettingsSection => {

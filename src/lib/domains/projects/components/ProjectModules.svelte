@@ -42,7 +42,7 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     {#if modules.length > FILTER_THRESHOLD}
       <div class="relative w-full max-w-xs">
-        <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search class="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
         <Input bind:value={filter} placeholder="Filter by name, path or stack" class="pl-8" />
       </div>
     {:else}

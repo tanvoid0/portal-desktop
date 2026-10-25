@@ -45,7 +45,7 @@
     <Button
       type="button"
       variant="ghost"
-      class="h-auto min-w-0 flex-1 flex-col items-start justify-start whitespace-normal p-0 text-left hover:bg-transparent disabled:opacity-100 {onOpen
+      class="h-auto min-w-0 flex-1 flex-col items-start justify-start p-0 text-left whitespace-normal hover:bg-transparent disabled:opacity-100 {onOpen
         ? 'cursor-pointer'
         : 'cursor-default'}"
       disabled={!onOpen}

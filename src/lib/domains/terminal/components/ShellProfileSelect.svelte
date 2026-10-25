@@ -39,7 +39,7 @@
 <Select.Root type="single" bind:value onValueChange={handleValueChange} {disabled}>
   <Select.Trigger
     size="sm"
-    class={cn('min-w-[10rem] max-w-[14rem] bg-muted text-xs text-foreground', className)}
+    class={cn('max-w-[14rem] min-w-[10rem] bg-muted text-xs text-foreground', className)}
   >
     <span data-slot="select-value" class="flex min-w-0 items-center gap-1.5 truncate">
       {#if selectedProfile}

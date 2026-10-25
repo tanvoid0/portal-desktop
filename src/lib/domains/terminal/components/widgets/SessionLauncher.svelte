@@ -61,9 +61,9 @@
     </p>
   </div>
 
-  <div class="min-h-0 flex-1 overflow-y-auto p-3 space-y-4">
+  <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
     <section>
-      <div class="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+      <div class="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase">
         <FolderOpen class="h-3.5 w-3.5" />
         Projects
       </div>
@@ -87,7 +87,7 @@
     </section>
 
     <section>
-      <div class="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+      <div class="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase">
         <Container class="h-3.5 w-3.5" />
         Containers
       </div>
@@ -113,7 +113,7 @@
               >
                 <ShellIcon icon={TERMINAL_ICONS.container} class="mr-2" />
               </Button>
-              <Badge variant="outline" class="text-xs shrink-0">
+              <Badge variant="outline" class="shrink-0 text-xs">
                 {container.status}
               </Badge>
             </div>

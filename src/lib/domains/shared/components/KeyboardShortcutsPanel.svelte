@@ -94,7 +94,7 @@
       {#each shortcutGroups as group}
         <div>
           {#if showCategoryHeaders}
-            <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <h4 class="mb-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
               {group.title}
             </h4>
           {/if}
@@ -135,7 +135,7 @@
           {#each shortcutGroups as group}
             <div>
               {#if showCategoryHeaders}
-                <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <h4 class="mb-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                   {group.title}
                 </h4>
               {/if}

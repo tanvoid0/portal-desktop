@@ -59,7 +59,7 @@
     spellcheck={false}
     class="font-mono text-xs"
   />
-  {#if error}<p class="text-destructive text-xs">{error}</p>{/if}
+  {#if error}<p class="text-xs text-destructive">{error}</p>{/if}
 
   <Collapsible bind:open={refineOpen}>
     <CollapsibleTrigger>
@@ -71,7 +71,7 @@
     </CollapsibleTrigger>
     <CollapsibleContent class="space-y-2 pt-2">
       {#if ai === null}
-        <p class="text-muted-foreground text-xs">Checking AI…</p>
+        <p class="text-xs text-muted-foreground">Checking AI…</p>
       {:else if ai}
         <Textarea
           bind:value={instruction}
@@ -88,7 +88,7 @@
           {refining ? 'Refining…' : 'Refine'}
         </Button>
       {:else}
-        <p class="text-muted-foreground text-xs">AI is not configured: Settings > AI</p>
+        <p class="text-xs text-muted-foreground">AI is not configured: Settings > AI</p>
       {/if}
     </CollapsibleContent>
   </Collapsible>

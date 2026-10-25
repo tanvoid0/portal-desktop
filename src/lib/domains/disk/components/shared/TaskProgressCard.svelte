@@ -27,7 +27,7 @@
         <span class="text-foreground">
           {label}<span class="text-muted-foreground"> · {progress.done} / {progress.total}</span>
         </span>
-        <span class="tabular-nums text-muted-foreground">{pct.toFixed(0)}%</span>
+        <span class="text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
       </div>
       <Progress value={pct} class="h-2" />
       {#if progress.currentPath}

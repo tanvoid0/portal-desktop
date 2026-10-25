@@ -222,7 +222,7 @@
           </div>
         </div>
       {:else}
-        <p class="text-sm text-muted-foreground text-center py-4">No subtasks</p>
+        <p class="py-4 text-center text-sm text-muted-foreground">No subtasks</p>
       {/each}
     </CardContent>
   </Card>
@@ -267,7 +267,7 @@
     {#if showOriginalText}
       <CardContent>
         <div class="rounded-lg border bg-muted/50 p-4">
-          <pre class="whitespace-pre-wrap font-mono text-sm">{originalText}</pre>
+          <pre class="font-mono text-sm whitespace-pre-wrap">{originalText}</pre>
         </div>
       </CardContent>
     {/if}

@@ -92,7 +92,7 @@
       <div class="flex h-full min-h-0">
         <div
           bind:this={gutter}
-          class="select-none overflow-hidden bg-muted/30 py-2 text-right font-mono text-xs text-muted-foreground"
+          class="overflow-hidden bg-muted/30 py-2 text-right font-mono text-xs text-muted-foreground select-none"
         >
           {#each { length: lineCount } as _, i (i)}
             <div class="px-2 leading-relaxed">{i + 1}</div>

@@ -210,7 +210,7 @@
             >
               {#if message.content && !isStreamingMessage && !shouldShowLoader}
                 <div
-                  class="flex items-center gap-0.5 opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100 {message.role ===
+                  class="flex items-center gap-0.5 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100 {message.role ===
                   'user'
                     ? 'justify-end'
                     : 'justify-start'}"

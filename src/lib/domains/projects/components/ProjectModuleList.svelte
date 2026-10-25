@@ -36,7 +36,7 @@
   <div class="max-h-56 space-y-2 overflow-y-auto pr-1">
     {#each groups as group (group.label)}
       <div>
-        <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <p class="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {group.label}
         </p>
         <ul class="space-y-0.5">

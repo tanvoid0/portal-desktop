@@ -190,7 +190,7 @@
                   </p>
                 {/if}
                 {#if updateInfo.body}
-                  <div class="whitespace-pre-wrap text-sm">
+                  <div class="text-sm whitespace-pre-wrap">
                     {updateInfo.body}
                   </div>
                 {/if}

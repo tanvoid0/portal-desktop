@@ -115,7 +115,7 @@
   {#if resizable}
     <div
       class="resize-handle absolute {direction === 'horizontal'
-        ? 'right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400'
+        ? 'top-0 right-0 h-full w-1 cursor-col-resize hover:bg-blue-400'
         : 'bottom-0 left-0 h-1 w-full cursor-row-resize hover:bg-blue-400'} {isResizing
         ? 'bg-blue-400'
         : 'bg-transparent'} transition-colors"

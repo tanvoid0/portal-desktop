@@ -259,7 +259,7 @@
                       </Button>
                     </div>
                     <pre
-                      class="overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-3 text-sm">{value}</pre>
+                      class="overflow-auto rounded bg-muted p-3 text-sm break-words whitespace-pre-wrap">{value}</pre>
                   </div>
                 {/each}
               </div>

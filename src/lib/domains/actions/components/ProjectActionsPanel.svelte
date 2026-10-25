@@ -246,7 +246,7 @@
   <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
     <!-- Actions sidebar -->
     <aside
-      class="w-full shrink-0 space-y-4 lg:sticky lg:top-4 lg:w-80 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto xl:w-96"
+      class="w-full shrink-0 space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-8rem)] lg:w-80 lg:overflow-y-auto xl:w-96"
     >
       <div class="flex flex-wrap gap-2">
         {#each FILTERS as filter (filter.id)}
@@ -409,7 +409,7 @@
             <div>
               <p class="mb-1 text-xs font-medium text-muted-foreground">Command</p>
               <code
-                class="block whitespace-pre-wrap break-all rounded bg-muted px-2 py-1.5 text-xs"
+                class="block rounded bg-muted px-2 py-1.5 text-xs break-all whitespace-pre-wrap"
               >
                 {selectedExecution.command}
               </code>
@@ -429,14 +429,14 @@
               <div>
                 <p class="mb-1 text-xs font-medium text-destructive">Error</p>
                 <pre
-                  class="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">{selectedExecution.error}</pre>
+                  class="max-h-40 overflow-auto rounded border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs whitespace-pre-wrap text-destructive">{selectedExecution.error}</pre>
               </div>
             {/if}
             {#if selectedExecution.output?.trim()}
               <div>
                 <p class="mb-1 text-xs font-medium text-muted-foreground">Output</p>
                 <pre
-                  class="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-1.5 text-xs">{selectedExecution.output}</pre>
+                  class="max-h-72 overflow-auto rounded bg-muted px-2 py-1.5 text-xs whitespace-pre-wrap">{selectedExecution.output}</pre>
               </div>
             {:else if !selectedExecution.error}
               <p class="text-xs text-muted-foreground">No output captured.</p>
@@ -478,11 +478,11 @@
                 {/if}
                 {#if step.error}
                   <pre
-                    class="max-h-32 overflow-auto whitespace-pre-wrap text-xs text-destructive">{step.error}</pre>
+                    class="max-h-32 overflow-auto text-xs whitespace-pre-wrap text-destructive">{step.error}</pre>
                 {/if}
                 {#if step.output?.trim()}
                   <pre
-                    class="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-1 text-xs">{step.output}</pre>
+                    class="max-h-40 overflow-auto rounded bg-muted px-2 py-1 text-xs whitespace-pre-wrap">{step.output}</pre>
                 {/if}
                 {#if step.executionId}
                   <Button

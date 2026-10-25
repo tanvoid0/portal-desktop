@@ -3,13 +3,7 @@
  */
 
 export type WorkspacePanel =
-  | 'chat'
-  | 'terminal'
-  | 'files'
-  | 'file'
-  | 'browser'
-  | 'changes'
-  | 'git-changes';
+  'chat' | 'terminal' | 'files' | 'file' | 'browser' | 'changes' | 'git-changes';
 
 export interface WorkspaceTab {
   id: string;

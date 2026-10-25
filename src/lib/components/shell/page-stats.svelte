@@ -34,7 +34,7 @@
         </CardTitle>
       </CardHeader>
       <CardContent class="px-4 py-3">
-        <div class="text-xl font-bold leading-none">{stat.value}</div>
+        <div class="text-xl leading-none font-bold">{stat.value}</div>
         {#if stat.description}
           <p class="mt-1 text-xs text-muted-foreground">{stat.description}</p>
         {/if}

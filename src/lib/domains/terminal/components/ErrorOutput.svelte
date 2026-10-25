@@ -88,11 +88,11 @@
 
     {#if showRaw}
       <pre
-        class="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-2 font-mono text-xs leading-relaxed text-foreground/80">{parsed.raw}</pre>
+        class="max-h-64 overflow-auto rounded-md border border-border bg-muted/30 p-2 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-foreground/80">{parsed.raw}</pre>
     {/if}
   </div>
 {:else}
   <pre
-    class="max-h-96 overflow-auto whitespace-pre-wrap break-words bg-muted/20 px-3 py-2 font-mono text-xs leading-relaxed text-foreground/90">{output ||
+    class="max-h-96 overflow-auto bg-muted/20 px-3 py-2 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-foreground/90">{output ||
       ' '}</pre>
 {/if}

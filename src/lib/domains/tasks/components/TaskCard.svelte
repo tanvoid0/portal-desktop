@@ -228,7 +228,7 @@
           </div>
         {/if}
         <Icon icon="mdi:flag" class="h-3 w-3 {getPriorityColor(task.priority)}" />
-        <span class="text-xs uppercase text-muted-foreground">{task.priority}</span>
+        <span class="text-xs text-muted-foreground uppercase">{task.priority}</span>
       </div>
     </div>
 

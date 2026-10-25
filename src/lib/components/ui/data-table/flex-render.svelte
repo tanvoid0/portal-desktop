@@ -2,7 +2,13 @@
   lang="ts"
   generics="TFeatures extends TableFeatures, TData extends RowData, TValue, TContext extends HeaderContext<TFeatures, TData, TValue> | CellContext<TFeatures, TData, TValue>"
 >
-  import type { CellContext, ColumnDefTemplate, HeaderContext, RowData, TableFeatures } from '@tanstack/table-core';
+  import type {
+    CellContext,
+    ColumnDefTemplate,
+    HeaderContext,
+    RowData,
+    TableFeatures,
+  } from '@tanstack/table-core';
   import { RenderComponentConfig, RenderSnippetConfig } from './render-helpers.js';
   import type { Attachment } from 'svelte/attachments';
   type Props = {

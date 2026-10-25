@@ -172,7 +172,7 @@
           <Button
             size="icon"
             variant="ghost"
-            class="hidden h-5 w-5 shrink-0 hover:text-destructive group-hover/folder:flex"
+            class="hidden h-5 w-5 shrink-0 group-hover/folder:flex hover:text-destructive"
             title="Delete folder (keeps its chats)"
             onclick={(e) => {
               e.preventDefault();

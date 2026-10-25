@@ -75,7 +75,7 @@
     </span>
   {/if}
 
-  <div class="flex min-w-0 max-w-full flex-1 items-center gap-1 text-muted-foreground">
+  <div class="flex max-w-full min-w-0 flex-1 items-center gap-1 text-muted-foreground">
     <span class="truncate font-mono text-xs" title={project.path}>{project.path}</span>
     <Button
       variant="ghost"

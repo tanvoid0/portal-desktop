@@ -114,7 +114,7 @@
         class="rounded-lg focus-visible:ring-blue-500"
       />
       <svg
-        class="absolute right-3 top-3 h-4 w-4 text-gray-400"
+        class="absolute top-3 right-3 h-4 w-4 text-gray-400"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -164,7 +164,7 @@
             <div class="divider-edge-t divider-edge-full">
               {#each modelList as model}
                 <div
-                  class="divider-edge-b divider-edge-full flex items-center justify-between p-4 transition-colors last:[&::after]:hidden hover:bg-gray-50"
+                  class="divider-edge-b divider-edge-full flex items-center justify-between p-4 transition-colors hover:bg-gray-50 last:[&::after]:hidden"
                 >
                   <div class="flex items-center gap-4">
                     <div class="flex items-center gap-2">

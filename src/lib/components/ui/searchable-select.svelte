@@ -96,7 +96,7 @@
                 value={option.value}
                 onclick={() => handleSelect(option.value)}
                 class={cn(
-                  'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
+                  'relative flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none',
                   'aria-selected:bg-accent aria-selected:text-accent-foreground',
                   'hover:bg-accent hover:text-accent-foreground',
                   value === option.value && 'bg-accent/50 font-medium'

@@ -64,7 +64,7 @@
             <p class="mb-1 text-sm font-medium">Content</p>
             <Card>
               <CardContent class="p-4">
-                <pre class="whitespace-pre-wrap text-sm">{selectedData.content}</pre>
+                <pre class="text-sm whitespace-pre-wrap">{selectedData.content}</pre>
               </CardContent>
             </Card>
           </div>

@@ -714,7 +714,7 @@ status:
               <div class="text-destructive">{yamlError}</div>
             {:else if yaml}
               <pre
-                class="max-h-[600px] overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-4 font-mono text-xs">{yaml}</pre>
+                class="max-h-[600px] overflow-auto rounded-lg bg-muted p-4 font-mono text-xs whitespace-pre-wrap">{yaml}</pre>
             {:else}
               <p class="text-muted-foreground">No YAML available</p>
             {/if}

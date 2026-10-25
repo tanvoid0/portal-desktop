@@ -38,7 +38,7 @@
   <div class="ml-auto flex items-center gap-3">
     <span class="text-sm text-muted-foreground">
       {count} selected ·
-      <span class="font-semibold tabular-nums text-foreground">{fmtBytes(bytes)}</span>
+      <span class="font-semibold text-foreground tabular-nums">{fmtBytes(bytes)}</span>
     </span>
     <Button variant="destructive" size="sm" onclick={onaction} disabled={disabled || count === 0}>
       <Trash2 class="size-4" />

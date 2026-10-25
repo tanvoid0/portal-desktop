@@ -37,12 +37,12 @@
   <div class="flex items-center gap-2">
     <div class="relative flex-1">
       <Search
-        class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+        class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
       />
       <Input
         bind:value={searchQuery}
         placeholder="Search command history..."
-        class="pl-10 pr-10"
+        class="pr-10 pl-10"
         onkeydown={handleKeydown}
       />
       {#if searchQuery}
@@ -50,7 +50,7 @@
           variant="ghost"
           size="sm"
           onclick={clearSearch}
-          class="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 transform p-0"
+          class="absolute top-1/2 right-1 h-6 w-6 -translate-y-1/2 transform p-0"
         >
           <X class="h-4 w-4" />
         </Button>

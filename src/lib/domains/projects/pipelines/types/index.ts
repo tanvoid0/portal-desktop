@@ -105,12 +105,7 @@ export interface PipelineExecutionListItem extends PipelineExecution {
 }
 
 export type ExecutionStatus =
-  | 'pending'
-  | 'running'
-  | 'success'
-  | 'failed'
-  | 'cancelled'
-  | 'skipped';
+  'pending' | 'running' | 'success' | 'failed' | 'cancelled' | 'skipped';
 
 export interface StepExecution {
   id: string;

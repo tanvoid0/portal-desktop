@@ -339,8 +339,8 @@
           <Badge
             variant="outline"
             class={partial
-              ? 'bg-status-warning-bg text-status-warning border-status-warning/30'
-              : 'bg-status-success-bg text-status-success border-status-success/30'}
+              ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
+              : 'border-status-success/30 bg-status-success-bg text-status-success'}
           >
             {partial ? `stopped at ${restorePct}%` : 'complete'}
           </Badge>
@@ -481,7 +481,7 @@
                     : t.status === 'failed'
                       ? 'bg-status-error'
                       : t.status.includes('progress') || t.status === 'running'
-                        ? 'bg-primary animate-pulse'
+                        ? 'animate-pulse bg-primary'
                         : 'bg-muted-foreground'}"
                 ></span>
                 <span>{t.role}</span>
@@ -509,7 +509,7 @@
           {#if verification?.gated}
             <Badge
               variant="outline"
-              class="bg-status-warning-bg text-status-warning border-status-warning/30"
+              class="border-status-warning/30 bg-status-warning-bg text-status-warning"
               >paused at a review gate</Badge
             >
           {/if}
@@ -562,7 +562,7 @@
                       <span class="text-xs font-medium text-foreground">{n.role}</span>
                       <span class="text-xs text-muted-foreground">#{n.taskId} · {n.status}</span>
                     </div>
-                    <div class="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                    <div class="text-sm break-words whitespace-pre-wrap text-muted-foreground">
                       {n.output}
                     </div>
                   </CardContent>
@@ -600,14 +600,14 @@
                 onCheckedChange={() => toggleSel(sel.ids, !sel.all)}
               />
             </TableCell>
-            <TableCell class="break-all align-top font-mono text-xs">
+            <TableCell class="align-top font-mono text-xs break-all">
               <div class="flex items-start" style="padding-left: {depth * 16}px">
                 {#if isFolder}
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    class="mr-1.5 mt-px h-4 w-4 shrink-0 p-0 text-muted-foreground"
+                    class="mt-px mr-1.5 h-4 w-4 shrink-0 p-0 text-muted-foreground"
                     onclick={() => toggleExp(node.fullPath)}
                     >{expanded.has(node.fullPath) ? '▾' : '▸'}</Button
                   >
@@ -624,7 +624,7 @@
             </TableCell>
             <TableCell class="align-top text-muted-foreground">{p ? p.kind : ''}</TableCell>
             <TableCell class="align-top text-muted-foreground">{p ? p.reason : ''}</TableCell>
-            <TableCell class="whitespace-nowrap text-right align-top"
+            <TableCell class="text-right align-top whitespace-nowrap"
               >{fmtBytes(node.sizeBytes)}</TableCell
             >
             <TableCell class="align-top">

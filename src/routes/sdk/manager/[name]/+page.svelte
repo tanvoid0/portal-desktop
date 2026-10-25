@@ -253,7 +253,7 @@
             {#if manager.install_command}
               <div class="space-y-2">
                 <p class="text-sm font-medium">Installation Command:</p>
-                <code class="block break-all rounded bg-muted p-2 font-mono text-xs">
+                <code class="block rounded bg-muted p-2 font-mono text-xs break-all">
                   {manager.install_command}
                 </code>
               </div>

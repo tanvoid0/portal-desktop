@@ -172,7 +172,7 @@
 
           <div class="w-full space-y-3">
             <div class="flex items-center gap-2 rounded-md bg-muted p-3">
-              <code class="flex-1 break-all text-sm">{url}</code>
+              <code class="flex-1 text-sm break-all">{url}</code>
               <Button
                 variant="ghost"
                 size="icon"

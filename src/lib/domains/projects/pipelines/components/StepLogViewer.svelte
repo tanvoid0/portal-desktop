@@ -137,7 +137,7 @@
       {:else}
         {#each displayLines as line, i (i)}
           <div
-            class="whitespace-pre-wrap break-all {isStderrLine(line)
+            class="break-all whitespace-pre-wrap {isStderrLine(line)
               ? 'text-red-400'
               : 'text-zinc-300'}"
           >

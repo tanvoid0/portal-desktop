@@ -92,7 +92,7 @@
       <div class="flex items-center gap-2 text-xs">
         <span class="h-2.5 w-2.5 shrink-0 rounded-sm" style="background-color:{s.color}"></span>
         <span class="truncate text-foreground">{s.label}</span>
-        <span class="ml-auto tabular-nums text-muted-foreground">{s.value}</span>
+        <span class="ml-auto text-muted-foreground tabular-nums">{s.value}</span>
       </div>
     {/each}
   </div>

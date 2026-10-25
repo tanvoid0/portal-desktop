@@ -1251,7 +1251,7 @@
               {#if project.git_repository}
                 <div>
                   <p class="text-sm font-medium text-muted-foreground">Repository</p>
-                  <p class="mt-1 break-all rounded bg-muted p-2 font-mono text-sm">
+                  <p class="mt-1 rounded bg-muted p-2 font-mono text-sm break-all">
                     {project.git_repository}
                   </p>
                   {#if toGitHubUrl(project.git_repository)}

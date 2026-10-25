@@ -173,7 +173,7 @@
                 value={option.value}
                 onclick={() => handleToggle(option.value)}
                 class={cn(
-                  'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
+                  'relative flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none',
                   'hover:bg-accent hover:text-accent-foreground',
                   value.includes(option.value) && 'bg-accent/50'
                 )}

@@ -1,6 +1,17 @@
 /** URL-backed tab selection helpers for SvelteKit pages. */
 
-type ReadableSearchParams = Pick<URLSearchParams, 'get' | 'getAll' | 'has' | 'keys' | 'values' | 'entries' | 'forEach' | 'toString' | typeof Symbol.iterator>;
+type ReadableSearchParams = Pick<
+  URLSearchParams,
+  | 'get'
+  | 'getAll'
+  | 'has'
+  | 'keys'
+  | 'values'
+  | 'entries'
+  | 'forEach'
+  | 'toString'
+  | typeof Symbol.iterator
+>;
 
 export function resolveUrlTab<T extends string>(
   searchParams: ReadableSearchParams,

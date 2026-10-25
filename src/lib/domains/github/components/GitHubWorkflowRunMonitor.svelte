@@ -181,7 +181,7 @@
             </Button>
 
             {#if expandedJobId === job.id}
-              <div class="divider-edge-t divider-edge-full space-y-3 px-3 pb-3 pt-2">
+              <div class="divider-edge-t divider-edge-full space-y-3 px-3 pt-2 pb-3">
                 {#if job.steps.length > 0}
                   <div class="space-y-1">
                     {#each job.steps as step (step.number)}

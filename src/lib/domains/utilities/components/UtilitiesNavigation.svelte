@@ -66,17 +66,17 @@
         type="button"
         variant="ghost"
         onclick={() => handleSectionClick(section.path)}
-        class="flex h-auto w-full items-start justify-start whitespace-normal rounded-lg px-4 py-3 text-base font-medium transition-colors {isActive
+        class="flex h-auto w-full items-start justify-start rounded-lg px-4 py-3 text-base font-medium whitespace-normal transition-colors {isActive
           ? 'bg-accent text-accent-foreground'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}"
       >
         {@const Icon = section.icon}
-        <Icon class="mr-3 mt-0.5 h-5 w-5 flex-shrink-0" />
+        <Icon class="mt-0.5 mr-3 h-5 w-5 flex-shrink-0" />
         <div class="min-w-0 flex-1 text-left">
-          <div class="text-base font-semibold leading-tight">
+          <div class="text-base leading-tight font-semibold">
             {section.label}
           </div>
-          <p class="mt-1 break-words text-sm leading-relaxed text-muted-foreground">
+          <p class="mt-1 text-sm leading-relaxed break-words text-muted-foreground">
             {section.description}
           </p>
         </div>

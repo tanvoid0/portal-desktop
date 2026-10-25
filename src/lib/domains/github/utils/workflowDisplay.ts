@@ -3,13 +3,7 @@ import { CheckCircle2, Circle, Loader2, XCircle, Ban, Clock } from '@lucide/svel
 import type { GitHubWorkflowRun } from '../types';
 
 export type WorkflowDisplayStatus =
-  | 'success'
-  | 'failed'
-  | 'running'
-  | 'queued'
-  | 'cancelled'
-  | 'skipped'
-  | 'pending';
+  'success' | 'failed' | 'running' | 'queued' | 'cancelled' | 'skipped' | 'pending';
 
 export function getWorkflowDisplayStatus(
   status: string,

@@ -305,7 +305,7 @@
                       </div>
                     </div>
                     <pre
-                      class="overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-3 text-sm">
+                      class="overflow-auto rounded bg-muted p-3 text-sm break-words whitespace-pre-wrap">
 											{#if showSecretValues[key]}
                         {decodeBase64(String(base64Value))}
                       {:else}

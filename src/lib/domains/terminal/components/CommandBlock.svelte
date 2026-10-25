@@ -203,13 +203,13 @@
       {:else}
         <pre
           bind:this={outputEl}
-          class="max-h-96 overflow-auto whitespace-pre-wrap break-words bg-muted/20 px-3 py-2 font-mono text-xs leading-relaxed text-foreground/90">{displayOutput ||
+          class="max-h-96 overflow-auto bg-muted/20 px-3 py-2 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-foreground/90">{displayOutput ||
             ' '}</pre>
         {#if displayOutput}
           <Button
             variant="ghost"
             size="sm"
-            class="absolute right-1.5 top-1.5 h-6 w-6 bg-card/80 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+            class="absolute top-1.5 right-1.5 h-6 w-6 bg-card/80 p-0 opacity-0 transition-opacity group-hover:opacity-100"
             title="Copy output"
             onclick={(e: MouseEvent) => {
               e.stopPropagation();

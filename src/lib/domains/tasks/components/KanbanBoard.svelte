@@ -136,7 +136,7 @@
                       </div>
                     {/if}
                     <Icon icon="mdi:flag" class="h-3 w-3 {getPriorityColor(task.priority)}" />
-                    <span class="text-xs uppercase text-muted-foreground">{task.priority}</span>
+                    <span class="text-xs text-muted-foreground uppercase">{task.priority}</span>
                   </div>
                 </div>
 
@@ -191,7 +191,7 @@
 
             <!-- Subtasks in Kanban View -->
             {#if getTaskSubtasks(task.id).length > 0}
-              <div class="ml-4 mt-2 space-y-2">
+              <div class="mt-2 ml-4 space-y-2">
                 {#each getTaskSubtasks(task.id) as subtask}
                   <div
                     onclick={(e) => {
@@ -227,7 +227,7 @@
                               icon="mdi:flag"
                               class="h-3 w-3 {getPriorityColor(subtask.priority)}"
                             />
-                            <span class="text-xs uppercase text-muted-foreground"
+                            <span class="text-xs text-muted-foreground uppercase"
                               >{subtask.priority}</span
                             >
                           </div>

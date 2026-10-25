@@ -402,7 +402,7 @@
                 </Button>
               </div>
             {:else}
-              <p class="text-sm text-muted-foreground text-center py-4">
+              <p class="py-4 text-center text-sm text-muted-foreground">
                 No environment variables added
               </p>
             {/each}

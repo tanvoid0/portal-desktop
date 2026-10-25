@@ -42,14 +42,7 @@
     if (section === 'framework-ides') return 'ides' as const;
     if (section.startsWith('ai')) return 'ai' as const;
     return (section || 'general') as
-      | 'general'
-      | 'editor'
-      | 'terminal'
-      | 'theme'
-      | 'ides'
-      | 'ai'
-      | 'github'
-      | 'updates';
+      'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'ai' | 'github' | 'updates';
   });
 
   onMount(async () => {

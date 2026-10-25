@@ -23,9 +23,9 @@
   {#each tiles as t (t.label)}
     <Card class="gap-0 py-4">
       <CardContent class="px-4">
-        <div class="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">{t.label}</div>
+        <div class="mb-1.5 text-xs tracking-wide text-muted-foreground uppercase">{t.label}</div>
         <div
-          class="text-2xl font-semibold tabular-nums tracking-tight {t.accent ?? 'text-foreground'}"
+          class="text-2xl font-semibold tracking-tight tabular-nums {t.accent ?? 'text-foreground'}"
         >
           {t.value}
         </div>

@@ -167,17 +167,14 @@ function normalizeAppSettings(raw: RawAppSettings | null | undefined): AppSettin
         clientId:
           (
             (app.integrations as Record<string, unknown> | undefined)?.github as
-              | Record<string, unknown>
-              | undefined
+              Record<string, unknown> | undefined
           )?.clientId?.toString?.() ??
           (
             (app.integrations as Record<string, unknown> | undefined)?.github as
-              | Record<string, unknown>
-              | undefined
+              Record<string, unknown> | undefined
           )?.client_id?.toString?.() ??
           ((app.integrations as Record<string, unknown> | undefined)?.github_client_id as
-            | string
-            | undefined) ??
+            string | undefined) ??
           DEFAULT_GITHUB_INTEGRATION_SETTINGS.clientId,
       },
     },

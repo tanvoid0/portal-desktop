@@ -216,7 +216,7 @@
   <div class="flex items-center gap-4">
     <div class="relative flex-1">
       <Search
-        class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+        class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
       />
       <Input placeholder="Search directories..." bind:value={searchTerm} class="pl-10" />
     </div>
@@ -303,7 +303,7 @@
             <div class="space-y-3">
               <div>
                 <Label class="text-xs text-muted-foreground">Path</Label>
-                <p class="mt-1 break-all rounded bg-muted p-2 font-mono text-sm">
+                <p class="mt-1 rounded bg-muted p-2 font-mono text-sm break-all">
                   {directory.path}
                 </p>
               </div>

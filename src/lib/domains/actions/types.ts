@@ -5,14 +5,7 @@
 export type ActionSource = 'local' | 'github' | 'n8n' | 'file' | 'custom';
 export type ActionRunner = 'local' | 'github' | 'n8n';
 export type ActionCategory =
-  | 'install'
-  | 'dev'
-  | 'build'
-  | 'test'
-  | 'lint'
-  | 'utility'
-  | 'ci'
-  | 'deploy';
+  'install' | 'dev' | 'build' | 'test' | 'lint' | 'utility' | 'ci' | 'deploy';
 
 export interface UnifiedAction {
   id: string;

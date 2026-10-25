@@ -284,14 +284,14 @@
 
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Boxes class="h-4 w-4 text-muted-foreground" />
                 Pods
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.pods.total}
               </div>
               <p class="mt-1 text-xs text-muted-foreground">
@@ -301,28 +301,28 @@
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Network class="h-4 w-4 text-muted-foreground" />
                 Services
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.services.total}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Rocket class="h-4 w-4 text-muted-foreground" />
                 Deployments
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.deployments.total}
               </div>
               <p class="mt-1 text-xs text-muted-foreground">
@@ -332,14 +332,14 @@
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Layers class="h-4 w-4 text-muted-foreground" />
                 StatefulSets
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.statefulsets.total}
               </div>
               <p class="mt-1 text-xs text-muted-foreground">
@@ -349,14 +349,14 @@
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Activity class="h-4 w-4 text-muted-foreground" />
                 DaemonSets
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.daemonsets.total}
               </div>
               <p class="mt-1 text-xs text-muted-foreground">
@@ -366,84 +366,84 @@
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Briefcase class="h-4 w-4 text-muted-foreground" />
                 Jobs
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.jobs.total}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Clock class="h-4 w-4 text-muted-foreground" />
                 CronJobs
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.cronjobs.total}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <FileText class="h-4 w-4 text-muted-foreground" />
                 ConfigMaps
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.configmaps.total}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Lock class="h-4 w-4 text-muted-foreground" />
                 Secrets
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.secrets.total}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Globe class="h-4 w-4 text-muted-foreground" />
                 Ingress
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.ingresses.total}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader class="pb-1 px-4">
+            <CardHeader class="px-4 pb-1">
               <CardTitle class="flex items-center gap-2 text-sm font-medium">
                 <Server class="h-4 w-4 text-muted-foreground" />
                 Namespaces
               </CardTitle>
             </CardHeader>
             <CardContent class="px-4 py-3">
-              <div class="text-xl font-bold leading-none">
+              <div class="text-xl leading-none font-bold">
                 {stats.namespaces.total}
               </div>
             </CardContent>

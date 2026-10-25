@@ -183,7 +183,7 @@
   </Button>
 
   {#if open}
-    <div class="ml-4 mt-1 space-y-2 border-l border-border/60 pl-3 pb-1">
+    <div class="mt-1 ml-4 space-y-2 border-l border-border/60 pb-1 pl-3">
       {#if isWrite}
         {#if isMarkdownWrite}
           <MarkdownFileContent content={writeContent} />

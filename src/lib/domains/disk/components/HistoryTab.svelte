@@ -94,15 +94,15 @@
       {#each entries as e (e.id)}
         <TableRow>
           <TableCell class="whitespace-nowrap text-muted-foreground">{fmtDate(e.ts)}</TableCell>
-          <TableCell class="break-all font-mono text-xs">{e.path}</TableCell>
+          <TableCell class="font-mono text-xs break-all">{e.path}</TableCell>
           <TableCell class="text-muted-foreground">{e.kind}</TableCell>
-          <TableCell class="whitespace-nowrap text-right">{fmtBytes(e.sizeBytes)}</TableCell>
+          <TableCell class="text-right whitespace-nowrap">{fmtBytes(e.sizeBytes)}</TableCell>
           <TableCell>
             <Badge
               variant="outline"
               class={e.status === 'moved'
-                ? 'bg-status-success-bg text-status-success border-status-success/30'
-                : 'bg-status-error-bg text-status-error border-status-error/30'}
+                ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                : 'border-status-error/30 bg-status-error-bg text-status-error'}
             >
               {e.status}
             </Badge>

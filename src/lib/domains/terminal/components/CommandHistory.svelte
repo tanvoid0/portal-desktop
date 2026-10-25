@@ -133,9 +133,9 @@
       </Button>
     {:else}
       <div class="p-6 text-center text-muted-foreground">
-        <div class="text-4xl mb-2">📝</div>
+        <div class="mb-2 text-4xl">📝</div>
         <div class="text-sm">No commands executed yet</div>
-        <div class="text-xs mt-1">Commands will appear here as you use the terminal</div>
+        <div class="mt-1 text-xs">Commands will appear here as you use the terminal</div>
       </div>
     {/each}
   </div>
@@ -190,7 +190,7 @@
         <div>
           <h3 class="mb-2 text-sm font-medium text-foreground">Output</h3>
           <pre
-            class="overflow-x-auto whitespace-pre-wrap rounded bg-muted p-3 text-xs text-foreground">{selectedEntry.output ||
+            class="overflow-x-auto rounded bg-muted p-3 text-xs whitespace-pre-wrap text-foreground">{selectedEntry.output ||
               '(No output)'}</pre>
         </div>
       </div>

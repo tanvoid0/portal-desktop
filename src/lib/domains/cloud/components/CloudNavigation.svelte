@@ -230,7 +230,7 @@
     {#each navGroups as group}
       <div>
         <h3
-          class="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-[collapsible=icon]:hidden"
+          class="mb-2 px-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase group-data-[collapsible=icon]:hidden"
         >
           {group.title}
         </h3>
@@ -246,7 +246,7 @@
             >
               <span class="flex-shrink-0 text-lg">{item.icon}</span>
               <div class="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
-                <div class="text-sm font-medium leading-tight">
+                <div class="text-sm leading-tight font-medium">
                   {item.label}
                 </div>
                 <p class="mt-0.5 text-xs leading-relaxed opacity-70">

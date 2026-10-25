@@ -14,13 +14,7 @@ export interface UpdateStatus {
 }
 
 export type UpdateErrorCategory =
-  | 'network'
-  | 'manifest'
-  | 'signature'
-  | 'download'
-  | 'install'
-  | 'disabled'
-  | 'unknown';
+  'network' | 'manifest' | 'signature' | 'download' | 'install' | 'disabled' | 'unknown';
 
 export interface UpdateErrorInfo {
   category: UpdateErrorCategory;

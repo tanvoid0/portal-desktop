@@ -288,7 +288,7 @@
             {#if manager.install_command && !manager.installed}
               <div class="mt-4">
                 <p class="mb-1 text-xs font-medium text-muted-foreground">Installation Command:</p>
-                <code class="block break-all rounded bg-muted p-2 font-mono text-xs">
+                <code class="block rounded bg-muted p-2 font-mono text-xs break-all">
                   {manager.install_command}
                 </code>
               </div>

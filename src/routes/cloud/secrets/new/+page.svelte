@@ -249,7 +249,7 @@ ${dataSection}
                       <Button
                         variant="ghost"
                         size="sm"
-                        class="absolute right-1 top-1 h-8 w-8 p-0"
+                        class="absolute top-1 right-1 h-8 w-8 p-0"
                         onclick={() => toggleVisibility(index)}
                       >
                         {#if entry.visible}

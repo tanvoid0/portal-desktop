@@ -475,7 +475,7 @@
             </Button>
           </Badge>
         {:else}
-          <p class="text-muted-foreground text-sm">
+          <p class="text-sm text-muted-foreground">
             {loadingState
               ? 'Loading saved folders…'
               : 'No folders yet — add the drive or directory your projects live under.'}
@@ -499,7 +499,7 @@
           <Button variant="ghost" onclick={() => cancelDiscovery()}>Cancel</Button>
         {/if}
       </div>
-      <p id="audit-root-hint" class="text-muted-foreground text-xs">
+      <p id="audit-root-hint" class="text-xs text-muted-foreground">
         Leave the field empty and Add folder opens a folder picker.
       </p>
 
@@ -514,7 +514,7 @@
             disabled={scanning}
           />
           <span>Measure reclaimable size</span>
-          <span class="text-muted-foreground text-xs">walks build output — slower</span>
+          <span class="text-xs text-muted-foreground">walks build output — slower</span>
         </label>
         <label class="flex items-center gap-2">
           <Checkbox
@@ -526,7 +526,7 @@
             disabled={scanning}
           />
           <span>Archive projects no longer on disk</span>
-          <span class="text-muted-foreground text-xs">roots that failed to open are skipped</span>
+          <span class="text-xs text-muted-foreground">roots that failed to open are skipped</span>
         </label>
       </div>
 
@@ -535,7 +535,7 @@
           <Progress value={percent} aria-label="Scan progress" />
           <!-- The path changes many times a second; announcing it would drown
                out everything else, so the pollable progressbar carries it. -->
-          <p class="text-muted-foreground truncate font-mono text-xs" aria-hidden="true">
+          <p class="truncate font-mono text-xs text-muted-foreground" aria-hidden="true">
             {progress.phase === 'find' ? 'walking' : `${progress.done}/${progress.total}`}
             {progress.phase === 'size' ? ' sizing' : ''} — {progress.path}
           </p>
@@ -543,10 +543,10 @@
       {/if}
 
       {#if error}
-        <p class="text-destructive text-sm" role="alert">{error}</p>
+        <p class="text-sm text-destructive" role="alert">{error}</p>
       {/if}
       {#if importSummary}
-        <p class="text-muted-foreground text-sm" role="status">{importSummary}</p>
+        <p class="text-sm text-muted-foreground" role="status">{importSummary}</p>
       {/if}
     </CardContent>
   </Card>
@@ -558,38 +558,38 @@
       <Card
         ><CardContent class="p-3">
           <div class="text-2xl font-semibold">{stats.projects}</div>
-          <div class="text-muted-foreground text-xs uppercase">Projects</div>
-          <div class="text-muted-foreground text-xs">{stats.roots} roots</div>
+          <div class="text-xs text-muted-foreground uppercase">Projects</div>
+          <div class="text-xs text-muted-foreground">{stats.roots} roots</div>
         </CardContent></Card
       >
       <Card
         ><CardContent class="p-3">
           <div class="text-2xl font-semibold">{stats.active}</div>
-          <div class="text-muted-foreground text-xs uppercase">Active</div>
-          <div class="text-muted-foreground text-xs">
+          <div class="text-xs text-muted-foreground uppercase">Active</div>
+          <div class="text-xs text-muted-foreground">
             {stats.recent} recent · {stats.dormant} dormant · {stats.stale} stale
           </div>
         </CardContent></Card
       >
       <Card
         ><CardContent class="p-3">
-          <div class="text-destructive text-2xl font-semibold">{highRisk.length}</div>
-          <div class="text-muted-foreground text-xs uppercase">Work at risk</div>
-          <div class="text-muted-foreground text-xs">{stats.unpushed} unpushed commits</div>
+          <div class="text-2xl font-semibold text-destructive">{highRisk.length}</div>
+          <div class="text-xs text-muted-foreground uppercase">Work at risk</div>
+          <div class="text-xs text-muted-foreground">{stats.unpushed} unpushed commits</div>
         </CardContent></Card
       >
       <Card
         ><CardContent class="p-3">
           <div class="text-2xl font-semibold">{duplicateSets.length}</div>
-          <div class="text-muted-foreground text-xs uppercase">Duplicate sets</div>
-          <div class="text-muted-foreground text-xs">same remote or name</div>
+          <div class="text-xs text-muted-foreground uppercase">Duplicate sets</div>
+          <div class="text-xs text-muted-foreground">same remote or name</div>
         </CardContent></Card
       >
       <Card
         ><CardContent class="p-3">
           <div class="text-2xl font-semibold">{undecided}</div>
-          <div class="text-muted-foreground text-xs uppercase">Undecided</div>
-          <div class="text-muted-foreground text-xs">of {stats.projects}</div>
+          <div class="text-xs text-muted-foreground uppercase">Undecided</div>
+          <div class="text-xs text-muted-foreground">of {stats.projects}</div>
         </CardContent></Card
       >
       <Card
@@ -597,8 +597,8 @@
           <div class="text-2xl font-semibold">
             {stats.regenerableBytes < 0 ? '—' : fmtBytes(stats.regenerableBytes)}
           </div>
-          <div class="text-muted-foreground text-xs uppercase">Reclaimable</div>
-          <div class="text-muted-foreground text-xs">
+          <div class="text-xs text-muted-foreground uppercase">Reclaimable</div>
+          <div class="text-xs text-muted-foreground">
             {stats.regenerableBytes < 0 ? 'not measured' : 'build output'}
           </div>
         </CardContent></Card
@@ -620,10 +620,10 @@
             id={rowId(p.path)}
             tabindex={-1}
             aria-current={i === cursor ? 'true' : undefined}
-            class="audit-row focus-visible:ring-ring outline-none focus-visible:ring-2 {i === cursor
-              ? 'ring-primary ring-2'
+            class="audit-row outline-none focus-visible:ring-2 focus-visible:ring-ring {i === cursor
+              ? 'ring-2 ring-primary'
               : selected?.path === p.path
-                ? 'ring-muted-foreground/30 ring-1'
+                ? 'ring-1 ring-muted-foreground/30'
                 : ''}"
           >
             <CardContent class="flex flex-wrap items-center gap-2 p-3">
@@ -652,7 +652,7 @@
                     <Badge variant="outline">dup: {p.duplicateOf[0]}</Badge>
                   {/if}
                 </div>
-                <div class="text-muted-foreground w-full truncate font-mono text-xs">
+                <div class="w-full truncate font-mono text-xs text-muted-foreground">
                   {p.path}
                 </div>
               </Button>
@@ -697,7 +697,7 @@
             {#if selected?.path === p.path}
               <CardContent class="border-t pt-3 text-sm">
                 {#if p.description}
-                  <p class="text-muted-foreground mb-2">{p.description}</p>
+                  <p class="mb-2 text-muted-foreground">{p.description}</p>
                 {/if}
                 <div class="grid gap-1 md:grid-cols-2">
                   <div>
@@ -738,7 +738,7 @@
 
                 {#if p.modules.length > 1}
                   <div class="mt-3">
-                    <div class="text-muted-foreground mb-1 text-xs uppercase">
+                    <div class="mb-1 text-xs text-muted-foreground uppercase">
                       Modules ({p.modules.length})
                     </div>
                     <div class="max-h-56 space-y-1 overflow-auto">
@@ -759,7 +759,7 @@
             {/if}
           </Card>
         {:else}
-          <p class="text-muted-foreground py-8 text-center text-sm">Nothing matches.</p>
+          <p class="py-8 text-center text-sm text-muted-foreground">Nothing matches.</p>
         {/each}
       </div>
     {/snippet}
@@ -800,7 +800,7 @@
       </div>
 
       {#if tab === 'triage' || tab === 'risk'}
-        <p class="text-muted-foreground text-xs">
+        <p class="text-xs text-muted-foreground">
           <span class="font-mono">j</span>/<span class="font-mono">k</span> move ·
           <span class="font-mono">1</span>–<span class="font-mono">4</span>
           keep/archive/delete/review · <span class="font-mono">o</span> open folder ·
@@ -811,7 +811,7 @@
       {/if}
 
       {#if exportedTo}
-        <p class="text-muted-foreground font-mono text-xs">Written to {exportedTo}</p>
+        <p class="font-mono text-xs text-muted-foreground">Written to {exportedTo}</p>
       {/if}
 
       {#if marked.size}
@@ -845,17 +845,17 @@
                 >
                 <span class="flex-1 truncate font-mono text-xs">{c.path}</span>
                 {#if c.from && c.from !== c.path}
-                  <span class="text-muted-foreground truncate font-mono text-xs">was {c.from}</span>
+                  <span class="truncate font-mono text-xs text-muted-foreground">was {c.from}</span>
                 {:else if c.kind === 'moved' && c.detail}
                   <!-- Same id, new folder: the old absolute path is the whole story. -->
-                  <span class="text-muted-foreground truncate font-mono text-xs"
+                  <span class="truncate font-mono text-xs text-muted-foreground"
                     >was {c.detail}</span
                   >
                 {/if}
-                <span class="text-muted-foreground text-xs">{new Date(c.at).toLocaleString()}</span>
+                <span class="text-xs text-muted-foreground">{new Date(c.at).toLocaleString()}</span>
               </div>
             {:else}
-              <p class="text-muted-foreground py-8 text-center text-sm">
+              <p class="py-8 text-center text-sm text-muted-foreground">
                 Nothing yet — the first scan is the baseline. Rescan later and what appeared, moved
                 or vanished lands here.
               </p>
@@ -880,8 +880,8 @@
                   <div class="flex items-center gap-2 text-sm">
                     {#if i === 0}<Badge variant="default">newest</Badge>{/if}
                     <span class="flex-1 truncate font-mono text-xs">{m.path}</span>
-                    <span class="text-muted-foreground text-xs">{ageLabel(m.ageDays)}</span>
-                    <span class="text-muted-foreground text-xs">{m.git.commits} commits</span>
+                    <span class="text-xs text-muted-foreground">{ageLabel(m.ageDays)}</span>
+                    <span class="text-xs text-muted-foreground">{m.git.commits} commits</span>
                     <Button size="sm" variant="ghost" onclick={() => (selected = m)}>inspect</Button
                     >
                   </div>
@@ -890,7 +890,7 @@
             </Card>
           {:else}
             <Card>
-              <CardContent class="text-muted-foreground py-8 text-center text-sm">
+              <CardContent class="py-8 text-center text-sm text-muted-foreground">
                 No duplicate sets — nothing scanned shares a git remote or a folder name with
                 anything else.
               </CardContent>
@@ -906,26 +906,26 @@
               <div class="py-1">
                 <Button
                   variant="ghost"
-                  class="hover:bg-muted h-auto justify-start gap-1 rounded px-1 py-0 font-mono text-sm"
+                  class="h-auto justify-start gap-1 rounded px-1 py-0 font-mono text-sm hover:bg-muted"
                   onclick={() => (expanded = { ...expanded, [area]: !expanded[area] })}
                 >
                   {#if expanded[area]}<ChevronDown class="h-3 w-3" />{:else}<ChevronRight
                       class="h-3 w-3"
                     />{/if}
-                  <span class="text-primary font-semibold">{area}</span>
-                  <span class="text-muted-foreground text-xs">
+                  <span class="font-semibold text-primary">{area}</span>
+                  <span class="text-xs text-muted-foreground">
                     {[...buckets.values()].reduce((a, b) => a + b.length, 0)} projects
                   </span>
                 </Button>
                 {#if expanded[area]}
-                  <div class="border-muted ml-4 border-l pl-3">
+                  <div class="ml-4 border-l border-muted pl-3">
                     {#each [...buckets.entries()] as [bucket, items] (bucket)}
                       <div class="py-1">
-                        <div class="text-muted-foreground text-xs">{bucket}</div>
+                        <div class="text-xs text-muted-foreground">{bucket}</div>
                         {#each items as p (p.path)}
                           <Button
                             variant="ghost"
-                            class="hover:bg-muted h-auto w-full justify-start gap-2 rounded px-1 py-0 text-left font-mono text-sm"
+                            class="h-auto w-full justify-start gap-2 rounded px-1 py-0 text-left font-mono text-sm hover:bg-muted"
                             onclick={() => (selected = p)}
                           >
                             <span class="flex-1 truncate">{p.name}</span>
@@ -935,7 +935,7 @@
                             <Badge variant={statusVariant(p.status)} class={statusClass(p.status)}
                               >{p.status}</Badge
                             >
-                            <span class="text-muted-foreground text-xs">{ageLabel(p.ageDays)}</span>
+                            <span class="text-xs text-muted-foreground">{ageLabel(p.ageDays)}</span>
                           </Button>
                         {/each}
                       </div>
@@ -944,7 +944,7 @@
                 {/if}
               </div>
             {:else}
-              <p class="text-muted-foreground py-8 text-center font-sans text-sm">
+              <p class="py-8 text-center font-sans text-sm text-muted-foreground">
                 {search.trim()
                   ? 'Nothing matches that search.'
                   : 'Nothing to group yet — run a scan first.'}

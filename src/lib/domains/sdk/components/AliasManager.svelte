@@ -191,7 +191,7 @@
   <div class="flex items-center gap-4">
     <div class="relative flex-1">
       <Search
-        class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+        class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
       />
       <Input placeholder="Search aliases..." bind:value={searchTerm} class="pl-10" />
     </div>

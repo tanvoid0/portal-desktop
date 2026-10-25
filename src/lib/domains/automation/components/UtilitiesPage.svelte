@@ -155,11 +155,11 @@
   });
 </script>
 
-<div class="container mx-auto p-6 space-y-6">
+<div class="container mx-auto space-y-6 p-6">
   <PageHeader title="Utilities" description="Manage and run custom scripts">
     {#snippet actions()}
       <Button onclick={handleCreateScript}>
-        <Plus class="h-4 w-4 mr-2" />
+        <Plus class="mr-2 h-4 w-4" />
         New Script
       </Button>
     {/snippet}
@@ -206,7 +206,7 @@
                   {/if}
                 </div>
               </div>
-              <div class="flex flex-wrap gap-2 mt-2">
+              <div class="mt-2 flex flex-wrap gap-2">
                 {#if runningInstances.length > 0}
                   <Badge variant="default" class="bg-green-500 text-white">
                     Running ({runningInstances.length})
@@ -239,12 +239,12 @@
                         onclick={() => handleOpenRunningScripts(script)}
                         class="flex-1"
                       >
-                        <Terminal class="h-4 w-4 mr-2" />
+                        <Terminal class="mr-2 h-4 w-4" />
                         Open ({runningInstances.length})
                       </Button>
                     {:else}
                       <Button size="sm" onclick={() => handleRunScript(script)} class="flex-1">
-                        <Play class="h-4 w-4 mr-2" />
+                        <Play class="mr-2 h-4 w-4" />
                         Run
                       </Button>
                     {/if}

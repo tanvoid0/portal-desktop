@@ -265,7 +265,7 @@
         <Collapsible bind:open={issuesOpen}>
           <CollapsibleTrigger>
             {#snippet child({ props })}
-              <Button {...props} variant="ghost" size="sm" class="text-muted-foreground h-auto p-0">
+              <Button {...props} variant="ghost" size="sm" class="h-auto p-0 text-muted-foreground">
                 {issues.length}
                 {issues.length === 1 ? 'thing' : 'things'} to check
               </Button>
@@ -276,7 +276,7 @@
               {#each issues as issue (issue.message)}
                 <li class="flex items-start gap-2">
                   {#if issue.level === 'error'}
-                    <CircleAlert class="text-destructive mt-0.5 h-4 w-4 shrink-0" />
+                    <CircleAlert class="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                   {:else}
                     <TriangleAlert class="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                   {/if}
@@ -313,7 +313,7 @@
               Apply
             </Button>
           {:else if editError}
-            <p class="text-destructive text-xs">{editError}</p>
+            <p class="text-xs text-destructive">{editError}</p>
           {/if}
         </CollapsibleContent>
       </Collapsible>

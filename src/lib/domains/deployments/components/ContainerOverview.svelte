@@ -182,8 +182,8 @@
           </p>
         {:else}
           <div class="grid grid-cols-2 gap-4">
-            <div class="min-w-0 max-h-48 space-y-3 overflow-y-auto pr-1">
-              <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div class="max-h-48 min-w-0 space-y-3 overflow-y-auto pr-1">
+              <div class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 Memory
               </div>
               {#if stats.topMemory.length === 0}
@@ -195,7 +195,7 @@
                   <div class="space-y-1">
                     <div class="flex flex-col gap-0.5 text-xs">
                       <span class="truncate font-medium" title={c.name}>{c.name}</span>
-                      <span class="tabular-nums text-muted-foreground"
+                      <span class="text-muted-foreground tabular-nums"
                         >{fmtBytes(mem)} · {fmtPercent(pct)}</span
                       >
                     </div>
@@ -208,8 +208,8 @@
               {/if}
             </div>
 
-            <div class="divider-edge-l min-w-0 max-h-48 space-y-3 overflow-y-auto pl-4">
-              <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div class="divider-edge-l max-h-48 min-w-0 space-y-3 overflow-y-auto pl-4">
+              <div class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 CPU
               </div>
               {#if stats.topCpu.length === 0}
@@ -220,7 +220,7 @@
                   <div class="space-y-1">
                     <div class="flex flex-col gap-0.5 text-xs">
                       <span class="truncate font-medium" title={c.name}>{c.name}</span>
-                      <span class="tabular-nums text-muted-foreground">{fmtPercent(cpu)}</span>
+                      <span class="text-muted-foreground tabular-nums">{fmtPercent(cpu)}</span>
                     </div>
                     <Progress
                       value={(cpu / maxCpu) * 100}

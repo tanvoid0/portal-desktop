@@ -32,7 +32,8 @@
     labelKey?: string;
     hideIndicator?: boolean;
     labelClassName?: string;
-    labelFormatter?: // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    labelFormatter?:
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ((value: any, payload: TooltipPayload[]) => string | number | Snippet) | null;
     formatter?: Snippet<
       [
@@ -120,7 +121,7 @@
             {:else if !hideIndicator}
               <div
                 style="--color-bg: {indicatorColor}; --color-border: {indicatorColor};"
-                class={cn('border-(--color-border) bg-(--color-bg) shrink-0 rounded-[2px]', {
+                class={cn('shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)', {
                   'size-2.5': indicator === 'dot',
                   'h-full w-1': indicator === 'line',
                   'w-0 border-[1.5px] border-dashed bg-transparent': indicator === 'dashed',
@@ -143,7 +144,7 @@
                 </span>
               </div>
               {#if item.value !== undefined && item.value !== null}
-                <span class="font-mono font-medium tabular-nums text-foreground">
+                <span class="font-mono font-medium text-foreground tabular-nums">
                   {(item.value as number | string).toLocaleString()}
                 </span>
               {/if}

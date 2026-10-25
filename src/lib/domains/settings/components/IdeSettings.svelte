@@ -747,7 +747,7 @@
                 {#each Object.entries(frameworksByCategory) as [category, categoryFrameworks]}
                   <div>
                     <p
-                      class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                      class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
                     >
                       {category}
                     </p>
@@ -784,7 +784,7 @@
                             {framework.name}
                           </Button>
                           <div
-                            class="absolute right-1 top-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100"
+                            class="absolute top-1 right-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100"
                           >
                             <Button
                               variant="ghost"
@@ -818,7 +818,7 @@
                 {#if unmappedInGroup.length > 0}
                   <div>
                     <p
-                      class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                      class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
                     >
                       {group.category}
                     </p>
@@ -929,7 +929,7 @@
               <p class="mb-3 text-sm font-medium text-muted-foreground">Add More Frameworks</p>
               {#each Object.entries(groupedByCategory) as [category, frameworks]}
                 <div>
-                  <p class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                     {category}
                   </p>
                   <div class="flex flex-wrap gap-2">

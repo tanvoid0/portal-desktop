@@ -87,7 +87,7 @@
     {#if openTabs.length > 0}
       <div class="divider-edge-b divider-edge-full px-2 py-2">
         <div
-          class="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+          class="mb-1 px-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
         >
           Open tabs
         </div>

@@ -228,8 +228,8 @@
             <CardContent class="space-y-4">
               <div>
                 <h3 class="mb-2 font-semibold">{generatedData.title}</h3>
-                <div class="prose dark:prose-invert max-w-none">
-                  <pre class="whitespace-pre-wrap text-sm">{generatedData.content}</pre>
+                <div class="prose max-w-none dark:prose-invert">
+                  <pre class="text-sm whitespace-pre-wrap">{generatedData.content}</pre>
                 </div>
               </div>
               {#if generatedData.suggestedTags && generatedData.suggestedTags.length > 0}

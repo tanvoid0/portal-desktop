@@ -58,7 +58,7 @@
 {#each sections as section}
   <div class="px-3 py-2">
     <h2
-      class="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden"
+      class="mb-1 px-2 text-xs font-semibold tracking-wider text-sidebar-foreground/60 uppercase group-data-[collapsible=icon]:hidden"
     >
       {section.title}
     </h2>
@@ -83,7 +83,7 @@
                     {#if item.badge}
                       <Badge
                         variant="secondary"
-                        class="ml-auto mr-6 text-xs group-data-[collapsible=icon]:hidden"
+                        class="mr-6 ml-auto text-xs group-data-[collapsible=icon]:hidden"
                       >
                         {item.badge}
                       </Badge>

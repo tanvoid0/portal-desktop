@@ -502,7 +502,7 @@
         <div class="space-y-2">
           <Label>Previous Result (Reference)</Label>
           <div class="max-h-[300px] overflow-y-auto rounded-lg border bg-muted/50 p-4">
-            <pre class="whitespace-pre-wrap font-mono text-xs">{getResultPreview()}</pre>
+            <pre class="font-mono text-xs whitespace-pre-wrap">{getResultPreview()}</pre>
           </div>
         </div>
 

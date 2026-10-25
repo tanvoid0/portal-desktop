@@ -92,7 +92,7 @@
         {flowMessage}
       </p>
       <div class="mb-4 w-full max-w-sm rounded-lg border bg-muted/40 px-6 py-4 text-center">
-        <div class="text-xs uppercase tracking-wide text-muted-foreground">Your code</div>
+        <div class="text-xs tracking-wide text-muted-foreground uppercase">Your code</div>
         <div class="mt-1 flex items-center justify-center gap-2">
           <div class="font-mono text-3xl font-semibold tracking-widest">
             {deviceFlow.userCode}

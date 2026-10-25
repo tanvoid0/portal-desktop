@@ -113,7 +113,7 @@
                 <span class="flex items-center gap-1 text-muted-foreground">
                   <Cpu class="h-3 w-3" /> CPU
                 </span>
-                <span class="tabular-nums font-medium">{fmtPercent(stats.cpuPercent)}</span>
+                <span class="font-medium tabular-nums">{fmtPercent(stats.cpuPercent)}</span>
               </div>
               <Progress
                 value={Math.min(stats.cpuPercent, 100)}
@@ -125,7 +125,7 @@
                 <span class="flex items-center gap-1 text-muted-foreground">
                   <MemoryStick class="h-3 w-3" /> Memory
                 </span>
-                <span class="tabular-nums font-medium">
+                <span class="font-medium tabular-nums">
                   {fmtBytes(stats.memoryBytes)}
                   {#if stats.memoryLimitBytes}
                     / {fmtBytes(stats.memoryLimitBytes)}

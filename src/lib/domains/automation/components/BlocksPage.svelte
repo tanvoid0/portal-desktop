@@ -445,7 +445,7 @@
   <title>Blocks Management - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto p-6 space-y-6">
+<div class="container mx-auto space-y-6 p-6">
   <PageHeader
     title="Pipeline Blocks & Templates"
     description="Manage reusable blocks, steps, scripts, and pipeline templates"
@@ -463,11 +463,11 @@
       <div class="flex items-center justify-between">
         <div class="flex gap-2">
           <Button variant="outline" onclick={() => (showImportDialog = true)}>
-            <Upload class="h-4 w-4 mr-2" />
+            <Upload class="mr-2 h-4 w-4" />
             Import Block
           </Button>
           <Button onclick={handleCreateBlock}>
-            <Plus class="h-4 w-4 mr-2" />
+            <Plus class="mr-2 h-4 w-4" />
             Create Block
           </Button>
         </div>
@@ -478,7 +478,7 @@
         <div class="flex-1">
           <Input bind:value={searchQuery} placeholder="Search blocks..." class="w-full">
             <Search
-              class="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+              class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
             />
           </Input>
         </div>
@@ -548,7 +548,7 @@
                     <CardDescription class="mt-1">{block.description}</CardDescription>
                   </div>
                   <Badge class={getCategoryColor(block.category)}>
-                    <CategoryIcon class="h-3 w-3 mr-1" />
+                    <CategoryIcon class="mr-1 h-3 w-3" />
                     {block.category}
                   </Badge>
                 </div>
@@ -589,7 +589,7 @@
                     onclick={() => handleEditBlock(block)}
                     class="flex-1"
                   >
-                    <Edit class="h-3 w-3 mr-1" />
+                    <Edit class="mr-1 h-3 w-3" />
                     Edit
                   </Button>
                   <Button size="sm" variant="outline" onclick={() => handleExportBlock(block)}>
@@ -615,7 +615,7 @@
       <div class="flex items-center justify-between">
         <div class="flex gap-2">
           <Button variant="outline" onclick={handleImportTemplate}>
-            <Upload class="h-4 w-4 mr-2" />
+            <Upload class="mr-2 h-4 w-4" />
             Import Template
           </Button>
         </div>
@@ -625,7 +625,7 @@
       <div class="flex-1">
         <Input bind:value={templateSearchQuery} placeholder="Search templates..." class="w-full">
           <Search
-            class="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+            class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
           />
         </Input>
       </div>
@@ -708,7 +708,7 @@
                       onclick={() => handleEditTemplate(template)}
                       class="flex-1"
                     >
-                      <Edit class="h-3 w-3 mr-1" />
+                      <Edit class="mr-1 h-3 w-3" />
                       Edit
                     </Button>
                     <Button
@@ -731,7 +731,7 @@
 
 <!-- Create/Edit Block Dialog -->
 <Dialog.Root bind:open={showCreateDialog}>
-  <Dialog.Content class="max-w-3xl max-h-[90vh] overflow-y-auto">
+  <Dialog.Content class="max-h-[90vh] max-w-3xl overflow-y-auto">
     <Dialog.Header>
       <Dialog.Title>{editingBlock ? 'Edit Block' : 'Create New Block'}</Dialog.Title>
       <Dialog.Description>
@@ -741,7 +741,7 @@
     <div class="space-y-4">
       <!-- JSON Import Section -->
       {#if !editingBlock}
-        <div class="rounded-lg border border-dashed p-4 space-y-3">
+        <div class="space-y-3 rounded-lg border border-dashed p-4">
           <div class="flex items-center justify-between">
             <Label class="text-sm font-medium">Import from JSON</Label>
             <input
@@ -756,7 +756,7 @@
               size="sm"
               onclick={() => document.getElementById('json-file-import')?.click()}
             >
-              <Upload class="h-3 w-3 mr-1" />
+              <Upload class="mr-1 h-3 w-3" />
               Load File
             </Button>
           </div>
@@ -847,12 +847,12 @@
       {#if formData.parameters && formData.parameters.length > 0}
         <div class="space-y-2">
           <Label>Parameters ({formData.parameters.length})</Label>
-          <div class="rounded-md border p-3 space-y-2 max-h-40 overflow-y-auto">
+          <div class="max-h-40 space-y-2 overflow-y-auto rounded-md border p-3">
             {#each formData.parameters as param, i}
-              <div class="flex items-center justify-between text-sm bg-muted/50 rounded p-2">
+              <div class="flex items-center justify-between rounded bg-muted/50 p-2 text-sm">
                 <div>
                   <span class="font-medium">{param.name}</span>
-                  <span class="text-muted-foreground ml-2">({param.type})</span>
+                  <span class="ml-2 text-muted-foreground">({param.type})</span>
                   {#if param.required}
                     <Badge variant="outline" class="ml-2 text-xs">required</Badge>
                   {/if}
@@ -876,7 +876,7 @@
       {#if formData.defaultConfig && Object.keys(formData.defaultConfig).length > 0}
         <div class="space-y-2">
           <Label>Default Config</Label>
-          <pre class="rounded-md bg-muted p-3 text-xs overflow-x-auto">{JSON.stringify(
+          <pre class="overflow-x-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(
               formData.defaultConfig,
               null,
               2
@@ -897,7 +897,7 @@
 </Dialog.Root>
 
 <Dialog.Root bind:open={showEditDialog}>
-  <Dialog.Content class="max-w-2xl max-h-[90vh] overflow-y-auto">
+  <Dialog.Content class="max-h-[90vh] max-w-2xl overflow-y-auto">
     <Dialog.Header>
       <Dialog.Title>Edit Block</Dialog.Title>
       <Dialog.Description>Update block details</Dialog.Description>
@@ -987,7 +987,7 @@
     <Dialog.Footer>
       <Button variant="outline" onclick={() => (showImportDialog = false)}>Cancel</Button>
       <Button onclick={handleImportBlock}>
-        <Upload class="h-4 w-4 mr-2" />
+        <Upload class="mr-2 h-4 w-4" />
         Select File
       </Button>
     </Dialog.Footer>
@@ -996,7 +996,7 @@
 
 <!-- Edit Template Dialog -->
 <Dialog.Root bind:open={showEditTemplateDialog}>
-  <Dialog.Content class="max-w-2xl max-h-[90vh] overflow-y-auto">
+  <Dialog.Content class="max-h-[90vh] max-w-2xl overflow-y-auto">
     <Dialog.Header>
       <Dialog.Title>Edit Template</Dialog.Title>
       <Dialog.Description>

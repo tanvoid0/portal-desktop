@@ -46,7 +46,7 @@
       class={cn(
         variant === 'ring'
           ? 'inline-flex shrink-0 items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:bg-muted/60'
-          : 'flex min-w-0 max-w-[220px] flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/60',
+          : 'flex max-w-[220px] min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/60',
         className
       )}
       title="Context window usage"
@@ -77,7 +77,7 @@
         <span class="text-[11px] tabular-nums">{percent.toFixed(0)}%</span>
       {:else}
         <span
-          class="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+          class="shrink-0 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
         >
           Context
         </span>
@@ -87,7 +87,7 @@
             style="width: {percent}%"
           ></div>
         </div>
-        <span class="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+        <span class="shrink-0 text-[10px] text-muted-foreground tabular-nums">
           {percent.toFixed(0)}%
         </span>
       {/if}

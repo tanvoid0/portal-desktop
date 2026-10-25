@@ -39,7 +39,7 @@
     isActive={selected}
     tooltipContent={sdk.version ? `${sdk.displayName} (${sdk.version})` : sdk.displayName}
     onclick={onSDKClick}
-    class="!w-auto !p-1 !gap-1"
+    class="!w-auto !gap-1 !p-1"
   >
     <Devicon icon={sdk.icon} size="sm" class={iconColor} />
     <SDKInstallStatusIcon installed={sdk.installed} />
@@ -67,15 +67,15 @@
       <div class="truncate text-xs font-medium">{sdk.displayName}</div>
 
       {#if sdk.version}
-        <div class="text-[11px] text-muted-foreground leading-3">
+        <div class="text-[11px] leading-3 text-muted-foreground">
           {sdk.version}
         </div>
       {:else if !sdk.installed}
-        <div class="text-[11px] text-muted-foreground leading-3">Not installed</div>
+        <div class="text-[11px] leading-3 text-muted-foreground">Not installed</div>
       {/if}
 
       {#if sdk.category === 'database' && sdk.port}
-        <div class="text-[11px] text-muted-foreground leading-3">
+        <div class="text-[11px] leading-3 text-muted-foreground">
           Port: {sdk.port}
         </div>
       {/if}

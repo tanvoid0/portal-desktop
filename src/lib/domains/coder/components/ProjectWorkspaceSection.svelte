@@ -80,7 +80,7 @@
         ></span>
       {/if}
       {#if sessionCount > 0}
-        <span class="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+        <span class="shrink-0 text-[10px] text-muted-foreground tabular-nums">
           {sessionCount}
         </span>
       {/if}
@@ -88,7 +88,7 @@
   </div>
 
   {#if expanded && threads.length > 0}
-    <div class="space-y-1 pb-1 pl-3 pr-1 pt-0.5">
+    <div class="space-y-1 pt-0.5 pr-1 pb-1 pl-3">
       {#each threads as t (t.id)}
         <CoderSessionCard
           thread={t}

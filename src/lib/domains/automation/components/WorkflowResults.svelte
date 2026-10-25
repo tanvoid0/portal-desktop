@@ -66,7 +66,7 @@
       <div>
         <h4 class="mb-2 font-medium">Output</h4>
         <pre
-          class="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-sm">{result
+          class="overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm whitespace-pre-wrap">{result
             .results.output}</pre>
       </div>
     {/if}

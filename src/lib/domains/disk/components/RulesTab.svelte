@@ -110,7 +110,7 @@
           <TableBody>
             {#each paths as p (p)}
               <TableRow>
-                <TableCell class="break-all font-mono text-xs">{p}</TableCell>
+                <TableCell class="font-mono text-xs break-all">{p}</TableCell>
                 <TableCell class="text-right">
                   <Button
                     variant="outline"

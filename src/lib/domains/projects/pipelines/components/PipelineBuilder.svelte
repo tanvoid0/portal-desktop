@@ -126,7 +126,7 @@
   });
 </script>
 
-<div class="w-full max-w-[1200px] mx-auto">
+<div class="mx-auto w-full max-w-[1200px]">
   <Card>
     <CardHeader>
       <CardTitle>{pipeline ? 'Edit Pipeline' : 'Create Pipeline'}</CardTitle>
@@ -227,7 +227,7 @@
               </div>
             </div>
           {:else}
-            <p class="text-sm text-muted-foreground text-center py-4">
+            <p class="py-4 text-center text-sm text-muted-foreground">
               No steps yet. Click "Add Step" to get started.
             </p>
           {/each}

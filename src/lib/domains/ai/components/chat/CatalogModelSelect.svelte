@@ -90,7 +90,7 @@
                 value={model.id}
                 onclick={() => handleSelect(model.id)}
                 class={cn(
-                  'relative flex cursor-pointer select-none items-start rounded-md px-2 py-2.5 outline-none transition-colors',
+                  'relative flex cursor-pointer items-start rounded-md px-2 py-2.5 transition-colors outline-none select-none',
                   'aria-selected:bg-accent aria-selected:text-accent-foreground',
                   'hover:bg-accent hover:text-accent-foreground',
                   value === model.id && 'bg-accent/50'

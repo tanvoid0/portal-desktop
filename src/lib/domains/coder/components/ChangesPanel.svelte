@@ -377,7 +377,7 @@
               role="button"
               tabindex="0"
               class="p-2 transition-colors {focused
-                ? 'bg-primary/5 ring-2 ring-inset ring-primary/30'
+                ? 'bg-primary/5 ring-2 ring-primary/30 ring-inset'
                 : reviewed
                   ? 'opacity-70'
                   : ''}"
@@ -447,7 +447,7 @@
                 <pre
                   class="overflow-auto rounded bg-green-500/10 px-2 py-1 text-xs {h.accepted
                     ? ''
-                    : 'opacity-50 line-through'}"><code
+                    : 'line-through opacity-50'}"><code
                     >{display(h.after_lines).replace(/^/gm, '+ ')}</code
                   ></pre>
               {/if}

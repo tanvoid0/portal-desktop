@@ -15,7 +15,7 @@
 
 <div
   class={cn(
-    'inline-flex items-center gap-2 animate-fade-in',
+    'inline-flex animate-fade-in items-center gap-2',
     size === 'sm' ? 'py-0.5' : 'gap-2 rounded-lg border bg-muted px-3 py-2',
     size === 'sm' && label ? 'gap-1.5' : '',
     className
@@ -28,7 +28,7 @@
     {#each delays as delay}
       <span
         class={cn(
-          'rounded-full animate-typing-bounce',
+          'animate-typing-bounce rounded-full',
           size === 'sm' ? 'h-1 w-1 bg-muted-foreground/50' : 'h-2 w-2 bg-muted-foreground/60'
         )}
         style="animation-delay: {delay}"

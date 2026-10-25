@@ -478,7 +478,7 @@
                 <p class="mb-1 text-sm font-medium">
                   {i + 1}. {step.name}
                 </p>
-                <code class="block break-all text-xs text-muted-foreground">
+                <code class="block text-xs break-all text-muted-foreground">
                   {step.command}
                 </code>
               </div>
@@ -528,7 +528,7 @@
                 </span>
               {/if}
             </div>
-            <code class="mb-2 block break-all text-xs text-muted-foreground">
+            <code class="mb-2 block text-xs break-all text-muted-foreground">
               {step.command}
             </code>
             {#if step.output}

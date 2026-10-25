@@ -906,11 +906,11 @@
           </CardHeader>
           <CardContent>
             <div class="group relative rounded-lg bg-muted p-4">
-              <pre class="whitespace-pre-wrap font-mono text-sm">{script.command}</pre>
+              <pre class="font-mono text-sm whitespace-pre-wrap">{script.command}</pre>
               <Button
                 variant="ghost"
                 size="sm"
-                class="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
+                class="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
                 onclick={handleCopyCommand}
               >
                 <Copy class="mr-1 h-4 w-4" />

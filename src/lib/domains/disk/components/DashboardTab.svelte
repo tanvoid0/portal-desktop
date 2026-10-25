@@ -121,7 +121,7 @@
   </Button>
 </div>
 
-<div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Disk storage</div>
+<div class="mb-2 text-xs tracking-wide text-muted-foreground uppercase">Disk storage</div>
 <div class="{DISK_DRIVE_GRID} mb-6">
   {#each disks as d (d.mountPoint)}
     {@const pct = usePct(d)}
@@ -140,7 +140,7 @@
           <span class="truncate text-xs text-muted-foreground"
             >{d.name?.trim() || d.mountPoint}</span
           >
-          <span class="ml-auto text-xs uppercase text-muted-foreground">{d.fsKind}</span>
+          <span class="ml-auto text-xs text-muted-foreground uppercase">{d.fsKind}</span>
         </div>
         <Progress
           value={pct}
@@ -151,10 +151,10 @@
               : ''}"
         />
         <div class="flex items-center justify-between text-xs">
-          <span class="tabular-nums text-muted-foreground"
+          <span class="text-muted-foreground tabular-nums"
             >{fmtBytes(used)} used · {fmtBytes(d.availableBytes)} free</span
           >
-          <span class="tabular-nums text-muted-foreground/70"
+          <span class="text-muted-foreground/70 tabular-nums"
             >{pct.toFixed(0)}% of {fmtBytes(d.totalBytes)}</span
           >
         </div>
@@ -175,7 +175,7 @@
   {/if}
 </div>
 
-<div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Quick actions</div>
+<div class="mb-2 text-xs tracking-wide text-muted-foreground uppercase">Quick actions</div>
 <div class="mb-6 flex flex-wrap gap-2">
   {#if quick.downloads}
     <Button variant="secondary" onclick={() => go('cleanup', quick.downloads!.path)}>
@@ -198,7 +198,7 @@
   </Button>
 </div>
 
-<div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Cleanup summary</div>
+<div class="mb-2 text-xs tracking-wide text-muted-foreground uppercase">Cleanup summary</div>
 <StatTiles
   tiles={[
     {
@@ -276,7 +276,7 @@
                 <span class="h-2.5 w-2.5 shrink-0 rounded-sm" style="background-color:{s.color}"
                 ></span>
                 <span class="truncate text-foreground">{s.label}</span>
-                <span class="ml-auto tabular-nums text-muted-foreground">{fmtBytes(s.value)}</span>
+                <span class="ml-auto text-muted-foreground tabular-nums">{fmtBytes(s.value)}</span>
               </div>
             {/each}
           </div>
@@ -299,7 +299,7 @@
                 : 'bg-status-error'}"
             ></span>
             <span class="truncate font-mono text-muted-foreground" title={e.path}>{e.path}</span>
-            <span class="ml-auto whitespace-nowrap tabular-nums text-muted-foreground"
+            <span class="ml-auto whitespace-nowrap text-muted-foreground tabular-nums"
               >{fmtBytes(e.sizeBytes)}</span
             >
           </div>

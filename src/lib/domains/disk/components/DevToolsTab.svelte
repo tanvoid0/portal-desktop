@@ -357,7 +357,7 @@
               <span class="text-xs text-muted-foreground"
                 >{g.items.length} item{g.items.length === 1 ? '' : 's'}</span
               >
-              <span class="text-sm font-semibold tabular-nums text-foreground"
+              <span class="text-sm font-semibold text-foreground tabular-nums"
                 >{fmtBytes(g.totalBytes)}</span
               >
             </div>
@@ -391,7 +391,7 @@
                   >
                     {subCollapsed.has(sub.label) ? '▸' : '▾'}
                   </Button>
-                  <span class="break-all font-mono text-xs text-foreground" title={sub.label}>
+                  <span class="font-mono text-xs break-all text-foreground" title={sub.label}>
                     {sub.label}
                   </span>
                   <span class="ml-auto flex items-center gap-3 whitespace-nowrap">
@@ -415,7 +415,7 @@
                           <TableCell class="font-mono text-xs">
                             <span class="text-muted-foreground">…\</span>{item.kind}
                           </TableCell>
-                          <TableCell class="whitespace-nowrap text-xs text-muted-foreground">
+                          <TableCell class="text-xs whitespace-nowrap text-muted-foreground">
                             {item.fileCount.toLocaleString()} files
                           </TableCell>
                           <TableCell>
@@ -429,7 +429,7 @@
                           >
                             {item.reason}
                           </TableCell>
-                          <TableCell class="whitespace-nowrap text-right">
+                          <TableCell class="text-right whitespace-nowrap">
                             {fmtBytes(item.sizeBytes)}
                           </TableCell>
                         </TableRow>
@@ -450,7 +450,7 @@
                         onCheckedChange={() => toggleSel([item.id], !selected.has(item.id))}
                       />
                     </TableCell>
-                    <TableCell class="break-all font-mono text-xs text-foreground">
+                    <TableCell class="font-mono text-xs break-all text-foreground">
                       {item.path}
                     </TableCell>
                     <TableCell>
@@ -469,7 +469,7 @@
                     >
                       {item.reason}
                     </TableCell>
-                    <TableCell class="whitespace-nowrap text-right">
+                    <TableCell class="text-right whitespace-nowrap">
                       {fmtBytes(item.sizeBytes)}
                     </TableCell>
                   </TableRow>

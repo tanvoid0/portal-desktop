@@ -53,7 +53,7 @@
   class={cn(
     'group relative cursor-pointer overflow-hidden',
     'hover:border-border hover:shadow-sm',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+    'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
     onClick && 'transition-shadow',
     className
   )}

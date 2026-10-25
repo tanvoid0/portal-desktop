@@ -95,7 +95,7 @@
   });
 </script>
 
-<div class={cn('px-4 pb-3 pt-2', className)}>
+<div class={cn('px-4 pt-2 pb-3', className)}>
   <div class="mx-auto w-full max-w-chat">
     {#if above}
       {@render above()}

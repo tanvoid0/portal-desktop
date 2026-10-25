@@ -62,7 +62,7 @@
 
 {#if showSuggestions && locations.length > 0}
   <div class="mb-6">
-    <div class="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+    <div class="mb-2 text-xs tracking-wide text-muted-foreground uppercase">
       Or start from a drive or common folder
     </div>
     <div class="flex flex-wrap gap-2">

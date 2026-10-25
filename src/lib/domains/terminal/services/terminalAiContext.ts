@@ -11,14 +11,7 @@ const MAX_BLOCKS = 5;
 const MAX_OUTPUT_CHARS = 1500;
 
 export type ShellFamily =
-  | 'powershell'
-  | 'pwsh'
-  | 'bash'
-  | 'zsh'
-  | 'cmd'
-  | 'fish'
-  | 'sh'
-  | 'unknown';
+  'powershell' | 'pwsh' | 'bash' | 'zsh' | 'cmd' | 'fish' | 'sh' | 'unknown';
 
 export interface ShellMetadata {
   family: ShellFamily;

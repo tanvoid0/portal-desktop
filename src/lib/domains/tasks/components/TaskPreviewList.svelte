@@ -76,7 +76,7 @@
         showAddButton={showAddButtons}
       />
     {:else}
-      <p class="text-sm text-muted-foreground text-center py-4">No subtasks</p>
+      <p class="py-4 text-center text-sm text-muted-foreground">No subtasks</p>
     {/each}
   </CardContent>
 </Card>

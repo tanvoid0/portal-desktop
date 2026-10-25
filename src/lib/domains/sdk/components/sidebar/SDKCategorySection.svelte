@@ -48,7 +48,7 @@
       tooltipContent={title}
       aria-expanded={isOpen}
       onclick={toggle}
-      class="!w-auto !p-1 !gap-1"
+      class="!w-auto !gap-1 !p-1"
     >
       {@const Icon = iconComponent}
       <Icon class="h-4 w-4" />
@@ -86,7 +86,7 @@
       onclick={toggle}
     >
       <Icon class="h-4 w-4" />
-      <h3 class="text-xs font-medium leading-none">{title}</h3>
+      <h3 class="text-xs leading-none font-medium">{title}</h3>
       {#if collapsible}
         <ChevronDown
           class="ml-auto h-3 w-3 transition-transform {isOpen ? 'rotate-0' : '-rotate-90'}"

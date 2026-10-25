@@ -26,7 +26,7 @@ no metadata (most cloud backends).
     <span class="truncate text-sm font-medium text-foreground">{row.name}</span>
     {#if row.quant}
       <span
-        class="shrink-0 rounded border border-border bg-muted/60 px-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground"
+        class="shrink-0 rounded border border-border bg-muted/60 px-1 text-[9px] font-medium tracking-wide text-muted-foreground uppercase"
         title="Quantization"
       >
         {row.quant}
@@ -49,7 +49,7 @@ no metadata (most cloud backends).
     <span class="w-20 shrink-0 truncate text-muted-foreground" title="Publisher">
       {row.publisher ?? ''}
     </span>
-    <span class="w-16 shrink-0 truncate tabular-nums text-muted-foreground" title="Parameters">
+    <span class="w-16 shrink-0 truncate text-muted-foreground tabular-nums" title="Parameters">
       {row.params ?? ''}
     </span>
     <span class="w-24 shrink-0">
@@ -66,7 +66,7 @@ no metadata (most cloud backends).
       {#if row.source}
         <span
           class={cn(
-            'block rounded px-1 py-px text-center text-[10px] font-semibold uppercase text-white',
+            'block rounded px-1 py-px text-center text-[10px] font-semibold text-white uppercase',
             row.source === 'live' ? 'bg-indigo-600' : 'bg-orange-500'
           )}
           title={row.source === 'live' ? 'Discovered live' : 'Config alias'}
@@ -75,7 +75,7 @@ no metadata (most cloud backends).
         </span>
       {/if}
     </span>
-    <span class="w-20 shrink-0 text-right tabular-nums text-muted-foreground" title="On-disk size">
+    <span class="w-20 shrink-0 text-right text-muted-foreground tabular-nums" title="On-disk size">
       {row.sizeLabel ?? ''}
     </span>
   {/if}

@@ -81,7 +81,7 @@
     <div class="flex items-center gap-2">
       <div class="relative min-w-0 flex-1">
         <Search
-          class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+          class="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
         />
         <Input placeholder={searchPlaceholder} bind:value={searchValue} class="h-8 pl-8 text-sm" />
       </div>

@@ -332,7 +332,7 @@
             <div class="flex w-full flex-wrap gap-2 sm:w-auto">
               <div class="relative min-w-[12rem] flex-1 sm:flex-none">
                 <Search
-                  class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                 />
                 <Input bind:value={userSearch} placeholder="Search user variables…" class="pl-8" />
               </div>
@@ -364,7 +364,7 @@
             <div class="flex w-full flex-wrap gap-2 sm:w-auto">
               <div class="relative min-w-[12rem] flex-1 sm:flex-none">
                 <Search
-                  class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                 />
                 <Input
                   bind:value={systemSearch}

@@ -112,7 +112,7 @@
   {#snippet meta()}
     {#if tokenCounter}
       <span
-        class="font-mono text-[11px] tabular-nums text-muted-foreground/70"
+        class="font-mono text-[11px] text-muted-foreground/70 tabular-nums"
         title="Estimated context used / context window"
       >
         {tokenCounter}

@@ -40,7 +40,7 @@
             {/if}
           </span>
         </span>
-        <span class="tabular-nums text-muted-foreground">
+        <span class="text-muted-foreground tabular-nums">
           {counting
             ? fmtDuration(progress.elapsedMs)
             : `${pct.toFixed(0)}% · ETA ${fmtDuration(progress.etaMs)}`}

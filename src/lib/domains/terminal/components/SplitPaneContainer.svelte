@@ -84,7 +84,7 @@
   {#if isMaximized && maximizedPaneId}
     <!-- Maximized view -->
     <div class="relative flex-1">
-      <div class="absolute right-2 top-2 z-10">
+      <div class="absolute top-2 right-2 z-10">
         <Button variant="ghost" size="sm" onclick={minimizePane} class="h-8 w-8 p-0">
           <Minimize2 class="h-4 w-4" />
         </Button>
@@ -110,7 +110,7 @@
         <div class="relative h-full w-full">
           <!-- Pane Controls -->
           <div
-            class="absolute right-2 top-2 z-10 flex items-center space-x-1 opacity-0 transition-opacity hover:opacity-100"
+            class="absolute top-2 right-2 z-10 flex items-center space-x-1 opacity-0 transition-opacity hover:opacity-100"
           >
             <Button
               variant="ghost"

@@ -39,14 +39,14 @@
     class="divider-edge-t divider-edge-full flex shrink-0 items-center justify-center gap-1.5 px-3 py-1.5"
   >
     <span
-      class="inline-flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground"
+      class="inline-flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums"
       title={memoryTitle}
     >
       <MemoryStick class="h-3 w-3" />
       {memoryLabel}
     </span>
     <span
-      class="inline-flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground"
+      class="inline-flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums"
       title="Host CPU load"
     >
       <Cpu class="h-3 w-3" />

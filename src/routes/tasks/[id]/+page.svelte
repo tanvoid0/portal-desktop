@@ -455,7 +455,7 @@
                         <MarkdownView content={task.description} truncateAt={500} />
                       </div>
                     {:else}
-                      <p class="mt-2 italic text-muted-foreground">No description provided</p>
+                      <p class="mt-2 text-muted-foreground italic">No description provided</p>
                     {/if}
                   </div>
 
@@ -730,7 +730,7 @@
                             </div>
                           </div>
                           {#if subtask.description}
-                            <p class="ml-6 mt-2 text-sm text-muted-foreground">
+                            <p class="mt-2 ml-6 text-sm text-muted-foreground">
                               {subtask.description}
                             </p>
                           {/if}

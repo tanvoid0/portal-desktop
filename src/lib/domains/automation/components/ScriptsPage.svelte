@@ -158,18 +158,18 @@
   <title>Scripts - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto p-6 space-y-6">
+<div class="container mx-auto space-y-6 p-6">
   <PageHeader
     title="Scripts"
     description="Create, manage, and run reusable scripts for your workflows"
   >
     {#snippet actions()}
       <Button variant="outline" onclick={handleImportJson}>
-        <Upload class="h-4 w-4 mr-2" />
+        <Upload class="mr-2 h-4 w-4" />
         Import JSON
       </Button>
       <Button onclick={handleCreateScript}>
-        <Plus class="h-4 w-4 mr-2" />
+        <Plus class="mr-2 h-4 w-4" />
         New Script
       </Button>
     {/snippet}
@@ -177,9 +177,9 @@
 
   <!-- Search and Filters -->
   <div class="flex gap-4">
-    <div class="flex-1 relative">
+    <div class="relative flex-1">
       <Search
-        class="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+        class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
       />
       <Input bind:value={searchQuery} placeholder="Search scripts..." class="pl-9" />
     </div>
@@ -234,13 +234,13 @@
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {#each filteredScripts as script (script.id)}
         <Card
-          class="hover:border-primary/50 transition-colors cursor-pointer"
+          class="cursor-pointer transition-colors hover:border-primary/50"
           onclick={() => handleViewScript(script)}
         >
           <CardHeader class="pb-3">
             <div class="flex items-start justify-between">
-              <div class="flex-1 min-w-0">
-                <CardTitle class="text-lg truncate">{script.name}</CardTitle>
+              <div class="min-w-0 flex-1">
+                <CardTitle class="truncate text-lg">{script.name}</CardTitle>
                 <CardDescription class="mt-1 line-clamp-2">{script.description}</CardDescription>
               </div>
               <Badge variant="outline" class="ml-2 shrink-0">{script.category}</Badge>
@@ -249,16 +249,16 @@
           <CardContent class="space-y-4">
             <!-- Command Preview -->
             <div
-              class="bg-muted rounded-md p-2 relative group"
+              class="group relative rounded-md bg-muted p-2"
               onclick={(e) => e.stopPropagation()}
             >
-              <code class="text-xs font-mono text-muted-foreground line-clamp-2"
+              <code class="line-clamp-2 font-mono text-xs text-muted-foreground"
                 >{script.command}</code
               >
               <Button
                 variant="ghost"
                 size="sm"
-                class="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                class="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
                 onclick={(e) => {
                   e.stopPropagation();
                   handleCopyCommand(script.command);
@@ -303,7 +303,7 @@
                 onclick={() => handleViewScript(script)}
                 class="flex-1"
               >
-                <Eye class="h-3 w-3 mr-1" />
+                <Eye class="mr-1 h-3 w-3" />
                 View
               </Button>
               <Button size="sm" variant="outline" onclick={() => handleEditScript(script)}>
