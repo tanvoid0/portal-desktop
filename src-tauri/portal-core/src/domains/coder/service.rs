@@ -132,6 +132,182 @@ const SYSTEM_PROMPT: &str = concat!(
     "- When done, give a short summary of what you changed and why."
 );
 
+/// `llm_provider` sentinel that selects the local Claude Code CLI engine
+/// instead of agent-platform. Overloads the existing column; no migration.
+pub const CLAUDE_CLI_PROVIDER: &str = "claude-cli";
+
+/// What one Claude Code stream-json line contributed.
+#[derive(Default)]
+struct CliParsed {
+    messages: Vec<ChatMessage>,
+    session_id: Option<String>,
+    final_text: Option<String>,
+}
+
+/// Claude tool_result `content` is either a string or an array of
+/// `{type:"text", text}` blocks.
+fn tool_result_text(content: Option<&Value>) -> String {
+    match content {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Array(arr)) => arr
+            .iter()
+            .filter_map(|b| b.get("text").and_then(Value::as_str))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Some(other) => other.to_string(),
+        None => String::new(),
+    }
+}
+
+/// Map one Claude Code stream-json event into transcript messages plus any
+/// session id / final result it carries. Pure — so the transcript mapping is
+/// unit-tested without spawning the CLI.
+fn parse_cli_event(event: &Value) -> CliParsed {
+    let mut out = CliParsed::default();
+    match event.get("type").and_then(Value::as_str) {
+        Some("system") => {
+            out.session_id = event
+                .get("session_id")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
+        Some("assistant") => {
+            let blocks = event
+                .get("message")
+                .and_then(|m| m.get("content"))
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            for block in blocks {
+                match block.get("type").and_then(Value::as_str) {
+                    Some("text") => {
+                        let text = block.get("text").and_then(Value::as_str).unwrap_or("");
+                        if !text.trim().is_empty() {
+                            out.messages.push(ChatMessage {
+                                role: "assistant".into(),
+                                content: Some(text.to_string()),
+                                tool_calls: None,
+                                tool_call_id: None,
+                                timestamp: Some(now_iso()),
+                            });
+                        }
+                    }
+                    Some("tool_use") => {
+                        let id = block.get("id").and_then(Value::as_str).unwrap_or("");
+                        let name = block.get("name").and_then(Value::as_str).unwrap_or("");
+                        let input = block.get("input").cloned().unwrap_or_else(|| json!({}));
+                        out.messages
+                            .push(ChatMessage::assistant_tool_call(id, name, &input, None));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Some("user") => {
+            let blocks = event
+                .get("message")
+                .and_then(|m| m.get("content"))
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            for block in blocks {
+                if block.get("type").and_then(Value::as_str) == Some("tool_result") {
+                    let call_id = block
+                        .get("tool_use_id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    out.messages.push(ChatMessage::tool_result(
+                        call_id,
+                        tool_result_text(block.get("content")),
+                    ));
+                }
+            }
+        }
+        Some("result") => {
+            out.session_id = event
+                .get("session_id")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            out.final_text = event
+                .get("result")
+                .and_then(Value::as_str)
+                .filter(|s| !s.trim().is_empty())
+                .map(str::to_string);
+        }
+        _ => {}
+    }
+    out
+}
+
+#[cfg(test)]
+mod claude_cli_tests {
+    use super::{parse_cli_event, tool_result_text};
+    use serde_json::json;
+
+    #[test]
+    fn parses_assistant_text_and_tool_use() {
+        let asst = json!({"type":"assistant","message":{"content":[
+            {"type":"text","text":"Reading the file."},
+            {"type":"tool_use","id":"tu_1","name":"Read","input":{"file_path":"a.rs"}}
+        ]}});
+        let p = parse_cli_event(&asst);
+        assert_eq!(p.messages.len(), 2);
+        assert_eq!(p.messages[0].role, "assistant");
+        assert_eq!(p.messages[0].content.as_deref(), Some("Reading the file."));
+        assert_eq!(p.messages[1].role, "assistant");
+        let tc = p.messages[1].tool_calls.as_ref().expect("tool_calls");
+        assert_eq!(tc[0].id, "tu_1");
+        assert_eq!(tc[0].function.name, "Read");
+    }
+
+    #[test]
+    fn skips_empty_assistant_text() {
+        let asst = json!({"type":"assistant","message":{"content":[{"type":"text","text":"   "}]}});
+        assert!(parse_cli_event(&asst).messages.is_empty());
+    }
+
+    #[test]
+    fn parses_tool_result_array_and_string() {
+        let arr = json!({"type":"user","message":{"content":[
+            {"type":"tool_result","tool_use_id":"tu_1","content":[{"type":"text","text":"file body"}]}
+        ]}});
+        let p = parse_cli_event(&arr);
+        assert_eq!(p.messages.len(), 1);
+        assert_eq!(p.messages[0].role, "tool");
+        assert_eq!(p.messages[0].tool_call_id.as_deref(), Some("tu_1"));
+        assert_eq!(p.messages[0].content.as_deref(), Some("file body"));
+
+        let s = json!({"type":"user","message":{"content":[
+            {"type":"tool_result","tool_use_id":"tu_2","content":"plain text"}
+        ]}});
+        assert_eq!(
+            parse_cli_event(&s).messages[0].content.as_deref(),
+            Some("plain text")
+        );
+    }
+
+    #[test]
+    fn captures_session_and_result() {
+        let init = json!({"type":"system","subtype":"init","session_id":"sess-1"});
+        assert_eq!(parse_cli_event(&init).session_id.as_deref(), Some("sess-1"));
+
+        let result = json!({"type":"result","subtype":"success","session_id":"sess-1","result":"Done."});
+        let p = parse_cli_event(&result);
+        assert_eq!(p.session_id.as_deref(), Some("sess-1"));
+        assert_eq!(p.final_text.as_deref(), Some("Done."));
+    }
+
+    #[test]
+    fn tool_result_text_shapes() {
+        assert_eq!(tool_result_text(Some(&json!("x"))), "x");
+        assert_eq!(
+            tool_result_text(Some(&json!([{"type":"text","text":"a"},{"type":"text","text":"b"}]))),
+            "a\nb"
+        );
+        assert_eq!(tool_result_text(None), "");
+    }
+}
+
 struct RunHandle {
     cancel: Arc<AtomicBool>,
 }
@@ -177,6 +353,9 @@ pub struct CoderService {
     pending_commands: Mutex<HashMap<String, PendingCommand>>,
     /// Messages to prepend after an edit that rewinds the platform thread.
     edit_prefix: Mutex<HashMap<String, Vec<ChatMessage>>>,
+    /// Claude Code CLI session ids keyed by thread id, for `--resume`. In-memory
+    /// only — lost on restart (v1), which just starts a fresh Claude session.
+    cli_sessions: Mutex<HashMap<String, String>>,
     multitask_semaphore: Arc<Semaphore>,
 }
 
@@ -203,6 +382,7 @@ impl CoderService {
             active_runs: Mutex::new(HashMap::new()),
             pending_commands: Mutex::new(HashMap::new()),
             edit_prefix: Mutex::new(HashMap::new()),
+            cli_sessions: Mutex::new(HashMap::new()),
             multitask_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_PARALLEL_SUBAGENTS)),
         };
         svc.load_from_db().await;
@@ -1613,7 +1793,16 @@ impl CoderService {
             svc.sync_sub_agent_from_thread(&tid, CoderSubAgentStatus::Running, None)
                 .await;
 
-            let result = svc.advance_platform(&tid, turn, Some(cancel)).await;
+            let engine = svc
+                .get_thread(&tid)
+                .await
+                .and_then(|t| t.llm_provider)
+                .unwrap_or_default();
+            let result = if engine == CLAUDE_CLI_PROVIDER {
+                svc.advance_claude_cli(&tid, turn, Some(cancel)).await
+            } else {
+                svc.advance_platform(&tid, turn, Some(cancel)).await
+            };
 
             {
                 let mut runs = svc.active_runs.lock().await;
@@ -2289,6 +2478,209 @@ impl CoderService {
 
             return Ok(self.finish(thread_id, done.final_text, false, false).await);
         }
+    }
+
+    /// Run a coder turn with the local Claude Code CLI (`claude -p`) instead of
+    /// agent-platform. Claude runs its *own* full tool-calling loop, so we spawn
+    /// it once, parse its stream-json transcript into [`ChatMessage`]s, stream
+    /// them to the UI via `coder://message`, and append them to the thread — the
+    /// persisted transcript is the audit trail.
+    ///
+    /// v1 corners, cut on purpose:
+    /// - `--permission-mode acceptEdits`: file edits auto-apply; no per-tool
+    ///   approval round-trip (so no `coder://pending`). Headless Claude
+    ///   auto-denies any tool that would otherwise prompt (e.g. Bash).
+    /// - No Cursor-style file-change review: `record_change` /
+    ///   `coder_file_changes` are not populated (Claude runs its own tools, so
+    ///   the pre-edit snapshot hook the platform path relies on is gone).
+    /// - Session continuity is in-memory (`cli_sessions`); lost on restart.
+    /// - Agent mode and `model` are ignored; Claude uses its configured default.
+    async fn advance_claude_cli(
+        &self,
+        thread_id: &str,
+        turn: AgentTurn,
+        cancel: Option<Arc<AtomicBool>>,
+    ) -> Result<CoderRunResult, String> {
+        use std::process::Stdio;
+        use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+
+        let is_cancelled = || {
+            cancel
+                .as_ref()
+                .map(|c| c.load(Ordering::SeqCst))
+                .unwrap_or(false)
+        };
+        if is_cancelled() {
+            return Ok(self.finish(thread_id, None, false, true).await);
+        }
+
+        // v1 handles a plain user turn. Approve has no meaning (no pending flow);
+        // Retry just re-sends the last user message, same as Send.
+        if matches!(turn, AgentTurn::Approve { .. }) {
+            return Ok(self.finish(thread_id, None, false, false).await);
+        }
+
+        let (prompt, workspace_root) = {
+            let threads = self.threads.lock().await;
+            let t = threads.get(thread_id).ok_or("thread not found")?;
+            let prompt = t
+                .messages
+                .iter()
+                .rev()
+                .find(|m| m.role == "user")
+                .and_then(|m| m.content.clone())
+                .ok_or("no user message to send")?;
+            (prompt, t.workspace_root.clone())
+        };
+        validate_workspace_root(&workspace_root)?;
+
+        // `which` gives a clear error if Claude Code isn't installed, and
+        // confirms it's on PATH so the Windows `cmd /C claude` form resolves too.
+        which::which("claude").map_err(|_| {
+            "`claude` CLI not found on PATH. Install Claude Code to use the Claude engine."
+                .to_string()
+        })?;
+
+        let resume = self.cli_sessions.lock().await.get(thread_id).cloned();
+
+        let mut cmd = if cfg!(target_os = "windows") {
+            // npm's `claude` shim is a .cmd, which CreateProcess can't run
+            // directly — go through cmd.exe (PATH lookup, which::which confirmed).
+            let mut c = tokio::process::Command::new("cmd");
+            c.arg("/C").arg("claude");
+            c
+        } else {
+            tokio::process::Command::new("claude")
+        };
+        cmd.current_dir(&workspace_root)
+            .arg("-p")
+            .arg("--output-format")
+            .arg("stream-json")
+            .arg("--verbose") // stream-json requires --verbose in -p mode
+            .arg("--permission-mode")
+            .arg("acceptEdits");
+        if let Some(sid) = &resume {
+            cmd.arg("--resume").arg(sid);
+        }
+        cmd.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("failed to spawn claude: {e}"))?;
+
+        // Prompt over stdin: no argv quoting of arbitrary user text.
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(prompt.as_bytes())
+                .await
+                .map_err(|e| format!("claude stdin write failed: {e}"))?;
+            // Drop closes the pipe (EOF) so claude starts generating.
+        }
+
+        // Drain stderr in a task so a full pipe can't block claude's stdout.
+        let (err_tx, err_rx) = oneshot::channel::<String>();
+        if let Some(mut stderr) = child.stderr.take() {
+            tokio::spawn(async move {
+                let mut s = String::new();
+                let _ = stderr.read_to_string(&mut s).await;
+                let _ = err_tx.send(s);
+            });
+        }
+
+        let stdout = child.stdout.take().ok_or("claude produced no stdout")?;
+        let mut lines = BufReader::new(stdout).lines();
+
+        let mut new_messages: Vec<ChatMessage> = Vec::new();
+        let mut final_text: Option<String> = None;
+        let mut session_id: Option<String> = None;
+        let mut cancelled = false;
+
+        loop {
+            let next = tokio::select! {
+                biased;
+                _ = async {
+                    while !is_cancelled() {
+                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    }
+                } => { cancelled = true; None }
+                l = lines.next_line() => Some(l),
+            };
+            let line = match next {
+                None => break,                       // cancelled
+                Some(Ok(Some(line))) => line,
+                Some(Ok(None)) => break,             // eof
+                Some(Err(e)) => return Err(format!("claude stream read error: {e}")),
+            };
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let Ok(event) = serde_json::from_str::<Value>(line) else {
+                continue; // non-JSON line on a stream-json stream — skip
+            };
+            let parsed = parse_cli_event(&event);
+            for msg in &parsed.messages {
+                self.emit(
+                    "coder://message",
+                    json!({ "thread_id": thread_id, "message": msg }),
+                );
+            }
+            new_messages.extend(parsed.messages);
+            if parsed.session_id.is_some() {
+                session_id = parsed.session_id;
+            }
+            if parsed.final_text.is_some() {
+                final_text = parsed.final_text;
+            }
+        }
+
+        if cancelled {
+            let _ = child.start_kill();
+        }
+        let _ = child.wait().await;
+
+        if let Some(sid) = session_id {
+            self.cli_sessions
+                .lock()
+                .await
+                .insert(thread_id.to_string(), sid);
+        }
+
+        // Nothing produced and not cancelled: surface claude's stderr so the
+        // user gets a real reason (bad flag, auth, model) and a Retry.
+        if !cancelled && final_text.is_none() && new_messages.is_empty() {
+            let detail = err_rx.await.unwrap_or_default();
+            let detail = detail.trim();
+            return Err(if detail.is_empty() {
+                "claude produced no output".to_string()
+            } else {
+                format!("claude failed: {detail}")
+            });
+        }
+
+        self.append_messages(thread_id, new_messages).await;
+
+        if cancelled || is_cancelled() {
+            return Ok(self.finish(thread_id, None, false, true).await);
+        }
+        Ok(self.finish(thread_id, final_text, false, false).await)
+    }
+
+    /// Append already-streamed messages to a thread transcript and persist it.
+    async fn append_messages(&self, thread_id: &str, msgs: Vec<ChatMessage>) {
+        if msgs.is_empty() {
+            return;
+        }
+        {
+            let mut threads = self.threads.lock().await;
+            if let Some(t) = threads.get_mut(thread_id) {
+                t.messages.extend(msgs);
+                t.updated_at = now_iso();
+            }
+        }
+        self.persist_thread(thread_id).await;
     }
 
     async fn ensure_platform_thread(&self, local_id: &str) -> Result<i64, String> {

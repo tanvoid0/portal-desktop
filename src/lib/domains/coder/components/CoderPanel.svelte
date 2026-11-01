@@ -447,6 +447,7 @@
     onModelChange={(m) => coderSession.handleModelChange(m)}
     onBackendProviderChange={(p) => coderSession.handleBackendProviderChange(p)}
     modelSelectClass="w-[180px]"
+    extraProviders={[{ value: 'claude-cli', label: 'Claude Code (CLI)' }]}
   />
   {#if showRetry && thread && !running}
     <Button
