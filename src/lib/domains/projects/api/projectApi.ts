@@ -23,3 +23,15 @@ export async function fetchProjectById(id: string): Promise<Project | null> {
 
   return project ? normalizeProject(project as Record<string, unknown>) : null;
 }
+
+/** Group a project under another, or ungroup it when parentId is null. */
+export async function setProjectParent(
+  id: number,
+  parentId: number | null
+): Promise<Project | null> {
+  const project = await invokeClient.post<unknown>('set_project_parent', {
+    id,
+    parentId,
+  });
+  return project ? normalizeProject(project as Record<string, unknown>) : null;
+}

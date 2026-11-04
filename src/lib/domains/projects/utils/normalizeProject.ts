@@ -77,6 +77,7 @@ export function normalizeProject(raw: RawProject): Project {
     git_commit: (raw.git_commit ?? raw.gitCommit) as string | undefined,
     has_uncommitted_changes: Boolean(raw.has_uncommitted_changes ?? raw.hasUncommittedChanges),
     last_commit: toOptionalDate(raw.last_commit ?? raw.lastCommit),
+    parent_id: (raw.parent_id ?? raw.parentId ?? null) as number | null,
     created_at: createdAt,
     updated_at: updatedAt,
     metadata,

@@ -38,7 +38,10 @@
     GitCommit,
     Globe,
     ChevronDown,
+    FolderTree,
+    Unlink,
   } from '@lucide/svelte';
+  import Select from '$lib/components/ui/select.svelte';
   import {
     getProjectGitBranch,
     getProjectGitCommit,
@@ -59,18 +62,27 @@
   interface Props {
     project: Project;
     modules?: ProjectModule[];
+    /** Projects nested inside this one (by path or manual grouping); hidden from the root list. */
+    nested?: Project[];
+    /** Projects this one may be grouped under (excludes itself and its own descendants). */
+    eligibleParents?: Array<{ id: string; name: string }>;
     onClick?: (project: Project) => void;
     onEdit?: (project: Project) => void;
     onDelete?: (project: Project) => void;
+    /** Group `projectId` under `parentId`, or ungroup it when `parentId` is null. */
+    onSetParent?: (projectId: string, parentId: number | null) => void;
     showActions?: boolean;
   }
 
   let {
     project,
     modules = [],
+    nested = [],
+    eligibleParents = [],
     onClick = () => {},
     onEdit = () => {},
     onDelete = () => {},
+    onSetParent = () => {},
     showActions = true,
   }: Props = $props();
 
@@ -78,6 +90,7 @@
 
   let registryReady = $state(false);
   let expanded = $state(false);
+  let nestedOpen = $state(false);
 
   onMount(async () => {
     await projectIconRegistry.ensureLoaded();
@@ -123,6 +136,11 @@
   const handleDelete = (e: Event) => {
     e.stopPropagation();
     onDelete(project);
+  };
+
+  const handleChildClick = (e: Event, child: Project) => {
+    e.stopPropagation();
+    onClick(child);
   };
 
   function techBadgeClass(item: ResolvedTechIcon): string {
@@ -237,6 +255,51 @@
         </div>
       {/if}
 
+      {#if nested.length > 0}
+        <Collapsible bind:open={nestedOpen}>
+          <CollapsibleTrigger
+            class="flex w-full items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+            onclick={(e: Event) => e.stopPropagation()}
+          >
+            <ChevronDown
+              class={cn('h-3.5 w-3.5 transition-transform', nestedOpen && 'rotate-180')}
+            />
+            <FolderTree class="h-3.5 w-3.5 shrink-0" />
+            {nested.length} nested {nested.length === 1 ? 'project' : 'projects'}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div class="mt-1 space-y-0.5 border-l pl-3">
+              {#each nested as child (child.id)}
+                <div class="group/row flex items-center gap-1.5 rounded pr-1 hover:bg-muted">
+                  <button
+                    type="button"
+                    class="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-left text-sm"
+                    onclick={(e) => handleChildClick(e, child)}
+                  >
+                    <FolderOpen class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span class="truncate">{child.name}</span>
+                  </button>
+                  {#if showActions}
+                    <button
+                      type="button"
+                      class="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 hover:text-foreground"
+                      title="Remove from group"
+                      aria-label="Remove {child.name} from group"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        onSetParent(child.id, null);
+                      }}
+                    >
+                      <Unlink class="h-3.5 w-3.5" />
+                    </button>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      {/if}
+
       <Collapsible bind:open={expanded}>
         <div class="flex items-center justify-between">
           <CollapsibleTrigger
@@ -278,6 +341,19 @@
         <CollapsibleContent>
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <div class="space-y-3 pt-3" onclick={(e) => e.stopPropagation()}>
+            {#if showActions && eligibleParents.length > 0}
+              <div class="flex items-center gap-2">
+                <FolderTree class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <Select
+                  defaultValue=""
+                  placeholder="Group under…"
+                  options={eligibleParents.map((p) => ({ value: p.id, label: p.name }))}
+                  onSelect={(value) => onSetParent(project.id, value ? Number(value) : null)}
+                  class="min-w-[160px]"
+                />
+              </div>
+            {/if}
+
             {#if project.description}
               <p class="text-sm text-muted-foreground">{project.description}</p>
             {/if}

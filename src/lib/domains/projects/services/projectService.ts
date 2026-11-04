@@ -9,7 +9,11 @@ import type {
   UpdateProjectRequest,
   ProjectStats,
 } from '$lib/domains/projects/types';
-import { fetchAllProjects, fetchProjectById } from '$lib/domains/projects/api/projectApi';
+import {
+  fetchAllProjects,
+  fetchProjectById,
+  setProjectParent,
+} from '$lib/domains/projects/api/projectApi';
 import { projectUi } from '$lib/domains/projects/state/projectUi.svelte';
 import { projectStore } from '$lib/domains/projects/stores/projectStore';
 import { logger } from '$lib/domains/shared/services/logger';
@@ -223,6 +227,24 @@ class ProjectService {
       log.info('Project deleted successfully', { id });
     } catch (error) {
       log.error('Failed to delete project', { error });
+      throw error;
+    }
+  }
+
+  /** Manually group a project under another (or ungroup it with parentId = null). */
+  async setProjectParent(id: string, parentId: number | null): Promise<void> {
+    try {
+      const projectId = parseInt(id, 10);
+      if (isNaN(projectId)) {
+        throw new Error(`Invalid project ID: ${id}`);
+      }
+
+      await setProjectParent(projectId, parentId);
+      invalidateProjectCaches(id);
+
+      log.info('Project parent updated', { id: projectId, parentId });
+    } catch (error) {
+      log.error('Failed to set project parent', { error });
       throw error;
     }
   }

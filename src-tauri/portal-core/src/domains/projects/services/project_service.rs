@@ -118,6 +118,18 @@ impl ProjectService {
         self.repository.delete(id).await
     }
 
+    /// Manually group a project under another, or ungroup it (`parent_id = None`).
+    pub async fn set_project_parent(
+        &self,
+        id: i32,
+        parent_id: Option<i32>,
+    ) -> Result<Option<ProjectResponse>, String> {
+        if parent_id == Some(id) {
+            return Err("A project cannot be its own parent".to_string());
+        }
+        self.repository.set_parent(id, parent_id).await
+    }
+
     pub async fn toggle_project_star(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
         // Get current project to check if it exists and get current starred status
         let current_project = self.repository.get_by_id(id).await?;
@@ -515,9 +527,11 @@ impl ProjectService {
             .ok()
             .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
             .is_some_and(|pkg| {
-                ["dependencies", "devDependencies"]
-                    .iter()
-                    .any(|k| pkg.get(k).and_then(|d| d.as_object()).is_some_and(|d| !d.is_empty()))
+                ["dependencies", "devDependencies"].iter().any(|k| {
+                    pkg.get(k)
+                        .and_then(|d| d.as_object())
+                        .is_some_and(|d| !d.is_empty())
+                })
             });
         if !has_own_deps {
             frameworks.retain(|f| f != "Node.js");

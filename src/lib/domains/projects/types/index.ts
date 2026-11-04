@@ -9,6 +9,8 @@ export interface Project extends BaseEntity {
   description?: string;
   path: string;
   status: ProjectStatus;
+  /** Manual grouping: project this one is nested under. null/undefined = ungrouped. */
+  parent_id?: number | null;
   framework_ids?: number[]; // Many-to-many: array of framework IDs
   package_manager_ids?: number[]; // Many-to-many: array of package manager IDs
   language_ids?: number[]; // Many-to-many: array of language IDs

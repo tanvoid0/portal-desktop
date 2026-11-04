@@ -280,6 +280,31 @@ impl ProjectRepository {
         Ok(Some(self.to_response(result).await?))
     }
 
+    /// Sets or clears a project's manual parent. `None` ungroups it.
+    pub async fn set_parent(
+        &self,
+        id: i32,
+        parent_id: Option<i32>,
+    ) -> Result<Option<ProjectResponse>, String> {
+        let connection = self.db_manager.get_connection();
+
+        let mut project: ProjectActiveModel = ProjectEntity::find_by_id(id)
+            .one(connection)
+            .await
+            .map_err(|e| format!("Failed to find project: {}", e))?
+            .ok_or_else(|| "Project not found".to_string())?
+            .into();
+
+        project.parent_id = Set(parent_id);
+
+        let result = project
+            .update(connection)
+            .await
+            .map_err(|e| format!("Failed to update project parent: {}", e))?;
+
+        Ok(Some(self.to_response(result).await?))
+    }
+
     // Helper methods for managing many-to-many relationships
     async fn set_project_frameworks(
         &self,

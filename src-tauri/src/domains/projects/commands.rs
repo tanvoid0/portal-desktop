@@ -104,6 +104,17 @@ pub async fn delete_project(
     service.delete_project(id).await
 }
 
+/// Manually group `id` under `parent_id`, or ungroup it when `parent_id` is null.
+#[portal_rpc_macro::rpc]
+pub async fn set_project_parent(
+    id: i32,
+    parent_id: Option<i32>,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
+    let service = ProjectService::new(&db_manager);
+    service.set_project_parent(id, parent_id).await
+}
+
 #[portal_rpc_macro::rpc]
 pub async fn toggle_project_star(
     id: i32,

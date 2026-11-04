@@ -20,6 +20,7 @@
   import { createAllModulesQuery } from '$lib/domains/projects/queries/moduleQueries';
   import { refreshAllModules } from '$lib/domains/projects/api/moduleApi';
   import { groupByProject } from '$lib/domains/projects/utils/moduleStacks';
+  import { nestProjects, descendantIds } from '$lib/domains/projects/utils/nestProjects';
   import { queryClient } from '$lib/domains/shared/query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import type { Project } from '$lib/domains/projects/types';
@@ -145,6 +146,11 @@
       })
   );
 
+  // Projects nested inside another (by path) group under their top-level parent
+  // and drop out of the root grid. Computed over the filtered set so a nested
+  // project still surfaces as a root when its parent is filtered out.
+  const nestedGroups = $derived(nestProjects(filteredProjects));
+
   const stats = $derived<PageStat[]>([
     { label: 'Total Projects', value: projects.length, icon: FolderOpen },
     {
@@ -225,6 +231,25 @@
     selectedProject = null;
     workflowResult = null;
   }
+
+  // Manual grouping: a project can be grouped under any project except itself
+  // and its own descendants (which would make a cycle).
+  function eligibleParents(project: Project): Array<{ id: string; name: string }> {
+    const blocked = descendantIds(projects, project.id);
+    blocked.add(project.id);
+    return projects
+      .filter((p) => !blocked.has(p.id))
+      .map((p) => ({ id: p.id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const handleSetParent = async (projectId: string, parentId: number | null) => {
+    try {
+      await projectService.setProjectParent(projectId, parentId);
+    } catch (error) {
+      log.error('Failed to set project parent', error);
+    }
+  };
 
   // Handle project delete
   const handleProjectDelete = async (project: any) => {
@@ -360,13 +385,16 @@
     />
   {:else}
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {#each filteredProjects as project (project.id)}
+      {#each nestedGroups as group (group.project.id)}
         <ProjectCard
-          {project}
-          modules={modulesByProject.get(Number(project.id)) ?? []}
+          project={group.project}
+          nested={group.children}
+          eligibleParents={eligibleParents(group.project)}
+          modules={modulesByProject.get(Number(group.project.id)) ?? []}
           onClick={(p) => handleProjectClick(p)}
           onEdit={(p) => goto(`/projects/${p.id}`)}
           onDelete={handleProjectDelete}
+          onSetParent={handleSetParent}
           showActions={true}
         />
       {/each}

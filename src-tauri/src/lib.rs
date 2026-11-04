@@ -280,6 +280,7 @@ pub fn run() {
             domains::projects::create_project,
             domains::projects::update_project,
             domains::projects::delete_project,
+            domains::projects::set_project_parent,
             domains::projects::toggle_project_star,
             domains::projects::open_project,
             domains::projects::refresh_project_metadata,

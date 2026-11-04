@@ -25,6 +25,7 @@ export type ProjectResponse = {
   git_commit: string | null;
   has_uncommitted_changes: boolean;
   last_commit: string | null;
+  parent_id: number | null;
   discovery_path: string | null;
   activity_status: string | null;
   last_activity: string | null;
