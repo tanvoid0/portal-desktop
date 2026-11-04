@@ -185,4 +185,35 @@ mod tests {
             "capabilities() must be sorted and deduplicated"
         );
     }
+
+    /// The exact set of capabilities the registry declares. Adding or removing a
+    /// `cap = "..."` anywhere changes this set, so this guard forces the remote
+    /// surface to be a deliberate decision rather than a drift. The dangerous
+    /// project commands (execute_command_in_directory, select_directory,
+    /// open_project_in_explorer) and the whole credential vault are deliberately
+    /// absent — loopback only.
+    #[test]
+    fn the_cap_list_is_exactly_the_annotated_set() {
+        assert_eq!(
+            capabilities(),
+            vec![
+                "coder",
+                "dashboard",
+                "projects",
+                "tasks",
+                "terminal",
+                "terminal.exec"
+            ],
+            "remote capability surface changed — update this guard only if intended"
+        );
+
+        // One command per cap, plus proof the fenced-off ones stay fenced.
+        assert_eq!(capability("coder_list_threads"), Some("coder"));
+        assert_eq!(capability("get_dashboard_overview"), Some("dashboard"));
+        assert_eq!(capability("get_all_projects"), Some("projects"));
+        assert_eq!(capability("create_task"), Some("tasks"));
+        assert_eq!(capability("load_command_history"), Some("terminal"));
+        assert_eq!(capability("execute_command"), Some("terminal.exec"));
+        assert!(capability("execute_command_in_directory").is_none());
+    }
 }
