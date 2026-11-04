@@ -1202,7 +1202,10 @@ mod itests {
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         let code = status_via_proxy(proxy_port, host).await;
         println!("[pipeline] GET http://{host} -> {code}");
-        let logs = svc.get_container_logs(cname, Some(5)).await.unwrap_or_default();
+        let logs = svc
+            .get_container_logs(cname, Some(5))
+            .await
+            .unwrap_or_default();
         println!("[pipeline] container logs:\n{}", logs.join("\n"));
 
         let _ = svc.remove_container(cname).await;
@@ -1274,7 +1277,10 @@ mod itests {
 
         // Give the app time to boot (Next.js cold start can be slow).
         tokio::time::sleep(std::time::Duration::from_secs(15)).await;
-        let logs = svc.get_container_logs(&cname, Some(60)).await.unwrap_or_default();
+        let logs = svc
+            .get_container_logs(&cname, Some(60))
+            .await
+            .unwrap_or_default();
         println!("[deploy] runtime logs:\n{}", logs.join("\n"));
 
         let out = Command::new("curl")

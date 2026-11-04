@@ -139,10 +139,8 @@ impl DeploymentService {
                 // has none of its own, so a committed .dockerignore always wins.
                 let dockerignore = format!("{}/.dockerignore", request.project_path);
                 if !std::path::Path::new(&dockerignore).exists() {
-                    let _ = std::fs::write(
-                        &dockerignore,
-                        self.docker_service.generate_dockerignore(),
-                    );
+                    let _ =
+                        std::fs::write(&dockerignore, self.docker_service.generate_dockerignore());
                 }
 
                 // Build Docker image
@@ -155,10 +153,9 @@ impl DeploymentService {
                     .await?;
 
                 // Host to route to: portal.yaml host, else <name>.localhost.
-                let host = detected
-                    .host
-                    .clone()
-                    .unwrap_or_else(|| format!("{}.localhost", detect::sanitize_name(&request.name)));
+                let host = detected.host.clone().unwrap_or_else(|| {
+                    format!("{}.localhost", detect::sanitize_name(&request.name))
+                });
 
                 // Create deployment record
                 let deployment = Deployment {
@@ -264,8 +261,11 @@ impl DeploymentService {
                         .find(|d| d.id == deployment_id)
                         .ok_or_else(|| format!("Deployment with id {} not found", deployment_id))?;
 
-                    let container_name =
-                        format!("{}-{}", detect::sanitize_name(&deployment.name), deployment.id);
+                    let container_name = format!(
+                        "{}-{}",
+                        detect::sanitize_name(&deployment.name),
+                        deployment.id
+                    );
                     // Detected listen port — falls back to 3000 only for rows
                     // created before detection existed.
                     let container_port = deployment.container_port.unwrap_or(3000);
@@ -318,28 +318,31 @@ impl DeploymentService {
                 // actually healthy — on some hosts (Docker Desktop for Windows)
                 // the proxy container runs but its socket API is unusable, so we
                 // verify instead of assuming.
-                let (network, labels, proxy_port): (Option<&str>, Vec<(String, String)>, Option<u16>) =
-                    match self.docker_service.ensure_proxy().await {
-                        Ok(pp) if self.docker_service.proxy_provider_healthy().await => (
-                            Some(PROXY_NETWORK),
-                            vec![
-                                ("traefik.enable".to_string(), "true".to_string()),
-                                (
-                                    format!("traefik.http.routers.{}.rule", container_name),
-                                    format!("Host(`{}`)", host),
+                let (network, labels, proxy_port): (
+                    Option<&str>,
+                    Vec<(String, String)>,
+                    Option<u16>,
+                ) = match self.docker_service.ensure_proxy().await {
+                    Ok(pp) if self.docker_service.proxy_provider_healthy().await => (
+                        Some(PROXY_NETWORK),
+                        vec![
+                            ("traefik.enable".to_string(), "true".to_string()),
+                            (
+                                format!("traefik.http.routers.{}.rule", container_name),
+                                format!("Host(`{}`)", host),
+                            ),
+                            (
+                                format!(
+                                    "traefik.http.services.{}.loadbalancer.server.port",
+                                    container_name
                                 ),
-                                (
-                                    format!(
-                                        "traefik.http.services.{}.loadbalancer.server.port",
-                                        container_name
-                                    ),
-                                    container_port.to_string(),
-                                ),
-                            ],
-                            Some(pp),
-                        ),
-                        _ => (None, Vec::new(), None),
-                    };
+                                container_port.to_string(),
+                            ),
+                        ],
+                        Some(pp),
+                    ),
+                    _ => (None, Vec::new(), None),
+                };
 
                 // No implicit volume. The old code bind-mounted `project_id` (a
                 // UUID, not a path) over /app, clobbering the image's own code.

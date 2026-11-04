@@ -18,11 +18,17 @@ fn columns() -> Vec<(&'static str, ColumnDef)> {
     vec![
         (
             "discovery_path",
-            ColumnDef::new(Projects::DiscoveryPath).string().null().to_owned(),
+            ColumnDef::new(Projects::DiscoveryPath)
+                .string()
+                .null()
+                .to_owned(),
         ),
         (
             "activity_status",
-            ColumnDef::new(Projects::ActivityStatus).string().null().to_owned(),
+            ColumnDef::new(Projects::ActivityStatus)
+                .string()
+                .null()
+                .to_owned(),
         ),
         (
             "last_activity",
@@ -33,7 +39,10 @@ fn columns() -> Vec<(&'static str, ColumnDef)> {
         ),
         (
             "risk_level",
-            ColumnDef::new(Projects::RiskLevel).string().null().to_owned(),
+            ColumnDef::new(Projects::RiskLevel)
+                .string()
+                .null()
+                .to_owned(),
         ),
         (
             "unpushed_commits",
@@ -69,11 +78,17 @@ fn columns() -> Vec<(&'static str, ColumnDef)> {
         ),
         (
             "duplicate_group",
-            ColumnDef::new(Projects::DuplicateGroup).string().null().to_owned(),
+            ColumnDef::new(Projects::DuplicateGroup)
+                .string()
+                .null()
+                .to_owned(),
         ),
         (
             "regenerable_dirs",
-            ColumnDef::new(Projects::RegenerableDirs).string().null().to_owned(),
+            ColumnDef::new(Projects::RegenerableDirs)
+                .string()
+                .null()
+                .to_owned(),
         ),
         (
             "discovered_at",
@@ -84,15 +99,24 @@ fn columns() -> Vec<(&'static str, ColumnDef)> {
         ),
         (
             "triage_decision",
-            ColumnDef::new(Projects::TriageDecision).string().null().to_owned(),
+            ColumnDef::new(Projects::TriageDecision)
+                .string()
+                .null()
+                .to_owned(),
         ),
         (
             "triage_note",
-            ColumnDef::new(Projects::TriageNote).text().null().to_owned(),
+            ColumnDef::new(Projects::TriageNote)
+                .text()
+                .null()
+                .to_owned(),
         ),
         (
             "triage_successor",
-            ColumnDef::new(Projects::TriageSuccessor).string().null().to_owned(),
+            ColumnDef::new(Projects::TriageSuccessor)
+                .string()
+                .null()
+                .to_owned(),
         ),
         (
             "triage_updated_at",

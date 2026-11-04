@@ -291,7 +291,8 @@ mod claude_cli_tests {
         let init = json!({"type":"system","subtype":"init","session_id":"sess-1"});
         assert_eq!(parse_cli_event(&init).session_id.as_deref(), Some("sess-1"));
 
-        let result = json!({"type":"result","subtype":"success","session_id":"sess-1","result":"Done."});
+        let result =
+            json!({"type":"result","subtype":"success","session_id":"sess-1","result":"Done."});
         let p = parse_cli_event(&result);
         assert_eq!(p.session_id.as_deref(), Some("sess-1"));
         assert_eq!(p.final_text.as_deref(), Some("Done."));
@@ -301,7 +302,9 @@ mod claude_cli_tests {
     fn tool_result_text_shapes() {
         assert_eq!(tool_result_text(Some(&json!("x"))), "x");
         assert_eq!(
-            tool_result_text(Some(&json!([{"type":"text","text":"a"},{"type":"text","text":"b"}]))),
+            tool_result_text(Some(
+                &json!([{"type":"text","text":"a"},{"type":"text","text":"b"}])
+            )),
             "a\nb"
         );
         assert_eq!(tool_result_text(None), "");
@@ -2608,9 +2611,9 @@ impl CoderService {
                 l = lines.next_line() => Some(l),
             };
             let line = match next {
-                None => break,                       // cancelled
+                None => break, // cancelled
                 Some(Ok(Some(line))) => line,
-                Some(Ok(None)) => break,             // eof
+                Some(Ok(None)) => break, // eof
                 Some(Err(e)) => return Err(format!("claude stream read error: {e}")),
             };
             let line = line.trim();

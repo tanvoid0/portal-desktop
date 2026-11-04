@@ -743,10 +743,25 @@ impl ExecutionService {
 
         let key = format!("release:{workflow_id}");
         let name = format!("Release: {workflow_id}");
-        let pipeline_id = match self.pipeline_repo.get_by_preset_key(project_id, &key).await? {
+        let pipeline_id = match self
+            .pipeline_repo
+            .get_by_preset_key(project_id, &key)
+            .await?
+        {
             Some(p) => {
                 self.pipeline_repo
-                    .update(p.id, Some(name), None, Some(steps_json), None, None, None, None, None, None)
+                    .update(
+                        p.id,
+                        Some(name),
+                        None,
+                        Some(steps_json),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
                     .await?
                     .id
             }
@@ -816,7 +831,10 @@ impl ExecutionService {
     ) -> Result<Vec<Value>, String> {
         let mut items = Vec::new();
         for p in self.pipeline_repo.get_all_by_project(project_id).await? {
-            if p.preset_key.as_deref().is_some_and(|k| k.starts_with("release:")) {
+            if p.preset_key
+                .as_deref()
+                .is_some_and(|k| k.starts_with("release:"))
+            {
                 items.extend(self.get_executions_by_pipeline(p.id, limit).await?);
             }
         }

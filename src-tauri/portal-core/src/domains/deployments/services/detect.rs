@@ -87,7 +87,10 @@ fn expose_port(dockerfile: &Path) -> Option<u16> {
     let text = std::fs::read_to_string(dockerfile).ok()?;
     for line in text.lines() {
         let line = line.trim();
-        if let Some(rest) = line.strip_prefix("EXPOSE ").or_else(|| line.strip_prefix("expose ")) {
+        if let Some(rest) = line
+            .strip_prefix("EXPOSE ")
+            .or_else(|| line.strip_prefix("expose "))
+        {
             // `EXPOSE 8080/tcp 9090` — take the first token's numeric part.
             if let Some(tok) = rest.split_whitespace().next() {
                 let num = tok.split('/').next().unwrap_or(tok);
@@ -190,7 +193,11 @@ pub fn detect(project_path: &str, fallback_stack: &str) -> DetectedApp {
     let container_port = cfg
         .run
         .and_then(|r| r.port)
-        .or_else(|| dockerfile.as_deref().and_then(|d| expose_port(Path::new(d))))
+        .or_else(|| {
+            dockerfile
+                .as_deref()
+                .and_then(|d| expose_port(Path::new(d)))
+        })
         .unwrap_or_else(|| default_port(&stack));
 
     // Host: portal.yaml host → <name or dir>.localhost. The caller may override
@@ -317,7 +324,10 @@ mod tests {
         fs::write(d.join("Dockerfile"), "FROM golang\nEXPOSE 9090/tcp\n").unwrap();
         let got = detect(d.to_str().unwrap(), "node");
         assert_eq!(got.stack, "go");
-        assert_eq!(got.container_port, 9090, "EXPOSE must win over the go default");
+        assert_eq!(
+            got.container_port, 9090,
+            "EXPOSE must win over the go default"
+        );
         assert!(got.dockerfile.is_some());
     }
 
@@ -351,7 +361,11 @@ mod tests {
 
         // A plain Node project stays "node".
         let d2 = tmp("plain-node");
-        fs::write(d2.join("package.json"), r#"{"dependencies":{"express":"^4"}}"#).unwrap();
+        fs::write(
+            d2.join("package.json"),
+            r#"{"dependencies":{"express":"^4"}}"#,
+        )
+        .unwrap();
         assert_eq!(detect(d2.to_str().unwrap(), "node").stack, "node");
     }
 
@@ -371,12 +385,21 @@ mod tests {
         assert_eq!(names, vec![".env", ".env.local"], "sorted, only .env*");
 
         let local = &files[1];
-        let get = |k: &str| local.vars.iter().find(|v| v.key == k).map(|v| v.value.as_str());
+        let get = |k: &str| {
+            local
+                .vars
+                .iter()
+                .find(|v| v.key == k)
+                .map(|v| v.value.as_str())
+        };
         assert_eq!(get("FOO"), Some("bar"), "export prefix dropped");
         assert_eq!(get("QUOTED"), Some("hi there"), "double quotes stripped");
         assert_eq!(get("SINGLE"), Some("x=y"), "value keeps inner =");
         assert_eq!(get("BLANK"), Some(""), "empty value kept");
-        assert!(local.vars.iter().all(|v| v.key != "not_a_pair"), "non-pairs skipped");
+        assert!(
+            local.vars.iter().all(|v| v.key != "not_a_pair"),
+            "non-pairs skipped"
+        );
     }
 
     #[test]

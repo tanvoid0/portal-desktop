@@ -24,7 +24,11 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(ProjectModules::ProjectId).integer().not_null())
+                    .col(
+                        ColumnDef::new(ProjectModules::ProjectId)
+                            .integer()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(ProjectModules::RelPath).string().not_null())
                     .col(ColumnDef::new(ProjectModules::Name).string().not_null())
                     .col(ColumnDef::new(ProjectModules::Stack).string().not_null())

@@ -177,10 +177,8 @@ fn role_for(rel_path: &str, stack: &str) -> String {
     let first = rel_path.split('/').next().unwrap_or_default();
     let role = if matches!(first, "packages" | "libs" | "crates" | "shared") {
         "package"
-    } else if matches!(
-        first,
-        "services" | "server" | "servers" | "api" | "backend"
-    ) || matches!(stack, "nestjs" | "go" | "java" | "dotnet")
+    } else if matches!(first, "services" | "server" | "servers" | "api" | "backend")
+        || matches!(stack, "nestjs" | "go" | "java" | "dotnet")
     {
         "service"
     } else {
@@ -211,7 +209,8 @@ pub fn language_name(stack: &str) -> Option<&'static str> {
     Some(match stack {
         "flutter" | "dart" => "Dart",
         "android" | "gradle" => "Kotlin",
-        "nestjs" | "nextjs" | "sveltekit" | "svelte" | "nuxt" | "vue" | "react" | "angular" | "node" | "tauri" => "TypeScript",
+        "nestjs" | "nextjs" | "sveltekit" | "svelte" | "nuxt" | "vue" | "react" | "angular"
+        | "node" | "tauri" => "TypeScript",
         "rust" => "Rust",
         "go" => "Go",
         "python" => "Python",

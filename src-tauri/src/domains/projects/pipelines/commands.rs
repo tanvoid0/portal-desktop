@@ -294,9 +294,14 @@ async fn start_release(
     } else {
         described["release"]["rehearse"].as_str()
     }
-    .ok_or_else(|| "No `rehearse` workflow declared; a rehearsal never runs the ship workflow".to_string())?
+    .ok_or_else(|| {
+        "No `rehearse` workflow declared; a rehearsal never runs the ship workflow".to_string()
+    })?
     .to_string();
-    variables.insert("RELEASE_DRY_RUN".to_string(), if ship { "0" } else { "1" }.to_string());
+    variables.insert(
+        "RELEASE_DRY_RUN".to_string(),
+        if ship { "0" } else { "1" }.to_string(),
+    );
 
     let id = service
         .execute_file_workflow(project_id, &workflow, variables, events.sink())
@@ -315,7 +320,14 @@ pub async fn release_rehearse(
     events: State<'_, Events>,
     service: State<'_, Arc<ExecutionService>>,
 ) -> Result<Value, String> {
-    start_release(project_id, false, variables.unwrap_or_default(), &events, &service).await
+    start_release(
+        project_id,
+        false,
+        variables.unwrap_or_default(),
+        &events,
+        &service,
+    )
+    .await
 }
 
 /// The real release. `local_only`: the daemon has no auth, and this deploys to
@@ -328,7 +340,14 @@ pub async fn release_ship(
     events: State<'_, Events>,
     service: State<'_, Arc<ExecutionService>>,
 ) -> Result<Value, String> {
-    start_release(project_id, true, variables.unwrap_or_default(), &events, &service).await
+    start_release(
+        project_id,
+        true,
+        variables.unwrap_or_default(),
+        &events,
+        &service,
+    )
+    .await
 }
 
 // ── Release setup: propose, refine with AI, write, and health ────────────
@@ -336,9 +355,18 @@ pub async fn release_ship(
 async fn root_and_modules(
     db: &Arc<crate::database::DatabaseManager>,
     project_id: i32,
-) -> Result<(std::path::PathBuf, Vec<crate::domains::projects::modules::DetectedModule>), String> {
+) -> Result<
+    (
+        std::path::PathBuf,
+        Vec<crate::domains::projects::modules::DetectedModule>,
+    ),
+    String,
+> {
     use crate::domains::projects::modules::{DetectedModule, ModuleService};
-    let project = crate::domains::projects::repositories::project_repository::ProjectRepository::new(db.clone())
+    let project =
+        crate::domains::projects::repositories::project_repository::ProjectRepository::new(
+            db.clone(),
+        )
         .get_by_id(project_id)
         .await?
         .ok_or_else(|| "Project not found".to_string())?;
@@ -346,7 +374,12 @@ async fn root_and_modules(
         .refresh(project_id)
         .await?
         .into_iter()
-        .map(|m| DetectedModule { rel_path: m.rel_path, name: m.name, stack: m.stack, role: m.role })
+        .map(|m| DetectedModule {
+            rel_path: m.rel_path,
+            name: m.name,
+            stack: m.stack,
+            role: m.role,
+        })
         .collect();
     Ok((std::path::PathBuf::from(project.path), modules))
 }
@@ -439,15 +472,19 @@ pub async fn release_refine(
         match release_validate(candidate.clone()).await {
             Ok(()) => return Ok(candidate),
             Err(e) => {
-                user = format!("{user}
+                user = format!(
+                    "{user}
 
 Your last reply was rejected: {e}
-Reply again with the corrected complete file.");
+Reply again with the corrected complete file."
+                );
                 last_error = e;
             }
         }
     }
-    Err(format!("The AI reply was not a valid pipeline file: {last_error}"))
+    Err(format!(
+        "The AI reply was not a valid pipeline file: {last_error}"
+    ))
 }
 
 fn parse_execution_request(value: Value) -> Result<ExecutionRequestData, String> {
