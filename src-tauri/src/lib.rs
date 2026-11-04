@@ -652,14 +652,12 @@ pub fn run() {
             domains::custom_scripts::commands::select_file,
             // Update commands
             domains::updates::commands::get_app_version_command,
-            // Network commands
+            // Network commands. Pairing verify/status/token-check are daemon
+            // routes (/pair/*), not IPC commands — see domains/network/commands.rs.
             domains::network::commands::get_local_network_ip,
             domains::network::commands::generate_device_passcode,
-            domains::network::commands::verify_device_passcode,
             domains::network::commands::approve_device,
-            domains::network::commands::verify_access_token,
             domains::network::commands::get_pending_device_approvals,
-            domains::network::commands::get_device_status,
             // Script execution commands
             domains::scripts::commands::execute_script,
             domains::scripts::commands::get_script_execution,

@@ -15,8 +15,10 @@ pub struct Model {
     pub approval_type: String, // "temporary" or "long_term"
     pub approved_at: Option<DateTimeWithTimeZone>, // When device was approved
     pub expires_at: Option<DateTimeWithTimeZone>, // Approval expiration (1 month max)
-    pub access_token: Option<String>, // JWT or session token for authenticated requests
+    pub access_token: Option<String>, // SHA-256 of the access token (never the token itself)
     pub token_expires_at: Option<DateTimeWithTimeZone>, // Token expiration
+    pub capabilities: String, // JSON array of granted capability names, e.g. ["coder","terminal"]
+    pub pairing_secret: Option<String>, // SHA-256 of the device's pairing secret; gates /pair/status
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
     pub last_used_at: Option<DateTimeWithTimeZone>, // Last time device accessed the API
