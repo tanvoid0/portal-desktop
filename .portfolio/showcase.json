@@ -1,0 +1,41 @@
+{
+  "product": {
+    "tagline": "A desktop workspace for developers: a terminal, AI chat, a coding agent and a project and disk audit, in one app for Windows, macOS and Linux.",
+    "summary": "Portal Desktop puts a terminal, an AI chat, a coding agent and tools for keeping a developer machine tidy in one window. Its AI features run through Agent Platform, which you run separately, so the app holds a server address and a token rather than your provider keys. Installers for Windows, macOS and Linux update themselves when a new release is out.",
+    "features": [
+      {
+        "title": "A terminal with an AI mode",
+        "detail": "A full terminal, plus /ai or Ctrl+Space to ask a question in plain English and have the answer stream into the same window."
+      },
+      {
+        "title": "Coder workspace",
+        "detail": "Watch a coding agent take its turns beside the terminal it works in, with its git changes and any sub-agents in view."
+      },
+      {
+        "title": "AI chat",
+        "detail": "Chat with any model on your Agent Platform, stop a reply mid-stream, set the system prompt and sampling per chat, and group chats into folders."
+      },
+      {
+        "title": "Project audit",
+        "detail": "Finds every project on your drives, shows which are alive, and flags work with unpushed commits or no remote, because that work exists only on that disk."
+      },
+      {
+        "title": "Disk Utility",
+        "detail": "Reclaim space taken by projects, developer tools and Docker or Podman resources. Files go to the Recycle Bin rather than being deleted outright."
+      },
+      {
+        "title": "GitHub in the app",
+        "detail": "Connect your GitHub account and browse your repositories and issues without leaving the window."
+      },
+      {
+        "title": "SDK manager",
+        "detail": "See which SDK managers and language versions are installed on the machine, and manage them from one screen."
+      }
+    ],
+    "platforms": [
+      "Windows (.exe or .msi)",
+      "macOS (Apple Silicon and Intel)",
+      "Linux (.deb, .rpm or AppImage)"
+    ]
+  }
+}
