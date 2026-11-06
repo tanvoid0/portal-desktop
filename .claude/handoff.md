@@ -1,103 +1,171 @@
-# Handoff — Portal Desktop coder engine work
+# Handoff — Portal Desktop, coder engine work
 
-Written 2026-11-06. For someone with no memory of the session that produced it.
+Rewritten 2026-11-06 ~22:15. For someone with no memory of the session that produced it.
+The previous version of this file described the state *before* the coder testing was run;
+that testing is now finished and its results live in
+[`.claude/coder-test-plan.md`](./coder-test-plan.md).
 
 ## Goal
 
-Two things the owner asked for, in order:
+Two things the owner asked for, both now done:
 
-1. Merge the outstanding branches to `main` in both repos (portal_desktop and agent-platform).
-2. Test Portal Desktop's **Coder** feature by driving the real app as a human developer would — pick a dummy project, brief it to build a React Native todo app, and find out what it can and cannot do. Fix what that test exposes.
+1. Commit everything outstanding in this checkout.
+2. Finish the remaining work in `.claude/coder-test-plan.md` — Parts A and B of the Coder
+   engine test — then fix what it exposed.
 
-A third item was added mid-session and is **not started**: test the coder on **Ollama via agent-platform**, to prove the coder is provider-independent rather than a thin wrapper around Claude Code.
+## State: branch `feat/coder-cli-permission-mode`, nothing pushed
 
-## State of the repos
+**Nothing is pushed in either repo** (portal_desktop or
+`D:\projects\production\ai\agentic-ai\agent-platform`). The owner has not asked.
 
-**portal_desktop** — on branch `feat/coder-cli-permission-mode`, cut from local `main`. Two commits on it:
+Nine commits, oldest first:
 
-- `dd2d844` fix(coder): let the Claude CLI engine run commands
-- `fb4be1e` feat(coder): record file changes on the Claude CLI engine
+| commit    | what                                                                      |
+| --------- | ------------------------------------------------------------------------- |
+| `dd2d844` | pre-existing: let the Claude CLI engine run commands                      |
+| `fb4be1e` | pre-existing: record file changes on the Claude CLI engine                |
+| `8530cbb` | another session's tasks board / list / archive revamp (16 files)          |
+| `e524574` | `.prettierignore` — ignore the generated `.impeccable/` hook cache        |
+| `f53cd46` | QA board sweep (QA-076..082) + the then-current handoff and test plan     |
+| `773bf2d` | Part A + Part B results written into the test plan; QA-083/084/085 filed  |
+| `e848a60` | fixes for QA-084 and QA-085                                               |
+| `e2bb5a8` | fix for QA-083                                                            |
+| `bfde40a` | repair of `e848a60`, which had shipped 4 type errors (see "What bit me")   |
 
-**Nothing is pushed.** Local `main` (`6240016`) carries three merges: `feat/coder-claude-cli-engine`, `fix/pipeline-step-timeout`, `fix/ci-svelte-kit-sync`.
+Working tree is clean. Gates, read with real exit codes: `pnpm check` 0 errors,
+`pnpm lint` 0 errors, `npx vitest run src/lib/domains/coder/utils/feedBlocks.test.ts` 5/5.
 
-Three branches were deliberately NOT merged — do not merge them without re-checking:
+## What was established (don't re-derive this)
 
-| branch                     | why skipped                                                                                                                                                                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fix/p0-shell-exec-csp`    | Direct diff vs `origin/main` is _only_ a 2-line `package.json` change; the rest already landed as squash #42. Fully redundant.                                                     |
-| `feat/local-docker-deploy` | Oct 17 base. Merging reverts 304 files (SvelteKit 3, shadcn re-vendor, P0 security work), downgrades version 0.12.3 → 0.12.2, and restores committed `target/rust-analyzer/` junk. |
-| `feat/coder-agent`         | July base, 85 commits behind, pre-`portal-core` layout. The coder domain has been rebuilt since with +9160 lines.                                                                  |
+**The coder is genuinely provider-independent.** It was tested end to end on Ollama
+(`gemma4:e4b`) through `agent-platformd` on `http://127.0.0.1:18410`, workspace
+`D:\projects\practice\todo-rn`. Streaming, the delegated tool loop, the Review approval
+gate and the Changes panel all work, and the platform path populates `coder_file_changes`
+**natively** — no transcript reconstruction. The Claude CLI path is the special case
+(it owns its own tool loop, which is why `fb4be1e` had to rebuild changes from the
+stream-json transcript).
 
-Use **two-dot** diffs (`git diff origin/main <branch>`) not three-dot when judging redundancy — three-dot hides that a squash merge already landed the content, which is what made these look live.
+Setup for Ollama needed **no bearer token, no model pull, no provider registration**:
 
-**agent-platform** (`D:\projects\production\ai\agentic-ai\agent-platform`) — local `main` has `feat/coder-approve-json-twin` merged (`221f158`). Conflicts in `desktop/crates/app/src/main.rs`, `screen.rs` and `plan.md` were resolved **to the branch**: main still held the pre-reframe nav and dashboard that the branch deliberately replaced. Not pushed.
+- `gemma4:e4b` advertises `capabilities: [..., "tools", ...]`, so it does function calling.
+  Only `ollama serve` had to be started.
+- agent-platform already ships Ollama in its provider registry
+  (`desktop/crates/server/src/llm_config.rs:99-122`, id `ollama`, base URL from
+  `OLLAMA_API_BASE`, default `http://127.0.0.1:11434`). `provider_configured("ollama")` is
+  true as soon as a base URL resolves — there is no registration endpoint and no DB row.
+- Portal already lists **Ollama** in the coder engine dropdown (the only two entries are
+  `Ollama` and `Claude Code (CLI)`) and posts `provider` + `model` per turn to
+  `/api/v1/coder/chat/stream`.
+- So the test plan's "issue a token, fill the AgentPlatform `api_key`" steps are **not
+  needed**. They were also not attempted: reading `master.key` and trying it against the
+  daemon is credential handling and the sandbox refused it, correctly. If a future run
+  genuinely needs a token, the daemon reads `AGENT_PLATFORM_MASTER_KEY`
+  (`desktop/crates/server/src/lib.rs:178`) and the desktop app writes
+  `<app_dir>/master.key` (`desktop/crates/app/src/shell.rs:623-639`) — **ask the owner
+  rather than reading it.**
 
-## SHARED CHECKOUT — read this before touching anything
-
-Another session, "Tasks UI revamp and organization", is working in **this same checkout with no worktree**, by the owner's instruction. It has uncommitted work and has agreed to commit onto this branch.
-
-Paths that belong to **them** — do not edit, and never stage:
-
-- `src/lib/domains/tasks/**`
-- `.claude/qa/**`
-- `src/routes/github/issues/+page.svelte` (legitimate knock-on: that page reuses KanbanBoard/TaskList, so extracting shared helpers into `utils/taskDisplay.ts` forced a matching edit)
-
-Paths that belong to **this** work, which they stay off:
-
-- `src/lib/domains/coder/**`
-- `src-tauri/portal-core/src/domains/coder/**`
-
-**Always `git add <path>`, never `git add -A`.** One sweep commits the other's half-finished work. Both commits above were staged by name and verified afterwards with `git show --name-only`.
-
-Contact them with `SendMessage` to `Tasks UI revamp and organization`. They have been reliable and proactive — they caught that an HMR reload would wipe a coder thread mid-test, which the session that wrote this had missed.
-
-## What was found and fixed
-
-### The test that exposed it
-
-Scratch repo at `D:\projects\practice\todo-rn` (created for this, imported into Portal as a project). The coder was briefed like a human would brief a developer and **wrote a correct Expo/TypeScript todo app** — including, unprompted, a `loaded` gate in `App.tsx` so the initial empty state does not overwrite AsyncStorage on launch. Verified independently: 716 packages install, `npx tsc --noEmit` clean.
-
-Then it stopped. It could not run a single command.
-
-### Fix 1 — `dd2d844`, commands
-
-Portal spawned `claude -p` with a hardcoded `--permission-mode acceptEdits` and no `--allowedTools`. Headless Claude cannot display an approval prompt, so it **auto-denies every tool that would otherwise ask**, Bash included. Worse, the permission-mode selector was hidden for this engine (`hideModes={isCli}` wrapped it), so no user could grant it.
-
-Now Portal's existing permission mode maps onto the CLI flag — `Review` → `acceptEdits` (unchanged default), `AutoAcceptAll` → `bypassPermissions`, which is already what that mode means for the platform engine. The selector renders for both engines; only the _agent_ mode stays platform-only behind `hideModes`.
-
-**This one is verified end to end.** Thread `cfa40a12` in the sqlite DB contains three real `Bash` tool calls including `npx tsc --noEmit`. The owner chose this approach over an `--allowedTools` allowlist.
-
-### Fix 2 — `fb4be1e`, the Changes panel
-
-The owner noticed the **Agent changes** panel stays empty for Claude Code sessions. Confirmed: `record_change` had exactly one call site, on the agent-platform path. Claude runs its own tool loop, so Portal never saw the write. (Git changes still worked — it shells out to git independently.)
-
-Now reconstructed from the stream-json transcript: Claude emits `tool_use` _before_ running a tool and `tool_result` _after_, so the file is snapshotted on the first and recorded on the second, by which point `record_change` can read `after` off disk as it already does.
-
-Three pure helpers next to `parse_cli_event` in `service.rs`, unit-tested the same way: `cli_edit_targets`, `cli_tool_result_ids`, `workspace_relative`.
-
-**Known limits, stated in the doc comment:** the snapshot-to-write gap is a race Portal cannot close while Claude owns the write; files edited outside the workspace root are skipped.
+What is provider-specific is **model capability, not plumbing**. `gemma4:e4b` called
+`write_file` without the required `path` argument twice and only succeeded once the
+arguments were dictated in the prompt. Portal's tool spec is correct
+(`src-tauri/portal-core/src/domains/coder/tools.rs:28-39`). A third provider needs: an
+entry in agent-platform's `PROVIDERS`, a reachable base URL, and a model whose tool calls
+fill required args. Only the last is a judgement call.
 
 ## What is left
 
-1. **Confirm the Changes panel actually populates.** This is the only unverified part of `fb4be1e`. The Rust is live in the running app, but nobody has watched the panel fill. Do it by starting a coder session on `D:\projects\practice\todo-rn`, asking for a small edit, then checking the panel — and verify at the data layer too:
+1. **QA-086 — four `role="button"` wrappers that nest real buttons.** The open item.
+   `.claude/qa/issues/QA-086-role-button-wrappers-swallow-nested-buttons.md` has the
+   sites:
+   - `src/lib/domains/terminal/components/TabBar.svelte:186` (wraps a real
+     `aria-label="Close tab"` button — worst of the four)
+   - `src/lib/domains/ai/components/shared/AISessionCard.svelte:76`
+   - `src/lib/domains/tasks/components/KanbanBoard.svelte:148,293`
+   - `src/lib/domains/tasks/components/TaskList.svelte:61,181`
 
-   ```
-   sqlite3 <db> "select count(*) from coder_file_changes where thread_id = (select id from coder_threads order by rowid desc limit 1);"
-   ```
+   The fix is the one already applied in `ChangesPanel.svelte` (see `e2bb5a8`): drop
+   `role="button"`, keep `tabindex="0"`, add `role="group"` plus an explicit `aria-label`,
+   and expose selection as `aria-current` rather than only a ring colour.
 
-   It was **0** before the fix. DB path: `C:\Users\tanvo\AppData\Roaming\com.tanvoid0.portal-desktop\portal_desktop.db` (copy it before querying; the app holds it open).
+   **The two tasks files belong to another session** ("Tasks UI revamp and organization")
+   which committed them as `8530cbb` in this same checkout. They were deliberately not
+   edited to avoid a concurrent write; that session has been messaged with the locations
+   and the fix. Check with it before touching them.
+   `src/lib/domains/sdk/components/sidebar/SDKSidebarItem.svelte:60` also uses
+   `role="button"` but nests nothing interactive — it is fine, leave it.
 
-2. **Ollama via agent-platform — not started.** `agent-platformd` is healthy on `http://127.0.0.1:18410` but requires `Authorization: Bearer <session JWT | agp_ workspace token | master key>`. Ollama is **not running**; binary at `C:\Users\tanvo\AppData\Local\Programs\Ollama\ollama`, and the only model on disk is `gemma4`, which may not support tool calling — the platform engine needs function calling, so pull something like `qwen2.5-coder` if it does not. Then fill the **AgentPlatform** provider row in Settings > AI (`base_url`, `api_key`, `model`, and it must be _enabled_) and start a **new thread**, because the engine is stored per-thread in `coder_threads.llm_provider`.
+2. **Part C leftovers**, from the test plan:
+   - the coder project dropdown shows a stale Linux path (`/media/tan/Workspace/...`) for
+     the Portal Desktop project itself, on a Windows machine. Not investigated.
+   - two unverified collapsed-sidebar observations (treat as "seen once", not findings).
+   - **push** — the owner has not asked.
 
-3. **Push.** Nothing is pushed in either repo. The owner has not asked yet.
+3. **Cosmetic:** several stale `pending` rows sit in `coder_file_changes` from test turns
+   on old threads. `D:\projects\practice\todo-rn\App.tsx` is back at its baseline
+   (`<Text style={styles.title}>Todos</Text>`), so nothing is actually dirty on disk.
 
-4. **Loose end, not investigated:** the coder's project dropdown showed a stale Linux path (`/media/tan/Workspace/...`) for the Portal Desktop project itself, on a Windows machine.
+## Files that matter
 
-## Things that bit the last session
+| path                                                                 | why                                                          |
+| -------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `.claude/coder-test-plan.md`                                         | the Part A / Part B results and the per-surface report        |
+| `.claude/qa/issues/QA-083..086*.md`                                  | 083/084/085 fixed + verified; **086 open**                    |
+| `.claude/qa/scripts/app.mjs`                                         | the CDP driver harness — use it, see below                    |
+| `src/lib/domains/coder/utils/feedBlocks.ts`                          | QA-084 fix: failed tool calls no longer counted as work       |
+| `src/lib/domains/coder/utils/feedBlocks.test.ts`                     | 5 cases covering that                                         |
+| `src/lib/domains/coder/state/coderSession.svelte.ts`                 | QA-085 fix: `llmConfigFor`, `syncThreadLlmConfig`             |
+| `src/lib/domains/coder/components/ChangesPanel.svelte:380`           | QA-083 fix, with a comment saying why it must stay a group    |
 
-- **Counting `cargo`/`rustc` processes is not a build check.** `tauri dev` leaves a `cargo run` alive as the parent of the app, with near-zero CPU. A whole stretch of the session was spent reporting a "stuck 25-minute rebuild" that had finished in 46 seconds. Check **CPU time** and the **binary mtime vs source mtime** instead. Better still, grep the built binary for a string only the new code contains.
-- **Running `cargo check --workspace` concurrently with `cargo test` against the same target dir produced a phantom `16 passed / 1 failed`.** Two clean runs after showed 215/0. Do not chase a lone failure under concurrent cargo.
-- **`pnpm check` and `pnpm lint` cover the whole tree, including the other session's in-flight work.** A red result is ambiguous between the two sessions. For a Rust-only change, run the cargo gates and say why you skipped the frontend ones.
-- **The app is a Tauri window, not a page** — drive it as a window. There is a helper at `C:/Users/tanvo/AppData/Local/Temp/claude/6ce5694c4c5839e1/5c08034c-1f05-47a7-a84a-86a304b95e74/scratchpad/pd.sh` (`shot` / `click` / `type` / `key` / `scroll` / `title`), but it lives in a session-scoped temp dir and **may be gone** — if so, see `C:/Users/tanvo/.claude/plugins/cache/tanvoid0/hands/0.5.1/win.ps1` and its `stacks/tauri.md`, which `pd.sh` wraps. Window coordinates include the title bar. `title` reads the document title and is the cheapest navigation assertion available. Native file dialogs are separate windows: set the path with `WM_SETTEXT` on the filename Edit, then `BM_CLICK` the confirm button.
-- **Screenshots are expensive and unevictable.** Delegate "look at this and tell me what it says" to a subagent so the image lands in its context, not yours.
-- **Do not trust the agent's self-report.** It claimed an exit code; the claim was only confirmed by finding the actual `Bash` tool call in `coder_threads.messages_json`. The same lesson applies to the panel: "the panel is empty" and "the write never happened" are different failures.
+## Decisions already made, and why
+
+- **A thread keeps the engine it was created with.** Changing the engine dropdown no
+  longer writes to the open thread; it sets the default for the next session and toasts to
+  say so. Rewriting a live thread's `llm_provider` misattributed the messages and
+  `coder_file_changes` rows the previous engine produced. Tradeoff accepted: the dropdown
+  can now show an engine the current thread will not use, which is why the toast exists.
+  Pinning or disabling the dropdown would be tidier but is a larger UI change.
+- **Failed tool calls are reported, not hidden.** `Created a file (1 failed)` when some
+  succeeded, `Failed creating 2 files` when none did. The all-failed wording reuses the
+  existing in-progress phrasing as a gerund so no new per-tool vocabulary was needed.
+- **QA-086 was filed rather than swept.** Fixing it means touching another session's
+  freshly committed files, and the ask was QA-083 specifically.
+- **`.claude/qa/shots/` was committed** (87 new PNGs, ~7 MB) because 510 shots were
+  already tracked from earlier sessions — the precedent exists. The other session thought
+  it was 53 MB of new history; it was not. If the owner wants shots gitignored going
+  forward, that only pays off if the 510 already in history also go.
+
+## What bit me — read this before you trust a gate
+
+- **`pnpm check | tail -3` reports `tail`'s exit code, not the gate's.** I read "exit 0"
+  twice from a failing gate and committed `e848a60` claiming "0 errors" while it shipped 4
+  svelte-check errors. Always `pnpm check > /tmp/out.txt 2>&1; echo $?`.
+- **I changed a method signature having seen only half its call sites**, because my grep
+  output was truncated by a `head` and I didn't notice. `syncThreadLlmConfig` had four
+  callers, not two. Count call sites before changing a signature.
+- **`getByRole('button', { name: ... })` is unsafe in this app.** Several containers carry
+  `role="button"` and their accessible name absorbs their children's text, so a role query
+  resolves to the **wrapper**; the click lands on its focus handler and **silently does
+  nothing** — no error, no console message. This produced a false "per-hunk reject is
+  broken" finding that I nearly filed as a bug. Use
+  `locator('button').filter({ hasText })` and assert `tagName === 'BUTTON'`. This is
+  exactly what QA-086 is about.
+- **Do not write a literal `<button>` in a Svelte comment** — the repo's
+  `portal/no-raw-ui-elements` eslint rule matches it and fails `pnpm lint`.
+- **Drive the app over CDP, not with pixel coordinates.** `.claude/qa/scripts/app.mjs`
+  connects to `127.0.0.1:9222` with Playwright. Three traps: (a) its `open()` does a
+  `page.goto`, which reloads the webview and **drops the active coder thread** — attach
+  without navigating, or reselect the thread from the Sessions list first; (b) menu items
+  are not uniformly `role="menuitem"` — find the open `[role="menu"]` and click its text,
+  and press `Escape` between attempts because an open menu intercepts pointer events;
+  (c) approval-banner buttons are **Accept once / Accept & remember / Reject**, not
+  "Approve" — a regex looking for "Approve" reports no gate on a working gate.
+  Importing the harness from outside the repo needs
+  `createRequire('<repo>/package.json')('@playwright/test')`.
+- Sessions-list rows show **truncated** prompt text — match a short prefix.
+- In `Review` mode a file edit is **not** prompted; it lands and is reviewed in the Changes
+  panel. The gate applies to **commands**. That is consistent with `Review` → `acceptEdits`.
+- The board on `:18420` is **not** down — `GET /health` returns
+  `{"name":"portal-desktop","ok":true,"version":"0.12.3"}` (the listener is
+  `portal_desktop.exe` itself). `GET /api/projects` 404s, so an earlier "board API did not
+  answer" report was a wrong path, not a dead endpoint.
+- This checkout is **shared with another session** with no worktree. Never `git add -A`;
+  stage by path. Stay off `src/lib/domains/tasks/**` and `.claude/qa/**` without checking.
