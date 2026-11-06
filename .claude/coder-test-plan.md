@@ -269,3 +269,71 @@ and start a new session; either order is now safe, and neither corrupts the old 
 
 Gates after the fixes: `pnpm check` 0 errors, `pnpm lint` 0 errors, and
 `src/lib/domains/coder/utils/feedBlocks.test.ts` 5/5.
+
+
+---
+
+## Part D — model accuracy, measured. 2026-11-06
+
+Part B proved the **plumbing** is provider-independent. It did not measure the **model**, and
+that is the thing that decides whether the coder can be relied on. This part measures it.
+
+### Method
+
+Portal's UI loop is already proven, so the model was driven directly against Portal's own
+tool specs and system prompt (copied verbatim from `domains/coder/tools.rs` and
+`service.rs:124`) over `POST /api/chat` on Ollama, with the same alias normalization Portal
+now applies. Three tasks x 2 repetitions per model, each run in a throwaway copy of the
+`todo-rn` baseline, default temperature (Portal sets none). `run_command` was refused to keep
+runs hermetic. Harness: `bench.mjs` / `battery.mjs`, written to the session scratchpad — it
+is a measuring instrument, not shipped code.
+
+**The gate is `tsc --noEmit`, not "the file changed".** The battery's own checker scored
+gemma4 6/6; six of those outputs, four compiled. An agent reporting success is not evidence,
+and neither is a non-empty diff.
+
+### Scoreboard
+
+| task                                           | gemma4:e4b | qwen3:8b  |
+| ---------------------------------------------- | ---------- | --------- |
+| T1 — change one heading string                 | **2/2**    | **2/2**   |
+| T2 — add a Text element showing a derived count | 1/2        | 1/2       |
+| T3 — add a three-option filter row that filters | 0/2        | 0/2       |
+| **total, compiling**                           | **3/6**    | **3/6**   |
+
+How the failures failed:
+
+- gemma4 T2: added `<Text style={styles.countText}>` and never added `countText` to the
+  stylesheet. `TS2339`.
+- gemma4 T3: both runs. One emitted invalid JSX (`TS1382`); the other referenced a
+  `FilterButton` component and a `styles.filterRow` it never defined.
+- qwen3 T2 and T3: one run each **described the edit in prose and called no tool at all**,
+  then reported it as done. The other T3 run rewrote the file in a single `write_file` and
+  produced `TS2657`.
+
+**`qwen2.5-coder:7b` scored 0/6 and is unusable.** It never emits the `<tool_call>` wrapper
+its own Ollama template demands, so every call arrives as assistant text and Portal's
+`strip_leaked_tool_syntax` drops it. Reproduced with Portal's system prompt, a one-line
+system prompt, and none at all — this is the model, not Portal. `ollama show
+qwen2.5-coder:7b --template` shows tool support is declared, and `/api/tags` reports
+`capabilities: [..., "tools", ...]`; neither means the model complies.
+
+### What this says about argument repair
+
+**Zero missing-argument failures in 24 tool calls across both working models.** The
+`missing arg: path` loop that motivated the fix reproduces at `temperature: 0` and did not
+appear once at Portal's default temperature. So the repair commit (`2ede7cf`) is worth
+keeping — it is cheap and it covers Claude- and OpenAI-shaped argument names — but argument
+plumbing was never the ceiling. **Code correctness on anything multi-part is the ceiling.**
+
+### Verdict
+
+- **Exactly-specified single-line edits: usable.** 4/4 across both models, all compiling.
+- **"Add an element" where a style or helper must come with it: coin flip.** 2/4.
+- **A feature in several coordinated parts: not usable.** 0/4.
+- **Never trust the summary.** Every failing run above ended with the model stating it had
+  made the change. Two made no edit whatsoever and said they had. A compile or test step is
+  not optional with a local model — it is the only signal that distinguishes the two cases.
+
+Unmeasured: anything over ~150 lines, multi-file edits, `run_command` flows, and models
+above 8B. n=2 per cell is a signal, not a reliability figure.
