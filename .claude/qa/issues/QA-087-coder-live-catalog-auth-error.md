@@ -79,7 +79,7 @@ fine, no AI entitlement), with the raw body as fallback. Two unit tests cover it
 
 **Not proven: what restored the auth.** The dropdown was dead when this was filed and works
 now, but the code change only affects the error *message*. The live settings file
-(`%APPDATA%\portal_desktopi-settings.json`) now holds a 64-character `api_key`; the most
+(`%APPDATA%/portal_desktop/ai-settings.json`) now holds a 64-character `api_key`; the most
 likely explanation is that it was empty before — which matches the daemon's own
 `AUTH_REQUIRED` meaning of "the header was missing" — and that saving the provider config
 from Settings -> AI (done while switching models for the Part D measurement) populated it.
@@ -88,8 +88,8 @@ new message will name the real code instead of guessing.
 
 ## Two traps found on the way
 
-- **A stale duplicate settings file.** `%APPDATA%\portal-desktopi-settings.json`
-  (hyphen) exists alongside `%APPDATA%\portal_desktopi-settings.json` (underscore), from
+- **A stale duplicate settings file.** `%APPDATA%/portal-desktop/ai-settings.json`
+  (hyphen) exists alongside `%APPDATA%/portal_desktop/ai-settings.json` (underscore), from
   an older app identifier, with a *different* `api_key` and a different `model`
   (`gemma4:latest` vs the live value). Only the underscore one is read —
   `app_paths::config_dir()` is the single source, used by both the catalog command and the
