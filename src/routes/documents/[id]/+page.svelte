@@ -15,7 +15,7 @@
   let isLoading = $state(true);
   let error = $state<string | null>(null);
 
-  const documentId = $derived(parseInt(page.params.id));
+  const documentId = $derived(parseInt(page.params.id ?? ''));
 
   onMount(async () => {
     await loadDocument();

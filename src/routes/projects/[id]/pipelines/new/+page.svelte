@@ -30,7 +30,7 @@
   import type { Pipeline } from '$lib/domains/projects/pipelines/types';
   import { toast } from '$lib/utils/toast';
 
-  const projectId = $derived(page.params.id);
+  const projectId = $derived(page.params.id ?? '');
   const projectQuery = createProjectQuery(() => projectId);
 
   let selectedTemplate: PipelineTemplate | null = $state(null);

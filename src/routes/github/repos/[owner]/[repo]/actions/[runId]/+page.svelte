@@ -10,8 +10,8 @@
   } from '$lib/domains/github';
   import { ArrowLeft } from '@lucide/svelte';
 
-  const owner = $derived(page.params.owner);
-  const repo = $derived(page.params.repo);
+  const owner = $derived(page.params.owner ?? '');
+  const repo = $derived(page.params.repo ?? '');
   const runId = $derived(Number(page.params.runId));
 
   const statusQuery = createGitHubStatusQuery();

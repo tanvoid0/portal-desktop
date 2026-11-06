@@ -40,6 +40,9 @@ export default defineConfig({
     sveltekit({
       preprocess: vitePreprocess(),
       adapter: adapter({ fallback: 'index.html' }),
+      // Kit writes these into its generated tsconfig, which is what gives
+      // svelte-check the same `@` / `$lib` resolution Vite has below.
+      alias: { '@': 'src', $lib: 'src/lib' },
     }),
   ],
 
@@ -86,7 +89,7 @@ export default defineConfig({
           // environment removed (Vitest v4 uses browser.enabled)
           browser: {
             enabled: true,
-            provider: playwright,
+            provider: playwright(),
             instances: [{ browser: 'chromium' }],
           },
           include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
