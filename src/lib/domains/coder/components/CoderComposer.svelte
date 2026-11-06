@@ -64,7 +64,9 @@
 
     rows?: number;
 
-    /** Claude CLI engine: agent/permission mode are ignored, so hide them. */
+    /** Claude CLI engine: Claude runs its own loop, so the agent mode is ignored
+     *  and hidden. Permission mode still applies — it maps onto the CLI's
+     *  `--permission-mode` — so it stays visible either way. */
     hideModes?: boolean;
 
     queuedMessages?: string[];
@@ -319,14 +321,17 @@
   {/snippet}
 
   {#snippet trailing()}
-    {#if !hideModes}
-      <CoderPermissionModeSelector
-        mode={permissionMode}
-        onModeChange={onPermissionModeChange}
-        inert={agentMode === 'ask'}
-        {disabled}
-      />
+    <!-- Permission mode applies to both engines: the platform path gates its own
+         tools with it, and the Claude CLI path maps it onto `--permission-mode`.
+         Only the agent mode is platform-only. -->
+    <CoderPermissionModeSelector
+      mode={permissionMode}
+      onModeChange={onPermissionModeChange}
+      inert={!hideModes && agentMode === 'ask'}
+      {disabled}
+    />
 
+    {#if !hideModes}
       <CoderAgentModeSelector
         mode={agentMode}
         {effectiveMode}

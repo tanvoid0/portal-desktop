@@ -2489,10 +2489,14 @@ impl CoderService {
     /// them to the UI via `coder://message`, and append them to the thread — the
     /// persisted transcript is the audit trail.
     ///
+    /// Portal's permission mode maps onto Claude's `--permission-mode`:
+    /// `Review` → `acceptEdits` (file edits auto-apply; headless Claude
+    /// auto-denies anything that would otherwise prompt, so it cannot run
+    /// commands), `AutoAcceptAll` → `bypassPermissions` (it can, which is what
+    /// that mode already means for the platform engine). Either way there is no
+    /// `coder://pending` round-trip — Claude owns its own approval loop.
+    ///
     /// v1 corners, cut on purpose:
-    /// - `--permission-mode acceptEdits`: file edits auto-apply; no per-tool
-    ///   approval round-trip (so no `coder://pending`). Headless Claude
-    ///   auto-denies any tool that would otherwise prompt (e.g. Bash).
     /// - No Cursor-style file-change review: `record_change` /
     ///   `coder_file_changes` are not populated (Claude runs its own tools, so
     ///   the pre-edit snapshot hook the platform path relies on is gone).
@@ -2555,13 +2559,21 @@ impl CoderService {
         } else {
             tokio::process::Command::new("claude")
         };
+        // Portal's own permission mode decides how much Claude may do without
+        // asking. Headless `claude -p` cannot prompt, so under `acceptEdits` any
+        // tool that would prompt (Bash, and therefore every build/test command)
+        // is auto-denied — the user opts into commands via `auto-accept-all`.
+        let cli_permission_mode = match self.get_permission_mode().await {
+            PermissionMode::AutoAcceptAll => "bypassPermissions",
+            PermissionMode::Review => "acceptEdits",
+        };
         cmd.current_dir(&workspace_root)
             .arg("-p")
             .arg("--output-format")
             .arg("stream-json")
             .arg("--verbose") // stream-json requires --verbose in -p mode
             .arg("--permission-mode")
-            .arg("acceptEdits");
+            .arg(cli_permission_mode);
         if let Some(sid) = &resume {
             cmd.arg("--resume").arg(sid);
         }
