@@ -569,11 +569,30 @@ class CoderSessionState {
     }
   }
 
-  /** Persist the given model/provider on a thread. */
+  /**
+   * What to persist for `t`: keep the model/engine it already has, and fill a
+   * blank from the current selection. A thread keeps the engine it was created
+   * with — see `syncThreadLlmConfig` and QA-085.
+   */
+  private llmConfigFor(t: CoderThread): { model: string | null; provider: string | null } {
+    return {
+      model: t.model || this.selectedModel,
+      provider: t.llm_provider || this.selectedBackendProvider,
+    };
+  }
+
+  /**
+   * Persist the given model/provider on a thread.
+   *
+   * Callers must pass what they want written — never read the selector here.
+   * Pushing the selector's engine onto an existing thread misattributes the
+   * messages and `coder_file_changes` rows the previous engine produced
+   * (QA-085). Use `llmConfigFor` to get back-fill-safe values.
+   */
   private async syncThreadLlmConfig(
     threadId: string,
-    model: string,
-    provider: string
+    model: string | null,
+    provider: string | null
   ): Promise<void> {
     await coderService.updateThreadModel(threadId, model, provider);
     if (this.thread?.id === threadId) {
@@ -951,8 +970,7 @@ class CoderSessionState {
       // engine, and pushing the selector's value onto an existing thread
       // silently misattributes that work to an engine which never ran it
       // (QA-085). Switching engine is done by starting a new session.
-      const model = this.thread.model || this.selectedModel;
-      const provider = this.thread.llm_provider || this.selectedBackendProvider;
+      const { model, provider } = this.llmConfigFor(this.thread);
       if ((!this.thread.model || !this.thread.llm_provider) && (model || provider)) {
         await this.syncThreadLlmConfig(this.thread.id, model, provider);
       }
@@ -1071,7 +1089,8 @@ class CoderSessionState {
     this.activeThreadId = t.id;
     this.thread = t;
     this.upsertThread(t);
-    await this.syncThreadLlmConfig(t.id);
+    const cfg = this.llmConfigFor(t);
+    await this.syncThreadLlmConfig(t.id, cfg.model, cfg.provider);
 
     const coord = await this.ensureCoordinatorThread(t);
     if (coord.thread_kind !== 'coordinator') return false;
@@ -1177,7 +1196,8 @@ class CoderSessionState {
     this.thread = t;
     this.upsertThread(t);
 
-    await this.syncThreadLlmConfig(t.id);
+    const cfg = this.llmConfigFor(t);
+    await this.syncThreadLlmConfig(t.id, cfg.model, cfg.provider);
 
     const spawnResult = await this.trySpawnMultitask(t, trimmed);
     if (spawnResult) {

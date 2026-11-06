@@ -379,9 +379,9 @@
             {@const focused = isFocused(c.id, h.index)}
             <!--
               A labelled group, NOT role="button". This div wraps the real
-              Accept/Reject <button>s, and a nested button role is both invalid
-              ARIA and unusable: the outer role's accessible name is computed
-              from its descendants, so it announced the entire diff plus both
+              Accept/Reject Button elements, and a nested button role is both
+              invalid ARIA and unusable: the outer role's accessible name is
+              computed from its descendants, so it announced the whole diff plus both
               button labels, and `getByRole('button', { name: 'Reject hunk' })`
               resolved to this wrapper instead of the button — the click then
               landed on the focus handler and silently did nothing (QA-083).
