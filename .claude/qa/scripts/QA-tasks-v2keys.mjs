@@ -1,0 +1,34 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=board'); const p = app.page;
+const url=()=>p.url().replace(/.*localhost:1420/,'');
+const dlg=async()=>(await p.getByRole('dialog').count())+' dialogs';
+const exists=async id=>p.evaluate(async id=>{try{const t=await window.__TAURI_INTERNALS__.invoke('get_task',{id});return !!t}catch{return false}},id);
+await p.keyboard.press('Control+k'); console.log('ctrl+k focus', await p.evaluate(()=>document.activeElement?.placeholder));
+await p.keyboard.press('Escape'); await p.locator('body').click({position:{x:700,y:60}});
+await p.keyboard.press('Control+f'); await p.waitForTimeout(400); console.log('ctrl+f', await dlg()); await app.shot('sweep-tasks-v2-filter-dialog'); await p.keyboard.press('Escape'); await p.waitForTimeout(400); console.log('esc', await dlg());
+await p.keyboard.press('Control+h'); await p.waitForTimeout(400); console.log('ctrl+h', await dlg()); await p.keyboard.press('Escape'); await p.waitForTimeout(400); console.log('esc', await dlg());
+await p.keyboard.press('Control+m'); await p.waitForTimeout(300); console.log('ctrl+m selectbar', await p.getByText(/selected/).count());
+await p.keyboard.press('Control+a'); await p.waitForTimeout(300); console.log('ctrl+a', await p.getByText(/\d+ selected/).allInnerTexts());
+// ctrl+a inside the search box: select text or all tasks?
+await p.keyboard.press('Escape'); await p.keyboard.press('Control+m');
+await p.getByPlaceholder('Search tasks...').fill('QA Del'); await p.waitForTimeout(500);
+await p.keyboard.press('Control+a'); await p.waitForTimeout(300);
+console.log('ctrl+a in search -> selected', await p.getByText(/\d+ selected/).allInnerTexts(), 'selection text', await p.evaluate(()=>getSelection().toString()+'|'+document.activeElement.value?.slice(0,10)));
+await p.getByPlaceholder('Search tasks...').press('Delete'); await p.waitForTimeout(300);
+console.log('Delete in search -> dialogs', await dlg(), 'search value', await p.getByPlaceholder('Search tasks...').inputValue());
+await p.getByPlaceholder('Search tasks...').fill('QA Del');
+// select all visible -> should be the 3 Del fixtures
+await p.locator('body').click({position:{x:700,y:60}});
+await p.getByRole('button',{name:/Select All/}).click(); await p.waitForTimeout(300);
+console.log('select all ->', await p.getByText(/\d+ selected/).allInnerTexts());
+await app.shot('sweep-tasks-v2-multiselect');
+await p.keyboard.press('Delete'); await p.waitForTimeout(500);
+console.log('Delete key -> dialogs', await dlg(), (await p.getByRole('alertdialog').allInnerTexts()));
+await app.shot('sweep-tasks-v2-bulkdelete-confirm');
+await p.keyboard.press('Escape'); await p.waitForTimeout(300); console.log('cancel keeps', await exists(75),await exists(76),await exists(77));
+await p.keyboard.press('Delete'); await p.waitForTimeout(500);
+await p.getByRole('button',{name:'Delete',exact:true}).last().click(); await p.waitForTimeout(250);
+await app.shot('sweep-tasks-v2-bulkdelete-toast');
+await p.waitForTimeout(1200);
+console.log('after delete exists', await exists(75),await exists(76),await exists(77), 'multiselect still on?', await p.getByText(/selected/).count());
+await app.done();

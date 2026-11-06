@@ -1,0 +1,12 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=board'); const p = app.page;
+const exists=async id=>p.evaluate(async id=>{try{return !!(await window.__TAURI_INTERNALS__.invoke('get_task',{id}))}catch{return false}},id);
+await p.getByPlaceholder('Search tasks...').fill('QA Del'); await p.waitForTimeout(500);
+await p.keyboard.press('Control+m'); await p.getByRole('button',{name:/Select All/}).click(); await p.waitForTimeout(300);
+await p.locator('body').click({position:{x:700,y:60}}); await p.keyboard.press('Delete'); await p.waitForTimeout(500);
+await p.getByRole('alertdialog').getByRole('button',{name:'Delete'}).click(); await p.waitForTimeout(300);
+await app.shot('sweep-tasks-v2-bulkdelete-toast');
+console.log('toast', await p.locator('[data-sonner-toast]').allInnerTexts());
+await p.waitForTimeout(1200);
+console.log('exists', await exists(75),await exists(76),await exists(77),'bar', await p.getByText(/\d+ selected/).count());
+await app.done();

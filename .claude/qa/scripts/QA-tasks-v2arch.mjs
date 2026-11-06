@@ -1,0 +1,11 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=board'); const p = app.page;
+const upd=(id,command)=>p.evaluate(async([id,command])=>{try{const t=await window.__TAURI_INTERNALS__.invoke('update_task',{id,command});return [t.status,t.completed_at]}catch(e){return 'ERR '+JSON.stringify(e)}},[id,command]);
+console.log(await upd(71,{status:'cancelled'}), await upd(69,{status:'cancelled'}));
+await p.reload(); await p.waitForTimeout(1500);
+const side = p.getByText('Archive',{exact:true}).first();
+console.log('sidebar text', (await p.locator('main').innerText()).match(/Archive\s*\n?\s*\d+/g));
+await side.click(); await p.waitForTimeout(800); console.log(p.url());
+await app.shot('sweep-tasks-v2-archive');
+console.log((await p.locator('main').innerText()).replace(/\n+/g,' | ').slice(0,700));
+await app.done();

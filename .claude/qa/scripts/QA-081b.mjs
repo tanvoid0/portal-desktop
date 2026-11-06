@@ -1,0 +1,12 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=board'); const p = app.page;
+const sel=()=>p.getByText(/\d+ selected/).allInnerTexts();
+await p.keyboard.press('Control+m'); await p.waitForTimeout(300);
+await p.locator('body').click({position:{x:700,y:60}}); await p.keyboard.press('Control+a'); await p.waitForTimeout(300);
+await p.keyboard.press('Delete'); await p.waitForTimeout(500);
+await p.getByRole('alertdialog').getByRole('button',{name:'Cancel'}).click(); await p.waitForTimeout(500);
+console.log('Cancel button: dialogs', await p.getByRole('alertdialog').count(), 'selected', await sel());
+await p.keyboard.press('Delete'); await p.waitForTimeout(500);
+await p.keyboard.press('Escape'); await p.waitForTimeout(500);
+console.log('Escape: dialogs', await p.getByRole('alertdialog').count(), 'selected', await sel(), 'bar', await p.getByText(/selected/).count());
+await p.keyboard.press('Escape'); await app.done();

@@ -1,0 +1,21 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=archive'); const p = app.page;
+const get = (id)=>p.evaluate(async id=>{const t=await window.__TAURI_INTERNALS__.invoke('get_task',{id});return [t.status,t.completed_at]},id);
+const txt=async()=>(await p.locator('main').innerText()).split('\n').filter(l=>/^QA|Restore|older/.test(l)).join('|');
+await p.getByPlaceholder('Search tasks...').fill('Gamma'); await p.waitForTimeout(500); console.log('search Gamma:', await txt());
+await p.getByPlaceholder('Search tasks...').fill('zzzz'); await p.waitForTimeout(500); console.log('search zzzz:', (await p.locator('main').innerText()).split('\n').slice(-4).join('|'));
+await app.shot('sweep-tasks-v2-archive-nomatch');
+await p.getByPlaceholder('Search tasks...').fill(''); await p.waitForTimeout(400);
+await p.getByRole('button',{name:/Restore/}).first().click(); await p.waitForTimeout(1200);
+console.log('after restore:', await txt(), '| toast:', await p.locator('[data-sonner-toast]').allInnerTexts());
+console.log('Gamma backend', await get(69));
+await p.goto(new URL('/tasks?project=all&view=board',p.url()).href); await p.waitForTimeout(1200);
+const col=(n)=>p.getByRole('region',{name:`Drop zone for ${n} tasks`});
+console.log('Gamma in Backlog', await col('Backlog').getByText('QA Gamma').count());
+// clock +8 days: QA Beta (completed) should archive
+await p.clock.install({time:new Date(Date.now()+8*86400e3)}); await p.reload(); await p.waitForTimeout(1500);
+console.log('+8d: Beta in Done', await col('Done').getByText('QA Beta').count());
+await p.goto(new URL('/tasks?project=all&view=archive',p.url()).href); await p.waitForTimeout(1200);
+console.log('+8d archive:', await txt());
+await app.shot('sweep-tasks-v2-archive-clock8d');
+await app.done();

@@ -1,0 +1,18 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=board'); const p = app.page;
+const ID=80;
+const get = ()=>p.evaluate(async id=>{const t=await window.__TAURI_INTERNALS__.invoke('get_task',{id});return [t.status,t.completed_at]},ID);
+const col = (n)=>p.getByRole('region',{name:`Drop zone for ${n} tasks`});
+const card=(t)=>p.getByRole('button',{name:`Select task: ${t}`});
+console.log('start', await get());
+await card('QA Cmp').dragTo(col('Done')); await p.waitForTimeout(1200); const a=await get(); console.log('1 complete', a);
+await p.waitForTimeout(1500);
+await p.goto(new URL('/tasks/80/edit',p.url()).href); await p.waitForTimeout(1000);
+await p.fill('#title','QA Cmp edited'); await p.getByRole('button',{name:'Update Task'}).click(); await p.waitForTimeout(1500);
+const b=await get(); console.log('2 title edit', b, 'UNCHANGED:', a[1]===b[1]);
+await p.goto(new URL('/tasks?project=all&view=board',p.url()).href); await p.waitForTimeout(1200);
+await card('QA Cmp edited').dragTo(col('In Progress')); await p.waitForTimeout(1200); console.log('3 out of done', await get());
+await p.waitForTimeout(1200);
+await card('QA Cmp edited').dragTo(col('Done')); await p.waitForTimeout(1200); const c=await get(); console.log('4 recomplete', c, 'FRESH:', c[1]!==a[1]);
+await card('QA Cmp edited').dragTo(col('Backlog')); await p.waitForTimeout(1000); console.log('5 backlog', await get());
+await app.done();

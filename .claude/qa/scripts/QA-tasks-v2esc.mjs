@@ -1,0 +1,11 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=board'); const p = app.page;
+await p.getByPlaceholder('Search tasks...').fill('QA Del'); await p.waitForTimeout(500);
+await p.keyboard.press('Control+m'); await p.getByRole('button',{name:/Select All/}).click(); await p.waitForTimeout(300);
+console.log('selected', await p.getByText(/\d+ selected/).allInnerTexts());
+await p.locator('body').click({position:{x:700,y:60}}); await p.keyboard.press('Delete'); await p.waitForTimeout(500);
+console.log('confirm open', await p.getByRole('alertdialog').count());
+await p.keyboard.press('Escape'); await p.waitForTimeout(500);
+console.log('after Esc on confirm: confirm', await p.getByRole('alertdialog').count(), 'selected bar', await p.getByText(/selected/).count(), await p.getByText(/\d+ selected/).allInnerTexts());
+await app.shot('QA-NEW-esc-confirm-leaves-multiselect');
+await app.done();

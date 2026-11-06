@@ -1,0 +1,10 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=board'); const p = app.page;
+const was = await p.evaluate(()=>document.documentElement.classList.contains('dark'));
+await p.evaluate(()=>document.documentElement.classList.add('dark')); await p.waitForTimeout(400);
+await app.shot('sweep-tasks-v2-dark-board');
+await p.keyboard.press('Control+f'); await p.waitForTimeout(500); await app.shot('sweep-tasks-v2-dark-filter'); await p.keyboard.press('Escape');
+await p.goto(new URL('/tasks?project=all&view=list',p.url()).href); await p.waitForTimeout(1000); 
+await p.evaluate(()=>document.documentElement.classList.add('dark')); await app.shot('sweep-tasks-v2-dark-list');
+await p.evaluate(w=>{if(!w)document.documentElement.classList.remove('dark')},was);
+await app.done();

@@ -1,0 +1,15 @@
+import { open } from './app.mjs';
+const app = await open('tasks?project=all&view=list'); const p = app.page;
+await p.setViewportSize({width:1024,height:600}); await p.waitForTimeout(700);
+console.log('crumb', await p.evaluate(()=>document.body.innerText.slice(0,0)), p.url());
+const scrollers = async()=>p.evaluate(()=>[...document.querySelectorAll('main *, div')].filter(e=>e.scrollHeight>e.clientHeight+5&&/auto|scroll/.test(getComputedStyle(e).overflowY)).map(e=>({c:e.className.toString().slice(0,60),sh:e.scrollHeight,ch:e.clientHeight})));
+console.log('list scrollers', JSON.stringify(await scrollers()));
+const s = p.locator('div.overflow-y-auto').filter({hasText:'QA'}).last();
+await p.mouse.move(600,450); await p.mouse.wheel(0,99999); await p.waitForTimeout(500);
+console.log('list bottom', await p.evaluate(()=>{const e=[...document.querySelectorAll('div')].filter(e=>e.scrollHeight>e.clientHeight+5&&/auto/.test(getComputedStyle(e).overflowY)).pop();return e?[e.scrollTop,e.scrollHeight-e.clientHeight]:null}));
+await app.shot('QA-076-after-list-bottom-1024x600');
+console.log('nospace row', await p.evaluate(()=>{const e=[...document.querySelectorAll('*')].find(e=>e.children.length==0&&e.textContent.startsWith('QA Nospace'));if(!e)return 'none';const r=e.getBoundingClientRect();return [Math.round(r.right),innerWidth,e.scrollWidth>e.clientWidth, getComputedStyle(e).textOverflow]}));
+await p.goto(p.url().replace('view=list','view=archive')); await p.waitForTimeout(1000);
+console.log('archive scrollers', JSON.stringify(await scrollers()));
+await app.shot('QA-076-after-archive-1024x600');
+await app.done();

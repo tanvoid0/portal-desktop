@@ -1,0 +1,20 @@
+import { open } from './app.mjs';
+let app = await open('tasks/create?parentId=52');
+let p = app.page;
+console.log(await p.locator('main').innerText().then(t=>t.slice(0,300)));
+console.log('title field:', await p.inputValue('#title'));
+await p.fill('#title', 'QA Alpha sub 1');
+await p.getByRole('button', { name: 'Create Task' }).click();
+await p.waitForTimeout(1500);
+console.log('after create sub ->', p.url());
+console.log((await p.locator('main').innerText()).slice(0,700));
+await app.shot('sweep-tasks-subtask-detail');
+await app.done();
+app = await open('tasks'); p = app.page;
+const z = p.locator('[aria-label^="Drop zone"]');
+console.log(await z.evaluateAll(zs=>zs.map(z=>z.getAttribute('aria-label')+' :: '+[...z.querySelectorAll('h4')].map(h=>h.textContent.trim()).filter(t=>t.startsWith('QA')).join(' | '))));
+// search for the subtask title
+await p.getByPlaceholder('Search tasks...').fill('sub 1');
+await p.waitForTimeout(400);
+console.log('search sub:', (await p.locator('main').innerText()).includes('No matching'), await p.locator('h4').allInnerTexts());
+await app.done();
