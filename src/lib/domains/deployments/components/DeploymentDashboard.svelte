@@ -35,18 +35,17 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import {
-    Plus,
-    Search,
-    Rocket,
-    Container as ContainerIcon,
-    Play,
-    Square,
-    AlertCircle,
-    Loader2,
-    RefreshCw,
-    Box,
-  } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Rocket from '~icons/fa6-solid/rocket';
+  import ContainerIcon from '~icons/fa6-solid/cube';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Box from '~icons/fa6-solid/box';
+  import Hammer from '~icons/fa6-solid/hammer';
   import type { DeploymentStatus, DockerContainer } from '../types';
   import type { GroupByMode } from '../utils/workloadGrouping';
   import { groupWorkloads } from '../utils/workloadGrouping';
@@ -488,7 +487,8 @@
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle class="text-sm font-medium">Building</CardTitle>
             <Badge variant="outline" class="bg-yellow-100 text-yellow-800">
-              🔨 {stats.building}
+              <Hammer class="mr-1 h-3 w-3" />
+              {stats.building}
             </Badge>
           </CardHeader>
           <CardContent>
@@ -574,12 +574,6 @@
                 ? 'Try adjusting your filters'
                 : 'Create your first deployment to get started'}
             </p>
-            {#if !searchQuery && !selectedStatus}
-              <Button onclick={handleCreateDeployment}>
-                <Plus class="mr-2 h-4 w-4" />
-                New Deployment
-              </Button>
-            {/if}
           </CardContent>
         </Card>
       {/if}

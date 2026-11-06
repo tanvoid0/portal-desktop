@@ -749,3 +749,10 @@
     animation-iteration-count: infinite !important;
   }
 }
+
+/* Narrower domain sidebars on small windows (settings, cloud, sdk, utilities) */
+@media (width < 80rem) {
+  :root {
+    --sidebar-width-domain: 14rem;
+  }
+}

@@ -1,4 +1,8 @@
 <script lang="ts">
+  import FaStar from '~icons/fa6-solid/star';
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaList from '~icons/fa6-solid/list';
+  import FaTrash from '~icons/fa6-solid/trash';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
@@ -74,7 +78,7 @@
       <Dialog bind:open={showSaveDialog}>
         <DialogTrigger>
           <Button variant="outline" size="sm">
-            <Icon icon="mdi:plus" class="mr-1 h-4 w-4" />
+            <FaPlus class="mr-1 h-4 w-4" />
             Save View
           </Button>
         </DialogTrigger>
@@ -110,7 +114,7 @@
   <CardContent class="p-4 pt-0">
     {#if taskUi.savedViews.length === 0}
       <div class="py-8 text-center text-muted-foreground">
-        <Icon icon="mdi:view-list" class="mx-auto mb-2 h-12 w-12" />
+        <FaList class="mx-auto mb-2 h-12 w-12" />
         <div class="text-sm">No saved views yet</div>
         <div class="text-xs">Create your first view to get started</div>
       </div>
@@ -127,7 +131,7 @@
                 onclick={() => loadView(view)}
               >
                 <div class="flex items-center gap-2">
-                  <Icon icon="mdi:view-list" class="h-4 w-4" />
+                  <FaList class="h-4 w-4" />
                   <div class="text-left">
                     <div class="font-medium">{view.name}</div>
                     {#if view.description}
@@ -151,7 +155,7 @@
                   onclick={() => setAsDefault(view.id)}
                   title="Set as default"
                 >
-                  <Icon icon="mdi:star-outline" class="h-4 w-4" />
+                  <FaStar class="h-4 w-4" />
                 </Button>
               {/if}
               <Button
@@ -161,7 +165,7 @@
                 title="Delete view"
                 class="text-destructive hover:text-destructive"
               >
-                <Icon icon="mdi:delete" class="h-4 w-4" />
+                <FaTrash class="h-4 w-4" />
               </Button>
             </div>
           </div>

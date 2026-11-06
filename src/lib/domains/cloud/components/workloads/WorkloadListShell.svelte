@@ -2,7 +2,7 @@
   import type { Snippet } from 'svelte';
   import { PageHeader, PageLoading, PageEmpty } from '$lib/components/shell';
   import { Button } from '$lib/components/ui/button';
-  import { RefreshCw } from '@lucide/svelte';
+  import RefreshCw from '~icons/fa6-solid/rotate';
   import { cloudStore } from '$lib/domains/cloud/stores';
   import type { ResourceType } from '$lib/domains/cloud/core/types';
 

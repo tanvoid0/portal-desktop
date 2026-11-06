@@ -1,6 +1,5 @@
 <!--
-	Projects page - Project management interface
-	Showcases the projects domain with full CRUD operations
+	Projects page - compact rows grouped by area
 -->
 
 <script module lang="ts">
@@ -9,11 +8,17 @@
 </script>
 
 <script lang="ts">
-  import * as Dialog from '$lib/components/ui/dialog';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
-  import { FolderOpen, CheckCircle, Database, Code } from '@lucide/svelte';
-  import ProjectCard from '$lib/domains/projects/components/ProjectCard.svelte';
+  import { Switch } from '$lib/components/ui/switch';
+  import { Label } from '$lib/components/ui/label';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Activity from '~icons/fa6-solid/wave-square';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
+  import Star from '~icons/fa6-solid/star';
+  import Plus from '~icons/fa6-solid/plus';
+  import ScanSearch from '~icons/fa6-solid/magnifying-glass';
+  import ProjectRow from '$lib/domains/projects/components/ProjectRow.svelte';
   import Select from '$lib/components/ui/select.svelte';
   import { projectService } from '$lib/domains/projects';
   import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
@@ -21,17 +26,16 @@
   import { refreshAllModules } from '$lib/domains/projects/api/moduleApi';
   import { groupByProject } from '$lib/domains/projects/utils/moduleStacks';
   import { nestProjects, descendantIds } from '$lib/domains/projects/utils/nestProjects';
+  import { groupByArea } from '$lib/domains/projects/utils/groupProjects';
   import { queryClient } from '$lib/domains/shared/query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import type { Project } from '$lib/domains/projects/types';
+  import { toggleProjectStar } from '$lib/domains/projects/api/projectApi';
+  import { toast } from '$lib/utils/toast';
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
   import { logger } from '$lib/domains/shared/services/logger';
   import { confirmAction } from '$lib/utils/confirm';
-  import { formatBytes } from '$lib/domains/shared/utils';
-  import { getProjectFramework } from '$lib/domains/projects/utils/display';
   import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
-  import { WorkflowTrigger, WorkflowResults } from '$lib/domains/automation';
-  import type { WorkflowResult } from '$lib/domains/automation/types';
   import {
     PageHeader,
     PageLoading,
@@ -41,7 +45,6 @@
     PageFilters,
   } from '$lib/components/shell';
   import type { PageStat } from '$lib/components/shell';
-  import { Plus, ScanSearch, ArrowUp } from '@lucide/svelte';
 
   const log = logger.createScoped('ProjectsPage');
 
@@ -49,19 +52,10 @@
   const modulesQuery = createAllModulesQuery();
 
   let searchQuery = $state('');
-  let selectedProject = $state<any>(null);
-  let showAutomation = $state(false);
-  let workflowResult = $state<WorkflowResult | null>(null);
-
-  // Filter state
-  let filterFramework = $state<string | null>(null);
-  let filterStatus = $state<string | null>(null);
-  let filterPackageManager = $state<string | null>(null);
-
-  // Sort state
-  type SortOption = 'name' | 'last_opened' | 'size' | 'created_at';
-  let sortBy = $state<SortOption>('name');
-  let sortDirection = $state<'asc' | 'desc'>('asc');
+  let filterStack = $state<string | null>(null);
+  let filterActivity = $state<string | null>(null);
+  let starredOnly = $state(false);
+  let sortBy = $state<'recent' | 'name'>('recent');
   let registryReady = $state(false);
 
   const projects = $derived(projectsQuery.data ?? []);
@@ -82,19 +76,28 @@
     if (modulesRefreshed) return;
     modulesRefreshed = true;
     refreshAllModules()
-      .then(() => queryClient.invalidateQueries({ queryKey: queryKeys.projects.modules }))
+      // The scan also fills the stack of projects that had none (and may add new
+      // framework rows), so reload the icon registry and refetch both.
+      .then(() => projectIconRegistry.reload())
+      .then(() =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.projects.modules }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.projects.all }),
+        ])
+      )
       .catch((error) => log.error('Failed to refresh modules', error));
   });
 
-  function projectHasFramework(project: Project, framework: string): boolean {
-    return projectIconRegistry.resolveFrameworks(project).some((item) => item.name === framework);
-  }
+  const stackNames = (project: Project): string[] =>
+    [
+      ...projectIconRegistry.resolveFrameworks(project),
+      ...projectIconRegistry.resolveLanguages(project),
+    ].map((item) => item.name);
 
-  function projectHasPackageManager(project: Project, packageManager: string): boolean {
-    return projectIconRegistry
-      .resolvePackageManagers(project)
-      .some((item) => item.name === packageManager);
-  }
+  const lastSeen = (p: Project): number => {
+    const d = p.last_activity ?? p.last_opened;
+    return d ? new Date(d).getTime() : 0;
+  };
 
   const filteredProjects = $derived(
     [...projects]
@@ -109,128 +112,49 @@
             return false;
           }
         }
-        if (filterFramework && !projectHasFramework(project, filterFramework)) {
-          return false;
-        }
-        if (filterStatus && project.status !== filterStatus) {
-          return false;
-        }
-        if (filterPackageManager && !projectHasPackageManager(project, filterPackageManager)) {
-          return false;
-        }
+        if (filterStack && !stackNames(project).includes(filterStack)) return false;
+        if (filterActivity && project.activity_status !== filterActivity) return false;
+        if (starredOnly && !project.starred) return false;
         return true;
       })
-      .sort((a, b) => {
-        let comparison = 0;
-
-        switch (sortBy) {
-          case 'name':
-            comparison = a.name.localeCompare(b.name);
-            break;
-          case 'last_opened':
-            comparison =
-              (a.last_opened ? new Date(a.last_opened).getTime() : 0) -
-              (b.last_opened ? new Date(b.last_opened).getTime() : 0);
-            break;
-          case 'size':
-            comparison = a.size - b.size;
-            break;
-          case 'created_at':
-            comparison =
-              (a.created_at ? new Date(a.created_at).getTime() : 0) -
-              (b.created_at ? new Date(b.created_at).getTime() : 0);
-            break;
-        }
-
-        return sortDirection === 'asc' ? comparison : -comparison;
-      })
+      .sort((a, b) =>
+        sortBy === 'name'
+          ? a.name.localeCompare(b.name)
+          : lastSeen(b) - lastSeen(a) || a.name.localeCompare(b.name)
+      )
   );
 
-  // Projects nested inside another (by path) group under their top-level parent
-  // and drop out of the root grid. Computed over the filtered set so a nested
-  // project still surfaces as a root when its parent is filtered out.
-  const nestedGroups = $derived(nestProjects(filteredProjects));
+  // Projects nested inside another (by path or manual grouping) sit under their
+  // root row. Computed over the filtered set so a nested project still surfaces
+  // as a root when its parent is filtered out.
+  const groups = $derived(groupByArea(nestProjects(filteredProjects)));
 
   const stats = $derived<PageStat[]>([
-    { label: 'Total Projects', value: projects.length, icon: FolderOpen },
+    { label: 'Total', value: projects.length, icon: FolderOpen },
     {
-      label: 'Active Projects',
-      value: projects.filter((p) => p.status === 'active').length,
-      icon: CheckCircle,
+      label: 'Active this week',
+      value: projects.filter((p) => p.activity_status === 'active').length,
+      icon: Activity,
     },
     {
-      label: 'Total Size',
-      value: formatBytes(projects.reduce((sum, p) => sum + p.size, 0)),
-      icon: Database,
+      label: 'Need attention',
+      value: projects.filter((p) => p.has_uncommitted_changes || (p.unpushed_commits ?? 0) > 0)
+        .length,
+      icon: AlertTriangle,
     },
-    {
-      label: 'Most Used Type',
-      value:
-        Object.entries(
-          projects.reduce(
-            (acc, p) => {
-              const framework = getProjectFramework(p) || 'Unknown';
-              acc[framework] = (acc[framework] || 0) + 1;
-              return acc;
-            },
-            {} as Record<string, number>
-          )
-        ).sort(([, a], [, b]) => b - a)[0]?.[0] || 'none',
-      icon: Code,
-    },
+    { label: 'Starred', value: projects.filter((p) => p.starred).length, icon: Star },
   ]);
 
   const isFiltered = $derived(
-    Boolean(searchQuery.trim() || filterFramework || filterStatus || filterPackageManager)
+    Boolean(searchQuery.trim() || filterStack || filterActivity || starredOnly)
   );
 
-  const uniqueFrameworks = $derived.by(() => {
+  const uniqueStacks = $derived.by(() => {
     if (!registryReady) return [];
-
     const names = new Set<string>();
-    for (const project of projects) {
-      for (const framework of projectIconRegistry.resolveFrameworks(project)) {
-        names.add(framework.name);
-      }
-    }
+    for (const project of projects) for (const name of stackNames(project)) names.add(name);
     return [...names].sort((a, b) => a.localeCompare(b));
   });
-
-  const uniquePackageManagers = $derived.by(() => {
-    if (!registryReady) return [];
-
-    const names = new Set<string>();
-    for (const project of projects) {
-      for (const manager of projectIconRegistry.resolvePackageManagers(project)) {
-        names.add(manager.name);
-      }
-    }
-    return [...names].sort((a, b) => a.localeCompare(b));
-  });
-
-  // Handle project click - navigate to details page
-  const handleProjectClick = (project: any) => {
-    goto(`/projects/${project.id}`);
-  };
-
-  // Handle automation
-  function handleAutomationClick(project: any, event: Event) {
-    event.stopPropagation();
-    selectedProject = project;
-    showAutomation = true;
-    workflowResult = null;
-  }
-
-  function handleWorkflowComplete(result: WorkflowResult) {
-    workflowResult = result;
-    log.info('Workflow completed', { result });
-  }
-
-  function closeAutomation() {
-    showAutomation = false;
-    selectedProject = null;
-    workflowResult = null;
-  }
 
   // Manual grouping: a project can be grouped under any project except itself
   // and its own descendants (which would make a cycle).
@@ -243,6 +167,16 @@
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  async function handleToggleStar(project: Project) {
+    try {
+      await toggleProjectStar(Number(project.id));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    } catch (error) {
+      log.error('Failed to toggle star', error);
+      toast.error('Could not update the star');
+    }
+  }
+
   const handleSetParent = async (projectId: string, parentId: number | null) => {
     try {
       await projectService.setProjectParent(projectId, parentId);
@@ -251,8 +185,7 @@
     }
   };
 
-  // Handle project delete
-  const handleProjectDelete = async (project: any) => {
+  const handleProjectDelete = async (project: Project) => {
     const confirmed = await confirmAction(`Are you sure you want to delete "${project.name}"?`);
     if (confirmed) {
       try {
@@ -270,7 +203,6 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <!-- Header -->
   <PageHeader title="Projects" description="Manage your development projects">
     {#snippet actions()}
       <Button variant="outline" onclick={() => goto('/projects/audit')}>
@@ -284,77 +216,61 @@
     {/snippet}
   </PageHeader>
 
-  <!-- Stats Cards -->
   <PageStats {stats} />
 
-  <!-- Filters -->
   <PageFilters bind:searchQuery searchPlaceholder="Search projects...">
     {#snippet filters()}
       <Select
-        defaultValue={filterFramework || ''}
-        placeholder="All Frameworks"
-        options={uniqueFrameworks.map((f) => ({ value: f, label: f }))}
-        onSelect={(value) => (filterFramework = value || null)}
-        class="min-w-[150px]"
+        value={filterStack ?? ''}
+        placeholder="All stacks"
+        options={[
+          { value: '', label: 'All stacks' },
+          ...uniqueStacks.map((n) => ({ value: n, label: n })),
+        ]}
+        onSelect={(value) => (filterStack = value || null)}
+        class="w-[170px]"
       />
 
       <Select
-        defaultValue={filterStatus || ''}
-        placeholder="All Statuses"
+        value={filterActivity ?? ''}
+        placeholder="Any activity"
         options={[
+          { value: '', label: 'Any activity' },
           { value: 'active', label: 'Active' },
-          { value: 'archived', label: 'Archived' },
-          { value: 'deleted', label: 'Deleted' },
+          { value: 'recent', label: 'Recent' },
+          { value: 'dormant', label: 'Dormant' },
+          { value: 'stale', label: 'Stale' },
         ]}
-        onSelect={(value) => (filterStatus = value || null)}
-        class="min-w-[130px]"
+        onSelect={(value) => (filterActivity = value || null)}
+        class="w-[150px]"
       />
 
       <Select
-        defaultValue={filterPackageManager || ''}
-        placeholder="All Package Managers"
-        options={uniquePackageManagers.map((m) => ({ value: m, label: m }))}
-        onSelect={(value) => (filterPackageManager = value || null)}
-        class="min-w-[180px]"
-      />
-
-      <Select
-        defaultValue={sortBy}
-        placeholder="Sort by"
+        value={sortBy}
         options={[
+          { value: 'recent', label: 'Recently active' },
           { value: 'name', label: 'Name' },
-          { value: 'last_opened', label: 'Last Opened' },
-          { value: 'size', label: 'Size' },
-          { value: 'created_at', label: 'Created Date' },
         ]}
-        onSelect={(value) => (sortBy = value as SortOption)}
-        class="min-w-[140px]"
+        onSelect={(value) => (sortBy = value as typeof sortBy)}
+        class="w-[170px]"
       />
+
+      <div class="flex items-center gap-2">
+        <Switch id="starred-only" bind:checked={starredOnly} />
+        <Label for="starred-only" class="text-sm">Starred only</Label>
+      </div>
     {/snippet}
 
     {#snippet actions()}
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={() => (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')}
-        class="flex items-center gap-1"
-        title={`Sort ${sortDirection === 'asc' ? 'Ascending' : 'Descending'}`}
-      >
-        <ArrowUp class="h-4 w-4 {sortDirection === 'desc' ? 'rotate-180' : ''}" />
-        {sortDirection === 'asc' ? 'Asc' : 'Desc'}
-      </Button>
-
-      <!-- Search counts as a filter: clearing everything but the search box left
-           the empty state telling you to adjust criteria you could not reach. -->
       {#if isFiltered}
         <Button
           variant="ghost"
           size="sm"
           onclick={() => {
             searchQuery = '';
-            filterFramework = null;
-            filterStatus = null;
-            filterPackageManager = null;
+            filterStack = null;
+            filterActivity = null;
+            starredOnly = false;
           }}
           class="text-muted-foreground"
         >
@@ -364,7 +280,6 @@
     {/snippet}
   </PageFilters>
 
-  <!-- Projects Grid -->
   {#if isLoading}
     <PageLoading message="Loading projects..." />
   {:else if pageError}
@@ -384,40 +299,38 @@
       onAction={() => goto('/projects/create')}
     />
   {:else}
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {#each nestedGroups as group (group.project.id)}
-        <ProjectCard
-          project={group.project}
-          nested={group.children}
-          eligibleParents={eligibleParents(group.project)}
-          modules={modulesByProject.get(Number(group.project.id)) ?? []}
-          onClick={(p) => handleProjectClick(p)}
-          onEdit={(p) => goto(`/projects/${p.id}`)}
-          onDelete={handleProjectDelete}
-          onSetParent={handleSetParent}
-          showActions={true}
-        />
+    <div class="space-y-6">
+      {#each groups as group (group.key)}
+        <section>
+          <h2 class="mb-1 flex items-baseline gap-2 border-b px-3 pb-1 text-sm font-semibold">
+            {group.title}
+            <span class="text-xs font-normal text-muted-foreground">{group.items.length}</span>
+          </h2>
+          {#each group.items as item (item.project.id)}
+            <ProjectRow
+              project={item.project}
+              {registryReady}
+              modules={modulesByProject.get(Number(item.project.id)) ?? []}
+              eligibleParents={eligibleParents(item.project)}
+              onDelete={handleProjectDelete}
+              onSetParent={handleSetParent}
+              onToggleStar={handleToggleStar}
+            />
+            {#each item.children as child (child.id)}
+              <ProjectRow
+                project={child}
+                nested
+                {registryReady}
+                modules={modulesByProject.get(Number(child.id)) ?? []}
+                eligibleParents={eligibleParents(child)}
+                onDelete={handleProjectDelete}
+                onSetParent={handleSetParent}
+                onToggleStar={handleToggleStar}
+              />
+            {/each}
+          {/each}
+        </section>
       {/each}
     </div>
   {/if}
-
-  <!-- Automation Modal -->
-  <Dialog.Root
-    open={showAutomation && !!selectedProject}
-    onOpenChange={(isOpen) => {
-      if (!isOpen) closeAutomation();
-    }}
-  >
-    <Dialog.Content class="max-h-[90vh] max-w-2xl overflow-y-auto">
-      <Dialog.Header>
-        <Dialog.Title>Automate: {selectedProject?.name}</Dialog.Title>
-      </Dialog.Header>
-
-      {#if workflowResult}
-        <WorkflowResults result={workflowResult} />
-      {:else if selectedProject}
-        <WorkflowTrigger project={selectedProject} onWorkflowComplete={handleWorkflowComplete} />
-      {/if}
-    </Dialog.Content>
-  </Dialog.Root>
 </div>

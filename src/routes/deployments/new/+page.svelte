@@ -28,7 +28,8 @@
   import { loadDeployConfig, saveDeployConfig } from '$lib/domains/deployments/utils/deployConfig';
   import { toast } from '$lib/utils/toast';
   import { logger } from '$lib/domains/shared';
-  import { ArrowLeft, Loader2 } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import Loader2 from '~icons/fa6-solid/spinner';
   import { PageHeader } from '$lib/components/shell';
 
   let deploymentType = $state<DeploymentType>(DeploymentType.DOCKER);
@@ -99,14 +100,25 @@
     }
   });
 
+  const portValid = $derived(
+    deploymentType !== DeploymentType.DOCKER ||
+      exposedPort == null ||
+      (Number.isInteger(exposedPort) && exposedPort >= 1 && exposedPort <= 65535)
+  );
+
   async function handleSubmit() {
-    if (!name || !projectPath) {
+    if (!name.trim() || !projectPath.trim()) {
       toast.error('Name and project path are required');
       return;
     }
 
+    if (!portValid) {
+      toast.error('Port must be between 1 and 65535');
+      return;
+    }
+
     // Validate type-specific fields
-    if (deploymentType === DeploymentType.CLI && !command) {
+    if (deploymentType === DeploymentType.CLI && !command.trim()) {
       toast.error('Command is required for CLI deployments');
       return;
     }
@@ -115,10 +127,10 @@
 
     try {
       const request: DeploymentCreateRequest = {
-        name,
+        name: name.trim(),
         description: description || undefined,
         type: deploymentType,
-        projectPath,
+        projectPath: projectPath.trim(),
         projectType,
         environment: {
           variables: envVars,
@@ -134,7 +146,7 @@
           deploymentType === DeploymentType.DOCKER ? dockerfilePath || undefined : undefined,
         exposedPort: deploymentType === DeploymentType.DOCKER ? exposedPort : undefined,
         // CLI-specific
-        command: deploymentType === DeploymentType.CLI ? command : undefined,
+        command: deploymentType === DeploymentType.CLI ? command.trim() : undefined,
         workingDirectory:
           deploymentType === DeploymentType.CLI ? workingDirectory || projectPath : undefined,
       };
@@ -314,7 +326,18 @@
 
             <div>
               <Label for="exposedPort">Exposed Port</Label>
-              <Input id="exposedPort" type="number" bind:value={exposedPort} placeholder="3000" />
+              <Input
+                id="exposedPort"
+                type="number"
+                min="1"
+                max="65535"
+                bind:value={exposedPort}
+                placeholder="3000"
+                aria-invalid={!portValid}
+              />
+              {#if !portValid}
+                <p class="mt-1 text-xs text-destructive">Port must be between 1 and 65535</p>
+              {/if}
             </div>
           </div>
         {/if}
@@ -413,9 +436,10 @@
         <div class="divider-edge-t divider-edge-full flex gap-2 pt-4">
           <Button
             type="submit"
-            disabled={!name ||
-              !projectPath ||
-              (deploymentType === DeploymentType.CLI && !command) ||
+            disabled={!name.trim() ||
+              !projectPath.trim() ||
+              !portValid ||
+              (deploymentType === DeploymentType.CLI && !command.trim()) ||
               isSubmitting}
             class="flex-1"
           >

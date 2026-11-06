@@ -15,7 +15,13 @@ static AUTONOMY_SERVICES: OnceLock<Arc<Mutex<HashMap<String, AutonomyService>>>>
 
 fn get_services_map() -> Arc<Mutex<HashMap<String, AutonomyService>>> {
     AUTONOMY_SERVICES
-        .get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+        // Seed "default" so the get/set commands work before any action is evaluated (QA-013).
+        .get_or_init(|| {
+            Arc::new(Mutex::new(HashMap::from([(
+                "default".to_string(),
+                AutonomyService::new(),
+            )])))
+        })
         .clone()
 }
 
@@ -41,11 +47,7 @@ pub async fn evaluate_autonomous_action(
     let db_conn = db_manager.get_connection_clone();
     let result = {
         let service_map = get_services_map();
-        let mut services = service_map.lock().await;
-        // Ensure service exists
-        if !services.contains_key("default") {
-            services.insert("default".to_string(), AutonomyService::new());
-        }
+        let services = service_map.lock().await;
 
         // Get autonomy level and enabled state before releasing lock
         let service = services

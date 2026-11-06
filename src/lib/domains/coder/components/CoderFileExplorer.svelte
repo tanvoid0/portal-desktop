@@ -1,6 +1,10 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
-  import { ChevronRight, ExternalLink, File, Folder, RefreshCw } from '@lucide/svelte';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import File from '~icons/fa6-solid/file';
+  import Folder from '~icons/fa6-solid/folder';
+  import RefreshCw from '~icons/fa6-solid/rotate';
   import { Button } from '$lib/components/ui/button';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
 

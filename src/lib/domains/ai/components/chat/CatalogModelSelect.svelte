@@ -3,7 +3,8 @@
   import * as Popover from '$lib/components/ui/popover';
   import * as Command from '$lib/components/ui/command';
   import { Button } from '$lib/components/ui/button';
-  import { Check, ChevronsUpDown } from '@lucide/svelte';
+  import Check from '~icons/fa6-solid/check';
+  import ChevronsUpDown from '~icons/fa6-solid/up-down';
   import ModelSelectOption from './ModelSelectOption.svelte';
   import type { CatalogModel } from '../../types/index.js';
   import { filterCatalogModels } from '../../utils/catalog.js';

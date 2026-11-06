@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
-  import { ShieldQuestion } from '@lucide/svelte';
+  import ShieldQuestion from '~icons/fa6-solid/shield-halved';
   import type { PendingApproval } from '../types.js';
   import { getToolCallDisplay } from '../utils/toolCallDisplay.js';
 

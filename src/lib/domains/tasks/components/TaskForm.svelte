@@ -1,4 +1,9 @@
 <script lang="ts">
+  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaXmark from '~icons/fa6-solid/xmark';
+  import FaGear from '~icons/fa6-solid/gear';
+  import FaChevronDown from '~icons/fa6-solid/chevron-down';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import {
@@ -31,15 +36,12 @@
     TASK_STATUS_OPTIONS,
     TASK_PRIORITY_OPTIONS,
     TASK_TYPE_OPTIONS,
-    TaskStatusEnum,
-    TaskPriorityEnum,
     RecurringPatternEnum,
   } from '../types';
   import { ResourceType } from '$lib/domains/shared/types/resourceType';
   import { documentActions, documents } from '$lib/domains/documents';
   import DocumentLinkSelector from '$lib/domains/documents/components/DocumentLinkSelector.svelte';
   import type { Document } from '$lib/domains/documents/types';
-  import Icon from '@iconify/svelte';
   import { goto } from '$app/navigation';
 
   interface Props {
@@ -221,7 +223,7 @@
       </div>
       {#if !task}
         <Button variant="outline" size="sm" onclick={() => goto('/tasks/generate')}>
-          <Icon icon="lucide:sparkles" class="mr-2 h-4 w-4" />
+          <FaWandMagicSparkles class="mr-2 h-4 w-4" />
           Generate Tasks with AI
         </Button>
       {/if}
@@ -262,7 +264,7 @@
       <div class="space-y-2">
         <Label for="status">Status</Label>
         <Select
-          options={TaskStatusEnum}
+          options={TASK_STATUS_OPTIONS}
           defaultValue={status}
           placeholder="Select status..."
           onSelect={(value) => (status = value as TaskStatus)}
@@ -272,7 +274,7 @@
       <div class="space-y-2">
         <Label for="priority">Priority</Label>
         <Select
-          options={TaskPriorityEnum}
+          options={TASK_PRIORITY_OPTIONS}
           defaultValue={priority}
           placeholder="Select priority..."
           onSelect={(value) => (priority = value as TaskPriority)}
@@ -337,7 +339,7 @@
       <div class="flex gap-2">
         <Input placeholder="Add a tag..." bind:value={newTag} onkeydown={handleTagKeydown} />
         <Button type="button" variant="outline" onclick={addTag}>
-          <Icon icon="mdi:plus" class="h-4 w-4" />
+          <FaPlus class="h-4 w-4" />
         </Button>
       </div>
       {#if tags.length > 0}
@@ -352,7 +354,7 @@
                 onclick={() => removeTag(tag)}
                 class="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
               >
-                <Icon icon="mdi:close" class="h-3 w-3" />
+                <FaXmark class="h-3 w-3" />
               </Button>
             </Badge>
           {/each}
@@ -386,9 +388,9 @@
     <Collapsible bind:open={showAdvanced}>
       <CollapsibleTrigger>
         <Button variant="outline" class="w-full">
-          <Icon icon="mdi:settings" class="mr-2 h-4 w-4" />
+          <FaGear class="mr-2 h-4 w-4" />
           Advanced Settings
-          <Icon icon="mdi:chevron-down" class="ml-auto h-4 w-4" />
+          <FaChevronDown class="ml-auto h-4 w-4" />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent class="mt-4 space-y-4">

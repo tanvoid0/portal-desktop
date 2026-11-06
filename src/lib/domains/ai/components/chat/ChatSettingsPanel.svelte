@@ -7,7 +7,9 @@
   import { Slider } from '$lib/components/ui/slider';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { Button } from '$lib/components/ui/button';
-  import { ChevronDown, RotateCcw, X } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import RotateCcw from '~icons/fa6-solid/rotate-left';
+  import X from '~icons/fa6-solid/xmark';
   import {
     DEFAULT_CHAT_SETTINGS,
     saveChatSettings,

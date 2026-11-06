@@ -1,14 +1,15 @@
 <script lang="ts">
+  import FaClock from '~icons/fa6-solid/clock';
+  import FaTrash from '~icons/fa6-solid/trash';
   import {
     Card,
-    CardContent,
     CardHeader,
     CardTitle,
-    CardActionCard,
+    CardDescription,
+    CardContent,
   } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import Icon from '@iconify/svelte';
   import type { Document } from '../types';
 
   interface Props {
@@ -24,7 +25,23 @@
   );
 </script>
 
-<CardActionCard title={document.title} description={preview} {onClick} class="h-full">
+<!-- Stretched-link pattern: the title button covers the card; Delete sits above it. -->
+<Card
+  elevation="raised"
+  class="group relative h-full cursor-pointer overflow-hidden transition-shadow focus-within:ring-2 focus-within:ring-ring hover:border-border hover:shadow-sm"
+>
+  <CardHeader>
+    <CardTitle class="transition-colors group-hover:text-primary">
+      <Button
+        variant="link"
+        class="h-auto p-0 text-left font-[inherit] text-[length:inherit] whitespace-normal text-inherit after:absolute after:inset-0 hover:no-underline"
+        onclick={() => onClick?.()}
+      >
+        {document.title}
+      </Button>
+    </CardTitle>
+    <CardDescription>{preview}</CardDescription>
+  </CardHeader>
   <CardContent class="space-y-3">
     <div class="flex items-start justify-between gap-2">
       <div class="flex-1">
@@ -47,7 +64,7 @@
           {/if}
         </div>
         <div class="flex items-center gap-2 text-xs text-muted-foreground">
-          <Icon icon="lucide:clock" class="h-3 w-3" />
+          <FaClock class="h-3 w-3" />
           {new Date(document.updatedAt).toLocaleDateString()}
         </div>
       </div>
@@ -55,15 +72,13 @@
         <Button
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
-          onclick={(e) => {
-            e.stopPropagation();
-            onDelete?.();
-          }}
+          class="relative z-10 h-8 w-8 p-0"
+          aria-label={`Delete document: ${document.title}`}
+          onclick={() => onDelete?.()}
         >
-          <Icon icon="lucide:trash-2" class="h-4 w-4" />
+          <FaTrash class="h-4 w-4" />
         </Button>
       {/if}
     </div>
   </CardContent>
-</CardActionCard>
+</Card>

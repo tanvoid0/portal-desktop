@@ -12,6 +12,16 @@ export function createGitHubStatusQuery() {
   }));
 }
 
+/** Cheap authenticated call: surfaces an undecryptable stored token that the status command can't see. */
+export function createGitHubTokenCheckQuery(enabled: () => boolean) {
+  return createQuery(() => ({
+    queryKey: [...queryKeys.github.status, 'token-check'] as const,
+    enabled: enabled(),
+    retry: false,
+    queryFn: () => githubService.listRepositories('', 1, 1),
+  }));
+}
+
 export function createGitHubRepositoriesQuery(
   search: () => string,
   enabled: () => boolean = () => true,

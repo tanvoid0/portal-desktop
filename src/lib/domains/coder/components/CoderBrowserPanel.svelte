@@ -1,7 +1,8 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
-  import { ArrowRight, Globe } from '@lucide/svelte';
+  import ArrowRight from '~icons/fa6-solid/arrow-right';
+  import Globe from '~icons/fa6-solid/globe';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
 
   let url = $state(coderWorkspaceStore.browserUrl);

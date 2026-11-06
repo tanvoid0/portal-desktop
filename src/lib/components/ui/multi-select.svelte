@@ -7,7 +7,8 @@
   import * as Popover from './popover';
   import * as Command from './command';
   import { Button } from './button';
-  import { ChevronsUpDown, X } from '@lucide/svelte';
+  import ChevronsUpDown from '~icons/fa6-solid/up-down';
+  import X from '~icons/fa6-solid/xmark';
   import { Checkbox } from './checkbox';
   import Icon from '@iconify/svelte';
 

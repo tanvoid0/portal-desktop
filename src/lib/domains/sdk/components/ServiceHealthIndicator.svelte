@@ -10,19 +10,17 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Progress } from '$lib/components/ui/progress';
   import { Button } from '$lib/components/ui/button';
-  import {
-    Heart,
-    HeartOff,
-    Activity,
-    MemoryStick,
-    Cpu,
-    Wifi,
-    WifiOff,
-    AlertTriangle,
-    CheckCircle,
-    XCircle,
-    RefreshCw,
-  } from '@lucide/svelte';
+  import Heart from '~icons/fa6-solid/heart';
+  import HeartOff from '~icons/fa6-solid/heart-crack';
+  import Activity from '~icons/fa6-solid/wave-square';
+  import MemoryStick from '~icons/fa6-solid/memory';
+  import Cpu from '~icons/fa6-solid/microchip';
+  import Wifi from '~icons/fa6-solid/wifi';
+  import WifiOff from '~icons/fa6-solid/wifi';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import RefreshCw from '~icons/fa6-solid/rotate';
 
   interface HealthData {
     is_healthy: boolean;

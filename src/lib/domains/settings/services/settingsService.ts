@@ -593,29 +593,6 @@ export class SettingsService {
   }
 
   /**
-   * Get available themes
-   */
-  getAvailableThemes(): Array<{
-    id: string;
-    name: string;
-    description: string;
-  }> {
-    return [
-      {
-        id: 'light',
-        name: 'Light',
-        description: 'Light theme with bright colors',
-      },
-      { id: 'dark', name: 'Dark', description: 'Dark theme with dark colors' },
-      {
-        id: 'system',
-        name: 'System',
-        description: 'Follow system theme preference',
-      },
-    ];
-  }
-
-  /**
    * Get available languages
    */
   getAvailableLanguages(): Array<{ id: string; name: string; native: string }> {

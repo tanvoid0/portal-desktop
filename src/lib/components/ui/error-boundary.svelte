@@ -8,7 +8,8 @@
   import type { Snippet } from 'svelte';
   import { Button } from './button';
   import { Alert, AlertDescription, AlertTitle } from './alert';
-  import { TriangleAlert, RefreshCw } from '@lucide/svelte';
+  import TriangleAlert from '~icons/fa6-solid/triangle-exclamation';
+  import RefreshCw from '~icons/fa6-solid/rotate';
   import { cn } from '$lib/utils';
 
   interface Props {

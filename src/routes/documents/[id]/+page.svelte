@@ -1,9 +1,12 @@
 <script lang="ts">
+  import FaArrowLeft from '~icons/fa6-solid/arrow-left';
+  import FaTrash from '~icons/fa6-solid/trash';
+
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
-  import Icon from '@iconify/svelte';
+
   import { documentActions } from '$lib/domains/documents';
   import DocumentEditor from '$lib/domains/documents/components/DocumentEditor.svelte';
   import type { Document } from '$lib/domains/documents';
@@ -41,14 +44,14 @@
 
   async function handleSave(savedDoc: Document) {
     document = savedDoc;
-    toastActions.success('Document saved successfully');
   }
 
   async function handleDelete() {
     if (!document) return;
     const confirmed = await confirmAction(
       `Are you sure you want to delete "${document.title}"?`,
-      'Delete document'
+      'Delete document',
+      { confirmLabel: 'Delete', destructive: true }
     );
     if (!confirmed) return;
 
@@ -72,7 +75,7 @@
 <div class="container mx-auto py-6">
   <div class="mb-4">
     <Button variant="ghost" onclick={() => goto('/documents')}>
-      <Icon icon="lucide:arrow-left" class="mr-2 h-4 w-4" />
+      <FaArrowLeft class="mr-2 h-4 w-4" />
       Back to Documents
     </Button>
   </div>
@@ -86,7 +89,7 @@
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold">{document.title}</h1>
         <Button variant="destructive" onclick={handleDelete}>
-          <Icon icon="lucide:trash-2" class="mr-2 h-4 w-4" />
+          <FaTrash class="mr-2 h-4 w-4" />
           Delete
         </Button>
       </div>

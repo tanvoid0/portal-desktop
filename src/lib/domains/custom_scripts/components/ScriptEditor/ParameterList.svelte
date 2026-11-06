@@ -5,7 +5,7 @@
 
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { Plus } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
   import ParameterEditor from './ParameterEditor.svelte';
   import type { ScriptParameter } from '$lib/domains/custom_scripts/services/customScriptService';
 

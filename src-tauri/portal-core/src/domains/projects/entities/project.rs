@@ -54,6 +54,13 @@ pub struct ProjectResponse {
 }
 
 impl ProjectResponse {
+    /// Whether any framework, language or package manager is recorded.
+    pub fn has_stack(&self) -> bool {
+        !(self.framework_ids.is_empty()
+            && self.language_ids.is_empty()
+            && self.package_manager_ids.is_empty())
+    }
+
     pub fn from_model(
         model: ProjectModel,
         framework_ids: Vec<i32>,

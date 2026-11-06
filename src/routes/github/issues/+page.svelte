@@ -1,25 +1,31 @@
 <script lang="ts">
+  import FaTableColumns from '~icons/fa6-solid/table-columns';
+  import FaList from '~icons/fa6-solid/list';
+
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import Select from '$lib/components/ui/select.svelte';
   import { Textarea } from '$lib/components/ui/textarea';
   import * as Dialog from '$lib/components/ui/dialog';
-  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageEmpty } from '$lib/components/shell';
   import {
     createGitHubIssuesQuery,
     createGitHubRepositoriesQuery,
     createGitHubStatusQuery,
     githubService,
     GitHubConnectPrompt,
+    GitHubError,
     type GitHubIssue,
   } from '$lib/domains/github';
+  import { isTokenUnreadableError } from '$lib/domains/github/utils/tokenError';
   import { createTaskUiState } from '$lib/domains/tasks/state/taskUi.svelte';
   import KanbanBoard from '$lib/domains/tasks/components/KanbanBoard.svelte';
   import TaskList from '$lib/domains/tasks/components/TaskList.svelte';
   import type { Task } from '$lib/domains/tasks/types';
   import { toast } from '$lib/utils/toast';
-  import { Bug, ExternalLink, Plus } from '@lucide/svelte';
-  import Icon from '@iconify/svelte';
+  import Bug from '~icons/fa6-solid/bug';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import Plus from '~icons/fa6-solid/plus';
 
   let filter: 'assigned' | 'created' = $state('assigned');
   let stateValue: 'open' | 'closed' | 'all' = $state('open');
@@ -45,6 +51,7 @@
     }),
     () => isConnected
   );
+  const tokenUnreadable = $derived(isTokenUnreadableError(issuesQuery.error));
   const reposQuery = createGitHubRepositoriesQuery(
     () => '',
     () => isConnected && createDialogOpen
@@ -199,7 +206,7 @@
           size="sm"
           class="px-3 py-1.5 text-sm font-medium"
         >
-          <Icon icon="mdi:view-column" class="mr-1.5 h-4 w-4" />
+          <FaTableColumns class="mr-1.5 h-4 w-4" />
           Kanban
         </Button>
         <Button
@@ -208,11 +215,11 @@
           size="sm"
           class="px-3 py-1.5 text-sm font-medium"
         >
-          <Icon icon="mdi:format-list-bulleted" class="mr-1.5 h-4 w-4" />
+          <FaList class="mr-1.5 h-4 w-4" />
           List
         </Button>
       </div>
-      <Button onclick={() => (createDialogOpen = true)}>
+      <Button onclick={() => (createDialogOpen = true)} disabled={tokenUnreadable}>
         <Plus class="mr-2 h-4 w-4" />
         New Issue
       </Button>
@@ -260,7 +267,7 @@
     {#if issuesQuery.isPending}
       <PageLoading message="Loading issues..." />
     {:else if issuesQuery.isError}
-      <PageError
+      <GitHubError
         title="Failed to load issues"
         message={issuesQuery.error instanceof Error
           ? issuesQuery.error.message

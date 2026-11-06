@@ -26,7 +26,13 @@
     AlertDialogHeader,
     AlertDialogTitle,
   } from '$lib/components/ui/alert-dialog';
-  import { Eye, EyeOff, Copy, Edit, Trash2, Calendar, Tag } from '@lucide/svelte';
+  import Eye from '~icons/fa6-solid/eye';
+  import EyeOff from '~icons/fa6-solid/eye-slash';
+  import Copy from '~icons/fa6-solid/copy';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Calendar from '~icons/fa6-solid/calendar';
+  import Tag from '~icons/fa6-solid/tag';
 
   interface Props {
     credential: Credential;
@@ -156,7 +162,13 @@
         </div>
       </div>
       <div class="flex items-center gap-1">
-        <Button variant="ghost" size="sm" onclick={handleToggleVisibility} disabled={isDecrypting}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={handleToggleVisibility}
+          disabled={isDecrypting}
+          aria-label={`${showValue ? 'Hide' : 'Reveal'} value of ${credential.name}`}
+        >
           {#if isDecrypting}
             <Eye class="h-4 w-4 animate-pulse" />
           {:else if showValue}
@@ -165,10 +177,20 @@
             <Eye class="h-4 w-4" />
           {/if}
         </Button>
-        <Button variant="ghost" size="sm" onclick={handleEdit}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={handleEdit}
+          aria-label={`Edit ${credential.name}`}
+        >
           <Edit class="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" onclick={handleDelete}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={handleDelete}
+          aria-label={`Delete ${credential.name}`}
+        >
           <Trash2 class="h-4 w-4" />
         </Button>
       </div>
@@ -187,7 +209,12 @@
         <div class="flex items-center justify-between">
           <span class="text-sm font-medium">Value</span>
           {#if showValue && decryptedValue}
-            <Button variant="ghost" size="sm" onclick={handleCopyValue}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onclick={handleCopyValue}
+              aria-label={`Copy value of ${credential.name}`}
+            >
               <Copy class="mr-1 h-3 w-3" />
               Copy
             </Button>

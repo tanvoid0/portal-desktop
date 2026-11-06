@@ -5,16 +5,14 @@
   import { Textarea } from '$lib/components/ui/textarea';
   import { Badge } from '$lib/components/ui/badge';
   import { Label } from '$lib/components/ui/label';
-  import {
-    ChevronRight,
-    File,
-    Folder,
-    GitBranch,
-    GitCommitHorizontal,
-    Loader2,
-    RefreshCw,
-    Sparkles,
-  } from '@lucide/svelte';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import File from '~icons/fa6-solid/file';
+  import Folder from '~icons/fa6-solid/folder';
+  import GitBranch from '~icons/fa6-solid/code-branch';
+  import GitCommitHorizontal from '~icons/fa6-solid/code-commit';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import { coderService } from '../services/coderService.js';
   import type { GitCommitDraft } from '../types.js';
   import { buildChangeTree, flattenChangeTree } from '../utils/changeTree.js';

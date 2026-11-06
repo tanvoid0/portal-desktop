@@ -4,7 +4,8 @@
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import { Button } from '$lib/components/ui/button';
   import { Skeleton } from '$lib/components/ui/skeleton/index.js';
-  import { FolderPlus, Loader2 } from '@lucide/svelte';
+  import FolderPlus from '~icons/fa6-solid/folder-plus';
+  import Loader2 from '~icons/fa6-solid/spinner';
   import { projectService } from '$lib/domains/projects';
   import type { Project } from '$lib/domains/projects';
   import ProjectWorkspaceSection from './ProjectWorkspaceSection.svelte';
@@ -13,6 +14,7 @@
     groupSessionsByProject,
     sortThreadsForWorkspace,
     filterAndSortSessions,
+    type ProjectWorkspace,
     type SessionListFilters,
     type SessionSortKey,
   } from '../utils/sessionList.js';
@@ -126,6 +128,14 @@
   }
 
   const workspaces = $derived(groupSessionsByProject(threads, projects));
+  // Sessions in folders that are not registered projects.
+  const otherWorkspaces = $derived(workspaces.filter((w) => !w.projectId && w.threads.length > 0));
+  const projectWorkspaces = $derived(workspaces.filter((w) => w.projectId));
+  const searching = $derived(filters.search.trim() !== '');
+  const hasMatches = (w: ProjectWorkspace) =>
+    !searching || threadsForWorkspace(w.path, w.threads).length > 0;
+  const otherVisible = $derived(otherWorkspaces.some(hasMatches));
+  const projectVisible = $derived(projectWorkspaces.some(hasMatches));
 
   function threadsForWorkspace(path: string, raw: CoderThread[]): CoderThread[] {
     const scopedFilters = {
@@ -200,34 +210,61 @@
           No workspaces yet. Add a project folder to get started.
         </p>
       {:else}
-        {#each workspaces as workspace (workspace.path)}
-          {@const isActive = workspace.path === coderUi.activeProjectPath}
-          {@const expanded = coderUi.showAllWorkspaces
-            ? coderUi.isExpanded(workspace.path)
-            : isActive}
-          {@const wsThreads = expanded
-            ? threadsForWorkspace(workspace.path, workspace.threads)
-            : []}
-          <ProjectWorkspaceSection
-            {workspace}
-            threads={wsThreads}
-            {expanded}
-            active={isActive}
-            {selectedThreadId}
-            {runningThreadIds}
-            onToggle={() => coderUi.toggleExpanded(workspace.path)}
-            onSelectProject={() => {
-              const p = projects.find((proj) => proj.path === workspace.path);
-              if (p) selectProject(p);
-              else selectProjectByPath(workspace.path, workspace.projectId);
-            }}
-            {onThreadClick}
-            {onDeleteThread}
-            {queuedCountFor}
-            {subAgentSummaryFor}
-          />
+        {#if otherVisible}
+          <p
+            class="px-2 pt-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
+          >
+            Other folders
+          </p>
+          {#each otherWorkspaces as workspace (workspace.path)}
+            {@render workspaceRow(workspace, true)}
+          {/each}
+          {#if projectVisible}
+            <p
+              class="px-2 pt-2 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
+            >
+              Projects
+            </p>
+          {/if}
+        {/if}
+        {#if searching && !otherVisible && !projectVisible}
+          <p class="px-2 py-4 text-center text-xs text-muted-foreground">No matching sessions</p>
+        {/if}
+        {#each projectWorkspaces as workspace (workspace.path)}
+          {@render workspaceRow(workspace, false)}
         {/each}
       {/if}
     </div>
   </ScrollArea>
 </div>
+
+{#snippet workspaceRow(workspace: ProjectWorkspace, orphan: boolean)}
+  {@const isActive = workspace.path === coderUi.activeProjectPath}
+  {@const expanded =
+    orphan || searching
+      ? true
+      : coderUi.showAllWorkspaces
+        ? coderUi.isExpanded(workspace.path)
+        : isActive}
+  {@const wsThreads = expanded ? threadsForWorkspace(workspace.path, workspace.threads) : []}
+  {#if !searching || wsThreads.length > 0}
+    <ProjectWorkspaceSection
+      {workspace}
+      threads={wsThreads}
+      {expanded}
+      active={isActive}
+      {selectedThreadId}
+      {runningThreadIds}
+      onToggle={() => coderUi.toggleExpanded(workspace.path)}
+      onSelectProject={() => {
+        const p = projects.find((proj) => proj.path === workspace.path);
+        if (p) selectProject(p);
+        else selectProjectByPath(workspace.path, workspace.projectId);
+      }}
+      {onThreadClick}
+      {onDeleteThread}
+      {queuedCountFor}
+      {subAgentSummaryFor}
+    />
+  {/if}
+{/snippet}

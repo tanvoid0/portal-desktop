@@ -178,3 +178,24 @@ export interface LlmUsage {
   total_tokens: number;
   cost_usd: number;
 }
+
+/** `ai_platform_health` — snake_case straight from Rust. */
+export interface PlatformHealth {
+  base_url: string;
+  reachable: boolean;
+  auth_required: boolean;
+  authenticated: boolean;
+  detail: string | null;
+}
+
+export interface PlatformStartResult {
+  started: boolean;
+  already_running: boolean;
+  pid: number | null;
+  detail: string;
+}
+
+export interface PlatformPairResult {
+  ok: boolean;
+  detail: string;
+}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Component } from 'svelte';
-  import { Inbox } from '@lucide/svelte';
+  import Inbox from '~icons/fa6-solid/inbox';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent } from '$lib/components/ui/card';
 

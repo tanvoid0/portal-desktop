@@ -29,15 +29,13 @@
   } from '$lib/components/ui/collapsible';
   import { aiProviderService } from '$lib/domains/ai/services/aiProviderService';
   import { toast } from '$lib/utils/toast';
-  import {
-    Rocket,
-    FlaskConical,
-    LoaderCircle,
-    CircleAlert,
-    TriangleAlert,
-    Pencil,
-    Settings2,
-  } from '@lucide/svelte';
+  import Rocket from '~icons/fa6-solid/rocket';
+  import FlaskConical from '~icons/fa6-solid/flask';
+  import LoaderCircle from '~icons/fa6-solid/spinner';
+  import CircleAlert from '~icons/fa6-solid/circle-exclamation';
+  import TriangleAlert from '~icons/fa6-solid/triangle-exclamation';
+  import Pencil from '~icons/fa6-solid/pencil';
+  import Settings2 from '~icons/fa6-solid/sliders';
   import type { Project } from '$lib/domains/projects/types';
   import type { ReleaseDescription, ReleaseRun } from '../types';
   import ReleaseEditor from './ReleaseEditor.svelte';

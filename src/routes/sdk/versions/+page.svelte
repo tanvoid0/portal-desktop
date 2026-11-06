@@ -9,7 +9,11 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { CheckCircle, XCircle, Download, Trash2, Play } from '@lucide/svelte';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Download from '~icons/fa6-solid/download';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Play from '~icons/fa6-solid/play';
   import { PageLoading, PageError, PageEmpty } from '$lib/components/shell';
 
   // State

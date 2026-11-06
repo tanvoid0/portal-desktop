@@ -8,7 +8,7 @@
   import { Input } from './input';
   import { Label } from './label';
   import { invoke } from '@tauri-apps/api/core';
-  import { FileUp } from '@lucide/svelte';
+  import FileUp from '~icons/fa6-solid/file-arrow-up';
 
   interface Props {
     value?: string;

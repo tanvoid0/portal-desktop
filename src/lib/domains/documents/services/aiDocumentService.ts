@@ -16,9 +16,9 @@ export interface AIErrorInfo {
 }
 
 export function parseError(error: unknown): AIErrorInfo {
-  if (error instanceof Error) {
-    // Try to extract structured error info if available
-    const message = error.message;
+  // Tauri rejects with plain strings, not Error instances.
+  if (error instanceof Error || (typeof error === 'string' && error)) {
+    const message = error instanceof Error ? error.message : error;
     return {
       message,
       code: 'GENERATION_ERROR',

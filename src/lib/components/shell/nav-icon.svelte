@@ -1,30 +1,28 @@
 <script lang="ts">
-  import {
-    Bot,
-    Boxes,
-    CheckSquare,
-    Cloud,
-    Code,
-    Database,
-    FileCode,
-    FileText,
-    Folder,
-    FolderGit2,
-    Globe,
-    HardDrive,
-    History,
-    Home,
-    Lock,
-    MessageSquare,
-    Rocket,
-    ScanSearch,
-    Settings,
-    Sparkles,
-    Terminal,
-    Variable,
-    Workflow,
-    Wrench,
-  } from '@lucide/svelte';
+  import Bot from '~icons/fa6-solid/robot';
+  import Boxes from '~icons/fa6-solid/boxes-stacked';
+  import CheckSquare from '~icons/fa6-solid/square-check';
+  import Cloud from '~icons/fa6-solid/cloud';
+  import Code from '~icons/fa6-solid/code';
+  import Database from '~icons/fa6-solid/database';
+  import FileCode from '~icons/fa6-solid/file-code';
+  import FileText from '~icons/fa6-solid/file-lines';
+  import Folder from '~icons/fa6-solid/folder';
+  import FolderGit2 from '~icons/fa6-solid/folder-tree';
+  import Globe from '~icons/fa6-solid/globe';
+  import HardDrive from '~icons/fa6-solid/hard-drive';
+  import History from '~icons/fa6-solid/clock-rotate-left';
+  import Home from '~icons/fa6-solid/house';
+  import Lock from '~icons/fa6-solid/lock';
+  import MessageSquare from '~icons/fa6-solid/message';
+  import Rocket from '~icons/fa6-solid/rocket';
+  import ScanSearch from '~icons/fa6-solid/magnifying-glass';
+  import Settings from '~icons/fa6-solid/gear';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import Variable from '~icons/fa6-solid/square-root-variable';
+  import Workflow from '~icons/fa6-solid/diagram-project';
+  import Wrench from '~icons/fa6-solid/wrench';
 
   interface Props {
     icon?: string;

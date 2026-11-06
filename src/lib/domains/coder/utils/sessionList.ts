@@ -1,6 +1,9 @@
 import type { Project } from '$lib/domains/projects/types';
 import type { CoderThread } from '../types.js';
 
+/** Bucket for sessions with no workspace path, so they can still be opened or deleted. */
+const UNKNOWN_FOLDER = '(unknown folder)';
+
 export interface ProjectWorkspace {
   path: string;
   label: string;
@@ -228,7 +231,7 @@ export function groupSessionsByProject(
       const fromId = projects.find((p) => p.id === String(t.project_id));
       if (fromId) path = fromId.path;
     }
-    if (!path) continue;
+    if (!path) path = UNKNOWN_FOLDER;
     const list = byPath.get(path) ?? [];
     list.push(t);
     byPath.set(path, list);

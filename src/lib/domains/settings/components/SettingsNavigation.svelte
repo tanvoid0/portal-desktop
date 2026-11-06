@@ -12,23 +12,21 @@
     CollapsibleTrigger,
   } from '$lib/components/ui/collapsible';
   import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
-  import {
-    Settings,
-    Code,
-    Terminal,
-    Palette,
-    Laptop,
-    Brain,
-    Package,
-    Bot,
-    Download,
-    Box,
-    FileCode,
-    ChevronDown,
-    Languages,
-    Sparkles,
-    FolderGit2,
-  } from '@lucide/svelte';
+  import Settings from '~icons/fa6-solid/gear';
+  import Code from '~icons/fa6-solid/code';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import Palette from '~icons/fa6-solid/palette';
+  import Laptop from '~icons/fa6-solid/laptop';
+  import Brain from '~icons/fa6-solid/brain';
+  import Package from '~icons/fa6-solid/box-open';
+  import Bot from '~icons/fa6-solid/robot';
+  import Download from '~icons/fa6-solid/download';
+  import Box from '~icons/fa6-solid/box';
+  import FileCode from '~icons/fa6-solid/file-code';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import Languages from '~icons/fa6-solid/language';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import FolderGit2 from '~icons/fa6-solid/folder-tree';
 
   type SettingsSectionType =
     | 'general'

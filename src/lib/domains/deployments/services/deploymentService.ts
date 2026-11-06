@@ -608,9 +608,9 @@ export class DeploymentService {
       });
 
       const result = await invoke<string>('build_docker_image_command', {
-        context_path: contextPath,
-        image_name: imageName,
-        dockerfile_path: dockerfilePath,
+        contextPath,
+        imageName,
+        dockerfilePath,
       });
 
       logger.info('Docker image built successfully', {
@@ -641,7 +641,7 @@ export class DeploymentService {
       });
 
       const isRunning = await invoke<boolean>('get_process_status_command', {
-        deployment_id: deploymentId,
+        deploymentId,
       });
 
       return isRunning;

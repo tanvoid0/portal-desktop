@@ -5,7 +5,10 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
-  import { Play, Loader2, CheckCircle, XCircle } from '@lucide/svelte';
+  import Play from '~icons/fa6-solid/play';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
 
   export let project: {
     id: string;

@@ -1,4 +1,16 @@
 <script lang="ts">
+  import FaCircleExclamation from '~icons/fa6-solid/circle-exclamation';
+  import FaClock from '~icons/fa6-solid/clock';
+  import FaCalendarWeek from '~icons/fa6-solid/calendar-week';
+  import FaStopwatch from '~icons/fa6-solid/stopwatch';
+  import FaLock from '~icons/fa6-solid/lock';
+  import FaLockOpen from '~icons/fa6-solid/lock-open';
+  import FaTag from '~icons/fa6-solid/tag';
+  import FaTurnDown from '~icons/fa6-solid/turn-down';
+  import FaFlag from '~icons/fa6-solid/flag';
+  import FaComment from '~icons/fa6-solid/comment';
+  import FaPaperclip from '~icons/fa6-solid/paperclip';
+  import FaPlus from '~icons/fa6-solid/plus';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
@@ -146,6 +158,7 @@
           checked={isSelected}
           onCheckedChange={() => onSelectionChange?.()}
           onclick={(e) => e.stopPropagation()}
+          aria-label="Select task"
           class="mt-1"
         />
       {/if}
@@ -156,7 +169,7 @@
           <!-- Due Date Indicators -->
           {#if isOverdue(task)}
             <Badge variant="destructive" class="text-xs">
-              <Icon icon="mdi:alert-circle" class="mr-1 h-3 w-3" />
+              <FaCircleExclamation class="mr-1 h-3 w-3" />
               Overdue
             </Badge>
           {:else if isDueToday(task)}
@@ -164,12 +177,12 @@
               variant="secondary"
               class="bg-yellow-100 text-xs text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300"
             >
-              <Icon icon="mdi:clock-alert" class="mr-1 h-3 w-3" />
+              <FaClock class="mr-1 h-3 w-3" />
               Due Today
             </Badge>
           {:else if isDueThisWeek(task)}
             <Badge variant="outline" class="text-xs">
-              <Icon icon="mdi:calendar-week" class="mr-1 h-3 w-3" />
+              <FaCalendarWeek class="mr-1 h-3 w-3" />
               This Week
             </Badge>
           {/if}
@@ -180,7 +193,7 @@
               variant="secondary"
               class="bg-blue-100 text-xs text-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
             >
-              <Icon icon="mdi:timer" class="mr-1 h-3 w-3" />
+              <FaStopwatch class="mr-1 h-3 w-3" />
               Tracking
             </Badge>
           {/if}
@@ -191,7 +204,7 @@
               variant="outline"
               class="border-red-200 text-xs text-red-600 dark:border-red-800 dark:text-red-400"
             >
-              <Icon icon="mdi:lock" class="mr-1 h-3 w-3" />
+              <FaLock class="mr-1 h-3 w-3" />
               Blocked
             </Badge>
           {/if}
@@ -201,7 +214,7 @@
               variant="outline"
               class="border-orange-200 text-xs text-orange-600 dark:border-orange-800 dark:text-orange-400"
             >
-              <Icon icon="mdi:lock-open" class="mr-1 h-3 w-3" />
+              <FaLockOpen class="mr-1 h-3 w-3" />
               Blocking
             </Badge>
           {/if}
@@ -212,7 +225,7 @@
           <div class="mb-2 flex flex-wrap gap-1">
             {#each task.tags as tag}
               <Badge variant="outline" class="text-xs">
-                <Icon icon="mdi:tag" class="mr-1 h-3 w-3" />
+                <FaTag class="mr-1 h-3 w-3" />
                 {tag}
               </Badge>
             {/each}
@@ -223,11 +236,11 @@
       <div class="flex items-center gap-1">
         {#if getSubtaskCount(task.id) > 0}
           <div class="flex items-center gap-1 text-xs text-muted-foreground">
-            <Icon icon="mdi:subdirectory-arrow-right" class="h-3 w-3" />
+            <FaTurnDown class="h-3 w-3" />
             <span>{getSubtaskCount(task.id)}</span>
           </div>
         {/if}
-        <Icon icon="mdi:flag" class="h-3 w-3 {getPriorityColor(task.priority)}" />
+        <FaFlag class="h-3 w-3 {getPriorityColor(task.priority)}" />
         <span class="text-xs text-muted-foreground uppercase">{task.priority}</span>
       </div>
     </div>
@@ -251,13 +264,13 @@
           <div class="flex items-center gap-2 text-xs text-muted-foreground">
             {#if task.estimatedTime}
               <div class="flex items-center gap-1">
-                <Icon icon="mdi:clock-outline" class="h-3 w-3" />
+                <FaClock class="h-3 w-3" />
                 <span>{getTimeEstimateText(task)}</span>
               </div>
             {/if}
             {#if task.actualTime}
               <div class="flex items-center gap-1">
-                <Icon icon="mdi:clock-check" class="h-3 w-3" />
+                <FaClock class="h-3 w-3" />
                 <span>{getActualTimeText(task)}</span>
               </div>
             {/if}
@@ -267,14 +280,14 @@
         <!-- Comments and Attachments Count -->
         {#if task.comments && task.comments.length > 0}
           <div class="flex items-center gap-1 text-xs text-muted-foreground">
-            <Icon icon="mdi:comment-outline" class="h-3 w-3" />
+            <FaComment class="h-3 w-3" />
             <span>{task.comments.length}</span>
           </div>
         {/if}
 
         {#if task.attachments && task.attachments.length > 0}
           <div class="flex items-center gap-1 text-xs text-muted-foreground">
-            <Icon icon="mdi:paperclip" class="h-3 w-3" />
+            <FaPaperclip class="h-3 w-3" />
             <span>{task.attachments.length}</span>
           </div>
         {/if}
@@ -291,8 +304,9 @@
             size="sm"
             class="h-8 w-8 p-0"
             title="Create subtask"
+            aria-label="Create subtask"
           >
-            <Icon icon="mdi:plus" class="h-4 w-4 text-muted-foreground" />
+            <FaPlus class="h-4 w-4 text-muted-foreground" />
           </Button>
         {/if}
         <Button
@@ -303,6 +317,8 @@
           variant="ghost"
           size="sm"
           class="h-8 w-8 p-0"
+          aria-label="Toggle task status"
+          title="Toggle task status"
         >
           <Icon icon={getTaskIcon(task)} class="h-4 w-4 {getTaskStatusColor(task.status)}" />
         </Button>

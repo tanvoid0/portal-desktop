@@ -65,12 +65,25 @@ impl BlockRepository {
             ..Default::default()
         };
 
-        let result = block
-            .insert(connection)
-            .await
-            .map_err(|e| format!("Failed to create block: {}", e))?;
-
-        Ok(result)
+        let id_clone = block.id.clone().unwrap();
+        match block.insert(connection).await {
+            Ok(model) => Ok(model),
+            Err(e) => {
+                let s = e.to_string();
+                // SQLite string-PK insert can report RecordNotFound though the row exists; verify.
+                if s.contains("RecordNotFound") || s.contains("Failed to find inserted item") {
+                    BlockEntity::find_by_id(&id_clone)
+                        .one(connection)
+                        .await
+                        .map_err(|e| format!("Failed to verify block insert: {}", e))?
+                        .ok_or_else(|| {
+                            format!("Failed to find inserted block with id: {}", id_clone)
+                        })
+                } else {
+                    Err(format!("Failed to create block: {}", e))
+                }
+            }
+        }
     }
 
     pub async fn update(

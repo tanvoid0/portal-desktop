@@ -1,6 +1,8 @@
 <script lang="ts">
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-  import { ChevronDown, Shield, Zap } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import Shield from '~icons/fa6-solid/shield';
+  import Zap from '~icons/fa6-solid/bolt';
   import { cn } from '$lib/utils.js';
   import { getPermissionModeConfig, PERMISSION_MODES } from '../config/permissionModes.js';
   import type { PermissionMode } from '../types.js';

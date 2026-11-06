@@ -81,10 +81,14 @@ class ProjectIconRegistry {
     icon: string;
     icon_type?: 'devicon' | 'file';
   }): ResolvedTechIcon {
+    // Rows added by stack detection can have no icon of their own.
+    const icon = item.icon || FALLBACK_ICONS[item.name.toLowerCase()]?.icon || '';
     return {
       name: item.name,
-      icon: item.icon,
-      icon_type: item.icon_type ?? (item.icon.includes(':') ? 'devicon' : 'file'),
+      icon,
+      icon_type: item.icon
+        ? (item.icon_type ?? (icon.includes(':') ? 'devicon' : 'file'))
+        : 'devicon',
     };
   }
 
@@ -132,6 +136,13 @@ class ProjectIconRegistry {
           byName: this.languagesByName,
         };
     }
+  }
+
+  /** Re-read the tables: a scan or re-detect may have added rows (e.g. `Android`). */
+  async reload(): Promise<void> {
+    if (this.loading) await this.loading;
+    this.loaded = false;
+    await this.ensureLoaded();
   }
 
   async ensureLoaded(): Promise<void> {

@@ -16,7 +16,10 @@
   } from '$lib/components/ui/card';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import DeviceAuthService from '$lib/services/deviceAuthService';
-  import { Shield, Loader2, AlertCircle, CheckCircle } from '@lucide/svelte';
+  import Shield from '~icons/fa6-solid/shield';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
 
   let { onAuthSuccess = () => {} }: { onAuthSuccess?: () => void } = $props();
 

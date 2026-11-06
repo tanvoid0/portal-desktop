@@ -25,6 +25,9 @@ controls, page shell, toasts, confirm dialogs).
   writes, real credentials. Open those screens, check they render and validate; stop before
   the action leaves the machine.
 - Never kill a process you did not start. A dev server on `:1420` is the owner's.
+- **Screenshots are kept** for demos and docs: never delete one. Name them per the README
+  (`sweep-…`, `QA-NNN-before-…`, `QA-NNN-after-…`) — every file issue gets a before shot,
+  every verify an after shot of the same view.
 
 ## Getting the app up
 

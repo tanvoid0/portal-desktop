@@ -1,6 +1,9 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { ChevronDown, ChevronRight, GitBranchPlus, Trash2 } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import GitBranchPlus from '~icons/fa6-solid/code-branch';
+  import Trash2 from '~icons/fa6-solid/trash';
   import type { CoderSubAgent } from '../types.js';
   import CoderSubAgentInline from './CoderSubAgentInline.svelte';
 

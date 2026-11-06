@@ -1,5 +1,6 @@
 <!-- Deployment Detail Page -->
 <script lang="ts">
+  import FaSpinner from '~icons/fa6-solid/spinner';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { goto, replaceState } from '$app/navigation';
@@ -19,7 +20,10 @@
   } from '$lib/components/ui/dialog';
   import { Label } from '$lib/components/ui/label';
   import { Input } from '$lib/components/ui/input';
-  import { ArrowLeft, RefreshCw, FileCode, RotateCcw } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import FileCode from '~icons/fa6-solid/file-code';
+  import RotateCcw from '~icons/fa6-solid/rotate-left';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
   import Loading from '$lib/components/ui/loading.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';
@@ -223,7 +227,7 @@
         <Button variant="outline" size="sm" onclick={handleScale}>Scale</Button>
         <Button variant="outline" size="sm" onclick={handleRollback} disabled={isRollingBack}>
           {#if isRollingBack}
-            <span class="i-lucide-loader-2 mr-2 h-4 w-4 animate-spin"></span>
+            <FaSpinner class="mr-2 h-4 w-4 animate-spin" />
           {:else}
             <RotateCcw class="mr-2 h-4 w-4" />
           {/if}

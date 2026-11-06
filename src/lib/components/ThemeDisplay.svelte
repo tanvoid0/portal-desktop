@@ -16,16 +16,14 @@
   import { Progress } from '$lib/components/ui/progress';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import {
-    AlertTriangle,
-    CheckCircle,
-    Info,
-    Settings,
-    User,
-    Mail,
-    Bell,
-    Download,
-  } from '@lucide/svelte';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import Info from '~icons/fa6-solid/circle-info';
+  import Settings from '~icons/fa6-solid/gear';
+  import User from '~icons/fa6-solid/user';
+  import Mail from '~icons/fa6-solid/envelope';
+  import Bell from '~icons/fa6-solid/bell';
+  import Download from '~icons/fa6-solid/download';
   import { toast } from '$lib/utils/toast';
 
   interface Props {

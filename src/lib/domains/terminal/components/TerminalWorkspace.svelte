@@ -23,7 +23,12 @@
   import CommandPalette from './CommandPalette.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
-  import { Blocks, Bot, StickyNote, Rocket, History, PanelRight } from '@lucide/svelte';
+  import Blocks from '~icons/fa6-solid/cubes';
+  import Bot from '~icons/fa6-solid/robot';
+  import StickyNote from '~icons/fa6-solid/note-sticky';
+  import Rocket from '~icons/fa6-solid/rocket';
+  import History from '~icons/fa6-solid/clock-rotate-left';
+  import PanelRight from '~icons/fa6-solid/table-columns';
   import type { TerminalTab } from '../stores/terminalStore';
   import type { TerminalConfig } from '../types';
   import { resolveSessionSettings } from '../utils/resolveSessionSettings';
@@ -119,6 +124,14 @@
     }
   }
 
+  // Mount a tab's session on first activation only. Restored background tabs sit
+  // in display:none (0x0), so xterm/PTY would start at 80x24 and ConPTY reflows
+  // garbage into the prompt when the tab is first shown and resized.
+  let visited = $state<Record<string, boolean>>({});
+  $effect(() => {
+    if (activeTabId && !visited[activeTabId]) visited[activeTabId] = true;
+  });
+
   let pendingCommand = $state<string | null>(null);
   let sessionRefs = $state<Record<string, ReturnType<typeof TerminalSession> | null>>({});
 
@@ -158,107 +171,109 @@
     {#each tabs as tab (tab.id)}
       {@const sessionSettings = resolveSessionSettings(tab, settings)}
       <div class="h-full w-full" style:display={tab.id === activeTabId ? 'block' : 'none'}>
-        <div class="flex h-full flex-col">
-          <div
-            class="divider-edge-b divider-edge-full flex items-center justify-end gap-1 bg-card px-2 py-1"
-          >
-            {#each widgetToggles as toggle (toggle.id)}
-              <Button
-                variant={widgetRail.activeWidgets.includes(toggle.id) ? 'secondary' : 'ghost'}
-                size="sm"
-                class="h-7 gap-1 px-2 text-xs"
-                onclick={() => handleWidgetToggle(toggle.id)}
-              >
-                <toggle.icon class="h-3.5 w-3.5" />
-                {toggle.label}
-              </Button>
-            {/each}
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-7 px-2"
-              onclick={() => {
-                widgetRail = {
-                  ...widgetRail,
-                  open: !widgetRail.open,
-                };
-              }}
-              title="Toggle widget rail"
+        {#if visited[tab.id]}
+          <div class="flex h-full flex-col">
+            <div
+              class="divider-edge-b divider-edge-full flex items-center justify-end gap-1 bg-card px-2 py-1"
             >
-              <PanelRight class="h-3.5 w-3.5" />
-            </Button>
-          </div>
+              {#each widgetToggles as toggle (toggle.id)}
+                <Button
+                  variant={widgetRail.activeWidgets.includes(toggle.id) ? 'secondary' : 'ghost'}
+                  size="sm"
+                  class="h-7 gap-1 px-2 text-xs"
+                  onclick={() => handleWidgetToggle(toggle.id)}
+                >
+                  <toggle.icon class="h-3.5 w-3.5" />
+                  {toggle.label}
+                </Button>
+              {/each}
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-7 px-2"
+                onclick={() => {
+                  widgetRail = {
+                    ...widgetRail,
+                    open: !widgetRail.open,
+                  };
+                }}
+                title="Toggle widget rail"
+              >
+                <PanelRight class="h-3.5 w-3.5" />
+              </Button>
+            </div>
 
-          <div class="min-h-0 flex-1">
-            {#if widgetRail.open && widgetRail.activeWidgets.length > 0}
-              <ResizablePaneGroup direction="horizontal" class="h-full">
-                <ResizablePane defaultSize={70} minSize={40} class="min-h-0">
-                  <div class="h-full min-h-0">
-                    {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}
-                      <TerminalSession
-                        bind:this={sessionRefs[tab.id]}
-                        tabId={tab.id}
-                        initialCommand={tab.id === activeTabId
-                          ? (pendingCommand ?? undefined)
-                          : undefined}
-                        settings={sessionSettings}
-                      />
-                    {/key}
-                  </div>
-                </ResizablePane>
-                <ResizableHandle withHandle />
-                <ResizablePane defaultSize={30} minSize={20}>
-                  <div class="flex h-full flex-col divide-y divide-border overflow-hidden">
-                    {#if widgetRail.activeWidgets.includes('blocks')}
-                      <div class="min-h-0 flex-1">
-                        <CommandBlocksPanel
+            <div class="min-h-0 flex-1">
+              {#if widgetRail.open && widgetRail.activeWidgets.length > 0}
+                <ResizablePaneGroup direction="horizontal" class="h-full">
+                  <ResizablePane defaultSize={70} minSize={40} class="min-h-0">
+                    <div class="h-full min-h-0">
+                      {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}
+                        <TerminalSession
+                          bind:this={sessionRefs[tab.id]}
                           tabId={tab.id}
-                          onRerun={(cmd) => handleRerun(tab.id, cmd)}
-                          onExplain={(block) => sessionRefs[tab.id]?.explainError(block)}
+                          initialCommand={tab.id === activeTabId
+                            ? (pendingCommand ?? undefined)
+                            : undefined}
+                          settings={sessionSettings}
                         />
-                      </div>
-                    {/if}
-                    {#if widgetRail.activeWidgets.includes('ai')}
-                      <div class="min-h-0 flex-1">
-                        <AIAssistantPanel
-                          tabId={tab.id}
-                          shell={sessionSettings.defaultShell}
-                          workingDirectory={sessionSettings.workingDirectory}
-                          onRunCommand={(cmd) => handleRerun(tab.id, cmd)}
-                        />
-                      </div>
-                    {/if}
-                    {#if widgetRail.activeWidgets.includes('notes')}
-                      <div class="min-h-0 flex-1">
-                        <NotesPanel tabId={tab.id} />
-                      </div>
-                    {/if}
-                    {#if showLauncher && widgetRail.activeWidgets.includes('launcher')}
-                      <div class="min-h-0 flex-1">
-                        <SessionLauncher
-                          onContainerOpened={(id) => terminalActions.setActiveTab(id)}
-                        />
-                      </div>
-                    {/if}
-                    {#if showHistory && widgetRail.activeWidgets.includes('history')}
-                      <div class="min-h-0 flex-1">
-                        <CommandHistoryPanel tabId={tab.id} />
-                      </div>
-                    {/if}
-                  </div>
-                </ResizablePane>
-              </ResizablePaneGroup>
-            {:else}
-              {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}
-                <TerminalSession
-                  bind:this={sessionRefs[tab.id]}
-                  tabId={tab.id}
-                  settings={sessionSettings}
-                />
-              {/key}
-            {/if}
+                      {/key}
+                    </div>
+                  </ResizablePane>
+                  <ResizableHandle withHandle />
+                  <ResizablePane defaultSize={30} minSize={20}>
+                    <div class="flex h-full flex-col divide-y divide-border overflow-hidden">
+                      {#if widgetRail.activeWidgets.includes('blocks')}
+                        <div class="min-h-0 flex-1">
+                          <CommandBlocksPanel
+                            tabId={tab.id}
+                            onRerun={(cmd) => handleRerun(tab.id, cmd)}
+                            onExplain={(block) => sessionRefs[tab.id]?.explainError(block)}
+                          />
+                        </div>
+                      {/if}
+                      {#if widgetRail.activeWidgets.includes('ai')}
+                        <div class="min-h-0 flex-1">
+                          <AIAssistantPanel
+                            tabId={tab.id}
+                            shell={sessionSettings.defaultShell}
+                            workingDirectory={sessionSettings.workingDirectory}
+                            onRunCommand={(cmd) => handleRerun(tab.id, cmd)}
+                          />
+                        </div>
+                      {/if}
+                      {#if widgetRail.activeWidgets.includes('notes')}
+                        <div class="min-h-0 flex-1">
+                          <NotesPanel tabId={tab.id} />
+                        </div>
+                      {/if}
+                      {#if showLauncher && widgetRail.activeWidgets.includes('launcher')}
+                        <div class="min-h-0 flex-1">
+                          <SessionLauncher
+                            onContainerOpened={(id) => terminalActions.setActiveTab(id)}
+                          />
+                        </div>
+                      {/if}
+                      {#if showHistory && widgetRail.activeWidgets.includes('history')}
+                        <div class="min-h-0 flex-1">
+                          <CommandHistoryPanel tabId={tab.id} />
+                        </div>
+                      {/if}
+                    </div>
+                  </ResizablePane>
+                </ResizablePaneGroup>
+              {:else}
+                {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}
+                  <TerminalSession
+                    bind:this={sessionRefs[tab.id]}
+                    tabId={tab.id}
+                    settings={sessionSettings}
+                  />
+                {/key}
+              {/if}
+            </div>
           </div>
-        </div>
+        {/if}
       </div>
     {/each}
   {/if}

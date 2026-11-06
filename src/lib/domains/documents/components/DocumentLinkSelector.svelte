@@ -1,4 +1,12 @@
 <script lang="ts">
+  import FaFileLines from '~icons/fa6-solid/file-lines';
+  import FaArrowUpRightFromSquare from '~icons/fa6-solid/arrow-up-right-from-square';
+  import FaXmark from '~icons/fa6-solid/xmark';
+  import FaLink from '~icons/fa6-solid/link';
+  import FaMagnifyingGlass from '~icons/fa6-solid/magnifying-glass';
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaFileCircleXmark from '~icons/fa6-solid/file-circle-xmark';
+  import FaChevronRight from '~icons/fa6-solid/chevron-right';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
@@ -11,7 +19,6 @@
     DialogTitle,
     DialogTrigger,
   } from '$lib/components/ui/dialog';
-  import Icon from '@iconify/svelte';
   import { documentActions, documents } from '../stores/documentStore';
   import type { Document } from '../types';
   import { goto } from '$app/navigation';
@@ -74,7 +81,7 @@
     <Card class="p-3">
       <div class="flex items-center justify-between">
         <div class="flex min-w-0 flex-1 items-center gap-2">
-          <Icon icon="lucide:file-text" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+          <FaFileLines class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
           <span class="truncate font-medium">{selectedDoc.title}</span>
           {#if selectedDoc.isDraft}
             <Badge variant="outline" class="text-xs">Draft</Badge>
@@ -87,10 +94,10 @@
             onclick={() => goto(`/documents/${selectedDoc.id}`)}
             class="h-8"
           >
-            <Icon icon="lucide:external-link" class="h-4 w-4" />
+            <FaArrowUpRightFromSquare class="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onclick={handleClear} class="h-8">
-            <Icon icon="lucide:x" class="h-4 w-4" />
+            <FaXmark class="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -99,7 +106,7 @@
     <Dialog bind:open={isOpen}>
       <DialogTrigger>
         <Button variant="outline" class="w-full justify-start">
-          <Icon icon="lucide:link" class="mr-2 h-4 w-4" />
+          <FaLink class="mr-2 h-4 w-4" />
           Link Document
         </Button>
       </DialogTrigger>
@@ -110,8 +117,7 @@
         <div class="space-y-4">
           <div class="flex gap-2">
             <div class="relative flex-1">
-              <Icon
-                icon="lucide:search"
+              <FaMagnifyingGlass
                 class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               />
               <Input
@@ -122,14 +128,14 @@
               />
             </div>
             <Button onclick={handleCreateNew}>
-              <Icon icon="lucide:plus" class="mr-2 h-4 w-4" />
+              <FaPlus class="mr-2 h-4 w-4" />
               New Document
             </Button>
           </div>
           <div class="max-h-[400px] space-y-2 overflow-y-auto">
             {#if filteredDocuments.length === 0}
               <div class="py-8 text-center text-muted-foreground">
-                <Icon icon="lucide:file-x" class="mx-auto mb-2 h-8 w-8 opacity-50" />
+                <FaFileCircleXmark class="mx-auto mb-2 h-8 w-8 opacity-50" />
                 <p class="text-sm">No documents found</p>
               </div>
             {:else}
@@ -147,10 +153,7 @@
                           {doc.content.length > 100 ? '...' : ''}
                         </p>
                       </div>
-                      <Icon
-                        icon="lucide:chevron-right"
-                        class="ml-2 h-4 w-4 text-muted-foreground"
-                      />
+                      <FaChevronRight class="ml-2 h-4 w-4 text-muted-foreground" />
                     </div>
                   </CardContent>
                 </Card>

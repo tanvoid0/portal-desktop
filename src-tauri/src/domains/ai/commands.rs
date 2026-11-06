@@ -10,6 +10,7 @@ use crate::domains::ai::conversation::{
 };
 use crate::domains::ai::logging::{AILog, LogFilters};
 use crate::domains::ai::message::ChatMessage;
+use crate::domains::ai::platform_admin::{self, PairResult, PlatformHealth, StartResult};
 use crate::domains::ai::platform_config::PlatformConfig;
 use crate::domains::ai::providers::{
     AIError, AgentPlatformProvider, ConfigurationStatus, GenerationOptions, GenerationResult,
@@ -157,6 +158,44 @@ pub async fn get_ai_platform_catalog(
         .fetch_catalog(query)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Reachability + auth state of the local agent-platform server.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn ai_platform_health(
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<PlatformHealth, String> {
+    Ok(platform_admin::platform_health(&settings_service).await)
+}
+
+/// Launch the Agent Platform app (which owns the agent-platformd child) if
+/// nothing is already answering on the platform port.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn start_agent_platform(
+    settings_service: State<'_, Arc<AISettingsService>>,
+) -> Result<StartResult, String> {
+    Ok(platform_admin::start_platform(&settings_service).await)
+}
+
+/// Mint a workspace token with the master key and save it. The key is used for
+/// the two requests only; it is never logged, stored or echoed back.
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn pair_agent_platform(
+    master_key: String,
+    settings_service: State<'_, Arc<AISettingsService>>,
+    ai_service: State<'_, Arc<AIService>>,
+) -> Result<PairResult, String> {
+    let result = platform_admin::pair_platform(&settings_service, &master_key).await;
+    if result.ok {
+        let config = settings_service
+            .get_provider_config(ProviderType::AgentPlatform)
+            .map_err(|e| e.to_string())?;
+        ai_service
+            .update_provider_config(config)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(result)
 }
 
 /// Generate text using AI

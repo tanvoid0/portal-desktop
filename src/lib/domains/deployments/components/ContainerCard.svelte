@@ -5,7 +5,11 @@
   import { Progress } from '$lib/components/ui/progress';
   import type { DockerContainer } from '../types';
   import { fmtBytes, fmtPercent, isContainerRunning } from '../utils/format';
-  import { Play, Square, Trash2, Cpu, MemoryStick } from '@lucide/svelte';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Cpu from '~icons/fa6-solid/microchip';
+  import MemoryStick from '~icons/fa6-solid/memory';
 
   interface Props {
     container: DockerContainer;

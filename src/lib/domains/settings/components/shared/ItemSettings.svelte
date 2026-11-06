@@ -26,7 +26,13 @@
     DialogTitle,
   } from '$lib/components/ui/dialog';
   import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
-  import { Plus, Edit, Trash2, Search, Loader2, Sparkles, TrendingUp } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import TrendingUp from '~icons/fa6-solid/arrow-trend-up';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { logger } from '$lib/domains/shared';
@@ -171,7 +177,7 @@
         await config.service.update(
           editingItem.id,
           itemName.trim(),
-          itemIcon.trim() || 'logos:code',
+          itemIcon.trim() || 'logos:visual-studio-code',
           itemIconType,
           itemCategory.trim() || 'Custom'
         );
@@ -179,7 +185,7 @@
       } else {
         const created = await config.service.create(
           itemName.trim(),
-          itemIcon.trim() || 'logos:code',
+          itemIcon.trim() || 'logos:visual-studio-code',
           itemIconType,
           itemCategory.trim() || 'Custom'
         );

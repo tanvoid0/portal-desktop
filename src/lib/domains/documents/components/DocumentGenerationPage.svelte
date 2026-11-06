@@ -1,4 +1,7 @@
 <script lang="ts">
+  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import FaFloppyDisk from '~icons/fa6-solid/floppy-disk';
+
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
   import { Label } from '$lib/components/ui/label';
@@ -10,7 +13,7 @@
     CardTitle,
   } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import Icon from '@iconify/svelte';
+
   import {
     aiDocumentService,
     type GeneratedDocumentStructure,
@@ -204,7 +207,7 @@
               disabled={!prompt.trim() || isGenerating}
               class="w-full"
             >
-              <Icon icon="lucide:sparkles" class="mr-2 h-4 w-4" />
+              <FaWandMagicSparkles class="mr-2 h-4 w-4" />
               Generate Document
             </Button>
           </CardContent>
@@ -241,7 +244,7 @@
                 </div>
               {/if}
               <Button onclick={handleCreateDocument} class="w-full">
-                <Icon icon="lucide:save" class="mr-2 h-4 w-4" />
+                <FaFloppyDisk class="mr-2 h-4 w-4" />
                 Create Document
               </Button>
             </CardContent>

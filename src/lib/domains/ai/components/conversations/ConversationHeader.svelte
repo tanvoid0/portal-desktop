@@ -1,4 +1,9 @@
 <script lang="ts">
+  import FaArrowLeft from '~icons/fa6-solid/arrow-left';
+  import FaCheck from '~icons/fa6-solid/check';
+  import FaXmark from '~icons/fa6-solid/xmark';
+  import FaPenToSquare from '~icons/fa6-solid/pen-to-square';
+  import FaTrash from '~icons/fa6-solid/trash';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import {
@@ -12,7 +17,6 @@
     AlertDialogTitle,
     AlertDialogTrigger,
   } from '$lib/components/ui/alert-dialog';
-  import Icon from '@iconify/svelte';
   import ProviderModelSelector from '../ProviderModelSelector.svelte';
   import type { Conversation } from '../../types/index.js';
 
@@ -62,7 +66,7 @@
 <div class="divider-edge-b divider-edge-full flex items-center gap-4 p-4">
   {#if onBack}
     <Button variant="ghost" size="sm" onclick={onBack}>
-      <Icon icon="lucide:arrow-left" class="mr-2 h-4 w-4" />
+      <FaArrowLeft class="mr-2 h-4 w-4" />
       Back
     </Button>
   {/if}
@@ -78,17 +82,17 @@
           }}
         />
         <Button variant="ghost" size="sm" onclick={handleSave}>
-          <Icon icon="lucide:check" class="h-4 w-4" />
+          <FaCheck class="h-4 w-4" />
         </Button>
         <Button variant="ghost" size="sm" onclick={handleCancel}>
-          <Icon icon="lucide:x" class="h-4 w-4" />
+          <FaXmark class="h-4 w-4" />
         </Button>
       </div>
     {:else}
       <div class="flex items-center gap-2">
         <h2 class="text-lg font-semibold">{conversation.title}</h2>
         <Button variant="ghost" size="sm" onclick={() => (isEditing = true)}>
-          <Icon icon="lucide:edit" class="h-4 w-4" />
+          <FaPenToSquare class="h-4 w-4" />
         </Button>
       </div>
     {/if}
@@ -106,7 +110,7 @@
     <AlertDialog>
       <AlertDialogTrigger>
         <Button variant="destructive" size="sm">
-          <Icon icon="lucide:trash-2" class="mr-2 h-4 w-4" />
+          <FaTrash class="mr-2 h-4 w-4" />
           Delete
         </Button>
       </AlertDialogTrigger>

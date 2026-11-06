@@ -13,7 +13,9 @@ use crate::entities::project_package_manager::{
     ActiveModel as ProjectPackageManagerActiveModel, Column as ProjectPackageManagerColumn,
     Entity as ProjectPackageManagerEntity,
 };
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+// Junction rows are read in insertion order: the first framework is the
+// project's main one (detection writes the root's stack first).
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use std::sync::Arc;
 
 fn junction_created_at() -> sea_orm::prelude::DateTimeWithTimeZone {
@@ -75,6 +77,7 @@ impl ProjectRepository {
         let connection = self.db_manager.get_connection();
         let rows = ProjectFrameworkEntity::find()
             .filter(ProjectFrameworkColumn::ProjectId.eq(project_id))
+            .order_by_asc(ProjectFrameworkColumn::Id)
             .all(connection)
             .await
             .map_err(|e| format!("Failed to fetch project frameworks: {}", e))?;
@@ -86,6 +89,7 @@ impl ProjectRepository {
         let connection = self.db_manager.get_connection();
         let rows = ProjectPackageManagerEntity::find()
             .filter(ProjectPackageManagerColumn::ProjectId.eq(project_id))
+            .order_by_asc(ProjectPackageManagerColumn::Id)
             .all(connection)
             .await
             .map_err(|e| format!("Failed to fetch project package managers: {}", e))?;
@@ -97,6 +101,7 @@ impl ProjectRepository {
         let connection = self.db_manager.get_connection();
         let rows = ProjectLanguageEntity::find()
             .filter(ProjectLanguageColumn::ProjectId.eq(project_id))
+            .order_by_asc(ProjectLanguageColumn::Id)
             .all(connection)
             .await
             .map_err(|e| format!("Failed to fetch project languages: {}", e))?;
@@ -303,6 +308,58 @@ impl ProjectRepository {
             .map_err(|e| format!("Failed to update project parent: {}", e))?;
 
         Ok(Some(self.to_response(result).await?))
+    }
+
+    /// Ids for `names` in a lookup table (`frameworks`, `languages` or
+    /// `package_managers`), matched case-insensitively. A name the table has never
+    /// seen (a stack detected on disk, e.g. `Android`) gets a row of its own.
+    pub async fn lookup_ids(&self, table: &'static str, names: &[String]) -> Result<Vec<i32>, String> {
+        use sea_orm::{ConnectionTrait, Statement};
+        let conn = self.db_manager.get_connection();
+        let backend = conn.get_database_backend();
+        let mut ids = Vec::new();
+        for name in names {
+            let icon = match name.as_str() {
+                "Android" => "logos:android-icon",
+                "pub" => "logos:dart",
+                _ => "",
+            };
+            // RFC 3339 like the seeded rows; the column default's format would not
+            // parse back into the entity's timestamp. One statement, so two scans
+            // adding the same new name cannot both insert it.
+            let now = chrono::Utc::now().to_rfc3339();
+            conn.execute(Statement::from_sql_and_values(
+                backend,
+                format!(
+                    "INSERT INTO {table} (name, icon, category, created_at, updated_at) \
+                     SELECT ?, ?, 'Detected', ?, ? \
+                     WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE lower(name) = lower(?))"
+                ),
+                [
+                    name.as_str().into(),
+                    icon.into(),
+                    now.clone().into(),
+                    now.into(),
+                    name.as_str().into(),
+                ],
+            ))
+            .await
+            .map_err(|e| format!("Failed to add {name} to {table}: {e}"))?;
+            let row = conn
+                .query_one(Statement::from_sql_and_values(
+                    backend,
+                    format!("SELECT id FROM {table} WHERE lower(name) = lower(?) ORDER BY id LIMIT 1"),
+                    [name.as_str().into()],
+                ))
+                .await
+                .map_err(|e| format!("Failed to look up {name} in {table}: {e}"))?
+                .ok_or_else(|| format!("{name} missing from {table}"))?;
+            let id = row.try_get::<i32>("", "id").map_err(|e| e.to_string())?;
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        Ok(ids)
     }
 
     // Helper methods for managing many-to-many relationships

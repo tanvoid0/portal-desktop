@@ -6,19 +6,17 @@
 <script lang="ts">
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import {
-    ChevronDown,
-    ChevronRight,
-    Check,
-    Copy,
-    Clock,
-    Folder,
-    Loader,
-    RotateCw,
-    Sparkles,
-    CheckCircle,
-    XCircle,
-  } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import Check from '~icons/fa6-solid/check';
+  import Copy from '~icons/fa6-solid/copy';
+  import Clock from '~icons/fa6-solid/clock';
+  import Folder from '~icons/fa6-solid/folder';
+  import Loader from '~icons/fa6-solid/spinner';
+  import RotateCw from '~icons/fa6-solid/rotate-right';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
   import type { CapturedCommand } from '../stores/commandBlockStore';
   import { stripForDisplay } from '../utils/textUtils';
   import AiResponse from './ai/AiResponse.svelte';

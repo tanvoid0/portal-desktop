@@ -6,7 +6,12 @@
   import { fmtBytes, fmtPercent, isContainerRunning } from '../utils/format';
   import { resolveComposeService as getService } from '../utils/workloadGrouping';
   import ContainerCard from './ContainerCard.svelte';
-  import { Play, Square, Trash2, ChevronDown, Cpu, MemoryStick } from '@lucide/svelte';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import Cpu from '~icons/fa6-solid/microchip';
+  import MemoryStick from '~icons/fa6-solid/memory';
 
   interface Props {
     container: DockerContainer;
@@ -110,15 +115,33 @@
 
     <div class="flex shrink-0 gap-1">
       {#if running}
-        <Button variant="outline" size="sm" onclick={() => onStop?.(container.id)}>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Stop container {displayName}"
+          title="Stop container"
+          onclick={() => onStop?.(container.id)}
+        >
           <Square class="h-4 w-4" />
         </Button>
       {:else}
-        <Button variant="default" size="sm" onclick={() => onStart?.(container.id)}>
+        <Button
+          variant="default"
+          size="sm"
+          aria-label="Start container {displayName}"
+          title="Start container"
+          onclick={() => onStart?.(container.id)}
+        >
           <Play class="h-4 w-4" />
         </Button>
       {/if}
-      <Button variant="destructive" size="sm" onclick={() => onRemove?.(container.id)}>
+      <Button
+        variant="destructive"
+        size="sm"
+        aria-label="Remove container {displayName}"
+        title="Remove container"
+        onclick={() => onRemove?.(container.id)}
+      >
         <Trash2 class="h-4 w-4" />
       </Button>
     </div>

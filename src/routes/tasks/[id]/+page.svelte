@@ -1,4 +1,21 @@
 <script lang="ts">
+  import FaArrowLeft from '~icons/fa6-solid/arrow-left';
+  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import FaPencil from '~icons/fa6-solid/pencil';
+  import FaTrash from '~icons/fa6-solid/trash';
+  import FaClipboard from '~icons/fa6-solid/clipboard';
+  import FaFlag from '~icons/fa6-solid/flag';
+  import FaCalendar from '~icons/fa6-solid/calendar';
+  import FaTurnDown from '~icons/fa6-solid/turn-down';
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaEye from '~icons/fa6-solid/eye';
+  import FaCalendarPlus from '~icons/fa6-solid/calendar-plus';
+  import FaCalendarDays from '~icons/fa6-solid/calendar-days';
+  import FaCircleCheck from '~icons/fa6-solid/circle-check';
+  import FaFileLines from '~icons/fa6-solid/file-lines';
+  import FaArrowUpRightFromSquare from '~icons/fa6-solid/arrow-up-right-from-square';
+  import FaPenToSquare from '~icons/fa6-solid/pen-to-square';
+  import FaHourglassHalf from '~icons/fa6-solid/hourglass-half';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -24,7 +41,14 @@
     TASK_STATUS_OPTIONS,
     TASK_PRIORITY_OPTIONS,
     TASK_TYPE_OPTIONS,
+    taskStatusLabel,
   } from '$lib/domains/tasks/types';
+
+  function formatMinutes(min: number): string {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  }
 
   const taskId = $derived(page.params.id);
   const tasksQuery = createTasksQuery();
@@ -217,7 +241,8 @@
   async function handleDeleteSubtask(subtaskId: string) {
     const confirmed = await confirmAction(
       'Are you sure you want to delete this subtask?',
-      'Delete subtask'
+      'Delete subtask',
+      { confirmLabel: 'Delete', destructive: true }
     );
     if (!confirmed) return;
 
@@ -236,8 +261,9 @@
     if (!task) return;
 
     const confirmed = await confirmAction(
-      `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
-      'Delete task'
+      `Are you sure you want to delete "${task.title}"?${subtasks.length ? ` Also deletes ${subtasks.length} subtask${subtasks.length === 1 ? '' : 's'}.` : ''} This action cannot be undone.`,
+      'Delete task',
+      { confirmLabel: 'Delete', destructive: true }
     );
     if (!confirmed) return;
 
@@ -335,20 +361,14 @@
       <div class="mb-6 flex items-center justify-between">
         <div class="flex items-center gap-4">
           <Button variant="ghost" onclick={() => goto('/tasks')} class="flex items-center gap-2">
-            <Icon icon="mdi:arrow-left" class="h-4 w-4" />
+            <FaArrowLeft class="h-4 w-4" />
             Back to Tasks
           </Button>
           <Separator orientation="vertical" class="h-6" />
           <div class="flex items-center gap-2">
             <Icon icon={getTaskIcon(task)} class="h-5 w-5 {getTaskStatusColor(task.status)}" />
             <Badge class={getStatusBadgeColor(task.status)}>
-              {task.status === 'pending'
-                ? 'To Do'
-                : task.status === 'in-progress'
-                  ? 'In Progress'
-                  : task.status === 'completed'
-                    ? 'Completed'
-                    : 'Cancelled'}
+              {taskStatusLabel(task.status)}
             </Badge>
           </div>
         </div>
@@ -363,15 +383,15 @@
               onclick={() => goto(`/tasks/${task.id}/generate`)}
               class="flex items-center gap-2"
             >
-              <Icon icon="lucide:sparkles" class="h-4 w-4" />
+              <FaWandMagicSparkles class="h-4 w-4" />
               Generate Tasks with AI
             </Button>
             <Button variant="outline" onclick={handleEdit} class="flex items-center gap-2">
-              <Icon icon="mdi:pencil" class="h-4 w-4" />
+              <FaPencil class="h-4 w-4" />
               Edit
             </Button>
             <Button variant="destructive" onclick={handleDelete} class="flex items-center gap-2">
-              <Icon icon="mdi:delete" class="h-4 w-4" />
+              <FaTrash class="h-4 w-4" />
               Delete
             </Button>
           {/if}
@@ -385,7 +405,7 @@
           <Card>
             <CardHeader>
               <CardTitle class="flex items-center gap-2">
-                <Icon icon="mdi:clipboard-text" class="h-5 w-5" />
+                <FaClipboard class="h-5 w-5" />
                 Task Details
               </CardTitle>
             </CardHeader>
@@ -468,13 +488,7 @@
                           class="h-4 w-4 {getTaskStatusColor(task.status)}"
                         />
                         <Badge class={getStatusBadgeColor(task.status)}>
-                          {task.status === 'pending'
-                            ? 'To Do'
-                            : task.status === 'in-progress'
-                              ? 'In Progress'
-                              : task.status === 'completed'
-                                ? 'Completed'
-                                : 'Cancelled'}
+                          {taskStatusLabel(task.status)}
                         </Badge>
                       </div>
                     </div>
@@ -482,7 +496,7 @@
                     <div>
                       <Label class="text-sm font-medium text-muted-foreground">Priority</Label>
                       <div class="mt-1 flex items-center gap-2">
-                        <Icon icon="mdi:flag" class="h-4 w-4 {getPriorityColor(task.priority)}" />
+                        <FaFlag class="h-4 w-4 {getPriorityColor(task.priority)}" />
                         <Badge variant="outline" class="uppercase">
                           {task.priority}
                         </Badge>
@@ -503,8 +517,40 @@
                     <div>
                       <Label class="text-sm font-medium text-muted-foreground">Due Date</Label>
                       <div class="mt-1 flex items-center gap-2">
-                        <Icon icon="mdi:calendar" class="h-4 w-4 text-muted-foreground" />
+                        <FaCalendar class="h-4 w-4 text-muted-foreground" />
                         <span class="text-sm">{new Date(task.dueDate).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  {/if}
+
+                  {#if task.assignee}
+                    <div>
+                      <Label class="text-sm font-medium text-muted-foreground">Assignee</Label>
+                      <div class="mt-1 text-sm">{task.assignee}</div>
+                    </div>
+                  {/if}
+
+                  {#if task.estimatedTime || task.actualTime}
+                    <div>
+                      <Label class="text-sm font-medium text-muted-foreground">Time</Label>
+                      <div class="mt-1 flex items-center gap-2 text-sm">
+                        <FaHourglassHalf class="h-4 w-4 text-muted-foreground" />
+                        <span>
+                          {task.estimatedTime ? formatMinutes(task.estimatedTime) : '-'} estimated{task.actualTime
+                            ? ` / ${formatMinutes(task.actualTime)} spent`
+                            : ''}
+                        </span>
+                      </div>
+                    </div>
+                  {/if}
+
+                  {#if task.tags && task.tags.length > 0}
+                    <div>
+                      <Label class="text-sm font-medium text-muted-foreground">Tags</Label>
+                      <div class="mt-1 flex flex-wrap gap-1">
+                        {#each task.tags as tag, i (i)}
+                          <Badge variant="outline">{tag}</Badge>
+                        {/each}
                       </div>
                     </div>
                   {/if}
@@ -519,7 +565,7 @@
               <CardHeader>
                 <CardTitle class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
-                    <Icon icon="mdi:subdirectory-arrow-right" class="h-5 w-5" />
+                    <FaTurnDown class="h-5 w-5" />
                     Subtasks
                   </div>
                   <Button
@@ -527,7 +573,7 @@
                     size="sm"
                     onclick={() => (showAddSubtask = !showAddSubtask)}
                   >
-                    <Icon icon="mdi:plus" class="mr-1 h-4 w-4" />
+                    <FaPlus class="mr-1 h-4 w-4" />
                     {showAddSubtask ? 'Cancel' : 'Add Subtask'}
                   </Button>
                 </CardTitle>
@@ -692,13 +738,7 @@
                             </div>
                             <div class="flex items-center gap-2">
                               <Badge class={getStatusBadgeColor(subtask.status)}>
-                                {subtask.status === 'pending'
-                                  ? 'To Do'
-                                  : subtask.status === 'in-progress'
-                                    ? 'In Progress'
-                                    : subtask.status === 'completed'
-                                      ? 'Completed'
-                                      : 'Cancelled'}
+                                {taskStatusLabel(subtask.status)}
                               </Badge>
                               <div class="flex gap-1">
                                 <Button
@@ -707,7 +747,7 @@
                                   onclick={() => goto(`/tasks/${subtask.id}`)}
                                   title="View subtask details"
                                 >
-                                  <Icon icon="mdi:eye" class="h-4 w-4" />
+                                  <FaEye class="h-4 w-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -715,7 +755,7 @@
                                   onclick={() => startEditSubtask(subtask)}
                                   title="Edit subtask"
                                 >
-                                  <Icon icon="mdi:pencil" class="h-4 w-4" />
+                                  <FaPencil class="h-4 w-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -724,7 +764,7 @@
                                   title="Delete subtask"
                                   class="text-destructive hover:text-destructive"
                                 >
-                                  <Icon icon="mdi:delete" class="h-4 w-4" />
+                                  <FaTrash class="h-4 w-4" />
                                 </Button>
                               </div>
                             </div>
@@ -740,10 +780,7 @@
                   </div>
                 {:else}
                   <div class="py-8 text-center text-muted-foreground">
-                    <Icon
-                      icon="mdi:subdirectory-arrow-right"
-                      class="mx-auto mb-2 h-8 w-8 opacity-50"
-                    />
+                    <FaTurnDown class="mx-auto mb-2 h-8 w-8 opacity-50" />
                     <p>No subtasks yet</p>
                     <Button
                       variant="outline"
@@ -751,7 +788,7 @@
                       onclick={() => (showAddSubtask = true)}
                       class="mt-2"
                     >
-                      <Icon icon="mdi:plus" class="mr-1 h-4 w-4" />
+                      <FaPlus class="mr-1 h-4 w-4" />
                       Add First Subtask
                     </Button>
                   </div>
@@ -772,7 +809,7 @@
               <div>
                 <Label class="text-sm font-medium text-muted-foreground">Created</Label>
                 <div class="mt-1 flex items-center gap-2">
-                  <Icon icon="mdi:calendar-plus" class="h-4 w-4 text-muted-foreground" />
+                  <FaCalendarPlus class="h-4 w-4 text-muted-foreground" />
                   <span class="text-sm">{new Date(task.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
@@ -780,7 +817,7 @@
               <div>
                 <Label class="text-sm font-medium text-muted-foreground">Last Updated</Label>
                 <div class="mt-1 flex items-center gap-2">
-                  <Icon icon="mdi:calendar-edit" class="h-4 w-4 text-muted-foreground" />
+                  <FaCalendarDays class="h-4 w-4 text-muted-foreground" />
                   <span class="text-sm">{new Date(task.updatedAt).toLocaleDateString()}</span>
                 </div>
               </div>
@@ -789,7 +826,7 @@
                 <div>
                   <Label class="text-sm font-medium text-muted-foreground">Completed</Label>
                   <div class="mt-1 flex items-center gap-2">
-                    <Icon icon="mdi:check-circle" class="h-4 w-4 text-green-500" />
+                    <FaCircleCheck class="h-4 w-4 text-green-500" />
                     <span class="text-sm">{new Date(task.completedAt).toLocaleDateString()}</span>
                   </div>
                 </div>
@@ -805,7 +842,7 @@
                       onclick={() => task && goto(`/tasks/${task.parentId}`)}
                       class="w-full justify-start"
                     >
-                      <Icon icon="mdi:subdirectory-arrow-left" class="mr-2 h-4 w-4" />
+                      <FaTurnDown class="mr-2 h-4 w-4" />
                       View Parent Task
                     </Button>
                   </div>
@@ -821,7 +858,7 @@
               <Card>
                 <CardHeader>
                   <CardTitle class="flex items-center gap-2 text-lg">
-                    <Icon icon="lucide:file-text" class="h-5 w-5" />
+                    <FaFileLines class="h-5 w-5" />
                     Linked Document
                   </CardTitle>
                 </CardHeader>
@@ -840,7 +877,7 @@
                       onclick={() => goto(`/documents/${linkedDoc.id}`)}
                       class="flex-1"
                     >
-                      <Icon icon="lucide:external-link" class="mr-2 h-4 w-4" />
+                      <FaArrowUpRightFromSquare class="mr-2 h-4 w-4" />
                       Open Document
                     </Button>
                     <Button
@@ -848,7 +885,7 @@
                       size="sm"
                       onclick={() => goto(`/documents/${linkedDoc.id}/edit`)}
                     >
-                      <Icon icon="lucide:edit" class="h-4 w-4" />
+                      <FaPenToSquare class="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>
@@ -858,7 +895,7 @@
             <Card>
               <CardHeader>
                 <CardTitle class="flex items-center gap-2 text-lg">
-                  <Icon icon="lucide:file-text" class="h-5 w-5" />
+                  <FaFileLines class="h-5 w-5" />
                   Document
                 </CardTitle>
               </CardHeader>
@@ -871,7 +908,7 @@
                     )}
                   class="w-full"
                 >
-                  <Icon icon="lucide:plus" class="mr-2 h-4 w-4" />
+                  <FaPlus class="mr-2 h-4 w-4" />
                   Create Document for Task
                 </Button>
               </CardContent>
@@ -889,7 +926,7 @@
                 onclick={() => task && taskActions.toggleTaskStatus(task.id)}
                 class="w-full justify-start"
               >
-                <Icon icon="mdi:progress-clock" class="mr-2 h-4 w-4" />
+                <FaHourglassHalf class="mr-2 h-4 w-4" />
                 Toggle Status
               </Button>
 
@@ -899,7 +936,7 @@
                   onclick={() => (showAddSubtask = !showAddSubtask)}
                   class="w-full justify-start"
                 >
-                  <Icon icon="mdi:plus" class="mr-2 h-4 w-4" />
+                  <FaPlus class="mr-2 h-4 w-4" />
                   {showAddSubtask ? 'Cancel Add Subtask' : 'Add Subtask'}
                 </Button>
               {/if}
@@ -909,7 +946,7 @@
                 onclick={() => task && goto(`/tasks/${task.id}/edit`)}
                 class="w-full justify-start"
               >
-                <Icon icon="mdi:pencil" class="mr-2 h-4 w-4" />
+                <FaPencil class="mr-2 h-4 w-4" />
                 Edit Task
               </Button>
             </CardContent>

@@ -33,24 +33,22 @@
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { goto } from '$app/navigation';
-  import {
-    Brain,
-    Activity,
-    Database,
-    Trash2,
-    Sparkles,
-    Zap,
-    Settings,
-    CheckCircle2,
-    XCircle,
-    RefreshCw,
-    Eye,
-    Star,
-    TrendingUp,
-    Clock,
-    Filter,
-    Search,
-  } from '@lucide/svelte';
+  import Brain from '~icons/fa6-solid/brain';
+  import Activity from '~icons/fa6-solid/wave-square';
+  import Database from '~icons/fa6-solid/database';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import Zap from '~icons/fa6-solid/bolt';
+  import Settings from '~icons/fa6-solid/gear';
+  import CheckCircle2 from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Eye from '~icons/fa6-solid/eye';
+  import Star from '~icons/fa6-solid/star';
+  import TrendingUp from '~icons/fa6-solid/arrow-trend-up';
+  import Clock from '~icons/fa6-solid/clock';
+  import Filter from '~icons/fa6-solid/filter';
+  import Search from '~icons/fa6-solid/magnifying-glass';
 
   const log = logger.createScoped('LearningSettings');
 

@@ -5,51 +5,43 @@
 
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { sdkManagersQuery } from '$lib/domains/sdk/queries/sdkQueries';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import {
-    CheckCircle,
-    XCircle,
-    Download,
-    ExternalLink,
-    RefreshCw,
-    ArrowRight,
-    Loader2,
-  } from '@lucide/svelte';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Download from '~icons/fa6-solid/download';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import ArrowRight from '~icons/fa6-solid/arrow-right';
+  import Loader2 from '~icons/fa6-solid/spinner';
   import Devicon from '$lib/components/ui/devicon.svelte';
   import { PageLoading, PageError, PageEmpty } from '$lib/components/shell';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import {
-    listSDKManagers,
     installSDKManager,
     uninstallSDKManager,
     type SDKManagerInfo,
   } from '$lib/domains/sdk/services/sdkManagerService';
 
-  // State
-  let loading = $state(true);
-  let error = $state<string | null>(null);
-  let managers = $state<SDKManagerInfo[]>([]);
+  const queryClient = useQueryClient();
+  const managersQ = createQuery(sdkManagersQuery);
+  const managers = $derived<SDKManagerInfo[]>(managersQ.data ?? []);
+  const loading = $derived(managersQ.isPending);
+  const error = $derived(
+    managersQ.error
+      ? managersQ.error instanceof Error
+        ? managersQ.error.message
+        : 'Failed to load SDK managers'
+      : null
+  );
 
-  // Load managers on mount
-  $effect(() => {
-    loadManagers();
-  });
-
-  async function loadManagers() {
-    loading = true;
-    error = null;
-
-    try {
-      managers = await listSDKManagers();
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load SDK managers';
-      console.error('Failed to load SDK managers:', err);
-    } finally {
-      loading = false;
-    }
+  // Installs change the sidebar's data too, so refetch everything under `sdk`.
+  function loadManagers() {
+    return queryClient.invalidateQueries({ queryKey: ['sdk'] });
   }
 
   let installingManager = $state<string | null>(null);
@@ -155,8 +147,8 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <Button variant="outline" onclick={loadManagers} disabled={loading}>
-        <RefreshCw class="mr-2 h-4 w-4 {loading ? 'animate-spin' : ''}" />
+      <Button variant="outline" onclick={loadManagers} disabled={managersQ.isFetching}>
+        <RefreshCw class="mr-2 h-4 w-4 {managersQ.isFetching ? 'animate-spin' : ''}" />
         Refresh
       </Button>
     </div>
@@ -176,21 +168,21 @@
     />
   {:else}
     <!-- Managers Grid -->
-    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-6">
       {#each managers as manager}
-        <Card class="relative">
+        <Card class="relative min-w-0">
           <CardHeader>
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <Button
                 type="button"
                 variant="ghost"
-                class="h-auto flex-1 justify-start gap-3 px-0 text-left hover:opacity-80"
+                class="h-auto min-w-0 flex-1 justify-start gap-3 px-0 text-left whitespace-normal hover:opacity-80"
                 onclick={() => navigateToManagerDetails(manager.id)}
                 onkeydown={(e) => e.key === 'Enter' && navigateToManagerDetails(manager.id)}
               >
-                <Devicon icon={getManagerIcon(manager.id)} class="h-10 w-10" />
-                <div>
-                  <CardTitle class="text-lg">{manager.display_name}</CardTitle>
+                <Devicon icon={getManagerIcon(manager.id)} class="h-10 w-10 shrink-0" />
+                <div class="min-w-0">
+                  <CardTitle class="text-lg break-words">{manager.display_name}</CardTitle>
                   {#if manager.version}
                     <p class="mt-1 text-xs text-muted-foreground">
                       {manager.version}
@@ -198,7 +190,7 @@
                   {/if}
                 </div>
               </Button>
-              <div class="flex items-center gap-2">
+              <div class="flex shrink-0 items-center gap-2">
                 {#if manager.installed}
                   <Badge variant="default" class="bg-green-100 text-green-800">
                     <CheckCircle class="mr-1 h-3 w-3" />

@@ -19,20 +19,18 @@
   import * as Dialog from '$lib/components/ui/dialog';
   import { Label } from '$lib/components/ui/label';
   import Select from '$lib/components/ui/select.svelte';
-  import {
-    Plus,
-    Search,
-    Upload,
-    Download,
-    Edit,
-    Trash2,
-    Package,
-    Code,
-    Rocket,
-    Wrench,
-    Settings,
-    FileText,
-  } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Upload from '~icons/fa6-solid/upload';
+  import Download from '~icons/fa6-solid/download';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Package from '~icons/fa6-solid/box-open';
+  import Code from '~icons/fa6-solid/code';
+  import Rocket from '~icons/fa6-solid/rocket';
+  import Wrench from '~icons/fa6-solid/wrench';
+  import Settings from '~icons/fa6-solid/gear';
+  import FileText from '~icons/fa6-solid/file-lines';
   import type { Block, CreateBlockRequest } from '$lib/domains/projects/pipelines';
   import {
     blockLibraryService,
@@ -41,6 +39,7 @@
   } from '$lib/domains/projects/pipelines';
   import { pipelineTemplateService } from '$lib/domains/projects/pipelines/services/pipelineTemplateService';
   import type { PipelineTemplate } from '$lib/domains/projects/pipelines';
+  import { parseImportJson } from '$lib/domains/automation/utils/importJson';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
@@ -138,24 +137,14 @@
       jsonImportError = 'Please paste JSON content';
       return;
     }
-    try {
-      const parsed = JSON.parse(jsonImportText);
-      // Map JSON fields to form data
-      formData = {
-        name: parsed.name || '',
-        description: parsed.description || '',
-        category: parsed.category || 'utility',
-        parameters: parsed.parameters || [],
-        command: parsed.command || '',
-        executionType: parsed.executionType || 'command',
-        defaultConfig: parsed.defaultConfig || {},
-        tags: parsed.tags || [],
-      };
-      jsonImportText = '';
-      toast.success('JSON imported - review and save');
-    } catch (e) {
-      jsonImportError = 'Invalid JSON format';
+    const result = parseImportJson(jsonImportText, 'command');
+    if ('error' in result) {
+      jsonImportError = result.error;
+      return;
     }
+    formData = result.data;
+    jsonImportText = '';
+    toast.success('JSON imported - review and save');
   }
 
   function handleJsonFileImport(event: Event) {
@@ -208,7 +197,8 @@
   async function handleDeleteBlock(blockId: string) {
     const confirmed = await confirmAction(
       'Are you sure you want to delete this block?',
-      'Delete block'
+      'Delete block',
+      { confirmLabel: 'Delete', destructive: true }
     );
     if (!confirmed) return;
     try {
@@ -381,7 +371,8 @@
   async function handleDeleteTemplate(template: PipelineTemplate) {
     const confirmed = await confirmAction(
       `Are you sure you want to delete template "${template.name}"?`,
-      'Delete template'
+      'Delete template',
+      { confirmLabel: 'Delete', destructive: true }
     );
     if (!confirmed) return;
 
@@ -586,18 +577,25 @@
                   <Button
                     size="sm"
                     variant="outline"
+                    aria-label={`Edit block ${block.name}`}
                     onclick={() => handleEditBlock(block)}
                     class="flex-1"
                   >
                     <Edit class="mr-1 h-3 w-3" />
                     Edit
                   </Button>
-                  <Button size="sm" variant="outline" onclick={() => handleExportBlock(block)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Export block ${block.name}`}
+                    onclick={() => handleExportBlock(block)}
+                  >
                     <Download class="h-3 w-3" />
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
+                    aria-label={`Delete block ${block.name}`}
                     onclick={() => handleDeleteBlock(block.id)}
                   >
                     <Trash2 class="h-3 w-3" />
@@ -697,6 +695,7 @@
                   <Button
                     size="sm"
                     variant="outline"
+                    aria-label={`Export template ${template.name}`}
                     onclick={() => handleExportTemplate(template)}
                   >
                     <Download class="h-3 w-3" />
@@ -705,6 +704,7 @@
                     <Button
                       size="sm"
                       variant="outline"
+                      aria-label={`Edit template ${template.name}`}
                       onclick={() => handleEditTemplate(template)}
                       class="flex-1"
                     >
@@ -714,6 +714,7 @@
                     <Button
                       size="sm"
                       variant="destructive"
+                      aria-label={`Delete template ${template.name}`}
                       onclick={() => handleDeleteTemplate(template)}
                     >
                       <Trash2 class="h-3 w-3" />
@@ -860,6 +861,7 @@
                 <Button
                   variant="ghost"
                   size="sm"
+                  aria-label={`Remove parameter ${param.name}`}
                   onclick={() => {
                     formData.parameters = formData.parameters.filter((_, idx) => idx !== i);
                   }}

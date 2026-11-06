@@ -1,8 +1,10 @@
 //! Caches [`detect::scan`] results in `project_modules`.
 
 use super::detect::{self, DetectedModule};
+use super::stack;
 use crate::database::DatabaseManager;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
+use crate::domains::projects::services::project_service::ProjectService;
 use crate::entities::project_module::{ActiveModel, Column, Entity, Model};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use std::path::PathBuf;
@@ -39,6 +41,8 @@ impl ModuleService {
 
     /// Rescan one project from disk and replace its rows. A missing folder
     /// clears the rows rather than failing, so a moved project just shows none.
+    /// A project with no stack recorded (every discovered one, until now) gets
+    /// it filled from the same scan; one that has a stack is left alone.
     pub async fn refresh(&self, project_id: i32) -> Result<Vec<Model>, String> {
         let project = self
             .projects
@@ -46,10 +50,20 @@ impl ModuleService {
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
         let root = PathBuf::from(&project.path);
-        let found: Vec<DetectedModule> = tokio::task::spawn_blocking(move || detect::scan(&root))
-            .await
-            .map_err(|e| e.to_string())?;
+        let needs_stack = !project.has_stack();
+        let (found, detected) = tokio::task::spawn_blocking(move || {
+            let found: Vec<DetectedModule> = detect::scan(&root);
+            let detected = needs_stack.then(|| stack::detect_with(&root, &found));
+            (found, detected)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
         self.replace(project_id, found).await?;
+        if let Some(detected) = detected {
+            ProjectService::new(&self.db)
+                .store_stack(&project, &detected, false)
+                .await?;
+        }
         self.list(project_id).await
     }
 

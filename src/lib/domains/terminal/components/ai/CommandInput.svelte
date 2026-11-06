@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Sparkles } from '@lucide/svelte';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import { Input } from '$lib/components/ui/input';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';

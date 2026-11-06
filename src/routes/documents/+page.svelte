@@ -1,8 +1,9 @@
 <script lang="ts">
+  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import FaPlus from '~icons/fa6-solid/plus';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
-  import Icon from '@iconify/svelte';
   import { documentActions, documents, isLoading, error } from '$lib/domains/documents';
   import DocumentList from '$lib/domains/documents/components/DocumentList.svelte';
   import type { Document } from '$lib/domains/documents';
@@ -21,7 +22,8 @@
   async function handleDocumentDelete(doc: Document) {
     const confirmed = await confirmAction(
       `Are you sure you want to delete "${doc.title}"?`,
-      'Delete document'
+      'Delete document',
+      { confirmLabel: 'Delete', destructive: true }
     );
     if (!confirmed) return;
 
@@ -49,11 +51,11 @@
   <PageHeader title="Documents" description="Workspace documentation, notes, and knowledge base">
     {#snippet actions()}
       <Button variant="outline" onclick={() => goto('/documents/generate')}>
-        <Icon icon="lucide:sparkles" class="mr-2 h-4 w-4" />
+        <FaWandMagicSparkles class="mr-2 h-4 w-4" />
         Generate with AI
       </Button>
       <Button onclick={handleCreateNew}>
-        <Icon icon="lucide:plus" class="mr-2 h-4 w-4" />
+        <FaPlus class="mr-2 h-4 w-4" />
         New Document
       </Button>
     {/snippet}

@@ -14,3 +14,4 @@ export type { DuplicateCluster } from './DuplicateCluster';
 export type { ProjectGitSummary } from './ProjectGitSummary';
 export type { ProjectResponse } from './ProjectResponse';
 export type { RiskLevel } from './RiskLevel';
+export type { UnavailableProject } from './UnavailableProject';

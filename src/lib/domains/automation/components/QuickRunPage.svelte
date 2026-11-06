@@ -16,20 +16,18 @@
   import { Label } from '$lib/components/ui/label';
   import FilePicker from '$lib/components/ui/file-picker.svelte';
   import Select from '$lib/components/ui/select.svelte';
-  import {
-    Play,
-    FolderOpen,
-    Plus,
-    Trash2,
-    ChevronUp,
-    ChevronDown,
-    Eye,
-    CheckCircle,
-    XCircle,
-    Loader2,
-    SkipForward,
-    Zap,
-  } from '@lucide/svelte';
+  import Play from '~icons/fa6-solid/play';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Plus from '~icons/fa6-solid/plus';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import ChevronUp from '~icons/fa6-solid/chevron-up';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import Eye from '~icons/fa6-solid/eye';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import SkipForward from '~icons/fa6-solid/forward-step';
+  import Zap from '~icons/fa6-solid/bolt';
   import type { Block } from '$lib/domains/projects/pipelines';
   import { blockLibraryStore, blocks as blocksStore } from '$lib/domains/projects/pipelines';
   import {
@@ -42,6 +40,7 @@
   import type { Project } from '$lib/domains/projects/types';
   import { getProjectPackageManager } from '$lib/domains/projects/utils/display';
   import { toast } from '$lib/utils/toast';
+  import { invokeClient } from '$lib/utils/invokeClient';
   import { setBreadcrumbs } from '$lib/domains/shared/stores/breadcrumbStore';
   import { PageHeader, PageLoading } from '$lib/components/shell';
 
@@ -163,6 +162,17 @@
     });
   }
 
+  /** Backend owns the "folder exists" check; toast + false when it fails. */
+  async function cwdIsValid(): Promise<boolean> {
+    try {
+      await invokeClient.post('validate_project_path', { path: cwd.trim() });
+      return true;
+    } catch (error) {
+      toast.error(`Working directory: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+
   async function handlePreview() {
     if (!cwd.trim()) {
       toast.error('Select a working directory first');
@@ -175,6 +185,10 @@
 
     previewLoading = true;
     try {
+      if (!(await cwdIsValid())) {
+        previewSteps = [];
+        return;
+      }
       previewSteps = await automation.resolve({
         cwd: cwd.trim(),
         blocks: buildBlockRefs(),
@@ -189,7 +203,7 @@
   }
 
   async function handleRun() {
-    if (!canRun) return;
+    if (!canRun || !(await cwdIsValid())) return;
 
     running = true;
     runResult = null;
@@ -256,6 +270,34 @@
       </Button>
     {/snippet}
   </PageHeader>
+
+  <!-- Preview -->
+  {#if previewLoading || previewSteps.length > 0}
+    <Card>
+      <CardHeader>
+        <CardTitle class="text-lg">Preview</CardTitle>
+        <CardDescription>Resolved commands for {cwd || '…'}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {#if previewLoading}
+          <PageLoading message="Resolving commands…" />
+        {:else}
+          <div class="space-y-2">
+            {#each previewSteps as step, i}
+              <div class="rounded-md border bg-muted/20 p-3">
+                <p class="mb-1 text-sm font-medium">
+                  {i + 1}. {step.name}
+                </p>
+                <code class="block text-xs break-all text-muted-foreground">
+                  {step.command}
+                </code>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </CardContent>
+    </Card>
+  {/if}
 
   <div class="grid gap-6 lg:grid-cols-2">
     <!-- Left: setup -->
@@ -460,34 +502,6 @@
       </Card>
     </div>
   </div>
-
-  <!-- Preview -->
-  {#if previewLoading || previewSteps.length > 0}
-    <Card>
-      <CardHeader>
-        <CardTitle class="text-lg">Preview</CardTitle>
-        <CardDescription>Resolved commands for {cwd || '…'}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {#if previewLoading}
-          <PageLoading message="Resolving commands…" />
-        {:else}
-          <div class="space-y-2">
-            {#each previewSteps as step, i}
-              <div class="rounded-md border bg-muted/20 p-3">
-                <p class="mb-1 text-sm font-medium">
-                  {i + 1}. {step.name}
-                </p>
-                <code class="block text-xs break-all text-muted-foreground">
-                  {step.command}
-                </code>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </CardContent>
-    </Card>
-  {/if}
 
   <!-- Results -->
   {#if runResult}

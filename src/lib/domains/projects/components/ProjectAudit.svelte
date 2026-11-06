@@ -15,17 +15,15 @@
   import { Progress } from '$lib/components/ui/progress';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import * as Tabs from '$lib/components/ui/tabs';
-  import {
-    FolderOpen,
-    RefreshCw,
-    ShieldAlert,
-    Copy,
-    ChevronRight,
-    ChevronDown,
-    HardDrive,
-    Download,
-    X,
-  } from '@lucide/svelte';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import ShieldAlert from '~icons/fa6-solid/shield-halved';
+  import Copy from '~icons/fa6-solid/copy';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import HardDrive from '~icons/fa6-solid/hard-drive';
+  import Download from '~icons/fa6-solid/download';
+  import X from '~icons/fa6-solid/xmark';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { save as saveDialog } from '@tauri-apps/plugin-dialog';
   import { onDestroy, onMount } from 'svelte';
@@ -488,7 +486,7 @@
           bind:value={newRootPath}
           aria-label="Folder path"
           aria-describedby="audit-root-hint"
-          placeholder="D:\\production"
+          placeholder={'D:\\production'}
         />
         <Button variant="outline" onclick={addRoot} disabled={scanning}>Add folder</Button>
         <Button onclick={scan} disabled={scanning || !roots.length}>

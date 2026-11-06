@@ -18,7 +18,9 @@
     CardTitle,
   } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import { X, Play, Square } from '@lucide/svelte';
+  import X from '~icons/fa6-solid/xmark';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
   import {
     CustomScriptService,
     type CustomScript,

@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { Box } from '@lucide/svelte';
+  import Box from '~icons/fa6-solid/box';
   import type { ProjectModule } from '$lib/domains/projects/types';
   import { stackIcon, stackLabel } from '$lib/domains/projects/utils/moduleStacks';
 

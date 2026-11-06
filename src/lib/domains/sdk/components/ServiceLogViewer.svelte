@@ -18,18 +18,16 @@
   import { Input } from '$lib/components/ui/input';
   import Select from '$lib/components/ui/select.svelte';
   import { ScrollArea } from '$lib/components/ui/scroll-area';
-  import {
-    Download,
-    Trash2,
-    Search,
-    Filter,
-    Play,
-    Square,
-    AlertCircle,
-    Info,
-    AlertTriangle,
-    X,
-  } from '@lucide/svelte';
+  import Download from '~icons/fa6-solid/download';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Filter from '~icons/fa6-solid/filter';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import Info from '~icons/fa6-solid/circle-info';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
+  import X from '~icons/fa6-solid/xmark';
 
   interface LogEntry {
     timestamp: string;

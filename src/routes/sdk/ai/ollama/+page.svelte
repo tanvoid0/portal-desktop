@@ -18,8 +18,6 @@
   } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import { Label } from '$lib/components/ui/label';
-  import { Textarea } from '$lib/components/ui/textarea';
   import { logger } from '$lib/domains/shared';
   import { toast } from '$lib/utils/toast';
   import ModelList from '$lib/components/ModelList.svelte';
@@ -53,18 +51,6 @@
   let installingModel = $state<string | null>(null);
   let installationProgress = $state(0);
   let installationStatus = $state<string>('');
-
-  // Configuration management
-  let configContent = $state<string>('');
-  let configLoading = $state(false);
-  let configError = $state<string | null>(null);
-  let configPath = $state<string>('');
-
-  // Log management
-  let logsContent = $state<string>('');
-  let logsLoading = $state(false);
-  let logsError = $state<string | null>(null);
-  let logPath = $state<string>('');
 
   onMount(async () => {
     await loadServiceInfo();
@@ -101,10 +87,6 @@
       } else {
         void loadAvailableModels();
       }
-    } else if (tab === 'configuration') {
-      if (!configContent) void loadConfiguration();
-    } else if (tab === 'log') {
-      void loadLogs();
     }
   }
 
@@ -157,7 +139,8 @@
 
       // Get real installed Ollama models
       const modelsData = (await ollamaApi.getModels()) as any[];
-      models = modelsData;
+      // Backend reports family "Unknown" when /api/tags omits it; don't show it as a badge
+      models = modelsData.map((m) => (m.family === 'Unknown' ? { ...m, family: undefined } : m));
 
       log.info('Ollama models loaded', { count: modelsData.length });
     } catch (error) {
@@ -503,119 +486,6 @@
     }
   }
 
-  async function loadConfiguration() {
-    try {
-      configLoading = true;
-      configError = null;
-
-      // Note: Config file management will be implemented in backend
-      // For now, show placeholder with default config
-      configPath = 'ollama/ollama.conf';
-      configContent =
-        'OLLAMA_HOST=0.0.0.0:11434\nOLLAMA_KEEP_ALIVE=5m\nOLLAMA_DEBUG=false\n\n# Add custom environment variables here\n# OLLAMA_MAX_LOADED_MODELS=3\n# OLLAMA_NUM_PARALLEL=2';
-
-      log.info('Configuration loaded');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load configuration';
-      configError = errorMessage;
-      log.error('Failed to load configuration', error);
-      toast.error('Failed to Load Configuration', errorMessage);
-    } finally {
-      configLoading = false;
-    }
-  }
-
-  async function saveConfiguration() {
-    try {
-      configLoading = true;
-      configError = null;
-
-      // Note: Config file writing will be implemented in backend
-      // For now, show a message that this is not yet implemented
-      log.info('Configuration save requested');
-      toast.info(
-        'Configuration Save',
-        'Config file management is being implemented. Changes are not yet persisted.'
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save configuration';
-      configError = errorMessage;
-      log.error('Failed to save configuration', error);
-      toast.error('Failed to Save Configuration', errorMessage);
-    } finally {
-      configLoading = false;
-    }
-  }
-
-  async function resetConfiguration() {
-    try {
-      configContent = 'OLLAMA_HOST=0.0.0.0:11434\nOLLAMA_KEEP_ALIVE=5m\nOLLAMA_DEBUG=false';
-      toast.success('Configuration Reset', 'Configuration has been reset to default values');
-    } catch (error) {
-      log.error('Failed to reset configuration', error);
-    }
-  }
-
-  async function loadLogs() {
-    try {
-      logsLoading = true;
-      logsError = null;
-
-      // Note: Log file reading will be implemented in backend
-      // For now, show a placeholder message
-      logPath = serviceInfo?.logPath || 'ollama/ollama.log';
-
-      if (serviceInfo?.running) {
-        logsContent = `[${new Date().toISOString()}] Ollama service is running.\n[Note] Real-time log viewing will be implemented soon.\n\nTo view Ollama logs, check the console output or log files in the Ollama installation directory.`;
-      } else {
-        logsContent = 'No logs available. Start the Ollama service to see logs.';
-      }
-
-      log.info('Logs loaded');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load logs';
-      logsError = errorMessage;
-      log.error('Failed to load logs', error);
-      toast.error('Failed to Load Logs', errorMessage);
-    } finally {
-      logsLoading = false;
-    }
-  }
-
-  async function clearLogs() {
-    try {
-      logsContent = '';
-      toast.success('Logs Cleared', 'Log display has been cleared');
-    } catch (error) {
-      log.error('Failed to clear logs', error);
-    }
-  }
-
-  async function downloadLogs() {
-    try {
-      if (!logsContent) {
-        toast.warning('No Logs', 'No logs available to download');
-        return;
-      }
-
-      // Create a download link
-      const blob = new Blob([logsContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ollama-logs-${new Date().toISOString().split('T')[0]}.log`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success('Logs Downloaded', 'Logs have been downloaded successfully');
-    } catch (error) {
-      log.error('Failed to download logs', error);
-      toast.error('Download Failed', 'Failed to download logs');
-    }
-  }
-
   function setActiveTab(tab: OllamaTab) {
     goto(buildTabUrl(page.url.pathname, page.url.searchParams, tab), {
       replaceState: true,
@@ -725,7 +595,7 @@
                 </p>
               </div>
 
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 {#if serviceInfo?.running}
                   <Button variant="destructive" onclick={stopService}>Stop Service</Button>
                 {:else}
@@ -795,7 +665,7 @@
                       <div class="text-sm text-muted-foreground">
                         Version {version.version}
                       </div>
-                      {#if version.size}
+                      {#if version.size && version.size !== '0.0 MB'}
                         <div class="text-sm text-muted-foreground">
                           {version.size}
                         </div>
@@ -967,145 +837,42 @@
       </Card>
     </TabsContent>
 
-    <!-- Configuration Tab -->
+    <!-- Configuration Tab: no backend command for the Ollama config file yet -->
     <TabsContent value="configuration" class="mt-6">
       <Card>
         <CardHeader>
-          <div class="flex items-center justify-between">
-            <div>
-              <CardTitle>Configuration</CardTitle>
-              <CardDescription>Configure Ollama settings</CardDescription>
-            </div>
-            <Button variant="outline" onclick={loadConfiguration} disabled={configLoading}>
-              <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh
-            </Button>
-          </div>
+          <CardTitle>Configuration</CardTitle>
+          <CardDescription>Configure Ollama settings</CardDescription>
         </CardHeader>
-        <CardContent>
-          {#if configLoading}
-            <div class="flex items-center justify-center p-8">
-              <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-              <span class="ml-2">Loading configuration...</span>
-            </div>
-          {:else if configError}
-            <div class="p-8 text-center">
-              <p class="text-destructive">Error: {configError}</p>
-              <Button onclick={loadConfiguration} class="mt-4">Retry</Button>
-            </div>
-          {:else}
-            <div class="space-y-4">
-              {#if configPath}
-                <div class="text-sm text-muted-foreground">
-                  Config file: <code class="rounded bg-muted px-2 py-1">{configPath}</code>
-                </div>
-              {/if}
-              <div>
-                <Label for="config-content" class="mb-2 block">Configuration File Content</Label>
-                <Textarea
-                  id="config-content"
-                  class="h-64 font-mono text-sm"
-                  bind:value={configContent}
-                  placeholder="OLLAMA_HOST=0.0.0.0:11434&#10;OLLAMA_KEEP_ALIVE=5m&#10;OLLAMA_DEBUG=false"
-                />
-              </div>
-              <div class="flex gap-2">
-                <Button onclick={saveConfiguration}>Save Configuration</Button>
-                <Button variant="outline" onclick={resetConfiguration}>Reset to Default</Button>
-              </div>
-              <div class="text-sm text-muted-foreground">
-                <p class="mb-2 font-medium">Available Settings:</p>
-                <ul class="list-inside list-disc space-y-1 text-xs">
-                  <li>
-                    <code>OLLAMA_HOST</code> - Host and port (default: 0.0.0.0:11434)
-                  </li>
-                  <li>
-                    <code>OLLAMA_KEEP_ALIVE</code> - Keep models in memory duration (default: 5m)
-                  </li>
-                  <li><code>OLLAMA_DEBUG</code> - Enable debug logging</li>
-                  <li>
-                    <code>OLLAMA_MAX_LOADED_MODELS</code> - Maximum number of loaded models
-                  </li>
-                  <li>
-                    <code>OLLAMA_NUM_PARALLEL</code> - Number of parallel requests
-                  </li>
-                </ul>
-              </div>
-            </div>
-          {/if}
+        <CardContent class="space-y-4">
+          <p class="text-sm text-muted-foreground">
+            Reading and editing the Ollama config file is not available yet.
+          </p>
+          <div class="text-sm text-muted-foreground">
+            <p class="mb-2 font-medium">Available Settings:</p>
+            <ul class="list-inside list-disc space-y-1 text-xs">
+              <li><code>OLLAMA_HOST</code> - Host and port (default: 0.0.0.0:11434)</li>
+              <li>
+                <code>OLLAMA_KEEP_ALIVE</code> - Keep models in memory duration (default: 5m)
+              </li>
+              <li><code>OLLAMA_DEBUG</code> - Enable debug logging</li>
+              <li><code>OLLAMA_MAX_LOADED_MODELS</code> - Maximum number of loaded models</li>
+              <li><code>OLLAMA_NUM_PARALLEL</code> - Number of parallel requests</li>
+            </ul>
+          </div>
         </CardContent>
       </Card>
     </TabsContent>
 
-    <!-- Log Tab -->
+    <!-- Log Tab: no backend command for Ollama logs yet -->
     <TabsContent value="log" class="mt-6">
       <Card>
         <CardHeader>
-          <div class="flex items-center justify-between">
-            <div>
-              <CardTitle>Service Logs</CardTitle>
-              <CardDescription>View Ollama service logs</CardDescription>
-            </div>
-            <Button variant="outline" onclick={loadLogs} disabled={logsLoading}>
-              <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh
-            </Button>
-          </div>
+          <CardTitle>Service Logs</CardTitle>
+          <CardDescription>View Ollama service logs</CardDescription>
         </CardHeader>
         <CardContent>
-          {#if logsLoading}
-            <div class="flex items-center justify-center p-8">
-              <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-              <span class="ml-2">Loading logs...</span>
-            </div>
-          {:else if logsError}
-            <div class="p-8 text-center">
-              <p class="text-destructive">Error: {logsError}</p>
-              <Button onclick={loadLogs} class="mt-4">Retry</Button>
-            </div>
-          {:else}
-            <div class="space-y-4">
-              {#if logPath}
-                <div class="text-sm text-muted-foreground">
-                  Log file: <code class="rounded bg-muted px-2 py-1">{logPath}</code>
-                </div>
-              {/if}
-              <div class="rounded-md border bg-muted/50 p-4">
-                <div class="mb-2 flex items-center justify-between">
-                  <span class="text-sm font-medium">Log Output</span>
-                  <div class="flex gap-2">
-                    <Button size="sm" variant="outline" onclick={clearLogs}>Clear</Button>
-                    <Button size="sm" variant="outline" onclick={downloadLogs}>Download</Button>
-                  </div>
-                </div>
-                <div
-                  class="max-h-96 overflow-auto rounded border bg-background p-3 font-mono text-xs"
-                >
-                  {#if logsContent}
-                    <pre class="whitespace-pre-wrap">{logsContent}</pre>
-                  {:else}
-                    <p class="text-muted-foreground">
-                      No logs available. Start the service to see logs.
-                    </p>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          {/if}
+          <p class="text-sm text-muted-foreground">Log viewing is not available yet.</p>
         </CardContent>
       </Card>
     </TabsContent>

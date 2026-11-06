@@ -10,7 +10,8 @@
   import { Button } from '$lib/components/ui/button';
   import type { Deployment } from '../types';
   import { DeploymentStatus, DeploymentType } from '../types';
-  import { Container, Terminal } from '@lucide/svelte';
+  import Container from '~icons/fa6-solid/cube';
+  import Terminal from '~icons/fa6-solid/terminal';
   import { openExternalUrl } from '$lib/utils/tauri';
 
   interface Props {

@@ -16,18 +16,16 @@
     DialogHeader,
     DialogTitle,
   } from '$lib/components/ui/dialog';
-  import {
-    Search,
-    RefreshCw,
-    Download,
-    Trash2,
-    ArrowUp,
-    Package as PackageIcon,
-    CheckCircle,
-    XCircle,
-    Info,
-    Loader2,
-  } from '@lucide/svelte';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Download from '~icons/fa6-solid/download';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import ArrowUp from '~icons/fa6-solid/arrow-up';
+  import PackageIcon from '~icons/fa6-solid/box-open';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Info from '~icons/fa6-solid/circle-info';
+  import Loader2 from '~icons/fa6-solid/spinner';
   import Select from '$lib/components/ui/select.svelte';
   import {
     getAvailablePackageManagers,

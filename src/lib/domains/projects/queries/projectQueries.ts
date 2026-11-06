@@ -1,6 +1,7 @@
 import { createQuery } from '@tanstack/svelte-query';
 import { queryKeys } from '$lib/domains/shared/query/keys';
 import { fetchAllProjects, fetchProjectById } from '../api/projectApi';
+import { findUnavailableProjects } from '../api/discoveryApi';
 
 export function createProjectsQuery() {
   return createQuery(() => ({
@@ -21,4 +22,12 @@ export function createProjectQuery(projectId: () => string | null | undefined) {
       enabled,
     };
   });
+}
+
+/** Projects whose folder no longer exists. Walks the audit roots, so it rides the default stale time. */
+export function createUnavailableProjectsQuery() {
+  return createQuery(() => ({
+    queryKey: queryKeys.projects.unavailable,
+    queryFn: findUnavailableProjects,
+  }));
 }

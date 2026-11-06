@@ -11,7 +11,13 @@
   import Select from '$lib/components/ui/select.svelte';
   import { Label } from '$lib/components/ui/label';
   import { Progress } from '$lib/components/ui/progress';
-  import { Power, Settings, Logs, ExternalLink, RefreshCw, Activity, X } from '@lucide/svelte';
+  import Power from '~icons/fa6-solid/power-off';
+  import Settings from '~icons/fa6-solid/gear';
+  import Logs from '~icons/fa6-solid/list';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Activity from '~icons/fa6-solid/wave-square';
+  import X from '~icons/fa6-solid/xmark';
   import ServiceLogViewer from './ServiceLogViewer.svelte';
   import ServiceConfigEditor from './ServiceConfigEditor.svelte';
   import ServiceHealthIndicator from './ServiceHealthIndicator.svelte';

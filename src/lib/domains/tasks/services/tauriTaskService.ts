@@ -234,7 +234,7 @@ export class TauriTaskService {
 
   async getSubtasks(parentId: string): Promise<Task[]> {
     const response = await invokeClient.post<TauriTaskResponse[]>('get_subtasks', {
-      parent_id: parseInt(parentId),
+      parentId: parseInt(parentId),
     });
     if (!response || !Array.isArray(response)) return [];
     return response.map(convertTauriTaskToTask);

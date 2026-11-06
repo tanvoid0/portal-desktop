@@ -1,128 +1,37 @@
 <!--
 	SDK Services Page
-	Shows running SDK services and allows management
+	Lists SDKs that run as services, from the same shared query as the sidebar and overview.
 -->
 
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { invoke } from '@tauri-apps/api/core';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { goto } from '$app/navigation';
+  import { Card, CardContent } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { Play, Square, Settings, ExternalLink, AlertCircle } from '@lucide/svelte';
+  import { PageLoading, PageError } from '$lib/components/shell';
+  import { sdkConfigsQuery } from '$lib/domains/sdk/queries/sdkQueries';
+  import { queryKeys } from '$lib/domains/shared/query/keys';
+  import { toast } from '$lib/utils/toast';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
 
-  // State
-  let loading = $state(true);
-  let error = $state<string | null>(null);
-  let services = $state<any[]>([]);
+  const queryClient = useQueryClient();
+  const configsQuery = createQuery(sdkConfigsQuery);
+  const services = $derived((configsQuery.data ?? []).filter((c) => c.service_running != null));
+  let busy = $state<string | null>(null);
 
-  // Initialize data
-  onMount(async () => {
-    await loadServices();
-  });
-
-  async function loadServices() {
-    loading = true;
-    error = null;
-
+  async function toggleService(id: string, running: boolean) {
+    busy = id;
     try {
-      // Load available SDKs
-      const availableSDKs = await invoke<any[]>('get_all_available_sdks');
-
-      // Load service status for each SDK type
-      const servicePromises = availableSDKs.map(async (sdk: any) => {
-        try {
-          // Ensure we have a valid sdkType
-          const sdkType = sdk.id || sdk.name || sdk.type;
-          if (!sdkType) {
-            console.warn('Skipping SDK without valid id/name/type:', sdk);
-            return {
-              ...sdk,
-              services: [],
-            };
-          }
-
-          const serviceStatus = await invoke('get_service_status', { sdkType });
-          return {
-            ...sdk,
-            services: serviceStatus || [],
-          };
-        } catch (err) {
-          console.warn('Failed to load service status for SDK:', sdk, err);
-          return {
-            ...sdk,
-            services: [],
-          };
-        }
-      });
-
-      const sdkWithServices = await Promise.all(servicePromises);
-
-      // Flatten services from all SDKs
-      services = sdkWithServices.flatMap((sdk: any) => {
-        const sdkServices = Array.isArray(sdk.services) ? sdk.services : [];
-        return sdkServices.map((service: any) => ({
-          ...service,
-          sdkType: sdk.id || sdk.name || sdk.type,
-          sdkName: sdk.name || sdk.title || 'Unknown SDK',
-        }));
-      });
+      await invoke(running ? 'stop_service' : 'start_service', { sdkType: id });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.sdk.configs });
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load SDK services';
-      console.error('Failed to load SDK services:', err);
+      toast.error('Service action failed', err instanceof Error ? err.message : String(err));
     } finally {
-      loading = false;
-    }
-  }
-
-  async function toggleService(service: any) {
-    try {
-      if (service.status === 'running') {
-        // Stop service
-        service.status = 'stopping';
-        await invoke('stop_sdk_service', {
-          sdkType: service.sdkType,
-          pid: service.pid,
-        });
-        service.status = 'stopped';
-        service.pid = null;
-      } else {
-        // Start service
-        service.status = 'starting';
-        const config = {
-          port: service.port,
-          host: 'localhost',
-          data_dir: null,
-          config_file: null,
-          environment: {},
-        };
-        const pid = await invoke('start_sdk_service', {
-          sdkType: service.sdkType,
-          version: service.version,
-          config,
-        });
-        service.status = 'running';
-        service.pid = pid;
-      }
-    } catch (err) {
-      service.status = 'error';
-      error = err instanceof Error ? err.message : 'Failed to toggle service';
-    }
-  }
-
-  async function configureService(service: any) {
-    // FUTURE: Open configuration dialog for service settings
-    console.log('Configure service:', service.id);
-  }
-
-  async function viewServiceLogs(service: any) {
-    // FUTURE: Open log viewer with service logs
-    console.log('View logs for:', service.id);
-  }
-
-  async function openServiceUrl(service: any) {
-    if (service.port) {
-      window.open(`http://localhost:${service.port}`, '_blank');
+      busy = null;
     }
   }
 </script>
@@ -132,112 +41,90 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <!-- Header -->
   <div class="flex items-center gap-4">
     <div class="flex-1">
       <h1 class="text-3xl font-bold">SDK Services</h1>
-      <p class="text-muted-foreground">Manage running SDK services and their configurations</p>
+      <p class="text-muted-foreground">Manage running SDK services</p>
     </div>
-    <div class="flex items-center gap-2">
-      <Button variant="outline" onclick={loadServices} disabled={loading}>Refresh</Button>
-    </div>
+    <Button
+      variant="outline"
+      onclick={() => configsQuery.refetch()}
+      disabled={configsQuery.isFetching}
+    >
+      Refresh
+    </Button>
   </div>
 
-  <!-- Error Alert -->
-  {#if error}
-    <div class="rounded-md border border-red-200 bg-red-50 p-4">
-      <p class="text-sm text-red-600">{error}</p>
-    </div>
-  {/if}
-
-  <!-- Services List -->
-  <div class="space-y-4">
-    {#each services as service}
-      <Card>
-        <CardContent class="p-6">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <div class="flex items-center gap-2">
-                <h3 class="text-lg font-semibold">{service.sdkName}</h3>
-                <Badge variant="outline">{service.version}</Badge>
-                {#if service.status === 'running'}
-                  <Badge variant="default" class="bg-green-100 text-green-800">
-                    <Play class="mr-1 h-3 w-3" />
-                    Running
-                  </Badge>
-                {:else if service.status === 'stopped'}
-                  <Badge variant="outline" class="text-gray-500">
-                    <Square class="mr-1 h-3 w-3" />
-                    Stopped
-                  </Badge>
-                {:else if service.status === 'error'}
-                  <Badge variant="destructive">
-                    <AlertCircle class="mr-1 h-3 w-3" />
-                    Error
-                  </Badge>
-                {/if}
-              </div>
-              {#if service.port}
-                <div class="text-sm text-muted-foreground">
-                  Port: {service.port}
-                </div>
+  {#if configsQuery.isPending}
+    <PageLoading message="Loading SDK services..." />
+  {:else if configsQuery.isError}
+    <PageError
+      title="Failed to load SDK services"
+      message={configsQuery.error instanceof Error
+        ? configsQuery.error.message
+        : String(configsQuery.error)}
+      onRetry={() => configsQuery.refetch()}
+    />
+  {:else if services.length === 0}
+    <Card>
+      <CardContent class="p-6 text-center">
+        <p class="text-muted-foreground">No SDK services found</p>
+      </CardContent>
+    </Card>
+  {:else}
+    <div class="space-y-3">
+      {#each services as c (c.id)}
+        <Card>
+          <CardContent class="flex flex-wrap items-center justify-between gap-4 p-4">
+            <div class="flex min-w-0 items-center gap-3">
+              <h3 class="text-lg font-semibold">{c.display_name}</h3>
+              {#if c.service_running}
+                <Badge variant="default" class="bg-green-100 text-green-800">
+                  <Play class="mr-1 h-3 w-3" />
+                  Running
+                </Badge>
+              {:else}
+                <Badge variant="outline" class="text-gray-500">
+                  <Square class="mr-1 h-3 w-3" />
+                  Stopped
+                </Badge>
+              {/if}
+              {#if c.service_port}
+                <span class="text-sm text-muted-foreground">Port: {c.service_port}</span>
               {/if}
             </div>
-
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
               <Button
-                variant={service.status === 'running' ? 'outline' : 'default'}
+                variant={c.service_running ? 'outline' : 'default'}
                 size="sm"
-                onclick={() => toggleService(service)}
-                disabled={service.status === 'starting' || service.status === 'stopping'}
+                disabled={busy === c.id}
+                onclick={() => toggleService(c.id, !!c.service_running)}
               >
-                {#if service.status === 'running'}
+                {#if c.service_running}
                   <Square class="mr-1 h-4 w-4" />
                   Stop
-                {:else if service.status === 'starting'}
-                  Starting...
-                {:else if service.status === 'stopping'}
-                  Stopping...
                 {:else}
                   <Play class="mr-1 h-4 w-4" />
                   Start
                 {/if}
               </Button>
-
-              {#if service.status === 'running' && service.port}
-                <Button variant="outline" size="sm" onclick={() => openServiceUrl(service)}>
+              {#if c.service_running && c.service_port}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onclick={() => window.open(`http://localhost:${c.service_port}`, '_blank')}
+                >
                   <ExternalLink class="mr-1 h-4 w-4" />
                   Open
                 </Button>
               {/if}
-
-              <Button variant="outline" size="sm" onclick={() => configureService(service)}>
-                <Settings class="mr-1 h-4 w-4" />
-                Configure
-              </Button>
-
-              <Button variant="outline" size="sm" onclick={() => viewServiceLogs(service)}>
-                View Logs
+              <Button variant="outline" size="sm" onclick={() => goto(`/sdk/${c.id}`)}>
+                Manage
               </Button>
             </div>
-          </div>
-
-          {#if service.pid}
-            <p class="mt-2 text-sm text-muted-foreground">PID: {service.pid}</p>
-          {/if}
-        </CardContent>
-      </Card>
-    {/each}
-
-    {#if services.length === 0}
-      <Card>
-        <CardContent class="p-6 text-center">
-          <p class="text-muted-foreground">No SDK services found</p>
-          <p class="mt-1 text-sm text-muted-foreground">
-            Install and configure SDKs to see their services here
-          </p>
-        </CardContent>
-      </Card>
-    {/if}
-  </div>
+          </CardContent>
+        </Card>
+      {/each}
+    </div>
+  {/if}
 </div>

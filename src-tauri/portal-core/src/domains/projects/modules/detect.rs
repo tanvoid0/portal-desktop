@@ -15,7 +15,7 @@ use std::path::Path;
 const MAX_DEPTH: usize = 3;
 const MAX_MODULES: usize = 200;
 
-const SKIP_DIRS: &[&str] = &[
+pub(crate) const SKIP_DIRS: &[&str] = &[
     "node_modules",
     "target",
     "build",
@@ -196,27 +196,10 @@ pub fn framework_name(stack: &str) -> Option<&'static str> {
         "nextjs" => "Next.js",
         "sveltekit" | "svelte" => "Svelte",
         "nuxt" => "Nuxt",
-        "vue" => "Vue.js",
+        "vue" => "Vue",
         "react" => "React",
         "angular" => "Angular",
         "tauri" => "Tauri",
-        _ => return None,
-    })
-}
-
-/// The language this stack is written in, by its `languages` table name.
-pub fn language_name(stack: &str) -> Option<&'static str> {
-    Some(match stack {
-        "flutter" | "dart" => "Dart",
-        "android" | "gradle" => "Kotlin",
-        "nestjs" | "nextjs" | "sveltekit" | "svelte" | "nuxt" | "vue" | "react" | "angular"
-        | "node" | "tauri" => "TypeScript",
-        "rust" => "Rust",
-        "go" => "Go",
-        "python" => "Python",
-        "java" => "Java",
-        "php" => "PHP",
-        "ruby" => "Ruby",
         _ => return None,
     })
 }

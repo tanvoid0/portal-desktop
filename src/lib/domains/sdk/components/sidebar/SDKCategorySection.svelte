@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
   import { MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
   import { Button } from '$lib/components/ui/button';
   import SDKSidebarItem from './SDKSidebarItem.svelte';

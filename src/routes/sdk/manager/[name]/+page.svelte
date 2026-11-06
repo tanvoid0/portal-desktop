@@ -10,15 +10,13 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import {
-    CheckCircle,
-    XCircle,
-    Download,
-    ExternalLink,
-    RefreshCw,
-    Play,
-    Trash2,
-  } from '@lucide/svelte';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Download from '~icons/fa6-solid/download';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Play from '~icons/fa6-solid/play';
+  import Trash2 from '~icons/fa6-solid/trash';
   import Devicon from '$lib/components/ui/devicon.svelte';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Input } from '$lib/components/ui/input';

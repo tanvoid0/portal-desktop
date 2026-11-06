@@ -2,7 +2,9 @@
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
   import ChatUserBubble from '$lib/domains/ai/components/chat/ChatUserBubble.svelte';
-  import { Undo2, Check, X } from '@lucide/svelte';
+  import Undo2 from '~icons/fa6-solid/rotate-left';
+  import Check from '~icons/fa6-solid/check';
+  import X from '~icons/fa6-solid/xmark';
   import type { ChatMessage } from '../types.js';
 
   interface Props {

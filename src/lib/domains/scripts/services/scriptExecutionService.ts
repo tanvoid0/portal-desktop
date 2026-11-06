@@ -108,6 +108,19 @@ class ScriptExecutionService {
   }
 
   /**
+   * Record a run done in the interactive terminal so it shows in History
+   */
+  async recordInteractive(params: {
+    blockId?: string;
+    command: string;
+    workingDirectory?: string;
+    exitCode: number | null;
+    startedAt?: string;
+  }): Promise<void> {
+    await invokeClient.post('record_interactive_execution', params);
+  }
+
+  /**
    * Cancel a running execution
    */
   async cancelExecution(executionId: string): Promise<void> {

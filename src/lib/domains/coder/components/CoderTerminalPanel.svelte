@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { Plus, X, Terminal as TerminalIcon } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import X from '~icons/fa6-solid/xmark';
+  import TerminalIcon from '~icons/fa6-solid/terminal';
   import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
   import CoderSessionTerminal from './CoderSessionTerminal.svelte';

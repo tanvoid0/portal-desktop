@@ -20,25 +20,26 @@
   import { autonomyService, type AutonomyLevel, type ApprovalStats } from '$lib/domains/autonomy';
   import { logger } from '$lib/domains/shared/services/logger';
   import { toast } from '$lib/utils/toast';
-  import {
-    Bot,
-    Shield,
-    CheckCircle2,
-    XCircle,
-    Eye,
-    AlertCircle,
-    TrendingUp,
-    RefreshCw,
-    Activity,
-    Zap,
-    Settings,
-  } from '@lucide/svelte';
+  import { PageError } from '$lib/components/shell';
+  import Bot from '~icons/fa6-solid/robot';
+  import Shield from '~icons/fa6-solid/shield';
+  import CheckCircle2 from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Eye from '~icons/fa6-solid/eye';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import TrendingUp from '~icons/fa6-solid/arrow-trend-up';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Activity from '~icons/fa6-solid/wave-square';
+  import Zap from '~icons/fa6-solid/bolt';
+  import Settings from '~icons/fa6-solid/gear';
 
   const log = logger.createScoped('AutonomySettings');
 
   let autonomyEnabled = $state(false);
   let autonomyLevel = $state<AutonomyLevel | null>(null);
   let approvalStats = $state<ApprovalStats | null>(null);
+  let loadError = $state<string | null>(null);
+  let statsError = $state<string | null>(null);
   let isLoading = $state(false);
   let isRefreshing = $state(false);
 
@@ -85,9 +86,13 @@
   };
 
   onMount(async () => {
-    await loadSettings();
-    await loadStats();
+    await load();
   });
+
+  async function load() {
+    await loadSettings();
+    if (!loadError) await loadStats();
+  }
 
   async function loadSettings() {
     isLoading = true;
@@ -96,10 +101,11 @@
         autonomyService.getEnabled(),
         autonomyService.getLevel(),
       ]);
+      loadError = null;
       log.info('Autonomy settings loaded', { autonomyEnabled, autonomyLevel });
     } catch (error) {
       log.error('Failed to load autonomy settings', error);
-      toast.error('Failed to load autonomy settings');
+      loadError = error instanceof Error ? error.message : String(error);
     } finally {
       isLoading = false;
     }
@@ -108,13 +114,16 @@
   async function loadStats() {
     try {
       approvalStats = await autonomyService.getApprovalStats();
+      statsError = null;
       log.info('Approval stats loaded');
     } catch (error) {
       log.error('Failed to load approval stats', error);
+      statsError = error instanceof Error ? error.message : String(error);
     }
   }
 
-  async function handleToggleEnabled() {
+  async function handleToggleEnabled(enabled: boolean) {
+    autonomyEnabled = enabled;
     try {
       await autonomyService.setEnabled(autonomyEnabled);
       toast.success(`Autonomy ${autonomyEnabled ? 'enabled' : 'disabled'}`);
@@ -159,209 +168,218 @@
   }
 </script>
 
-<div class="space-y-6">
-  <!-- Status Card -->
-  <Card>
-    <CardHeader>
-      <CardTitle class="flex items-center gap-2">
-        <Bot class="h-5 w-5" />
-        Autonomous Action System
-      </CardTitle>
-      <CardDescription>
-        Control how the system autonomously executes actions based on learned patterns
-      </CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <Label for="autonomy-enabled" class="text-base font-medium">Autonomy Enabled</Label>
-          {#if autonomyEnabled}
-            <Badge variant="default" class="bg-green-500">
-              <CheckCircle2 class="mr-1 h-3 w-3" />
-              Active
-            </Badge>
-          {:else}
-            <Badge variant="secondary">
-              <XCircle class="mr-1 h-3 w-3" />
-              Disabled
-            </Badge>
-          {/if}
-        </div>
-        <Switch
-          id="autonomy-enabled"
-          checked={autonomyEnabled}
-          onCheckedChange={handleToggleEnabled}
-          disabled={isLoading}
-        />
-      </div>
-
-      <Separator />
-
-      <div class="space-y-2">
-        <Label>Current Autonomy Level</Label>
-        {#if autonomyLevel === null}
-          <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
-        {:else}
-          {#each levelOptions as option}
-            {#if option.value === autonomyLevel}
-              {@const Icon = option.icon}
-              <div class="flex items-center gap-2 rounded-md border bg-muted/50 p-3">
-                <Icon class="h-5 w-5 {option.color}" />
-                <div class="flex-1">
-                  <div class="font-medium">{option.label}</div>
-                  <div class="text-sm text-muted-foreground">
-                    {option.description}
-                  </div>
-                </div>
-              </div>
+{#if loadError}
+  <PageError title="Autonomy settings unavailable" message={loadError} onRetry={load} />
+{:else}
+  <div class="space-y-6">
+    <!-- Status Card -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Bot class="h-5 w-5" />
+          Autonomous Action System
+        </CardTitle>
+        <CardDescription>
+          Control how the system autonomously executes actions based on learned patterns
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <Label for="autonomy-enabled" class="text-base font-medium">Autonomy Enabled</Label>
+            {#if autonomyEnabled}
+              <Badge variant="default" class="bg-green-500">
+                <CheckCircle2 class="mr-1 h-3 w-3" />
+                Active
+              </Badge>
+            {:else}
+              <Badge variant="secondary">
+                <XCircle class="mr-1 h-3 w-3" />
+                Disabled
+              </Badge>
             {/if}
-          {/each}
-        {/if}
-      </div>
-    </CardContent>
-  </Card>
-
-  <!-- Autonomy Level Control -->
-  <Card>
-    <CardHeader>
-      <CardTitle class="flex items-center gap-2">
-        <Settings class="h-5 w-5" />
-        Autonomy Level
-      </CardTitle>
-      <CardDescription>
-        Choose how aggressively the system executes autonomous actions
-      </CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-4">
-      <div class="space-y-2">
-        <Label>Select Autonomy Level</Label>
-        {#if autonomyLevel !== null}
-          <Select
-            options={levelOptions.map((o) => ({
-              value: o.value,
-              label: `${o.label} - ${o.description}`,
-            }))}
-            defaultValue={autonomyLevel}
-            onSelect={(value) => value && handleLevelChange(value as AutonomyLevel)}
-            disabled={!autonomyEnabled || isLoading}
+          </div>
+          <Switch
+            id="autonomy-enabled"
+            checked={autonomyEnabled}
+            onCheckedChange={handleToggleEnabled}
+            disabled={isLoading}
           />
-        {:else}
-          <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
-        {/if}
-        {#if autonomyLevel !== null}
-          <div class="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-            {levelDescriptions[autonomyLevel]}
-          </div>
-        {/if}
-      </div>
-
-      {#if !autonomyEnabled}
-        <div class="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-          Enable autonomy above to adjust level settings.
-        </div>
-      {/if}
-
-      {#if autonomyLevel === 'aggressive'}
-        <div class="rounded-md border border-orange-500/20 bg-orange-500/10 p-3">
-          <div class="flex items-start gap-2">
-            <AlertCircle class="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-500" />
-            <div class="text-sm">
-              <strong class="text-orange-700 dark:text-orange-400">Warning:</strong>
-              <span class="text-orange-600 dark:text-orange-300">
-                {' '}Aggressive mode allows medium-risk actions to execute automatically. Monitor
-                the system closely and review approval statistics regularly.
-              </span>
-            </div>
-          </div>
-        </div>
-      {/if}
-    </CardContent>
-  </Card>
-
-  <!-- Approval Statistics -->
-  <Card>
-    <CardHeader>
-      <CardTitle class="flex items-center gap-2">
-        <TrendingUp class="h-5 w-5" />
-        Approval Statistics
-      </CardTitle>
-      <CardDescription>Track autonomous action approval rates and patterns</CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-4">
-      {#if approvalStats && Object.keys(approvalStats).length > 0}
-        <div class="space-y-3">
-          {#each Object.entries(approvalStats) as [actionType, stats]}
-            <div class="flex items-center justify-between rounded-md border p-3">
-              <div class="flex-1">
-                <div class="font-medium">{actionType}</div>
-                <div class="text-sm text-muted-foreground">
-                  {stats.approved} approved out of {stats.total} requests
-                </div>
-              </div>
-              <div class="text-right">
-                <div class="text-lg font-bold">
-                  {formatPercent(stats.approval_rate)}
-                </div>
-                <div class="text-xs text-muted-foreground">approval rate</div>
-              </div>
-            </div>
-          {/each}
         </div>
 
         <Separator />
 
-        <div class="flex justify-end">
-          <Button variant="ghost" size="sm" onclick={refreshStats} disabled={isRefreshing}>
-            <RefreshCw class="mr-2 h-4 w-4 {isRefreshing ? 'animate-spin' : ''}" />
-            Refresh Stats
-          </Button>
-        </div>
-      {:else}
-        <div class="py-8 text-center text-muted-foreground">
-          {#if isRefreshing}
-            Loading statistics...
+        <div class="space-y-2">
+          <Label>Current Autonomy Level</Label>
+          {#if autonomyLevel === null}
+            <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
           {:else}
-            <p>No approval statistics yet.</p>
-            <p class="mt-2 text-xs">
-              Statistics will appear here as autonomous actions are evaluated.
-            </p>
+            {#each levelOptions as option}
+              {#if option.value === autonomyLevel}
+                {@const Icon = option.icon}
+                <div class="flex items-center gap-2 rounded-md border bg-muted/50 p-3">
+                  <Icon class="h-5 w-5 {option.color}" />
+                  <div class="flex-1">
+                    <div class="font-medium">{option.label}</div>
+                    <div class="text-sm text-muted-foreground">
+                      {option.description}
+                    </div>
+                  </div>
+                </div>
+              {/if}
+            {/each}
           {/if}
         </div>
-      {/if}
-    </CardContent>
-  </Card>
+      </CardContent>
+    </Card>
 
-  <!-- Info Card -->
-  <Card>
-    <CardHeader>
-      <CardTitle class="flex items-center gap-2">
-        <Shield class="h-5 w-5" />
-        How Autonomy Works
-      </CardTitle>
-    </CardHeader>
-    <CardContent class="space-y-3 text-sm text-muted-foreground">
-      <p>
-        The autonomous action system learns from your workflow patterns and gradually increases its
-        autonomy based on successful actions.
-      </p>
-      <ul class="ml-2 list-inside list-disc space-y-1">
-        <li>
-          <strong>Safe actions:</strong> Read-only operations, suggestions, UI updates
-        </li>
-        <li>
-          <strong>Low-risk actions:</strong> Common commands like npm install, git status
-        </li>
-        <li>
-          <strong>Medium-risk actions:</strong> Configuration changes, file creation
-        </li>
-        <li>
-          <strong>High-risk actions:</strong> Always require approval (file deletion, system changes)
-        </li>
-      </ul>
-      <p class="pt-2">
-        The system tracks approval rates and success rates to determine when actions can be executed
-        autonomously. You can always review and adjust these settings.
-      </p>
-    </CardContent>
-  </Card>
-</div>
+    <!-- Autonomy Level Control -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Settings class="h-5 w-5" />
+          Autonomy Level
+        </CardTitle>
+        <CardDescription>
+          Choose how aggressively the system executes autonomous actions
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="space-y-2">
+          <Label>Select Autonomy Level</Label>
+          {#if autonomyLevel !== null}
+            <Select
+              options={levelOptions.map((o) => ({
+                value: o.value,
+                label: `${o.label} - ${o.description}`,
+              }))}
+              defaultValue={autonomyLevel}
+              onSelect={(value) => value && handleLevelChange(value as AutonomyLevel)}
+              disabled={!autonomyEnabled || isLoading}
+            />
+          {:else}
+            <div class="h-10 animate-pulse rounded-md border border-input bg-muted"></div>
+          {/if}
+          {#if autonomyLevel !== null}
+            <div class="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+              {levelDescriptions[autonomyLevel]}
+            </div>
+          {/if}
+        </div>
+
+        {#if !autonomyEnabled}
+          <div class="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+            Enable autonomy above to adjust level settings.
+          </div>
+        {/if}
+
+        {#if autonomyLevel === 'aggressive'}
+          <div class="rounded-md border border-orange-500/20 bg-orange-500/10 p-3">
+            <div class="flex items-start gap-2">
+              <AlertCircle class="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-500" />
+              <div class="text-sm">
+                <strong class="text-orange-700 dark:text-orange-400">Warning:</strong>
+                <span class="text-orange-600 dark:text-orange-300">
+                  {' '}Aggressive mode allows medium-risk actions to execute automatically. Monitor
+                  the system closely and review approval statistics regularly.
+                </span>
+              </div>
+            </div>
+          </div>
+        {/if}
+      </CardContent>
+    </Card>
+
+    <!-- Approval Statistics -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <TrendingUp class="h-5 w-5" />
+          Approval Statistics
+        </CardTitle>
+        <CardDescription>Track autonomous action approval rates and patterns</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        {#if approvalStats && Object.keys(approvalStats).length > 0}
+          <div class="space-y-3">
+            {#each Object.entries(approvalStats) as [actionType, stats]}
+              <div class="flex items-center justify-between rounded-md border p-3">
+                <div class="flex-1">
+                  <div class="font-medium">{actionType}</div>
+                  <div class="text-sm text-muted-foreground">
+                    {stats.approved} approved out of {stats.total} requests
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-lg font-bold">
+                    {formatPercent(stats.approval_rate)}
+                  </div>
+                  <div class="text-xs text-muted-foreground">approval rate</div>
+                </div>
+              </div>
+            {/each}
+          </div>
+
+          <Separator />
+
+          <div class="flex justify-end">
+            <Button variant="ghost" size="sm" onclick={refreshStats} disabled={isRefreshing}>
+              <RefreshCw class="mr-2 h-4 w-4 {isRefreshing ? 'animate-spin' : ''}" />
+              Refresh Stats
+            </Button>
+          </div>
+        {:else if statsError}
+          <div class="py-8 text-center text-sm text-destructive">
+            <p>Failed to load approval statistics: {statsError}</p>
+            <Button variant="ghost" size="sm" class="mt-2" onclick={refreshStats}>Retry</Button>
+          </div>
+        {:else}
+          <div class="py-8 text-center text-muted-foreground">
+            {#if isRefreshing}
+              Loading statistics...
+            {:else}
+              <p>No approval statistics yet.</p>
+              <p class="mt-2 text-xs">
+                Statistics will appear here as autonomous actions are evaluated.
+              </p>
+            {/if}
+          </div>
+        {/if}
+      </CardContent>
+    </Card>
+
+    <!-- Info Card -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Shield class="h-5 w-5" />
+          How Autonomy Works
+        </CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-3 text-sm text-muted-foreground">
+        <p>
+          The autonomous action system learns from your workflow patterns and gradually increases
+          its autonomy based on successful actions.
+        </p>
+        <ul class="ml-2 list-inside list-disc space-y-1">
+          <li>
+            <strong>Safe actions:</strong> Read-only operations, suggestions, UI updates
+          </li>
+          <li>
+            <strong>Low-risk actions:</strong> Common commands like npm install, git status
+          </li>
+          <li>
+            <strong>Medium-risk actions:</strong> Configuration changes, file creation
+          </li>
+          <li>
+            <strong>High-risk actions:</strong> Always require approval (file deletion, system changes)
+          </li>
+        </ul>
+        <p class="pt-2">
+          The system tracks approval rates and success rates to determine when actions can be
+          executed autonomously. You can always review and adjust these settings.
+        </p>
+      </CardContent>
+    </Card>
+  </div>
+{/if}

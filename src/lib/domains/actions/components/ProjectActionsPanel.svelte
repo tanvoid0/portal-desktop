@@ -11,7 +11,13 @@
   } from '$lib/components/ui/card';
   import { PageEmpty, PageLoading } from '$lib/components/shell';
   import { toast } from '$lib/utils/toast';
-  import { Play, RefreshCw, Workflow, Terminal, GitBranch, Layers, History } from '@lucide/svelte';
+  import Play from '~icons/fa6-solid/play';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Workflow from '~icons/fa6-solid/diagram-project';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import GitBranch from '~icons/fa6-solid/code-branch';
+  import Layers from '~icons/fa6-solid/layer-group';
+  import History from '~icons/fa6-solid/clock-rotate-left';
   import type { Project } from '$lib/domains/projects/types';
   import {
     actions,
@@ -29,6 +35,7 @@
   import {
     formatExecutionDuration,
     getExecutionStatusBadgeVariant,
+    getExecutionStatusBadgeClass,
     getExecutionStatusColor,
     getExecutionStatusIcon,
   } from '$lib/domains/projects/pipelines/utils/executionDisplay';
@@ -396,7 +403,7 @@
               </div>
               <Badge
                 variant={getExecutionStatusBadgeVariant(selectedExecution.status)}
-                class="gap-1"
+                class="gap-1 {getExecutionStatusBadgeClass(selectedExecution.status)}"
               >
                 <StatusIcon
                   class="h-3.5 w-3.5 {getExecutionStatusColor(selectedExecution.status)}"
@@ -550,7 +557,10 @@
                           execution.status
                         )}{execution.status === 'running' ? ' animate-spin' : ''}"
                       />
-                      <Badge variant={getExecutionStatusBadgeVariant(execution.status)}>
+                      <Badge
+                        variant={getExecutionStatusBadgeVariant(execution.status)}
+                        class={getExecutionStatusBadgeClass(execution.status)}
+                      >
                         {execution.status}
                       </Badge>
                       <span class="truncate text-sm font-medium">

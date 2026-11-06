@@ -16,7 +16,8 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Input } from '$lib/components/ui/input';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import { Square, X } from '@lucide/svelte';
+  import Square from '~icons/fa6-solid/square';
+  import X from '~icons/fa6-solid/xmark';
   import { useRunningScripts, type RunningScript } from '../../hooks/useRunningScripts';
   import { TerminalService, type TerminalOutput } from '$lib/domains/terminal';
 

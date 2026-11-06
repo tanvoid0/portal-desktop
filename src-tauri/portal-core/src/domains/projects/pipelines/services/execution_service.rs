@@ -902,6 +902,22 @@ impl ExecutionService {
         Ok(())
     }
 
+    /// Startup only: any execution still unfinished lost its driver when the app quit.
+    pub async fn reconcile_interrupted(&self) -> Result<usize, String> {
+        let stale = self.execution_repo.get_non_terminal().await?;
+        for e in &stale {
+            self.finalize_running_steps(&e.id, "failed").await?;
+            self.execution_repo
+                .update_status(
+                    &e.id,
+                    "failed".to_string(),
+                    Some("Interrupted by app restart".to_string()),
+                )
+                .await?;
+        }
+        Ok(stale.len())
+    }
+
     async fn finalize_running_steps(&self, execution_id: &str, status: &str) -> Result<(), String> {
         let execution = self
             .execution_repo

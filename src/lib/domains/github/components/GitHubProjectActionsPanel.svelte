@@ -13,7 +13,8 @@
     GitHubWorkflowRunsPanel,
   } from '$lib/domains/github';
   import { parseGitHubRemote } from '$lib/domains/github/utils/parseGitHubRemote';
-  import { ExternalLink, Workflow } from '@lucide/svelte';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import Workflow from '~icons/fa6-solid/diagram-project';
 
   interface Props {
     project: Project;

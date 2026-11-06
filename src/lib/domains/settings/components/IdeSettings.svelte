@@ -15,24 +15,25 @@
   } from '$lib/components/ui/card';
   import { Label } from '$lib/components/ui/label';
   import { Badge } from '$lib/components/ui/badge';
-  import {
-    Laptop,
-    Plus,
-    Edit,
-    Trash2,
-    Search,
-    RefreshCw,
-    Loader2,
-    Code2,
-    Code,
-  } from '@lucide/svelte';
+  import Laptop from '~icons/fa6-solid/laptop';
+  import Plus from '~icons/fa6-solid/plus';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Code2 from '~icons/fa6-solid/code';
+  import Code from '~icons/fa6-solid/code';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { logger } from '$lib/domains/shared';
   import { ideService, type IdeConfig, type FrameworkIdeMapping } from '$lib/domains/ide';
   import { Separator } from '$lib/components/ui/separator';
   import * as Dialog from '$lib/components/ui/dialog';
-  import { Link2, ArrowRight, Upload, X } from '@lucide/svelte';
+  import Link2 from '~icons/fa6-solid/link';
+  import ArrowRight from '~icons/fa6-solid/arrow-right';
+  import Upload from '~icons/fa6-solid/upload';
+  import X from '~icons/fa6-solid/xmark';
   import Select from '$lib/components/ui/select.svelte';
   import Icon from '@iconify/svelte';
   import { open } from '@tauri-apps/plugin-dialog';
@@ -209,7 +210,7 @@
       'logos:gatsby',
       'logos:quarkus-icon',
       'logos:phoenix',
-      'logos:elixir',
+      'devicon-elixir-plain colored',
       'logos:sinatra',
       'logos:symfony',
       'logos:fastapi-icon',

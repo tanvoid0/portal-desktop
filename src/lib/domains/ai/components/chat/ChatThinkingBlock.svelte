@@ -3,7 +3,7 @@
   (inline <think> blocks) and the coder feed (separate thought messages).
 -->
 <script lang="ts">
-  import { ChevronRight } from '@lucide/svelte';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
   import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
 
   interface Props {

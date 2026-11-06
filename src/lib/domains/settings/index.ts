@@ -12,4 +12,3 @@ export * from './stores/settingsStore';
 export { settingsService } from './services/settingsService';
 
 // Components
-export { default as SettingsPanel } from './components/SettingsPanel.svelte';

@@ -21,25 +21,23 @@
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { Switch } from '$lib/components/ui/switch';
   import Select from '$lib/components/ui/select.svelte';
-  import {
-    ArrowLeft,
-    Trash2,
-    Plus,
-    FileCode,
-    Save,
-    Download,
-    Copy,
-    Edit,
-    Play,
-    Square,
-    RefreshCw,
-    Clock,
-    CheckCircle,
-    XCircle,
-    Loader2,
-    Terminal,
-    History,
-  } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Plus from '~icons/fa6-solid/plus';
+  import FileCode from '~icons/fa6-solid/file-code';
+  import Save from '~icons/fa6-solid/floppy-disk';
+  import Download from '~icons/fa6-solid/download';
+  import Copy from '~icons/fa6-solid/copy';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Clock from '~icons/fa6-solid/clock';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import History from '~icons/fa6-solid/clock-rotate-left';
   import type { Block, BlockParameter, CreateBlockRequest } from '$lib/domains/projects/pipelines';
   import { blockLibraryService, blockLibraryStore } from '$lib/domains/projects/pipelines';
   import { automation } from '$lib/domains/automation';
@@ -65,6 +63,7 @@
   let interactiveMode = $state(true); // Default to interactive mode
   let showInteractiveTerminal = $state(false);
   let resolvedCommand = $state('');
+  let interactiveStartedAt: string | undefined;
   let unsubscribe: (() => void) | null = null;
 
   // Parameter values for execution
@@ -196,6 +195,7 @@
 
     if (interactiveMode) {
       // Interactive mode - use embedded terminal
+      interactiveStartedAt = new Date().toISOString();
       showInteractiveTerminal = true;
       executing = true;
       toast.success('Starting interactive terminal...');
@@ -247,12 +247,23 @@
     }
   }
 
-  function handleInteractiveComplete(exitCode: number | null) {
+  async function handleInteractiveComplete(exitCode: number | null) {
     executing = false;
     if (exitCode === 0) {
       toast.success('Script completed successfully');
     } else if (exitCode !== null) {
       toast.error(`Script exited with code ${exitCode}`);
+    }
+    try {
+      await scriptExecutionService.recordInteractive({
+        blockId: scriptId,
+        command: resolvedCommand,
+        workingDirectory: workingDirectory || undefined,
+        exitCode,
+        startedAt: interactiveStartedAt,
+      });
+    } catch (e) {
+      console.error('Failed to record interactive run', e);
     }
     loadExecutionHistory();
   }
@@ -380,7 +391,8 @@
   async function handleDelete() {
     const confirmed = await confirmAction(
       'Are you sure you want to delete this script?',
-      'Delete script'
+      'Delete script',
+      { confirmLabel: 'Delete', destructive: true }
     );
     if (!confirmed) return;
 
@@ -463,7 +475,12 @@
   {:else if script}
     <!-- Header -->
     <div class="mb-6 flex items-center gap-4">
-      <Button variant="ghost" size="icon" onclick={() => goto('/scripts')}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Back to scripts"
+        onclick={() => goto('/scripts')}
+      >
         <ArrowLeft class="h-5 w-5" />
       </Button>
       <div class="flex-1">
@@ -760,12 +777,12 @@
             <!-- Interactive Mode Toggle -->
             <div class="flex items-center justify-between rounded-lg bg-muted/50 p-3">
               <div>
-                <Label class="text-sm font-medium">Interactive Mode</Label>
+                <Label for="interactive-mode" class="text-sm font-medium">Interactive Mode</Label>
                 <p class="mt-0.5 text-xs text-muted-foreground">
                   Enable for scripts that require user input (passwords, confirmations, etc.)
                 </p>
               </div>
-              <Switch bind:checked={interactiveMode} />
+              <Switch id="interactive-mode" bind:checked={interactiveMode} />
             </div>
 
             <!-- Parameters -->
@@ -793,6 +810,7 @@
                       {:else if param.type === 'boolean'}
                         <div class="flex items-center gap-2">
                           <Checkbox
+                            aria-label={param.name}
                             checked={parameterValues[param.name] === 'true'}
                             onCheckedChange={(checked) => {
                               parameterValues[param.name] = checked === true ? 'true' : 'false';

@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
+import Icons from 'unplugin-icons/vite';
 import adapter from '@sveltejs/adapter-static';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'url';
@@ -37,6 +38,7 @@ export default defineConfig({
   plugins: [
     deviconWoffOnly(),
     tailwindcss(),
+    Icons({ compiler: 'svelte' }),
     sveltekit({
       preprocess: vitePreprocess(),
       adapter: adapter({ fallback: 'index.html' }),

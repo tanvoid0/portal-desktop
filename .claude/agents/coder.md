@@ -31,6 +31,6 @@ The `qa-tester` agent files issues in `.claude/qa/issues/`; `.claude/qa/README.m
 4. Run the gates above, then rerun the repro.
 5. Fill `## Fix` — root cause in one line, files changed, checks run, other ids covered — and set `status: fixed`.
 
-You write only `status:` and `## Fix`. Never set `verified` or `wontfix`, never edit the tester's sections, never delete issue files — the tester closes. Never commit unless the lead says so.
+You write only `status:` and `## Fix`. Never set `verified` or `wontfix`, never edit the tester's sections, never delete issue files or screenshots — the tester closes. Never commit unless the lead says so.
 
 When you finish **feature work**, end your report with a `Ready for QA` line: routes touched and the use cases to test, so the lead can hand it straight to the qa-tester. If SendMessage reaches the qa-tester as a teammate, ping them with the ids — the board stays the record.

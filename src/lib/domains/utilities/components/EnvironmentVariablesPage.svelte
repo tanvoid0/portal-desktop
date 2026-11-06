@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import { beforeNavigate, goto } from '$app/navigation';
   import {
     Card,
     CardContent,
@@ -13,20 +14,19 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import {
-    Plus,
-    Trash2,
-    Save,
-    RefreshCw,
-    Shield,
-    ShieldAlert,
-    Search,
-    Loader2,
-    Variable,
-    User,
-    Monitor,
-  } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Save from '~icons/fa6-solid/floppy-disk';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Shield from '~icons/fa6-solid/shield';
+  import ShieldAlert from '~icons/fa6-solid/shield-halved';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Variable from '~icons/fa6-solid/square-root-variable';
+  import User from '~icons/fa6-solid/user';
+  import Monitor from '~icons/fa6-solid/desktop';
   import { toast } from '$lib/utils/toast';
+  import { confirmAction } from '$lib/utils/confirm';
   import { isTauriEnvironment } from '$lib/utils/tauri';
   import type { EnvPermissions, EnvRow, EnvVariable } from '../types';
   import {
@@ -95,6 +95,23 @@
     load();
   });
 
+  let leaveConfirmed = false;
+  beforeNavigate((nav) => {
+    const { to, willUnload, cancel } = nav;
+    if (leaveConfirmed || willUnload || !to?.url || to.url.origin !== location.origin) return;
+    if (buildChanges(original, rows).length === 0) return;
+    cancel();
+    confirmAction('You have unsaved changes. Leave and discard them?', 'Unsaved changes', {
+      confirmLabel: 'Leave',
+      destructive: true,
+    }).then((ok) => {
+      if (!ok) return;
+      leaveConfirmed = true;
+      if (nav.type === 'popstate') history.go(nav.delta);
+      else goto(to.url);
+    });
+  });
+
   async function load() {
     if (!isTauriEnvironment()) {
       loading = false;
@@ -124,12 +141,16 @@
     }
   }
 
-  function addRow(scope: EditableScope) {
+  async function addRow(scope: EditableScope) {
     tab = scope;
+    // an active search would hide the empty new row
+    if (scope === 'user') userSearch = '';
+    else systemSearch = '';
+    const id = `row-${nextId++}`;
     rows = [
       ...rows,
       {
-        id: `row-${nextId++}`,
+        id,
         name: '',
         value: '',
         scope,
@@ -137,6 +158,8 @@
         isDirty: true,
       },
     ];
+    await tick();
+    document.getElementById(`name-${id}`)?.focus();
   }
 
   function updateRow(id: string, patch: Partial<EnvRow>) {
@@ -197,9 +220,13 @@
   }
 </script>
 
-{#snippet variableList(sectionRows: EnvRow[])}
+{#snippet variableList(sectionRows: EnvRow[], search: string)}
   {#if sectionRows.length === 0}
-    <p class="py-8 text-center text-sm text-muted-foreground">No variables in this section yet.</p>
+    <p class="py-8 text-center text-sm text-muted-foreground">
+      {search.trim()
+        ? `No variables match "${search.trim()}".`
+        : 'No variables in this section yet.'}
+    </p>
   {:else}
     {#each sectionRows as row (row.id)}
       <div class="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_1.5fr_auto]">
@@ -347,7 +374,7 @@
             </div>
           </CardHeader>
           <CardContent class="space-y-3">
-            {@render variableList(userRows)}
+            {@render variableList(userRows, userSearch)}
           </CardContent>
         </Card>
       </TabsContent>
@@ -389,7 +416,7 @@
                 </AlertDescription>
               </Alert>
             {/if}
-            {@render variableList(systemRows)}
+            {@render variableList(systemRows, systemSearch)}
           </CardContent>
         </Card>
       </TabsContent>

@@ -4,6 +4,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import Select from '$lib/components/ui/select.svelte';
@@ -15,14 +16,14 @@
     type ExecutionStatus,
   } from '$lib/domains/projects/pipelines';
   import { logger } from '$lib/domains/shared';
-  import { RefreshCw } from '@lucide/svelte';
+  import RefreshCw from '~icons/fa6-solid/rotate';
 
   const log = logger.createScoped('ActionRunsPage');
 
   let executions = $state<PipelineExecutionListItem[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let search = $state('');
+  let search = $state(page.url.searchParams.get('q') ?? '');
   let statusFilter = $state<string>('all');
 
   const statusOptions = [
@@ -33,6 +34,9 @@
     { value: 'cancelled', label: 'Cancelled' },
     { value: 'pending', label: 'Pending' },
   ];
+
+  const initialStatus = page.url.searchParams.get('status');
+  if (statusOptions.some((o) => o.value === initialStatus)) statusFilter = initialStatus!;
 
   const filteredExecutions = $derived(
     executions.filter((execution) => {
@@ -61,7 +65,13 @@
   }
 
   function handleSelect(execution: PipelineExecutionListItem) {
-    goto(`/projects/${execution.projectId}/pipelines/run/${execution.id}`);
+    const params = new URLSearchParams();
+    if (search) params.set('q', search);
+    if (statusFilter !== 'all') params.set('status', statusFilter);
+    const back = `/pipeline-runs${params.toString() ? `?${params}` : ''}`;
+    goto(
+      `/projects/${execution.projectId}/pipelines/run/${execution.id}?from=${encodeURIComponent(back)}`
+    );
   }
 
   onMount(() => {

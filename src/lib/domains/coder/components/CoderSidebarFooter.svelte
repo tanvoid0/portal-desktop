@@ -1,7 +1,9 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { Settings2, Sparkles, Trash2 } from '@lucide/svelte';
+  import Settings2 from '~icons/fa6-solid/sliders';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import Trash2 from '~icons/fa6-solid/trash';
   import { goto } from '$app/navigation';
   import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
   import { coderSession } from '../state/coderSession.svelte.js';

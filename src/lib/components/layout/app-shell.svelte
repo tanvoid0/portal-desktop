@@ -5,7 +5,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
+  import { goto, afterNavigate } from '$app/navigation';
   import type { Snippet } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import ThemeToggle from '$lib/components/ui/theme-toggle.svelte';
@@ -28,7 +28,13 @@
   import DeviceAuthGuard from '$lib/components/DeviceAuthGuard.svelte';
   import { isTauriEnvironment } from '$lib/utils/tauri';
   import { InvokeClient } from '$lib/utils/invokeClient';
-  import { ArrowLeft, ArrowRight, RefreshCw, Home, QrCode, Shield } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import ArrowRight from '~icons/fa6-solid/arrow-right';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Home from '~icons/fa6-solid/house';
+  import QrCode from '~icons/fa6-solid/qrcode';
+  import Shield from '~icons/fa6-solid/shield';
+  import Gear from '~icons/fa6-solid/gear';
   import {
     Provider as SidebarProvider,
     Trigger as SidebarTrigger,
@@ -37,6 +43,7 @@
   import { SIDEBAR_COOKIE_NAME } from '$lib/components/ui/sidebar/constants';
   import type { NavSection } from '$lib/components/shell/nav-types';
   import NavSectionList from '$lib/components/shell/nav-section-list.svelte';
+  import SidebarTooltip from '$lib/components/shell/sidebar-tooltip.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
   import { buildMainNavSections } from '$lib/config/main-nav';
   import {
@@ -84,19 +91,20 @@
   // Browser navigation state
   let canGoBack = $state(false);
   let canGoForward = $state(false);
-  let hasNavigatedBack = $state(false);
 
   function updateNavigationState() {
     if (typeof window !== 'undefined') {
-      // Check if we can go back (history has more than 1 entry)
-      canGoBack = window.history.length > 1;
+      // Navigation API (Chromium/WebView2) reports real back/forward availability
+      const nav = (
+        window as unknown as { navigation?: { canGoBack: boolean; canGoForward: boolean } }
+      ).navigation;
+      canGoBack = nav ? nav.canGoBack : window.history.length > 1;
+      canGoForward = nav?.canGoForward ?? false;
     }
   }
 
   function goBack() {
     if (typeof window !== 'undefined' && canGoBack) {
-      hasNavigatedBack = true;
-      canGoForward = true;
       window.history.back();
     }
   }
@@ -108,8 +116,6 @@
   }
 
   function goHome() {
-    hasNavigatedBack = false;
-    canGoForward = false;
     goto('/');
   }
 
@@ -153,13 +159,7 @@
 
       // Listen to popstate events to track forward/back navigation
       if (typeof window !== 'undefined') {
-        popStateHandler = () => {
-          updateNavigationState();
-          // If we navigated to a new page (not via back/forward), disable forward
-          if (!hasNavigatedBack) {
-            canGoForward = false;
-          }
-        };
+        popStateHandler = updateNavigationState;
         window.addEventListener('popstate', popStateHandler);
       }
 
@@ -185,23 +185,22 @@
     }
   });
 
+  // The app scrolls inside <main>, not the window, so SvelteKit's own scroll reset never
+  // reaches it. Reset on forward navigation to a different path; back/forward (popstate) and
+  // same-path navigations (tab switches with reset:false) keep position, and so do sidebars.
+  let mainScroller = $state<HTMLElement | null>(null);
+  afterNavigate(({ type, from, to }) => {
+    if (type === 'popstate' || !from?.url || !to?.url || from.url.pathname === to.url.pathname)
+      return;
+    mainScroller?.querySelectorAll('*').forEach((el) => {
+      if (el.scrollTop > 0 && !el.closest('[data-sidebar]')) el.scrollTop = 0;
+    });
+  });
+
   // Update navigation state when page changes
   $effect(() => {
+    void page.url.href;
     updateNavigationState();
-    // Reset forward state when navigating to a new page (not via back/forward)
-    if (!hasNavigatedBack) {
-      canGoForward = false;
-    }
-    // Reset hasNavigatedBack flag after navigation completes
-    // This allows detecting new navigation vs back/forward
-    const timeoutId = setTimeout(() => {
-      if (hasNavigatedBack) {
-        // Check if we're still in a back state or if we've navigated forward
-        hasNavigatedBack = false;
-      }
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
   });
 
   onDestroy(() => {
@@ -214,7 +213,23 @@
   });
 </script>
 
+<!-- Fallback title for routes that set no <title> of their own (the last breadcrumb names the page). -->
+<svelte:head>
+  <title>{$breadcrumbItems.at(-1)?.label ?? 'Home'} - Portal Desktop</title>
+</svelte:head>
+
 <DeviceAuthGuard>
+  <!-- Skip link: first Tab stop, jumps past the header and sidebar into the page. -->
+  <a
+    href="#main-content"
+    class="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium text-foreground shadow focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+    onclick={(e) => {
+      e.preventDefault();
+      mainScroller?.focus();
+    }}
+  >
+    Skip to content
+  </a>
   <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
     <div
       class="flex h-screen min-h-0 w-full flex-col overflow-hidden"
@@ -288,44 +303,49 @@
           <SidebarRoot collapsible="icon">
             <div class="flex h-full min-h-0 min-w-0 flex-col">
               <!-- Sidebar Header -->
-              <Button
-                type="button"
-                variant="ghost"
-                class="divider-edge-b divider-edge-full divider-edge-sidebar h-auto w-full justify-start gap-3 px-4 py-4 text-left transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 hover:bg-sidebar-accent/50"
-                onclick={() => goto('/')}
-              >
-                <div
-                  class="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary"
-                >
-                  {#if isSdkPage}
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                      />
-                    </svg>
-                  {:else}
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  {/if}
-                </div>
-                <div class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                  <h1 class="truncate text-sm font-semibold text-sidebar-foreground">
-                    {isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
-                  </h1>
-                  <p class="text-xs text-sidebar-foreground/60">
-                    {isSdkPage ? 'Development Tools' : 'Development Environment'}
-                  </p>
-                </div>
-              </Button>
+              <SidebarTooltip label={isSdkPage ? 'SDK Manager' : 'Portal Desktop'}>
+                {#snippet trigger({ props })}
+                  <Button
+                    {...props}
+                    type="button"
+                    variant="ghost"
+                    class="divider-edge-b divider-edge-full divider-edge-sidebar h-auto w-full justify-start gap-3 px-4 py-4 text-left transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 hover:bg-sidebar-accent/50"
+                    onclick={() => goto('/')}
+                  >
+                    <div
+                      class="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary"
+                    >
+                      {#if isSdkPage}
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                          />
+                        </svg>
+                      {:else}
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      {/if}
+                    </div>
+                    <div class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                      <span class="block truncate text-sm font-semibold text-sidebar-foreground">
+                        {isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
+                      </span>
+                      <span class="block text-xs text-sidebar-foreground/60">
+                        {isSdkPage ? 'Development Tools' : 'Development Environment'}
+                      </span>
+                    </div>
+                  </Button>
+                {/snippet}
+              </SidebarTooltip>
 
               <!-- Sidebar Content — nav renders immediately; the dashboard
                    query only supplies badge counts, so there is nothing to
@@ -334,50 +354,62 @@
                 <NavSectionList sections={navigationSections} currentPath={page.url.pathname} />
               </div>
 
-              <!-- Sidebar Footer -->
-              <div class="divider-edge-t divider-edge-full divider-edge-sidebar flex-shrink-0 p-4">
-                <div class="flex items-center justify-between gap-2">
+              <!-- Sidebar Footer — stacks into a single icon column when collapsed,
+                   otherwise the row overflows the 3rem rail and clips the buttons. -->
+              <div
+                class="divider-edge-t divider-edge-full divider-edge-sidebar flex-shrink-0 p-4 group-data-[collapsible=icon]:p-2"
+              >
+                <div
+                  class="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
+                >
                   <ThemeToggle />
-                  <div class="flex items-center gap-1">
+                  <div
+                    class="flex items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
+                  >
                     {#if showQRButton}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => (qrCodeDialogOpen = true)}
-                        title="Share via QR Code"
-                      >
-                        <QrCode class="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => (deviceApprovalDialogOpen = true)}
-                        title="Device approval requests"
-                      >
-                        <Shield class="h-4 w-4" />
-                      </Button>
+                      <SidebarTooltip label="Share via QR Code">
+                        {#snippet trigger({ props })}
+                          <Button
+                            {...props}
+                            variant="ghost"
+                            size="sm"
+                            class="h-8 w-8 px-0"
+                            onclick={() => (qrCodeDialogOpen = true)}
+                            aria-label="Share via QR Code"
+                          >
+                            <QrCode class="h-4 w-4" />
+                          </Button>
+                        {/snippet}
+                      </SidebarTooltip>
+                      <SidebarTooltip label="Device approval requests">
+                        {#snippet trigger({ props })}
+                          <Button
+                            {...props}
+                            variant="ghost"
+                            size="sm"
+                            class="h-8 w-8 px-0"
+                            onclick={() => (deviceApprovalDialogOpen = true)}
+                            aria-label="Device approval requests"
+                          >
+                            <Shield class="h-4 w-4" />
+                          </Button>
+                        {/snippet}
+                      </SidebarTooltip>
                     {/if}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => goto('/settings')}
-                      title="Settings"
-                    >
-                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                        />
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                    </Button>
+                    <SidebarTooltip label="Settings">
+                      {#snippet trigger({ props })}
+                        <Button
+                          {...props}
+                          variant="ghost"
+                          size="sm"
+                          class="h-8 w-8 px-0"
+                          onclick={() => goto('/settings')}
+                          aria-label="Settings"
+                        >
+                          <Gear class="h-4 w-4" />
+                        </Button>
+                      {/snippet}
+                    </SidebarTooltip>
                   </div>
                 </div>
               </div>
@@ -386,7 +418,12 @@
         {/if}
 
         <!-- Page Content -->
-        <main class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <main
+          id="main-content"
+          tabindex="-1"
+          bind:this={mainScroller}
+          class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background outline-none"
+        >
           {#if isFillViewport}
             {@render children()}
           {:else if isDomainLayout}

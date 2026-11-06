@@ -271,12 +271,34 @@
     }
   }
 
+  let isRetrying = $state(false);
+
   async function handleRetry() {
-    await loadClustersList();
-    if (canOfferAutoSetup) {
-      await loadSetupDetection();
+    isRetrying = true;
+    autoConnectError = null;
+    try {
+      await loadClustersList();
+      if (canOfferAutoSetup) {
+        await loadSetupDetection();
+      }
+      await attemptAutoConnect();
+      const error = autoConnectError ?? (isExpectedNoClustersState ? null : clusterLoadError);
+      if (error) toast.error('Retry failed', { description: error });
+      else if (clusters.length === 0) toast.info('No clusters found');
+      else toast.success(`Found ${clusters.length} cluster(s)`);
+    } finally {
+      isRetrying = false;
     }
-    await attemptAutoConnect();
+  }
+
+  async function refreshTools() {
+    const before = installedToolLabels.join(',') + detectedTargets.length;
+    await loadSetupDetection();
+    if (setupDetectionError)
+      toast.error('Tool detection failed', { description: setupDetectionError });
+    else if (before === installedToolLabels.join(',') + detectedTargets.length)
+      toast.info('No new tools detected');
+    else toast.success('Tools updated');
   }
 
   const showConnectionUI = $derived(
@@ -333,7 +355,7 @@
               <ul class="mt-3 list-inside list-disc space-y-1 text-xs text-muted-foreground">
                 <li>Create a kubeconfig using your cluster provider CLI.</li>
                 <li>Save it to the default kubeconfig location, or set KUBECONFIG.</li>
-                <li>Reopen this page and click Retry.</li>
+                <li>Then click Retry below.</li>
               </ul>
             {/if}
           </div>
@@ -356,12 +378,12 @@
                 <div class="mb-2 flex items-center justify-between gap-2">
                   <p class="text-sm font-medium">Automatic setup</p>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    onclick={loadSetupDetection}
+                    onclick={refreshTools}
                     disabled={isLoadingSetupOptions || isGeneratingKubeconfig}
                   >
-                    Refresh tools
+                    {isLoadingSetupOptions ? 'Refreshing...' : 'Refresh tools'}
                   </Button>
                 </div>
 
@@ -375,6 +397,12 @@
                       Detected tools: {installedToolLabels.join(', ')}
                     </p>
                   {/if}
+
+                  {#each installedToolLabels.filter((t) => !['aws', 'gcloud', 'az', 'kubectl'].includes(t) && !detectedTargets.some((x) => x.provider === t)) as tool (tool)}
+                    <p class="mt-1 text-xs text-muted-foreground">
+                      no {tool} clusters found. Add a cluster context to your kubeconfig, then click Retry.
+                    </p>
+                  {/each}
 
                   {#if setupDetectionError}
                     <p class="mt-2 text-xs text-destructive">
@@ -488,9 +516,9 @@
               variant="outline"
               class="w-full"
               onclick={handleRetry}
-              disabled={isLoadingClusters}
+              disabled={isLoadingClusters || isRetrying}
             >
-              {#if isLoadingClusters}
+              {#if isLoadingClusters || isRetrying}
                 Loading...
               {:else}
                 Retry

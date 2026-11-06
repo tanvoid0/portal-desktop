@@ -1,8 +1,8 @@
 <script lang="ts">
+  import FaXmark from '~icons/fa6-solid/xmark';
 	import { Input } from '$lib/components/ui/input';
 	import Select from '$lib/components/ui/select.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import Icon from '@iconify/svelte';
 	import type { ProviderType, LogFilters } from '../../types/index.js';
 
 	interface Props {
@@ -62,7 +62,7 @@
 	/>
 	{#if (filters.search_query || filters.provider || filters.log_type) && onClear}
 		<Button variant="outline" size="sm" onclick={onClear}>
-			<Icon icon="lucide:x" class="h-4 w-4 mr-2" />
+			<FaXmark class="h-4 w-4 mr-2" />
 			Clear
 		</Button>
 	{/if}

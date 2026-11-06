@@ -32,7 +32,7 @@ This is the #1 source of wrong output. Match the existing code (see `src/lib/dom
 <script lang="ts">
   interface Props {
     project: Project;
-    onEdit?: (p: Project) => void;   // callbacks, not dispatched events
+    onEdit?: (p: Project) => void; // callbacks, not dispatched events
   }
   let { project, onEdit = () => {} }: Props = $props();
 </script>
@@ -43,7 +43,7 @@ This is the #1 source of wrong output. Match the existing code (see `src/lib/dom
 - `let open = $state(false);`
 - `const label = $derived(expr);` — single expression.
 - `const rows = $derived.by(() => { ... });` — when you need a block body.
-- **NEVER `$derived(() => ...)`** — that stores the *function*, memoizes nothing, and re-runs at every read. Enforced by the `portal/no-derived-closure` eslint rule. Use `$derived.by` for a body, `$derived(expr)` for an expression.
+- **NEVER `$derived(() => ...)`** — that stores the _function_, memoizes nothing, and re-runs at every read. Enforced by the `portal/no-derived-closure` eslint rule. Use `$derived.by` for a body, `$derived(expr)` for an expression.
 
 **Other runes idioms:**
 
@@ -61,14 +61,14 @@ When unsure about a rune, check the Svelte 5 docs (links at the bottom) — do n
 
 Interactive controls come from `$lib/components/ui/*`. **Raw `<button>` / `<input>` / `<textarea>` / `<select>` / `<label>` in app code is a lint error** (`portal/no-raw-ui-elements`).
 
-| Need | Use |
-|------|-----|
-| Button | `{ Button } from '$lib/components/ui/button'` |
-| Text field | `{ Input }`, `{ Textarea }`, `{ Label }` |
-| Select | `import Select from '$lib/components/ui/select.svelte'` (wrapper — takes `options`, `bind:value`) |
-| Toggle | `{ Checkbox }`, `{ Switch }`, `{ Toggle }`, `{ ToggleGroup }` |
-| Overlay | `{ Dialog }`, `{ Sheet }`, `{ AlertDialog }` — never a hand-rolled `fixed inset-0 z-50` div |
-| Layout | `{ Card }`, `{ Table }`, `{ Badge }` |
+| Need       | Use                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| Button     | `{ Button } from '$lib/components/ui/button'`                                                     |
+| Text field | `{ Input }`, `{ Textarea }`, `{ Label }`                                                          |
+| Select     | `import Select from '$lib/components/ui/select.svelte'` (wrapper — takes `options`, `bind:value`) |
+| Toggle     | `{ Checkbox }`, `{ Switch }`, `{ Toggle }`, `{ ToggleGroup }`                                     |
+| Overlay    | `{ Dialog }`, `{ Sheet }`, `{ AlertDialog }` — never a hand-rolled `fixed inset-0 z-50` div       |
+| Layout     | `{ Card }`, `{ Table }`, `{ Badge }`                                                              |
 
 Rules:
 

@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Plus, Wrench } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Wrench from '~icons/fa6-solid/wrench';
   import { cn } from '$lib/utils.js';
   import AIComposerShell from './AIComposerShell.svelte';
   import type { ContextUsage } from '../../types/index.js';

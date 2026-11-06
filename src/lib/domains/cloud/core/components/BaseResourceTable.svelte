@@ -10,7 +10,7 @@
     TableRow,
   } from '$lib/components/ui/table';
   import { Button } from '$lib/components/ui/button';
-  import { Inbox } from '@lucide/svelte';
+  import Inbox from '~icons/fa6-solid/inbox';
 
   interface Column {
     key: string;

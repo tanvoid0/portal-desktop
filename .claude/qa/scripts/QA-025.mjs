@@ -1,0 +1,20 @@
+// Repro: Tasks search and filters show a chip/badge but never filter the board/list.
+import { open } from './app.mjs';
+const app = await open('tasks');
+const p = app.page;
+await p.getByRole('button', { name: 'List', exact: true }).click();
+await p.waitForTimeout(500);
+const rows = () => p.locator('[aria-label^="Select task:"]').count();
+const before = await rows();
+await p.getByPlaceholder('Search tasks...').fill('zzzznomatch-qa');
+await p.waitForTimeout(800);
+console.log('rows before search:', before, 'after search for nonsense:', await rows(), '(expected 0)');
+await p.getByPlaceholder('Search tasks...').fill('');
+await p.getByRole('button', { name: 'Filters', exact: true }).click();
+await p.getByText('Cancelled', { exact: true }).click();
+await p.getByRole('button', { name: 'Apply Filters' }).click();
+await p.waitForTimeout(800);
+console.log('rows with status=Cancelled filter:', await rows(), '(expected 0, no cancelled tasks)');
+await app.shot('QA-025-before-filter-ignored');
+await p.getByRole('button', { name: /Clear All/ }).first().click().catch(() => {});
+await app.done();

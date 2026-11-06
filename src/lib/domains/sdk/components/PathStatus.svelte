@@ -10,18 +10,16 @@
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
-  import {
-    CheckCircle,
-    XCircle,
-    AlertTriangle,
-    Settings,
-    RefreshCw,
-    ExternalLink,
-    Shield,
-    ShieldOff,
-    Wifi,
-    WifiOff,
-  } from '@lucide/svelte';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
+  import Settings from '~icons/fa6-solid/gear';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import Shield from '~icons/fa6-solid/shield';
+  import ShieldOff from '~icons/fa6-solid/shield';
+  import Wifi from '~icons/fa6-solid/wifi';
+  import WifiOff from '~icons/fa6-solid/wifi';
 
   interface PathStatus {
     sdk_type: string;

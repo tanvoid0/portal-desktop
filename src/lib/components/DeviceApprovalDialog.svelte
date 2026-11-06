@@ -4,7 +4,10 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { tauriInvoke } from '$lib/utils/tauri';
-  import { AlertCircle, CheckCircle, Clock, XCircle } from '@lucide/svelte';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import Clock from '~icons/fa6-solid/clock';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
 
   interface PendingDevice {
     device_id: string;

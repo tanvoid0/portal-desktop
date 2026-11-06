@@ -11,7 +11,7 @@
 //   await app.shot('QA-007-after-add');
 //   await app.done();
 import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const SHOTS = fileURLToPath(new URL('../shots/', import.meta.url));
@@ -43,7 +43,9 @@ export async function open(route = '/', { width = 1280, height = 800 } = {}) {
     errors,
     async shot(name) {
       mkdirSync(SHOTS, { recursive: true });
-      const path = `${SHOTS}${name}.png`;
+      // Shots are kept for demos and docs: never overwrite, add -2, -3, ...
+      let path = `${SHOTS}${name}.png`;
+      for (let i = 2; existsSync(path); i++) path = `${SHOTS}${name}-${i}.png`;
       await page.screenshot({ path, fullPage: true });
       return path;
     },

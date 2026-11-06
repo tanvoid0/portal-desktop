@@ -1,7 +1,8 @@
 <script lang="ts">
   import { Input } from '$lib/components/ui/input';
   import { Button } from '$lib/components/ui/button';
-  import { Search, X } from '@lucide/svelte';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import X from '~icons/fa6-solid/xmark';
   import { commandHistoryStore } from '../stores/commandHistoryStore';
 
   export const tabId: string = '';

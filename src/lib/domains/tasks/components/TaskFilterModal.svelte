@@ -1,4 +1,6 @@
 <script lang="ts">
+  import FaMagnifyingGlass from '~icons/fa6-solid/magnifying-glass';
+  import FaFilterCircleXmark from '~icons/fa6-solid/filter-circle-xmark';
   import * as Dialog from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -136,8 +138,7 @@
       <div>
         <p class="mb-2 block text-sm font-medium text-foreground">Search</p>
         <div class="relative">
-          <Icon
-            icon="mdi:magnify"
+          <FaMagnifyingGlass
             class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
           />
           <Input
@@ -208,7 +209,7 @@
       <!-- Action Buttons -->
       <div class="divider-edge-t divider-edge-full flex items-center justify-between pt-4">
         <Button variant="outline" onclick={clearAllFilters} class="text-red-600 hover:text-red-700">
-          <Icon icon="mdi:filter-remove" class="mr-2 h-4 w-4" />
+          <FaFilterCircleXmark class="mr-2 h-4 w-4" />
           Clear All
         </Button>
 

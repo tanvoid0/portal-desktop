@@ -8,25 +8,25 @@
   import FolderPicker from '$lib/components/ui/folder-picker.svelte';
   import { Input } from '$lib/components/ui/input';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageEmpty } from '$lib/components/shell';
   import {
     createGitHubIssuesQuery,
     createGitHubRepositoryQuery,
     createGitHubStatusQuery,
     githubService,
     GitHubConnectPrompt,
+    GitHubError,
     GitHubWorkflowRunsPanel,
   } from '$lib/domains/github';
+  import { isTokenUnreadableError } from '$lib/domains/github/utils/tokenError';
   import { toast } from '$lib/utils/toast';
-  import {
-    ExternalLink,
-    FolderGit2,
-    Link2,
-    Bug,
-    GitPullRequest,
-    GitFork,
-    Workflow,
-  } from '@lucide/svelte';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import FolderGit2 from '~icons/fa6-solid/folder-tree';
+  import Link2 from '~icons/fa6-solid/link';
+  import Bug from '~icons/fa6-solid/bug';
+  import GitPullRequest from '~icons/fa6-solid/code-pull-request';
+  import GitFork from '~icons/fa6-solid/code-fork';
+  import Workflow from '~icons/fa6-solid/diagram-project';
 
   const owner = $derived(page.params.owner ?? '');
   const repo = $derived(page.params.repo ?? '');
@@ -38,6 +38,7 @@
     () => repo,
     () => isConnected
   );
+  const tokenUnreadable = $derived(isTokenUnreadableError(repoQuery.error));
   const repoIssuesQuery = createGitHubIssuesQuery(
     () => ({
       owner,
@@ -117,14 +118,16 @@
     description="Repository details, linked projects, and issue overview"
   >
     {#snippet actions()}
-      <Button variant="outline" onclick={() => (linkDialogOpen = true)}>
-        <Link2 class="mr-2 h-4 w-4" />
-        Link Existing Repo
-      </Button>
-      <Button onclick={() => (cloneDialogOpen = true)}>
-        <FolderGit2 class="mr-2 h-4 w-4" />
-        Clone as Project
-      </Button>
+      {#if !tokenUnreadable}
+        <Button variant="outline" onclick={() => (linkDialogOpen = true)}>
+          <Link2 class="mr-2 h-4 w-4" />
+          Link Existing Repo
+        </Button>
+        <Button onclick={() => (cloneDialogOpen = true)}>
+          <FolderGit2 class="mr-2 h-4 w-4" />
+          Clone as Project
+        </Button>
+      {/if}
     {/snippet}
   </PageHeader>
 
@@ -135,7 +138,7 @@
   {:else if repoQuery.isPending}
     <PageLoading message="Loading repository..." />
   {:else if repoQuery.isError}
-    <PageError
+    <GitHubError
       title="Failed to load repository"
       message={repoQuery.error instanceof Error
         ? repoQuery.error.message
@@ -247,7 +250,7 @@
             {#if repoIssuesQuery.isPending}
               <PageLoading message="Loading issues..." />
             {:else if repoIssuesQuery.isError}
-              <PageError
+              <GitHubError
                 title="Failed to load issues"
                 message={repoIssuesQuery.error instanceof Error
                   ? repoIssuesQuery.error.message
@@ -294,7 +297,7 @@
             {#if repoIssuesQuery.isPending}
               <PageLoading message="Loading pull requests..." />
             {:else if repoIssuesQuery.isError}
-              <PageError
+              <GitHubError
                 title="Failed to load pull requests"
                 message={repoIssuesQuery.error instanceof Error
                   ? repoIssuesQuery.error.message

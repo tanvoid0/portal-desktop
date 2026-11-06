@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { Play, Square } from '@lucide/svelte';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
   import { Switch } from '$lib/components/ui/switch';
   import type { SDKSidebarVariant } from './sdkSidebarTypes';
 

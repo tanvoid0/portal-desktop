@@ -9,7 +9,9 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
-  import { FolderOpen, Search, Square } from '@lucide/svelte';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Square from '~icons/fa6-solid/square';
   import type { Location } from '../../types';
 
   let {

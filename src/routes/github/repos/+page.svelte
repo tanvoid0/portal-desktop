@@ -4,14 +4,20 @@
   import { Input } from '$lib/components/ui/input';
   import { Badge } from '$lib/components/ui/badge';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageEmpty } from '$lib/components/shell';
   import {
     createGitHubLinkedRepositoriesQuery,
     createGitHubRepositoriesQuery,
     createGitHubStatusQuery,
     GitHubConnectPrompt,
+    GitHubError,
   } from '$lib/domains/github';
-  import { FolderGit2, Lock, Globe, ExternalLink, Link2, GitFork } from '@lucide/svelte';
+  import FolderGit2 from '~icons/fa6-solid/folder-tree';
+  import Lock from '~icons/fa6-solid/lock';
+  import Globe from '~icons/fa6-solid/globe';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import Link2 from '~icons/fa6-solid/link';
+  import GitFork from '~icons/fa6-solid/code-fork';
 
   let search = $state('');
   // The query key is derived from the search term, so binding the input
@@ -59,7 +65,7 @@
     {#if reposQuery.isPending}
       <PageLoading message="Loading repositories..." />
     {:else if reposQuery.isError}
-      <PageError
+      <GitHubError
         title="Failed to load repositories"
         message={reposQuery.error instanceof Error
           ? reposQuery.error.message

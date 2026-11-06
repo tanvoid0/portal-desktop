@@ -1,5 +1,10 @@
 import type { Component } from 'svelte';
-import { CheckCircle2, Circle, Loader2, XCircle, Ban, Clock } from '@lucide/svelte';
+import CheckCircle2 from '~icons/fa6-solid/circle-check';
+import Circle from '~icons/fa6-solid/circle';
+import Loader2 from '~icons/fa6-solid/spinner';
+import XCircle from '~icons/fa6-solid/circle-xmark';
+import Ban from '~icons/fa6-solid/ban';
+import Clock from '~icons/fa6-solid/clock';
 import type { GitHubWorkflowRun } from '../types';
 
 export type WorkflowDisplayStatus =

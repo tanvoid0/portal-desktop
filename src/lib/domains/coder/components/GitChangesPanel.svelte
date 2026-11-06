@@ -2,7 +2,9 @@
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { FileEdit, GitCommitHorizontal, RefreshCw } from '@lucide/svelte';
+  import FileEdit from '~icons/fa6-solid/file-pen';
+  import GitCommitHorizontal from '~icons/fa6-solid/code-commit';
+  import RefreshCw from '~icons/fa6-solid/rotate';
   import { coderService } from '../services/coderService.js';
   import type { GitFileChange } from '../types.js';
 

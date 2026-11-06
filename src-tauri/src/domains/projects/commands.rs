@@ -211,6 +211,17 @@ pub async fn analyze_project_directory(
     service.analyze_project_directory(&path).await
 }
 
+/// Opens the project in the editor mapped to its framework, else the default
+/// editor, else the first one installed. Returns the editor's name. Not
+/// remotable, like `open_project_in_explorer`: it launches a program on this host.
+#[portal_rpc_macro::rpc]
+pub async fn open_project_in_ide(
+    id: i32,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<String, String> {
+    ProjectService::new(&db_manager).open_in_ide(id).await
+}
+
 #[portal_rpc_macro::rpc]
 pub async fn open_project_in_explorer(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]

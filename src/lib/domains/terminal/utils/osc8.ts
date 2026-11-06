@@ -16,8 +16,19 @@ function osc8Wrap(uri: string, visible: string): string {
   return `\x1b]8;;${uri}${st}${visible}\x1b]8;;${st}`;
 }
 
+// Existing OSC sequences (window title, our own OSC 8) must pass through untouched:
+// linkifying a path inside `ESC]0;C:\...\powershell.exe BEL` injects a BEL that ends the title early
+// and leaks the rest of the path onto the prompt line.
+const oscRe = /(\x1b\][^\x07\x1b]*(?:\x07|\x1b\\))/;
+
 function linkify(content: string): string {
   if (!content) return content;
+  if (oscRe.test(content)) {
+    return content
+      .split(oscRe)
+      .map((part, i) => (i % 2 ? part : linkify(part)))
+      .join('');
+  }
 
   // Replace Windows paths first to avoid conflicts with drive-letter `C:` patterns.
   let out = content.replace(windowsPathRe, (full, path) => {

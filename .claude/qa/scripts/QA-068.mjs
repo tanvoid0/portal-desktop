@@ -1,0 +1,14 @@
+import { open } from './app.mjs';
+const app = await open('projects/create'); const p = app.page;
+await p.waitForTimeout(800);
+const path = p.getByPlaceholder('/path/to/your/project'); const name = p.getByPlaceholder('My Awesome Project');
+const want = String.raw`C:\Users\tanvo\no-such-qa-dir`;
+await path.fill(want);
+console.log('fill got', await path.inputValue());
+await name.fill('QA Throwaway');
+await p.getByRole('button', { name: 'Create Project' }).click();
+await p.waitForTimeout(1500);
+console.log('URL', p.url());
+console.log('alert', (await p.locator('[role=alert]').allInnerTexts()).join('|'));
+await app.shot('QA-068-before-create-error-hides-cause');
+await app.done();

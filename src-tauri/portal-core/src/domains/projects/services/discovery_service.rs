@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::database::DatabaseManager;
 use crate::domains::projects::discovery::{
-    discover, state, DiscoveryChange, DiscoveryConfig, DiscoveryProgress, DiscoveryReport,
-    DiscoveryState,
+    discover, relink, state, DiscoveryChange, DiscoveryConfig, DiscoveryProgress, DiscoveryReport,
+    DiscoveryState, UnavailableProject,
 };
 use crate::domains::projects::repositories::discovery_repository::{
     DiscoveryRepository, ImportOutcome,
@@ -92,6 +92,37 @@ impl DiscoveryService {
     /// Stores the completed scan and returns what it changed.
     pub fn record_scan(config: &DiscoveryConfig, report: &DiscoveryReport) -> Vec<DiscoveryChange> {
         state::record_scan(config, report)
+    }
+
+    /// Registry rows whose folder no longer exists, each with folders under the
+    /// scan roots that look like where it went. The roots are only walked when
+    /// something is actually missing.
+    pub async fn find_unavailable(&self) -> Result<Vec<UnavailableProject>, String> {
+        let rows = self.repository.list_paths().await?;
+        let config = state::load().config;
+        let roots: Vec<std::path::PathBuf> =
+            config.roots.iter().map(|r| r.path.clone().into()).collect();
+        tokio::task::spawn_blocking(move || {
+            let missing: Vec<_> = rows
+                .into_iter()
+                .filter(|(_, _, path)| !std::path::Path::new(path).is_dir())
+                .collect();
+            if missing.is_empty() {
+                return Vec::new();
+            }
+            let dirs = relink::index_dirs(&roots, config.max_depth);
+            missing
+                .into_iter()
+                .map(|(id, name, path)| UnavailableProject {
+                    id,
+                    name,
+                    suggestions: relink::suggest(&path, &dirs),
+                    path,
+                })
+                .collect()
+        })
+        .await
+        .map_err(|e| e.to_string())
     }
 
     pub async fn set_triage(

@@ -10,7 +10,12 @@
   import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
   import Select from '$lib/components/ui/select.svelte';
-  import { ArrowLeft, Save, Plus, X, Eye, EyeOff } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import Save from '~icons/fa6-solid/floppy-disk';
+  import Plus from '~icons/fa6-solid/plus';
+  import X from '~icons/fa6-solid/xmark';
+  import Eye from '~icons/fa6-solid/eye';
+  import EyeOff from '~icons/fa6-solid/eye-slash';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
   import { toastActions } from '$lib/utils/toast';
   import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';

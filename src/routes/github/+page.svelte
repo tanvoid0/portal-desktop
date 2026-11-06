@@ -3,15 +3,25 @@
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import { PageHeader, PageLoading, PageError } from '$lib/components/shell';
-  import { createGitHubStatusQuery, githubService } from '$lib/domains/github';
+  import { PageHeader, PageLoading } from '$lib/components/shell';
+  import {
+    createGitHubStatusQuery,
+    createGitHubTokenCheckQuery,
+    GitHubError,
+    githubService,
+  } from '$lib/domains/github';
   import type { GitHubDeviceFlowStart } from '$lib/domains/github';
+  import { isTokenUnreadableError } from '$lib/domains/github/utils/tokenError';
   import { openExternalUrl } from '$lib/utils/tauri';
   import { toast } from '$lib/utils/toast';
-  import { FolderGit2, Bug, Unplug } from '@lucide/svelte';
+  import FolderGit2 from '~icons/fa6-solid/folder-tree';
+  import Bug from '~icons/fa6-solid/bug';
+  import Unplug from '~icons/fa6-solid/plug-circle-xmark';
 
   const statusQuery = createGitHubStatusQuery();
   const status = $derived(statusQuery.data);
+  const tokenCheck = createGitHubTokenCheckQuery(() => status?.connected ?? false);
+  const tokenUnreadable = $derived(isTokenUnreadableError(tokenCheck.error));
 
   let connecting = $state(false);
   let disconnecting = $state(false);
@@ -99,7 +109,7 @@
   {#if statusQuery.isPending}
     <PageLoading message="Checking GitHub connection..." />
   {:else if statusQuery.isError}
-    <PageError
+    <GitHubError
       title="GitHub unavailable"
       message={statusQuery.error instanceof Error
         ? statusQuery.error.message
@@ -122,11 +132,21 @@
               <div class="text-sm text-muted-foreground">{status.account.name}</div>
             {/if}
             <div class="flex flex-wrap gap-2 pt-1">
-              <Badge variant="secondary">Connected</Badge>
+              {#if tokenUnreadable}
+                <Badge variant="destructive">Needs reconnect</Badge>
+              {:else}
+                <Badge variant="secondary">Connected</Badge>
+              {/if}
               {#each status.account.scopes as scope}
                 <Badge variant="outline">{scope}</Badge>
               {/each}
             </div>
+            {#if tokenUnreadable}
+              <p class="pt-1 text-sm text-muted-foreground">
+                Stored GitHub token can't be read. Reconnect GitHub to continue.
+              </p>
+              <Button size="sm" onclick={() => goto('/settings/github')}>Reconnect GitHub</Button>
+            {/if}
           {:else if status?.clientIdConfigured}
             <p class="text-sm text-muted-foreground">No GitHub account connected yet.</p>
           {:else}

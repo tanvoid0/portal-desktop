@@ -6,16 +6,14 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Progress } from '$lib/components/ui/progress';
-  import {
-    HardDrive,
-    Usb,
-    RefreshCw,
-    Download,
-    Recycle,
-    Boxes,
-    Trash2,
-    Container,
-  } from '@lucide/svelte';
+  import HardDrive from '~icons/fa6-solid/hard-drive';
+  import Usb from '~icons/fa6-solid/plug';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Download from '~icons/fa6-solid/download';
+  import Recycle from '~icons/fa6-solid/recycle';
+  import Boxes from '~icons/fa6-solid/boxes-stacked';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Container from '~icons/fa6-solid/cube';
 
   let {
     active,

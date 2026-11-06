@@ -120,7 +120,6 @@
     dateFormat = settings.dateFormat || 'YYYY-MM-DD';
   });
 
-  const availableThemes = settingsService.getAvailableThemes();
   const availableLanguages = settingsService.getAvailableLanguages();
 </script>
 
@@ -132,16 +131,6 @@
       <CardDescription>Configure the look and feel of the application</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
-      <div class="space-y-2">
-        <Label for="theme">Theme</Label>
-        <Select
-          defaultValue={settings.theme}
-          options={availableThemes.map((t) => ({ value: t.id, label: t.name }))}
-          onSelect={(value) => onUpdate({ theme: value as 'light' | 'dark' | 'system' })}
-          placeholder="Select theme"
-        />
-      </div>
-
       <div class="space-y-2">
         <Label for="language">Language</Label>
         <Select

@@ -3,7 +3,8 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { Copy, Check } from '@lucide/svelte';
+  import Copy from '~icons/fa6-solid/copy';
+  import Check from '~icons/fa6-solid/check';
   import { ScrollArea } from '$lib/components/ui/scroll-area';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
@@ -112,14 +113,16 @@
           {/if}
         </Button>
       {/if}
-      <Button
-        variant="ghost"
-        size="sm"
-        class="h-7 text-zinc-400 hover:text-zinc-100"
-        onclick={() => (userAutoScroll = !userAutoScroll)}
-      >
-        {userAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
-      </Button>
+      {#if autoScroll}
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-7 text-zinc-400 hover:text-zinc-100"
+          onclick={() => (userAutoScroll = !userAutoScroll)}
+        >
+          {userAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
+        </Button>
+      {/if}
     </div>
   </div>
 

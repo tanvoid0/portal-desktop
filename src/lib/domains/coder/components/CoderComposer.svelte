@@ -3,7 +3,11 @@
 
   import { Button } from '$lib/components/ui/button';
 
-  import { Plus, Bot, GitBranch, X, ListOrdered } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Bot from '~icons/fa6-solid/robot';
+  import GitBranch from '~icons/fa6-solid/code-branch';
+  import X from '~icons/fa6-solid/xmark';
+  import ListOrdered from '~icons/fa6-solid/list-ol';
 
   import { cn } from '$lib/utils.js';
 
@@ -60,6 +64,9 @@
 
     rows?: number;
 
+    /** Claude CLI engine: agent/permission mode are ignored, so hide them. */
+    hideModes?: boolean;
+
     queuedMessages?: string[];
 
     onRemoveQueued?: (index: number) => void;
@@ -109,6 +116,8 @@
     llmUsage = null,
 
     rows = 2,
+
+    hideModes = false,
 
     queuedMessages = [],
 
@@ -198,7 +207,7 @@
   {rows}
   submitOn="modifier-enter"
   queueSend={true}
-  onModeCycle={cycleAgentMode}
+  onModeCycle={hideModes ? undefined : cycleAgentMode}
   class={className}
 >
   {#snippet above()}
@@ -310,19 +319,21 @@
   {/snippet}
 
   {#snippet trailing()}
-    <CoderPermissionModeSelector
-      mode={permissionMode}
-      onModeChange={onPermissionModeChange}
-      inert={agentMode === 'ask'}
-      {disabled}
-    />
+    {#if !hideModes}
+      <CoderPermissionModeSelector
+        mode={permissionMode}
+        onModeChange={onPermissionModeChange}
+        inert={agentMode === 'ask'}
+        {disabled}
+      />
 
-    <CoderAgentModeSelector
-      mode={agentMode}
-      {effectiveMode}
-      onModeChange={onAgentModeChange}
-      {disabled}
-    />
+      <CoderAgentModeSelector
+        mode={agentMode}
+        {effectiveMode}
+        onModeChange={onAgentModeChange}
+        {disabled}
+      />
+    {/if}
   {/snippet}
 
   {#snippet footer()}
@@ -344,7 +355,9 @@
           <span class="truncate">{workspaceName || 'This PC'}</span>
         </span>
 
-        <span class="hidden text-muted-foreground/70 sm:inline">Shift+Tab · cycle mode</span>
+        <span class="truncate">
+          Ctrl+Enter · send{hideModes ? '' : ' · Shift+Tab · cycle mode'}
+        </span>
       </div>
 
       <AIContextBar variant="ring" {contextUsage} {llmUsage} />

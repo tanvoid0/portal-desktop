@@ -15,7 +15,22 @@ grep -l "^status: fixed" .claude/qa/issues/*.md     # what needs verifying
 | `issues/QA-NNN-short-slug.md` | one issue, template below                                 |
 | `scripts/app.mjs`             | helper: open a route, screenshot, collect console errors  |
 | `scripts/QA-NNN.mjs`          | repro for an issue — the coder reruns it to prove the fix |
-| `shots/`                      | screenshots (gitignored)                                  |
+| `shots/`                      | screenshots — kept for demos and docs, tracked in git     |
+
+## Screenshots are kept
+
+They double as demo and documentation material. **Never delete or overwrite one.**
+`app.mjs` enforces the overwrite part: an existing name gets `-2`, `-3`, … instead.
+Name them so they read without the issue open:
+
+| name                             | when                                                    |
+| -------------------------------- | ------------------------------------------------------- |
+| `sweep-<route>-<state>.png`      | sweep coverage, e.g. `sweep-projects-create-dark.png`   |
+| `QA-NNN-before-<what>.png`       | the problem, taken when filing                          |
+| `QA-NNN-after-<what>.png`        | the same view once fixed, taken when verifying          |
+
+Reference them from the issue's `## Evidence` and `## Verification`. No throwaway names
+(`x`, `t1`, `chk`) — a shot not worth naming is not worth taking.
 
 ## Status flow
 
@@ -76,7 +91,7 @@ What the user is trying to do.
 
 ## Evidence
 
-`.claude/qa/shots/QA-007-relink.png`, console errors, invoke errors.
+`.claude/qa/shots/QA-007-before-relink.png`, console errors, invoke errors.
 
 ## Repro
 

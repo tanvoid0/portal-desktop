@@ -27,7 +27,10 @@
   import Select from '$lib/components/ui/select.svelte';
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
-  import { Loader2, AlertCircle, Plus, X } from '@lucide/svelte';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import Plus from '~icons/fa6-solid/plus';
+  import X from '~icons/fa6-solid/xmark';
 
   interface Props {
     credential?: Credential | null;
@@ -94,7 +97,7 @@
       validationErrors.push('Name is required');
     }
 
-    if (!value.trim()) {
+    if (!credential && !value.trim()) {
       validationErrors.push('Value is required');
     }
 
@@ -110,31 +113,34 @@
       loading = true;
       error = null;
 
-      if (credential) {
+      // onSave closes the form, which nulls the `credential` prop: read the id first.
+      const credentialId = credential?.id;
+      if (credentialId) {
         // Update existing credential
         logger.info('Updating credential', {
           context: 'CredentialForm',
-          data: { credentialId: credential.id },
+          data: { credentialId },
         });
 
         const updateRequest: CredentialUpdateRequest = {
           name: name.trim(),
           description: description.trim() || undefined,
           tags: tags,
-          value: value.trim(),
+          // empty = keep the existing secret (backend only re-encrypts when a value is sent)
+          value: value.trim() || undefined,
           expiresAt: expiresAt ? new Date(expiresAt) : undefined,
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         };
 
         const updatedCredential = await credentialService.updateCredential(
-          credential.id,
+          credentialId,
           updateRequest
         );
         onSave?.(updatedCredential);
 
         logger.info('Credential updated successfully', {
           context: 'CredentialForm',
-          data: { credentialId: credential.id },
+          data: { credentialId },
         });
       } else {
         // Create new credential
@@ -161,15 +167,19 @@
           data: { credentialId: newCredential.id },
         });
       }
-
-      toast.success(credential ? 'Credential updated' : 'Credential created');
     } catch (err) {
       logger.error('Failed to save credential', {
         context: 'CredentialForm',
         error: err,
         data: { name, type },
       });
-      error = err instanceof Error ? err.message : 'Failed to save credential';
+      error =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : 'Failed to save credential';
+      toast.error(error);
     } finally {
       loading = false;
     }
@@ -246,10 +256,12 @@
 
       <!-- Value -->
       <div class="space-y-2">
-        <Label for="value">Value *</Label>
+        <Label for="value">{credential ? 'Value' : 'Value *'}</Label>
         <Textarea
           id="value"
-          placeholder="Enter the credential value"
+          placeholder={credential
+            ? 'Leave empty to keep the current value'
+            : 'Enter the credential value'}
           bind:value
           disabled={loading}
           rows={3}

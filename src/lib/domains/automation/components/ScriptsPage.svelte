@@ -15,18 +15,16 @@
   } from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
   import { Badge } from '$lib/components/ui/badge';
-  import {
-    Plus,
-    Search,
-    Upload,
-    Download,
-    Edit,
-    Trash2,
-    FileCode,
-    Terminal,
-    Copy,
-    Eye,
-  } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Upload from '~icons/fa6-solid/upload';
+  import Download from '~icons/fa6-solid/download';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import FileCode from '~icons/fa6-solid/file-code';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import Copy from '~icons/fa6-solid/copy';
+  import Eye from '~icons/fa6-solid/eye';
   import type { Block } from '$lib/domains/projects/pipelines';
   import {
     blockLibraryService,
@@ -93,7 +91,8 @@
   async function handleDeleteScript(scriptId: string) {
     const confirmed = await confirmAction(
       'Are you sure you want to delete this script?',
-      'Delete script'
+      'Delete script',
+      { confirmLabel: 'Delete', destructive: true }
     );
     if (!confirmed) return;
     try {
@@ -259,6 +258,7 @@
                 variant="ghost"
                 size="sm"
                 class="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label={`Copy command for ${script.name}`}
                 onclick={(e) => {
                   e.stopPropagation();
                   handleCopyCommand(script.command);
@@ -306,13 +306,28 @@
                 <Eye class="mr-1 h-3 w-3" />
                 View
               </Button>
-              <Button size="sm" variant="outline" onclick={() => handleEditScript(script)}>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label={`Edit script ${script.name}`}
+                onclick={() => handleEditScript(script)}
+              >
                 <Edit class="h-3 w-3" />
               </Button>
-              <Button size="sm" variant="outline" onclick={() => handleExportScript(script)}>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label={`Export script ${script.name}`}
+                onclick={() => handleExportScript(script)}
+              >
                 <Download class="h-3 w-3" />
               </Button>
-              <Button size="sm" variant="destructive" onclick={() => handleDeleteScript(script.id)}>
+              <Button
+                size="sm"
+                variant="destructive"
+                aria-label={`Delete script ${script.name}`}
+                onclick={() => handleDeleteScript(script.id)}
+              >
                 <Trash2 class="h-3 w-3" />
               </Button>
             </div>

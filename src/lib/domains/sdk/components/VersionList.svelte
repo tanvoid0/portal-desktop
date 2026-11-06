@@ -17,7 +17,11 @@
   import { Progress } from '$lib/components/ui/progress';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import { Download, Trash2, Check, Clock, AlertCircle } from '@lucide/svelte';
+  import Download from '~icons/fa6-solid/download';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Check from '~icons/fa6-solid/check';
+  import Clock from '~icons/fa6-solid/clock';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
 
   interface VersionInfo {
     version: string;

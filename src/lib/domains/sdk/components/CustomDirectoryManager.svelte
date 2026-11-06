@@ -21,18 +21,16 @@
     DialogTrigger,
   } from '$lib/components/ui/dialog';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
-  import {
-    FolderPlus,
-    FolderOpen,
-    Trash2,
-    RefreshCw,
-    AlertCircle,
-    CheckCircle,
-    Plus,
-    X,
-    Search,
-    Settings,
-  } from '@lucide/svelte';
+  import FolderPlus from '~icons/fa6-solid/folder-plus';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import Plus from '~icons/fa6-solid/plus';
+  import X from '~icons/fa6-solid/xmark';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Settings from '~icons/fa6-solid/gear';
 
   interface CustomDirectory {
     id: string;

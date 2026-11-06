@@ -1,4 +1,7 @@
 <script lang="ts">
+  import FaEye from '~icons/fa6-solid/eye';
+  import FaPenToSquare from '~icons/fa6-solid/pen-to-square';
+  import FaTrash from '~icons/fa6-solid/trash';
   import {
     Table,
     TableBody,
@@ -8,7 +11,6 @@
     TableRow,
   } from '$lib/components/ui/table';
   import { Button } from '$lib/components/ui/button';
-  import Icon from '@iconify/svelte';
   import type { TrainingData } from '../../types/index.js';
 
   interface Props {
@@ -52,17 +54,17 @@
               <div class="flex items-center justify-end gap-2">
                 {#if onView}
                   <Button variant="ghost" size="sm" onclick={() => onView(item)}>
-                    <Icon icon="lucide:eye" class="h-4 w-4" />
+                    <FaEye class="h-4 w-4" />
                   </Button>
                 {/if}
                 {#if onEdit}
                   <Button variant="ghost" size="sm" onclick={() => onEdit(item)}>
-                    <Icon icon="lucide:edit" class="h-4 w-4" />
+                    <FaPenToSquare class="h-4 w-4" />
                   </Button>
                 {/if}
                 {#if onDelete}
                   <Button variant="ghost" size="sm" onclick={() => onDelete(item)}>
-                    <Icon icon="lucide:trash-2" class="h-4 w-4" />
+                    <FaTrash class="h-4 w-4" />
                   </Button>
                 {/if}
               </div>

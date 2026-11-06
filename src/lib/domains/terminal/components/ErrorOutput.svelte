@@ -6,7 +6,11 @@
   import * as Alert from '$lib/components/ui/alert';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import { AlertCircle, ChevronDown, ChevronRight, Lightbulb, Sparkles } from '@lucide/svelte';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import Lightbulb from '~icons/fa6-solid/lightbulb';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import { parseTerminalError, ERROR_CATEGORY_LABELS } from '../utils/parseTerminalError';
 
   interface Props {

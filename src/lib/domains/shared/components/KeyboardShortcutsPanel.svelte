@@ -5,7 +5,8 @@
   import * as Dialog from '$lib/components/ui/dialog';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
-  import { Keyboard, X } from '@lucide/svelte';
+  import Keyboard from '~icons/fa6-solid/keyboard';
+  import X from '~icons/fa6-solid/xmark';
   import KeyboardShortcutHint from '$lib/domains/k8s-navigation/components/KeyboardShortcutHint.svelte';
 
   export interface ShortcutGroup {

@@ -6,7 +6,11 @@
   import DeviceAuthService from '$lib/services/deviceAuthService';
   import { isTauriEnvironment, tauriInvoke } from '$lib/utils/tauri';
   import QRCode from 'qrcode';
-  import { Copy, Check, Loader2, AlertCircle, Shield } from '@lucide/svelte';
+  import Copy from '~icons/fa6-solid/copy';
+  import Check from '~icons/fa6-solid/check';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import Shield from '~icons/fa6-solid/shield';
 
   let {
     open = $bindable(false),

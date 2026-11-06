@@ -4,7 +4,9 @@
   import { Input } from '$lib/components/ui/input';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import { Skeleton } from '$lib/components/ui/skeleton/index.js';
-  import { Plus, Search, Loader2 } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Loader2 from '~icons/fa6-solid/spinner';
   import AISidebarStatus from './AISidebarStatus.svelte';
 
   interface Props {

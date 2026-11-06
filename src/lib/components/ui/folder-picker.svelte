@@ -9,7 +9,8 @@
   import { Label } from './label';
   import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './tooltip';
   import { invokeClient } from '$lib/utils/invokeClient';
-  import { FolderOpen, Info } from '@lucide/svelte';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Info from '~icons/fa6-solid/circle-info';
   import { isTauriEnvironment } from '$lib/utils/tauri';
 
   interface Props {

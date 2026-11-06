@@ -8,7 +8,8 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
   import Select from '$lib/components/ui/select.svelte';
-  import { RefreshCw, Search } from '@lucide/svelte';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Search from '~icons/fa6-solid/magnifying-glass';
   import { goto } from '$app/navigation';
   import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 

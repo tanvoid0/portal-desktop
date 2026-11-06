@@ -13,10 +13,12 @@
   import {
     formatExecutionDuration,
     getExecutionStatusBadgeVariant,
+    getExecutionStatusBadgeClass,
     getExecutionStatusColor,
     getExecutionStatusIcon,
   } from '../utils/executionDisplay';
-  import { History, RefreshCw } from '@lucide/svelte';
+  import History from '~icons/fa6-solid/clock-rotate-left';
+  import RefreshCw from '~icons/fa6-solid/rotate';
 
   interface Props {
     executions: PipelineExecutionListItem[];
@@ -85,7 +87,10 @@
                     execution.status
                   )}{execution.status === 'running' ? ' animate-spin' : ''}"
                 />
-                <Badge variant={getExecutionStatusBadgeVariant(execution.status)}>
+                <Badge
+                  variant={getExecutionStatusBadgeVariant(execution.status)}
+                  class={getExecutionStatusBadgeClass(execution.status)}
+                >
                   {execution.status}
                 </Badge>
                 {#if showPipeline && execution.pipelineName}

@@ -7,8 +7,16 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { CheckCircle2, XCircle, Loader2, Circle, Ban, Clock, Copy, Check } from '@lucide/svelte';
+  import CheckCircle2 from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Circle from '~icons/fa6-solid/circle';
+  import Ban from '~icons/fa6-solid/ban';
+  import Clock from '~icons/fa6-solid/clock';
+  import Copy from '~icons/fa6-solid/copy';
+  import Check from '~icons/fa6-solid/check';
   import { toast } from '$lib/utils/toast';
+  import { PageHeader, PageError, PageLoading } from '$lib/components/shell';
   import type { PipelineExecution, StepExecution } from '../types';
   import { executionService } from '../services/executionService';
   import StepLogViewer from './StepLogViewer.svelte';
@@ -28,6 +36,9 @@
   let unlistenStepLog: (() => void) | null = null;
   let cancelling = $state(false);
   let errorCopied = $state(false);
+  let loadError = $state<string | null>(null);
+  let subscribed = false;
+  let destroyed = false;
 
   const hasRunningStep = $derived(
     execution?.stepExecutions.some((s) => s.status === 'running') ?? false
@@ -79,8 +90,19 @@
   }
 
   async function refreshExecution() {
-    const updated = await executionService.getExecution(executionId);
-    if (!updated) return;
+    let updated: PipelineExecution | null;
+    try {
+      updated = await executionService.getExecution(executionId);
+    } catch (e) {
+      // keep showing the last good execution if a poll fails
+      if (!execution) loadError = e instanceof Error ? e.message : String(e);
+      return;
+    }
+    if (!updated) {
+      if (!execution) loadError = 'Execution not found.';
+      return;
+    }
+    loadError = null;
     execution = normalizeExecution(updated);
     syncLiveBuffersFromExecution(execution);
     if (!selectedStepId) {
@@ -88,9 +110,24 @@
     }
   }
 
-  onMount(async () => {
+  async function load() {
+    loadError = null;
     await refreshExecution();
+    if (execution && !subscribed && !destroyed) {
+      subscribed = true;
+      try {
+        await subscribe();
+      } catch (e) {
+        subscribed = false;
+        unlistenExecution?.();
+        unlistenStepLog?.();
+        unlistenExecution = unlistenStepLog = null;
+        loadError = e instanceof Error ? e.message : String(e);
+      }
+    }
+  }
 
+  async function subscribe() {
     unlistenExecution = await listen<PipelineExecution>('pipeline-execution-update', (event) => {
       if (event.payload.id !== executionId) return;
       execution = normalizeExecution(event.payload);
@@ -99,6 +136,10 @@
         selectedStepId = pickActiveStep(execution) ?? selectedStepId;
       }
     });
+    if (destroyed) {
+      unlistenExecution();
+      return;
+    }
 
     unlistenStepLog = await listen<{
       executionId: string;
@@ -121,6 +162,10 @@
         selectedStepId = stepId;
       }
     });
+    if (destroyed) {
+      unlistenStepLog();
+      return;
+    }
 
     pollInterval = setInterval(async () => {
       if (execution && ['pending', 'running'].includes(execution.status)) {
@@ -130,9 +175,12 @@
         pollInterval = null;
       }
     }, 1000);
-  });
+  }
+
+  onMount(load);
 
   onDestroy(() => {
+    destroyed = true;
     unlistenExecution?.();
     unlistenStepLog?.();
     if (pollInterval) clearInterval(pollInterval);
@@ -191,19 +239,17 @@
 </script>
 
 <div class="flex h-full flex-col gap-4">
-  <div class="flex items-center justify-between">
-    <div>
-      <h2 class="text-lg font-semibold">Pipeline Run</h2>
-      {#if execution}
-        <p class="text-sm text-muted-foreground">
-          Started {new Date(execution.startedAt).toLocaleString()}
-          {#if execution.finishedAt}
-            · Finished {new Date(execution.finishedAt).toLocaleString()}
-          {/if}
-        </p>
-      {/if}
-    </div>
-    <div class="flex items-center gap-2">
+  <PageHeader
+    title="Pipeline Run"
+    description={execution
+      ? `Started ${new Date(execution.startedAt).toLocaleString()}${
+          execution.finishedAt
+            ? ` · Finished ${new Date(execution.finishedAt).toLocaleString()}`
+            : ''
+        }`
+      : undefined}
+  >
+    {#snippet actions()}
       {#if execution}
         <Badge variant="outline" class={getStatusColor(execution.status)}>
           {execution.status}
@@ -222,15 +268,13 @@
       {#if onClose}
         <Button variant="outline" size="sm" onclick={onClose}>Close</Button>
       {/if}
-    </div>
-  </div>
+    {/snippet}
+  </PageHeader>
 
-  {#if !execution}
-    <Card>
-      <CardContent class="py-12 text-center text-muted-foreground">
-        Loading execution...
-      </CardContent>
-    </Card>
+  {#if loadError}
+    <PageError title="Failed to load execution" message={loadError} onRetry={load} />
+  {:else if !execution}
+    <PageLoading message="Loading execution..." />
   {:else}
     <div class="grid min-h-[480px] flex-1 gap-4 lg:grid-cols-[280px_1fr]">
       <!-- Step timeline -->

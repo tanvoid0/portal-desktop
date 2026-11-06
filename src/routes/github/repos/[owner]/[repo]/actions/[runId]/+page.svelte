@@ -8,7 +8,7 @@
     GitHubConnectPrompt,
     GitHubWorkflowRunMonitor,
   } from '$lib/domains/github';
-  import { ArrowLeft } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
 
   const owner = $derived(page.params.owner ?? '');
   const repo = $derived(page.params.repo ?? '');

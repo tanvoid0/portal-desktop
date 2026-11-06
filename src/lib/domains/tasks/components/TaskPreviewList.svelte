@@ -1,9 +1,10 @@
 <script lang="ts">
+  import FaListCheck from '~icons/fa6-solid/list-check';
+  import FaPlus from '~icons/fa6-solid/plus';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import SubtaskPreviewCard from './SubtaskPreviewCard.svelte';
   import type { GeneratedSubtask } from '../services/aiTaskService';
-  import Icon from '@iconify/svelte';
 
   interface Props {
     subtasks: GeneratedSubtask[];
@@ -56,11 +57,11 @@
   <CardHeader>
     <CardTitle class="flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <Icon icon="lucide:list-checks" class="h-5 w-5" />
+        <FaListCheck class="h-5 w-5" />
         Subtasks ({subtasks.length})
       </div>
       <Button variant="outline" size="sm" onclick={addEmptySubtask}>
-        <Icon icon="lucide:plus" class="mr-1 h-4 w-4" />
+        <FaPlus class="mr-1 h-4 w-4" />
         Add Subtask
       </Button>
     </CardTitle>

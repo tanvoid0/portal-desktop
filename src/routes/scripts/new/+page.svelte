@@ -20,16 +20,15 @@
   import { Label } from '$lib/components/ui/label';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import Select from '$lib/components/ui/select.svelte';
-  import {
-    ArrowLeft,
-    Upload,
-    Trash2,
-    Plus,
-    ChevronDown,
-    ChevronUp,
-    FileCode,
-    Save,
-  } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import Upload from '~icons/fa6-solid/upload';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Plus from '~icons/fa6-solid/plus';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import ChevronUp from '~icons/fa6-solid/chevron-up';
+  import FileCode from '~icons/fa6-solid/file-code';
+  import Save from '~icons/fa6-solid/floppy-disk';
+  import { parseImportJson } from '$lib/domains/automation/utils/importJson';
   import type { BlockParameter, CreateBlockRequest } from '$lib/domains/projects/pipelines';
   import { blockLibraryService } from '$lib/domains/projects/pipelines';
   import { toast } from '$lib/utils/toast';
@@ -88,24 +87,15 @@
       jsonImportError = 'Please paste JSON content';
       return;
     }
-    try {
-      const parsed = JSON.parse(jsonImportText);
-      formData = {
-        name: parsed.name || '',
-        description: parsed.description || '',
-        category: parsed.category || 'utility',
-        parameters: parsed.parameters || [],
-        command: parsed.command || '',
-        executionType: parsed.executionType || 'script',
-        defaultConfig: parsed.defaultConfig || {},
-        tags: parsed.tags || [],
-      };
-      jsonImportText = '';
-      showJsonImport = false;
-      toast.success('JSON imported - review and save');
-    } catch (e) {
-      jsonImportError = 'Invalid JSON format';
+    const result = parseImportJson(jsonImportText, 'script');
+    if ('error' in result) {
+      jsonImportError = result.error;
+      return;
     }
+    formData = result.data;
+    jsonImportText = '';
+    showJsonImport = false;
+    toast.success('JSON imported - review and save');
   }
 
   function handleJsonFileImport(event: Event) {
@@ -123,6 +113,7 @@
   }
 
   async function handleSave() {
+    if (saving) return;
     if (!formData.name || !formData.description || !formData.command) {
       toast.error('Please fill in all required fields');
       return;
@@ -184,7 +175,12 @@
 <div class="container mx-auto max-w-4xl p-6">
   <!-- Header -->
   <div class="mb-6 flex items-center gap-4">
-    <Button variant="ghost" size="icon" onclick={() => goto('/scripts')}>
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Back to scripts"
+      onclick={() => goto('/scripts')}
+    >
       <ArrowLeft class="h-5 w-5" />
     </Button>
     <div class="flex-1">
@@ -448,7 +444,12 @@
                     </p>
                   {/if}
                 </div>
-                <Button variant="ghost" size="icon" onclick={() => removeParameter(i)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove parameter ${param.name}`}
+                  onclick={() => removeParameter(i)}
+                >
                   <Trash2 class="h-4 w-4" />
                 </Button>
               </div>

@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { Terminal as TerminalIcon } from '@lucide/svelte';
+  import TerminalIcon from '~icons/fa6-solid/terminal';
   import CommandBlock from '../CommandBlock.svelte';
   import { commandBlockStore, type CapturedCommand } from '../../stores/commandBlockStore';
 
