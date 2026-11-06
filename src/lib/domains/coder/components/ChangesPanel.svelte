@@ -377,9 +377,21 @@
           {#each c.hunks as h (h.index)}
             {@const reviewed = isReviewed(c.id, h.index)}
             {@const focused = isFocused(c.id, h.index)}
+            <!--
+              A labelled group, NOT role="button". This div wraps the real
+              Accept/Reject <button>s, and a nested button role is both invalid
+              ARIA and unusable: the outer role's accessible name is computed
+              from its descendants, so it announced the entire diff plus both
+              button labels, and `getByRole('button', { name: 'Reject hunk' })`
+              resolved to this wrapper instead of the button — the click then
+              landed on the focus handler and silently did nothing (QA-083).
+              `aria-label` keeps the name off the children either way.
+            -->
             <div
               data-hunk-id="{c.id}:{h.index}"
-              role="button"
+              role="group"
+              aria-label="Hunk {h.index + 1}, line {h.before_start + 1}"
+              aria-current={focused ? 'true' : undefined}
               tabindex="0"
               class="p-2 transition-colors {focused
                 ? 'bg-primary/5 ring-2 ring-primary/30 ring-inset'

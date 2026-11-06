@@ -252,10 +252,14 @@ see that plugin's `stacks/tauri.md`.
 
 ## Fixes applied — 2026-11-06
 
-`QA-084` and `QA-085` are both fixed, verified in the running app, and committed.
-`QA-083` (the `role="button"` hunk-row wrapper) is **still open** — it is a real a11y
-defect but cosmetic in effect, and it is the one that most endangers future automation
-runs, so read it before writing another driver script.
+`QA-083`, `QA-084` and `QA-085` are all fixed, verified in the running app, and committed.
+
+The `QA-083` fix matters for anyone driving this app: the changes-panel hunk row is now a
+labelled `role="group"`, so `getByRole('button', { name: 'Reject hunk' })` resolves to the
+real button instead of the wrapper. Four more wrappers with the same defect are filed as
+**`QA-086`** and are **not** fixed — `TabBar.svelte`, `AISessionCard.svelte`, and the two
+tasks components a concurrent session had just committed. Until those are done, keep
+preferring `locator('button').filter({ hasText })` over role queries.
 
 The engine-switch fix changes behaviour worth knowing about: **a thread keeps the engine it
 was created with.** Moving the dropdown no longer re-labels the open session; it sets the
