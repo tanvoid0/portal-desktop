@@ -3,12 +3,10 @@ use crate::domains::terminal::shell_integration::{
 };
 use crate::domains::terminal::types::*;
 use crate::events::{EventSink, EventSinkExt};
-use crate::process_ext::NoWindowExt;
 use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -96,7 +94,7 @@ impl TerminalManager {
                 } else if shell_lower.contains("wsl") {
                     ("wsl.exe".to_string(), vec![])
                 } else {
-                    (request.shell.clone(), vec![])
+                    (allowed_shell(&request.shell)?, vec![])
                 }
             } else if shell_lower.contains("zsh") {
                 ("zsh".to_string(), vec![])
@@ -107,7 +105,7 @@ impl TerminalManager {
             } else if request.shell == "bash" || request.shell.is_empty() {
                 ("zsh".to_string(), vec![])
             } else {
-                (request.shell.clone(), vec![])
+                (allowed_shell(&request.shell)?, vec![])
             }
         };
 
@@ -532,39 +530,6 @@ PROMPT_COMMAND='__portal_osc133_precmd'
         Ok(processes.values().cloned().collect())
     }
 
-    pub async fn execute_command(
-        &self,
-        request: ExecuteCommandRequest,
-        _events: Arc<dyn EventSink>,
-    ) -> Result<String, String> {
-        let (cmd, _args) = parse_command(&request.command);
-
-        if cmd.is_empty() {
-            return Ok("".to_string());
-        }
-
-        let output = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .no_window()
-                .args(["/C", &request.command])
-                .output()
-        } else {
-            Command::new("sh").arg("-c").arg(&request.command).output()
-        }
-        .map_err(|e| e.to_string())?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-
-        let result = if output.status.success() {
-            stdout.to_string()
-        } else {
-            format!("Error: {}\nOutput: {}", stderr, stdout)
-        };
-
-        Ok(result)
-    }
-
     pub async fn add_command_interceptor(
         &self,
         interceptor: CommandInterceptor,
@@ -728,15 +693,64 @@ fn sweep_stale_temp_rc() {
     }
 }
 
-// Helper function to parse commands (from terminux)
-fn parse_command(input: &str) -> (String, Vec<String>) {
-    let parts: Vec<&str> = input.trim().split_whitespace().collect();
-    if parts.is_empty() {
-        return (String::new(), Vec::new());
+/// The terminal launches a shell, never an arbitrary program.
+///
+/// `create_process` maps the shells it knows to their canonical executable; a
+/// name it does not know used to be spawned verbatim, which let a webview
+/// request point the PTY at any binary on disk. Now an unknown name is accepted
+/// only when the OS lists it as a shell: on Unix that is `/etc/shells` (an exact
+/// path, or a bare name resolved through `PATH`), on Windows the two extra
+/// shells `get_available_shells` can report beyond the mapped ones.
+fn allowed_shell(shell: &str) -> Result<String, String> {
+    let bare = !shell.contains(['/', '\\']);
+    let known = if cfg!(target_os = "windows") {
+        bare && matches!(
+            shell.to_ascii_lowercase().as_str(),
+            "zsh" | "zsh.exe" | "fish" | "fish.exe"
+        )
+    } else {
+        std::fs::read_to_string("/etc/shells").is_ok_and(|list| {
+            list.lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty() && !line.starts_with('#'))
+                .any(|line| {
+                    line == shell
+                        || (bare
+                            && Path::new(line).file_name().and_then(|n| n.to_str()) == Some(shell))
+                })
+        })
+    };
+    if known {
+        Ok(shell.to_string())
+    } else {
+        Err(format!("`{shell}` is not a recognised shell"))
+    }
+}
+
+#[cfg(test)]
+mod shell_scope_tests {
+    use super::allowed_shell;
+
+    #[test]
+    fn arbitrary_programs_are_refused() {
+        for program in [
+            "calc.exe",
+            "C:\\Windows\\System32\\calc.exe",
+            "/tmp/payload",
+            "./sh",
+            "../zsh",
+            "python",
+            "",
+        ] {
+            assert!(allowed_shell(program).is_err(), "{program} was accepted");
+        }
     }
 
-    let command = parts[0].to_string();
-    let args = parts[1..].iter().map(|s| ToString::to_string(s)).collect();
-
-    (command, args)
+    #[cfg(windows)]
+    #[test]
+    fn extra_windows_shells_are_accepted_by_bare_name_only() {
+        assert!(allowed_shell("fish.exe").is_ok());
+        assert!(allowed_shell("zsh").is_ok());
+        assert!(allowed_shell("C:\\tools\\fish.exe").is_err());
+    }
 }

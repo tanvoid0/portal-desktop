@@ -1,10 +1,11 @@
 /**
- * Run project build/start/test commands via pipelines or shell fallback.
+ * Resolve a project's build/start/test commands and the pipeline that runs them.
+ * Running goes through the actions catalog (`execute_script`); there is no
+ * separate shell path.
  */
 
 import type { Project } from '$lib/domains/projects/types';
 import type { Pipeline } from '$lib/domains/projects/pipelines';
-import { invokeClient } from '$lib/utils/invokeClient';
 
 export type ProjectCommandKind = 'build' | 'start' | 'test';
 
@@ -44,30 +45,5 @@ export function commandKindLabel(kind: ProjectCommandKind): string {
       return 'Start';
     case 'test':
       return 'Test';
-  }
-}
-
-function isWindows(): boolean {
-  return typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows');
-}
-
-export async function runShellCommand(
-  workingDirectory: string,
-  command: string
-): Promise<{ success: boolean; output: string }> {
-  const shell = isWindows()
-    ? { command: 'cmd', args: ['/C', command] }
-    : { command: 'sh', args: ['-c', command] };
-
-  try {
-    const output = await invokeClient.post<string>('execute_command_in_directory', {
-      command: shell.command,
-      args: shell.args,
-      workingDirectory,
-    });
-    return { success: true, output };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { success: false, output: message };
   }
 }

@@ -5,22 +5,10 @@
 
 import { invokeClient } from '$lib/utils/invokeClient';
 import { isTauriEnvironment } from '$lib/utils/tauri';
-import type {
-  TerminalProcess,
-  TerminalOutput,
-  TerminalCommand,
-  TerminalContext,
-  CreateProcessRequest,
-} from '../types';
+import type { TerminalProcess, TerminalOutput, CreateProcessRequest } from '../types';
 import { commandHistoryStore } from '../stores/commandHistoryStore';
 import { patternCollector } from '$lib/domains/learning';
 import { subscribeTerminalOutput, ensureTerminalOutputListener } from './terminalOutputBus';
-
-export interface ExecuteCommandRequest {
-  command: string;
-  workingDirectory?: string;
-  environment?: Record<string, string>;
-}
 
 export class TerminalService {
   private static currentCommand: {
@@ -178,26 +166,6 @@ export class TerminalService {
   }
 
   /**
-   * Execute command with interception
-   */
-  static async executeCommand(command: string, workingDirectory?: string): Promise<string> {
-    try {
-      const request: ExecuteCommandRequest = {
-        command,
-        workingDirectory,
-        environment: {},
-      };
-
-      return await invokeClient.request<string>('execute_command', {
-        data: { request },
-      });
-    } catch (error) {
-      console.error('Failed to execute command:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get system information with native terminal profiles
    */
   static async getSystemInfo(): Promise<{
@@ -232,57 +200,6 @@ export class TerminalService {
     } catch (error) {
       console.error('Failed to resize terminal:', error);
       throw error;
-    }
-  }
-
-  /**
-   * Execute command in context (for cross-domain usage)
-   */
-  static async executeInContext(
-    context: TerminalContext,
-    command: string,
-    options?: { captureBlock?: boolean }
-  ): Promise<TerminalCommand> {
-    try {
-      const result = await this.executeCommand(command, context.workingDirectory);
-
-      const cmd: TerminalCommand = {
-        id: crypto.randomUUID(),
-        processId: 'context-execution',
-        command,
-        timestamp: new Date(),
-        status: 'completed',
-        output: result,
-      };
-
-      if (options?.captureBlock !== false) {
-        const { commandBlockStore } = await import('../stores/commandBlockStore');
-        commandBlockStore.captureReadonlyResult(context.tabId, {
-          ...cmd,
-          exitCode: 0,
-        });
-      }
-
-      return cmd;
-    } catch (error) {
-      const cmd: TerminalCommand = {
-        id: crypto.randomUUID(),
-        processId: 'context-execution',
-        command,
-        timestamp: new Date(),
-        status: 'failed',
-        output: error instanceof Error ? error.message : 'Unknown error',
-      };
-
-      if (options?.captureBlock !== false) {
-        const { commandBlockStore } = await import('../stores/commandBlockStore');
-        commandBlockStore.captureReadonlyResult(context.tabId, {
-          ...cmd,
-          exitCode: 1,
-        });
-      }
-
-      return cmd;
     }
   }
 

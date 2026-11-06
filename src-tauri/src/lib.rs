@@ -250,7 +250,6 @@ pub fn run() {
             // Terminal commands
             domains::terminal::create_terminal_process,
             domains::terminal::send_terminal_input,
-            domains::terminal::execute_command,
             domains::terminal::kill_terminal_process,
             domains::terminal::get_terminal_processes,
             domains::terminal::get_terminal_process,
@@ -294,7 +293,6 @@ pub fn run() {
             domains::projects::analyze_project_directory,
             domains::projects::open_project_in_explorer,
             domains::projects::select_directory,
-            domains::projects::execute_command_in_directory,
             // Project discovery / audit
             domains::projects::discovery_commands::discover_projects,
             domains::projects::discovery_commands::discover_and_import_projects,

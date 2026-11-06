@@ -93,7 +93,7 @@
     defaultValue: '',
   });
 
-  const scriptId = $derived(page.params.id);
+  const scriptId = $derived(page.params.id ?? '');
 
   onMount(async () => {
     await loadScript();

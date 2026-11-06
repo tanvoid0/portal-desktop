@@ -753,13 +753,6 @@ export class SDKService {
   }
 
   /**
-   * Run a shell command via the backend (used to install SDK managers).
-   */
-  async runShellCommand(command: string, workingDirectory?: string): Promise<string> {
-    return invoke<string>('execute_command', { command, workingDirectory });
-  }
-
-  /**
    * Get suggested SDK version based on learned preferences
    * Returns the most commonly used version for the given SDK type and context
    */

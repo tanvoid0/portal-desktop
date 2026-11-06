@@ -7,6 +7,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { sdkService } from '$lib/domains/sdk/services/sdkService';
+  import { installSDKManager as installManagerById } from '$lib/domains/sdk/services/sdkManagerService';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Button } from '$lib/components/ui/button';
@@ -426,8 +427,9 @@
     manager.installProgress = 0;
 
     try {
-      // Execute installation command
-      await sdkService.runShellCommand(manager.installCommand, '/tmp');
+      // The backend owns the install workflow per manager id; the webview
+      // never sends the install script itself.
+      await installManagerById(manager.id);
 
       manager.installing = false;
       managerInstallationStatus[manager.id] = true;
