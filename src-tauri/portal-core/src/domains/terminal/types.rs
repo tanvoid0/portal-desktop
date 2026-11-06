@@ -50,13 +50,6 @@ pub struct CreateProcessRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecuteCommandRequest {
-    pub command: String,
-    pub working_directory: Option<String>,
-    pub environment: Option<HashMap<String, String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalSettings {
     pub theme: String,
     pub font_size: u32,

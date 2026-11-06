@@ -77,7 +77,6 @@
   import {
     getProjectCommand,
     findPipelineForCommand,
-    runShellCommand,
     commandKindLabel,
     type ProjectCommandKind,
   } from '$lib/domains/projects/utils/projectCommandRunner';
@@ -599,20 +598,12 @@
         toast.error(err);
       }
     } catch (err) {
-      // Fallback: shell command if action missing
+      // Fallback when the actions catalog cannot run it: hand the command to
+      // the terminal rather than a second, unscoped shell path.
       const command = getProjectCommand(project, kind);
       if (command) {
-        if (kind === 'start') {
-          setActiveTab('terminal');
-          toast.info(`Run in terminal: ${command}`);
-          return;
-        }
-        const result = await runShellCommand(project.path, command);
-        if (result.success) {
-          toast.success(`${commandKindLabel(kind)} completed`);
-        } else {
-          toast.error(`${commandKindLabel(kind)} failed`, result.output);
-        }
+        setActiveTab('terminal');
+        toast.info(`Run in terminal: ${command}`);
       } else {
         log.error(`Failed to run ${kind} command`, err);
         toast.error(`Failed to run ${commandKindLabel(kind).toLowerCase()} command`);

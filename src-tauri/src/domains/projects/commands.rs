@@ -255,29 +255,6 @@ pub async fn select_directory(app_handle: tauri::AppHandle) -> Result<Option<Str
     }
 }
 
-#[portal_rpc_macro::rpc]
-pub async fn execute_command_in_directory(
-    command: String,
-    args: Vec<String>,
-    working_directory: String,
-) -> Result<String, String> {
-    use crate::process_ext::NoWindowExt;
-    use std::process::Command;
-
-    let output = Command::new(&command)
-        .no_window()
-        .args(&args)
-        .current_dir(&working_directory)
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
-    }
-}
-
 // ── Modules: the apps / services / packages inside a project ─────────────
 
 use crate::domains::projects::modules::ModuleService;

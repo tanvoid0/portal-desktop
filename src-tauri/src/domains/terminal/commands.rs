@@ -32,15 +32,6 @@ pub async fn send_terminal_input(
 }
 
 #[portal_rpc_macro::rpc]
-pub async fn execute_command(
-    request: ExecuteCommandRequest,
-    manager: State<'_, TerminalManager>,
-    events: State<'_, Events>,
-) -> Result<String, String> {
-    manager.execute_command(request, events.sink()).await
-}
-
-#[portal_rpc_macro::rpc]
 pub async fn kill_terminal_process(
     process_id: String,
     manager: State<'_, TerminalManager>,
