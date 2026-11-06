@@ -1,7 +1,7 @@
 ---
 id: QA-085
 title: Switching the coder engine rewrites the active thread's llm_provider, falsifying which engine did the work
-status: open
+status: fixed
 severity: major
 kind: bug
 area: coder / session state
@@ -85,3 +85,42 @@ Silently re-labelling a thread means:
 This also makes the test plan's own advice insufficient. "Switch the selector, *then*
 start a new session" is not safe while a thread is active: the switch lands on the old
 thread first. Open a new session first, then pick the engine.
+
+## Correction to the root cause above
+
+`createThreadIfNeeded` was only the *secondary* path. The one that actually fired in the
+repro is `handleBackendProviderChange`
+([coderSession.svelte.ts:1410](../../../src/lib/domains/coder/state/coderSession.svelte.ts#L1410)),
+which called `syncThreadLlmConfig(this.thread.id)` **the moment the dropdown changed** —
+before any "New session" click. That is why thread `2bb8fc85` was already relabelled by
+the time a new session was started. Both paths wrote; both are fixed.
+
+## Fix — 2026-11-06
+
+- `handleBackendProviderChange` no longer writes to the active thread at all. It records
+  the choice (state + `localStorage` default for the next session) and, when a thread is
+  already on a different engine, says so instead of staying silent:
+  `This session stays on Ollama. Start a new session to use Claude Code (CLI).`
+- `createThreadIfNeeded` now **back-fills only** — it writes model/provider solely when
+  the thread has one missing, and preserves whatever is already recorded.
+- `syncThreadLlmConfig` takes explicit `model` / `provider` arguments rather than reading
+  the selector, so it can no longer clobber one field while filling the other.
+- `handleModelChange` still updates the active thread's model (legitimate mid-thread) but
+  passes the thread's existing engine through.
+
+**Verified in the running app:**
+
+| check | result |
+| ----- | ------ |
+| thread `77074dc4` provider before switching the selector | `ollama` |
+| switched selector to **Claude Code (CLI)** | toast shown, selector moved |
+| thread `77074dc4` provider after | **still `ollama`** |
+| new session on the selected engine (non-regression) | new thread `e55cfc54` created as `claude-cli`, turn ran |
+
+Shot: `.claude/qa/shots/coder-QA-085-after-fix.png`.
+
+## Known tradeoff
+
+The engine dropdown can now show an engine the *current* thread will not use. The toast is
+what keeps that from being silent. Pinning the dropdown to the active thread, or disabling
+it once a thread has messages, would be tidier but is a UI change beyond this fix.

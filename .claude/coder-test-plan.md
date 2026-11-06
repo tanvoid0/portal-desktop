@@ -180,22 +180,21 @@ tool calls fill required args. Only (3) is a judgement call.
 
 ### Filed from Part B
 
-- **`QA-084`** (major) — the turn summary said "Created 2 files" when **both** `write_file`
+- **`QA-084`** (major, **fixed and verified**) — the turn summary said "Created 2 files" when **both** `write_file`
   calls returned `Error: missing arg: path`. `feedBlocks.ts:179` counts tool _invocations_
   and never inspects results, so a failed call is indistinguishable from a success.
-- **`QA-085`** (major) — moving the engine selector while a thread is active rewrites
+- **`QA-085`** (major, **fixed and verified**) — moving the engine selector while a thread is active rewrites
   **that thread's** `llm_provider` (`coderSession.svelte.ts:938-947`). Part A's thread
   `2bb8fc85` went from `claude-cli` to `ollama` while still owning the two changes the
   Claude CLI engine produced. **The plan's own advice ("switch the selector, then start a
   new session") is unsafe** — open the new session first, then pick the engine.
 
-### Observation, not filed
+### Observation — resolved
 
-The composer renders **two adjacent chips**: the permission mode chip (`Review`, title
-"Prompt before mutating actions") and a second chip reading `Auto` with no `title` and no
-`aria-label`, both in the same parent. Unclear what the second controls; its value vocabulary
-collides with the first chip's (`Auto` is also a permission mode). Worth identifying before
-filing.
+The composer appeared to render two adjacent chips (`Review` and an untitled `Auto`). The
+second one is the **agent-mode** chip, which only renders for the platform engine: it
+disappeared as soon as the engine was switched back to Claude Code (CLI). Not a bug. It is
+unlabelled (`title` and `aria-label` both empty), which is the only thing worth tidying.
 
 ### Driving notes for next time
 
@@ -248,3 +247,21 @@ see that plugin's `stacks/tauri.md`.
 - One stray `pending` row is left in `coder_file_changes` from the last Ollama turn. The
   file on disk is back at its baseline (`Todos`), so it is cosmetic; "Reject all" only
   appears while the Agent changes tab is the active rail tab.
+
+---
+
+## Fixes applied — 2026-11-06
+
+`QA-084` and `QA-085` are both fixed, verified in the running app, and committed.
+`QA-083` (the `role="button"` hunk-row wrapper) is **still open** — it is a real a11y
+defect but cosmetic in effect, and it is the one that most endangers future automation
+runs, so read it before writing another driver script.
+
+The engine-switch fix changes behaviour worth knowing about: **a thread keeps the engine it
+was created with.** Moving the dropdown no longer re-labels the open session; it sets the
+default for the next one and now toasts to say so. So the plan's Part B step 5 advice is
+superseded — _start the new session first, then pick the engine_, or just pick the engine
+and start a new session; either order is now safe, and neither corrupts the old thread.
+
+Gates after the fixes: `pnpm check` 0 errors, `pnpm lint` 0 errors, and
+`src/lib/domains/coder/utils/feedBlocks.test.ts` 5/5.

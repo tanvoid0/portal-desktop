@@ -49,6 +49,7 @@ export type FeedBlock =
 type ToolBucket = {
   total: number;
   pending: number;
+  failed: number;
 };
 
 const ACTIVITY_ORDER = [
@@ -152,13 +153,14 @@ export function buildActivitySummary(tools: Array<{ call: ToolCall; result: stri
 
   for (const { call, result } of tools) {
     const tool = call.function.name;
-    const bucket = buckets.get(tool) ?? { total: 0, pending: 0 };
+    const bucket = buckets.get(tool) ?? { total: 0, pending: 0, failed: 0 };
     bucket.total++;
     const status = getToolResultStatus(tool, result);
     if (status === 'pending') {
       bucket.pending++;
       isRunning = true;
     } else if (status === 'failed') {
+      bucket.failed++;
       hasFailed = true;
     }
     buckets.set(tool, bucket);
@@ -176,9 +178,35 @@ export function buildActivitySummary(tools: Array<{ call: ToolCall; result: stri
     const bucket = buckets.get(tool);
     if (!bucket) continue;
     const active = bucket.pending > 0;
-    const count = bucket.total;
-    const phrase = activityPhrase(tool, count, active);
-    if (phrase) parts.push(phrase);
+    // A failed call did no work: never let it inflate the count, or the summary
+    // claims work that never happened (e.g. "Created 2 files" for two
+    // `Error: missing arg: path` results).
+    const succeeded = bucket.total - bucket.failed;
+
+    if (succeeded > 0) {
+      const phrase = activityPhrase(tool, succeeded, active);
+      if (phrase) {
+        parts.push(
+          bucket.failed > 0
+            ? { ...phrase, rest: `${phrase.rest} (${bucket.failed} failed)` }
+            : phrase
+        );
+      }
+      continue;
+    }
+
+    if (bucket.failed > 0) {
+      // Nothing succeeded. Reuse the in-progress phrasing ("Creating a file")
+      // as a gerund so no extra per-tool vocabulary is needed.
+      const gerund = activityPhrase(tool, bucket.failed, true);
+      if (gerund) {
+        parts.push({
+          verb: 'Failed',
+          rest: ` ${gerund.verb.toLowerCase()}${gerund.rest}`,
+          isActive: false,
+        });
+      }
+    }
   }
 
   if (parts.length > 0) {

@@ -41,6 +41,14 @@ import { coderTerminalStore } from './coderTerminalStore.svelte.js';
 import { coderWorkspaceStore } from './coderWorkspaceStore.svelte.js';
 import { inferEffectiveMode } from '../config/agentModes.js';
 import { coderUi } from './coderUi.svelte.js';
+import { toast } from '$lib/utils/toast';
+
+/** Human-readable name for a coder engine id. */
+function engineLabel(providerId: string): string {
+  return providerId === 'claude-cli'
+    ? 'Claude Code (CLI)'
+    : providerId.charAt(0).toUpperCase() + providerId.slice(1);
+}
 
 export type SubAgentNotificationEvent =
   | {
@@ -561,18 +569,18 @@ class CoderSessionState {
     }
   }
 
-  /** Persist current UI model/provider selection on the active thread. */
-  private async syncThreadLlmConfig(threadId: string): Promise<void> {
-    await coderService.updateThreadModel(
-      threadId,
-      this.selectedModel,
-      this.selectedBackendProvider
-    );
+  /** Persist the given model/provider on a thread. */
+  private async syncThreadLlmConfig(
+    threadId: string,
+    model: string,
+    provider: string
+  ): Promise<void> {
+    await coderService.updateThreadModel(threadId, model, provider);
     if (this.thread?.id === threadId) {
       this.thread = {
         ...this.thread,
-        model: this.selectedModel,
-        llm_provider: this.selectedBackendProvider,
+        model,
+        llm_provider: provider,
       };
       this.upsertThread(this.thread);
     }
@@ -938,11 +946,15 @@ class CoderSessionState {
   async createThreadIfNeeded(): Promise<CoderThread> {
     if (this.thread) {
       this.upsertThread(this.thread);
-      if (
-        (this.selectedModel && this.selectedModel !== this.thread.model) ||
-        (this.selectedBackendProvider && this.selectedBackendProvider !== this.thread.llm_provider)
-      ) {
-        await this.syncThreadLlmConfig(this.thread.id);
+      // Back-fill only. A thread keeps the engine it was created with: its
+      // messages and its `coder_file_changes` rows were produced by that
+      // engine, and pushing the selector's value onto an existing thread
+      // silently misattributes that work to an engine which never ran it
+      // (QA-085). Switching engine is done by starting a new session.
+      const model = this.thread.model || this.selectedModel;
+      const provider = this.thread.llm_provider || this.selectedBackendProvider;
+      if ((!this.thread.model || !this.thread.llm_provider) && (model || provider)) {
+        await this.syncThreadLlmConfig(this.thread.id, model, provider);
       }
       return this.thread;
     }
@@ -1397,24 +1409,35 @@ class CoderSessionState {
     this.selectedModel = model;
     if (!this.thread) return;
     try {
-      await this.syncThreadLlmConfig(this.thread.id);
+      // Changing model on the same engine is fine; keep the thread's engine.
+      await this.syncThreadLlmConfig(
+        this.thread.id,
+        model,
+        this.thread.llm_provider || this.selectedBackendProvider
+      );
     } catch (e) {
       console.error('Failed to update session model:', e);
     }
   }
 
   async handleBackendProviderChange(providerId: string) {
+    const previous = this.thread?.llm_provider ?? null;
     this.selectedBackendProvider = providerId;
     try {
       localStorage.setItem(PROVIDER_KEY, providerId);
     } catch {
       /* private mode */
     }
-    if (!this.thread) return;
-    try {
-      await this.syncThreadLlmConfig(this.thread.id);
-    } catch (e) {
-      console.error('Failed to update session provider:', e);
+    // Never push the new engine onto an existing thread. Its messages and its
+    // `coder_file_changes` rows were produced by the engine already recorded
+    // on it, so relabelling attributes that work to an engine which never ran
+    // (QA-085). The choice becomes the default for the next session instead —
+    // say so, rather than leaving the selector quietly disagreeing with the
+    // engine the next turn will actually use.
+    if (previous && previous !== providerId) {
+      toast.info(
+        `This session stays on ${engineLabel(previous)}. Start a new session to use ${engineLabel(providerId)}.`
+      );
     }
   }
 }

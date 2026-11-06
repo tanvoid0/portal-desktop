@@ -1,7 +1,7 @@
 ---
 id: QA-084
 title: Coder turn summary reports "Created 2 files" when both write_file calls failed
-status: open
+status: fixed
 severity: major
 kind: bug
 area: coder / feed summary
@@ -70,3 +70,30 @@ and `gemma4:e4b` simply omitted it. Portal's job here is to report that honestly
 ## Evidence
 
 - `.claude/qa/shots/coder-B-ollama-turn.png`
+
+## Fix — 2026-11-06
+
+`feedBlocks.ts` now tracks failures per tool bucket and never counts them as work done:
+
+- `ToolBucket` gained `failed`, incremented in the same branch that already set `hasFailed`.
+- The summary is built from `succeeded = total - failed`:
+  - some succeeded, some failed -> `Created a file (1 failed)`
+  - none succeeded -> `Failed creating 2 files` (reuses the existing in-progress
+    phrasing as a gerund, so no new per-tool vocabulary was needed)
+  - nothing failed -> unchanged
+- In-progress calls still count toward the active phrase, so a running turn reads the
+  same as before.
+
+Covered by `src/lib/domains/coder/utils/feedBlocks.test.ts` (5 cases, including the exact
+two-failed-`write_file` case from this report).
+
+**Verified in the running app on the original data.** Reopening thread
+`77074dc4-349b-410a-a9fc-890c0aa4d3c1` — the very turn this issue was filed from — now
+renders:
+
+```
+Failed creating 2 files, Read a file, Listed a directory
+```
+
+where it previously read `Created 2 files, Read a file, Listed a directory`.
+Shot: `.claude/qa/shots/coder-QA-084-after-fix.png`.
