@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { FolderOpen, FolderPlus } from '@lucide/svelte';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import FolderPlus from '~icons/fa6-solid/folder-plus';
   import { Button } from '$lib/components/ui/button';
   import Select from '$lib/components/ui/select.svelte';
   import { projectService } from '$lib/domains/projects';
@@ -133,14 +134,14 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col gap-1">
-  <div class="flex flex-1 items-center gap-1">
+<div class="flex min-w-0 flex-1 flex-col gap-1">
+  <div class="flex min-w-0 flex-1 items-center gap-1">
     <Select
       bind:value
       options={projectOptions}
       placeholder={loading ? 'Loading projects…' : 'Select a project…'}
       disabled={disabled || loading}
-      class="flex-1 font-mono text-xs"
+      class="min-w-0 flex-1 font-mono text-xs"
       onSelect={handleProjectChange}
     />
 

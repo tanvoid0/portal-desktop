@@ -1,6 +1,9 @@
 <script lang="ts">
+  import FaClipboard from '~icons/fa6-solid/clipboard';
+  import FaClock from '~icons/fa6-solid/clock';
+  import FaHourglassHalf from '~icons/fa6-solid/hourglass-half';
+  import FaCircleCheck from '~icons/fa6-solid/circle-check';
   import { Card, CardContent } from '$lib/components/ui/card';
-  import Icon from '@iconify/svelte';
   import { taskUi } from '../state/taskUi.svelte';
 </script>
 
@@ -12,7 +15,7 @@
           <p class="text-xs font-medium text-muted-foreground">Total</p>
           <p class="text-sm font-bold text-foreground">{taskUi.taskStats.total}</p>
         </div>
-        <Icon icon="mdi:clipboard-text" class="h-4 w-4 text-primary" />
+        <FaClipboard class="h-4 w-4 text-primary" />
       </div>
     </CardContent>
   </Card>
@@ -24,7 +27,7 @@
           <p class="text-xs font-medium text-muted-foreground">To Do</p>
           <p class="text-sm font-bold text-foreground">{taskUi.taskStats.pending}</p>
         </div>
-        <Icon icon="mdi:clock-outline" class="h-4 w-4 text-muted-foreground" />
+        <FaClock class="h-4 w-4 text-muted-foreground" />
       </div>
     </CardContent>
   </Card>
@@ -38,7 +41,7 @@
             {taskUi.taskStats.inProgress}
           </p>
         </div>
-        <Icon icon="mdi:progress-clock" class="h-4 w-4 text-primary" />
+        <FaHourglassHalf class="h-4 w-4 text-primary" />
       </div>
     </CardContent>
   </Card>
@@ -52,7 +55,7 @@
             {taskUi.taskStats.completed}
           </p>
         </div>
-        <Icon icon="mdi:check-circle" class="h-4 w-4 text-success-500" />
+        <FaCircleCheck class="h-4 w-4 text-success-500" />
       </div>
     </CardContent>
   </Card>

@@ -1,12 +1,13 @@
 <script lang="ts">
+  import FaXmark from '~icons/fa6-solid/xmark';
+  import FaFlag from '~icons/fa6-solid/flag';
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import Select from '$lib/components/ui/select.svelte';
-  import Icon from '@iconify/svelte';
   import { taskActions } from '../stores/taskStore';
   import { taskUi } from '../state/taskUi.svelte';
-  import type { TaskStatus, TaskPriority } from '../types';
+  import { taskStatusLabel, type TaskStatus, type TaskPriority } from '../types';
 
   let statusFilters = $state<TaskStatus[]>([]);
   let priorityFilters = $state<TaskPriority[]>([]);
@@ -70,7 +71,7 @@
       <h3 class="text-xs font-medium text-foreground">Filters</h3>
       {#if hasActiveFilters}
         <Button onclick={clearAllFilters} variant="ghost" size="sm" class="text-xs">
-          <Icon icon="mdi:close" class="mr-1 h-3 w-3" />
+          <FaXmark class="mr-1 h-3 w-3" />
           Clear All
         </Button>
       {/if}
@@ -89,13 +90,7 @@
                 size="sm"
                 class="text-xs"
               >
-                {status === 'pending'
-                  ? 'To Do'
-                  : status === 'in-progress'
-                    ? 'In Progress'
-                    : status === 'completed'
-                      ? 'Completed'
-                      : 'Cancelled'}
+                {taskStatusLabel(status)}
               </Button>
             {/each}
           </div>
@@ -114,8 +109,7 @@
                 size="sm"
                 class="text-xs"
               >
-                <Icon
-                  icon="mdi:flag"
+                <FaFlag
                   class="mr-1 h-3 w-3 {priority === 'high'
                     ? 'text-red-500'
                     : priority === 'medium'

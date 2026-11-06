@@ -4,7 +4,12 @@
   import type { WorkflowExecution } from '../types';
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import { Play, Pause, CheckCircle, XCircle, Clock, Loader2 } from '@lucide/svelte';
+  import Play from '~icons/fa6-solid/play';
+  import Pause from '~icons/fa6-solid/pause';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Clock from '~icons/fa6-solid/clock';
+  import Loader2 from '~icons/fa6-solid/spinner';
 
   export let executionId: string;
   export let onStatusChange: (execution: WorkflowExecution) => void = () => {};

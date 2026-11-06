@@ -21,7 +21,12 @@
   } from '$lib/components/ui/dialog';
   import { Label } from '$lib/components/ui/label';
   import { Input } from '$lib/components/ui/input';
-  import { ArrowLeft, RefreshCw, Download, Terminal, FileCode, Network } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Download from '~icons/fa6-solid/download';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import FileCode from '~icons/fa6-solid/file-code';
+  import Network from '~icons/fa6-solid/network-wired';
   import { podApi } from '$lib/domains/cloud/api/podApi';
   import Loading from '$lib/components/ui/loading.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';

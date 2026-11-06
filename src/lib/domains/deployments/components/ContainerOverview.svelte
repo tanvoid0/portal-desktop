@@ -4,7 +4,9 @@
   import DonutChart from './DonutChart.svelte';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Progress } from '$lib/components/ui/progress';
-  import { Cpu, MemoryStick, Network } from '@lucide/svelte';
+  import Cpu from '~icons/fa6-solid/microchip';
+  import MemoryStick from '~icons/fa6-solid/memory';
+  import Network from '~icons/fa6-solid/network-wired';
 
   let { containers }: { containers: DockerContainer[] } = $props();
 

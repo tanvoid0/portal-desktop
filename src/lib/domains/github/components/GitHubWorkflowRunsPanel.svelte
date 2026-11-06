@@ -2,7 +2,8 @@
   import { goto } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import { PageEmpty, PageError, PageLoading } from '$lib/components/shell';
+  import GitHubError from './GitHubError.svelte';
+  import { PageEmpty, PageLoading } from '$lib/components/shell';
   import { createGitHubWorkflowRunsQuery, type GitHubWorkflowRun } from '$lib/domains/github';
   import {
     formatWorkflowDuration,
@@ -12,7 +13,9 @@
     getWorkflowStatusIcon,
     isWorkflowRunActive,
   } from '$lib/domains/github/utils/workflowDisplay';
-  import { ExternalLink, RefreshCw, Workflow } from '@lucide/svelte';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Workflow from '~icons/fa6-solid/diagram-project';
 
   interface Props {
     owner: string;
@@ -45,7 +48,7 @@
 {#if runsQuery.isPending}
   <PageLoading message="Loading workflow runs..." />
 {:else if runsQuery.isError}
-  <PageError
+  <GitHubError
     title="Failed to load workflow runs"
     message={runsQuery.error instanceof Error
       ? runsQuery.error.message

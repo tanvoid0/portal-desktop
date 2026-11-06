@@ -1,7 +1,10 @@
 <script lang="ts">
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import { ChevronRight, FolderGit2, Square, Trash2 } from '@lucide/svelte';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import FolderGit2 from '~icons/fa6-solid/folder-tree';
+  import Square from '~icons/fa6-solid/square';
+  import Trash2 from '~icons/fa6-solid/trash';
   import type { CoderSubAgent } from '../types.js';
 
   interface Props {

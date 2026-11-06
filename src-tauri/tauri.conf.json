@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Portal Desktop",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "identifier": "com.tanvoid0.portal-desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -42,7 +42,7 @@
         "https://github.com/tanvoid0/portal-desktop/releases/latest/download/latest.json"
       ],
       "dialog": false,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI0ODQxMTFGMEJDMjEyRkMKUldUOEVzSUxIeEdFdEdzVVlaNXY2cC9PK3NwNlhxVHFZSXJZUzFnNHFuV0VuWERINFNXN3lEMHoK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg3RDMxOEExMjQyQzkwMEMKUldRTWtDd2tvUmpUaDc2OW5oKzZSdHBOQ1QyQU44eVlaVzFaMFp6Um9KOXlNTmdWQUlvNDZpTHUK"
     }
   }
 }

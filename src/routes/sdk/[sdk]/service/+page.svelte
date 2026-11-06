@@ -14,7 +14,9 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
-  import { AlertCircle, RefreshCw, ArrowLeft } from '@lucide/svelte';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import ServiceCard from '$lib/domains/sdk/components/ServiceCard.svelte';
   import { goto } from '$app/navigation';
   import { PageLoading, PageError } from '$lib/components/shell';

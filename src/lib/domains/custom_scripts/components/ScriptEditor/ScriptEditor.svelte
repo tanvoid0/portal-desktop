@@ -13,7 +13,7 @@
     CardHeader,
     CardTitle,
   } from '$lib/components/ui/card';
-  import { X } from '@lucide/svelte';
+  import X from '~icons/fa6-solid/xmark';
   import {
     CustomScriptService,
     type CustomScript,

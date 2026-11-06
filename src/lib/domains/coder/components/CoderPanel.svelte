@@ -4,26 +4,29 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
-  import {
-    Bot,
-    GitBranch,
-    GitCommitHorizontal,
-    RotateCcw,
-    FolderOpen,
-    Copy,
-    Check,
-    Terminal as TerminalIcon,
-    PanelRightOpen,
-    PanelLeftOpen,
-    ArrowLeft,
-  } from '@lucide/svelte';
+  import Bot from '~icons/fa6-solid/robot';
+  import GitBranch from '~icons/fa6-solid/code-branch';
+  import GitCommitHorizontal from '~icons/fa6-solid/code-commit';
+  import RotateCcw from '~icons/fa6-solid/rotate-left';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Copy from '~icons/fa6-solid/copy';
+  import Check from '~icons/fa6-solid/check';
+  import TerminalIcon from '~icons/fa6-solid/terminal';
+  import PanelRightOpen from '~icons/fa6-solid/table-columns';
+  import PanelLeftOpen from '~icons/fa6-solid/table-columns';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import { toast } from '$lib/utils/toast';
   import { replaceState } from '$app/navigation';
   import { coderSession, type SubAgentNotificationEvent } from '../state/coderSession.svelte.js';
   import { coderUi } from '../state/coderUi.svelte.js';
   import { coderService } from '../services/coderService.js';
   import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
-  import type { ChatMessage, GitDiffStats } from '../types.js';
+  import { isAuthError } from '$lib/domains/ai/utils/catalog.js';
+  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
+  import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
+  import PlatformStatusBanner from '$lib/domains/ai/components/PlatformStatusBanner.svelte';
+  import { confirmAction } from '$lib/utils/confirm';
+  import type { ChatMessage, CoderThread, GitDiffStats } from '../types.js';
   import CoderSessionList from './CoderSessionList.svelte';
   import CoderProjectSelector from './CoderProjectSelector.svelte';
   import CoderMultitaskBar from './CoderMultitaskBar.svelte';
@@ -47,6 +50,13 @@
   let copied = $state(false);
   let gitStats = $state<GitDiffStats | null>(null);
   let showCommitDialog = $state(false);
+  let catalogError = $state<string | null>(null);
+  // The Claude CLI engine ignores model and agent/permission modes.
+  const isCli = $derived(coderSession.selectedBackendProvider === 'claude-cli');
+  const tokenRejected = $derived(isAuthError(catalogError));
+  // The CLI engine talks to `claude` directly and never touches agent-platform,
+  // so a dead platform must not block it.
+  const platformBlocked = $derived(!isCli && aiPlatform.blocked);
 
   // Hand the action row to the AI layout's tab bar row — it has the width.
   $effect(() => {
@@ -81,7 +91,9 @@
   const pendingChangeCount = $derived(
     coderSession.changes.filter((c) => c.status === 'pending').length
   );
-  const composerDisabled = $derived(!!pending);
+  const blockedPlaceholder =
+    'Agent Platform is unavailable — switch to Claude Code (CLI) or fix it above';
+  const composerDisabled = $derived(!!pending || platformBlocked);
   const isEmpty = $derived(
     messages.filter((m) => m.role === 'user' || m.role === 'assistant').length === 0 &&
       !streamingText &&
@@ -137,6 +149,21 @@
   const activeTerminalThread = $derived(
     sessionThreads.find((t) => t.id === activeThreadId) ?? thread
   );
+
+  async function deleteSession(t: CoderThread) {
+    const ok = await confirmAction(
+      `Delete "${t.title || 'this session'}" and its transcript?`,
+      'Delete session',
+      { confirmLabel: 'Delete', destructive: true }
+    );
+    if (!ok) return;
+    try {
+      await coderSession.removeThread(t);
+      toast.success('Session deleted');
+    } catch (e) {
+      toast.error(`Failed to delete session: ${e}`);
+    }
+  }
 
   async function refreshGitStats() {
     const root = thread?.workspace_root ?? coderSession.workspaceRoot;
@@ -219,6 +246,7 @@
   // returned synchronously — otherwise the notification handler outlives the
   // component and fires against a destroyed panel.
   onMount(() => {
+    void aiPlatform.refresh();
     coderSession.setSubAgentNotificationHandler(handleSubAgentNotification);
     coderUi.initFromStorage();
     if (coderUi.activeProjectPath && !coderSession.workspaceRoot) {
@@ -447,13 +475,25 @@
     onModelChange={(m) => coderSession.handleModelChange(m)}
     onBackendProviderChange={(p) => coderSession.handleBackendProviderChange(p)}
     modelSelectClass="w-[180px]"
+    showPlatformLabel={!isCli}
+    showModel={!isCli}
+    showInlineError={false}
+    onStatusChange={(s) => (catalogError = s.error)}
+    extraProviders={[{ value: 'claude-cli', label: 'Claude Code (CLI)' }]}
   />
+  {#if catalogError && !isCli && !platformBlocked}
+    <span class="text-xs font-medium text-destructive dark:text-red-400" title={catalogError}>
+      {tokenRejected ? 'Agent Platform token rejected.' : 'Agent Platform unreachable.'}
+      <a href={AI_PROVIDER_SETTINGS_PATH} class="underline">Settings &gt; AI</a>
+    </span>
+  {/if}
   {#if showRetry && thread && !running}
     <Button
       size="sm"
       variant="outline"
       class="h-8 gap-1"
-      title="Retry the last message"
+      title={platformBlocked ? 'Unavailable: Agent Platform is down' : 'Retry the last message'}
+      disabled={platformBlocked}
       onclick={() => coderSession.retry()}
     >
       <RotateCcw class="h-3.5 w-3.5" />
@@ -488,7 +528,7 @@
     }}
   >
     <TerminalIcon class="h-3.5 w-3.5" />
-    Terminal
+    <span class="hidden xl:inline">Terminal</span>
   </Button>
   <Button
     size="icon"
@@ -545,7 +585,7 @@
     onclick={() => (showCommitDialog = true)}
   >
     <GitCommitHorizontal class="h-3.5 w-3.5" />
-    Commit
+    <span class="hidden xl:inline">Commit</span>
   </Button>
 {/snippet}
 
@@ -564,7 +604,7 @@
         sessionsPanelOpen = false;
       }}
       onCreateNew={newSession}
-      onDeleteThread={(t) => coderSession.removeThread(t)}
+      onDeleteThread={deleteSession}
       queuedCountFor={(id) => {
         coderSession.runtimeRevision;
         return coderSession.queuedCountFor(id);
@@ -628,7 +668,7 @@
         {/if}
       </div>
 
-      <div class="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:max-w-md sm:shrink-0">
+      <div class="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:max-w-md sm:shrink">
         <CoderProjectSelector
           bind:value={coderSession.workspaceRoot}
           disabled={!!thread}
@@ -636,6 +676,10 @@
         />
       </div>
     </div>
+
+    {#if !isCli}
+      <PlatformStatusBanner blocks="Sending, retry and approvals" />
+    {/if}
 
     {#if multitaskMode && thread?.thread_kind === 'coordinator'}
       <CoderMultitaskBar
@@ -649,17 +693,21 @@
     {/if}
 
     <div class="flex min-h-0 flex-1 overflow-hidden">
-      <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
         {#if isEmpty}
-          <div class="flex flex-1 flex-col items-center justify-center px-4 pb-8">
-            <div class="mb-6 text-center">
+          <div
+            class="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-8 [@media(max-height:700px)]:pb-2"
+          >
+            <div class="mb-6 text-center [@media(max-height:700px)]:mb-2">
               <div
-                class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10"
+                class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 [@media(max-height:700px)]:hidden"
               >
                 <Bot class="h-6 w-6 text-primary" />
               </div>
               <h3 class="text-lg font-semibold">What should we build?</h3>
-              <p class="mt-1 max-w-md text-sm text-muted-foreground">
+              <p
+                class="mt-1 max-w-md text-sm text-muted-foreground [@media(max-height:700px)]:hidden"
+              >
                 Describe a task. The agent explores, edits, and runs commands — mode controls how it
                 operates.
               </p>
@@ -670,7 +718,10 @@
                   bind:value={input}
                   onSend={send}
                   rows={3}
-                  placeholder="Ask the coder… (2+ lines auto-spawns parallel agents)"
+                  hideModes={isCli}
+                  placeholder={platformBlocked
+                    ? blockedPlaceholder
+                    : 'Ask the coder… (2+ lines auto-spawns parallel agents)'}
                   disabled={composerDisabled}
                   {running}
                   {queuedMessages}
@@ -721,7 +772,8 @@
                 threadId={activeThreadId ?? undefined}
                 canEdit={canEditMessages}
                 onEditMessage={(idx, text) => void coderSession.editMessage(idx, text)}
-                onRetry={() => coderSession.retry()}
+                onRetry={platformBlocked ? undefined : () => coderSession.retry()}
+                decisionsDisabled={platformBlocked}
                 onOpenSubAgent={(childId, coordId) => void openSubAgent(childId, coordId)}
                 onCancelSubAgent={(id) => void coderSession.cancelSubAgent(id)}
                 onCleanupSubAgent={(id) => void coderSession.cleanupSubAgents([id], true)}
@@ -735,6 +787,7 @@
               onSend={send}
               onStop={() => void coderSession.stop()}
               disabled={composerDisabled}
+              placeholder={platformBlocked ? blockedPlaceholder : undefined}
               {running}
               {queuedMessages}
               onRemoveQueued={removeQueued}
@@ -755,11 +808,12 @@
               {changesRevision}
               {contextUsage}
               {llmUsage}
+              hideModes={isCli}
               class="pt-0"
             />
           </div>
         {/if}
-      </main>
+      </div>
 
       {#if showWorkspace}
         <CoderWorkspacePanel

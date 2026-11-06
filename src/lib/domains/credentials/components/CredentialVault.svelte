@@ -21,7 +21,9 @@
   import { Input } from '$lib/components/ui/input';
   import Select from '$lib/components/ui/select.svelte';
   import { Badge } from '$lib/components/ui/badge';
-  import { Plus, Search, Shield } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Shield from '~icons/fa6-solid/shield';
   import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
   import type { CredentialType, Credential } from '../types';
 
@@ -107,9 +109,20 @@
     handleFormClose();
   }
 
-  function handleDeleteCredential(credentialId: string) {
-    credentialActions.removeCredential(credentialId);
-    toast.success('Credential deleted');
+  async function handleDeleteCredential(credentialId: string) {
+    try {
+      await credentialService.deleteCredential(credentialId);
+      credentialActions.removeCredential(credentialId);
+      toast.success('Credential deleted');
+    } catch (err) {
+      toast.error(
+        typeof err === 'string'
+          ? err
+          : err instanceof Error
+            ? err.message
+            : 'Failed to delete credential'
+      );
+    }
   }
 </script>
 

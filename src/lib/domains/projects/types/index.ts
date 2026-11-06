@@ -9,6 +9,8 @@ export interface Project extends BaseEntity {
   description?: string;
   path: string;
   status: ProjectStatus;
+  /** Manual grouping: project this one is nested under. null/undefined = ungrouped. */
+  parent_id?: number | null;
   framework_ids?: number[]; // Many-to-many: array of framework IDs
   package_manager_ids?: number[]; // Many-to-many: array of package manager IDs
   language_ids?: number[]; // Many-to-many: array of language IDs
@@ -28,6 +30,14 @@ export interface Project extends BaseEntity {
   git_commit?: string;
   has_uncommitted_changes: boolean;
   last_commit?: Date;
+  /** `<root>/<area…>/<folder>` from discovery, e.g. `production/flutter/aipairs`. */
+  discovery_path?: string;
+  /** `active` | `recent` | `dormant` | `stale`, from the last discovery scan. */
+  activity_status?: string;
+  /** Newest file or commit time seen by discovery. */
+  last_activity?: Date;
+  unpushed_commits?: number;
+  has_remote?: boolean;
   created_at?: Date;
   updated_at?: Date;
   metadata: ProjectMetadata;

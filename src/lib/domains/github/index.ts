@@ -24,6 +24,7 @@ export type {
   GitHubWorkflowRunDetail,
 } from './types';
 
+export { default as GitHubError } from './components/GitHubError.svelte';
 export { default as GitHubConnectPrompt } from './components/GitHubConnectPrompt.svelte';
 export { default as GitHubProjectActionsPanel } from './components/GitHubProjectActionsPanel.svelte';
 export { default as GitHubWorkflowRunsPanel } from './components/GitHubWorkflowRunsPanel.svelte';
@@ -36,6 +37,7 @@ export {
   createGitHubRepositoriesQuery,
   createGitHubRepositoryQuery,
   createGitHubStatusQuery,
+  createGitHubTokenCheckQuery,
   createGitHubWorkflowJobLogsQuery,
   createGitHubWorkflowRunQuery,
   createGitHubWorkflowRunsQuery,

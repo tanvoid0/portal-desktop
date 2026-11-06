@@ -1,6 +1,6 @@
 <script lang="ts">
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-  import { ChevronDown } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
   import { cn } from '$lib/utils.js';
   import { AGENT_MODES, autoModeSubtitle, getAgentModeConfig } from '../config/agentModes.js';
   import type { CoderAgentMode } from '../types.js';

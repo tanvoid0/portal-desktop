@@ -1,5 +1,10 @@
 import type { Component } from 'svelte';
-import { CheckCircle2, Circle, Loader2, XCircle, Ban, SkipForward } from '@lucide/svelte';
+import CheckCircle2 from '~icons/fa6-solid/circle-check';
+import Circle from '~icons/fa6-solid/circle';
+import Loader2 from '~icons/fa6-solid/spinner';
+import XCircle from '~icons/fa6-solid/circle-xmark';
+import Ban from '~icons/fa6-solid/ban';
+import SkipForward from '~icons/fa6-solid/forward-step';
 import type { ExecutionStatus } from '../types';
 
 export function getExecutionStatusIcon(status: ExecutionStatus | string): Component {
@@ -34,6 +39,10 @@ export function getExecutionStatusColor(status: ExecutionStatus | string): strin
     default:
       return 'text-muted-foreground';
   }
+}
+
+export function getExecutionStatusBadgeClass(status: ExecutionStatus | string): string {
+  return status === 'success' ? 'bg-green-600 text-white' : '';
 }
 
 export function getExecutionStatusBadgeVariant(

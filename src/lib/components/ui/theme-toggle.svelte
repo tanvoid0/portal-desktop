@@ -6,8 +6,10 @@
     DropdownMenuItem,
     DropdownMenuTrigger,
   } from './dropdown-menu';
-  import { themeStore, resolvedTheme } from '$lib/domains/shared';
-  import { Sun, Moon, Monitor } from '@lucide/svelte';
+  import { themeStore, currentTheme } from '$lib/domains/shared';
+  import Sun from '~icons/fa6-solid/sun';
+  import Moon from '~icons/fa6-solid/moon';
+  import Monitor from '~icons/fa6-solid/desktop';
 
   let isOpen = false;
 
@@ -19,14 +21,18 @@
 
 <DropdownMenu bind:open={isOpen}>
   <DropdownMenuTrigger>
-    <Button variant="ghost" size="sm" class="h-8 w-8 px-0">
-      {#if $resolvedTheme === 'light'}
-        <Sun class="h-4 w-4" />
-      {:else}
-        <Moon class="h-4 w-4" />
-      {/if}
-      <span class="sr-only">Toggle theme</span>
-    </Button>
+    {#snippet child({ props })}
+      <Button {...props} variant="ghost" size="sm" class="h-8 w-8 px-0">
+        {#if $currentTheme === 'system'}
+          <Monitor class="h-4 w-4" />
+        {:else if $currentTheme === 'light'}
+          <Sun class="h-4 w-4" />
+        {:else}
+          <Moon class="h-4 w-4" />
+        {/if}
+        <span class="sr-only">Toggle theme</span>
+      </Button>
+    {/snippet}
   </DropdownMenuTrigger>
   <DropdownMenuContent align="end">
     <DropdownMenuItem onclick={() => setTheme('light')}>

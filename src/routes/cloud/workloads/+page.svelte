@@ -6,19 +6,17 @@
   import { Button } from '$lib/components/ui/button';
   import { goto } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge';
-  import {
-    Boxes,
-    Network,
-    Rocket,
-    Layers,
-    Activity,
-    Briefcase,
-    Clock,
-    FileText,
-    Lock,
-    Globe,
-    Server,
-  } from '@lucide/svelte';
+  import Boxes from '~icons/fa6-solid/boxes-stacked';
+  import Network from '~icons/fa6-solid/network-wired';
+  import Rocket from '~icons/fa6-solid/rocket';
+  import Layers from '~icons/fa6-solid/layer-group';
+  import Activity from '~icons/fa6-solid/wave-square';
+  import Briefcase from '~icons/fa6-solid/briefcase';
+  import Clock from '~icons/fa6-solid/clock';
+  import FileText from '~icons/fa6-solid/file-lines';
+  import Lock from '~icons/fa6-solid/lock';
+  import Globe from '~icons/fa6-solid/globe';
+  import Server from '~icons/fa6-solid/server';
   import { PageLoading, PageError } from '$lib/components/shell';
   import MetricsDisplay from '$lib/domains/cloud/components/MetricsDisplay.svelte';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';

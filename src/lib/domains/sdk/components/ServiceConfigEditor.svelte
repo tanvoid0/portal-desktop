@@ -20,17 +20,15 @@
   import { Textarea } from '$lib/components/ui/textarea';
   import Select from '$lib/components/ui/select.svelte';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import {
-    Settings,
-    Save,
-    RotateCcw,
-    Download,
-    Upload,
-    AlertCircle,
-    CheckCircle,
-    FileText,
-    Code,
-  } from '@lucide/svelte';
+  import Settings from '~icons/fa6-solid/gear';
+  import Save from '~icons/fa6-solid/floppy-disk';
+  import RotateCcw from '~icons/fa6-solid/rotate-left';
+  import Download from '~icons/fa6-solid/download';
+  import Upload from '~icons/fa6-solid/upload';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import FileText from '~icons/fa6-solid/file-lines';
+  import Code from '~icons/fa6-solid/code';
 
   interface ConfigFile {
     name: string;

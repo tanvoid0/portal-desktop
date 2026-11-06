@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { X, Maximize2, MessageSquare } from '@lucide/svelte';
+  import X from '~icons/fa6-solid/xmark';
+  import Maximize2 from '~icons/fa6-solid/maximize';
+  import MessageSquare from '~icons/fa6-solid/message';
   import { Button } from '$lib/components/ui/button';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
   import CoderTerminalPanel from './CoderTerminalPanel.svelte';

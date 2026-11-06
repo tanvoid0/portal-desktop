@@ -19,7 +19,12 @@
   import { Button } from '$lib/components/ui/button';
   import { Card } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import { Settings, Download, RotateCcw, Save, RefreshCw, Loader2 } from '@lucide/svelte';
+  import Settings from '~icons/fa6-solid/gear';
+  import Download from '~icons/fa6-solid/download';
+  import RotateCcw from '~icons/fa6-solid/rotate-left';
+  import Save from '~icons/fa6-solid/floppy-disk';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Loader2 from '~icons/fa6-solid/spinner';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { logger } from '$lib/domains/shared';
@@ -136,10 +141,7 @@
     }
   }
 
-  function getSettingsStats() {
-    const settingsData = get(settings);
-    if (!settingsData) return { total: 0, configured: 0 };
-
+  function getSettingsStats(settingsData: NonNullable<typeof $settings>) {
     const total = 7; // general, editor, terminal, theme, ides, frameworks, package-managers, languages (framework mappings included)
     let configured = 0;
 
@@ -163,7 +165,7 @@
     class="divider-edge-b divider-edge-full flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
     <div
-      class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 3xl:px-8"
+      class="flex flex-col gap-3 px-4 py-4 md:px-6 xl:flex-row xl:items-center xl:justify-between 3xl:px-8"
     >
       <div class="min-w-0">
         <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
@@ -175,7 +177,7 @@
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
-        <Button variant="outline" onclick={handleExport} disabled={isExporting || !get(settings)}>
+        <Button variant="outline" onclick={handleExport} disabled={isExporting || !$settings}>
           {#if isExporting}
             <Loader2 class="mr-2 h-4 w-4 animate-spin" />
           {:else}
@@ -191,7 +193,7 @@
           {/if}
           Reset to Defaults
         </Button>
-        <Button onclick={handleSave} disabled={isSaving || !get(settings)}>
+        <Button onclick={handleSave} disabled={isSaving || !$settings}>
           {#if isSaving}
             <Loader2 class="mr-2 h-4 w-4 animate-spin" />
           {:else}
@@ -202,23 +204,14 @@
       </div>
     </div>
 
-    <!-- Settings Stats Bar -->
-    {#if get(settings)}
-      {@const currentSettings = get(settings)}
-      <div class="px-6 pb-4">
-        <div class="flex items-center gap-4">
-          <Badge variant="outline">
-            Configured: {getSettingsStats().configured}/{getSettingsStats().total}
-          </Badge>
-          <Badge variant="outline">
-            Theme: {currentSettings?.app?.theme || 'system'}
-          </Badge>
-          <Badge variant="outline">
-            Language: {currentSettings?.app?.language || 'en'}
-          </Badge>
-        </div>
-      </div>
-    {/if}
+    <!-- Settings Stats Bar (space reserved so chips appearing after load don't shift layout) -->
+    <div class="flex min-h-[2.75rem] flex-wrap items-center gap-2 px-4 pb-4 md:px-6 3xl:px-8">
+      {#if $settings}
+        {@const stats = getSettingsStats($settings)}
+        <Badge variant="outline">Configured: {stats.configured}/{stats.total}</Badge>
+        <Badge variant="outline">Language: {$settings.app?.language || 'en'}</Badge>
+      {/if}
+    </div>
   </div>
 
   <ShellSidebarLayout mobileTriggerLabel="Settings menu">

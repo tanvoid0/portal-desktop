@@ -25,6 +25,8 @@
     options: string[] | SelectOption[] | ConstantArray | EnumType;
     /** Lands on the trigger, so a sibling `<Label for=…>` has something to point at. */
     id?: string;
+    /** Accessible name for selects with no visible label (the trigger text is only the value). */
+    'aria-label'?: string;
     defaultValue?: string;
     value?: string;
     placeholder?: string;
@@ -39,6 +41,7 @@
   let {
     options = [],
     id,
+    'aria-label': ariaLabel,
     defaultValue = '',
     value = $bindable(),
     placeholder = 'Select an option...',
@@ -98,6 +101,7 @@
   >
     <SelectPrimitive.Trigger
       {id}
+      aria-label={ariaLabel}
       class={cn('w-full', error && 'border-destructive aria-invalid:border-destructive')}
       aria-required={required}
       aria-invalid={!!error}

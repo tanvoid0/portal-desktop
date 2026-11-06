@@ -182,6 +182,15 @@ impl DiscoveryRepository {
         Ok(true)
     }
 
+    /// Id, name and path of every registry row — all the unavailable check needs.
+    pub async fn list_paths(&self) -> Result<Vec<(i32, String, String)>, String> {
+        let rows = Project::find()
+            .all(self.db.get_connection())
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(rows.into_iter().map(|r| (r.id, r.name, r.path)).collect())
+    }
+
     /// Bulk decision for the "select 20 stale course repos, archive them" case.
     pub async fn set_triage_bulk(
         &self,

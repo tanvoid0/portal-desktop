@@ -8,7 +8,8 @@
     CollapsibleTrigger,
   } from '$lib/components/ui/collapsible';
   import { toast } from '$lib/utils/toast';
-  import { Sparkles, LoaderCircle } from '@lucide/svelte';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import LoaderCircle from '~icons/fa6-solid/spinner';
 
   let {
     projectId,

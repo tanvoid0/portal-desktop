@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
 
-  import { ChevronRight } from '@lucide/svelte';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
 
   import type { ToolCall } from '../types.js';
 

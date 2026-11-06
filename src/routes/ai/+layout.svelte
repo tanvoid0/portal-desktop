@@ -2,13 +2,17 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { afterNavigate } from '$app/navigation';
+  import { page } from '$app/state';
   import AITabBar from '$lib/domains/ai/components/navigation/AITabBar.svelte';
   import { setBreadcrumbs, clearBreadcrumbs } from '$lib/domains/shared/stores/breadcrumbStore';
-  import { getAiTabBreadcrumb, isAiSectionRoute } from '$lib/config/ai-tabs';
+  import { getAiTabBreadcrumb, isAiCoderRoute, isAiSectionRoute } from '$lib/config/ai-tabs';
   import { AI_CHAT_PATH } from '$lib/config/ai-nav';
   import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
 
   let { children }: { children: Snippet<[]> } = $props();
+
+  // Page identity for screen readers: this layout also serves /ai/coder.
+  const srHeading = $derived(isAiCoderRoute(page.url.pathname) ? 'Code' : 'AI');
 
   function syncAiBreadcrumbs(pathname: string) {
     if (!isAiSectionRoute(pathname)) return;
@@ -28,6 +32,7 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
+  <h1 class="sr-only">{srHeading}</h1>
   <!-- Pages park their action controls here so their own header stays readable. -->
   <div
     class="divider-edge-b divider-edge-full flex shrink-0 items-center gap-3 bg-background px-3 py-2 md:px-4"

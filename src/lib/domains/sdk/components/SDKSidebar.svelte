@@ -7,22 +7,20 @@
   import { Button } from '$lib/components/ui/button';
   import { ScrollArea } from '$lib/components/ui/scroll-area';
   import { Separator } from '$lib/components/ui/separator';
-  import {
-    Settings,
-    Database,
-    Code,
-    Globe,
-    Container,
-    Package,
-    Download,
-    ArrowLeft,
-  } from '@lucide/svelte';
+  import Settings from '~icons/fa6-solid/gear';
+  import Database from '~icons/fa6-solid/database';
+  import Code from '~icons/fa6-solid/code';
+  import Globe from '~icons/fa6-solid/globe';
+  import Container from '~icons/fa6-solid/cube';
+  import Package from '~icons/fa6-solid/box-open';
+  import Download from '~icons/fa6-solid/download';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import { invoke } from '@tauri-apps/api/core';
   import { logger } from '$lib/domains/shared';
-  import {
-    sdkConfigService,
-    type ProcessedSDKConfig,
-  } from '$lib/domains/sdk/services/sdkConfigService';
+  import type { ProcessedSDKConfig } from '$lib/domains/sdk/services/sdkConfigService';
+  import { sdkConfigsQuery, sdkManagersQuery } from '$lib/domains/sdk/queries/sdkQueries';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { queryKeys } from '$lib/domains/shared/query/keys';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
@@ -59,10 +57,6 @@
   }: Props = $props();
 
   // State
-  let sdkConfigs = $state<ProcessedSDKConfig[]>([]);
-  let loading = $state(true);
-  let sdkManagers = $state<SDKManager[]>([]);
-  let managersLoading = $state(true);
   let currentPath = $derived(page.url.pathname);
   const sidebar = useSidebar();
   let serviceToggleInFlight = $state<Set<string>>(new Set());
@@ -76,57 +70,16 @@
   });
   let lastSelectedItemId = $state<string | null>(null);
 
-  // Load SDK configs
-  $effect(() => {
-    loadSDKConfigs();
-    loadSDKManagers();
-  });
+  const configsQuery = createQuery(sdkConfigsQuery);
+  const managersQuery = createQuery(sdkManagersQuery);
+  const queryClient = useQueryClient();
+  const sdkConfigs = $derived<ProcessedSDKConfig[]>(configsQuery.data ?? []);
+  const sdkManagers = $derived<SDKManager[]>(managersQuery.data ?? []);
+  const loading = $derived(configsQuery.isPending);
+  const managersLoading = $derived(managersQuery.isPending);
 
-  async function loadSDKConfigs() {
-    try {
-      loading = true;
-      const configs = await sdkConfigService.getAllSDKConfigs();
-      sdkConfigs = configs;
-      logger.info('SDK configs loaded', {
-        context: 'SDKSidebar',
-        data: { count: configs.length },
-      });
-    } catch (error) {
-      logger.error('Failed to load SDK configs', {
-        context: 'SDKSidebar',
-        error,
-      });
-    } finally {
-      loading = false;
-    }
-  }
-
-  async function loadSDKManagers() {
-    try {
-      managersLoading = true;
-      const managers = await invoke<SDKManager[]>('get_all_sdk_managers');
-      sdkManagers = Array.isArray(managers) ? managers : [];
-    } catch (error) {
-      logger.error('Failed to load SDK managers', {
-        context: 'SDKSidebar',
-        error,
-      });
-      sdkManagers = [];
-    } finally {
-      managersLoading = false;
-    }
-  }
-
-  async function refreshSDKConfigsSilent() {
-    try {
-      const configs = await sdkConfigService.getAllSDKConfigs();
-      sdkConfigs = configs;
-    } catch (error) {
-      logger.error('Failed to refresh SDK configs', {
-        context: 'SDKSidebar',
-        error,
-      });
-    }
+  function refreshSDKConfigsSilent() {
+    return queryClient.invalidateQueries({ queryKey: queryKeys.sdk.configs });
   }
 
   // Navigation items - using actual routes
@@ -989,7 +942,11 @@
     <div class="divider-edge-t divider-edge-full p-3">
       <div class="space-y-1 text-center text-xs text-muted-foreground">
         <div>
-          {allSDKs.filter((sdk) => sdk.installed).length} of {allSDKs.length} SDKs
+          {#if sidebarLoading}
+            Loading SDKs...
+          {:else}
+            {allSDKs.filter((sdk) => sdk.installed).length} of {allSDKs.length} SDKs
+          {/if}
         </div>
       </div>
     </div>

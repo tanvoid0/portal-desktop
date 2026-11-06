@@ -197,7 +197,7 @@ export class IdeService {
       this.log.info('Setting framework IDE mapping', { framework, ideId });
       const result = await invokeClient.post<number>('set_framework_ide_mapping', {
         framework,
-        ide_id: ideId,
+        ideId,
       });
       this.log.info('Framework IDE mapping set successfully', {
         framework,

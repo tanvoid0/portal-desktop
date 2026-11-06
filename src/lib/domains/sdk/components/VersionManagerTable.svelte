@@ -14,24 +14,22 @@
   import { Input } from '$lib/components/ui/input';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import { sdkService } from '$lib/domains/sdk/services/sdkService';
-  import { Sparkles } from '@lucide/svelte';
-  import {
-    CheckCircle,
-    XCircle,
-    AlertTriangle,
-    RefreshCw,
-    Search,
-    Download,
-    Trash2,
-    Settings,
-    ExternalLink,
-    Shield,
-    ShieldOff,
-    Tag,
-    FolderOpen,
-    Play,
-    Square,
-  } from '@lucide/svelte';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Download from '~icons/fa6-solid/download';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Settings from '~icons/fa6-solid/gear';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import Shield from '~icons/fa6-solid/shield';
+  import ShieldOff from '~icons/fa6-solid/shield';
+  import Tag from '~icons/fa6-solid/tag';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
 
   interface VersionInfo {
     version: string;

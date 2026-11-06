@@ -172,16 +172,9 @@ if (typeof window !== 'undefined') {
   // Listen for system theme changes
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-  const handleSystemThemeChange = () => {
-    themeStore.subscribe((state) => {
-      if (state.current === 'system') {
-        themeStore.refreshSystemTheme();
-      }
-    })();
-  };
-
-  // Add listener
-  mediaQuery.addEventListener('change', handleSystemThemeChange);
+  // refreshSystemTheme() is a no-op unless the preference is 'system'. Never call it from inside
+  // a subscribe callback: its update() re-notifies that live subscriber forever (QA-006).
+  mediaQuery.addEventListener('change', () => themeStore.refreshSystemTheme());
 
   // Also listen for storage changes (in case theme is changed in another tab)
   window.addEventListener('storage', (e) => {

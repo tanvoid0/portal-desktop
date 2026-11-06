@@ -1,4 +1,13 @@
 <script lang="ts">
+  import FaBullseye from '~icons/fa6-solid/bullseye';
+  import FaXmark from '~icons/fa6-solid/xmark';
+  import FaListCheck from '~icons/fa6-solid/list-check';
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaTrash from '~icons/fa6-solid/trash';
+  import FaFolder from '~icons/fa6-solid/folder';
+  import FaFileLines from '~icons/fa6-solid/file-lines';
+  import FaRotate from '~icons/fa6-solid/rotate';
+  import FaCheck from '~icons/fa6-solid/check';
   import { Button } from '$lib/components/ui/button';
   import {
     Card,
@@ -13,7 +22,7 @@
   import { Textarea } from '$lib/components/ui/textarea';
   import { Label } from '$lib/components/ui/label';
   import Select from '$lib/components/ui/select.svelte';
-  import { TASK_PRIORITY_OPTIONS, TaskPriorityEnum } from '../types';
+  import { TASK_PRIORITY_OPTIONS } from '../types';
   import type {
     GeneratedTaskStructure,
     GeneratedTask,
@@ -88,7 +97,7 @@
   <Card>
     <CardHeader>
       <CardTitle class="flex items-center gap-2">
-        <Icon icon="lucide:target" class="h-5 w-5" />
+        <FaBullseye class="h-5 w-5" />
         Main Task
       </CardTitle>
     </CardHeader>
@@ -112,7 +121,7 @@
         <div class="space-y-2">
           <Label>Priority</Label>
           <Select
-            options={TaskPriorityEnum}
+            options={TASK_PRIORITY_OPTIONS}
             defaultValue={mainTask.priority}
             onSelect={(value) => (mainTask.priority = value as string)}
           />
@@ -140,8 +149,7 @@
           {#each suggestedLabels as tag, index}
             <Badge variant="secondary" class="cursor-pointer">
               {tag}
-              <Icon
-                icon="lucide:x"
+              <FaXmark
                 class="ml-1 h-3 w-3"
                 onclick={() => {
                   suggestedLabels = suggestedLabels.filter((_, i) => i !== index);
@@ -172,11 +180,11 @@
     <CardHeader>
       <CardTitle class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <Icon icon="lucide:list-checks" class="h-5 w-5" />
+          <FaListCheck class="h-5 w-5" />
           Subtasks ({subtasks.length})
         </div>
         <Button variant="outline" size="sm" onclick={addEmptySubtask}>
-          <Icon icon="lucide:plus" class="mr-1 h-4 w-4" />
+          <FaPlus class="mr-1 h-4 w-4" />
           Add Subtask
         </Button>
       </CardTitle>
@@ -192,7 +200,7 @@
               onclick={() => removeSubtask(index)}
               class="text-destructive"
             >
-              <Icon icon="lucide:trash-2" class="h-4 w-4" />
+              <FaTrash class="h-4 w-4" />
             </Button>
           </div>
 
@@ -232,7 +240,7 @@
     <Card>
       <CardHeader>
         <CardTitle class="flex items-center gap-2">
-          <Icon icon="lucide:folder" class="h-5 w-5" />
+          <FaFolder class="h-5 w-5" />
           Suggested Project
         </CardTitle>
         <CardDescription>
@@ -253,7 +261,7 @@
     <CardHeader>
       <CardTitle class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <Icon icon="lucide:file-text" class="h-5 w-5" />
+          <FaFileLines class="h-5 w-5" />
           Original Text Reference
         </div>
         <Button variant="ghost" size="sm" onclick={() => (showOriginalText = !showOriginalText)}>
@@ -282,13 +290,13 @@
           onRegenerate(generated);
         }}
       >
-        <Icon icon="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+        <FaRotate class="mr-2 h-4 w-4" />
         Regenerate
       </Button>
     {/if}
     <Button variant="outline" onclick={onCancel}>Cancel</Button>
     <Button onclick={handleApprove}>
-      <Icon icon="lucide:check" class="mr-2 h-4 w-4" />
+      <FaCheck class="mr-2 h-4 w-4" />
       Approve & Create Tasks
     </Button>
   </div>

@@ -13,7 +13,9 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
-  import { AlertCircle, RefreshCw, ArrowLeft } from '@lucide/svelte';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import VersionList from '$lib/domains/sdk/components/VersionList.svelte';
   import { goto } from '$app/navigation';
   import { confirmAction } from '$lib/utils/confirm';

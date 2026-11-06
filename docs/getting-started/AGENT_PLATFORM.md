@@ -100,13 +100,14 @@ API tokens are **not** read from env vars — set them in **AI → Providers** i
 
 ## Troubleshooting
 
-| Symptom                            | Fix                                                                                                        |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| "Can't reach agent-platform"       | Start agent-platform (`pnpm dev:server` or Docker). Confirm `http://127.0.0.1:18410/health` returns `200`. |
-| "Invalid catalog response"         | Update agent-platform to the latest version; catalog format is defined in its `/v1/catalog` API.           |
-| "Invalid or missing API token"     | Add a workspace token in AI → Providers, or disable auth on the platform for local dev.                    |
-| Coder agent fails                  | Ensure agent-platform exposes `/api/v1/coder/chat/stream` and your model supports tools if required.       |
-| `web_search` says "not configured" | Set `SEARCH_API_KEY` and `SEARCH_CX` on the platform, not in Portal.                                       |
+| Symptom                                              | Fix                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Can't reach agent-platform"                         | Start agent-platform (`pnpm dev:server` or Docker). Confirm `http://127.0.0.1:18410/health` returns `200`.                                                                                                                                                                          |
+| "Invalid catalog response"                           | Update agent-platform to the latest version; catalog format is defined in its `/v1/catalog` API.                                                                                                                                                                                    |
+| "Invalid or missing API token"                       | Add a workspace token in AI → Providers, or disable auth on the platform for local dev.                                                                                                                                                                                             |
+| Coder agent fails                                    | Ensure agent-platform exposes `/api/v1/coder/chat/stream` and your model supports tools if required.                                                                                                                                                                                |
+| `web_search` says "not configured"                   | Set `SEARCH_API_KEY` and `SEARCH_CX` on the platform, not in Portal.                                                                                                                                                                                                                |
+| Platform shows the wrong data, or an empty workspace | A bare `agent-platformd` is squatting port 18410. It defaults to `data/agent_platform.db` under whatever directory launched it and runs with no master key, and the app then attaches to it instead of its own server. Start the **Agent Platform app**, never the daemon directly. |
 
 ## Links
 

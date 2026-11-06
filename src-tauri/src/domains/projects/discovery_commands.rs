@@ -11,7 +11,9 @@ use std::time::Instant;
 use tauri::State;
 
 use crate::database::DatabaseManager;
-use crate::domains::projects::discovery::{DiscoveryConfig, DiscoveryReport, DiscoveryState};
+use crate::domains::projects::discovery::{
+    DiscoveryConfig, DiscoveryReport, DiscoveryState, UnavailableProject,
+};
 use crate::domains::projects::services::discovery_service::{
     DiscoveryImportResult, DiscoveryService,
 };
@@ -123,6 +125,14 @@ pub async fn set_project_triage(
 ) -> Result<bool, String> {
     let service = DiscoveryService::new(&db_manager);
     service.set_triage(id, decision, note, successor).await
+}
+
+/// Registry rows whose folder is gone, with likely new homes for each.
+#[portal_rpc_macro::rpc]
+pub async fn find_unavailable_projects(
+    db_manager: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<UnavailableProject>, String> {
+    DiscoveryService::new(&db_manager).find_unavailable().await
 }
 
 #[portal_rpc_macro::rpc]

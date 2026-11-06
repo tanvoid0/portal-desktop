@@ -43,7 +43,7 @@
   }
 </script>
 
-<div class="container mx-auto space-y-6 px-4 py-8">
+<div class="space-y-6">
   <PageHeader
     title="Create New Project"
     description="Create a new project and let us auto-detect its properties from the directory structure."

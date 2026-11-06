@@ -180,3 +180,15 @@ export function shortCommitHash(commit: string | undefined): string | undefined 
   if (!commit) return undefined;
   return commit.length > 7 ? commit.slice(0, 7) : commit;
 }
+
+/**
+ * Descriptions read from READMEs carry HTML, badge images and URLs; keep the words.
+ * Applied at display so rows imported before the cleanup read well too.
+ */
+export function readableDescription(text: string | undefined): string {
+  return (text ?? '')
+    .replace(/<[^>]*>?/g, ' ') // tags, including one cut off by the length limit
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

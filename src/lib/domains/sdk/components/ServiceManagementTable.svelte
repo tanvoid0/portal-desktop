@@ -14,25 +14,23 @@
   import { Input } from '$lib/components/ui/input';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import { Progress } from '$lib/components/ui/progress';
-  import {
-    Play,
-    Square,
-    RefreshCw,
-    Settings,
-    FileText,
-    ExternalLink,
-    AlertTriangle,
-    CheckCircle,
-    XCircle,
-    Clock,
-    Activity,
-    Search,
-    Filter,
-    Plus,
-    Trash2,
-    Eye,
-    EyeOff,
-  } from '@lucide/svelte';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Settings from '~icons/fa6-solid/gear';
+  import FileText from '~icons/fa6-solid/file-lines';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Clock from '~icons/fa6-solid/clock';
+  import Activity from '~icons/fa6-solid/wave-square';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Filter from '~icons/fa6-solid/filter';
+  import Plus from '~icons/fa6-solid/plus';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Eye from '~icons/fa6-solid/eye';
+  import EyeOff from '~icons/fa6-solid/eye-slash';
 
   interface ServiceInfo {
     id: string;

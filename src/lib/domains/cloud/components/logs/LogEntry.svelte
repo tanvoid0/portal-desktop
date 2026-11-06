@@ -2,7 +2,7 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import { Copy } from '@lucide/svelte';
+	import Copy from '~icons/fa6-solid/copy';
 	import { toastActions } from '$lib/domains/shared/stores/toastStore';
 	import type { K8sLog } from '../../types/k8s';
 	

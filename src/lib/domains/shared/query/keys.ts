@@ -6,6 +6,8 @@ export const queryKeys = {
     all: ['projects'] as const,
     detail: (id: number | string) => ['projects', id] as const,
     modules: ['project-modules'] as const,
+    /** Under `projects` so any project write refetches it. */
+    unavailable: ['projects', 'unavailable'] as const,
   },
   github: {
     status: ['github', 'status'] as const,
@@ -21,6 +23,9 @@ export const queryKeys = {
       ['github', 'workflow-job-logs', owner, repo, jobId] as const,
     projectLink: (projectId: number | string) => ['github', 'project-link', projectId] as const,
   },
+  ai: {
+    logs: (filters: object) => ['ai', 'logs', filters] as const,
+  },
   tasks: {
     all: ['tasks'] as const,
     detail: (id: string) => ['tasks', id] as const,
@@ -29,6 +34,7 @@ export const queryKeys = {
     resources: (type: string, namespace: string) => ['cloud', type, namespace] as const,
   },
   sdk: {
+    configs: ['sdk', 'configs'] as const,
     managers: ['sdk', 'managers'] as const,
     versions: (name: string) => ['sdk', name, 'versions'] as const,
   },

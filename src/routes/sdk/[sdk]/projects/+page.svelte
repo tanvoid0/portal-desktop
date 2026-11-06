@@ -18,7 +18,9 @@
   } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { ArrowLeft, FolderOpen, ExternalLink } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
   import { goto } from '$app/navigation';
   import { PageLoading, PageError } from '$lib/components/shell';
 

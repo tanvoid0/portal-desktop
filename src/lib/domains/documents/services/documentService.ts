@@ -61,7 +61,7 @@ export class DocumentService {
   async updateDraft(id: number, contentDraft: string): Promise<Document> {
     const response = await invoke<TauriDocumentResponse>('update_document_draft', {
       id,
-      content_draft: contentDraft,
+      contentDraft,
     });
     return convertTauriDocumentToDocument(response);
   }
@@ -76,9 +76,9 @@ export class DocumentService {
     const response = await invoke<TauriDocumentResponse>('save_document', {
       id,
       title: title || null,
-      content: content || null,
+      content: content ?? null,
       tags: tags || null,
-      is_archived: isArchived !== undefined ? isArchived : null,
+      isArchived: isArchived !== undefined ? isArchived : null,
     });
     return convertTauriDocumentToDocument(response);
   }

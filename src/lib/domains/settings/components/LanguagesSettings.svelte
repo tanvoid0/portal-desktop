@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import { Code } from '@lucide/svelte';
+  import Code from '~icons/fa6-solid/code';
   import { learningService } from '$lib/domains/learning';
   import ItemSettings from './shared/ItemSettings.svelte';
   import { languageServiceAdapter } from './shared/serviceAdapters';

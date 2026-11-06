@@ -211,7 +211,7 @@ function groupByStack(containers: DockerContainer[], deployments: Deployment[]):
   for (const [project, projectContainers] of composeMap) {
     groups.push(
       buildGroup(`compose-${project}`, project, 'compose', 'compose', projectContainers, {
-        subtitle: `${projectContainers.length} services`,
+        subtitle: `${projectContainers.length} service${projectContainers.length === 1 ? '' : 's'}`,
       })
     );
   }

@@ -44,5 +44,8 @@ export function getAiTabBreadcrumb(pathname: string): {
   if (isAiCoderRoute(pathname)) {
     return { label: 'Code', href: AI_CODER_PATH, icon: 'code' };
   }
+  if (pathname === '/ai/logs') {
+    return { label: 'AI Logs', href: '/ai/logs', icon: 'file-text' };
+  }
   return { label: 'Home', href: AI_CHAT_PATH, icon: 'message-circle' };
 }

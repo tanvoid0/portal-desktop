@@ -1,11 +1,24 @@
 <script lang="ts">
+  import FaTableColumns from '~icons/fa6-solid/table-columns';
+  import FaList from '~icons/fa6-solid/list';
+  import FaSquareCheck from '~icons/fa6-solid/square-check';
+  import FaCheckDouble from '~icons/fa6-solid/check-double';
+  import FaXmark from '~icons/fa6-solid/xmark';
+  import FaTrash from '~icons/fa6-solid/trash';
+  import FaKeyboard from '~icons/fa6-solid/keyboard';
+  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaMagnifyingGlass from '~icons/fa6-solid/magnifying-glass';
+  import FaFilter from '~icons/fa6-solid/filter';
+  import FaCircle from '~icons/fa6-solid/circle';
+  import FaFlag from '~icons/fa6-solid/flag';
+  import FaFilterCircleXmark from '~icons/fa6-solid/filter-circle-xmark';
   import * as Dialog from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Separator } from '$lib/components/ui/separator';
   import { Input } from '$lib/components/ui/input';
-  import Icon from '@iconify/svelte';
   import { goto } from '$app/navigation';
   import { taskActions, isLoading, error } from '../stores/taskStore';
   import { taskUi, getSubtaskCount } from '../state/taskUi.svelte';
@@ -14,7 +27,7 @@
   import { confirmAction } from '$lib/utils/confirm';
   import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
   import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
-  import type { Task, TaskStatus, TaskPriority } from '../types';
+  import { taskStatusLabel, type Task, type TaskStatus, type TaskPriority } from '../types';
   import TaskCard from './TaskCard.svelte';
   import TaskStats from './TaskStats.svelte';
   import TaskProgress from './TaskProgress.svelte';
@@ -65,18 +78,18 @@
 
   // Computed values
   let parentTasks = $derived(taskUi.parentTasks);
-  let filteredTasksWithSearch = $derived(
-    parentTasks.filter((task) => {
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        return (
-          task.title.toLowerCase().includes(query) ||
-          (task.description && task.description.toLowerCase().includes(query))
-        );
-      }
-      return true;
-    })
-  );
+  let filteredTasksWithSearch = $derived(taskUi.filteredTasks);
+
+  // Kanban/List read taskUi.filteredTasks, so push the local filter state into it.
+  $effect(() => {
+    taskUi.taskFilters = {
+      search: searchQuery,
+      status: statusFilters,
+      priority: priorityFilters,
+      type: typeFilters,
+    };
+  });
+  $effect(() => () => taskUi.clearFilters());
 
   // Active filter states
   let activeStatusFilters = $derived(statusFilters);
@@ -226,9 +239,14 @@
 
   async function handleBulkDelete() {
     if (taskUi.selectedTaskIds.size > 0) {
+      const subtaskCount = Array.from(taskUi.selectedTaskIds).reduce(
+        (n, id) => n + getSubtaskCount(id, taskUi.tasks),
+        0
+      );
       const confirmed = await confirmAction(
-        `Are you sure you want to delete ${taskUi.selectedTaskIds.size} selected task${taskUi.selectedTaskIds.size === 1 ? '' : 's'}?`,
-        'Delete tasks'
+        `Are you sure you want to delete ${taskUi.selectedTaskIds.size} selected task${taskUi.selectedTaskIds.size === 1 ? '' : 's'}?${subtaskCount ? ` Also deletes ${subtaskCount} subtask${subtaskCount === 1 ? '' : 's'}.` : ''}`,
+        'Delete tasks',
+        { confirmLabel: 'Delete', destructive: true }
       );
       if (confirmed) {
         try {
@@ -293,112 +311,111 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="container mx-auto space-y-6 bg-background p-6">
-  <PageHeader title="Tasks" description="Organize and track your work efficiently">
-    {#snippet actions()}
-      <!-- View Toggle -->
-      <div class="flex rounded-lg bg-muted p-1">
-        <Button
-          onclick={() => (currentView = 'kanban')}
-          variant={currentView === 'kanban' ? 'default' : 'ghost'}
-          size="sm"
-          class="px-3 py-1.5 text-sm font-medium"
-        >
-          <Icon icon="mdi:view-column" class="mr-1.5 h-4 w-4" />
-          Kanban
-        </Button>
-        <Button
-          onclick={() => (currentView = 'list')}
-          variant={currentView === 'list' ? 'default' : 'ghost'}
-          size="sm"
-          class="px-3 py-1.5 text-sm font-medium"
-        >
-          <Icon icon="mdi:format-list-bulleted" class="mr-1.5 h-4 w-4" />
-          List
-        </Button>
-      </div>
-
-      <!-- Multi-select Controls -->
-      {#if taskUi.isMultiSelectMode}
-        <div
-          class="flex items-center gap-3 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 dark:border-warning-800 dark:bg-warning-900/20"
-        >
-          <Badge
-            variant="secondary"
-            class="bg-warning-100 text-warning-800 dark:bg-warning-800 dark:text-warning-100"
-          >
-            <Icon icon="mdi:checkbox-multiple-marked" class="mr-1 h-3 w-3" />
-            {taskUi.selectedTaskIds.size} selected
-          </Badge>
-          <div class="flex items-center gap-2">
-            <Button onclick={handleSelectAll} variant="outline" size="sm" class="h-7 px-2 text-xs">
-              <Icon icon="mdi:select-all" class="mr-1 h-3 w-3" />
-              Select All
-            </Button>
-            <Button
-              onclick={handleClearSelection}
-              variant="outline"
-              size="sm"
-              class="h-7 px-2 text-xs"
-            >
-              <Icon icon="mdi:close" class="mr-1 h-3 w-3" />
-              Clear
-            </Button>
-            <Button
-              onclick={handleBulkDelete}
-              disabled={taskUi.selectedTaskIds.size === 0}
-              variant="destructive"
-              size="sm"
-              class="h-7 px-2 text-xs"
-            >
-              <Icon icon="mdi:delete" class="mr-1 h-3 w-3" />
-              Delete ({taskUi.selectedTaskIds.size})
-            </Button>
-            <Button
-              onclick={handleMultiSelectToggle}
-              variant="ghost"
-              size="sm"
-              class="h-7 px-2 text-xs"
-            >
-              <Icon icon="mdi:close" class="mr-1 h-3 w-3" />
-              Cancel
-            </Button>
-          </div>
-        </div>
-      {:else}
-        <Button
-          onclick={handleMultiSelectToggle}
-          variant="outline"
-          class="flex items-center space-x-2"
-        >
-          <Icon icon="mdi:checkbox-multiple-marked" class="h-4 w-4" />
-          <span>Multi-Select</span>
-        </Button>
-      {/if}
-
-      <!-- Action Buttons -->
+  <PageHeader title="Tasks" description="Organize and track your work efficiently" />
+  <div class="flex flex-wrap items-center gap-2">
+    <!-- View Toggle -->
+    <div class="flex rounded-lg bg-muted p-1">
       <Button
-        onclick={() => (showKeyboardShortcuts = true)}
-        variant="ghost"
-        class="flex items-center space-x-2"
-        title="Keyboard Shortcuts (Ctrl+H)"
+        onclick={() => (currentView = 'kanban')}
+        variant={currentView === 'kanban' ? 'default' : 'ghost'}
+        size="sm"
+        class="px-3 py-1.5 text-sm font-medium"
       >
-        <Icon icon="mdi:keyboard" class="h-4 w-4" />
-        <span>Shortcuts</span>
+        <FaTableColumns class="mr-1.5 h-4 w-4" />
+        Kanban
       </Button>
       <Button
-        onclick={() => goto('/tasks/generate')}
+        onclick={() => (currentView = 'list')}
+        variant={currentView === 'list' ? 'default' : 'ghost'}
+        size="sm"
+        class="px-3 py-1.5 text-sm font-medium"
+      >
+        <FaList class="mr-1.5 h-4 w-4" />
+        List
+      </Button>
+    </div>
+
+    <!-- Multi-select Controls -->
+    {#if taskUi.isMultiSelectMode}
+      <div
+        class="flex items-center gap-3 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 dark:border-warning-800 dark:bg-warning-900/20"
+      >
+        <Badge
+          variant="secondary"
+          class="bg-warning-100 text-warning-800 dark:bg-warning-800 dark:text-warning-100"
+        >
+          <FaSquareCheck class="mr-1 h-3 w-3" />
+          {taskUi.selectedTaskIds.size} selected
+        </Badge>
+        <div class="flex items-center gap-2">
+          <Button onclick={handleSelectAll} variant="outline" size="sm" class="h-7 px-2 text-xs">
+            <FaCheckDouble class="mr-1 h-3 w-3" />
+            Select All
+          </Button>
+          <Button
+            onclick={handleClearSelection}
+            variant="outline"
+            size="sm"
+            class="h-7 px-2 text-xs"
+          >
+            <FaXmark class="mr-1 h-3 w-3" />
+            Clear
+          </Button>
+          <Button
+            onclick={handleBulkDelete}
+            disabled={taskUi.selectedTaskIds.size === 0}
+            variant="destructive"
+            size="sm"
+            class="h-7 px-2 text-xs"
+          >
+            <FaTrash class="mr-1 h-3 w-3" />
+            Delete ({taskUi.selectedTaskIds.size})
+          </Button>
+          <Button
+            onclick={handleMultiSelectToggle}
+            variant="ghost"
+            size="sm"
+            class="h-7 px-2 text-xs"
+          >
+            <FaXmark class="mr-1 h-3 w-3" />
+            Cancel
+          </Button>
+        </div>
+      </div>
+    {:else}
+      <Button
+        onclick={handleMultiSelectToggle}
         variant="outline"
         class="flex items-center space-x-2"
       >
-        <Icon icon="lucide:sparkles" class="h-4 w-4" />
-        <span>Generate Tasks with AI</span>
+        <FaSquareCheck class="h-4 w-4" />
+        <span>Multi-Select</span>
       </Button>
-      <Button onclick={handleTaskCreate} class="flex items-center space-x-2">
-        <Icon icon="mdi:plus" class="h-4 w-4" />
-        <span>New Task</span>
-      </Button>
-    {/snippet}
-  </PageHeader>
+    {/if}
+
+    <!-- Action Buttons -->
+    <Button
+      onclick={() => (showKeyboardShortcuts = true)}
+      variant="ghost"
+      class="flex items-center space-x-2"
+      title="Keyboard Shortcuts (Ctrl+H)"
+    >
+      <FaKeyboard class="h-4 w-4" />
+      <span>Shortcuts</span>
+    </Button>
+    <Button
+      onclick={() => goto('/tasks/generate')}
+      variant="outline"
+      class="flex items-center space-x-2"
+    >
+      <FaWandMagicSparkles class="h-4 w-4" />
+      <span>Generate Tasks with AI</span>
+    </Button>
+    <Button onclick={handleTaskCreate} class="flex items-center space-x-2">
+      <FaPlus class="h-4 w-4" />
+      <span>New Task</span>
+    </Button>
+  </div>
 
   <!-- Main Content -->
   <div class="w-full">
@@ -420,8 +437,7 @@
         <div class="flex items-center gap-3">
           <!-- Search Input -->
           <div class="relative flex-1">
-            <Icon
-              icon="mdi:magnify"
+            <FaMagnifyingGlass
               class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
             />
             <Input
@@ -438,7 +454,7 @@
             onclick={() => (showFilterModal = !showFilterModal)}
             class="flex items-center gap-2"
           >
-            <Icon icon="mdi:filter-variant" class="h-4 w-4" />
+            <FaFilter class="h-4 w-4" />
             Filters
             {#if hasActiveFilters}
               <Badge variant="secondary" class="ml-1 px-1.5 py-0.5 text-xs">
@@ -456,7 +472,7 @@
 
               {#if searchQuery.trim() !== ''}
                 <Badge variant="outline" class="text-xs">
-                  <Icon icon="mdi:magnify" class="mr-1 h-3 w-3" />
+                  <FaMagnifyingGlass class="mr-1 h-3 w-3" />
                   "{searchQuery}"
                   <Button
                     onclick={() => (searchQuery = '')}
@@ -464,36 +480,29 @@
                     size="sm"
                     class="ml-1 h-4 w-4 p-0 hover:bg-muted"
                   >
-                    <Icon icon="mdi:close" class="h-3 w-3" />
+                    <FaXmark class="h-3 w-3" />
                   </Button>
                 </Badge>
               {/if}
 
               {#each activeStatusFilters as status}
                 <Badge variant="outline" class="text-xs">
-                  <Icon icon="mdi:circle" class="mr-1 h-3 w-3" />
-                  {status === 'pending'
-                    ? 'To Do'
-                    : status === 'in-progress'
-                      ? 'In Progress'
-                      : status === 'completed'
-                        ? 'Completed'
-                        : 'Cancelled'}
+                  <FaCircle class="mr-1 h-3 w-3" />
+                  {taskStatusLabel(status)}
                   <Button
                     onclick={() => toggleStatusFilter(status)}
                     variant="ghost"
                     size="sm"
                     class="ml-1 h-4 w-4 p-0 hover:bg-muted"
                   >
-                    <Icon icon="mdi:close" class="h-3 w-3" />
+                    <FaXmark class="h-3 w-3" />
                   </Button>
                 </Badge>
               {/each}
 
               {#each activePriorityFilters as priority}
                 <Badge variant="outline" class="text-xs">
-                  <Icon
-                    icon="mdi:flag"
+                  <FaFlag
                     class="mr-1 h-3 w-3 {priority === 'high'
                       ? 'text-red-500'
                       : priority === 'medium'
@@ -507,7 +516,7 @@
                     size="sm"
                     class="ml-1 h-4 w-4 p-0 hover:bg-muted"
                   >
-                    <Icon icon="mdi:close" class="h-3 w-3" />
+                    <FaXmark class="h-3 w-3" />
                   </Button>
                 </Badge>
               {/each}
@@ -521,13 +530,13 @@
                     size="sm"
                     class="ml-1 h-4 w-4 p-0 hover:bg-muted"
                   >
-                    <Icon icon="mdi:close" class="h-3 w-3" />
+                    <FaXmark class="h-3 w-3" />
                   </Button>
                 </Badge>
               {/each}
 
               <Button variant="outline" size="sm" onclick={clearAllFilters} class="ml-2 text-xs">
-                <Icon icon="mdi:filter-remove" class="mr-1 h-3 w-3" />
+                <FaFilterCircleXmark class="mr-1 h-3 w-3" />
                 Clear All
               </Button>
             </div>
@@ -567,6 +576,13 @@
         description="Create your first task to start organizing your work."
         actionLabel="Create Task"
         onAction={() => goto('/tasks/create')}
+      />
+    {:else if filteredTasksWithSearch.length === 0}
+      <PageEmpty
+        title="No matching tasks"
+        description="No tasks match the current search or filters."
+        actionLabel="Clear filters"
+        onAction={clearAllFilters}
       />
     {:else if currentView === 'kanban'}
       <KanbanBoard

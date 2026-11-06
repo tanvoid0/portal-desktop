@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight } from '@lucide/svelte';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
   import { Button } from '$lib/components/ui/button';
   import type { ActivitySummaryPart } from '../utils/feedBlocks.js';
 

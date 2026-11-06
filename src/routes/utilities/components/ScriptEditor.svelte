@@ -20,7 +20,9 @@
     CardTitle,
   } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import { Plus, X, Trash2 } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import X from '~icons/fa6-solid/xmark';
+  import Trash2 from '~icons/fa6-solid/trash';
   import {
     CustomScriptService,
     type CustomScript,

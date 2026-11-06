@@ -214,6 +214,16 @@ export function lastUserTurnNeedsReply(messages: ChatMessage[]): boolean {
   return true;
 }
 
+const PROVIDER_KEY = 'portal.coder.backendProvider';
+
+function loadStoredProvider(): string | null {
+  try {
+    return localStorage.getItem(PROVIDER_KEY);
+  } catch {
+    return null;
+  }
+}
+
 class CoderSessionState {
   initialized = false;
   /** Shared init promise so concurrent callers wait for full hydration. */
@@ -232,7 +242,7 @@ class CoderSessionState {
   changes = $state<FileChange[]>([]);
   runningThreadIds = $state<Set<string>>(new Set());
   selectedProvider = $state<ProviderType | null>('AgentPlatform');
-  selectedBackendProvider = $state<string | null>(null);
+  selectedBackendProvider = $state<string | null>(loadStoredProvider());
   selectedModel = $state<string | null>(null);
   multitaskMode = $state(false);
   /** Coordinator thread when drilling into a sub-agent session. */
@@ -1395,6 +1405,11 @@ class CoderSessionState {
 
   async handleBackendProviderChange(providerId: string) {
     this.selectedBackendProvider = providerId;
+    try {
+      localStorage.setItem(PROVIDER_KEY, providerId);
+    } catch {
+      /* private mode */
+    }
     if (!this.thread) return;
     try {
       await this.syncThreadLlmConfig(this.thread.id);

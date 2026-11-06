@@ -9,7 +9,7 @@
   import { Label } from '$lib/components/ui/label';
   import { Button } from '$lib/components/ui/button';
   import { Checkbox } from '$lib/components/ui/checkbox';
-  import { X } from '@lucide/svelte';
+  import X from '~icons/fa6-solid/xmark';
   import { FilePicker } from '$lib/domains/shared/components';
   import type { ScriptParameter } from '$lib/domains/custom_scripts/services/customScriptService';
 

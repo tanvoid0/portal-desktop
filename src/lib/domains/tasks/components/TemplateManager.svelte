@@ -1,4 +1,9 @@
 <script lang="ts">
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaXmark from '~icons/fa6-solid/xmark';
+  import FaTableCellsLarge from '~icons/fa6-solid/table-cells-large';
+  import FaPencil from '~icons/fa6-solid/pencil';
+  import FaTrash from '~icons/fa6-solid/trash';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
@@ -19,7 +24,6 @@
   import { taskUi } from '../state/taskUi.svelte';
   import type { TaskTemplate, TaskStatus, TaskPriority } from '../types';
   import { TASK_TYPE_OPTIONS, TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from '../types';
-  import Icon from '@iconify/svelte';
 
   interface Props {
     onApplyTemplate?: (template: TaskTemplate) => void;
@@ -145,7 +149,7 @@
       <Dialog bind:open={showCreateDialog}>
         <DialogTrigger>
           <Button variant="outline" size="sm">
-            <Icon icon="mdi:plus" class="mr-1 h-4 w-4" />
+            <FaPlus class="mr-1 h-4 w-4" />
             New Template
           </Button>
         </DialogTrigger>
@@ -213,7 +217,7 @@
                   onkeydown={handleTagKeydown}
                 />
                 <Button type="button" variant="outline" onclick={addTag}>
-                  <Icon icon="mdi:plus" class="h-4 w-4" />
+                  <FaPlus class="h-4 w-4" />
                 </Button>
               </div>
               {#if templateTags.length > 0}
@@ -228,7 +232,7 @@
                         onclick={() => removeTag(tag)}
                         class="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
                       >
-                        <Icon icon="mdi:close" class="h-3 w-3" />
+                        <FaXmark class="h-3 w-3" />
                       </Button>
                     </Badge>
                   {/each}
@@ -260,7 +264,7 @@
   <CardContent class="p-4 pt-0">
     {#if taskUi.taskTemplates.length === 0}
       <div class="py-8 text-center text-muted-foreground">
-        <Icon icon="mdi:template" class="mx-auto mb-2 h-12 w-12" />
+        <FaTableCellsLarge class="mx-auto mb-2 h-12 w-12" />
         <div class="text-sm">No templates yet</div>
         <div class="text-xs">Create your first template to get started</div>
       </div>
@@ -277,7 +281,7 @@
                 onclick={() => applyTemplate(template)}
               >
                 <div class="flex items-center gap-2">
-                  <Icon icon="mdi:template" class="h-4 w-4" />
+                  <FaTableCellsLarge class="h-4 w-4" />
                   <div class="text-left">
                     <div class="font-medium">{template.name}</div>
                     {#if template.description}
@@ -309,7 +313,7 @@
                 onclick={() => editTemplate(template)}
                 title="Edit template"
               >
-                <Icon icon="mdi:pencil" class="h-4 w-4" />
+                <FaPencil class="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
@@ -318,7 +322,7 @@
                 title="Delete template"
                 class="text-destructive hover:text-destructive"
               >
-                <Icon icon="mdi:delete" class="h-4 w-4" />
+                <FaTrash class="h-4 w-4" />
               </Button>
             </div>
           </div>

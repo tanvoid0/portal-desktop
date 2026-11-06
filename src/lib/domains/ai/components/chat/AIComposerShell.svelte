@@ -2,7 +2,9 @@
   import type { Snippet } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
-  import { ArrowUp, ListOrdered, Square } from '@lucide/svelte';
+  import ArrowUp from '~icons/fa6-solid/arrow-up';
+  import ListOrdered from '~icons/fa6-solid/list-ol';
+  import Square from '~icons/fa6-solid/square';
   import { cn } from '$lib/utils.js';
 
   interface Props {
@@ -116,7 +118,7 @@
         {disabled}
         onkeydown={handleKeydown}
         oninput={autoResize}
-        class="max-h-40 min-h-[36px] w-full resize-none border-0 bg-transparent px-1 py-1 text-xs leading-relaxed shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0"
+        class="max-h-40 min-h-[36px] w-full resize-none border-0 bg-transparent px-1 py-1 text-xs leading-relaxed shadow-none outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 dark:bg-transparent"
       />
 
       <div class="mt-1 flex items-center gap-1">

@@ -13,8 +13,9 @@
     CollapsibleContent,
     CollapsibleTrigger,
   } from '$lib/components/ui/collapsible';
-  import { ChevronDown } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
   import NavIcon from './nav-icon.svelte';
+  import { sidebarTooltipProps } from './sidebar-tooltip.svelte';
   import type { NavItem, NavSection } from './nav-types';
 
   interface Props {
@@ -75,6 +76,7 @@
                 size="lg"
                 isActive={isSubmenuActive(item, currentPath)}
                 tooltipContent={item.title}
+                tooltipContentProps={sidebarTooltipProps}
               >
                 {#snippet child({ props })}
                   <a {...props} href={item.url} onclick={() => expandOnNavigate(item)}>
@@ -122,6 +124,7 @@
             size="lg"
             isActive={isNavItemActive(item.url, currentPath)}
             tooltipContent={item.title}
+            tooltipContentProps={sidebarTooltipProps}
           >
             {#snippet child({ props })}
               <a {...props} href={item.url}>

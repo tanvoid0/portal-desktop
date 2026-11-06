@@ -3,7 +3,7 @@
 -->
 
 <script lang="ts">
-  import { Package } from '@lucide/svelte';
+  import Package from '~icons/fa6-solid/box-open';
   import { learningService } from '$lib/domains/learning';
   import ItemSettings from './shared/ItemSettings.svelte';
   import { packageManagerServiceAdapter } from './shared/serviceAdapters';

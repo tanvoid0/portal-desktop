@@ -20,7 +20,8 @@
   import { Separator } from '$lib/components/ui/separator';
   import { toastActions } from '$lib/utils/toast';
   import { aiProviderService } from '../../services/aiProviderService.js';
-  import { formatModelMetadata, flattenCatalogModels } from '../../utils/catalog.js';
+  import { aiPlatform } from '../../state/aiPlatform.svelte.js';
+  import { formatModelMetadata, flattenCatalogModels, isAuthError } from '../../utils/catalog.js';
   import type {
     ProviderConfig,
     ProviderType,
@@ -29,16 +30,16 @@
     CatalogProvider,
     CatalogModel,
   } from '../../types/index.js';
-  import {
-    Brain,
-    CheckCircle2,
-    RefreshCw,
-    AlertTriangle,
-    Server,
-    Sparkles,
-    Loader2,
-    Key,
-  } from '@lucide/svelte';
+  import Brain from '~icons/fa6-solid/brain';
+  import CheckCircle2 from '~icons/fa6-solid/circle-check';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
+  import Server from '~icons/fa6-solid/server';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Key from '~icons/fa6-solid/key';
+  import Eye from '~icons/fa6-solid/eye';
+  import EyeOff from '~icons/fa6-solid/eye-slash';
 
   const providerType: ProviderType = 'AgentPlatform';
 
@@ -53,7 +54,45 @@
   let loadingCatalog = $state(false);
   let catalogLive = $state(false);
 
-  onMount(loadProvider);
+  let showApiKey = $state(false);
+  let pairOpen = $state(false);
+  let pairing = $state(false);
+  // The master key is only ever read from the DOM node inside pair(); it is
+  // never held in component state.
+  let masterKeyInput = $state<HTMLInputElement | null>(null);
+  /** Real auth state of the saved token; `unknown` until a probe/test has run. */
+  let connection = $state<'unknown' | 'ok' | 'unauthorized' | 'unreachable'>('unknown');
+
+  function markConnection(error?: unknown) {
+    connection = error === undefined ? 'ok' : isAuthError(error) ? 'unauthorized' : 'unreachable';
+  }
+
+  onMount(() => {
+    void aiPlatform.refresh();
+    void loadProvider();
+  });
+
+  async function pair() {
+    const key = masterKeyInput?.value ?? '';
+    if (!key.trim()) return;
+    pairing = true;
+    try {
+      const res = await aiProviderService.pairPlatform(key);
+      if (res.ok) {
+        toastActions.success('Paired', 'The API token was replaced with a fresh one.');
+        pairOpen = false;
+        await loadProvider();
+      } else {
+        toastActions.error('Pairing failed', res.detail);
+      }
+    } catch (error) {
+      toastActions.error('Pairing failed', error);
+    } finally {
+      if (masterKeyInput) masterKeyInput.value = '';
+      pairing = false;
+      await aiPlatform.refresh();
+    }
+  }
 
   async function loadProvider() {
     isLoading = true;
@@ -67,6 +106,12 @@
       providerConfig = config;
       defaultProvider = defaultProviderType;
       configStatus = status;
+      if (status?.is_configured) {
+        aiProviderService
+          .testProvider(providerType)
+          .then(() => markConnection())
+          .catch(markConnection);
+      }
     } catch (error) {
       console.error('Failed to load Agent Platform configuration:', error);
       toastActions.error('Failed to load configuration', error);
@@ -77,6 +122,7 @@
 
   async function updateConfig(updates: Partial<ProviderConfig>) {
     if (!providerConfig) return;
+    if ('api_key' in updates || 'base_url' in updates) connection = 'unknown';
 
     const updated: ProviderConfig = {
       ...providerConfig,
@@ -128,10 +174,12 @@
 
       await new Promise((resolve) => setTimeout(resolve, 100));
       await aiProviderService.testProvider(providerType);
+      markConnection();
       toastActions.success('Connection successful');
 
       configStatus = await aiProviderService.getConfigStatus(providerType);
     } catch (error) {
+      markConnection(error);
       toastActions.error('Connection test failed', error);
     } finally {
       testingProvider = false;
@@ -155,6 +203,7 @@
 
       catalogProviders = catalog.providers;
       catalogModels = flattenCatalogModels(catalog.providers);
+      if (live) markConnection();
 
       if (catalogModels.length === 0) {
         toastActions.info(
@@ -172,6 +221,7 @@
         }
       }
     } catch (error) {
+      markConnection(error);
       toastActions.error('Failed to load catalog', error);
     } finally {
       loadingCatalog = false;
@@ -215,10 +265,50 @@
         <CardTitle class="flex items-center gap-2">
           <Server class="h-5 w-5" />
           Agent Platform
-          {#if configStatus?.is_configured}
+          {#if connection === 'unauthorized'}
+            <Badge variant="destructive" class="ml-2">Token rejected</Badge>
+          {:else if connection === 'unreachable'}
+            <Badge variant="destructive" class="ml-2">Unreachable</Badge>
+          {:else if connection === 'ok'}
             <Badge class="ml-2 bg-green-500 hover:bg-green-600">Ready</Badge>
           {/if}
         </CardTitle>
+        <div
+          class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+          data-testid="platform-health"
+        >
+          {#if aiPlatform.checking && !aiPlatform.known}
+            Checking {aiPlatform.baseUrl || 'platform'}…
+          {:else if aiPlatform.known}
+            <span>{aiPlatform.baseUrl}</span>
+            <Badge variant={aiPlatform.reachable ? 'secondary' : 'destructive'}>
+              {aiPlatform.reachable ? 'reachable' : 'not running'}
+            </Badge>
+            <Badge variant="secondary">
+              {aiPlatform.authRequired ? 'auth required' : 'no auth'}
+            </Badge>
+            {#if aiPlatform.reachable && aiPlatform.authRequired}
+              <Badge variant={aiPlatform.authenticated ? 'secondary' : 'destructive'}>
+                {aiPlatform.authenticated ? 'authenticated' : 'not authenticated'}
+              </Badge>
+            {/if}
+            {#if aiPlatform.detail}<span class="truncate">{aiPlatform.detail}</span>{/if}
+          {:else}
+            Platform health unavailable.
+          {/if}
+          {#if aiPlatform.known && !aiPlatform.reachable}
+            <Button
+              size="sm"
+              variant="outline"
+              class="h-6 text-xs"
+              disabled={aiPlatform.starting}
+              onclick={() => aiPlatform.start()}
+            >
+              {#if aiPlatform.starting}<Loader2 class="mr-1 h-3 w-3 animate-spin" />{/if}
+              {aiPlatform.starting ? 'Starting…' : 'Start server'}
+            </Button>
+          {/if}
+        </div>
         <CardDescription>
           OpenAI-compatible proxy at <code>http://127.0.0.1:18410</code> by default. Use
           <strong>Load catalog</strong>
@@ -252,12 +342,13 @@
 
         <div class="flex items-center justify-between">
           <div class="space-y-0.5">
-            <Label>Enable Agent Platform</Label>
+            <Label for="agent-platform-enabled">Enable Agent Platform</Label>
             <p class="text-sm text-muted-foreground">
               Route AI requests through the platform proxy
             </p>
           </div>
           <Switch
+            id="agent-platform-enabled"
             checked={providerConfig.enabled}
             onCheckedChange={(checked: boolean) => updateConfig({ enabled: checked })}
           />
@@ -284,19 +375,58 @@
             <Key class="mr-1 inline h-4 w-4" />
             API token
           </Label>
-          <Input
-            id="api-key"
-            type="text"
-            autocomplete="off"
-            spellcheck={false}
-            class="font-mono text-sm"
-            placeholder="agp_… workspace token from agent-platform /config"
-            value={providerConfig.api_key || ''}
-            oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
-              updateConfig({ api_key: e.currentTarget.value || null })}
-          />
+          <div class="flex gap-2">
+            <Input
+              id="api-key"
+              type={showApiKey ? 'text' : 'password'}
+              autocomplete="off"
+              spellcheck={false}
+              class="font-mono text-sm"
+              placeholder="agp_… workspace token from agent-platform /config"
+              value={providerConfig.api_key || ''}
+              oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
+                updateConfig({ api_key: e.currentTarget.value || null })}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              type="button"
+              aria-label={showApiKey ? 'Hide API token' : 'Show API token'}
+              onclick={() => (showApiKey = !showApiKey)}
+            >
+              {#if showApiKey}<EyeOff class="h-4 w-4" />{:else}<Eye class="h-4 w-4" />{/if}
+            </Button>
+          </div>
+          <div class="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onclick={() => (pairOpen = !pairOpen)}
+            >
+              Pair with agent-platform
+            </Button>
+          </div>
+          {#if pairOpen}
+            <div class="flex gap-2">
+              <Input
+                bind:ref={masterKeyInput}
+                type="password"
+                autocomplete="off"
+                spellcheck={false}
+                class="font-mono text-sm"
+                placeholder="Platform master key (used once, never stored)"
+                aria-label="Platform master key"
+                onkeydown={(e: KeyboardEvent) => e.key === 'Enter' && pair()}
+              />
+              <Button size="sm" type="button" disabled={pairing} onclick={pair}>
+                {#if pairing}<Loader2 class="mr-2 h-4 w-4 animate-spin" />{/if}
+                Pair
+              </Button>
+            </div>
+          {/if}
           <p class="text-xs text-muted-foreground">
-            Shown in plain text for verification. Paste a scoped
+            Hidden by default; use the eye button to reveal. Paste a scoped
             <code class="rounded bg-muted px-1">agp_</code> token from agent-platform — not the platform
             master key.
           </p>

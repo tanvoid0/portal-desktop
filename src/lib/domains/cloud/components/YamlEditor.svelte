@@ -4,7 +4,11 @@
   import { Button } from '$lib/components/ui/button';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Badge } from '$lib/components/ui/badge';
-  import { AlertCircle, CheckCircle, Save, X, RotateCcw } from '@lucide/svelte';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import Save from '~icons/fa6-solid/floppy-disk';
+  import X from '~icons/fa6-solid/xmark';
+  import RotateCcw from '~icons/fa6-solid/rotate-left';
   import { confirmAction } from '$lib/utils/confirm';
   import {
     AlertDialog,

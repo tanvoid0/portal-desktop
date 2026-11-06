@@ -1,7 +1,9 @@
 <script lang="ts">
   import { terminalStore, terminalActions, tabCount } from '../stores/terminalStore';
   import type { TerminalTab } from '../stores/terminalStore';
-  import { Plus, X, ChevronDown } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import X from '~icons/fa6-solid/xmark';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
   import { TerminalService } from '../services/terminalService';
   import { Button } from '$lib/components/ui/button';
   import { onMount } from 'svelte';
@@ -150,6 +152,11 @@
     }
   });
 
+  function tabTooltip(tab: TerminalTab) {
+    const where = tab.currentWorkingDirectory || tab.workingDirectory;
+    return where ? `${tab.title} - ${where}` : tab.title;
+  }
+
   function getTabStatusColor(tab: any) {
     switch (tab.status) {
       case 'active':
@@ -166,11 +173,11 @@
 
 <div class="tab-bar divider-edge-b divider-edge-full flex min-h-[40px] items-center bg-card">
   <!-- Tab List -->
-  <div class="flex flex-1 overflow-x-auto">
+  <div class="flex min-w-0 flex-1 overflow-x-auto">
     {#each tabs as tab (tab.id)}
       <div
         onclick={() => handleTabClick(tab.id)}
-        class="tab divider-edge-r flex min-w-0 cursor-pointer items-center space-x-2 border-b-2 px-4 py-2 text-sm transition-colors {activeTabId ===
+        class="tab divider-edge-r flex min-w-28 shrink-0 cursor-pointer items-center space-x-2 border-b-2 px-4 py-2 text-sm transition-colors {activeTabId ===
         tab.id
           ? 'bg-accent text-accent-foreground'
           : 'bg-card text-muted-foreground hover:bg-accent/60 hover:text-foreground'} {getTabStatusColor(
@@ -179,7 +186,7 @@
         role="button"
         tabindex="0"
         onkeydown={(e) => e.key === 'Enter' && handleTabClick(tab.id)}
-        title={tab.title}
+        title={tabTooltip(tab)}
       >
         <ShellIcon {tab} size="sm" />
         <span class="max-w-32 truncate">{tab.title}</span>
@@ -192,7 +199,7 @@
             onclick={(e) => handleCloseTab(tab.id, e)}
             aria-label="Close tab"
           >
-            <X size={12} />
+            <X class="h-3 w-3" />
           </Button>
         {/if}
       </div>
@@ -223,7 +230,7 @@
       aria-label="New tab"
       title="New Tab with selected profile (Ctrl+T)"
     >
-      <Plus size={16} />
+      <Plus class="h-4 w-4" />
     </Button>
   {/if}
 </div>

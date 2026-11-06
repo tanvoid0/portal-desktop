@@ -19,7 +19,11 @@
   } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { PageLoading, PageError } from '$lib/components/shell';
-  import { Check, Copy, FolderGit2, Unplug, ExternalLink } from '@lucide/svelte';
+  import Check from '~icons/fa6-solid/check';
+  import Copy from '~icons/fa6-solid/copy';
+  import FolderGit2 from '~icons/fa6-solid/folder-tree';
+  import Unplug from '~icons/fa6-solid/plug-circle-xmark';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
 
   const settingsData = $derived($settings);
   const statusQuery = createGitHubStatusQuery();

@@ -9,7 +9,7 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
   import Select from '$lib/components/ui/select.svelte';
-  import { RefreshCw } from '@lucide/svelte';
+  import RefreshCw from '~icons/fa6-solid/rotate';
   import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 
   let searchQuery = $state('');

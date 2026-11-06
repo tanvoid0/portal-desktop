@@ -30,6 +30,7 @@ pub struct ProjectResponse {
     pub git_commit: Option<String>,
     pub has_uncommitted_changes: bool,
     pub last_commit: Option<DateTime<Utc>>,
+    pub parent_id: Option<i32>,
     pub discovery_path: Option<String>,
     pub activity_status: Option<String>,
     pub last_activity: Option<DateTime<Utc>>,
@@ -53,6 +54,13 @@ pub struct ProjectResponse {
 }
 
 impl ProjectResponse {
+    /// Whether any framework, language or package manager is recorded.
+    pub fn has_stack(&self) -> bool {
+        !(self.framework_ids.is_empty()
+            && self.language_ids.is_empty()
+            && self.package_manager_ids.is_empty())
+    }
+
     pub fn from_model(
         model: ProjectModel,
         framework_ids: Vec<i32>,
@@ -81,6 +89,7 @@ impl ProjectResponse {
             git_commit: model.git_commit,
             has_uncommitted_changes: model.has_uncommitted_changes,
             last_commit: model.last_commit.map(|dt| dt.into()),
+            parent_id: model.parent_id,
             discovery_path: model.discovery_path,
             activity_status: model.activity_status,
             last_activity: model.last_activity.map(|dt| dt.into()),

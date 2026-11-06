@@ -57,6 +57,23 @@ pub async fn execute_script(
     service.execute_script(request).await
 }
 
+/// Record an interactive-terminal run in script history
+#[portal_rpc_macro::rpc]
+pub async fn record_interactive_execution(
+    db_manager: State<'_, Arc<DatabaseManager>>,
+    execution_state: State<'_, ScriptExecutionState>,
+    block_id: Option<String>,
+    command: String,
+    working_directory: Option<String>,
+    exit_code: Option<i32>,
+    started_at: Option<String>,
+) -> Result<(), String> {
+    let service = execution_state.get_or_init(&db_manager).await;
+    service
+        .record_interactive(block_id, command, working_directory, exit_code, started_at)
+        .await
+}
+
 /// Get execution details
 #[portal_rpc_macro::rpc]
 pub async fn get_script_execution(

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import FaArrowLeft from '~icons/fa6-solid/arrow-left';
+  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
+
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
@@ -13,7 +16,7 @@
   } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Separator } from '$lib/components/ui/separator';
-  import Icon from '@iconify/svelte';
+
   import {
     aiTaskService,
     type GeneratedTaskStructure,
@@ -502,7 +505,7 @@
           </p>
         </div>
         <Button variant="ghost" onclick={() => goto(taskId ? `/tasks/${taskId}` : '/tasks')}>
-          <Icon icon="lucide:arrow-left" class="mr-2 h-4 w-4" />
+          <FaArrowLeft class="mr-2 h-4 w-4" />
           Back
         </Button>
       </div>
@@ -548,7 +551,7 @@
                 disabled={!storyText.trim() || isGenerating}
                 class="w-full"
               >
-                <Icon icon="lucide:sparkles" class="mr-2 h-4 w-4" />
+                <FaWandMagicSparkles class="mr-2 h-4 w-4" />
                 Generate Tasks
               </Button>
             </CardContent>
@@ -564,10 +567,13 @@
                     Review and edit the generated tasks before creating them
                   </p>
                 </div>
-                <Badge variant="outline" class="text-xs">
-                  Confidence: {Math.round(generatedData.confidence * 100)}% | Model:{' '}
-                  {generatedData.model_used}
-                </Badge>
+                <!-- 'existing-task' = loaded from a saved task, nothing generated yet -->
+                {#if generatedData.model_used !== 'existing-task'}
+                  <Badge variant="outline" class="text-xs">
+                    Confidence: {Math.round(generatedData.confidence * 100)}% | Model:{' '}
+                    {generatedData.model_used}
+                  </Badge>
+                {/if}
               </div>
 
               <TaskPreviewCard

@@ -28,8 +28,6 @@
   });
 
   async function handleSave(savedDoc: Document) {
-    toastActions.success('Document created successfully');
-
     // If taskId is provided, link the document to the task
     if (taskId) {
       try {

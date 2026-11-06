@@ -5,6 +5,9 @@ import type {
   ConfigurationStatus,
   PlatformCatalog,
   CatalogQuery,
+  PlatformHealth,
+  PlatformStartResult,
+  PlatformPairResult,
 } from '../types/index.js';
 
 export class AIProviderService {
@@ -75,8 +78,23 @@ export class AIProviderService {
     return invoke<PlatformCatalog>('get_ai_platform_catalog', {
       providers: query.providers ?? null,
       live: query.live ?? null,
-      probe_capabilities: query.probe_capabilities ?? null,
+      probeCapabilities: query.probe_capabilities ?? null,
     });
+  }
+
+  /** Reachability + auth probe of agent-platform. */
+  async platformHealth(): Promise<PlatformHealth> {
+    return invoke<PlatformHealth>('ai_platform_health');
+  }
+
+  /** Spawn agent-platform if it is not running; resolves once health answers (~15s max). */
+  async startPlatform(): Promise<PlatformStartResult> {
+    return invoke<PlatformStartResult>('start_agent_platform');
+  }
+
+  /** Mint a fresh workspace token with the master key and save it into the provider config. */
+  async pairPlatform(masterKey: string): Promise<PlatformPairResult> {
+    return invoke<PlatformPairResult>('pair_agent_platform', { masterKey });
   }
 
   /** Fast catalog load: all providers, YAML aliases only. */
@@ -86,7 +104,7 @@ export class AIProviderService {
 
   /** Full catalog with live upstream model lists and capability probes. */
   async getCatalogLive(): Promise<PlatformCatalog> {
-    return this.getCatalog({ providers: ['all'], probe_capabilities: true });
+    return this.getCatalog({ providers: ['all'], live: true, probe_capabilities: true });
   }
 }
 

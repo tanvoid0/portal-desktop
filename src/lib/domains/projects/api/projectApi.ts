@@ -23,3 +23,26 @@ export async function fetchProjectById(id: string): Promise<Project | null> {
 
   return project ? normalizeProject(project as Record<string, unknown>) : null;
 }
+
+/** Group a project under another, or ungroup it when parentId is null. */
+export async function setProjectParent(
+  id: number,
+  parentId: number | null
+): Promise<Project | null> {
+  const project = await invokeClient.post<unknown>('set_project_parent', {
+    id,
+    parentId,
+  });
+  return project ? normalizeProject(project as Record<string, unknown>) : null;
+}
+
+/** Opens the project in the user's default editor; resolves to the editor name used. */
+export async function openProjectInIde(id: number): Promise<string> {
+  return invokeClient.post<string>('open_project_in_ide', { id });
+}
+
+/** Flips the project's star; resolves to the updated project. */
+export async function toggleProjectStar(id: number): Promise<Project | null> {
+  const project = await invokeClient.post<unknown>('toggle_project_star', { id });
+  return project ? normalizeProject(project as Record<string, unknown>) : null;
+}

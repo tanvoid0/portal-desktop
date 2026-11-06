@@ -13,6 +13,7 @@ import type {
   VaultUnlockRequest,
   VaultUnlockResult,
 } from '../types';
+import { normalizeCredential, normalizeCredentials } from '../utils/normalizeCredential';
 
 export class CredentialService {
   private static instance: CredentialService;
@@ -31,20 +32,20 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Creating credential: ${request.name} (${request.type})`);
 
-      const credential = await invoke<Credential>('create_credential', {
+      const credential = await invoke<unknown>('create_credential', {
         name: request.name,
-        credential_type: request.type,
+        credentialType: request.type,
         description: request.description,
         tags: request.tags,
         value: request.value,
         fields: request.fields,
         metadata: request.metadata,
-        expires_at: request.expiresAt,
+        expiresAt: request.expiresAt,
       });
 
-      logger.info('CredentialService', `Credential created successfully: ${credential.id}`);
+      logger.info('CredentialService', `Credential created successfully: ${request.name}`);
 
-      return credential;
+      return normalizeCredential(credential);
     } catch (error) {
       logger.error('Failed to create credential', {
         context: 'CredentialService',
@@ -61,7 +62,7 @@ export class CredentialService {
     try {
       logger.info('CredentialService', 'Getting credentials');
 
-      const credentials = await invoke<Credential[]>('get_credentials');
+      const credentials = normalizeCredentials(await invoke<unknown>('get_credentials'));
 
       logger.info('CredentialService', `Credentials retrieved: ${credentials.length} items`);
 
@@ -82,11 +83,11 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Getting credential: ${id}`);
 
-      const credential = await invoke<Credential>('get_credential', { id });
+      const credential = await invoke<unknown>('get_credential', { id });
 
       logger.info('CredentialService', `Credential retrieved: ${id}`);
 
-      return credential;
+      return normalizeCredential(credential);
     } catch (error) {
       logger.error('Failed to get credential', {
         context: 'CredentialService',
@@ -103,7 +104,7 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Updating credential: ${id}`);
 
-      const credential = await invoke<Credential>('update_credential', {
+      const credential = await invoke<unknown>('update_credential', {
         id,
         name: request.name,
         description: request.description,
@@ -112,12 +113,12 @@ export class CredentialService {
         fields: request.fields,
         metadata: request.metadata,
         status: request.status,
-        expires_at: request.expiresAt,
+        expiresAt: request.expiresAt,
       });
 
       logger.info('CredentialService', `Credential updated successfully: ${id}`);
 
-      return credential;
+      return normalizeCredential(credential);
     } catch (error) {
       logger.error('Failed to update credential', {
         context: 'CredentialService',
@@ -174,9 +175,9 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Searching credentials: ${query}`);
 
-      const credentials = await invoke<Credential[]>('search_credentials', {
-        query,
-      });
+      const credentials = normalizeCredentials(
+        await invoke<unknown>('search_credentials', { query })
+      );
 
       logger.info(
         'CredentialService',

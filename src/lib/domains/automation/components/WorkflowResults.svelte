@@ -2,7 +2,11 @@
   import type { WorkflowResult } from '../types';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import { CheckCircle, XCircle, Clock, FileText, Terminal } from '@lucide/svelte';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Clock from '~icons/fa6-solid/clock';
+  import FileText from '~icons/fa6-solid/file-lines';
+  import Terminal from '~icons/fa6-solid/terminal';
 
   export let result: WorkflowResult;
 

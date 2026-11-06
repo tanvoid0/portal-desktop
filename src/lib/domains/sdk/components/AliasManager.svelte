@@ -14,17 +14,15 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
-  import {
-    Plus,
-    Trash2,
-    Edit,
-    RefreshCw,
-    AlertCircle,
-    CheckCircle,
-    Search,
-    Tag,
-    X,
-  } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Tag from '~icons/fa6-solid/tag';
+  import X from '~icons/fa6-solid/xmark';
 
   interface Alias {
     name: string;

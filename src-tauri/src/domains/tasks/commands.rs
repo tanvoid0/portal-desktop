@@ -130,7 +130,7 @@ pub struct TaskFiltersCommand {
     pub resource_type: Option<String>,
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn create_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
     command: CreateTaskCommand,
@@ -217,7 +217,7 @@ pub async fn create_task(
         })
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn update_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -314,7 +314,7 @@ pub async fn update_task(
         })
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn delete_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -339,7 +339,7 @@ pub async fn delete_task(
     }
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn get_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
     id: i32,
@@ -360,7 +360,7 @@ pub async fn get_task(
         })
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn get_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
     filters: Option<TaskFiltersCommand>,
@@ -386,7 +386,7 @@ pub async fn get_tasks(
         })
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn get_subtasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
     parent_id: i32,
@@ -407,7 +407,7 @@ pub async fn get_subtasks(
         })
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn get_main_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
@@ -423,7 +423,7 @@ pub async fn get_main_tasks(
         })
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn get_task_count(db_manager: State<'_, Arc<DatabaseManager>>) -> Result<u64, String> {
     let task_service = TaskService::new(db_manager.get_connection_clone());
 
@@ -435,7 +435,7 @@ pub async fn get_task_count(db_manager: State<'_, Arc<DatabaseManager>>) -> Resu
 
 // New advanced commands
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn get_overdue_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
@@ -451,7 +451,7 @@ pub async fn get_overdue_tasks(
         })
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn get_due_today_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
@@ -467,7 +467,7 @@ pub async fn get_due_today_tasks(
         })
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn get_unestimated_tasks(
     db_manager: State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<TaskResponse>, String> {
@@ -493,7 +493,7 @@ pub struct GenerateTasksFromStoryCommand {
     pub instruction: Option<String>,
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn generate_tasks_from_story(
     ai_service: State<'_, Arc<AIService>>,
     command: GenerateTasksFromStoryCommand,

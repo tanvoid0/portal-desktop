@@ -38,7 +38,12 @@
     AlertDialogTitle,
     AlertDialogTrigger,
   } from '$lib/components/ui/alert-dialog';
-  import { Plus, Play, Edit, Trash2, Terminal, FileCode } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import Play from '~icons/fa6-solid/play';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import FileCode from '~icons/fa6-solid/file-code';
   import {
     CustomScriptService,
     type CustomScript,

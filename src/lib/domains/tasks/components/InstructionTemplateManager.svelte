@@ -1,4 +1,8 @@
 <script lang="ts">
+  import FaFileLines from '~icons/fa6-solid/file-lines';
+  import FaChevronDown from '~icons/fa6-solid/chevron-down';
+  import FaPencil from '~icons/fa6-solid/pencil';
+  import FaTrash from '~icons/fa6-solid/trash';
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
@@ -236,10 +240,10 @@
     <CollapsibleTrigger>
       <Button variant="outline" class="w-full justify-between">
         <span class="flex items-center gap-2">
-          <Icon icon="lucide:file-text" class="h-4 w-4" />
+          <FaFileLines class="h-4 w-4" />
           Custom Instructions
         </span>
-        <Icon icon="lucide:chevron-down" class="h-4 w-4" />
+        <FaChevronDown class="h-4 w-4" />
       </Button>
     </CollapsibleTrigger>
     <CollapsibleContent>
@@ -358,7 +362,7 @@
                       onclick={() => handleEditTemplate(template.id)}
                       class="h-7 w-7 p-0"
                     >
-                      <Icon icon="lucide:pencil" class="h-3 w-3" />
+                      <FaPencil class="h-3 w-3" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -366,7 +370,7 @@
                       onclick={() => handleDeleteTemplate(template.id)}
                       class="h-7 w-7 p-0 text-destructive"
                     >
-                      <Icon icon="lucide:trash-2" class="h-3 w-3" />
+                      <FaTrash class="h-3 w-3" />
                     </Button>
                   {/if}
                 </div>

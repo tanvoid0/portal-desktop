@@ -27,6 +27,17 @@ impl ScriptExecutionRepository {
         let db = self.db_manager.get_connection();
         let id_clone = id.clone();
 
+        // block_id has an FK to blocks, but built-in blocks live in code, not in that table.
+        // Keep the link only when the row exists, otherwise record the run as ad-hoc.
+        let block_id = match block_id {
+            Some(b) => crate::entities::block::Entity::find_by_id(&b)
+                .one(db)
+                .await
+                .map_err(|e| format!("Failed to look up block: {}", e))?
+                .map(|_| b),
+            None => None,
+        };
+
         let execution = ActiveModel {
             id: Set(id),
             block_id: Set(block_id),
@@ -113,6 +124,15 @@ impl ScriptExecutionRepository {
             .all(db)
             .await
             .map_err(|e| format!("Failed to get running executions: {}", e))
+    }
+
+    /// Rows still "pending" at startup never got a process; nothing can finish them.
+    pub async fn get_pending(&self) -> Result<Vec<Model>, String> {
+        Entity::find()
+            .filter(Column::Status.eq("pending"))
+            .all(self.db_manager.get_connection())
+            .await
+            .map_err(|e| format!("Failed to get pending executions: {}", e))
     }
 
     pub async fn get_recent(&self, limit: u64) -> Result<Vec<Model>, String> {

@@ -5,6 +5,7 @@ import type { DiscoveryProgress } from '$lib/domains/projects/generated/Discover
 import type { DiscoveryImportResult } from '$lib/domains/projects/generated/DiscoveryImportResult';
 import type { DiscoveryState } from '$lib/domains/projects/generated/DiscoveryState';
 import type { DiscoveryChange } from '$lib/domains/projects/generated/DiscoveryChange';
+import type { UnavailableProject } from '$lib/domains/projects/generated/UnavailableProject';
 
 export type TriageDecision = 'keep' | 'archive' | 'delete' | 'review';
 
@@ -85,6 +86,11 @@ export async function setProjectTriage(
   });
 }
 
+/** Registry rows whose folder is gone, each with similar-named folders under the scan roots. */
+export async function findUnavailableProjects(): Promise<UnavailableProject[]> {
+  return invokeClient.post<UnavailableProject[]>('find_unavailable_projects');
+}
+
 export async function setProjectTriageBulk(
   ids: number[],
   decision: TriageDecision | null
@@ -99,4 +105,5 @@ export type {
   DiscoveryImportResult,
   DiscoveryState,
   DiscoveryChange,
+  UnavailableProject,
 };

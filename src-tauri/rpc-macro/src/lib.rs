@@ -32,30 +32,97 @@
 
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, FnArg, ItemFn, Pat, PathArguments, ReturnType, Type};
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
+use syn::{
+    parse_macro_input, Expr, ExprLit, FnArg, ItemFn, Lit, Meta, Pat, PathArguments, ReturnType,
+    Token, Type,
+};
 
 #[proc_macro_attribute]
 pub fn rpc(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let local_only = !attr.is_empty() && attr.to_string().replace(' ', "") == "local_only";
-    if !attr.is_empty() && !local_only {
-        return compile_error(
-            proc_macro2::Span::call_site(),
-            "the only supported argument is `local_only`",
-        );
-    }
+    let opts = match parse_options(attr) {
+        Ok(opts) => opts,
+        Err(err) => return err,
+    };
 
     let func = parse_macro_input!(item as ItemFn);
 
-    if local_only {
+    if opts.local_only {
         // IPC only, on purpose. Still tagged so a reader can see the surface was
         // considered rather than forgotten.
         return quote!(#[tauri::command] #func).into();
     }
 
-    match expand(&func) {
+    match expand(&func, opts.cap.as_deref()) {
         Ok(glue) => quote!(#[tauri::command] #func #glue).into(),
         Err(err) => err.into(),
     }
+}
+
+/// Parsed `#[rpc(...)]` arguments — the three-tier remote surface.
+///
+/// - nothing: remotable, no capability. Reachable over IPC and the loopback
+///   `/rpc`, but a remote (LAN) peer is refused because it holds no capability
+///   that could match.
+/// - `cap = "coder"`: remotable, and reachable by a remote peer that was granted
+///   the named capability.
+/// - `local_only`: IPC only. Not registered in the `/rpc` surface at all.
+///
+/// `local_only` and `cap` together are a contradiction, and a compile error: a
+/// local-only command is never remotable, so a capability on it is never checked.
+struct Options {
+    local_only: bool,
+    cap: Option<String>,
+}
+
+fn parse_options(attr: TokenStream) -> Result<Options, TokenStream> {
+    use syn::spanned::Spanned;
+
+    let mut opts = Options {
+        local_only: false,
+        cap: None,
+    };
+    if attr.is_empty() {
+        return Ok(opts);
+    }
+
+    let metas = Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse(attr)
+        .map_err(|e| TokenStream::from(e.to_compile_error()))?;
+
+    for meta in metas {
+        match meta {
+            Meta::Path(path) if path.is_ident("local_only") => opts.local_only = true,
+            Meta::NameValue(nv) if nv.path.is_ident("cap") => match nv.value {
+                Expr::Lit(ExprLit {
+                    lit: Lit::Str(s), ..
+                }) => opts.cap = Some(s.value()),
+                other => {
+                    return Err(compile_error(
+                        other.span(),
+                        "cap must be a string literal, e.g. `cap = \"coder\"`",
+                    ))
+                }
+            },
+            other => {
+                return Err(compile_error(
+                    other.span(),
+                    "unsupported #[rpc] argument; use `local_only` or `cap = \"...\"`",
+                ))
+            }
+        }
+    }
+
+    if opts.local_only && opts.cap.is_some() {
+        return Err(compile_error(
+            proc_macro2::Span::call_site(),
+            "`local_only` and `cap` are mutually exclusive: a local-only command is \
+             never remotable, so a capability on it would never be checked",
+        ));
+    }
+
+    Ok(opts)
 }
 
 /// How one parameter is produced when the call arrives over HTTP.
@@ -68,7 +135,7 @@ enum Source {
     Arg { snake: String, camel: String },
 }
 
-fn expand(func: &ItemFn) -> Result<proc_macro2::TokenStream, TokenStream> {
+fn expand(func: &ItemFn, cap: Option<&str>) -> Result<proc_macro2::TokenStream, TokenStream> {
     let name = &func.sig.ident;
     let name_str = name.to_string();
     let is_async = func.sig.asyncness.is_some();
@@ -85,7 +152,8 @@ fn expand(func: &ItemFn) -> Result<proc_macro2::TokenStream, TokenStream> {
         };
 
         let binding = format_ident!("arg{}", index);
-        let source = classify(&typed.ty, &typed.pat).map_err(|msg| compile_error(span_of(input), &msg))?;
+        let source =
+            classify(&typed.ty, &typed.pat).map_err(|msg| compile_error(span_of(input), &msg))?;
 
         bindings.push(match source {
             Source::State(inner) => quote! {
@@ -125,6 +193,11 @@ fn expand(func: &ItemFn) -> Result<proc_macro2::TokenStream, TokenStream> {
 
     let register = format_ident!("__rpc_register_{}", name);
 
+    let cap_tokens = match cap {
+        Some(c) => quote!(::core::option::Option::Some(#c)),
+        None => quote!(::core::option::Option::None),
+    };
+
     Ok(quote! {
         #[doc(hidden)]
         #[allow(non_snake_case)]
@@ -150,7 +223,7 @@ fn expand(func: &ItemFn) -> Result<proc_macro2::TokenStream, TokenStream> {
             }
 
             ::inventory::submit! {
-                crate::rpc::Entry { name: #name_str, call }
+                crate::rpc::Entry { name: #name_str, call, cap: #cap_tokens }
             }
         }
     })

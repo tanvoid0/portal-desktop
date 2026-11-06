@@ -8,7 +8,10 @@
   import { goto } from '$app/navigation';
   import { MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
   import NamespaceSelector from '$lib/domains/cloud/components/NamespaceSelector.svelte';
-  import { Container, Network, Settings, Globe } from '@lucide/svelte';
+  import Container from '~icons/fa6-solid/cube';
+  import Network from '~icons/fa6-solid/network-wired';
+  import Settings from '~icons/fa6-solid/gear';
+  import Globe from '~icons/fa6-solid/globe';
   import { useKeyboardShortcuts } from '$lib/domains/k8s-navigation';
   import { RESOURCE_TYPE_SHORTCUTS } from '$lib/domains/k8s-navigation/utils/keyboardConstants';
   import { cloudStore } from '$lib/domains/cloud/stores';

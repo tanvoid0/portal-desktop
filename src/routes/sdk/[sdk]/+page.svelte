@@ -12,7 +12,12 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { CheckCircle, XCircle, Download, ExternalLink, Loader2, Trash2 } from '@lucide/svelte';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
+  import Download from '~icons/fa6-solid/download';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Trash2 from '~icons/fa6-solid/trash';
   import Devicon from '$lib/components/ui/devicon.svelte';
   import { goto } from '$app/navigation';
   import { PageLoading, PageError } from '$lib/components/shell';

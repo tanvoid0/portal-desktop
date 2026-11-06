@@ -6,7 +6,9 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Badge } from '$lib/components/ui/badge';
 	import Select from '$lib/components/ui/select.svelte';
-	import { Search, X, Filter } from '@lucide/svelte';
+	import Search from '~icons/fa6-solid/magnifying-glass';
+  import X from '~icons/fa6-solid/xmark';
+  import Filter from '~icons/fa6-solid/filter';
 	
 	interface Props {
 		searchQuery?: string;

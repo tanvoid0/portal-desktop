@@ -387,3 +387,12 @@ export function flattenCatalogModels(
   }
   return Array.from(byId.values()).sort((a, b) => a.id.localeCompare(b.id));
 }
+
+/** True when an agent-platform error means the token was rejected (vs unreachable). */
+export function isAuthError(error: unknown): boolean {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String(error.message)
+      : String(error ?? '');
+  return /authentication|api token|unauthori[sz]ed|\b401\b/i.test(message);
+}

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import FaTurnDown from '~icons/fa6-solid/turn-down';
+  import FaFlag from '~icons/fa6-solid/flag';
+  import FaPlus from '~icons/fa6-solid/plus';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
@@ -16,7 +19,7 @@
     getDropZoneClasses,
     getTaskCardClasses,
   } from '../utils/dragDrop';
-  import type { Task } from '../types';
+  import { taskStatusLabel, type Task } from '../types';
   import TaskCard from './TaskCard.svelte';
 
   interface Props {
@@ -131,11 +134,11 @@
                   <div class="flex items-center gap-1">
                     {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
                       <div class="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Icon icon="mdi:subdirectory-arrow-right" class="h-3 w-3" />
+                        <FaTurnDown class="h-3 w-3" />
                         <span>{getSubtaskCount(task.id, taskUi.tasks)}</span>
                       </div>
                     {/if}
-                    <Icon icon="mdi:flag" class="h-3 w-3 {getPriorityColor(task.priority)}" />
+                    <FaFlag class="h-3 w-3 {getPriorityColor(task.priority)}" />
                     <span class="text-xs text-muted-foreground uppercase">{task.priority}</span>
                   </div>
                 </div>
@@ -143,6 +146,12 @@
                 {#if task.description}
                   <p class="mb-3 line-clamp-2 text-xs text-muted-foreground">
                     {task.description}
+                  </p>
+                {/if}
+
+                {#if task.tags?.length}
+                  <p class="mb-2 truncate text-xs text-muted-foreground">
+                    {task.tags.map((t) => '#' + t).join(' ')}
                   </p>
                 {/if}
 
@@ -166,8 +175,9 @@
                         size="sm"
                         class="h-8 w-8 p-0"
                         title="Create subtask"
+                        aria-label="Create subtask"
                       >
-                        <Icon icon="mdi:plus" class="h-4 w-4 text-muted-foreground" />
+                        <FaPlus class="h-4 w-4 text-muted-foreground" />
                       </Button>
                     {/if}
                     <Button
@@ -178,6 +188,8 @@
                       variant="ghost"
                       size="sm"
                       class="h-8 w-8 p-0"
+                      aria-label="Toggle task status"
+                      title="Toggle task status"
                     >
                       <Icon
                         icon={getTaskIcon(task)}
@@ -214,19 +226,13 @@
                       <CardContent class="p-3">
                         <div class="mb-2 flex items-start justify-between">
                           <div class="flex items-center gap-2">
-                            <Icon
-                              icon="mdi:subdirectory-arrow-right"
-                              class="h-3 w-3 flex-shrink-0 text-primary"
-                            />
+                            <FaTurnDown class="h-3 w-3 flex-shrink-0 text-primary" />
                             <h4 class="text-sm font-medium text-foreground">
                               {subtask.title}
                             </h4>
                           </div>
                           <div class="flex items-center gap-1">
-                            <Icon
-                              icon="mdi:flag"
-                              class="h-3 w-3 {getPriorityColor(subtask.priority)}"
-                            />
+                            <FaFlag class="h-3 w-3 {getPriorityColor(subtask.priority)}" />
                             <span class="text-xs text-muted-foreground uppercase"
                               >{subtask.priority}</span
                             >
@@ -242,7 +248,7 @@
                         <div class="flex items-center justify-between">
                           <div class="flex items-center gap-2">
                             <Badge class="text-xs {getStatusBadgeColor(subtask.status)}">
-                              {subtask.status}
+                              {taskStatusLabel(subtask.status)}
                             </Badge>
                           </div>
 
@@ -254,6 +260,8 @@
                             variant="ghost"
                             size="sm"
                             class="h-8 w-8 p-0"
+                            aria-label="Toggle subtask status"
+                            title="Toggle subtask status"
                           >
                             <Icon
                               icon={getTaskIcon(subtask)}

@@ -176,20 +176,28 @@ pub fn run() {
             let pipeline_service = PipelineService::new(db_manager_arc.clone());
             let execution_service = ExecutionService::new(db_manager_arc.clone());
             app.manage(Arc::new(pipeline_service));
-            app.manage(Arc::new(execution_service));
+            // Runs the previous session left unfinished can never complete; settle them
+            // before the UI can read them (nothing of this session is running yet).
+            let execution_service = Arc::new(execution_service);
+            match tauri::async_runtime::block_on(execution_service.reconcile_interrupted()) {
+                Ok(n) if n > 0 => {
+                    log_info!("Pipelines", "Marked {} interrupted executions failed", n)
+                }
+                Ok(_) => {}
+                Err(e) => log_warn!("Pipelines", "Failed to reconcile executions: {}", e),
+            }
+            app.manage(execution_service);
 
             // Initialize script execution state
             let script_execution_state = ScriptExecutionState::new();
             app.manage(script_execution_state);
 
             // Sync any running script executions from previous session
-            let db_for_sync = db_manager_arc.clone();
-            tauri::async_runtime::spawn(async move {
-                let service = domains::scripts::ScriptExecutionService::new(db_for_sync);
-                if let Err(e) = service.sync_running_executions().await {
-                    log_warn!("Scripts", "Failed to sync script executions: {}", e);
-                }
-            });
+            // Blocking: a spawned sync could race with runs started this session.
+            let service = domains::scripts::ScriptExecutionService::new(db_manager_arc.clone());
+            if let Err(e) = tauri::async_runtime::block_on(service.sync_running_executions()) {
+                log_warn!("Scripts", "Failed to sync script executions: {}", e);
+            }
 
             log_info!("Tauri", "Automation service initialized");
             log_info!("Tauri", "Settings service initialized");
@@ -280,6 +288,7 @@ pub fn run() {
             domains::projects::create_project,
             domains::projects::update_project,
             domains::projects::delete_project,
+            domains::projects::set_project_parent,
             domains::projects::toggle_project_star,
             domains::projects::open_project,
             domains::projects::refresh_project_metadata,
@@ -292,6 +301,7 @@ pub fn run() {
             domains::projects::detect_framework,
             domains::projects::analyze_project_directory,
             domains::projects::open_project_in_explorer,
+            domains::projects::open_project_in_ide,
             domains::projects::select_directory,
             // Project discovery / audit
             domains::projects::discovery_commands::discover_projects,
@@ -303,6 +313,7 @@ pub fn run() {
             domains::projects::discovery_commands::export_discovery_csv,
             domains::projects::discovery_commands::set_project_triage,
             domains::projects::discovery_commands::set_project_triage_bulk,
+            domains::projects::discovery_commands::find_unavailable_projects,
             // Pipeline commands
             domains::projects::get_project_modules,
             domains::projects::get_all_project_modules,
@@ -620,6 +631,9 @@ pub fn run() {
             domains::ai::commands::test_ai_provider,
             domains::ai::commands::get_ai_provider_models,
             domains::ai::commands::get_ai_platform_catalog,
+            domains::ai::commands::ai_platform_health,
+            domains::ai::commands::start_agent_platform,
+            domains::ai::commands::pair_agent_platform,
             domains::ai::commands::generate_ai_text,
             domains::ai::commands::generate_ai_text_with_system,
             // AI Chat commands
@@ -651,16 +665,15 @@ pub fn run() {
             domains::custom_scripts::commands::select_file,
             // Update commands
             domains::updates::commands::get_app_version_command,
-            // Network commands
+            // Network commands. Pairing verify/status/token-check are daemon
+            // routes (/pair/*), not IPC commands — see domains/network/commands.rs.
             domains::network::commands::get_local_network_ip,
             domains::network::commands::generate_device_passcode,
-            domains::network::commands::verify_device_passcode,
             domains::network::commands::approve_device,
-            domains::network::commands::verify_access_token,
             domains::network::commands::get_pending_device_approvals,
-            domains::network::commands::get_device_status,
             // Script execution commands
             domains::scripts::commands::execute_script,
+            domains::scripts::commands::record_interactive_execution,
             domains::scripts::commands::get_script_execution,
             domains::scripts::commands::get_script_execution_live_output,
             domains::scripts::commands::cancel_script_execution,

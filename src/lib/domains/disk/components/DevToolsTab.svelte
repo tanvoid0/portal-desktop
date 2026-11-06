@@ -27,7 +27,12 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { Table, TableBody, TableCell, TableRow } from '$lib/components/ui/table';
-  import { Boxes, Container, FolderOpen, Search, Square, X } from '@lucide/svelte';
+  import Boxes from '~icons/fa6-solid/boxes-stacked';
+  import Container from '~icons/fa6-solid/cube';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Square from '~icons/fa6-solid/square';
+  import X from '~icons/fa6-solid/xmark';
   import ScanProgressCard from './shared/ScanProgressCard.svelte';
   import TaskProgressCard from './shared/TaskProgressCard.svelte';
   import StatTiles from './shared/StatTiles.svelte';

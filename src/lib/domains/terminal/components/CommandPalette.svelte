@@ -6,7 +6,15 @@
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Badge } from '$lib/components/ui/badge';
-  import { Search, X, Play, Square, Trash2, Copy, Clock, Terminal, Zap } from '@lucide/svelte';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import X from '~icons/fa6-solid/xmark';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import Copy from '~icons/fa6-solid/copy';
+  import Clock from '~icons/fa6-solid/clock';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import Zap from '~icons/fa6-solid/bolt';
 
   export let tabId: string;
   export let onKillProcess: () => void;

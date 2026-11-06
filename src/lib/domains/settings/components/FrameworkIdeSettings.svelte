@@ -17,7 +17,13 @@
   import { Label } from '$lib/components/ui/label';
   import { Badge } from '$lib/components/ui/badge';
   import Select from '$lib/components/ui/select.svelte';
-  import { Link2, Plus, Edit, Trash2, ArrowRight, RefreshCw, Loader2 } from '@lucide/svelte';
+  import Link2 from '~icons/fa6-solid/link';
+  import Plus from '~icons/fa6-solid/plus';
+  import Edit from '~icons/fa6-solid/pen-to-square';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import ArrowRight from '~icons/fa6-solid/arrow-right';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Loader2 from '~icons/fa6-solid/spinner';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { logger } from '$lib/domains/shared';

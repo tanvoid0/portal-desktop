@@ -11,7 +11,9 @@
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { FolderOpen, ShieldCheck, Sparkles } from '@lucide/svelte';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import ShieldCheck from '~icons/fa6-solid/shield-halved';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import {
     Table,
     TableBody,

@@ -10,7 +10,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Trash2 } from '@lucide/svelte';
+  import Trash2 from '~icons/fa6-solid/trash';
   import { fmtBytes } from '../../utils';
 
   let {

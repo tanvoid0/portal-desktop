@@ -3,7 +3,8 @@
   import * as Popover from './popover';
   import * as Command from './command';
   import { Button } from './button';
-  import { Check, ChevronsUpDown } from '@lucide/svelte';
+  import Check from '~icons/fa6-solid/check';
+  import ChevronsUpDown from '~icons/fa6-solid/up-down';
 
   interface Props {
     options: Array<{ value: string; label: string }>;

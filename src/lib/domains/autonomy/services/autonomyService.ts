@@ -124,7 +124,7 @@ class AutonomyService {
       return level.toLowerCase() as AutonomyLevel;
     } catch (error) {
       log.error('Failed to get autonomy level', error);
-      return 'balanced'; // Default
+      throw error;
     }
   }
 
@@ -150,7 +150,7 @@ class AutonomyService {
       return await invoke<boolean>('get_autonomy_enabled');
     } catch (error) {
       log.error('Failed to get autonomy enabled state', error);
-      return false; // Default to disabled for safety
+      throw error;
     }
   }
 

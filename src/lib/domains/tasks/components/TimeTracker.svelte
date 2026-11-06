@@ -1,11 +1,15 @@
 <script lang="ts">
+  import FaStopwatch from '~icons/fa6-solid/stopwatch';
+  import FaStop from '~icons/fa6-solid/stop';
+  import FaPause from '~icons/fa6-solid/pause';
+  import FaPlay from '~icons/fa6-solid/play';
+
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Progress } from '$lib/components/ui/progress';
   import { taskUi } from '../state/taskUi.svelte';
   import type { Task } from '../types';
-  import Icon from '@iconify/svelte';
 
   interface Props {
     onStartTracking?: (taskId: string) => void;
@@ -65,7 +69,7 @@
 <Card class="w-full">
   <CardHeader>
     <CardTitle class="flex items-center gap-2">
-      <Icon icon="mdi:timer" class="h-5 w-5" />
+      <FaStopwatch class="h-5 w-5" />
       Time Tracker
     </CardTitle>
   </CardHeader>
@@ -87,11 +91,11 @@
         <!-- Action Buttons -->
         <div class="flex gap-2">
           <Button variant="destructive" onclick={handleStopTracking} class="flex-1">
-            <Icon icon="mdi:stop" class="mr-2 h-4 w-4" />
+            <FaStop class="mr-2 h-4 w-4" />
             Stop
           </Button>
           <Button variant="outline" onclick={handlePauseTracking} class="flex-1">
-            <Icon icon="mdi:pause" class="mr-2 h-4 w-4" />
+            <FaPause class="mr-2 h-4 w-4" />
             Pause
           </Button>
         </div>
@@ -100,12 +104,12 @@
       <!-- No Active Tracking -->
       <div class="space-y-4">
         <div class="text-center">
-          <Icon icon="mdi:timer-outline" class="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
+          <FaStopwatch class="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
           <div class="text-sm text-muted-foreground">No active time tracking</div>
         </div>
 
         <Button variant="default" onclick={handleStartTracking} class="w-full">
-          <Icon icon="mdi:play" class="mr-2 h-4 w-4" />
+          <FaPlay class="mr-2 h-4 w-4" />
           Start Tracking
         </Button>
       </div>

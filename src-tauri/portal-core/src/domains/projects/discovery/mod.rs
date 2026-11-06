@@ -13,10 +13,12 @@
 
 pub mod analysis;
 pub mod git;
+pub mod relink;
 pub mod scan;
 pub mod state;
 
 pub use analysis::*;
 pub use git::*;
+pub use relink::UnavailableProject;
 pub use scan::*;
 pub use state::{DiscoveryChange, DiscoveryState};

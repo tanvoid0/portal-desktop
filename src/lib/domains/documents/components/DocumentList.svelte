@@ -1,8 +1,7 @@
 <script lang="ts">
+  import FaMagnifyingGlass from '~icons/fa6-solid/magnifying-glass';
   import { Input } from '$lib/components/ui/input';
-  import { Button } from '$lib/components/ui/button';
-  import Icon from '@iconify/svelte';
-  import { FileText } from '@lucide/svelte';
+  import FileText from '~icons/fa6-solid/file-lines';
   import { PageEmpty } from '$lib/components/shell';
   import DocumentCard from './DocumentCard.svelte';
   import type { Document } from '../types';
@@ -31,18 +30,11 @@
 <div class="space-y-4">
   <div class="flex items-center gap-2">
     <div class="relative flex-1">
-      <Icon
-        icon="lucide:search"
+      <FaMagnifyingGlass
         class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
       />
       <Input type="text" placeholder="Search documents..." bind:value={searchQuery} class="pl-10" />
     </div>
-    {#if onCreateNew}
-      <Button onclick={onCreateNew}>
-        <Icon icon="lucide:plus" class="mr-2 h-4 w-4" />
-        New Document
-      </Button>
-    {/if}
   </div>
 
   {#if filteredDocuments.length === 0}

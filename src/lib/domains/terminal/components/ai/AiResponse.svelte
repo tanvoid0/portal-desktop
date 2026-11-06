@@ -3,7 +3,9 @@
   command suggestions (Run inserts + executes, Copy copies).
 -->
 <script lang="ts">
-  import { Check, Copy, Play } from '@lucide/svelte';
+  import Check from '~icons/fa6-solid/check';
+  import Copy from '~icons/fa6-solid/copy';
+  import Play from '~icons/fa6-solid/play';
   import { Button } from '$lib/components/ui/button';
   import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
   import { parseAiResponse } from '../../services/terminalAiContext';

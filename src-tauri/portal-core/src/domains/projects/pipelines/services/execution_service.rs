@@ -764,10 +764,25 @@ impl ExecutionService {
 
         let key = format!("release:{workflow_id}");
         let name = format!("Release: {workflow_id}");
-        let pipeline_id = match self.pipeline_repo.get_by_preset_key(project_id, &key).await? {
+        let pipeline_id = match self
+            .pipeline_repo
+            .get_by_preset_key(project_id, &key)
+            .await?
+        {
             Some(p) => {
                 self.pipeline_repo
-                    .update(p.id, Some(name), None, Some(steps_json), None, None, None, None, None, None)
+                    .update(
+                        p.id,
+                        Some(name),
+                        None,
+                        Some(steps_json),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
                     .await?
                     .id
             }
@@ -837,7 +852,10 @@ impl ExecutionService {
     ) -> Result<Vec<Value>, String> {
         let mut items = Vec::new();
         for p in self.pipeline_repo.get_all_by_project(project_id).await? {
-            if p.preset_key.as_deref().is_some_and(|k| k.starts_with("release:")) {
+            if p.preset_key
+                .as_deref()
+                .is_some_and(|k| k.starts_with("release:"))
+            {
                 items.extend(self.get_executions_by_pipeline(p.id, limit).await?);
             }
         }
@@ -903,6 +921,22 @@ impl ExecutionService {
         }
 
         Ok(())
+    }
+
+    /// Startup only: any execution still unfinished lost its driver when the app quit.
+    pub async fn reconcile_interrupted(&self) -> Result<usize, String> {
+        let stale = self.execution_repo.get_non_terminal().await?;
+        for e in &stale {
+            self.finalize_running_steps(&e.id, "failed").await?;
+            self.execution_repo
+                .update_status(
+                    &e.id,
+                    "failed".to_string(),
+                    Some("Interrupted by app restart".to_string()),
+                )
+                .await?;
+        }
+        Ok(stale.len())
     }
 
     async fn finalize_running_steps(&self, execution_id: &str, status: &str) -> Result<(), String> {

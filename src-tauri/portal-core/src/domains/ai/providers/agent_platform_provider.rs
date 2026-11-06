@@ -106,7 +106,18 @@ impl AgentPlatformProvider {
             .timeout(std::time::Duration::from_secs(30))
             .send()
             .await
-            .map_err(|e| AIError::NetworkError(format!("Failed to fetch catalog: {}", e)))?;
+            .map_err(|e| {
+                if e.is_timeout() {
+                    AIError::TimeoutError("Catalog request timed out".to_string())
+                } else if e.is_connect() {
+                    AIError::NetworkError(format!(
+                        "Cannot reach agent-platform at {}. Is it running?",
+                        self.base_url()
+                    ))
+                } else {
+                    AIError::NetworkError(format!("Failed to fetch catalog: {}", e))
+                }
+            })?;
 
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
             return Err(AIError::AuthenticationError(

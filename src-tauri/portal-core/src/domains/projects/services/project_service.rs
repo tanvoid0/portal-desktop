@@ -8,17 +8,56 @@ use std::process::Command;
 use crate::database::DatabaseManager;
 use crate::domains::projects::entities::ProjectAnalysis;
 use crate::domains::projects::entities::ProjectResponse;
+use crate::domains::projects::modules::stack::{self, Stack};
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use crate::error::{AppError, AppResult};
 use std::sync::Arc;
 
+/// [`stack::detect`] off the async runtime: it reads the disk.
+pub async fn detect_stack(path: &str) -> Stack {
+    let root = std::path::PathBuf::from(path);
+    tokio::task::spawn_blocking(move || stack::detect(&root))
+        .await
+        .unwrap_or_default()
+}
+
+/// A command for an editor executable. On Windows an extensionless path (VS
+/// Code's `bin\code` is a shell script beside `code.cmd`) or a bare name cannot
+/// be spawned directly, so it resolves to the real `.exe`/`.cmd` beside it or on
+/// PATH. Never through `cmd /C`: the project path is an argument, and a folder
+/// named `a&calc` must not reach a shell.
+fn editor_command(executable: &str) -> Command {
+    if cfg!(windows) && Path::new(executable).extension().is_none() {
+        let exe = Path::new(executable);
+        let dirs: Vec<std::path::PathBuf> = if exe.components().count() > 1 {
+            vec![exe.parent().map(Path::to_path_buf).unwrap_or_default()]
+        } else {
+            std::env::var_os("PATH")
+                .map(|p| std::env::split_paths(&p).collect())
+                .unwrap_or_default()
+        };
+        let name = exe.file_name().and_then(|n| n.to_str()).unwrap_or(executable);
+        for dir in dirs {
+            for ext in ["exe", "cmd", "bat"] {
+                let candidate = dir.join(format!("{name}.{ext}"));
+                if candidate.is_file() {
+                    return Command::new(candidate);
+                }
+            }
+        }
+    }
+    Command::new(executable)
+}
+
 pub struct ProjectService {
+    db: Arc<DatabaseManager>,
     repository: ProjectRepository,
 }
 
 impl ProjectService {
     pub fn new(db_manager: &Arc<DatabaseManager>) -> Self {
         Self {
+            db: db_manager.clone(),
             repository: ProjectRepository::new(db_manager.clone()),
         }
     }
@@ -118,6 +157,18 @@ impl ProjectService {
         self.repository.delete(id).await
     }
 
+    /// Manually group a project under another, or ungroup it (`parent_id = None`).
+    pub async fn set_project_parent(
+        &self,
+        id: i32,
+        parent_id: Option<i32>,
+    ) -> Result<Option<ProjectResponse>, String> {
+        if parent_id == Some(id) {
+            return Err("A project cannot be its own parent".to_string());
+        }
+        self.repository.set_parent(id, parent_id).await
+    }
+
     pub async fn toggle_project_star(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
         // Get current project to check if it exists and get current starred status
         let current_project = self.repository.get_by_id(id).await?;
@@ -194,50 +245,53 @@ impl ProjectService {
         }
     }
 
+    /// Re-reads one project from disk: size, git, and the stack (overwriting what
+    /// was detected before, per [`Self::store_stack`]).
     pub async fn refresh_project_metadata(
         &self,
         id: i32,
     ) -> Result<Option<ProjectResponse>, String> {
-        // Get current project
-        let current_project = self.repository.get_by_id(id).await?;
-        if let Some(project) = current_project {
-            // Scan project directory
-            let (size, file_count) = self.scan_project_directory(&project.path).await?;
-            let git_info = self.get_git_info(&project.path).await.ok();
-            let analysis = self.analyze_project_directory(&project.path).await.ok();
+        let Some(project) = self.repository.get_by_id(id).await? else {
+            return Ok(None);
+        };
+        let (size, file_count) = self.scan_project_directory(&project.path).await?;
+        let git_info = self.get_git_info(&project.path).await.ok();
+        let stack = detect_stack(&project.path).await;
+        self.store_stack(&project, &stack, true).await?;
+        let primary_framework = stack.frameworks.first().cloned();
+        let output_directory = self
+            .detect_output_directory(&project.path, &primary_framework)
+            .await;
+        let (dev_port, prod_port) = self.detect_ports(&project.path, &primary_framework).await;
 
-            // Update metadata using repository
-            self.repository
-                .update(
-                    id,
-                    None,                                                       // name
-                    None,                                                       // description
-                    None,                                                       // path
-                    None,                                                       // status
-                    None,                                                       // framework_ids
-                    None, // package_manager_ids
-                    None, // language_ids
-                    analysis.as_ref().and_then(|a| a.build_command.clone()), // build_command
-                    analysis.as_ref().and_then(|a| a.start_command.clone()), // start_command
-                    analysis.as_ref().and_then(|a| a.test_command.clone()), // test_command
-                    analysis.as_ref().and_then(|a| a.output_directory.clone()), // output_directory
-                    analysis.as_ref().and_then(|a| a.dev_port), // dev_port
-                    analysis.as_ref().and_then(|a| a.prod_port), // prod_port
-                    None, // starred
-                    None, // open_count
-                    None, // last_opened
-                    Some(size), // size
-                    Some(file_count), // file_count
-                    git_info.as_ref().and_then(|g| g.repository.clone()), // git_repository
-                    git_info.as_ref().and_then(|g| g.branch.clone()), // git_branch
-                    git_info.as_ref().and_then(|g| g.commit.clone()), // git_commit
-                    git_info.as_ref().map(|g| g.has_uncommitted_changes), // has_uncommitted_changes
-                    git_info.as_ref().and_then(|g| g.last_commit), // last_commit
-                )
-                .await
-        } else {
-            Ok(None)
-        }
+        self.repository
+            .update(
+                id,
+                None, // name
+                None, // description
+                None, // path
+                None, // status
+                None, // framework_ids: written by store_stack
+                None, // package_manager_ids
+                None, // language_ids
+                None, // build_command: filled by store_stack when blank
+                None, // start_command
+                None, // test_command
+                output_directory,
+                dev_port,
+                prod_port,
+                None, // starred
+                None, // open_count
+                None, // last_opened
+                Some(size),
+                Some(file_count),
+                git_info.as_ref().and_then(|g| g.repository.clone()),
+                git_info.as_ref().and_then(|g| g.branch.clone()),
+                git_info.as_ref().and_then(|g| g.commit.clone()),
+                git_info.as_ref().map(|g| g.has_uncommitted_changes),
+                git_info.as_ref().and_then(|g| g.last_commit),
+            )
+            .await
     }
 
     pub async fn get_projects_with_filters(
@@ -318,233 +372,182 @@ impl ProjectService {
     }
 
     pub async fn detect_frameworks(&self, path: &str) -> Result<Vec<String>, String> {
-        let path_obj = Path::new(path);
-        let mut frameworks = Vec::new();
-
-        // Check for common framework indicators (check ALL, not just first)
-        let framework_indicators = [
-            ("tauri.conf.json", "Tauri"),
-            ("angular.json", "Angular"),
-            ("vue.config.js", "Vue.js"),
-            ("next.config.js", "Next.js"),
-            ("nuxt.config.js", "Nuxt.js"),
-            ("svelte.config.js", "Svelte"),
-            ("svelte.config.ts", "Svelte"),
-            ("vite.config.js", "Vite"),
-            ("vite.config.ts", "Vite"),
-            ("webpack.config.js", "Webpack"),
-            ("remix.config.js", "Remix"),
-            ("gatsby-config.js", "Gatsby"),
-            ("package.json", "Node.js"), // Keep this for general Node.js detection
-            ("requirements.txt", "Python"),
-            ("pom.xml", "Java/Maven"),
-            ("build.gradle", "Java/Gradle"),
-            ("Cargo.toml", "Rust"),
-            ("go.mod", "Go"),
-            ("composer.json", "PHP"),
-            ("Gemfile", "Ruby"),
-            ("Dockerfile", "Docker"),
-            ("docker-compose.yml", "Docker Compose"),
-        ];
-
-        for (file, framework) in framework_indicators.iter() {
-            if path_obj.join(file).exists() {
-                frameworks.push((*framework).to_string());
-            }
-        }
-
-        // Check for framework-specific directories (only if no frameworks found yet)
-        if frameworks.is_empty() {
-            let framework_dirs = [
-                ("node_modules", "Node.js"),
-                ("vendor", "PHP"),
-                ("target", "Java/Maven"),
-                ("build", "Java/Gradle"),
-            ];
-
-            for (dir, framework) in framework_dirs.iter() {
-                if path_obj.join(dir).exists() {
-                    frameworks.push((*framework).to_string());
-                }
-            }
-        }
-
-        Ok(frameworks)
-    }
-
-    pub async fn detect_languages(&self, path: &str) -> Result<Vec<String>, String> {
-        let path_obj = Path::new(path);
-        let mut languages = Vec::new();
-
-        // Language detection based on file extensions and config files
-        let language_indicators = [
-            ("Cargo.toml", "Rust"),
-            ("go.mod", "Go"),
-            ("package.json", "JavaScript"), // JavaScript if package.json exists
-            ("tsconfig.json", "TypeScript"),
-            ("requirements.txt", "Python"),
-            ("pom.xml", "Java"),
-            ("build.gradle", "Java"),
-            ("composer.json", "PHP"),
-            ("Gemfile", "Ruby"),
-            ("mix.exs", "Elixir"),
-        ];
-
-        for (file, language) in language_indicators.iter() {
-            if path_obj.join(file).exists() {
-                languages.push((*language).to_string());
-            }
-        }
-
-        // Also check for source files in common directories (more efficient than scanning all files)
-        let source_dirs = ["src", "src-tauri/src", "lib", "app"];
-        for dir in &source_dirs {
-            let dir_path = path_obj.join(dir);
-            if dir_path.is_dir() {
-                if let Ok(entries) = std::fs::read_dir(&dir_path) {
-                    for entry in entries.flatten().take(20) {
-                        // Limit to first 20 files for performance
-                        if let Some(ext) = entry.path().extension().and_then(|e| e.to_str()) {
-                            match ext {
-                                "rs" if !languages.contains(&"Rust".to_string()) => {
-                                    languages.push("Rust".to_string())
-                                }
-                                "go" if !languages.contains(&"Go".to_string()) => {
-                                    languages.push("Go".to_string())
-                                }
-                                "js" if !languages.contains(&"JavaScript".to_string()) => {
-                                    languages.push("JavaScript".to_string())
-                                }
-                                "ts" | "tsx" if !languages.contains(&"TypeScript".to_string()) => {
-                                    languages.push("TypeScript".to_string())
-                                }
-                                "py" if !languages.contains(&"Python".to_string()) => {
-                                    languages.push("Python".to_string())
-                                }
-                                "java" if !languages.contains(&"Java".to_string()) => {
-                                    languages.push("Java".to_string())
-                                }
-                                "php" if !languages.contains(&"PHP".to_string()) => {
-                                    languages.push("PHP".to_string())
-                                }
-                                "rb" if !languages.contains(&"Ruby".to_string()) => {
-                                    languages.push("Ruby".to_string())
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(languages)
+        Ok(detect_stack(path).await.frameworks)
     }
 
     pub async fn analyze_project_directory(&self, path: &str) -> Result<ProjectAnalysis, String> {
-        let path_obj = Path::new(path);
-
-        // Extract project name from path
-        let name = path_obj
+        let name = Path::new(path)
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("Unknown Project")
             .to_string();
-
-        // Format name with proper capitalization and spaces
-        let formatted_name = self.format_project_name(&name);
-
-        // Detect multiple frameworks
-        let frameworks = self.detect_frameworks(path).await.unwrap_or_default();
-
-        // Detect multiple languages
-        let languages = self.detect_languages(path).await.unwrap_or_default();
-
-        // Detect multiple package managers
-        let package_managers = self.detect_package_managers(path).await;
-
-        // A monorepo's root says little (often just a scripts-only package.json), so
-        // fold in what its modules are made of and drop the root's Node/JS guess when
-        // that package.json has no dependencies of its own.
-        let (frameworks, languages) = self.with_module_stacks(path, frameworks, languages).await;
-
-        // For backward compatibility with command detection, use first framework/package manager
-        let primary_framework = frameworks.first().cloned();
-        let primary_package_manager = package_managers.first().cloned();
-
-        // Detect build/start/test commands
-        let (build_command, start_command, test_command) = self
-            .detect_commands(path, &primary_framework, &primary_package_manager)
-            .await;
-
-        // Detect output directory
+        let stack = detect_stack(path).await;
+        let primary_framework = stack.frameworks.first().cloned();
         let output_directory = self.detect_output_directory(path, &primary_framework).await;
-
-        // Detect ports
         let (dev_port, prod_port) = self.detect_ports(path, &primary_framework).await;
 
         Ok(ProjectAnalysis {
-            name: formatted_name,
-            frameworks,
-            languages,
-            package_managers,
-            build_command,
-            start_command,
-            test_command,
+            name: self.format_project_name(&name),
+            frameworks: stack.frameworks,
+            languages: stack.languages,
+            package_managers: stack.package_managers,
+            build_command: stack.build,
+            start_command: stack.start,
+            test_command: stack.test,
             output_directory,
             dev_port,
             prod_port,
         })
     }
 
-    async fn with_module_stacks(
+    /// Saves a detected stack onto a project. With `overwrite` false a project that
+    /// already has a stack is left alone, so bulk rescans keep hand-picked values.
+    /// A category detection found nothing for is never cleared, and run commands
+    /// are only filled where blank, so a hand-edited command survives a re-detect.
+    pub async fn store_stack(
         &self,
-        path: &str,
-        mut frameworks: Vec<String>,
-        mut languages: Vec<String>,
-    ) -> (Vec<String>, Vec<String>) {
-        use crate::domains::projects::modules::detect;
-        let root = std::path::PathBuf::from(path);
-        let modules = tokio::task::spawn_blocking(move || detect::scan(&root))
-            .await
-            .unwrap_or_default();
-        if modules.is_empty() {
-            return (frameworks, languages);
+        project: &ProjectResponse,
+        stack: &Stack,
+        overwrite: bool,
+    ) -> Result<(), String> {
+        // Fill-only callers hold a snapshot from before a slow scan; re-read so a
+        // stack the user saved meanwhile is not overwritten.
+        let fresh;
+        let project = if overwrite {
+            project
+        } else {
+            fresh = self.repository.get_by_id(project.id).await?;
+            match &fresh {
+                Some(p) if !p.has_stack() => p,
+                _ => return Ok(()),
+            }
+        };
+        let ids = |table, names| self.repository.lookup_ids(table, names);
+        let found = |ids: Vec<i32>| (!ids.is_empty()).then_some(ids);
+        let framework_ids = found(ids("frameworks", &stack.frameworks).await?);
+        let language_ids = found(ids("languages", &stack.languages).await?);
+        let package_manager_ids = found(ids("package_managers", &stack.package_managers).await?);
+        let fill = |current: &Option<String>, detected: &Option<String>| {
+            current.is_none().then(|| detected.clone()).flatten()
+        };
+        let build = fill(&project.build_command, &stack.build);
+        let start = fill(&project.start_command, &stack.start);
+        let test = fill(&project.test_command, &stack.test);
+        if framework_ids.is_none()
+            && language_ids.is_none()
+            && package_manager_ids.is_none()
+            && build.is_none()
+            && start.is_none()
+            && test.is_none()
+        {
+            return Ok(());
         }
-        let has_own_deps = fs::read_to_string(Path::new(path).join("package.json"))
-            .ok()
-            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
-            .is_some_and(|pkg| {
-                ["dependencies", "devDependencies"]
-                    .iter()
-                    .any(|k| pkg.get(k).and_then(|d| d.as_object()).is_some_and(|d| !d.is_empty()))
-            });
-        if !has_own_deps {
-            frameworks.retain(|f| f != "Node.js");
-            languages.retain(|l| l != "JavaScript");
+        self.repository
+            .update(
+                project.id,
+                None,
+                None,
+                None,
+                None,
+                framework_ids,
+                package_manager_ids,
+                language_ids,
+                build,
+                start,
+                test,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Opens the project in an editor: the one mapped to its main framework, else
+    /// the default editor, else the first editor found installed. Returns the
+    /// editor's name for the confirmation toast.
+    pub async fn open_in_ide(&self, id: i32) -> Result<String, String> {
+        use crate::domains::ide::repositories::framework_ide_mapping_repository::FrameworkIdeMappingRepository;
+        use crate::domains::ide::repositories::ide_repository::IdeRepository;
+        use crate::domains::ide::services::ide_service::IdeService;
+        use sea_orm::EntityTrait;
+
+        let project = self
+            .repository
+            .get_by_id(id)
+            .await?
+            .ok_or_else(|| "Project not found".to_string())?;
+        if !Path::new(&project.path).is_dir() {
+            return Err(format!("Folder not found: {}", project.path));
         }
-        // Most common stack first: the first framework drives command detection.
-        let mut counts: Vec<(String, usize)> = Vec::new();
-        for m in &modules {
-            match counts.iter_mut().find(|(s, _)| *s == m.stack) {
-                Some(c) => c.1 += 1,
-                None => counts.push((m.stack.clone(), 1)),
+        let conn = self.db.get_connection();
+        let mut editor: Option<(String, String)> = None;
+        // The stored stack (it may be hand-picked), main framework first.
+        let mut frameworks = Vec::new();
+        for id in &project.framework_ids {
+            if let Some(f) = crate::entities::framework::Entity::find_by_id(*id)
+                .one(conn)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                frameworks.push(f.name);
             }
         }
-        counts.sort_by(|a, b| b.1.cmp(&a.1));
-        for (stack, _) in &counts {
-            if let Some(name) = detect::framework_name(stack) {
-                if !frameworks.iter().any(|f| f == name) {
-                    frameworks.push(name.to_string());
-                }
-            }
-            if let Some(name) = detect::language_name(stack) {
-                if !languages.iter().any(|l| l == name) {
-                    languages.push(name.to_string());
-                }
+        for framework in frameworks {
+            let Some(mapping) = FrameworkIdeMappingRepository::get_by_framework(conn, &framework)
+                .await
+                .map_err(|e| e.to_string())?
+            else {
+                continue;
+            };
+            if let Some(ide) = IdeRepository::get_by_id(conn, mapping.ide_id)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                editor = Some((ide.name, ide.executable));
+                break;
             }
         }
-        (frameworks, languages)
+        if editor.is_none() {
+            editor = IdeRepository::get_default(conn)
+                .await
+                .map_err(|e| e.to_string())?
+                .map(|ide| (ide.name, ide.executable));
+        }
+        let (name, executable) = match editor {
+            Some(e) => e,
+            None => {
+                let exe = tokio::task::spawn_blocking(|| IdeService::new().detect_installed_ides())
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .into_iter()
+                    .next()
+                    .ok_or_else(|| "No editor found. Add one in Settings.".to_string())?;
+                let name = Path::new(&exe)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("editor")
+                    .to_string();
+                (name, exe)
+            }
+        };
+        editor_command(&executable)
+            .arg(&project.path)
+            .no_window()
+            .spawn()
+            .map_err(|e| format!("Could not start {name}: {e}"))?;
+        self.open_project(id).await?;
+        Ok(name)
     }
 
     fn format_project_name(&self, name: &str) -> String {
@@ -576,119 +579,6 @@ impl ProjectService {
             .to_string()
     }
 
-    async fn detect_package_managers(&self, path: &str) -> Vec<String> {
-        use std::path::Path;
-
-        let path_obj = Path::new(path);
-        let mut package_managers = Vec::new();
-
-        // Check for all package manager indicators (not just first)
-        if path_obj.join("package-lock.json").exists() {
-            package_managers.push("npm".to_string());
-        }
-
-        if path_obj.join("yarn.lock").exists() {
-            package_managers.push("yarn".to_string());
-        }
-
-        if path_obj.join("pnpm-lock.yaml").exists() {
-            package_managers.push("pnpm".to_string());
-        }
-
-        if path_obj.join("requirements.txt").exists() {
-            package_managers.push("pip".to_string());
-        }
-
-        if path_obj.join("Cargo.toml").exists() {
-            package_managers.push("cargo".to_string());
-        }
-
-        if path_obj.join("go.mod").exists() {
-            package_managers.push("go".to_string());
-        }
-
-        if path_obj.join("composer.json").exists() {
-            package_managers.push("composer".to_string());
-        }
-
-        if path_obj.join("Gemfile").exists() {
-            package_managers.push("bundle".to_string());
-        }
-
-        package_managers
-    }
-
-    async fn detect_commands(
-        &self,
-        path: &str,
-        _framework: &Option<String>,
-        package_manager: &Option<String>,
-    ) -> (Option<String>, Option<String>, Option<String>) {
-        use std::fs;
-        use std::path::Path;
-
-        let path_obj = Path::new(path);
-        let mut build_command = None;
-        let mut start_command = None;
-        let mut test_command = None;
-
-        // Check package.json for scripts
-        if let Ok(contents) = fs::read_to_string(path_obj.join("package.json")) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&contents) {
-                if let Some(scripts) = json.get("scripts").and_then(|s| s.as_object()) {
-                    build_command = scripts
-                        .get("build")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                    start_command = scripts
-                        .get("start")
-                        .or_else(|| scripts.get("dev"))
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                    test_command = scripts
-                        .get("test")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                }
-            }
-        }
-
-        // Set defaults based on package manager if no scripts found
-        if build_command.is_none() {
-            if let Some(pm) = package_manager {
-                match pm.as_str() {
-                    "npm" | "yarn" | "pnpm" => build_command = Some("npm run build".to_string()),
-                    "cargo" => build_command = Some("cargo build".to_string()),
-                    "go" => build_command = Some("go build".to_string()),
-                    _ => {}
-                }
-            }
-        }
-
-        if start_command.is_none() {
-            if let Some(pm) = package_manager {
-                match pm.as_str() {
-                    "npm" | "yarn" | "pnpm" => start_command = Some("npm start".to_string()),
-                    "cargo" => start_command = Some("cargo run".to_string()),
-                    "go" => start_command = Some("go run .".to_string()),
-                    _ => {}
-                }
-            }
-        }
-
-        if test_command.is_none() {
-            if let Some(pm) = package_manager {
-                match pm.as_str() {
-                    "npm" | "yarn" | "pnpm" => test_command = Some("npm test".to_string()),
-                    "cargo" => test_command = Some("cargo test".to_string()),
-                    "go" => test_command = Some("go test".to_string()),
-                    _ => {}
-                }
-            }
-        }
-
-        (build_command, start_command, test_command)
-    }
 
     async fn detect_output_directory(
         &self,
@@ -711,7 +601,7 @@ impl ProjectService {
         // Framework-specific defaults
         if let Some(fw) = framework {
             match fw.as_str() {
-                "Vite" | "Svelte" | "Vue.js" => return Some("dist".to_string()),
+                "Vite" | "Svelte" | "Vue" => return Some("dist".to_string()),
                 "Next.js" => return Some("out".to_string()),
                 "Angular" => return Some("dist".to_string()),
                 _ => {}
@@ -762,7 +652,7 @@ impl ProjectService {
                 match fw.as_str() {
                     "Vite" | "Svelte" => dev_port = Some(5173),
                     "Next.js" => dev_port = Some(3000),
-                    "Vue.js" | "Nuxt.js" => dev_port = Some(3000),
+                    "Vue" | "Nuxt" => dev_port = Some(3000),
                     "Angular" => dev_port = Some(4200),
                     "React" => dev_port = Some(3000),
                     _ => {}

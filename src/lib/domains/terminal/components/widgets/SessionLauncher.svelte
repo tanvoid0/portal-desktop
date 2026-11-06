@@ -12,7 +12,8 @@
   import { defaultTerminalConfig } from '../../config/defaultTerminalConfig';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { FolderOpen, Container } from '@lucide/svelte';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Container from '~icons/fa6-solid/cube';
   import ShellIcon from '../ShellIcon.svelte';
   import { TERMINAL_ICONS } from '../../utils/shellIcons';
   import DockerStatusBanner from '$lib/domains/deployments/components/DockerStatusBanner.svelte';

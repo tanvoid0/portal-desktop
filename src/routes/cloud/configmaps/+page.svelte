@@ -7,7 +7,9 @@
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
-  import { RefreshCw, Search, Plus } from '@lucide/svelte';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Search from '~icons/fa6-solid/magnifying-glass';
+  import Plus from '~icons/fa6-solid/plus';
   import { goto } from '$app/navigation';
   import { useTableNavigation, useResourceActions } from '$lib/domains/k8s-navigation';
 

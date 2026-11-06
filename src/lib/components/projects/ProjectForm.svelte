@@ -25,7 +25,8 @@
     TooltipTrigger,
     TooltipProvider,
   } from '$lib/components/ui/tooltip';
-  import { RefreshCw, Info } from '@lucide/svelte';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Info from '~icons/fa6-solid/circle-info';
   import { logger } from '$lib/domains/shared/services/logger';
   import { isTauriEnvironment } from '$lib/utils/tauri';
   import type { CreateProjectRequest } from '$lib/domains/projects/types';
@@ -317,7 +318,10 @@
       await onSubmit(projectData);
     } catch (err) {
       log.error('Failed to submit project form', err);
-      error = 'Failed to save project. Please try again.';
+      error =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to save project. Please try again.';
     }
   }
 </script>
@@ -438,17 +442,15 @@
           {/if}
         </div>
 
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div class="space-y-2">
-            <Label for="name">Project Name *</Label>
-            <Input
-              id="name"
-              bind:value={name}
-              placeholder="My Awesome Project"
-              disabled={isLoading || isAnalyzing}
-              required
-            />
-          </div>
+        <div class="space-y-2">
+          <Label for="name">Project Name *</Label>
+          <Input
+            id="name"
+            bind:value={name}
+            placeholder="My Awesome Project"
+            disabled={isLoading || isAnalyzing}
+            required
+          />
         </div>
 
         <div class="space-y-2">

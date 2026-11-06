@@ -26,6 +26,9 @@ pub struct Model {
     pub git_commit: Option<String>,
     pub has_uncommitted_changes: bool,
     pub last_commit: Option<DateTimeWithTimeZone>,
+    /// Manual grouping: another project this one is nested under. Null = ungrouped
+    /// (falls back to path-based nesting on the frontend).
+    pub parent_id: Option<i32>,
     /// Logical id from discovery: `<root>/<category>/<name>`. Survives folder
     /// moves, which is why triage decisions key off it rather than `path`.
     pub discovery_path: Option<String>,

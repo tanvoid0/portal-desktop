@@ -11,7 +11,13 @@
   import { computeGroupRollup, kindBadgeLabel } from '../utils/workloadGrouping';
   import { fmtBytes, fmtPercent, isContainerRunning } from '../utils/format';
   import ContainerRow from './ContainerRow.svelte';
-  import { ChevronDown, Play, Square, FolderOpen, Layers, Cpu, MemoryStick } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Layers from '~icons/fa6-solid/layer-group';
+  import Cpu from '~icons/fa6-solid/microchip';
+  import MemoryStick from '~icons/fa6-solid/memory';
 
   interface Props {
     group: WorkloadGroup;

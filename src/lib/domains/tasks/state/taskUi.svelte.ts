@@ -149,7 +149,7 @@ export class TaskUiState {
     },
     {
       id: 'completed',
-      title: 'Done',
+      title: 'Completed',
       color: 'bg-green-100 dark:bg-green-900/20',
       tasks: this.filteredTasks.filter((t) => t.status === 'completed'),
     },

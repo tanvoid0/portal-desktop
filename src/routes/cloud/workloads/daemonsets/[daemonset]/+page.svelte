@@ -9,7 +9,8 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { ArrowLeft, RefreshCw } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import RefreshCw from '~icons/fa6-solid/rotate';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
   import Loading from '$lib/components/ui/loading.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';

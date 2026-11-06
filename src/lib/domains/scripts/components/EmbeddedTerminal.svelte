@@ -1,6 +1,9 @@
 <script lang="ts">
   import { Terminal, defaultTerminalConfig, type TerminalConfig } from '$lib/domains/terminal';
-  import { Copy, Square, Maximize2, Minimize2 } from '@lucide/svelte';
+  import Copy from '~icons/fa6-solid/copy';
+  import Square from '~icons/fa6-solid/square';
+  import Maximize2 from '~icons/fa6-solid/maximize';
+  import Minimize2 from '~icons/fa6-solid/minimize';
   import { Button } from '$lib/components/ui/button';
   import { toast } from '$lib/utils/toast';
 

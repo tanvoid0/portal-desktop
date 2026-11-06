@@ -37,24 +37,22 @@
     DialogTitle,
     DialogTrigger,
   } from '$lib/components/ui/dialog';
-  import {
-    RefreshCw,
-    Download,
-    AlertCircle,
-    Settings,
-    FolderOpen,
-    Zap,
-    Globe,
-    Database,
-    Container,
-    Code,
-    Terminal,
-    Plus,
-    Trash2,
-    ArrowRightLeft,
-    Play,
-    Square,
-  } from '@lucide/svelte';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Download from '~icons/fa6-solid/download';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import Settings from '~icons/fa6-solid/gear';
+  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import Zap from '~icons/fa6-solid/bolt';
+  import Globe from '~icons/fa6-solid/globe';
+  import Database from '~icons/fa6-solid/database';
+  import Container from '~icons/fa6-solid/cube';
+  import Code from '~icons/fa6-solid/code';
+  import Terminal from '~icons/fa6-solid/terminal';
+  import Plus from '~icons/fa6-solid/plus';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import ArrowRightLeft from '~icons/fa6-solid/right-left';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
 
   interface Props {
     onSDKSelect?: (sdk: any) => void;

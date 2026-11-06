@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Bot, Send } from '@lucide/svelte';
+  import Bot from '~icons/fa6-solid/robot';
+  import Send from '~icons/fa6-solid/paper-plane';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { aiChatService } from '$lib/domains/ai/services/aiChatService';

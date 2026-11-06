@@ -1,11 +1,12 @@
 <script lang="ts">
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaTrash from '~icons/fa6-solid/trash';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Textarea } from '$lib/components/ui/textarea';
   import { Label } from '$lib/components/ui/label';
   import { Badge } from '$lib/components/ui/badge';
   import type { GeneratedSubtask } from '../services/aiTaskService';
-  import Icon from '@iconify/svelte';
 
   interface Props {
     subtask: GeneratedSubtask;
@@ -60,13 +61,13 @@
           onclick={handleAdd}
           disabled={isAdding || !subtask.title.trim()}
         >
-          <Icon icon="lucide:plus" class="mr-1 h-4 w-4" />
+          <FaPlus class="mr-1 h-4 w-4" />
           Add
         </Button>
       {/if}
       {#if onRemove}
         <Button variant="ghost" size="sm" onclick={onRemove} class="text-destructive">
-          <Icon icon="lucide:trash-2" class="h-4 w-4" />
+          <FaTrash class="h-4 w-4" />
         </Button>
       {/if}
     </div>

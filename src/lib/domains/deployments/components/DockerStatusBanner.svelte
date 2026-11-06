@@ -13,7 +13,10 @@
     isDockerOffline,
   } from '../stores/deploymentStore';
   import { toast } from '$lib/utils/toast';
-  import { Container, Loader2, Play, RefreshCw } from '@lucide/svelte';
+  import Container from '~icons/fa6-solid/cube';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Play from '~icons/fa6-solid/play';
+  import RefreshCw from '~icons/fa6-solid/rotate';
 
   let {
     onReady,

@@ -3,7 +3,7 @@ use crate::domains::tasks::entities::task::{
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set,
+    QueryOrder, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 
@@ -189,9 +189,16 @@ impl TaskRepository {
         active_model.update(&self.db).await
     }
 
+    /// Deletes the task and its direct subtasks in one transaction (QA-040: no orphans).
+    // ponytail: one level only, which is all the UI creates; recurse if nested subtasks appear.
     pub async fn delete(&self, id: i32) -> Result<(), sea_orm::DbErr> {
-        TaskEntity::delete_by_id(id).exec(&self.db).await?;
-        Ok(())
+        let txn = self.db.begin().await?;
+        TaskEntity::delete_many()
+            .filter(Column::ParentId.eq(id))
+            .exec(&txn)
+            .await?;
+        TaskEntity::delete_by_id(id).exec(&txn).await?;
+        txn.commit().await
     }
 
     pub async fn find_by_id(&self, id: i32) -> Result<Option<TaskModel>, sea_orm::DbErr> {

@@ -15,7 +15,10 @@
   import Select from '$lib/components/ui/select.svelte';
   import { Button } from '$lib/components/ui/button';
   import { Separator } from '$lib/components/ui/separator';
-  import { Palette, Download, Upload, RotateCcw } from '@lucide/svelte';
+  import Palette from '~icons/fa6-solid/palette';
+  import Download from '~icons/fa6-solid/download';
+  import Upload from '~icons/fa6-solid/upload';
+  import RotateCcw from '~icons/fa6-solid/rotate-left';
   import { settingsService } from '../services/settingsService';
   import type { ThemeSettings, CustomTheme } from '../types';
 

@@ -1,13 +1,11 @@
 <script lang="ts">
-  import {
-    ChevronRight,
-    GitBranch,
-    Globe,
-    Terminal as TerminalIcon,
-    FileText,
-    Plus,
-    Bot,
-  } from '@lucide/svelte';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import GitBranch from '~icons/fa6-solid/code-branch';
+  import Globe from '~icons/fa6-solid/globe';
+  import TerminalIcon from '~icons/fa6-solid/terminal';
+  import FileText from '~icons/fa6-solid/file-lines';
+  import Plus from '~icons/fa6-solid/plus';
+  import Bot from '~icons/fa6-solid/robot';
   import { Button } from '$lib/components/ui/button';
   import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
   import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';

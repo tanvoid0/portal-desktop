@@ -11,7 +11,7 @@
   import type { PendingApproval } from '../types.js';
   import { stripLeakedToolSyntax } from '../utils/leakedToolCall.js';
   import { Button } from '$lib/components/ui/button';
-  import { RotateCcw } from '@lucide/svelte';
+  import RotateCcw from '~icons/fa6-solid/rotate-left';
 
   interface Props {
     messages: ChatMessage[];
@@ -28,6 +28,8 @@
     workspaceRoot?: string;
     threadId?: string;
     canEdit?: boolean;
+    /** Platform is down: approving would resume a turn that cannot run. */
+    decisionsDisabled?: boolean;
     onEditMessage?: (messageIndex: number, content: string) => void;
     onRetry?: () => void;
     onOpenSubAgent?: (childId: string, coordId: string) => void;
@@ -50,6 +52,7 @@
     workspaceRoot = '',
     threadId,
     canEdit = false,
+    decisionsDisabled = false,
     onEditMessage,
     onRetry,
     onOpenSubAgent,
@@ -155,7 +158,7 @@
   {/if}
 
   {#if pending && onDecision}
-    <ApprovalBanner {pending} busy={running} {onDecision} />
+    <ApprovalBanner {pending} busy={running || decisionsDisabled} {onDecision} />
   {/if}
 
   {#if showRetry && !running}

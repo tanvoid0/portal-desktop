@@ -4,7 +4,7 @@ use crate::domains::projects::services::ProjectService;
 use std::sync::Arc;
 use tauri::command;
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn get_all_projects(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<crate::domains::projects::entities::ProjectResponse>, String> {
@@ -12,7 +12,7 @@ pub async fn get_all_projects(
     service.get_all_projects().await.map_err(|e| e.to_string())
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn get_project(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -21,7 +21,7 @@ pub async fn get_project(
     service.get_project(id).await.map_err(|e| e.to_string())
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn create_project(
     name: String,
     description: Option<String>,
@@ -56,7 +56,7 @@ pub async fn create_project(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn update_project(
     id: i32,
     name: Option<String>,
@@ -95,7 +95,7 @@ pub async fn update_project(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn delete_project(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -104,7 +104,18 @@ pub async fn delete_project(
     service.delete_project(id).await
 }
 
-#[portal_rpc_macro::rpc]
+/// Manually group `id` under `parent_id`, or ungroup it when `parent_id` is null.
+#[portal_rpc_macro::rpc(cap = "projects")]
+pub async fn set_project_parent(
+    id: i32,
+    parent_id: Option<i32>,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
+    let service = ProjectService::new(&db_manager);
+    service.set_project_parent(id, parent_id).await
+}
+
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn toggle_project_star(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -113,7 +124,7 @@ pub async fn toggle_project_star(
     service.toggle_project_star(id).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn open_project(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -122,7 +133,7 @@ pub async fn open_project(
     service.open_project(id).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn refresh_project_metadata(
     id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -131,7 +142,7 @@ pub async fn refresh_project_metadata(
     service.refresh_project_metadata(id).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn get_projects_with_filters(
     status_filter: Option<String>,
     sort_by: String,
@@ -144,7 +155,7 @@ pub async fn get_projects_with_filters(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn get_frameworks(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<String>, String> {
@@ -152,7 +163,7 @@ pub async fn get_frameworks(
     service.get_frameworks().await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn get_project_stats(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<crate::domains::projects::services::ProjectStats, String> {
@@ -160,7 +171,7 @@ pub async fn get_project_stats(
     service.get_project_stats().await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn validate_project_path(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -173,7 +184,7 @@ pub async fn validate_project_path(
         .or_else(|e| Err(e))
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn generate_project_name(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -182,7 +193,7 @@ pub async fn generate_project_name(
     service.generate_project_name(&path).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn detect_framework(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -191,13 +202,24 @@ pub async fn detect_framework(
     service.detect_frameworks(&path).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn analyze_project_directory(
     path: String,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<ProjectAnalysis, String> {
     let service = ProjectService::new(&db_manager);
     service.analyze_project_directory(&path).await
+}
+
+/// Opens the project in the editor mapped to its framework, else the default
+/// editor, else the first one installed. Returns the editor's name. Not
+/// remotable, like `open_project_in_explorer`: it launches a program on this host.
+#[portal_rpc_macro::rpc]
+pub async fn open_project_in_ide(
+    id: i32,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<String, String> {
+    ProjectService::new(&db_manager).open_in_ide(id).await
 }
 
 #[portal_rpc_macro::rpc]
@@ -260,7 +282,7 @@ pub async fn select_directory(app_handle: tauri::AppHandle) -> Result<Option<Str
 use crate::domains::projects::modules::ModuleService;
 use crate::entities::project_module::Model as ProjectModule;
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn get_project_modules(
     project_id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -268,7 +290,7 @@ pub async fn get_project_modules(
     ModuleService::new(&db_manager).list(project_id).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn get_all_project_modules(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<ProjectModule>, String> {
@@ -276,7 +298,7 @@ pub async fn get_all_project_modules(
 }
 
 /// Rescan one project's folders and return what it now holds.
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn refresh_project_modules(
     project_id: i32,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
@@ -285,7 +307,7 @@ pub async fn refresh_project_modules(
 }
 
 /// Rescan every project; returns all modules when done.
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn refresh_all_project_modules(
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Vec<ProjectModule>, String> {

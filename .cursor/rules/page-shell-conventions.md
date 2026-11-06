@@ -36,7 +36,7 @@ Use shared shell components from `$lib/components/shell` for list and management
 ## Feedback and imports
 
 - **Toasts:** `import { toast } from "$lib/utils/toast"` — do not use `$lib/stores/toast` directly
-- **Icons:** `@lucide/svelte` — not `lucide-svelte`
+- **Icons:** FontAwesome (`~icons/fa6-solid/*`) and devicon (`~icons/devicon/*`) via unplugin-icons; no lucide
 - **Path alias:** `$lib/...` — not `@/lib/...` in new or touched files
 - **Confirm dialogs:** use `confirmAction()` or `AlertDialog` — not raw `confirm()`
 

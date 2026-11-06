@@ -1,11 +1,12 @@
 <script lang="ts">
+  import FaChevronUp from '~icons/fa6-solid/chevron-up';
+  import FaChevronDown from '~icons/fa6-solid/chevron-down';
   import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
   } from '$lib/components/ui/collapsible';
   import { Button } from '$lib/components/ui/button';
-  import Icon from '@iconify/svelte';
   import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
 
   interface Props {
@@ -45,10 +46,10 @@
             class="h-auto p-0 text-muted-foreground hover:text-foreground"
           >
             {#if isExpanded}
-              <Icon icon="lucide:chevron-up" class="mr-1 h-4 w-4" />
+              <FaChevronUp class="mr-1 h-4 w-4" />
               Show less
             {:else}
-              <Icon icon="lucide:chevron-down" class="mr-1 h-4 w-4" />
+              <FaChevronDown class="mr-1 h-4 w-4" />
               Show more
             {/if}
           </Button>

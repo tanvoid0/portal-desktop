@@ -15,15 +15,13 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Progress } from '$lib/components/ui/progress';
-  import {
-    RefreshCw,
-    Download,
-    CheckCircle2,
-    AlertCircle,
-    Loader2,
-    Info,
-    WifiOff,
-  } from '@lucide/svelte';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Download from '~icons/fa6-solid/download';
+  import CheckCircle2 from '~icons/fa6-solid/circle-check';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import Info from '~icons/fa6-solid/circle-info';
+  import WifiOff from '~icons/fa6-solid/wifi';
   import {
     checkForUpdates,
     installUpdateAndRelaunch,

@@ -43,6 +43,11 @@ export const TASK_STATUS_OPTIONS = [
   { value: 'cancelled' as const, label: 'Cancelled' },
 ] as const;
 
+/** Single display label per status — use everywhere instead of the raw enum value. */
+export function taskStatusLabel(status: string): string {
+  return TASK_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status;
+}
+
 export const TASK_PRIORITY_OPTIONS = [
   { value: 'low' as const, label: 'Low' },
   { value: 'medium' as const, label: 'Medium' },

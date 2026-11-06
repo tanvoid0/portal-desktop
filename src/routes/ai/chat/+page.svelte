@@ -17,13 +17,20 @@
     LlmUsage,
     ProviderType,
   } from '$lib/domains/ai/types/index.js';
+  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
+  import { isAuthError } from '$lib/domains/ai/utils/catalog.js';
+  import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
+  import PlatformStatusBanner from '$lib/domains/ai/components/PlatformStatusBanner.svelte';
   import AIContextBar from '$lib/domains/ai/components/AIContextBar.svelte';
   import {
     fallbackTitleFromMessage,
     isPlaceholderTitle,
     reconcileThreadTitle,
   } from '$lib/domains/chat/title.js';
-  import { PanelLeftOpen, Settings2, RefreshCw, ServerOff } from '@lucide/svelte';
+  import PanelLeftOpen from '~icons/fa6-solid/table-columns';
+  import Settings2 from '~icons/fa6-solid/sliders';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import ServerOff from '~icons/fa6-solid/server';
   import ResponsivePanel from '$lib/components/shell/responsive-panel.svelte';
   import { Button } from '$lib/components/ui/button';
   import ChatSettingsPanel from '$lib/domains/ai/components/chat/ChatSettingsPanel.svelte';
@@ -57,7 +64,14 @@
   let platformOnline = $state(true);
   let platformChecking = $state(true);
   let platformError = $state<string | null>(null);
-  const platformOffline = $derived(!platformOnline);
+  // The health probe is authoritative when it has a verdict; the catalog
+  // round trip still catches failures the probe cannot see.
+  const platformOffline = $derived(!platformOnline || aiPlatform.blocked);
+  const platformUnauthorized = $derived(
+    aiPlatform.blocked
+      ? aiPlatform.status === 'unauthenticated'
+      : platformOffline && isAuthError(platformError)
+  );
 
   /**
    * Keep the last completed verdict while a re-check is in flight, so the
@@ -95,6 +109,7 @@
   }
 
   onMount(async () => {
+    void aiPlatform.refresh();
     const defaultProvider = await aiProviderService.getDefaultProvider();
     selectedProvider = defaultProvider || 'AgentPlatform';
 
@@ -453,7 +468,7 @@
 
   /** Re-fetch the catalog; that round trip is the reachability check. */
   async function retryPlatform() {
-    await providerSelector?.reload();
+    await Promise.all([aiPlatform.refresh(), providerSelector?.reload()]);
   }
 
   async function handleStop() {
@@ -506,7 +521,7 @@
   </ResponsivePanel>
 
   <!-- Main Chat Area -->
-  <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <div
       class="divider-edge-b divider-edge-full flex flex-wrap items-center justify-between gap-2 bg-background px-4 py-2.5"
     >
@@ -525,28 +540,47 @@
         </h2>
       </div>
     </div>
-    {#if platformOffline}
+    {#if aiPlatform.blocked}
+      <PlatformStatusBanner blocks="Sending, regenerate and edit-and-resend" />
+    {:else if platformOffline}
       <div
         class="divider-edge-b divider-edge-full flex flex-wrap items-center gap-3 bg-destructive/10 px-4 py-2.5 text-destructive"
         role="status"
       >
         <ServerOff class="h-4 w-4 shrink-0" />
         <div class="min-w-0 flex-1">
-          <p class="text-xs font-medium">Agent Platform is unreachable</p>
+          <p class="text-xs font-medium">
+            {platformUnauthorized
+              ? 'Agent Platform rejected the API token'
+              : 'Agent Platform is unreachable'}
+          </p>
           <p class="truncate text-[11px] opacity-80" title={platformError ?? ''}>
-            {platformError ?? 'Check that the platform is running.'}
+            {platformUnauthorized
+              ? 'Update the token in Settings > AI, then reopen chat.'
+              : (platformError ?? 'Check that the platform is running.')}
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          class="h-7 shrink-0 gap-1.5 text-xs"
-          disabled={platformChecking}
-          onclick={retryPlatform}
-        >
-          <RefreshCw class="h-3 w-3 {platformChecking ? 'animate-spin' : ''}" />
-          {platformChecking ? 'Checking…' : 'Retry'}
-        </Button>
+        {#if platformUnauthorized}
+          <Button
+            size="sm"
+            variant="outline"
+            class="h-7 shrink-0 text-xs"
+            href={AI_PROVIDER_SETTINGS_PATH}
+          >
+            Open Settings > AI
+          </Button>
+        {:else}
+          <Button
+            size="sm"
+            variant="outline"
+            class="h-7 shrink-0 gap-1.5 text-xs"
+            disabled={platformChecking}
+            onclick={retryPlatform}
+          >
+            <RefreshCw class="h-3 w-3 {platformChecking ? 'animate-spin' : ''}" />
+            {platformChecking ? 'Checking…' : 'Retry'}
+          </Button>
+        {/if}
       </div>
     {/if}
     <div class="flex min-h-0 w-full flex-1 flex-col">
@@ -567,10 +601,12 @@
         onTruncate={handleTruncate}
         onBranch={handleBranch}
         sendDisabled={platformOffline}
-        sendDisabledHint="Agent Platform is offline — retry to reconnect."
+        sendDisabledHint={platformUnauthorized
+          ? 'Sending is disabled: the agent-platform token was rejected. Fix it in Settings > AI.'
+          : 'Agent Platform is offline — retry to reconnect.'}
       />
     </div>
-  </main>
+  </div>
 
   {#if settingsPanelOpen}
     <ResponsivePanel bind:open={settingsPanelOpen} side="right" desktopClass="w-72">

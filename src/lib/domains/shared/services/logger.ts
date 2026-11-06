@@ -279,42 +279,25 @@ class LoggerService {
    * Create a scoped logger for a specific context
    */
   createScoped(context: string) {
+    // Strings/Errors/primitives must not be spread (a string becomes {0:'A',1:'u',...})
+    const withContext = (data?: any) =>
+      data === undefined || data === null
+        ? { context }
+        : typeof data === 'object' && !(data instanceof Error)
+          ? { ...data, context }
+          : { error: data, context };
     return {
       debug: (message: string, data?: any) => {
-        this.addEntry(
-          LogLevel.DEBUG,
-          message,
-          data ? { ...data, context } : { context },
-          'frontend',
-          context
-        );
+        this.addEntry(LogLevel.DEBUG, message, withContext(data), 'frontend', context);
       },
       info: (message: string, data?: any) => {
-        this.addEntry(
-          LogLevel.INFO,
-          message,
-          data ? { ...data, context } : { context },
-          'frontend',
-          context
-        );
+        this.addEntry(LogLevel.INFO, message, withContext(data), 'frontend', context);
       },
       warn: (message: string, data?: any) => {
-        this.addEntry(
-          LogLevel.WARN,
-          message,
-          data ? { ...data, context } : { context },
-          'frontend',
-          context
-        );
+        this.addEntry(LogLevel.WARN, message, withContext(data), 'frontend', context);
       },
       error: (message: string, data?: any) => {
-        this.addEntry(
-          LogLevel.ERROR,
-          message,
-          data ? { ...data, context } : { context },
-          'frontend',
-          context
-        );
+        this.addEntry(LogLevel.ERROR, message, withContext(data), 'frontend', context);
       },
     };
   }

@@ -2,7 +2,10 @@
   import { onMount, onDestroy } from 'svelte';
   import ResizablePane from './ResizablePane.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Maximize2, Minimize2, Split, X } from '@lucide/svelte';
+  import Maximize2 from '~icons/fa6-solid/maximize';
+  import Minimize2 from '~icons/fa6-solid/minimize';
+  import Split from '~icons/fa6-solid/code-fork';
+  import X from '~icons/fa6-solid/xmark';
 
   export let direction: 'horizontal' | 'vertical' = 'horizontal';
   export let panes: Array<{

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { CheckCircle, XCircle } from '@lucide/svelte';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import XCircle from '~icons/fa6-solid/circle-xmark';
   import { cn } from '$lib/utils.js';
 
   interface Props {

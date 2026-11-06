@@ -85,6 +85,18 @@ impl ExecutionRepository {
         Ok(executions)
     }
 
+    /// Executions that cannot outlive the process that was driving them.
+    pub async fn get_non_terminal(&self) -> Result<Vec<ExecutionModel>, String> {
+        ExecutionEntity::find()
+            .filter(
+                crate::entities::pipeline_execution::Column::Status
+                    .is_in(["pending", "queued", "running"]),
+            )
+            .all(self.db_manager.get_connection())
+            .await
+            .map_err(|e| format!("Failed to fetch unfinished executions: {}", e))
+    }
+
     pub async fn create(
         &self,
         id: String,

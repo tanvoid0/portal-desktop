@@ -1,7 +1,12 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
-  import { Plus, MessageCircle, Trash2, FolderPlus, ChevronRight, X } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import MessageCircle from '~icons/fa6-solid/comment';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import FolderPlus from '~icons/fa6-solid/folder-plus';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import X from '~icons/fa6-solid/xmark';
   import AISessionSidebar from '$lib/domains/ai/components/shared/AISessionSidebar.svelte';
   import ConversationCard from './ConversationCard.svelte';
   import {

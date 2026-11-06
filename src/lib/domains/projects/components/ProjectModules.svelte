@@ -3,7 +3,9 @@
 -->
 
 <script lang="ts">
-  import { Loader2, RefreshCw, Search } from '@lucide/svelte';
+  import Loader2 from '~icons/fa6-solid/spinner';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Search from '~icons/fa6-solid/magnifying-glass';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import type { ProjectModule } from '$lib/domains/projects/types';

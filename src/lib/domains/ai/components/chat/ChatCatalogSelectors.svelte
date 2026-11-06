@@ -3,19 +3,21 @@
   import Select from '$lib/components/ui/select.svelte';
   import CatalogModelSelect from './CatalogModelSelect.svelte';
   import { Badge } from '$lib/components/ui/badge';
-  import { Loader } from '@lucide/svelte';
+  import Loader from '~icons/fa6-solid/spinner';
   import type {
     ProviderType,
     CatalogProvider,
     PlatformCatalog,
     CatalogModel,
   } from '../../types/index.js';
+  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
   import { aiProviderService } from '../../services/aiProviderService.js';
   import {
     selectableCatalogProviders,
     modelsForCatalogProvider,
     defaultModelForCatalogProvider,
   } from '../../utils/catalog.js';
+  import { isAuthError } from '../../utils/catalog.js';
   import { loadChatCatalogPrefs, saveChatCatalogPrefs } from '../../utils/chatCatalogPrefs.js';
 
   import type { CatalogStatus } from '../../types/index.js';
@@ -34,6 +36,10 @@
     showPlatformLabel?: boolean;
     /** Hide the inline error label when the caller renders its own banner. */
     showInlineError?: boolean;
+    /** Extra non-catalog providers to offer (e.g. a local CLI engine). */
+    extraProviders?: { value: string; label: string }[];
+    /** Hide the model picker (e.g. for an engine that ignores the model). */
+    showModel?: boolean;
   }
 
   let {
@@ -48,6 +54,8 @@
     modelSelectClass = 'w-[280px]',
     showPlatformLabel = true,
     showInlineError = true,
+    extraProviders = [],
+    showModel = true,
   }: Props = $props();
 
   let catalog = $state<PlatformCatalog | null>(null);
@@ -113,7 +121,8 @@
       onStatusChange?.({ checking: false, online: true, error: null });
     } catch (error) {
       console.error('Failed to load live catalog:', error);
-      loadError = error instanceof Error ? error.message : 'Failed to load catalog';
+      loadError =
+        error instanceof Error ? error.message : String(error || 'Failed to load catalog');
       catalogProviders = [];
       onStatusChange?.({ checking: false, online: false, error: loadError });
     } finally {
@@ -130,6 +139,14 @@
   }
 
   function handleBackendProviderChange(providerId: string) {
+    // A non-catalog engine (e.g. the Claude CLI) has no catalog models; just
+    // select it and clear the model — the engine ignores it.
+    if (extraProviders.some((p) => p.value === providerId)) {
+      selectedBackendProvider = providerId;
+      selectedModel = null;
+      onBackendProviderChange?.(providerId);
+      return;
+    }
     if (!catalog) return;
     selectedBackendProvider = providerId;
     onBackendProviderChange?.(providerId);
@@ -155,12 +172,13 @@
     persistSelection();
   }
 
-  const backendOptions = $derived.by(() =>
-    catalogProviders.map((provider) => ({
+  const backendOptions = $derived.by(() => [
+    ...catalogProviders.map((provider) => ({
       value: provider.id,
       label: provider.label,
-    }))
-  );
+    })),
+    ...extraProviders,
+  ]);
 
   const catalogModels = $derived.by((): CatalogModel[] => {
     if (!catalog || !selectedBackendProvider) return [];
@@ -207,16 +225,18 @@
     class={backendSelectClass}
   />
 
-  <CatalogModelSelect
-    models={catalogModels}
-    bind:value={selectedModel}
-    onSelect={handleModelChange}
-    placeholder={isLoading ? 'Loading...' : 'Select model'}
-    disabled={disabled || isLoading || !selectedBackendProvider}
-    class={modelSelectClass}
-  />
+  {#if showModel}
+    <CatalogModelSelect
+      models={catalogModels}
+      bind:value={selectedModel}
+      onSelect={handleModelChange}
+      placeholder={isLoading ? 'Loading...' : 'Select model'}
+      disabled={disabled || isLoading || !selectedBackendProvider}
+      class={modelSelectClass}
+    />
+  {/if}
 
-  {#if isDefaultModel}
+  {#if showModel && isDefaultModel}
     <Badge variant="secondary" class="text-xs">Default</Badge>
   {/if}
 
@@ -225,6 +245,9 @@
   {/if}
 
   {#if loadError && !isLoading && showInlineError}
-    <span class="text-xs text-destructive" title={loadError}>Catalog error</span>
+    <span class="text-xs text-destructive" title={loadError}>
+      {isAuthError(loadError) ? 'Agent Platform token rejected.' : 'Agent Platform unreachable.'}
+      <a href={AI_PROVIDER_SETTINGS_PATH} class="underline">Settings &gt; AI</a>
+    </span>
   {/if}
 </div>

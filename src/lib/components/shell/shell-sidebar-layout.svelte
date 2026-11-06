@@ -107,8 +107,8 @@
       </div>
     </SidebarRoot>
 
-    <main class={mainClass}>
+    <div class={mainClass}>
       {@render children()}
-    </main>
+    </div>
   </div>
 </SidebarProvider>

@@ -5,7 +5,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import ExecutionMonitor from '$lib/domains/projects/pipelines/components/ExecutionMonitor.svelte';
   import { createProjectQuery } from '$lib/domains/projects';
   import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
@@ -18,12 +18,28 @@
 
   $effect(() => {
     if (projectQuery.data) {
-      breadcrumbActions.setProjectDetailsBreadcrumbs(projectQuery.data.name);
+      breadcrumbActions.setProjectSubpageBreadcrumbs(
+        projectQuery.data.name,
+        projectQuery.data.id,
+        'Pipeline Run'
+      );
     }
+    return () => breadcrumbActions.clearCustomBreadcrumbs();
   });
 
+  // Opened from the global Action Runs list: return there with its filters
+  const from = $derived(page.url.searchParams.get('from'));
+  const backUrl = $derived.by(() => {
+    if (!from) return null;
+    const u = new URL(from, location.origin);
+    return u.origin === location.origin && u.pathname === '/pipeline-runs'
+      ? u.pathname + u.search
+      : null;
+  });
+  const fromList = $derived(backUrl !== null);
+
   function handleBack() {
-    goto(`/projects/${projectId}?tab=actions`);
+    goto(backUrl ?? `/projects/${projectId}?tab=actions`);
   }
 </script>
 
@@ -31,10 +47,10 @@
   <title>Pipeline Run - {projectName || 'Project'} - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto flex h-[calc(100vh-4rem)] flex-col space-y-4 p-6">
+<div class="space-y-6">
   <Button variant="ghost" size="sm" onclick={handleBack} class="w-fit gap-2">
     <ArrowLeft class="h-4 w-4" />
-    Back to Actions
+    {fromList ? 'Back to Action Runs' : 'Back to Actions'}
   </Button>
 
   {#if executionId}

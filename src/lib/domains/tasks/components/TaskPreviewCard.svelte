@@ -1,4 +1,6 @@
 <script lang="ts">
+  import FaBullseye from '~icons/fa6-solid/bullseye';
+  import FaXmark from '~icons/fa6-solid/xmark';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Textarea } from '$lib/components/ui/textarea';
@@ -6,7 +8,7 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import Select from '$lib/components/ui/select.svelte';
-  import { TaskPriorityEnum } from '../types';
+  import { TASK_PRIORITY_OPTIONS } from '../types';
   import type { GeneratedTask } from '../services/aiTaskService';
   import Icon from '@iconify/svelte';
 
@@ -85,7 +87,7 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <CardTitle class="flex items-center gap-2">
-          <Icon icon="lucide:target" class="h-5 w-5" />
+          <FaBullseye class="h-5 w-5" />
           Main Task
         </CardTitle>
         {#if isUpdateMode && originalStatus}
@@ -148,7 +150,7 @@
       <div class="space-y-2">
         <Label>Priority</Label>
         <Select
-          options={TaskPriorityEnum}
+          options={TASK_PRIORITY_OPTIONS}
           defaultValue={task.priority}
           onSelect={(value) => {
             task.priority = value as string;
@@ -185,7 +187,7 @@
         {#each suggestedLabels as tag, index}
           <Badge variant="secondary" class="cursor-pointer">
             {tag}
-            <Icon icon="lucide:x" class="ml-1 h-3 w-3" onclick={() => removeTag(tag)} />
+            <FaXmark class="ml-1 h-3 w-3" onclick={() => removeTag(tag)} />
           </Badge>
         {/each}
         <Input

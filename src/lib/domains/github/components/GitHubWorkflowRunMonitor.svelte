@@ -2,7 +2,8 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { PageError, PageLoading } from '$lib/components/shell';
+  import GitHubError from './GitHubError.svelte';
+  import { PageLoading } from '$lib/components/shell';
   import {
     createGitHubWorkflowJobLogsQuery,
     createGitHubWorkflowRunQuery,
@@ -21,7 +22,10 @@
   } from '$lib/domains/github/utils/workflowDisplay';
 
   const WORKFLOW_POLL_INTERVAL_MS = 3_000;
-  import { ChevronDown, ChevronRight, ExternalLink, RefreshCw } from '@lucide/svelte';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import RefreshCw from '~icons/fa6-solid/rotate';
 
   interface Props {
     owner: string;
@@ -80,7 +84,7 @@
 {#if runQuery.isPending}
   <PageLoading message="Loading workflow run..." />
 {:else if runQuery.isError}
-  <PageError
+  <GitHubError
     title="Failed to load workflow run"
     message={runQuery.error instanceof Error
       ? runQuery.error.message

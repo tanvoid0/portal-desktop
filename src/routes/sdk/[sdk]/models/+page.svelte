@@ -21,7 +21,10 @@
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 
-  import { AlertCircle, ArrowLeft, Play, Square } from '@lucide/svelte';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import Play from '~icons/fa6-solid/play';
+  import Square from '~icons/fa6-solid/square';
 
   import {
     sdkConfigService,
@@ -53,6 +56,7 @@
   let sdkConfig = $state<ProcessedSDKConfig | null>(null);
 
   // Service status
+  let unsupported = $state(false);
   let serviceLoading = $state(true);
   let serviceError = $state<string | null>(null);
   let serviceInfo = $state<{
@@ -82,6 +86,7 @@
 
   async function load() {
     serviceLoading = true;
+    unsupported = false;
     serviceError = null;
     try {
       sdkConfig = await sdkConfigService.getSDKConfig(sdkId);
@@ -92,6 +97,7 @@
         !sdkConfig.category_features?.modelManagement ||
         !sdkConfig.tabs.some((t) => t.id === 'models')
       ) {
+        unsupported = true;
         serviceError = 'Model management is not available for this SDK.';
         return;
       }
@@ -236,7 +242,11 @@
   {#if serviceLoading}
     <PageLoading message="Loading models..." />
   {:else if serviceError}
-    <PageError title="Failed to load models" message={serviceError} onRetry={load} />
+    <PageError
+      title="Failed to load models"
+      message={serviceError}
+      onRetry={unsupported ? undefined : load}
+    />
   {:else if sdkConfig}
     <div class="space-y-6">
       <!-- Header -->

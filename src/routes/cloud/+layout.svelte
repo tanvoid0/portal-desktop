@@ -118,6 +118,8 @@
   });
 </script>
 
+<h1 class="sr-only">Cloud</h1>
+
 {#if $cloudStore.connection.isConnected}
   <ShellSidebarLayout>
     {#snippet sidebar()}

@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { Eye, Wrench, Binary } from '@lucide/svelte';
+  import Eye from '~icons/fa6-solid/eye';
+  import Wrench from '~icons/fa6-solid/wrench';
+  import Binary from '~icons/fa6-solid/0';
   import { cn } from '$lib/utils';
   import type { CatalogModel } from '../../types/index.js';
   import { getModelRow } from '../../utils/catalog.js';

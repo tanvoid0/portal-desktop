@@ -304,6 +304,50 @@ impl ScriptExecutionService {
         Ok(execution_id)
     }
 
+    /// Record a run that happened in the embedded interactive terminal (no process is spawned here).
+    pub async fn record_interactive(
+        &self,
+        block_id: Option<String>,
+        command: String,
+        working_directory: Option<String>,
+        exit_code: Option<i32>,
+        started_at: Option<String>,
+    ) -> Result<(), String> {
+        let id = Uuid::new_v4().to_string();
+        self.repository
+            .create(
+                id.clone(),
+                block_id,
+                command,
+                "{}".to_string(),
+                working_directory,
+                "user".to_string(),
+            )
+            .await?;
+        let status = match exit_code {
+            Some(0) => "success",
+            Some(_) => "failed",
+            None => "cancelled",
+        };
+        self.repository
+            .update_status(&id, status.to_string(), exit_code, None)
+            .await?;
+        // Backdate started_at to when the terminal run began so duration is real.
+        if let Some(t) = started_at.and_then(|t| chrono::DateTime::parse_from_rfc3339(&t).ok()) {
+            use crate::entities::script_execution::{ActiveModel, Entity};
+            use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+            let db = self.db_manager.get_connection();
+            if let Ok(Some(m)) = Entity::find_by_id(&id).one(db).await {
+                let mut am: ActiveModel = m.into();
+                am.started_at = Set(t);
+                am.update(db)
+                    .await
+                    .map_err(|e| format!("Failed to set started_at: {}", e))?;
+            }
+        }
+        Ok(())
+    }
+
     /// Get execution details
     pub async fn get_execution(
         &self,
@@ -390,7 +434,9 @@ impl ScriptExecutionService {
 
     /// Get all running executions
     pub async fn get_running_executions(&self) -> Result<Vec<ScriptExecutionInfo>, String> {
-        let executions = self.repository.get_running().await?;
+        let mut executions = self.repository.get_running().await?;
+        // Pending rows have no pid, so they fall into the "state unknown" branch below.
+        executions.extend(self.repository.get_pending().await?);
 
         Ok(executions
             .into_iter()
@@ -467,7 +513,7 @@ impl ScriptExecutionService {
                         &execution.id,
                         "failed".to_string(),
                         None,
-                        Some("Process state unknown".to_string()),
+                        Some("Interrupted by app restart".to_string()),
                     )
                     .await?;
             }

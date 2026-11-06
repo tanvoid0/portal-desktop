@@ -1,11 +1,14 @@
 <script lang="ts">
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaTurnDown from '~icons/fa6-solid/turn-down';
+  import FaFlag from '~icons/fa6-solid/flag';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import Icon from '@iconify/svelte';
   import { taskUi as defaultTaskUi, type TaskUiState } from '../state/taskUi.svelte';
-  import type { Task } from '../types';
+  import { taskStatusLabel, type Task } from '../types';
 
   interface Props {
     ui?: TaskUiState;
@@ -84,7 +87,7 @@
                     class="h-8 w-8 p-0"
                     title="Create subtask"
                   >
-                    <Icon icon="mdi:plus" class="h-4 w-4 text-muted-foreground" />
+                    <FaPlus class="h-4 w-4 text-muted-foreground" />
                   </Button>
                 {/if}
                 <Button
@@ -108,7 +111,7 @@
                   <h4 class="font-medium text-foreground">{task.title}</h4>
                   {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
                     <div class="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Icon icon="mdi:subdirectory-arrow-right" class="h-3 w-3" />
+                      <FaTurnDown class="h-3 w-3" />
                       <span>{getSubtaskCount(task.id, taskUi.tasks)}</span>
                     </div>
                   {/if}
@@ -116,6 +119,11 @@
                 {#if task.description}
                   <p class="mt-1 text-sm text-muted-foreground">
                     {task.description}
+                  </p>
+                {/if}
+                {#if task.tags?.length}
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {task.tags.map((t) => '#' + t).join(' ')}
                   </p>
                 {/if}
               </div>
@@ -129,14 +137,14 @@
               {/if}
 
               <div class="flex items-center gap-1">
-                <Icon icon="mdi:flag" class="h-4 w-4 {getPriorityColor(task.priority)}" />
+                <FaFlag class="h-4 w-4 {getPriorityColor(task.priority)}" />
                 <Badge variant="outline" class="text-xs uppercase">
                   {task.priority}
                 </Badge>
               </div>
 
               <Badge class="text-sm {getStatusBadgeColor(task.status)}">
-                {task.status}
+                {taskStatusLabel(task.status)}
               </Badge>
             </div>
           </div>
@@ -181,10 +189,7 @@
 
                       <div>
                         <div class="flex items-center gap-2">
-                          <Icon
-                            icon="mdi:subdirectory-arrow-right"
-                            class="h-3 w-3 flex-shrink-0 text-primary"
-                          />
+                          <FaTurnDown class="h-3 w-3 flex-shrink-0 text-primary" />
                           <h4 class="font-medium text-foreground">
                             {subtask.title}
                           </h4>
@@ -205,17 +210,14 @@
                       {/if}
 
                       <div class="flex items-center gap-1">
-                        <Icon
-                          icon="mdi:flag"
-                          class="h-4 w-4 {getPriorityColor(subtask.priority)}"
-                        />
+                        <FaFlag class="h-4 w-4 {getPriorityColor(subtask.priority)}" />
                         <Badge variant="outline" class="text-xs uppercase">
                           {subtask.priority}
                         </Badge>
                       </div>
 
                       <Badge class="text-sm {getStatusBadgeColor(subtask.status)}">
-                        {subtask.status}
+                        {taskStatusLabel(subtask.status)}
                       </Badge>
                     </div>
                   </div>

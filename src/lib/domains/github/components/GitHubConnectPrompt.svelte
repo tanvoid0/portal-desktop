@@ -7,7 +7,9 @@
   import type { GitHubConnectionStatus, GitHubDeviceFlowStart } from '$lib/domains/github';
   import { openExternalUrl } from '$lib/utils/tauri';
   import { toast } from '$lib/utils/toast';
-  import { Check, Copy, FolderGit2 } from '@lucide/svelte';
+  import Check from '~icons/fa6-solid/check';
+  import Copy from '~icons/fa6-solid/copy';
+  import FolderGit2 from '~icons/fa6-solid/folder-tree';
 
   interface Props {
     status?: GitHubConnectionStatus | null;

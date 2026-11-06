@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { AlertCircle, RotateCw } from '@lucide/svelte';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import RotateCw from '~icons/fa6-solid/rotate-right';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent } from '$lib/components/ui/card';
 

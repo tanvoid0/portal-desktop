@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
-  import { Cpu, MemoryStick } from '@lucide/svelte';
+  import Cpu from '~icons/fa6-solid/microchip';
+  import MemoryStick from '~icons/fa6-solid/memory';
 
   interface HostStats {
     cpuPercent: number;

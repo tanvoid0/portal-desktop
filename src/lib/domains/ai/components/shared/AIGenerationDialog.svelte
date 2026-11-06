@@ -1,4 +1,12 @@
 <script lang="ts">
+  import FaCode from '~icons/fa6-solid/code';
+  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import FaCircleInfo from '~icons/fa6-solid/circle-info';
+  import FaTriangleExclamation from '~icons/fa6-solid/triangle-exclamation';
+  import FaGear from '~icons/fa6-solid/gear';
+  import FaBoxOpen from '~icons/fa6-solid/box-open';
+  import FaRotate from '~icons/fa6-solid/rotate';
+
   import * as Dialog from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
@@ -6,7 +14,6 @@
   import { toastActions } from '$lib/utils/toast';
   import { goto } from '$app/navigation';
   import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
-  import Icon from '@iconify/svelte';
 
   export interface AIErrorInfo {
     message: string;
@@ -349,7 +356,7 @@
       {#if config.showDeveloperNote}
         <div class="space-y-2">
           <Label for="developer-note">
-            <Icon icon="lucide:code" class="mr-1 inline h-4 w-4" />
+            <FaCode class="mr-1 inline h-4 w-4" />
             Developer Note (Optional)
           </Label>
           <Textarea
@@ -370,7 +377,7 @@
       {#if config.showInstruction}
         <div class="space-y-2">
           <Label for="instruction">
-            <Icon icon="lucide:wand-2" class="mr-1 inline h-4 w-4" />
+            <FaWandMagicSparkles class="mr-1 inline h-4 w-4" />
             Generation Instructions (Optional)
           </Label>
           <Textarea
@@ -389,7 +396,7 @@
       {#if config.infoContent}
         <div class="rounded-lg border bg-muted/50 p-4">
           <div class="flex gap-2">
-            <Icon icon="lucide:info" class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+            <FaCircleInfo class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
             <div class="space-y-1 text-sm text-muted-foreground">
               {#if typeof config.infoContent === 'string'}
                 <p>{config.infoContent}</p>
@@ -411,8 +418,7 @@
           class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
         >
           <div class="flex gap-2">
-            <Icon
-              icon="lucide:alert-triangle"
+            <FaTriangleExclamation
               class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
             />
             <div class="flex-1 space-y-2 text-sm">
@@ -428,7 +434,7 @@
                 onclick={handleOpenSettings}
                 class="mt-2 border-amber-300 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
               >
-                <Icon icon="lucide:settings" class="mr-2 h-4 w-4" />
+                <FaGear class="mr-2 h-4 w-4" />
                 Configure AI Provider
               </Button>
             </div>
@@ -441,10 +447,7 @@
           class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20"
         >
           <div class="flex gap-2">
-            <Icon
-              icon="lucide:package"
-              class="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400"
-            />
+            <FaBoxOpen class="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
             <div class="flex-1 space-y-2 text-sm">
               <p class="font-medium text-blue-900 dark:text-blue-100">Model Not Installed</p>
               <p class="text-blue-800 dark:text-amber-200">{error}</p>
@@ -458,7 +461,7 @@
                 onclick={handleOpenSettings}
                 class="mt-2 border-blue-300 text-blue-900 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-100 dark:hover:bg-blue-900/40"
               >
-                <Icon icon="lucide:settings" class="mr-2 h-4 w-4" />
+                <FaGear class="mr-2 h-4 w-4" />
                 Open Settings
               </Button>
             </div>
@@ -474,13 +477,13 @@
           onclick={() => (showRegenerateDialog = true)}
           disabled={isGenerating}
         >
-          <Icon icon="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+          <FaRotate class="mr-2 h-4 w-4" />
           Regenerate
         </Button>
       {/if}
       <Button variant="outline" onclick={handleCancel} disabled={isGenerating}>Cancel</Button>
       <Button onclick={handleGenerate} disabled={isGenerating || !inputText.trim()}>
-        <Icon icon="lucide:sparkles" class="mr-2 h-4 w-4" />
+        <FaWandMagicSparkles class="mr-2 h-4 w-4" />
         Generate
       </Button>
     </Dialog.Footer>
@@ -541,7 +544,7 @@
           onclick={handleRegenerate}
           disabled={isRegenerating || !regenerateInstructions.trim()}
         >
-          <Icon icon="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+          <FaRotate class="mr-2 h-4 w-4" />
           Regenerate
         </Button>
       </Dialog.Footer>

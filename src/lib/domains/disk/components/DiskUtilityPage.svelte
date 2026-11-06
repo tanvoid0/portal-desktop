@@ -14,7 +14,7 @@
   import HistoryTab from './HistoryTab.svelte';
   import RulesTab from './RulesTab.svelte';
   import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-  import { HardDrive } from '@lucide/svelte';
+  import HardDrive from '~icons/fa6-solid/hard-drive';
   import { onMount } from 'svelte';
 
   type Tab = 'overview' | 'files' | 'developer' | 'history' | 'rules';

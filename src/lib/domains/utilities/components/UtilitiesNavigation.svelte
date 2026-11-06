@@ -3,7 +3,8 @@
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
-  import { HardDrive, Variable } from '@lucide/svelte';
+  import HardDrive from '~icons/fa6-solid/hard-drive';
+  import Variable from '~icons/fa6-solid/square-root-variable';
 
   type UtilitySection = 'disk' | 'environment';
 

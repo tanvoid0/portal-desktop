@@ -1,7 +1,7 @@
 <script lang="ts">
   import CatalogModelSelect from './CatalogModelSelect.svelte';
   import { Badge } from '$lib/components/ui/badge';
-  import { Loader } from '@lucide/svelte';
+  import Loader from '~icons/fa6-solid/spinner';
   import type { ProviderType, CatalogModel } from '../../types/index.js';
   import { aiProviderService } from '../../services/aiProviderService.js';
   import { flattenCatalogModels } from '../../utils/catalog.js';

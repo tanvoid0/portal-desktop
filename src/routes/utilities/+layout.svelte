@@ -5,7 +5,7 @@
   import ShellSidebarLayout from '$lib/components/shell/shell-sidebar-layout.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
   import { Card } from '$lib/components/ui/card';
-  import { Wrench } from '@lucide/svelte';
+  import Wrench from '~icons/fa6-solid/wrench';
 
   let { children }: { children: Snippet<[]> } = $props();
 
@@ -33,10 +33,10 @@
       class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 3xl:px-8"
     >
       <div class="min-w-0">
-        <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
+        <div class="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Wrench class="h-6 w-6" />
           Utilities
-        </h1>
+        </div>
         <p class="mt-1 text-sm text-muted-foreground">
           System tools for disk cleanup, environment management, and more
         </p>

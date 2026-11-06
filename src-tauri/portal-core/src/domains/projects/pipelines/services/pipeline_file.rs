@@ -35,7 +35,11 @@ pub struct FileAction {
     pub cwd: Option<String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub env: HashMap<String, String>,
-    #[serde(default, rename = "longRunning", skip_serializing_if = "std::ops::Not::not")]
+    #[serde(
+        default,
+        rename = "longRunning",
+        skip_serializing_if = "std::ops::Not::not"
+    )]
     pub long_running: bool,
 }
 
@@ -79,7 +83,9 @@ pub fn parse(raw: &str) -> Result<PipelineFile, String> {
     if let Some(r) = &file.release {
         for id in std::iter::once(&r.ship).chain(r.rehearse.iter()) {
             if !file.workflows.contains_key(id) {
-                return Err(format!("release names workflow '{id}', which is not defined"));
+                return Err(format!(
+                    "release names workflow '{id}', which is not defined"
+                ));
             }
         }
     }
@@ -89,8 +95,10 @@ pub fn parse(raw: &str) -> Result<PipelineFile, String> {
 /// The file as YAML text, with the `version: 1` the frontend requires.
 pub fn to_yaml(file: &PipelineFile) -> Result<String, String> {
     let body = serde_yaml::to_string(file).map_err(|e| e.to_string())?;
-    Ok(format!("version: 1
-{body}"))
+    Ok(format!(
+        "version: 1
+{body}"
+    ))
 }
 
 /// `Ok(None)` when the project has no pipeline file.
@@ -98,7 +106,8 @@ pub fn load(project_path: &str) -> Result<Option<PipelineFile>, String> {
     for rel in CANDIDATES {
         let path = Path::new(project_path).join(rel);
         if path.is_file() {
-            let raw = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let raw =
+                std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
             return parse(&raw).map(Some);
         }
     }
@@ -116,10 +125,12 @@ pub fn build_steps(file: &PipelineFile, workflow_id: &str) -> Result<Vec<Value>,
     wf.steps
         .iter()
         .map(|step| {
-            let action = file
-                .actions
-                .get(&step.action)
-                .ok_or_else(|| format!("Workflow '{workflow_id}' uses undefined action '{}'", step.action))?;
+            let action = file.actions.get(&step.action).ok_or_else(|| {
+                format!(
+                    "Workflow '{workflow_id}' uses undefined action '{}'",
+                    step.action
+                )
+            })?;
             let mut env: HashMap<&String, &String> = release_env.into_iter().flatten().collect();
             env.extend(action.env.iter());
             Ok(json!({

@@ -6,6 +6,7 @@ pub mod conversation;
 pub mod entities;
 pub mod logging;
 pub mod message;
+pub mod platform_admin;
 pub mod platform_config;
 pub mod platform_project;
 pub mod providers;

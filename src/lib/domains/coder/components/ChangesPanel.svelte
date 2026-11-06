@@ -3,7 +3,12 @@
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
   import { Badge } from '$lib/components/ui/badge';
-  import { Check, X, FileEdit, Pencil, ChevronDown, ChevronUp } from '@lucide/svelte';
+  import Check from '~icons/fa6-solid/check';
+  import X from '~icons/fa6-solid/xmark';
+  import FileEdit from '~icons/fa6-solid/file-pen';
+  import Pencil from '~icons/fa6-solid/pencil';
+  import ChevronDown from '~icons/fa6-solid/chevron-down';
+  import ChevronUp from '~icons/fa6-solid/chevron-up';
   import { coderService } from '../services/coderService.js';
   import type { FileChange, Hunk } from '../types.js';
 

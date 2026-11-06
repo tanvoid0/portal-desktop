@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { ChevronRight, Folder } from '@lucide/svelte';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import Folder from '~icons/fa6-solid/folder';
   import { Button } from '$lib/components/ui/button';
   import CoderSessionCard from './CoderSessionCard.svelte';
   import type { CoderThread } from '../types.js';

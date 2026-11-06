@@ -1,16 +1,14 @@
 <script lang="ts">
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import { Button } from '$lib/components/ui/button';
-  import {
-    MessageSquare,
-    MessageCircle,
-    Copy,
-    Check,
-    RefreshCw,
-    Pencil,
-    Trash2,
-    GitBranch,
-  } from '@lucide/svelte';
+  import MessageSquare from '~icons/fa6-solid/message';
+  import MessageCircle from '~icons/fa6-solid/comment';
+  import Copy from '~icons/fa6-solid/copy';
+  import Check from '~icons/fa6-solid/check';
+  import RefreshCw from '~icons/fa6-solid/rotate';
+  import Pencil from '~icons/fa6-solid/pencil';
+  import Trash2 from '~icons/fa6-solid/trash';
+  import GitBranch from '~icons/fa6-solid/code-branch';
   import ChatMessage from './ChatMessage.svelte';
   import ChatInput from './ChatInput.svelte';
   import ChatCatalogSelectors from './ChatCatalogSelectors.svelte';
@@ -173,13 +171,20 @@
 <div class="flex h-full min-h-0 flex-col {className}">
   {#if showSelectors}
     <div
-      class="divider-edge-b divider-edge-full flex items-center justify-between gap-2 px-4 py-2.5"
+      class="divider-edge-b divider-edge-full flex flex-wrap items-center justify-between gap-2 px-4 py-2.5"
     >
-      <h2 class="flex items-center gap-2 text-sm font-semibold">
+      <h2 class="flex shrink-0 items-center gap-2 text-sm font-semibold">
         <MessageSquare class="h-4 w-4" />
         {title}
       </h2>
-      <ChatCatalogSelectors bind:selectedProvider bind:selectedBackendProvider bind:selectedModel />
+      <ChatCatalogSelectors
+        bind:selectedProvider
+        bind:selectedBackendProvider
+        bind:selectedModel
+        showPlatformLabel={false}
+        backendSelectClass="w-[120px]"
+        modelSelectClass="w-[170px]"
+      />
     </div>
   {/if}
   <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -257,8 +262,8 @@
                       size="icon"
                       variant="ghost"
                       class="h-6 w-6 text-muted-foreground"
-                      title="Edit and resend"
-                      disabled={isLoading}
+                      title={sendDisabled ? 'Unavailable while offline' : 'Edit and resend'}
+                      disabled={isLoading || sendDisabled}
                       onclick={() => editMessage(index, message.content)}
                     >
                       <Pencil class="h-3 w-3" />

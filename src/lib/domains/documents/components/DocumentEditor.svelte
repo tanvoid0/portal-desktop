@@ -1,4 +1,6 @@
 <script lang="ts">
+  import FaPlus from '~icons/fa6-solid/plus';
+  import FaXmark from '~icons/fa6-solid/xmark';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Textarea } from '$lib/components/ui/textarea';
@@ -8,7 +10,6 @@
   import { Separator } from '$lib/components/ui/separator';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import Select from '$lib/components/ui/select.svelte';
-  import Icon from '@iconify/svelte';
   import { documentActions } from '../stores/documentStore';
   import { toastActions } from '$lib/utils/toast';
   import type { Document } from '../types';
@@ -34,9 +35,10 @@
   // UI state
   let isSaving = $state(false);
   let newTag = $state('');
+  let autoSaveError = $state<string | null>(null);
   let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const isCreateMode = $derived(document === null);
+  const isCreateMode = $derived(!document);
 
   // Auto-save draft
   function startAutoSave() {
@@ -47,8 +49,10 @@
       if (!isCreateMode && document) {
         try {
           await documentActions.updateDraft(document.id, contentDraft || content);
+          autoSaveError = null;
         } catch (error) {
           console.error('Auto-save failed:', error);
+          autoSaveError = error instanceof Error ? error.message : String(error);
         }
       }
     }, 2000);
@@ -71,6 +75,7 @@
       return;
     }
 
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
     try {
       isSaving = true;
       let savedDoc: Document;
@@ -93,22 +98,15 @@
     } catch (error) {
       toastActions.error(
         `Failed to ${isCreateMode ? 'create' : 'save'} document`,
-        error instanceof Error ? error.message : 'An unexpected error occurred'
+        error instanceof Error ? error.message : String(error)
       );
     } finally {
       isSaving = false;
     }
   }
 
-  $effect(() => {
-    if (contentDraft || content) {
-      startAutoSave();
-    }
-    return () => {
-      if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer);
-      }
-    };
+  $effect(() => () => {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
   });
 </script>
 
@@ -142,7 +140,11 @@
           startAutoSave();
         }}
       />
-      {#if isDraft}
+      {#if autoSaveError}
+        <p class="text-xs text-destructive" role="status">
+          Draft auto-save failed: {autoSaveError}. Use Save Document to keep your edits.
+        </p>
+      {:else if isDraft}
         <p class="text-xs text-muted-foreground">Draft saved</p>
       {/if}
     </div>
@@ -162,7 +164,7 @@
           }}
         />
         <Button type="button" variant="outline" onclick={addTag}>
-          <Icon icon="lucide:plus" class="h-4 w-4" />
+          <FaPlus class="h-4 w-4" />
         </Button>
       </div>
       {#if tags.length > 0}
@@ -177,7 +179,7 @@
                 onclick={() => removeTag(tag)}
                 class="h-4 w-4 p-0"
               >
-                <Icon icon="lucide:x" class="h-3 w-3" />
+                <FaXmark class="h-3 w-3" />
               </Button>
             </Badge>
           {/each}

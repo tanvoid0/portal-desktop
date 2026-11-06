@@ -1,7 +1,10 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import Select from '$lib/components/ui/select.svelte';
-  import { Plus, X, LayoutGrid, SlidersHorizontal } from '@lucide/svelte';
+  import Plus from '~icons/fa6-solid/plus';
+  import X from '~icons/fa6-solid/xmark';
+  import LayoutGrid from '~icons/fa6-solid/table-cells-large';
+  import SlidersHorizontal from '~icons/fa6-solid/sliders';
   import { formatCount } from '$lib/domains/shared/utils';
   import AISessionSidebar from '$lib/domains/ai/components/shared/AISessionSidebar.svelte';
   import ProjectWorkspaceList from './ProjectWorkspaceList.svelte';
@@ -97,17 +100,14 @@
 
   const showProviderFilter = $derived(providerOptions.length > 2);
 
-  const filteredCount = $derived(
-    filterAndSortSessions(
-      displayThreads,
-      {
-        ...listFilters,
-        project: coderUi.showAllWorkspaces ? 'all' : (coderUi.activeProjectPath ?? 'all'),
-        projectId: coderUi.showAllWorkspaces ? 'all' : (coderUi.activeProjectId ?? 'all'),
-      },
-      runningThreadIds,
-      queuedCountFor
-    ).length
+  // The count spans every workspace group below, and collapsed groups hide their rows,
+  // so say how many workspaces it covers rather than letting it contradict what is on screen.
+  const filteredSessions = $derived(
+    filterAndSortSessions(displayThreads, listFilters, runningThreadIds, queuedCountFor)
+  );
+  const filteredCount = $derived(filteredSessions.length);
+  const workspaceCount = $derived(
+    new Set(filteredSessions.map((t) => t.workspace_root ?? '')).size
   );
 
   const filtersActive = $derived(hasActiveFilters(listFilters) || coderUi.showAllWorkspaces);
@@ -188,7 +188,9 @@
         {#if showLoadingSkeleton}
           Loading sessions…
         {:else}
-          {formatCount(filteredCount, 'session')}
+          {formatCount(filteredCount, 'session')}{workspaceCount > 1
+            ? ` in ${workspaceCount} workspaces`
+            : ''}
         {/if}
       </p>
       <div class="flex shrink-0 items-center gap-1">

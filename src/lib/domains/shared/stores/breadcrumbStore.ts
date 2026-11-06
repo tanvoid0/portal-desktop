@@ -3,7 +3,7 @@
  * Provides centralized breadcrumb management across the application
  */
 
-import { writable, derived, readable } from 'svelte/store';
+import { writable, derived, readable, toStore } from 'svelte/store';
 import { page } from '$app/state';
 import { logger } from '../services/logger';
 
@@ -18,6 +18,10 @@ export interface BreadcrumbItem {
 
 // Store for custom breadcrumb items (set by pages)
 const customBreadcrumbs = writable<BreadcrumbItem[]>([]);
+// Path the custom items were set on; they are ignored once the user navigates elsewhere
+let customPath = '';
+// `page` is rune state; this makes the derived store re-run on navigation
+const currentHref = toStore(() => page.url.href);
 
 // Store for page-specific breadcrumb configuration
 const breadcrumbConfig = writable<{
@@ -28,15 +32,15 @@ const breadcrumbConfig = writable<{
 
 // Derived store that automatically generates breadcrumbs from URL
 export const breadcrumbItems = derived(
-  [customBreadcrumbs, breadcrumbConfig],
-  ([$customBreadcrumbs, _$config]) => {
-    // If custom breadcrumbs are set, use them
-    if ($customBreadcrumbs.length > 0) {
+  [customBreadcrumbs, breadcrumbConfig, currentHref],
+  ([$customBreadcrumbs]) => {
+    // Use custom breadcrumbs only on the page that set them
+    if ($customBreadcrumbs.length > 0 && customPath === page.url.pathname) {
       return $customBreadcrumbs;
     }
 
     // Generate breadcrumbs based on current page including query parameters
-    return generateBreadcrumbsFromPath(page.url.pathname, page.url.search);
+    return generateBreadcrumbsFromPath(page.url.pathname, page.url.search, page.route.id);
   }
 );
 
@@ -57,11 +61,27 @@ export const breadcrumbSettings = derived(breadcrumbConfig, ($config) => ({
   ...$config,
 }));
 
+// Acronyms/brands the plain humanizer would get wrong
+const SEGMENT_LABELS: Record<string, string> = {
+  ides: 'IDEs',
+  'framework-ides': 'Framework IDEs',
+  sdk: 'SDK',
+  github: 'GitHub',
+  ai: 'AI',
+  'pipeline-runs': 'Action Runs',
+  'frameworks-languages': 'Frameworks & Languages',
+};
+
 /**
  * Generate breadcrumbs from URL path and query parameters
  */
-function generateBreadcrumbsFromPath(pathname: string, search: string): BreadcrumbItem[] {
+function generateBreadcrumbsFromPath(
+  pathname: string,
+  search: string,
+  routeId?: string | null
+): BreadcrumbItem[] {
   const segments = pathname.split('/').filter(Boolean);
+  const routeSegments = (routeId ?? '').split('/').filter(Boolean);
   const breadcrumbs: BreadcrumbItem[] = [];
 
   // Build breadcrumbs from path segments
@@ -71,8 +91,15 @@ function generateBreadcrumbsFromPath(pathname: string, search: string): Breadcru
     const segment = segments[i];
     currentPath += `/${segment}`;
 
-    // Convert segment to uppercase for display
-    const label = segment.toUpperCase();
+    // Static segments are humanized; [param] values are shown as-is ("#n" if numeric)
+    const isParam = routeSegments.length === segments.length && /^\[.*\]$/.test(routeSegments[i]);
+    const decoded = decodeURIComponent(segment);
+    const label = isParam
+      ? /^\d+$/.test(decoded)
+        ? `#${decoded}`
+        : decoded
+      : (SEGMENT_LABELS[decoded] ??
+        decoded.replace(/[-_]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase()));
 
     // Use a generic icon for all segments
     const icon = 'file';
@@ -87,7 +114,10 @@ function generateBreadcrumbsFromPath(pathname: string, search: string): Breadcru
   // Add query parameters as a separate breadcrumb if they exist
   if (search) {
     const queryParams = new URLSearchParams(search);
-    const paramEntries = Array.from(queryParams.entries());
+    // `tab` is page-local view state (tabs show their own label), not a location
+    const paramEntries = Array.from(queryParams.entries()).filter(
+      ([key]) => !['tab', 'from', 'q', 'status'].includes(key)
+    );
 
     if (paramEntries.length > 0) {
       // Create a label showing the query parameters
@@ -110,6 +140,7 @@ function generateBreadcrumbsFromPath(pathname: string, search: string): Breadcru
  */
 export function setBreadcrumbs(items: BreadcrumbItem[]) {
   log.debug('Setting custom breadcrumbs', { items });
+  customPath = page.url.pathname;
   customBreadcrumbs.set(items);
 }
 
@@ -210,15 +241,22 @@ export const breadcrumbActions = {
   /**
    * Set breadcrumbs for project edit
    */
-  setProjectEditBreadcrumbs(projectName: string) {
+  setProjectEditBreadcrumbs(projectName: string, projectId: string | number) {
     setBreadcrumbs([
       { label: 'Projects', href: '/projects', icon: 'folder' },
-      {
-        label: projectName,
-        href: `/projects/${projectName}`,
-        icon: 'folder-open',
-      },
+      { label: projectName, href: `/projects/${projectId}`, icon: 'folder-open' },
       { label: 'Edit', icon: 'edit' },
+    ]);
+  },
+
+  /**
+   * Set breadcrumbs for a project sub-page (e.g. "Create Pipeline", "Pipeline Run")
+   */
+  setProjectSubpageBreadcrumbs(projectName: string, projectId: string | number, label: string) {
+    setBreadcrumbs([
+      { label: 'Projects', href: '/projects', icon: 'folder' },
+      { label: projectName, href: `/projects/${projectId}`, icon: 'folder-open' },
+      { label, icon: 'file' },
     ]);
   },
 

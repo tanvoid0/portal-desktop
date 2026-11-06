@@ -6,7 +6,11 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
   import { Button } from './button';
-  import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from '@lucide/svelte';
+  import X from '~icons/fa6-solid/xmark';
+  import CheckCircle from '~icons/fa6-solid/circle-check';
+  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
+  import Info from '~icons/fa6-solid/circle-info';
+  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
   import { onMount } from 'svelte';
 
   interface ToastProps {

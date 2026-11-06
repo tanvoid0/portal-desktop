@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Blocks, SquareTerminal } from '@lucide/svelte';
+  import Blocks from '~icons/fa6-solid/cubes';
+  import SquareTerminal from '~icons/fa6-solid/terminal';
   import { Button } from '$lib/components/ui/button';
   import CommandInput from '../ai/CommandInput.svelte';
   import type { SessionView } from '../core/TerminalSession.svelte';

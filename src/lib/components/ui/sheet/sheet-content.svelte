@@ -22,7 +22,7 @@
 
 <script lang="ts">
   import { Dialog as SheetPrimitive } from 'bits-ui';
-  import XIcon from '@lucide/svelte/icons/x';
+  import XIcon from '~icons/fa6-solid/xmark';
   import type { Snippet } from 'svelte';
   import SheetPortal from './sheet-portal.svelte';
   import SheetOverlay from './sheet-overlay.svelte';

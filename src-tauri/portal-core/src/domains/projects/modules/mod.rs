@@ -3,6 +3,7 @@
 
 pub mod detect;
 pub mod service;
+pub mod stack;
 
 pub use detect::DetectedModule;
 pub use service::ModuleService;

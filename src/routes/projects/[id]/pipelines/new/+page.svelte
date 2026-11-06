@@ -16,7 +16,12 @@
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
-  import { ArrowLeft, Sparkles, Code, Package, Rocket, Wrench } from '@lucide/svelte';
+  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
+  import Code from '~icons/fa6-solid/code';
+  import Package from '~icons/fa6-solid/box-open';
+  import Rocket from '~icons/fa6-solid/rocket';
+  import Wrench from '~icons/fa6-solid/wrench';
   import PipelineBuilder from '$lib/domains/projects/pipelines/components/PipelineBuilder.svelte';
   import {
     pipelineTemplateService,
@@ -29,6 +34,7 @@
   import { PageHeader, PageLoading, PageEmpty } from '$lib/components/shell';
   import type { Pipeline } from '$lib/domains/projects/pipelines/types';
   import { toast } from '$lib/utils/toast';
+  import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
 
   const projectId = $derived(page.params.id ?? '');
   const projectQuery = createProjectQuery(() => projectId);
@@ -40,6 +46,12 @@
 
   const project = $derived(projectQuery.data ?? null);
   const loading = $derived(projectQuery.isPending);
+
+  $effect(() => {
+    if (project)
+      breadcrumbActions.setProjectSubpageBreadcrumbs(project.name, project.id, 'Create Pipeline');
+    return () => breadcrumbActions.clearCustomBreadcrumbs();
+  });
 
   let registryReady = $state(false);
 
