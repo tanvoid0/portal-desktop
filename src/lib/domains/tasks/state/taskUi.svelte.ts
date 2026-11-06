@@ -14,6 +14,19 @@ import type {
   CreateTaskRequest,
 } from '../types';
 
+const DONE_VISIBLE_DAYS = 7;
+
+export function hasProject(task: Task): boolean {
+  return task.resourceType === 'project' && !!task.resourceId;
+}
+
+/** Archived = cancelled, or completed more than 7 days ago (or with no completedAt). Never deleted. */
+export function isArchived(task: Task, now: number = Date.now()): boolean {
+  if (task.status === 'cancelled') return true;
+  if (task.status !== 'completed') return false;
+  return !task.completedAt || task.completedAt.getTime() < now - DONE_VISIBLE_DAYS * 86_400_000;
+}
+
 function applyTaskFilters(tasks: Task[], filters: TaskFilters): Task[] {
   let filtered = tasks.filter((task) => !task.parentId);
 
@@ -38,6 +51,10 @@ function applyTaskFilters(tasks: Task[], filters: TaskFilters): Task[] {
     filtered = filtered.filter((task) => task.type && filters.type!.includes(task.type));
   }
 
+  if (filters.noProject) {
+    filtered = filtered.filter((task) => !hasProject(task));
+  }
+
   if (filters.resourceType && filters.resourceId) {
     filtered = filtered.filter(
       (task) => task.resourceType === filters.resourceType && task.resourceId === filters.resourceId
@@ -45,6 +62,10 @@ function applyTaskFilters(tasks: Task[], filters: TaskFilters): Task[] {
   }
 
   return filtered;
+}
+
+function archiveTime(task: Task): number {
+  return (task.completedAt ?? task.updatedAt)?.getTime() ?? 0;
 }
 
 function computeTaskStats(parentTasks: Task[]): TaskStats {
@@ -124,6 +145,8 @@ export class TaskUiState {
   selectedTaskIds = $state<Set<string>>(new Set());
   isMultiSelectMode = $state(false);
   taskFilters = $state<TaskFilters>({});
+  /** Off for non-task lists (e.g. GitHub issues) that have no completion dates to archive by. */
+  archiveEnabled = $state(true);
   timeTrackingSession = $state<TimeTrackingSession | null>(null);
   savedViews = $state<SavedView[]>([]);
   taskTemplates = $state<TaskTemplate[]>([]);
@@ -134,32 +157,68 @@ export class TaskUiState {
 
   taskStats = $derived(computeTaskStats(this.parentTasks));
 
-  kanbanColumns = $derived([
-    {
-      id: 'pending',
-      title: 'To Do',
-      color: 'bg-gray-100 dark:bg-gray-800',
-      tasks: this.filteredTasks.filter((t) => t.status === 'pending'),
-    },
-    {
-      id: 'in-progress',
-      title: 'In Progress',
-      color: 'bg-blue-100 dark:bg-blue-900/20',
-      tasks: this.filteredTasks.filter((t) => t.status === 'in-progress'),
-    },
-    {
-      id: 'completed',
-      title: 'Completed',
-      color: 'bg-green-100 dark:bg-green-900/20',
-      tasks: this.filteredTasks.filter((t) => t.status === 'completed'),
-    },
-    {
-      id: 'cancelled',
-      title: 'Cancelled',
-      color: 'bg-red-100 dark:bg-red-900/20',
-      tasks: this.filteredTasks.filter((t) => t.status === 'cancelled'),
-    },
-  ]);
+  archived(task: Task): boolean {
+    return this.archiveEnabled && isArchived(task);
+  }
+
+  /** Filtered tasks that belong on the board (everything not archived). */
+  boardTasks = $derived(this.filteredTasks.filter((t) => !this.archived(t)));
+
+  /** Filtered tasks that live in the Archive view, newest completion first. */
+  archivedTasks = $derived(
+    this.filteredTasks
+      .filter((t) => this.archived(t))
+      .sort((a, b) => archiveTime(b) - archiveTime(a))
+  );
+
+  /** Unfiltered counts for the project sidebar. Keys are project ids; '' = no project. */
+  projectCounts = $derived.by(() => {
+    const open: Record<string, number> = {};
+    let archived = 0;
+    let openTotal = 0;
+    for (const t of this.parentTasks) {
+      if (this.archived(t)) {
+        archived++;
+        continue;
+      }
+      openTotal++;
+      const key = hasProject(t) ? t.resourceId! : '';
+      open[key] = (open[key] ?? 0) + 1;
+    }
+    // Projects that only have archived tasks still count as "having tasks".
+    const known = new Set(this.parentTasks.filter(hasProject).map((t) => t.resourceId!));
+    return { open, archived, openTotal, known };
+  });
+
+  kanbanColumns = $derived.by(() => {
+    const done = this.filteredTasks
+      .filter((t) => t.status === 'completed' && !this.archived(t))
+      .sort((a, b) => archiveTime(b) - archiveTime(a));
+    return [
+      {
+        id: 'pending',
+        title: 'Backlog',
+        color: 'bg-gray-100 dark:bg-gray-800',
+        tasks: this.filteredTasks.filter((t) => t.status === 'pending'),
+        olderCount: 0,
+      },
+      {
+        id: 'in-progress',
+        title: 'In Progress',
+        color: 'bg-blue-100 dark:bg-blue-900/20',
+        tasks: this.filteredTasks.filter((t) => t.status === 'in-progress'),
+        olderCount: 0,
+      },
+      {
+        id: 'completed',
+        title: 'Done',
+        color: 'bg-green-100 dark:bg-green-900/20',
+        tasks: done,
+        olderCount: this.filteredTasks.filter((t) => t.status === 'completed' && this.archived(t))
+          .length,
+      },
+    ];
+  });
 
   overdueTasks = $derived(
     this.tasks.filter(

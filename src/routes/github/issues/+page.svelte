@@ -22,6 +22,7 @@
   import KanbanBoard from '$lib/domains/tasks/components/KanbanBoard.svelte';
   import TaskList from '$lib/domains/tasks/components/TaskList.svelte';
   import type { Task } from '$lib/domains/tasks/types';
+  import type { TaskDisplay } from '$lib/domains/tasks/utils/taskDisplay';
   import { toast } from '$lib/utils/toast';
   import Bug from '~icons/fa6-solid/bug';
   import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
@@ -66,6 +67,7 @@
   // Reuse the tasks board UI: map GitHub issues onto the Task shape and give
   // the board its own state instance (not the local-tasks singleton).
   const issueUi = createTaskUiState();
+  issueUi.archiveEnabled = false;
   const issueByTaskId = new Map<string, GitHubIssue>();
 
   function issueTaskId(issue: GitHubIssue): string {
@@ -139,10 +141,17 @@
     setIssueState(issue, issue.state === 'closed' ? 'open' : 'closed');
   }
 
+  const issueDisplay: TaskDisplay = {
+    statusColor: (status) => (status === 'completed' ? 'text-red-500' : 'text-green-500'),
+    statusBadge: (status) =>
+      status === 'completed'
+        ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+        : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300',
+    priorityColor: () => 'text-muted-foreground',
+    icon: (task) => (task.status === 'completed' ? 'mdi:source-merge' : 'mdi:source-branch'),
+  };
+
   function noop() {}
-  function zero() {
-    return 0;
-  }
 
   async function handleCreateIssue() {
     const [owner, repo] = createRepoFullName.split('/');
@@ -287,16 +296,7 @@
         {handleTaskStatusToggle}
         handleTaskSelection={noop}
         handleCreateSubtask={noop}
-        getSubtaskCount={zero}
-        getTaskStatusColor={(status) =>
-          status === 'completed' ? 'text-red-500' : 'text-green-500'}
-        getStatusBadgeColor={(status) =>
-          status === 'completed'
-            ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
-            : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'}
-        getPriorityColor={() => 'text-muted-foreground'}
-        getTaskIcon={(task) =>
-          task.status === 'completed' ? 'mdi:source-merge' : 'mdi:source-branch'}
+        display={issueDisplay}
         onTaskMove={handleTaskMove}
         showSubtaskActions={false}
       />
@@ -307,16 +307,7 @@
         {handleTaskStatusToggle}
         handleTaskSelection={noop}
         handleCreateSubtask={noop}
-        getSubtaskCount={zero}
-        getTaskStatusColor={(status) =>
-          status === 'completed' ? 'text-red-500' : 'text-green-500'}
-        getStatusBadgeColor={(status) =>
-          status === 'completed'
-            ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
-            : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'}
-        getPriorityColor={() => 'text-muted-foreground'}
-        getTaskIcon={(task) =>
-          task.status === 'completed' ? 'mdi:source-merge' : 'mdi:source-branch'}
+        display={issueDisplay}
         showSubtaskActions={false}
       />
     {/if}

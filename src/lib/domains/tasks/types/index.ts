@@ -137,6 +137,8 @@ export interface TaskFilters {
   parentId?: string;
   resourceId?: string;
   resourceType?: string;
+  /** Only tasks with no project link (resourceType !== 'project'). */
+  noProject?: boolean;
   search?: string;
 }
 

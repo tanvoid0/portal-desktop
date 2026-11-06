@@ -24,6 +24,15 @@ export const VIEWPORT_FILL_ROUTES = ['/ai/coder', '/ai/chat', '/terminal'] as co
 /** Routes that use ShellSidebarLayout (domain sidebar + fixed height). */
 export const SHELL_SIDEBAR_ROUTES = ['/ai', '/cloud', '/settings', '/sdk', '/utilities'] as const;
 
+/**
+ * Routes whose own page — not a `+layout` — uses ShellSidebarLayout, so the
+ * shell must bound their height, while their CHILD routes stay ordinary
+ * scrolling pages. Matched exactly, never by prefix: `/tasks` is a full-height
+ * board, but `/tasks/create` and `/tasks/[id]` are plain pages that would be
+ * clipped by the domain branch's `overflow-hidden` (it provides no scroller).
+ */
+export const SHELL_SIDEBAR_EXACT_ROUTES = ['/tasks'] as const;
+
 export function isViewportFillRoute(pathname: string): boolean {
   return VIEWPORT_FILL_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
@@ -31,7 +40,10 @@ export function isViewportFillRoute(pathname: string): boolean {
 }
 
 export function isShellSidebarRoute(pathname: string): boolean {
-  return SHELL_SIDEBAR_ROUTES.some((route) => pathname.startsWith(route));
+  return (
+    SHELL_SIDEBAR_ROUTES.some((route) => pathname.startsWith(route)) ||
+    SHELL_SIDEBAR_EXACT_ROUTES.some((route) => pathname === route)
+  );
 }
 
 /** Main app sidebar is hidden only for routes that still use a standalone shell. */

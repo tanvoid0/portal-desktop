@@ -114,9 +114,10 @@ function generateBreadcrumbsFromPath(
   // Add query parameters as a separate breadcrumb if they exist
   if (search) {
     const queryParams = new URLSearchParams(search);
-    // `tab` is page-local view state (tabs show their own label), not a location
+    // `tab` is page-local view state (tabs show their own label), not a location.
+    // `project`/`view` are the tasks board's own selection, shown by its sidebar.
     const paramEntries = Array.from(queryParams.entries()).filter(
-      ([key]) => !['tab', 'from', 'q', 'status'].includes(key)
+      ([key]) => !['tab', 'from', 'q', 'status', 'project', 'view'].includes(key)
     );
 
     if (paramEntries.length > 0) {

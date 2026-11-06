@@ -128,12 +128,12 @@
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Content class="max-h-[80vh] max-w-2xl overflow-hidden">
-    <Dialog.Header class="pb-3">
+  <Dialog.Content class="flex max-h-[80vh] max-w-2xl flex-col overflow-hidden">
+    <Dialog.Header class="shrink-0 pb-3">
       <Dialog.Title class="text-lg">Advanced Filters</Dialog.Title>
     </Dialog.Header>
 
-    <div class="space-y-6 overflow-y-auto px-6 pb-6">
+    <div class="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6">
       <!-- Search -->
       <div>
         <p class="mb-2 block text-sm font-medium text-foreground">Search</p>
@@ -205,18 +205,24 @@
           {/each}
         </div>
       </div>
+    </div>
 
-      <!-- Action Buttons -->
-      <div class="divider-edge-t divider-edge-full flex items-center justify-between pt-4">
-        <Button variant="outline" onclick={clearAllFilters} class="text-red-600 hover:text-red-700">
-          <FaFilterCircleXmark class="mr-2 h-4 w-4" />
-          Clear All
-        </Button>
+    <!--
+      Action buttons sit OUTSIDE the scroll area. Inside it they scrolled away
+      with the content, and since the dialog is max-h + overflow-hidden, Apply
+      ended up past the dialog's own bottom edge and unreachable by mouse.
+    -->
+    <div
+      class="divider-edge-t divider-edge-full flex shrink-0 items-center justify-between px-6 py-4"
+    >
+      <Button variant="outline" onclick={clearAllFilters} class="text-red-600 hover:text-red-700">
+        <FaFilterCircleXmark class="mr-2 h-4 w-4" />
+        Clear All
+      </Button>
 
-        <div class="flex items-center gap-2">
-          <Button variant="outline" onclick={handleClose}>Cancel</Button>
-          <Button onclick={applyFilters}>Apply Filters</Button>
-        </div>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" onclick={handleClose}>Cancel</Button>
+        <Button onclick={applyFilters}>Apply Filters</Button>
       </div>
     </div>
   </Dialog.Content>

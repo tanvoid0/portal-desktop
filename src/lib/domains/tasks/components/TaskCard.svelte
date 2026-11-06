@@ -16,7 +16,16 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import Icon from '@iconify/svelte';
-  import { taskUi } from '../state/taskUi.svelte';
+  import { taskUi, getSubtaskCount } from '../state/taskUi.svelte';
+  import {
+    getTaskStatusColor,
+    getPriorityColor,
+    getTaskIcon,
+    isOverdue,
+    isDueToday,
+    isDueThisWeek,
+    formatMinutes,
+  } from '../utils/taskDisplay';
   import type { Task } from '../types';
 
   interface Props {
@@ -39,99 +48,8 @@
     onSelectionChange,
   }: Props = $props();
 
-  function getTaskStatusColor(status: string) {
-    switch (status) {
-      case 'completed':
-        return 'text-green-500';
-      case 'in-progress':
-        return 'text-blue-500';
-      case 'cancelled':
-        return 'text-red-500';
-      default:
-        return 'text-gray-400';
-    }
-  }
-
-  function getPriorityColor(priority: string) {
-    switch (priority) {
-      case 'high':
-        return 'text-red-500';
-      case 'medium':
-        return 'text-yellow-500';
-      case 'low':
-        return 'text-green-500';
-      default:
-        return 'text-gray-400';
-    }
-  }
-
-  function getTaskIcon(task: Task) {
-    switch (task.status) {
-      case 'completed':
-        return 'mdi:check-circle';
-      case 'in-progress':
-        return 'mdi:progress-clock';
-      case 'cancelled':
-        return 'mdi:cancel';
-      default:
-        return 'mdi:circle-outline';
-    }
-  }
-
-  function getSubtaskCount(taskId: string): number {
-    // This would need to be passed from parent or computed
-    return 0;
-  }
-
-  // New helper functions for advanced features
-  function isOverdue(task: Task): boolean {
-    return (
-      !!task.dueDate &&
-      task.dueDate < new Date() &&
-      task.status !== 'completed' &&
-      task.status !== 'cancelled'
-    );
-  }
-
-  function isDueToday(task: Task): boolean {
-    if (!task.dueDate) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return task.dueDate >= today && task.dueDate < tomorrow;
-  }
-
-  function isDueThisWeek(task: Task): boolean {
-    if (!task.dueDate) return false;
-    const today = new Date();
-    const weekFromNow = new Date(today);
-    weekFromNow.setDate(weekFromNow.getDate() + 7);
-    return task.dueDate >= today && task.dueDate <= weekFromNow;
-  }
-
   function isCurrentlyTracking(task: Task): boolean {
     return taskUi.currentlyTracking?.taskId === task.id;
-  }
-
-  function getTimeEstimateText(task: Task): string {
-    if (!task.estimatedTime) return '';
-    const hours = Math.floor(task.estimatedTime / 60);
-    const minutes = task.estimatedTime % 60;
-    if (hours > 0) {
-      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-    }
-    return `${minutes}m`;
-  }
-
-  function getActualTimeText(task: Task): string {
-    if (!task.actualTime) return '';
-    const hours = Math.floor(task.actualTime / 60);
-    const minutes = task.actualTime % 60;
-    if (hours > 0) {
-      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-    }
-    return `${minutes}m`;
   }
 
   function isBlocked(task: Task): boolean {
@@ -234,10 +152,10 @@
       </div>
 
       <div class="flex items-center gap-1">
-        {#if getSubtaskCount(task.id) > 0}
+        {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
           <div class="flex items-center gap-1 text-xs text-muted-foreground">
             <FaTurnDown class="h-3 w-3" />
-            <span>{getSubtaskCount(task.id)}</span>
+            <span>{getSubtaskCount(task.id, taskUi.tasks)}</span>
           </div>
         {/if}
         <FaFlag class="h-3 w-3 {getPriorityColor(task.priority)}" />
@@ -265,13 +183,13 @@
             {#if task.estimatedTime}
               <div class="flex items-center gap-1">
                 <FaClock class="h-3 w-3" />
-                <span>{getTimeEstimateText(task)}</span>
+                <span>{formatMinutes(task.estimatedTime)}</span>
               </div>
             {/if}
             {#if task.actualTime}
               <div class="flex items-center gap-1">
                 <FaClock class="h-3 w-3" />
-                <span>{getActualTimeText(task)}</span>
+                <span>{formatMinutes(task.actualTime)}</span>
               </div>
             {/if}
           </div>

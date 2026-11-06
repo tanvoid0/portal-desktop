@@ -13,33 +13,37 @@
   import FaCircle from '~icons/fa6-solid/circle';
   import FaFlag from '~icons/fa6-solid/flag';
   import FaFilterCircleXmark from '~icons/fa6-solid/filter-circle-xmark';
+  import FaBoxArchive from '~icons/fa6-solid/box-archive';
+  import FaLayerGroup from '~icons/fa6-solid/layer-group';
+  import FaFolder from '~icons/fa6-solid/folder';
+  import FaInbox from '~icons/fa6-solid/inbox';
   import * as Dialog from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import { Separator } from '$lib/components/ui/separator';
   import { Input } from '$lib/components/ui/input';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { taskActions, isLoading, error } from '../stores/taskStore';
-  import { taskUi, getSubtaskCount } from '../state/taskUi.svelte';
+  import { taskUi, getSubtaskCount, hasProject } from '../state/taskUi.svelte';
   import { createTasksQuery } from '../queries/taskQueries';
+  import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
-  import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
-  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import {
+    PageHeader,
+    PageLoading,
+    PageError,
+    PageEmpty,
+    ShellSidebarLayout,
+  } from '$lib/components/shell';
   import { taskStatusLabel, type Task, type TaskStatus, type TaskPriority } from '../types';
-  import TaskCard from './TaskCard.svelte';
-  import TaskStats from './TaskStats.svelte';
-  import TaskProgress from './TaskProgress.svelte';
   import TaskFilterModal from './TaskFilterModal.svelte';
   import KanbanBoard from './KanbanBoard.svelte';
   import TaskList from './TaskList.svelte';
-  import QuickActions from './QuickActions.svelte';
-  import SavedViews from './SavedViews.svelte';
-  import TimeTracker from './TimeTracker.svelte';
-  import TemplateManager from './TemplateManager.svelte';
+  import ArchiveView from './ArchiveView.svelte';
 
   const tasksQuery = createTasksQuery();
+  const projectsQuery = createProjectsQuery();
 
   $effect(() => {
     if (tasksQuery.data) {
@@ -58,113 +62,79 @@
     }
   });
 
-  // View state
-  let currentView = $state<'kanban' | 'list'>('kanban');
+  // Selection lives in the URL: ?project=<id|all|none>&view=board|list|archive
+  type View = 'board' | 'list' | 'archive';
+  const selectedProject = $derived(page.url.searchParams.get('project') ?? 'all');
+  const rawView = $derived(page.url.searchParams.get('view'));
+  const currentView = $derived<View>(
+    rawView === 'list' || rawView === 'archive' ? rawView : 'board'
+  );
+
+  function navigate(project: string, view: View) {
+    goto(`?project=${encodeURIComponent(project)}&view=${view}`, { replace: true, reset: false });
+  }
+
   let searchQuery = $state('');
-  let showSidebar = $state(true);
-  let sidebarTab = $state<'actions' | 'filters' | 'views' | 'templates' | 'tracker'>('actions');
-
-  // Filter modal state
   let showFilterModal = $state(false);
-
-  // Keyboard shortcuts modal state
   let showKeyboardShortcuts = $state(false);
-
-  // Delete modal state (bulk delete uses confirmAction)
-  // Filter state
   let statusFilters = $state<TaskStatus[]>([]);
   let priorityFilters = $state<TaskPriority[]>([]);
   let typeFilters = $state<string[]>([]);
 
-  // Computed values
-  let parentTasks = $derived(taskUi.parentTasks);
-  let filteredTasksWithSearch = $derived(taskUi.filteredTasks);
-
-  // Kanban/List read taskUi.filteredTasks, so push the local filter state into it.
+  // Kanban/List/Archive read taskUi.filteredTasks, so push the local filter state into it.
   $effect(() => {
     taskUi.taskFilters = {
       search: searchQuery,
       status: statusFilters,
       priority: priorityFilters,
       type: typeFilters,
+      noProject: selectedProject === 'none',
+      resourceType: selectedProject !== 'all' && selectedProject !== 'none' ? 'project' : undefined,
+      resourceId:
+        selectedProject !== 'all' && selectedProject !== 'none' ? selectedProject : undefined,
     };
   });
   $effect(() => () => taskUi.clearFilters());
 
-  // Active filter states
-  let activeStatusFilters = $derived(statusFilters);
-  let activePriorityFilters = $derived(priorityFilters);
-  let activeTypeFilters = $derived(typeFilters);
-  let hasActiveFilters = $derived(
+  const hasActiveFilters = $derived(
     searchQuery.trim() !== '' ||
       statusFilters.length > 0 ||
       priorityFilters.length > 0 ||
       typeFilters.length > 0
   );
-  let activeFilterCount = $derived(
+  const activeFilterCount = $derived(
     (statusFilters.length > 0 ? 1 : 0) +
       (priorityFilters.length > 0 ? 1 : 0) +
       (typeFilters.length > 0 ? 1 : 0) +
       (searchQuery.trim() !== '' ? 1 : 0)
   );
 
-  // Helper functions
-  function getTaskStatusColor(status: string) {
-    switch (status) {
-      case 'completed':
-        return 'text-green-500';
-      case 'in-progress':
-        return 'text-blue-500';
-      case 'cancelled':
-        return 'text-red-500';
-      default:
-        return 'text-gray-400';
-    }
-  }
+  // Sidebar data: only projects that actually have tasks.
+  const projectNames = $derived(
+    new Map((projectsQuery.data ?? []).map((p) => [String(p.id), p.name]))
+  );
+  const nameOf = (id: string) => projectNames.get(id) ?? `Project #${id}`;
+  const sidebarProjects = $derived(
+    [...taskUi.projectCounts.known]
+      .map((id) => ({ id, name: nameOf(id), open: taskUi.projectCounts.open[id] ?? 0 }))
+      .sort((a, b) => b.open - a.open || a.name.localeCompare(b.name))
+  );
+  const noProjectOpen = $derived(taskUi.projectCounts.open[''] ?? 0);
+  // "No project" shows when any parent task lacks a project link (open or archived).
+  const hasNoProjectTasks = $derived(taskUi.parentTasks.some((t) => !hasProject(t)));
 
-  function getStatusBadgeColor(status: string) {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
-      case 'in-progress':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    }
-  }
+  const projectLabel = $derived(
+    selectedProject === 'all'
+      ? (t: Task) => (hasProject(t) ? nameOf(t.resourceId!) : undefined)
+      : undefined
+  );
 
-  function getPriorityColor(priority: string) {
-    switch (priority) {
-      case 'high':
-        return 'text-red-500';
-      case 'medium':
-        return 'text-yellow-500';
-      case 'low':
-        return 'text-green-500';
-      default:
-        return 'text-gray-400';
-    }
-  }
-
-  function getTaskIcon(task: Task) {
-    switch (task.status) {
-      case 'completed':
-        return 'mdi:check-circle';
-      case 'in-progress':
-        return 'mdi:progress-clock';
-      case 'cancelled':
-        return 'mdi:cancel';
-      default:
-        return 'mdi:circle-outline';
-    }
-  }
+  const columns = $derived(taskUi.kanbanColumns);
+  const hasAnyVisible = $derived(taskUi.boardTasks.length + taskUi.archivedTasks.length > 0);
 
   // Event handlers
   function handleTaskSelect(task: Task) {
     taskActions.selectTask(task);
-    // Add haptic feedback for better UX
     if (navigator.vibrate) {
       navigator.vibrate(50);
     }
@@ -172,37 +142,26 @@
   }
 
   function handleTaskCreate() {
-    // Add smooth transition
     goto('/tasks/create');
-  }
-
-  function handleTaskEdit(task: Task) {
-    goto(`/tasks/${task.id}/edit`);
   }
 
   // Filter functions
   function toggleStatusFilter(status: TaskStatus) {
-    if (statusFilters.includes(status)) {
-      statusFilters = statusFilters.filter((s) => s !== status);
-    } else {
-      statusFilters = [...statusFilters, status];
-    }
+    statusFilters = statusFilters.includes(status)
+      ? statusFilters.filter((s) => s !== status)
+      : [...statusFilters, status];
   }
 
   function togglePriorityFilter(priority: TaskPriority) {
-    if (priorityFilters.includes(priority)) {
-      priorityFilters = priorityFilters.filter((p) => p !== priority);
-    } else {
-      priorityFilters = [...priorityFilters, priority];
-    }
+    priorityFilters = priorityFilters.includes(priority)
+      ? priorityFilters.filter((p) => p !== priority)
+      : [...priorityFilters, priority];
   }
 
   function toggleTypeFilter(type: string) {
-    if (typeFilters.includes(type)) {
-      typeFilters = typeFilters.filter((t) => t !== type);
-    } else {
-      typeFilters = [...typeFilters, type];
-    }
+    typeFilters = typeFilters.includes(type)
+      ? typeFilters.filter((t) => t !== type)
+      : [...typeFilters, type];
   }
 
   function clearAllFilters() {
@@ -225,12 +184,11 @@
   }
 
   function handleCreateSubtask(parentTask: Task) {
-    // Navigate to create task page with parentId pre-filled
     goto(`/tasks/create?parentId=${parentTask.id}`);
   }
 
   function handleSelectAll() {
-    taskActions.selectAllTasks(filteredTasksWithSearch.map((task) => task.id));
+    taskActions.selectAllTasks(taskUi.boardTasks.map((task) => task.id));
   }
 
   function handleClearSelection() {
@@ -238,34 +196,53 @@
   }
 
   async function handleBulkDelete() {
-    if (taskUi.selectedTaskIds.size > 0) {
-      const subtaskCount = Array.from(taskUi.selectedTaskIds).reduce(
-        (n, id) => n + getSubtaskCount(id, taskUi.tasks),
-        0
+    // Capture first: deleteTasksBulk empties the selection.
+    const ids = Array.from(taskUi.selectedTaskIds);
+    if (ids.length === 0) return;
+    const n = ids.length;
+    const plural = n === 1 ? '' : 's';
+    const subtaskCount = ids.reduce((sum, id) => sum + getSubtaskCount(id, taskUi.tasks), 0);
+    const confirmed = await confirmAction(
+      `Are you sure you want to delete ${n} selected task${plural}?${subtaskCount ? ` Also deletes ${subtaskCount} subtask${subtaskCount === 1 ? '' : 's'}.` : ''}`,
+      'Delete tasks',
+      { confirmLabel: 'Delete', destructive: true }
+    );
+    if (!confirmed) return;
+    try {
+      await taskActions.deleteTasksBulk(ids);
+      toastActions.success('Tasks deleted', `Successfully deleted ${n} task${plural}`);
+    } catch (err) {
+      toastActions.error(
+        'Failed to delete tasks',
+        err instanceof Error ? err.message : 'An unexpected error occurred'
       );
-      const confirmed = await confirmAction(
-        `Are you sure you want to delete ${taskUi.selectedTaskIds.size} selected task${taskUi.selectedTaskIds.size === 1 ? '' : 's'}?${subtaskCount ? ` Also deletes ${subtaskCount} subtask${subtaskCount === 1 ? '' : 's'}.` : ''}`,
-        'Delete tasks',
-        { confirmLabel: 'Delete', destructive: true }
-      );
-      if (confirmed) {
-        try {
-          await taskActions.deleteTasksBulk(Array.from(taskUi.selectedTaskIds));
-          toastActions.success(
-            'Tasks deleted',
-            `Successfully deleted ${taskUi.selectedTaskIds.size} task${taskUi.selectedTaskIds.size === 1 ? '' : 's'}`
-          );
-        } catch (err) {
-          toastActions.error(
-            'Failed to delete tasks',
-            err instanceof Error ? err.message : 'An unexpected error occurred'
-          );
-        }
-      }
     }
   }
 
   // Keyboard shortcuts
+  /** True while the event came from a text field, where native editing wins. */
+  function isTypingTarget(event: KeyboardEvent): boolean {
+    const el = event.target as HTMLElement | null;
+    return !!el?.closest('input, textarea, [contenteditable="true"]');
+  }
+
+  /** True while any dialog is open — its own Escape handling must win. */
+  function hasOpenDialog(): boolean {
+    return !!document.querySelector('[role="dialog"], [role="alertdialog"]');
+  }
+
+  /**
+   * Whether a dialog was open when the key went down, sampled in the capture
+   * phase. By the time the bubble handler runs, the dialog has already closed
+   * itself in response to the same Escape, so asking then always says "none
+   * open" and the keypress falls through and drops the multi-selection.
+   */
+  let dialogOpenAtKeydown = false;
+
+  function noteDialogState(event: KeyboardEvent) {
+    if (event.key === 'Escape') dialogOpenAtKeydown = hasOpenDialog();
+  }
+
   function handleKeydown(event: KeyboardEvent) {
     if (event.ctrlKey || event.metaKey) {
       if (event.key === 'n') {
@@ -276,7 +253,6 @@
         showFilterModal = true;
       } else if (event.key === 'k') {
         event.preventDefault();
-        // Focus search input
         const searchInput = document.querySelector(
           'input[placeholder="Search tasks..."]'
         ) as HTMLInputElement;
@@ -290,13 +266,21 @@
         event.preventDefault();
         handleMultiSelectToggle();
       } else if (event.key === 'a' && taskUi.isMultiSelectMode) {
+        // In a text field Ctrl+A means "select this text", not "select every task".
+        if (isTypingTarget(event)) return;
         event.preventDefault();
         handleSelectAll();
-      } else if (event.key === 'Delete' && taskUi.selectedTaskIds.size > 0) {
-        event.preventDefault();
-        handleBulkDelete();
       }
+    } else if (event.key === 'Delete' && taskUi.selectedTaskIds.size > 0) {
+      // Don't hijack Delete while typing in a field.
+      if (isTypingTarget(event)) return;
+      event.preventDefault();
+      handleBulkDelete();
     } else if (event.key === 'Escape') {
+      // A confirm dialog's own Escape would otherwise bubble to here and drop
+      // the whole multi-selection behind it. Use the capture-phase sample:
+      // the dialog has already closed by the time this runs.
+      if (dialogOpenAtKeydown) return;
       if (showFilterModal) {
         showFilterModal = false;
       } else if (showKeyboardShortcuts) {
@@ -308,308 +292,358 @@
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydowncapture={noteDialogState} onkeydown={handleKeydown} />
 
-<div class="container mx-auto space-y-6 bg-background p-6">
-  <PageHeader title="Tasks" description="Organize and track your work efficiently" />
-  <div class="flex flex-wrap items-center gap-2">
-    <!-- View Toggle -->
-    <div class="flex rounded-lg bg-muted p-1">
-      <Button
-        onclick={() => (currentView = 'kanban')}
-        variant={currentView === 'kanban' ? 'default' : 'ghost'}
-        size="sm"
-        class="px-3 py-1.5 text-sm font-medium"
-      >
-        <FaTableColumns class="mr-1.5 h-4 w-4" />
-        Kanban
-      </Button>
-      <Button
-        onclick={() => (currentView = 'list')}
-        variant={currentView === 'list' ? 'default' : 'ghost'}
-        size="sm"
-        class="px-3 py-1.5 text-sm font-medium"
-      >
-        <FaList class="mr-1.5 h-4 w-4" />
-        List
-      </Button>
-    </div>
+{#snippet navItem(label: string, count: number, active: boolean, onclick: () => void, Ico: any)}
+  <Button
+    {onclick}
+    variant={active ? 'secondary' : 'ghost'}
+    size="sm"
+    class="w-full justify-between gap-2 px-2"
+    aria-current={active ? 'true' : undefined}
+  >
+    <span class="flex min-w-0 items-center gap-2">
+      <Ico class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <span class="truncate" title={label}>{label}</span>
+    </span>
+    <Badge variant="outline" class="shrink-0 px-1.5">{count}</Badge>
+  </Button>
+{/snippet}
 
-    <!-- Multi-select Controls -->
-    {#if taskUi.isMultiSelectMode}
-      <div
-        class="flex items-center gap-3 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 dark:border-warning-800 dark:bg-warning-900/20"
-      >
-        <Badge
-          variant="secondary"
-          class="bg-warning-100 text-warning-800 dark:bg-warning-800 dark:text-warning-100"
-        >
-          <FaSquareCheck class="mr-1 h-3 w-3" />
-          {taskUi.selectedTaskIds.size} selected
-        </Badge>
-        <div class="flex items-center gap-2">
-          <Button onclick={handleSelectAll} variant="outline" size="sm" class="h-7 px-2 text-xs">
-            <FaCheckDouble class="mr-1 h-3 w-3" />
-            Select All
+<div class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
+  <div class="shrink-0 px-4 py-4 md:px-6">
+    <PageHeader title="Tasks" description="Organize and track your work efficiently">
+      {#snippet actions()}
+        {#if !taskUi.isMultiSelectMode}
+          <Button onclick={handleMultiSelectToggle} variant="outline" size="sm">
+            <FaSquareCheck class="mr-1.5 h-4 w-4" />
+            Multi-Select
           </Button>
-          <Button
-            onclick={handleClearSelection}
-            variant="outline"
-            size="sm"
-            class="h-7 px-2 text-xs"
-          >
-            <FaXmark class="mr-1 h-3 w-3" />
-            Clear
-          </Button>
-          <Button
-            onclick={handleBulkDelete}
-            disabled={taskUi.selectedTaskIds.size === 0}
-            variant="destructive"
-            size="sm"
-            class="h-7 px-2 text-xs"
-          >
-            <FaTrash class="mr-1 h-3 w-3" />
-            Delete ({taskUi.selectedTaskIds.size})
-          </Button>
-          <Button
-            onclick={handleMultiSelectToggle}
-            variant="ghost"
-            size="sm"
-            class="h-7 px-2 text-xs"
-          >
-            <FaXmark class="mr-1 h-3 w-3" />
-            Cancel
-          </Button>
-        </div>
-      </div>
-    {:else}
-      <Button
-        onclick={handleMultiSelectToggle}
-        variant="outline"
-        class="flex items-center space-x-2"
-      >
-        <FaSquareCheck class="h-4 w-4" />
-        <span>Multi-Select</span>
-      </Button>
-    {/if}
-
-    <!-- Action Buttons -->
-    <Button
-      onclick={() => (showKeyboardShortcuts = true)}
-      variant="ghost"
-      class="flex items-center space-x-2"
-      title="Keyboard Shortcuts (Ctrl+H)"
-    >
-      <FaKeyboard class="h-4 w-4" />
-      <span>Shortcuts</span>
-    </Button>
-    <Button
-      onclick={() => goto('/tasks/generate')}
-      variant="outline"
-      class="flex items-center space-x-2"
-    >
-      <FaWandMagicSparkles class="h-4 w-4" />
-      <span>Generate Tasks with AI</span>
-    </Button>
-    <Button onclick={handleTaskCreate} class="flex items-center space-x-2">
-      <FaPlus class="h-4 w-4" />
-      <span>New Task</span>
-    </Button>
-  </div>
-
-  <!-- Main Content -->
-  <div class="w-full">
-    <!-- Stats and Progress Row -->
-    <div class="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <!-- Left: Compact Stats -->
-      <div class="lg:col-span-2">
-        <TaskStats />
-      </div>
-      <!-- Right: Progress Bar -->
-      <div class="lg:col-span-1">
-        <TaskProgress />
-      </div>
-    </div>
-
-    <!-- Search and Filters Row -->
-    <Card class="mb-4">
-      <CardContent class="p-3">
-        <div class="flex items-center gap-3">
-          <!-- Search Input -->
-          <div class="relative flex-1">
-            <FaMagnifyingGlass
-              class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
-            />
-            <Input
-              type="text"
-              placeholder="Search tasks..."
-              bind:value={searchQuery}
-              class="pl-10"
-            />
-          </div>
-
-          <!-- Filter Button -->
-          <Button
-            variant="outline"
-            onclick={() => (showFilterModal = !showFilterModal)}
-            class="flex items-center gap-2"
-          >
-            <FaFilter class="h-4 w-4" />
-            Filters
-            {#if hasActiveFilters}
-              <Badge variant="secondary" class="ml-1 px-1.5 py-0.5 text-xs">
-                {activeFilterCount}
-              </Badge>
-            {/if}
-          </Button>
-        </div>
-
-        <!-- Active Filters Display -->
-        {#if hasActiveFilters}
-          <div class="divider-edge-t divider-edge-full mt-3 pt-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-xs font-medium text-muted-foreground">Active filters:</span>
-
-              {#if searchQuery.trim() !== ''}
-                <Badge variant="outline" class="text-xs">
-                  <FaMagnifyingGlass class="mr-1 h-3 w-3" />
-                  "{searchQuery}"
-                  <Button
-                    onclick={() => (searchQuery = '')}
-                    variant="ghost"
-                    size="sm"
-                    class="ml-1 h-4 w-4 p-0 hover:bg-muted"
-                  >
-                    <FaXmark class="h-3 w-3" />
-                  </Button>
-                </Badge>
-              {/if}
-
-              {#each activeStatusFilters as status}
-                <Badge variant="outline" class="text-xs">
-                  <FaCircle class="mr-1 h-3 w-3" />
-                  {taskStatusLabel(status)}
-                  <Button
-                    onclick={() => toggleStatusFilter(status)}
-                    variant="ghost"
-                    size="sm"
-                    class="ml-1 h-4 w-4 p-0 hover:bg-muted"
-                  >
-                    <FaXmark class="h-3 w-3" />
-                  </Button>
-                </Badge>
-              {/each}
-
-              {#each activePriorityFilters as priority}
-                <Badge variant="outline" class="text-xs">
-                  <FaFlag
-                    class="mr-1 h-3 w-3 {priority === 'high'
-                      ? 'text-red-500'
-                      : priority === 'medium'
-                        ? 'text-yellow-500'
-                        : 'text-green-500'}"
-                  />
-                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                  <Button
-                    onclick={() => togglePriorityFilter(priority)}
-                    variant="ghost"
-                    size="sm"
-                    class="ml-1 h-4 w-4 p-0 hover:bg-muted"
-                  >
-                    <FaXmark class="h-3 w-3" />
-                  </Button>
-                </Badge>
-              {/each}
-
-              {#each activeTypeFilters as type}
-                <Badge variant="outline" class="text-xs">
-                  {type}
-                  <Button
-                    onclick={() => toggleTypeFilter(type)}
-                    variant="ghost"
-                    size="sm"
-                    class="ml-1 h-4 w-4 p-0 hover:bg-muted"
-                  >
-                    <FaXmark class="h-3 w-3" />
-                  </Button>
-                </Badge>
-              {/each}
-
-              <Button variant="outline" size="sm" onclick={clearAllFilters} class="ml-2 text-xs">
-                <FaFilterCircleXmark class="mr-1 h-3 w-3" />
-                Clear All
-              </Button>
-            </div>
-          </div>
         {/if}
-      </CardContent>
-    </Card>
-
-    <!-- Filter Modal -->
-    {#if showFilterModal}
-      <TaskFilterModal
-        bind:open={showFilterModal}
-        {searchQuery}
-        {statusFilters}
-        {priorityFilters}
-        {typeFilters}
-        onSearchChange={(value) => (searchQuery = value)}
-        onStatusFilterChange={(filters) => (statusFilters = filters)}
-        onPriorityFilterChange={(filters) => (priorityFilters = filters)}
-        onTypeFilterChange={(filters) => (typeFilters = filters)}
-        onClearAll={clearAllFilters}
-      />
-    {/if}
-
-    <!-- Main Content -->
-    {#if $isLoading}
-      <PageLoading message="Loading tasks..." />
-    {:else if $error}
-      <PageError
-        title="Failed to load tasks"
-        message={$error}
-        onRetry={() => tasksQuery.refetch()}
-      />
-    {:else if parentTasks.length === 0 && !hasActiveFilters}
-      <PageEmpty
-        title="No tasks yet"
-        description="Create your first task to start organizing your work."
-        actionLabel="Create Task"
-        onAction={() => goto('/tasks/create')}
-      />
-    {:else if filteredTasksWithSearch.length === 0}
-      <PageEmpty
-        title="No matching tasks"
-        description="No tasks match the current search or filters."
-        actionLabel="Clear filters"
-        onAction={clearAllFilters}
-      />
-    {:else if currentView === 'kanban'}
-      <KanbanBoard
-        {handleTaskSelect}
-        {handleTaskStatusToggle}
-        {handleTaskSelection}
-        {handleCreateSubtask}
-        {getSubtaskCount}
-        {getTaskStatusColor}
-        {getStatusBadgeColor}
-        {getPriorityColor}
-        {getTaskIcon}
-      />
-    {:else if currentView === 'list'}
-      <TaskList
-        {handleTaskSelect}
-        {handleTaskStatusToggle}
-        {handleTaskSelection}
-        {handleCreateSubtask}
-        {getSubtaskCount}
-        {getTaskStatusColor}
-        {getStatusBadgeColor}
-        {getPriorityColor}
-        {getTaskIcon}
-      />
-    {/if}
+        <Button
+          onclick={() => (showKeyboardShortcuts = true)}
+          variant="ghost"
+          size="sm"
+          title="Keyboard Shortcuts (Ctrl+H)"
+        >
+          <FaKeyboard class="mr-1.5 h-4 w-4" />
+          Shortcuts
+        </Button>
+        <Button onclick={() => goto('/tasks/generate')} variant="outline" size="sm">
+          <FaWandMagicSparkles class="mr-1.5 h-4 w-4" />
+          Generate with AI
+        </Button>
+        <Button onclick={handleTaskCreate} size="sm">
+          <FaPlus class="mr-1.5 h-4 w-4" />
+          New Task
+        </Button>
+      {/snippet}
+    </PageHeader>
   </div>
+
+  <ShellSidebarLayout mobileTriggerLabel="Projects menu">
+    {#snippet sidebar()}
+      <nav class="flex flex-col gap-1 p-3" aria-label="Task projects">
+        {@render navItem(
+          'All projects',
+          taskUi.projectCounts.openTotal,
+          selectedProject === 'all' && currentView !== 'archive',
+          () => navigate('all', currentView === 'archive' ? 'board' : currentView),
+          FaLayerGroup
+        )}
+        <div class="divider-edge-t divider-edge-full my-1"></div>
+        {#each sidebarProjects as p (p.id)}
+          {@render navItem(
+            p.name,
+            p.open,
+            selectedProject === p.id && currentView !== 'archive',
+            () => navigate(p.id, currentView === 'archive' ? 'board' : currentView),
+            FaFolder
+          )}
+        {/each}
+        {#if hasNoProjectTasks}
+          {@render navItem(
+            'No project',
+            noProjectOpen,
+            selectedProject === 'none' && currentView !== 'archive',
+            () => navigate('none', currentView === 'archive' ? 'board' : currentView),
+            FaInbox
+          )}
+        {/if}
+        <div class="divider-edge-t divider-edge-full my-1"></div>
+        {@render navItem(
+          'Archive',
+          taskUi.projectCounts.archived,
+          currentView === 'archive',
+          () => navigate(selectedProject, 'archive'),
+          FaBoxArchive
+        )}
+      </nav>
+    {/snippet}
+
+    <!--
+      Bounded flex column, not a scroller: the toolbar stays put and the content
+      region below owns the scrolling. Board view scrolls inside KanbanBoard
+      (columns scroll vertically, the row scrolls horizontally) so its horizontal
+      scrollbar sits at the viewport edge instead of at the foot of a tall page.
+    -->
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden p-4 md:p-6">
+      <!-- One toolbar row -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Badge variant="outline">Backlog {columns[0].tasks.length}</Badge>
+          <Badge variant="outline">In Progress {columns[1].tasks.length}</Badge>
+          <Badge variant="outline">Done this week {columns[2].tasks.length}</Badge>
+        </div>
+
+        <div class="relative min-w-[200px] flex-1 sm:max-w-sm">
+          <FaMagnifyingGlass
+            class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            type="text"
+            placeholder="Search tasks..."
+            bind:value={searchQuery}
+            class="h-9 pl-9"
+          />
+        </div>
+
+        <Button variant="outline" size="sm" onclick={() => (showFilterModal = !showFilterModal)}>
+          <FaFilter class="mr-1.5 h-4 w-4" />
+          Filters
+          {#if hasActiveFilters}
+            <Badge variant="secondary" class="ml-1.5 px-1.5 py-0.5 text-xs">
+              {activeFilterCount}
+            </Badge>
+          {/if}
+        </Button>
+
+        <div class="flex rounded-lg bg-muted p-0.5">
+          <Button
+            onclick={() => navigate(selectedProject, 'board')}
+            variant={currentView === 'board' ? 'default' : 'ghost'}
+            size="sm"
+            class="h-8 px-3"
+          >
+            <FaTableColumns class="mr-1.5 h-4 w-4" />
+            Kanban
+          </Button>
+          <Button
+            onclick={() => navigate(selectedProject, 'list')}
+            variant={currentView === 'list' ? 'default' : 'ghost'}
+            size="sm"
+            class="h-8 px-3"
+          >
+            <FaList class="mr-1.5 h-4 w-4" />
+            List
+          </Button>
+        </div>
+
+        {#if hasActiveFilters}
+          {#if searchQuery.trim() !== ''}
+            <Badge variant="outline" class="text-xs">
+              <FaMagnifyingGlass class="mr-1 h-3 w-3" />
+              "{searchQuery}"
+              <Button
+                onclick={() => (searchQuery = '')}
+                variant="ghost"
+                size="sm"
+                class="ml-1 h-4 w-4 p-0 hover:bg-muted"
+                aria-label="Clear search"
+              >
+                <FaXmark class="h-3 w-3" />
+              </Button>
+            </Badge>
+          {/if}
+
+          {#each statusFilters as status (status)}
+            <Badge variant="outline" class="text-xs">
+              <FaCircle class="mr-1 h-3 w-3" />
+              {taskStatusLabel(status)}
+              <Button
+                onclick={() => toggleStatusFilter(status)}
+                variant="ghost"
+                size="sm"
+                class="ml-1 h-4 w-4 p-0 hover:bg-muted"
+                aria-label="Remove status filter"
+              >
+                <FaXmark class="h-3 w-3" />
+              </Button>
+            </Badge>
+          {/each}
+
+          {#each priorityFilters as priority (priority)}
+            <Badge variant="outline" class="text-xs">
+              <FaFlag
+                class="mr-1 h-3 w-3 {priority === 'high'
+                  ? 'text-red-500'
+                  : priority === 'medium'
+                    ? 'text-yellow-500'
+                    : 'text-green-500'}"
+              />
+              {priority.charAt(0).toUpperCase() + priority.slice(1)}
+              <Button
+                onclick={() => togglePriorityFilter(priority)}
+                variant="ghost"
+                size="sm"
+                class="ml-1 h-4 w-4 p-0 hover:bg-muted"
+                aria-label="Remove priority filter"
+              >
+                <FaXmark class="h-3 w-3" />
+              </Button>
+            </Badge>
+          {/each}
+
+          {#each typeFilters as type (type)}
+            <Badge variant="outline" class="text-xs">
+              {type}
+              <Button
+                onclick={() => toggleTypeFilter(type)}
+                variant="ghost"
+                size="sm"
+                class="ml-1 h-4 w-4 p-0 hover:bg-muted"
+                aria-label="Remove type filter"
+              >
+                <FaXmark class="h-3 w-3" />
+              </Button>
+            </Badge>
+          {/each}
+
+          <Button variant="ghost" size="sm" onclick={clearAllFilters} class="h-7 text-xs">
+            <FaFilterCircleXmark class="mr-1 h-3 w-3" />
+            Clear All
+          </Button>
+        {/if}
+      </div>
+
+      <!-- Multi-select controls (only while active) -->
+      {#if taskUi.isMultiSelectMode}
+        <div
+          class="flex flex-wrap items-center gap-3 rounded-lg border border-warning-200 bg-warning-50 px-4 py-2 dark:border-warning-800 dark:bg-warning-900/20"
+        >
+          <Badge
+            variant="secondary"
+            class="bg-warning-100 text-warning-800 dark:bg-warning-800 dark:text-warning-100"
+          >
+            <FaSquareCheck class="mr-1 h-3 w-3" />
+            {taskUi.selectedTaskIds.size} selected
+          </Badge>
+          <div class="flex items-center gap-2">
+            <Button onclick={handleSelectAll} variant="outline" size="sm" class="h-7 px-2 text-xs">
+              <FaCheckDouble class="mr-1 h-3 w-3" />
+              Select All
+            </Button>
+            <Button
+              onclick={handleClearSelection}
+              variant="outline"
+              size="sm"
+              class="h-7 px-2 text-xs"
+            >
+              <FaXmark class="mr-1 h-3 w-3" />
+              Clear
+            </Button>
+            <Button
+              onclick={handleBulkDelete}
+              disabled={taskUi.selectedTaskIds.size === 0}
+              variant="destructive"
+              size="sm"
+              class="h-7 px-2 text-xs"
+            >
+              <FaTrash class="mr-1 h-3 w-3" />
+              Delete ({taskUi.selectedTaskIds.size})
+            </Button>
+            <Button
+              onclick={handleMultiSelectToggle}
+              variant="ghost"
+              size="sm"
+              class="h-7 px-2 text-xs"
+            >
+              <FaXmark class="mr-1 h-3 w-3" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Filter Modal -->
+      {#if showFilterModal}
+        <TaskFilterModal
+          bind:open={showFilterModal}
+          {searchQuery}
+          {statusFilters}
+          {priorityFilters}
+          {typeFilters}
+          onSearchChange={(value) => (searchQuery = value)}
+          onStatusFilterChange={(filters) => (statusFilters = filters)}
+          onPriorityFilterChange={(filters) => (priorityFilters = filters)}
+          onTypeFilterChange={(filters) => (typeFilters = filters)}
+          onClearAll={clearAllFilters}
+        />
+      {/if}
+
+      <!-- Main Content -->
+      <div class="min-h-0 flex-1 {currentView === 'board' ? 'overflow-hidden' : 'overflow-y-auto'}">
+        {#if $isLoading}
+          <PageLoading message="Loading tasks..." />
+        {:else if $error}
+          <PageError
+            title="Failed to load tasks"
+            message={$error}
+            onRetry={() => tasksQuery.refetch()}
+          />
+        {:else if taskUi.parentTasks.length === 0 && !hasActiveFilters}
+          <PageEmpty
+            title="No tasks yet"
+            description="Create your first task to start organizing your work."
+            actionLabel="Create Task"
+            onAction={() => goto('/tasks/create')}
+          />
+        {:else if currentView === 'archive'}
+          {#if taskUi.archivedTasks.length === 0 && hasActiveFilters}
+            <!-- archivedTasks is already search/filter-filtered, so an empty list
+                 under active filters means "no match", not "nothing archived". -->
+            <PageEmpty
+              title="No matching archived tasks"
+              description="No archived tasks match the current project, search or filters."
+              actionLabel="Clear filters"
+              onAction={clearAllFilters}
+            />
+          {:else if taskUi.archivedTasks.length === 0}
+            <PageEmpty
+              title="Archive is empty"
+              description="Tasks completed more than 7 days ago and cancelled tasks show up here."
+            />
+          {:else}
+            <ArchiveView tasks={taskUi.archivedTasks} onSelect={handleTaskSelect} {projectLabel} />
+          {/if}
+        {:else if !hasAnyVisible}
+          <PageEmpty
+            title="No matching tasks"
+            description="No tasks match the current project, search or filters."
+            actionLabel="Clear filters"
+            onAction={clearAllFilters}
+          />
+        {:else if currentView === 'board'}
+          <KanbanBoard
+            {handleTaskSelect}
+            {handleTaskStatusToggle}
+            {handleTaskSelection}
+            {handleCreateSubtask}
+            {projectLabel}
+            onShowArchive={() => navigate(selectedProject, 'archive')}
+          />
+        {:else}
+          <TaskList
+            {handleTaskSelect}
+            {handleTaskStatusToggle}
+            {handleTaskSelection}
+            {handleCreateSubtask}
+            {projectLabel}
+          />
+        {/if}
+      </div>
+    </div>
+  </ShellSidebarLayout>
 
   <!-- Keyboard Shortcuts Modal -->
   <Dialog.Root bind:open={showKeyboardShortcuts}>

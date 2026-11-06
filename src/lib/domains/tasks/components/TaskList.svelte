@@ -7,7 +7,12 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import Icon from '@iconify/svelte';
-  import { taskUi as defaultTaskUi, type TaskUiState } from '../state/taskUi.svelte';
+  import {
+    taskUi as defaultTaskUi,
+    getSubtaskCount,
+    type TaskUiState,
+  } from '../state/taskUi.svelte';
+  import { defaultDisplay, type TaskDisplay } from '../utils/taskDisplay';
   import { taskStatusLabel, type Task } from '../types';
 
   interface Props {
@@ -16,11 +21,10 @@
     handleTaskStatusToggle: (taskId: string) => void;
     handleTaskSelection: (taskId: string) => void;
     handleCreateSubtask: (task: Task) => void;
-    getSubtaskCount: (taskId: string, allTasks: Task[]) => number;
-    getTaskStatusColor: (status: string) => string;
-    getStatusBadgeColor: (status: string) => string;
-    getPriorityColor: (priority: string) => string;
-    getTaskIcon: (task: Task) => string;
+    /** Project name shown next to the title (All-projects mode). */
+    projectLabel?: (task: Task) => string | undefined;
+    /** Override status/priority colours and icons (GitHub issues use their own). */
+    display?: TaskDisplay;
     showSubtaskActions?: boolean;
   }
 
@@ -30,11 +34,8 @@
     handleTaskStatusToggle,
     handleTaskSelection,
     handleCreateSubtask,
-    getSubtaskCount,
-    getTaskStatusColor,
-    getStatusBadgeColor,
-    getPriorityColor,
-    getTaskIcon,
+    projectLabel,
+    display = defaultDisplay,
     showSubtaskActions = true,
   }: Props = $props();
   let taskUi = $derived(ui);
@@ -47,7 +48,7 @@
 <Card>
   <CardContent class="p-0">
     <div class="divide-y divide-border">
-      {#each taskUi.filteredTasks as task}
+      {#each taskUi.boardTasks as task (task.id)}
         <div
           onclick={() =>
             taskUi.isMultiSelectMode ? handleTaskSelection(task.id) : handleTaskSelect(task)}
@@ -66,8 +67,10 @@
             ? 'bg-warning-50 dark:bg-warning-900/20'
             : ''}"
         >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
+          <div class="flex min-w-0 items-center justify-between">
+            <!-- min-w-0 all the way down: the title's own truncate does nothing
+                 unless every flex ancestor is allowed to shrink below content. -->
+            <div class="flex min-w-0 items-center gap-3">
               {#if taskUi.isMultiSelectMode}
                 <Checkbox
                   checked={taskUi.selectedTaskIds.has(task.id)}
@@ -100,15 +103,25 @@
                   class="h-8 w-8 p-0"
                 >
                   <Icon
-                    icon={getTaskIcon(task)}
-                    class="h-5 w-5 {getTaskStatusColor(task.status)}"
+                    icon={display.icon(task)}
+                    class="h-5 w-5 {display.statusColor(task.status)}"
                   />
                 </Button>
               </div>
 
-              <div>
-                <div class="flex items-center gap-2">
-                  <h4 class="font-medium text-foreground">{task.title}</h4>
+              <div class="min-w-0">
+                <div class="flex min-w-0 items-center gap-2">
+                  <!-- A title with no spaces has no break opportunity: without
+                       min-w-0 + break-words it runs past the row and shoves the
+                       badges out of view. -->
+                  <h4 class="min-w-0 flex-1 truncate font-medium break-words text-foreground">
+                    {task.title}
+                  </h4>
+                  {#if projectLabel?.(task)}
+                    <Badge variant="outline" class="max-w-[10rem] truncate text-xs">
+                      {projectLabel(task)}
+                    </Badge>
+                  {/if}
                   {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
                     <div class="flex items-center gap-1 text-xs text-muted-foreground">
                       <FaTurnDown class="h-3 w-3" />
@@ -137,13 +150,13 @@
               {/if}
 
               <div class="flex items-center gap-1">
-                <FaFlag class="h-4 w-4 {getPriorityColor(task.priority)}" />
+                <FaFlag class="h-4 w-4 {display.priorityColor(task.priority)}" />
                 <Badge variant="outline" class="text-xs uppercase">
                   {task.priority}
                 </Badge>
               </div>
 
-              <Badge class="text-sm {getStatusBadgeColor(task.status)}">
+              <Badge class="text-sm {display.statusBadge(task.status)}">
                 {taskStatusLabel(task.status)}
               </Badge>
             </div>
@@ -168,7 +181,7 @@
                   role="button"
                   tabindex="0"
                   aria-label="Select subtask: {subtask.title}"
-                  class="cursor-pointer border-l-4 border-l-primary bg-primary/5 p-3 transition-colors hover:bg-muted/50 dark:bg-primary/10"
+                  class="cursor-pointer border-l-2 border-l-primary p-3 transition-colors hover:bg-muted/50"
                 >
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
@@ -182,8 +195,8 @@
                         class="h-8 w-8 p-0"
                       >
                         <Icon
-                          icon={getTaskIcon(subtask)}
-                          class="h-5 w-5 {getTaskStatusColor(subtask.status)}"
+                          icon={display.icon(subtask)}
+                          class="h-5 w-5 {display.statusColor(subtask.status)}"
                         />
                       </Button>
 
@@ -210,13 +223,13 @@
                       {/if}
 
                       <div class="flex items-center gap-1">
-                        <FaFlag class="h-4 w-4 {getPriorityColor(subtask.priority)}" />
+                        <FaFlag class="h-4 w-4 {display.priorityColor(subtask.priority)}" />
                         <Badge variant="outline" class="text-xs uppercase">
                           {subtask.priority}
                         </Badge>
                       </div>
 
-                      <Badge class="text-sm {getStatusBadgeColor(subtask.status)}">
+                      <Badge class="text-sm {display.statusBadge(subtask.status)}">
                         {taskStatusLabel(subtask.status)}
                       </Badge>
                     </div>

@@ -31,7 +31,7 @@ pub struct CreateTaskRequest {
     pub blocks: Option<String>,     // JSON array of task IDs
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UpdateTaskRequest {
     pub title: Option<String>,
     pub description: Option<String>,
@@ -107,11 +107,12 @@ impl TaskRepository {
         id: i32,
         request: UpdateTaskRequest,
     ) -> Result<TaskModel, sea_orm::DbErr> {
-        let mut active_model: ActiveModel = TaskEntity::find_by_id(id)
+        let existing = TaskEntity::find_by_id(id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Task not found".to_string()))?
-            .into();
+            .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Task not found".to_string()))?;
+        let was_completed = existing.status == "completed";
+        let mut active_model: ActiveModel = existing.into();
 
         if let Some(title) = request.title {
             active_model.title = Set(title);
@@ -120,6 +121,7 @@ impl TaskRepository {
             active_model.description = Set(Some(description));
         }
         // Set completed_at if status is completed (check before moving the value)
+        let status_changed = request.status.is_some();
         let is_completed = if let Some(ref status) = request.status {
             status == "completed"
         } else {
@@ -179,9 +181,16 @@ impl TaskRepository {
             active_model.blocks = Set(Some(blocks));
         }
 
-        // Set completed_at if status is completed
-        if is_completed {
+        // Stamp completed_at only on the transition INTO completed, and clear it
+        // on the way out. Re-stamping on every update that merely carries
+        // status="completed" (the edit form sends the whole task) pushed the
+        // 7-day archive window back each time the task was touched, so an
+        // edited task never aged into the Archive. Leaving a stale timestamp
+        // behind on the way out is the same bug from the other side.
+        if is_completed && !was_completed {
             active_model.completed_at = Set(Some(chrono::Utc::now().into()));
+        } else if was_completed && status_changed && !is_completed {
+            active_model.completed_at = Set(None);
         }
 
         active_model.updated_at = Set(Some(chrono::Utc::now().into()));
@@ -320,5 +329,102 @@ impl TaskRepository {
             .filter(Column::Status.ne("cancelled"))
             .all(&self.db)
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::migrations::runner::run_migrations;
+    use sea_orm::Database;
+    use tempfile::tempdir;
+
+    async fn repo() -> (TaskRepository, tempfile::TempDir) {
+        let dir = tempdir().expect("temp dir");
+        let url = format!("sqlite://{}?mode=rwc", dir.path().join("t.db").display());
+        let conn = Database::connect(&url).await.expect("connect");
+        run_migrations(&conn).await.expect("migrate");
+        (TaskRepository::new(conn), dir)
+    }
+
+    fn new_task(status: &str) -> CreateTaskRequest {
+        CreateTaskRequest {
+            title: "t".into(),
+            description: None,
+            status: status.into(),
+            priority: "medium".into(),
+            type_: None,
+            parent_id: None,
+            resource_id: None,
+            resource_type: None,
+            due_date: None,
+            estimated_time: None,
+            actual_time: None,
+            tags: None,
+            assignee: None,
+            recurring_pattern: None,
+            recurring_interval: None,
+            recurring_end_date: None,
+            recurring_last_generated: None,
+            blocked_by: None,
+            blocks: None,
+        }
+    }
+
+    /// completed_at marks WHEN a task was completed, and the 7-day Archive
+    /// window is measured from it. Re-stamping it on an unrelated edit kept
+    /// edited tasks out of the Archive forever (QA-080).
+    #[tokio::test]
+    async fn completed_at_tracks_the_transition_not_every_update() {
+        let (repo, _dir) = repo().await;
+        let task = repo.create(new_task("pending")).await.expect("create");
+        assert!(task.completed_at.is_none(), "pending task has no completed_at");
+
+        // Into completed: stamped.
+        let done = repo
+            .update(
+                task.id,
+                UpdateTaskRequest {
+                    status: Some("completed".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("complete");
+        let stamped = done.completed_at.expect("completing stamps completed_at");
+
+        // Edited while still completed (the edit form resends status): unchanged.
+        let edited = repo
+            .update(
+                task.id,
+                UpdateTaskRequest {
+                    title: Some("renamed".into()),
+                    status: Some("completed".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("edit");
+        assert_eq!(
+            edited.completed_at,
+            Some(stamped),
+            "editing a completed task must not restamp completed_at"
+        );
+
+        // Back out of completed: cleared, so no stale timestamp is left behind.
+        let reopened = repo
+            .update(
+                task.id,
+                UpdateTaskRequest {
+                    status: Some("pending".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("reopen");
+        assert!(
+            reopened.completed_at.is_none(),
+            "leaving completed must clear completed_at"
+        );
     }
 }

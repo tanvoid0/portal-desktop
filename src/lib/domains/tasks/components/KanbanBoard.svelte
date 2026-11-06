@@ -2,13 +2,24 @@
   import FaTurnDown from '~icons/fa6-solid/turn-down';
   import FaFlag from '~icons/fa6-solid/flag';
   import FaPlus from '~icons/fa6-solid/plus';
+  import FaClock from '~icons/fa6-solid/clock';
+  import FaLock from '~icons/fa6-solid/lock';
+  import FaUser from '~icons/fa6-solid/user';
+  import FaFolder from '~icons/fa6-solid/folder';
+  import FaCircleExclamation from '~icons/fa6-solid/circle-exclamation';
+  import FaCalendarWeek from '~icons/fa6-solid/calendar-week';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import Icon from '@iconify/svelte';
   import { taskActions } from '../stores/taskStore';
-  import { taskUi as defaultTaskUi, type TaskUiState } from '../state/taskUi.svelte';
+  import { toastActions } from '$lib/utils/toast';
+  import {
+    taskUi as defaultTaskUi,
+    getSubtaskCount,
+    type TaskUiState,
+  } from '../state/taskUi.svelte';
   import {
     createDragDropState,
     handleDragStart,
@@ -19,8 +30,15 @@
     getDropZoneClasses,
     getTaskCardClasses,
   } from '../utils/dragDrop';
+  import {
+    defaultDisplay,
+    isOverdue,
+    isDueToday,
+    isDueThisWeek,
+    formatMinutes,
+    type TaskDisplay,
+  } from '../utils/taskDisplay';
   import { taskStatusLabel, type Task } from '../types';
-  import TaskCard from './TaskCard.svelte';
 
   interface Props {
     ui?: TaskUiState;
@@ -28,12 +46,12 @@
     handleTaskStatusToggle: (taskId: string) => void;
     handleTaskSelection: (taskId: string) => void;
     handleCreateSubtask: (task: Task) => void;
-    getSubtaskCount: (taskId: string, allTasks: Task[]) => number;
-    getTaskStatusColor: (status: string) => string;
-    getStatusBadgeColor: (status: string) => string;
-    getPriorityColor: (priority: string) => string;
-    getTaskIcon: (task: Task) => string;
+    /** Project name to show on the card (All-projects mode); undefined hides it. */
+    projectLabel?: (task: Task) => string | undefined;
     onTaskMove?: (taskId: string, newStatus: string) => void;
+    onShowArchive?: () => void;
+    /** Override status/priority colours and icons (GitHub issues use their own). */
+    display?: TaskDisplay;
     showSubtaskActions?: boolean;
   }
 
@@ -43,12 +61,10 @@
     handleTaskStatusToggle,
     handleTaskSelection,
     handleCreateSubtask,
-    getSubtaskCount,
-    getTaskStatusColor,
-    getStatusBadgeColor,
-    getPriorityColor,
-    getTaskIcon,
+    projectLabel,
     onTaskMove,
+    onShowArchive,
+    display = defaultDisplay,
     showSubtaskActions = true,
   }: Props = $props();
   let taskUi = $derived(ui);
@@ -69,17 +85,32 @@
       await taskActions.updateTask(taskId, { status: newStatus as any });
     } catch (error) {
       console.error('Failed to move task:', error);
+      toastActions.error(
+        'Failed to move task',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
+      );
     }
+  }
+
+  function activate(task: Task) {
+    if (taskUi.isMultiSelectMode) handleTaskSelection(task.id);
+    else handleTaskSelect(task);
   }
 </script>
 
-<div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-  {#each taskUi.kanbanColumns as column}
+<!--
+  Height-bound so the horizontal scrollbar lands at the viewport edge. Let the
+  board grow to its tallest column instead and that scrollbar ends up at the
+  foot of a page thousands of pixels tall, which reads as "the right columns
+  are cropped and I cannot scroll to them".
+-->
+<div class="flex h-full min-h-0 gap-4 overflow-x-auto pb-2">
+  {#each taskUi.kanbanColumns as column (column.id)}
     <div
-      class="space-y-3 {getDropZoneClasses(
+      class="flex min-h-0 min-w-[300px] flex-1 flex-col gap-3 {getDropZoneClasses(
         column.id,
         dragDropState,
-        'min-h-[200px] rounded-lg border-2 border-dashed border-transparent p-2'
+        'rounded-lg border-2 border-dashed border-transparent p-2'
       )}"
       role="region"
       aria-label="Drop zone for {column.title} tasks"
@@ -87,84 +118,131 @@
       ondragleave={(e) => handleDragLeave(e, dragDropState)}
       ondrop={(e) => handleDrop(e, column.id, dragDropState, handleTaskMove)}
     >
-      <div class="flex items-center justify-between">
+      <div class="flex shrink-0 items-center justify-between">
         <h3 class="text-sm font-semibold text-foreground">{column.title}</h3>
         <span class="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
           {column.tasks.length}
         </span>
       </div>
 
-      <div class="space-y-2">
-        {#each column.tasks as task}
-          <div
-            draggable="true"
-            ondragstart={(e) => handleDragStart(e, task, dragDropState)}
-            ondragend={(e) => handleDragEnd(e, dragDropState)}
-            onclick={() =>
-              taskUi.isMultiSelectMode ? handleTaskSelection(task.id) : handleTaskSelect(task)}
-            onkeydown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                taskUi.isMultiSelectMode ? handleTaskSelection(task.id) : handleTaskSelect(task);
-              }
-            }}
-            role="button"
-            tabindex="0"
-            aria-label="Select task: {task.title}"
-            class="cursor-pointer transition-shadow hover:shadow-md {taskUi.selectedTaskIds.has(
-              task.id
-            )
-              ? 'bg-warning-50 ring-2 ring-warning-500 dark:bg-warning-900/20'
-              : ''} {getTaskCardClasses(task, dragDropState)}"
-          >
-            <Card>
-              <CardContent class="p-3">
-                <div class="mb-1 flex items-start justify-between">
+      <!-- Each column scrolls on its own, so the board never outgrows the viewport. -->
+      <div class="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+        {#each column.tasks as task (task.id)}
+          {@const subCount = getSubtaskCount(task.id, taskUi.tasks)}
+          {@const project = projectLabel?.(task)}
+          {@const tags = task.tags ?? []}
+          {@const blocked = !!task.blockedBy && task.blockedBy.length > 0}
+          <div>
+            <Card
+              draggable="true"
+              ondragstart={(e: DragEvent) => handleDragStart(e, task, dragDropState)}
+              ondragend={(e: DragEvent) => handleDragEnd(e, dragDropState)}
+              onclick={() => activate(task)}
+              onkeydown={(e: KeyboardEvent) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  activate(task);
+                }
+              }}
+              role="button"
+              tabindex={0}
+              aria-label="Select task: {task.title}"
+              class="cursor-pointer gap-0 py-0 hover:shadow-md {taskUi.selectedTaskIds.has(task.id)
+                ? 'bg-warning-50 ring-2 ring-warning-500 dark:bg-warning-900/20'
+                : ''} {getTaskCardClasses(task, dragDropState)}"
+            >
+              <CardContent class="space-y-2 p-3">
+                <div class="flex items-start gap-2">
                   {#if taskUi.isMultiSelectMode}
                     <Checkbox
                       checked={taskUi.selectedTaskIds.has(task.id)}
                       onCheckedChange={() => handleTaskSelection(task.id)}
                       onclick={(e) => e.stopPropagation()}
-                      class="mt-1"
+                      class="mt-0.5 shrink-0"
                     />
                   {/if}
-                  <h4 class="text-sm font-medium text-foreground">
+                  <h4
+                    class="line-clamp-2 min-w-0 flex-1 text-sm font-medium break-words text-foreground"
+                  >
                     {task.title}
                   </h4>
-                  <div class="flex items-center gap-1">
-                    {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
-                      <div class="flex items-center gap-1 text-xs text-muted-foreground">
-                        <FaTurnDown class="h-3 w-3" />
-                        <span>{getSubtaskCount(task.id, taskUi.tasks)}</span>
-                      </div>
-                    {/if}
-                    <FaFlag class="h-3 w-3 {getPriorityColor(task.priority)}" />
-                    <span class="text-xs text-muted-foreground uppercase">{task.priority}</span>
+                  <div class="flex shrink-0 items-center pt-0.5">
+                    <span title="{task.priority} priority" aria-label="{task.priority} priority">
+                      <FaFlag class="h-3 w-3 {display.priorityColor(task.priority)}" />
+                    </span>
                   </div>
                 </div>
 
                 {#if task.description}
-                  <p class="mb-3 line-clamp-2 text-xs text-muted-foreground">
-                    {task.description}
-                  </p>
+                  <p class="line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
                 {/if}
 
-                {#if task.tags?.length}
-                  <p class="mb-2 truncate text-xs text-muted-foreground">
-                    {task.tags.map((t) => '#' + t).join(' ')}
-                  </p>
-                {/if}
-
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
+                {#if task.type || isOverdue(task) || isDueToday(task) || isDueThisWeek(task) || blocked || tags.length > 0}
+                  <div class="flex flex-wrap items-center gap-1">
                     {#if task.type}
-                      <Badge variant="outline" class="text-xs">
-                        {task.type}
+                      <Badge variant="outline">{task.type}</Badge>
+                    {/if}
+                    {#if isOverdue(task)}
+                      <Badge variant="destructive"><FaCircleExclamation /> Overdue</Badge>
+                    {:else if isDueToday(task)}
+                      <Badge
+                        variant="secondary"
+                        class="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300"
+                      >
+                        <FaClock /> Today
+                      </Badge>
+                    {:else if isDueThisWeek(task)}
+                      <Badge variant="outline"><FaCalendarWeek /> This week</Badge>
+                    {/if}
+                    {#if blocked}
+                      <Badge
+                        variant="outline"
+                        class="border-red-200 text-red-600 dark:border-red-800 dark:text-red-400"
+                      >
+                        <FaLock /> Blocked
+                      </Badge>
+                    {/if}
+                    {#each tags.slice(0, 2) as tag (tag)}
+                      <Badge variant="secondary" class="max-w-[8rem] truncate">{tag}</Badge>
+                    {/each}
+                    {#if tags.length > 2}
+                      <Badge variant="secondary" title={tags.slice(2).join(', ')}>
+                        +{tags.length - 2}
                       </Badge>
                     {/if}
                   </div>
+                {/if}
 
-                  <div class="flex items-center gap-1">
+                <div class="flex items-center justify-between gap-2">
+                  <div
+                    class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+                  >
+                    {#if project}
+                      <span class="flex min-w-0 items-center gap-1" title={project}>
+                        <FaFolder class="h-3 w-3 shrink-0" />
+                        <span class="max-w-[10rem] truncate">{project}</span>
+                      </span>
+                    {/if}
+                    {#if subCount > 0}
+                      <span class="flex items-center gap-1" title="{subCount} subtasks">
+                        <FaTurnDown class="h-3 w-3" />{subCount}
+                      </span>
+                    {/if}
+                    {#if task.assignee}
+                      <span class="flex items-center gap-1">
+                        <FaUser class="h-3 w-3" />
+                        <span class="max-w-[8rem] truncate">{task.assignee}</span>
+                      </span>
+                    {/if}
+                    {#if task.estimatedTime}
+                      <span class="flex items-center gap-1">
+                        <FaClock class="h-3 w-3" />{formatMinutes(task.estimatedTime)}
+                      </span>
+                    {/if}
+                  </div>
+
+                  <div class="flex shrink-0 items-center gap-1">
                     {#if showSubtaskActions && !task.parentId}
                       <Button
                         onclick={(e) => {
@@ -192,8 +270,8 @@
                       title="Toggle task status"
                     >
                       <Icon
-                        icon={getTaskIcon(task)}
-                        class="h-4 w-4 {getTaskStatusColor(task.status)}"
+                        icon={display.icon(task)}
+                        class="h-4 w-4 {display.statusColor(task.status)}"
                       />
                     </Button>
                   </div>
@@ -202,82 +280,83 @@
             </Card>
 
             <!-- Subtasks in Kanban View -->
-            {#if getTaskSubtasks(task.id).length > 0}
-              <div class="mt-2 ml-4 space-y-2">
-                {#each getTaskSubtasks(task.id) as subtask}
-                  <div
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      handleTaskSelect(subtask);
-                    }}
-                    onkeydown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleTaskSelect(subtask);
-                      }
-                    }}
-                    role="button"
-                    tabindex="0"
-                    aria-label="Select subtask: {subtask.title}"
-                    class="cursor-pointer transition-shadow hover:shadow-md"
-                  >
-                    <Card class="border-l-4 border-l-primary bg-primary/5 dark:bg-primary/10">
-                      <CardContent class="p-3">
-                        <div class="mb-2 flex items-start justify-between">
-                          <div class="flex items-center gap-2">
-                            <FaTurnDown class="h-3 w-3 flex-shrink-0 text-primary" />
-                            <h4 class="text-sm font-medium text-foreground">
-                              {subtask.title}
-                            </h4>
-                          </div>
-                          <div class="flex items-center gap-1">
-                            <FaFlag class="h-3 w-3 {getPriorityColor(subtask.priority)}" />
-                            <span class="text-xs text-muted-foreground uppercase"
-                              >{subtask.priority}</span
-                            >
-                          </div>
-                        </div>
-
-                        {#if subtask.description}
-                          <p class="mb-2 line-clamp-2 text-xs text-muted-foreground">
-                            {subtask.description}
-                          </p>
-                        {/if}
-
-                        <div class="flex items-center justify-between">
-                          <div class="flex items-center gap-2">
-                            <Badge class="text-xs {getStatusBadgeColor(subtask.status)}">
-                              {taskStatusLabel(subtask.status)}
-                            </Badge>
-                          </div>
-
-                          <Button
-                            onclick={(e) => {
-                              e.stopPropagation();
-                              handleTaskStatusToggle(subtask.id);
-                            }}
-                            variant="ghost"
-                            size="sm"
-                            class="h-8 w-8 p-0"
-                            aria-label="Toggle subtask status"
-                            title="Toggle subtask status"
-                          >
-                            <Icon
-                              icon={getTaskIcon(subtask)}
-                              class="h-4 w-4 {getTaskStatusColor(subtask.status)}"
-                            />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+            {#each getTaskSubtasks(task.id) as subtask (subtask.id)}
+              <Card
+                onclick={() => handleTaskSelect(subtask)}
+                onkeydown={(e: KeyboardEvent) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleTaskSelect(subtask);
+                  }
+                }}
+                role="button"
+                tabindex={0}
+                aria-label="Select subtask: {subtask.title}"
+                borderAccent="left"
+                class="mt-2 ml-4 cursor-pointer gap-0 py-0 hover:shadow-md"
+              >
+                <CardContent class="space-y-2 p-3">
+                  <div class="flex items-start gap-2">
+                    <FaTurnDown class="mt-1 h-3 w-3 shrink-0 text-primary" />
+                    <h4
+                      class="line-clamp-2 min-w-0 flex-1 text-sm font-medium break-words text-foreground"
+                    >
+                      {subtask.title}
+                    </h4>
+                    <span
+                      class="shrink-0 pt-0.5"
+                      title="{subtask.priority} priority"
+                      aria-label="{subtask.priority} priority"
+                    >
+                      <FaFlag class="h-3 w-3 {display.priorityColor(subtask.priority)}" />
+                    </span>
                   </div>
-                {/each}
-              </div>
-            {/if}
+
+                  {#if subtask.description}
+                    <p class="line-clamp-2 text-xs text-muted-foreground">
+                      {subtask.description}
+                    </p>
+                  {/if}
+
+                  <div class="flex items-center justify-between gap-2">
+                    <Badge class={display.statusBadge(subtask.status)}>
+                      {taskStatusLabel(subtask.status)}
+                    </Badge>
+                    <Button
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        handleTaskStatusToggle(subtask.id);
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      class="h-8 w-8 shrink-0 p-0"
+                      aria-label="Toggle subtask status"
+                      title="Toggle subtask status"
+                    >
+                      <Icon
+                        icon={display.icon(subtask)}
+                        class="h-4 w-4 {display.statusColor(subtask.status)}"
+                      />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            {/each}
           </div>
         {/each}
       </div>
+
+      {#if column.olderCount > 0}
+        <Button
+          variant="link"
+          size="sm"
+          class="h-auto shrink-0 p-0 text-xs text-muted-foreground"
+          onclick={() => onShowArchive?.()}
+        >
+          {column.olderCount} older in Archive
+        </Button>
+      {/if}
     </div>
   {/each}
 </div>
