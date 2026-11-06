@@ -159,6 +159,79 @@ fn tool_result_text(content: Option<&Value>) -> String {
     }
 }
 
+/// Claude's file-editing tools, and the input key each one puts the path in.
+/// Anything not listed here cannot change a file, so it is not worth a snapshot.
+const CLI_EDIT_TOOLS: &[(&str, &str)] = &[
+    ("Write", "file_path"),
+    ("Edit", "file_path"),
+    ("MultiEdit", "file_path"),
+    ("NotebookEdit", "notebook_path"),
+];
+
+/// `(tool_use_id, tool name, path)` for every file-editing tool call in an
+/// `assistant` event. The path is whatever Claude wrote — usually absolute.
+/// Pure, so the extraction is unit-tested without spawning the CLI.
+fn cli_edit_targets(event: &Value) -> Vec<(String, String, String)> {
+    if event.get("type").and_then(Value::as_str) != Some("assistant") {
+        return Vec::new();
+    }
+    let blocks = event
+        .get("message")
+        .and_then(|m| m.get("content"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    blocks
+        .iter()
+        .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_use"))
+        .filter_map(|b| {
+            let name = b.get("name").and_then(Value::as_str)?;
+            let key = CLI_EDIT_TOOLS
+                .iter()
+                .find(|(t, _)| *t == name)
+                .map(|(_, k)| *k)?;
+            let path = b.get("input").and_then(|i| i.get(key)).and_then(Value::as_str)?;
+            let id = b.get("id").and_then(Value::as_str)?;
+            Some((id.to_string(), name.to_string(), path.to_string()))
+        })
+        .collect()
+}
+
+/// The `tool_use_id`s a `user` event reports results for — i.e. the tool calls
+/// that have now finished, so the file on disk is in its post-edit state.
+fn cli_tool_result_ids(event: &Value) -> Vec<String> {
+    if event.get("type").and_then(Value::as_str) != Some("user") {
+        return Vec::new();
+    }
+    event
+        .get("message")
+        .and_then(|m| m.get("content"))
+        .and_then(Value::as_array)
+        .map(|blocks| {
+            blocks
+                .iter()
+                .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_result"))
+                .filter_map(|b| b.get("tool_use_id").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Express a path Claude reported as relative to the workspace root, which is
+/// what `tools::read_raw` and the review panel expect. `None` means the file
+/// sits outside the workspace, so it is none of the review panel's business.
+fn workspace_relative(root: &str, path: &str) -> Option<String> {
+    let p = std::path::Path::new(path);
+    let rel = if p.is_absolute() {
+        p.strip_prefix(std::path::Path::new(root)).ok()?
+    } else {
+        p
+    };
+    let rel = rel.to_string_lossy().replace('\\', "/");
+    (!rel.is_empty()).then_some(rel)
+}
+
 /// Map one Claude Code stream-json event into transcript messages plus any
 /// session id / final result it carries. Pure — so the transcript mapping is
 /// unit-tested without spawning the CLI.
@@ -241,8 +314,73 @@ fn parse_cli_event(event: &Value) -> CliParsed {
 
 #[cfg(test)]
 mod claude_cli_tests {
-    use super::{parse_cli_event, tool_result_text};
+    use super::{
+        cli_edit_targets, cli_tool_result_ids, parse_cli_event, tool_result_text,
+        workspace_relative,
+    };
     use serde_json::json;
+
+    #[test]
+    fn edit_targets_picks_only_file_editing_tools() {
+        let asst = json!({"type":"assistant","message":{"content":[
+            {"type":"text","text":"Editing."},
+            {"type":"tool_use","id":"tu_read","name":"Read","input":{"file_path":"a.rs"}},
+            {"type":"tool_use","id":"tu_bash","name":"Bash","input":{"command":"npx tsc"}},
+            {"type":"tool_use","id":"tu_w","name":"Write","input":{"file_path":"/w/App.tsx"}},
+            {"type":"tool_use","id":"tu_nb","name":"NotebookEdit","input":{"notebook_path":"/w/n.ipynb"}}
+        ]}});
+        let got = cli_edit_targets(&asst);
+        // Read and Bash cannot change a file, so neither earns a snapshot.
+        assert_eq!(
+            got,
+            vec![
+                ("tu_w".to_string(), "Write".to_string(), "/w/App.tsx".to_string()),
+                (
+                    "tu_nb".to_string(),
+                    "NotebookEdit".to_string(),
+                    "/w/n.ipynb".to_string()
+                ),
+            ]
+        );
+        // A user event carries no edit targets, only results.
+        assert!(cli_edit_targets(&json!({"type":"user","message":{"content":[]}})).is_empty());
+    }
+
+    #[test]
+    fn tool_result_ids_come_from_user_events() {
+        let user = json!({"type":"user","message":{"content":[
+            {"type":"tool_result","tool_use_id":"tu_w","content":"ok"},
+            {"type":"text","text":"ignored"}
+        ]}});
+        assert_eq!(cli_tool_result_ids(&user), vec!["tu_w".to_string()]);
+        let asst = json!({"type":"assistant","message":{"content":[
+            {"type":"tool_use","id":"tu_w","name":"Write","input":{"file_path":"a"}}
+        ]}});
+        assert!(cli_tool_result_ids(&asst).is_empty());
+    }
+
+    #[test]
+    fn workspace_relative_strips_root_and_rejects_outsiders() {
+        let root = if cfg!(windows) { r"D:\w" } else { "/w" };
+        let inside = if cfg!(windows) {
+            r"D:\w\src\App.tsx"
+        } else {
+            "/w/src/App.tsx"
+        };
+        let outside = if cfg!(windows) {
+            r"D:\other\x.rs"
+        } else {
+            "/other/x.rs"
+        };
+        // Separators are normalised so the stored path matches the platform path's.
+        assert_eq!(workspace_relative(root, inside).as_deref(), Some("src/App.tsx"));
+        // Already-relative paths pass through untouched.
+        assert_eq!(workspace_relative(root, "src/App.tsx").as_deref(), Some("src/App.tsx"));
+        // Outside the workspace is not the review panel's business.
+        assert_eq!(workspace_relative(root, outside), None);
+        // The root itself is not a file.
+        assert_eq!(workspace_relative(root, root), None);
+    }
 
     #[test]
     fn parses_assistant_text_and_tool_use() {
@@ -2496,10 +2634,14 @@ impl CoderService {
     /// that mode already means for the platform engine). Either way there is no
     /// `coder://pending` round-trip — Claude owns its own approval loop.
     ///
+    /// File changes ARE recorded, so the review panel works on this path too —
+    /// but reconstructed from the transcript rather than from Portal's own
+    /// tool calls: a file is snapshotted when Claude announces an edit and
+    /// recorded when the result lands. The gap between those two is a race
+    /// Portal cannot close, since Claude owns the write; a file edited outside
+    /// the workspace root is skipped.
+    ///
     /// v1 corners, cut on purpose:
-    /// - No Cursor-style file-change review: `record_change` /
-    ///   `coder_file_changes` are not populated (Claude runs its own tools, so
-    ///   the pre-edit snapshot hook the platform path relies on is gone).
     /// - Session continuity is in-memory (`cli_sessions`); lost on restart.
     /// - Agent mode and `model` are ignored; Claude uses its configured default.
     async fn advance_claude_cli(
@@ -2611,6 +2753,13 @@ impl CoderService {
         let mut final_text: Option<String> = None;
         let mut session_id: Option<String> = None;
         let mut cancelled = false;
+        // Claude owns its own tools, so Portal never sees an edit the way the
+        // platform path does. Reconstruct the review panel's input from the
+        // transcript instead: snapshot a file when Claude announces the tool
+        // call, and record the change once its result lands (by then the write
+        // has happened, and `record_change` reads `after` off disk itself).
+        // tool_use_id -> (tool, workspace-relative path, contents before)
+        let mut pending_edits: HashMap<String, (String, String, Option<String>)> = HashMap::new();
 
         loop {
             let next = tokio::select! {
@@ -2635,6 +2784,22 @@ impl CoderService {
             let Ok(event) = serde_json::from_str::<Value>(line) else {
                 continue; // non-JSON line on a stream-json stream — skip
             };
+            // Snapshot before the tool runs: this line is emitted when Claude
+            // decides to call the tool, not after it has written.
+            for (id, tool, path) in cli_edit_targets(&event) {
+                if let Some(rel) = workspace_relative(&workspace_root, &path) {
+                    let before = tools::read_raw(&workspace_root, &rel);
+                    pending_edits.insert(id, (tool, rel, before));
+                }
+            }
+            // The result means the write is done, so `after` is now on disk.
+            for id in cli_tool_result_ids(&event) {
+                if let Some((tool, rel, before)) = pending_edits.remove(&id) {
+                    self.record_change(thread_id, &tool, &workspace_root, rel, before)
+                        .await;
+                }
+            }
+
             let parsed = parse_cli_event(&event);
             for msg in &parsed.messages {
                 self.emit(
