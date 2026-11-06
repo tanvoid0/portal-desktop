@@ -127,7 +127,9 @@
     selectProjectByPath(project.path, project.id);
   }
 
-  const workspaces = $derived(groupSessionsByProject(threads, projects));
+  const workspaces = $derived(
+    groupSessionsByProject(threads, projects, filters.sort as SessionSortKey, runningThreadIds)
+  );
   // Sessions in folders that are not registered projects.
   const otherWorkspaces = $derived(workspaces.filter((w) => !w.projectId && w.threads.length > 0));
   const projectWorkspaces = $derived(workspaces.filter((w) => w.projectId));

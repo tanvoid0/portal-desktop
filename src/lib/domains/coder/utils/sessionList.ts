@@ -219,9 +219,20 @@ export function hasActiveFilters(filters: SessionListFilters): boolean {
 }
 
 /** Group threads by workspace path, merging portal projects with orphan paths. */
+/**
+ * Group sessions by workspace, ordering the groups by the same sort used inside
+ * them.
+ *
+ * Groups used to be ordered by label unconditionally, so a workspace you had
+ * just worked in sat wherever the alphabet put it and had to be scrolled to
+ * every time — and picking "Recently updated" reordered the sessions inside each
+ * group while leaving the groups themselves alphabetical.
+ */
 export function groupSessionsByProject(
   threads: CoderThread[],
-  projects: Project[]
+  projects: Project[],
+  sort: SessionSortKey = 'updated_desc',
+  runningThreadIds: Set<string> = new Set()
 ): ProjectWorkspace[] {
   const byPath = new Map<string, CoderThread[]>();
 
@@ -259,7 +270,30 @@ export function groupSessionsByProject(
     });
   }
 
-  return result.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+  const byLabel = (a: ProjectWorkspace, b: ProjectWorkspace) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+
+  // The name-based sorts are about the workspace name, so order groups by label.
+  if (sort === 'title_asc' || sort === 'project_asc') return result.sort(byLabel);
+  if (sort === 'title_desc') return result.sort((a, b) => byLabel(b, a));
+
+  // Activity-based sorts: rank each group by its own top session under the same
+  // comparator, so the group order agrees with the order inside the groups.
+  // Computed once per group rather than inside the comparator — sorting threads
+  // per comparison would be O(n² log n).
+  const top = new Map<string, CoderThread | undefined>();
+  for (const w of result) {
+    top.set(w.path, sortThreadsForWorkspace(w.threads, sort, runningThreadIds)[0]);
+  }
+
+  return result.sort((a, b) => {
+    const ta = top.get(a.path);
+    const tb = top.get(b.path);
+    // A workspace with no sessions has no activity to rank, so it sinks below
+    // the ones that do instead of outranking an active workspace.
+    if (!ta || !tb) return ta === tb ? byLabel(a, b) : ta ? -1 : 1;
+    return compareSessions(ta, tb, sort, runningThreadIds) || byLabel(a, b);
+  });
 }
 
 export function sortThreadsForWorkspace(

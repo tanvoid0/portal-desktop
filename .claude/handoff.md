@@ -1,7 +1,7 @@
 # Handoff — Portal Desktop, coder engine work
 
 Rewritten 2026-11-06 ~22:15. For someone with no memory of the session that produced it.
-The previous version of this file described the state *before* the coder testing was run;
+The previous version of this file described the state _before_ the coder testing was run;
 that testing is now finished and its results live in
 [`.claude/coder-test-plan.md`](./coder-test-plan.md).
 
@@ -20,17 +20,17 @@ Two things the owner asked for, both now done:
 
 Nine commits, oldest first:
 
-| commit    | what                                                                      |
-| --------- | ------------------------------------------------------------------------- |
-| `dd2d844` | pre-existing: let the Claude CLI engine run commands                      |
-| `fb4be1e` | pre-existing: record file changes on the Claude CLI engine                |
-| `8530cbb` | another session's tasks board / list / archive revamp (16 files)          |
-| `e524574` | `.prettierignore` — ignore the generated `.impeccable/` hook cache        |
-| `f53cd46` | QA board sweep (QA-076..082) + the then-current handoff and test plan     |
-| `773bf2d` | Part A + Part B results written into the test plan; QA-083/084/085 filed  |
-| `e848a60` | fixes for QA-084 and QA-085                                               |
-| `e2bb5a8` | fix for QA-083                                                            |
-| `bfde40a` | repair of `e848a60`, which had shipped 4 type errors (see "What bit me")   |
+| commit    | what                                                                     |
+| --------- | ------------------------------------------------------------------------ |
+| `dd2d844` | pre-existing: let the Claude CLI engine run commands                     |
+| `fb4be1e` | pre-existing: record file changes on the Claude CLI engine               |
+| `8530cbb` | another session's tasks board / list / archive revamp (16 files)         |
+| `e524574` | `.prettierignore` — ignore the generated `.impeccable/` hook cache       |
+| `f53cd46` | QA board sweep (QA-076..082) + the then-current handoff and test plan    |
+| `773bf2d` | Part A + Part B results written into the test plan; QA-083/084/085 filed |
+| `e848a60` | fixes for QA-084 and QA-085                                              |
+| `e2bb5a8` | fix for QA-083                                                           |
+| `bfde40a` | repair of `e848a60`, which had shipped 4 type errors (see "What bit me") |
 
 Working tree is clean. Gates, read with real exit codes: `pnpm check` 0 errors,
 `pnpm lint` 0 errors, `npx vitest run src/lib/domains/coder/utils/feedBlocks.test.ts` 5/5.
@@ -105,15 +105,15 @@ fill required args. Only the last is a judgement call.
 
 ## Files that matter
 
-| path                                                                 | why                                                          |
-| -------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `.claude/coder-test-plan.md`                                         | the Part A / Part B results and the per-surface report        |
-| `.claude/qa/issues/QA-083..086*.md`                                  | 083/084/085 fixed + verified; **086 open**                    |
-| `.claude/qa/scripts/app.mjs`                                         | the CDP driver harness — use it, see below                    |
-| `src/lib/domains/coder/utils/feedBlocks.ts`                          | QA-084 fix: failed tool calls no longer counted as work       |
-| `src/lib/domains/coder/utils/feedBlocks.test.ts`                     | 5 cases covering that                                         |
-| `src/lib/domains/coder/state/coderSession.svelte.ts`                 | QA-085 fix: `llmConfigFor`, `syncThreadLlmConfig`             |
-| `src/lib/domains/coder/components/ChangesPanel.svelte:380`           | QA-083 fix, with a comment saying why it must stay a group    |
+| path                                                       | why                                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| `.claude/coder-test-plan.md`                               | the Part A / Part B results and the per-surface report     |
+| `.claude/qa/issues/QA-083..086*.md`                        | 083/084/085 fixed + verified; **086 open**                 |
+| `.claude/qa/scripts/app.mjs`                               | the CDP driver harness — use it, see below                 |
+| `src/lib/domains/coder/utils/feedBlocks.ts`                | QA-084 fix: failed tool calls no longer counted as work    |
+| `src/lib/domains/coder/utils/feedBlocks.test.ts`           | 5 cases covering that                                      |
+| `src/lib/domains/coder/state/coderSession.svelte.ts`       | QA-085 fix: `llmConfigFor`, `syncThreadLlmConfig`          |
+| `src/lib/domains/coder/components/ChangesPanel.svelte:380` | QA-083 fix, with a comment saying why it must stay a group |
 
 ## Decisions already made, and why
 
