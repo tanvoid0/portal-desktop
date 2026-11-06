@@ -123,7 +123,10 @@
       console.error('Failed to load live catalog:', error);
       loadError =
         error instanceof Error ? error.message : String(error || 'Failed to load catalog');
-      catalogProviders = [];
+      // Deliberately keep the last known provider list. Blanking it leaves both
+      // selectors inert — the engine cannot be switched and the model cannot be
+      // changed back — which is how an unreachable platform turned into "the
+      // model is stuck forever" (QA-087).
       onStatusChange?.({ checking: false, online: false, error: loadError });
     } finally {
       isLoading = false;
@@ -181,7 +184,15 @@
   ]);
 
   const catalogModels = $derived.by((): CatalogModel[] => {
-    if (!catalog || !selectedBackendProvider) return [];
+    if (!selectedBackendProvider) return [];
+    if (!catalog) {
+      // No catalog (platform unreachable or refusing us): still offer the model
+      // already in use, so the selector states the truth instead of showing an
+      // empty box, and a later successful load can replace it.
+      return selectedModel
+        ? [{ id: selectedModel, provider: selectedBackendProvider, source: 'alias' }]
+        : [];
+    }
     const models = modelsForCatalogProvider(catalog.providers, selectedBackendProvider);
     if (selectedModel && !models.some((entry) => entry.id === selectedModel)) {
       return [
