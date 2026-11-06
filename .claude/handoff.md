@@ -107,6 +107,11 @@ blanked both selector lists. Facts worth keeping:
   authenticates. So the `agp_` token is most likely what the daemon was *rejecting* (plausibly
   issued by an older daemon instance). If the owner wants off a master-key-shaped secret,
   **issue a fresh `agp_` token**; do not reuse the deleted one.
+- **All four stale settings copies are now deleted, with the owner's approval.** Two under
+  `%APPDATA%/portal-desktop/` and two `ai-settings.json.bak-2026-11-06` files, all holding the
+  same 52-char `agp_` token. Only `%APPDATA%/portal_desktop/ai-settings.json` remains, and the
+  coder was verified working after each deletion. `portal-desktop/settings.json` was left in
+  place deliberately — different file, and the live directory has a newer copy.
 - The live key is 64 hex characters with no `agp_` prefix, which is master-key-shaped, while
   Portal's own Settings text says to paste a scoped `agp_` token and **not** the master key.
   Confirming it is literally the master key needs reading `master.key`, which the sandbox
@@ -127,14 +132,7 @@ you need to change the model, **use the dropdown**, not localStorage.
 
 ## What is left
 
-1. **One stale settings copy, pending the owner's answer.**
-   `%APPDATA%/portal_desktop/ai-settings.json.bak-2026-11-06` still holds the old 52-char
-   `agp_` token. The owner was asked whether to delete it and had not answered when this was
-   written. The two legacy copies under `%APPDATA%/portal-desktop/` were deleted with their
-   approval; `portal-desktop/settings.json` was deliberately left (different file, and the
-   live directory has a newer one).
-
-2. **QA-086 — four `role="button"` wrappers that nest real buttons.** Still open, unchanged
+1. **QA-086 — four `role="button"` wrappers that nest real buttons.** Still open, unchanged
    from the previous handoff. `.claude/qa/issues/QA-086-role-button-wrappers-swallow-nested-buttons.md`
    has the sites: `terminal/components/TabBar.svelte:186` (worst — wraps a real
    `aria-label="Close tab"` button), `ai/components/shared/AISessionCard.svelte:76`,
@@ -145,15 +143,15 @@ you need to change the model, **use the dropdown**, not localStorage.
    session** — check with it first. `sdk/components/sidebar/SDKSidebarItem.svelte:60` also
    uses `role="button"` but nests nothing interactive; leave it.
 
-3. **Push.** Nothing is pushed in either repo. The owner has not asked.
+2. **Push.** Nothing is pushed in either repo. The owner has not asked.
 
-4. **A latent hole deliberately not fixed** (speculative, no sighting): `app_paths::config_dir()`
+3. **A latent hole deliberately not fixed** (speculative, no sighting): `app_paths::config_dir()`
    migrates the legacy config dir only when the new dir does **not exist at all**, and
    `copy_files_into` skips files that already exist. If the new directory gets created by
    some other feature first, legacy settings are never migrated and the config silently comes
    up empty. Only worth fixing if settings have ever been seen to vanish.
 
-5. **Part C leftovers**, unchanged: the coder project dropdown shows a stale Linux path
+4. **Part C leftovers**, unchanged: the coder project dropdown shows a stale Linux path
    (`/media/tan/Workspace/...`) for Portal Desktop itself on a Windows machine; two
    unverified collapsed-sidebar observations (treat as "seen once"); several stale `pending`
    rows in `coder_file_changes` from test turns (cosmetic — files are at baseline on disk).
