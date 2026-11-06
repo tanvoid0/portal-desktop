@@ -13,6 +13,49 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use std::time::Instant;
 
+/// Turn a 401 body from agent-platform into a message that says which check
+/// rejected the request.
+///
+/// The daemon distinguishes a missing header (`AUTH_REQUIRED`) from a rejected
+/// secret (`TOKEN_INVALID`, `TOKEN_EXPIRED`) and from a missing AI entitlement
+/// (`APP_ID_REQUIRED`, `APP_ID_UNKNOWN`). Those need completely different
+/// fixes, and reporting all of them as a bad token sends every investigation to
+/// the token first — which is what QA-087 cost.
+fn auth_failure_detail(body: String) -> String {
+    let code = serde_json::from_str::<Value>(&body)
+        .ok()
+        .and_then(|v| {
+            v.pointer("/error/code")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .filter(|c| !c.is_empty());
+    match code.as_deref() {
+        Some("AUTH_REQUIRED") => {
+            "agent-platform rejected the request: no Authorization header was sent. \
+             Set the AgentPlatform api_key in Settings -> AI."
+                .to_string()
+        }
+        Some(c @ ("TOKEN_INVALID" | "TOKEN_EXPIRED")) => format!(
+            "agent-platform rejected the saved token ({c}). Issue a fresh agp_ token and \
+             re-save it in Settings -> AI."
+        ),
+        Some(c @ ("APP_ID_REQUIRED" | "APP_ID_UNKNOWN")) => format!(
+            "agent-platform accepted the token but refused the request ({c}): this client \
+             has no AI entitlement. The token is not the problem."
+        ),
+        Some(c) => format!("agent-platform returned 401 {c}"),
+        None => {
+            let snippet: String = body.chars().take(300).collect();
+            if snippet.trim().is_empty() {
+                "agent-platform returned 401 with no body".to_string()
+            } else {
+                format!("agent-platform returned 401: {snippet}")
+            }
+        }
+    }
+}
+
 /// What a consumed SSE completion stream yielded.
 struct StreamOutcome {
     content: String,
@@ -120,9 +163,9 @@ impl AgentPlatformProvider {
             })?;
 
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(AIError::AuthenticationError(
-                "Invalid or missing agent-platform API token".to_string(),
-            ));
+            return Err(AIError::AuthenticationError(auth_failure_detail(
+                response.text().await.unwrap_or_default(),
+            )));
         }
         if !response.status().is_success() {
             let status = response.status();
@@ -200,9 +243,9 @@ impl AgentPlatformProvider {
             })?;
 
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(AIError::AuthenticationError(
-                "Invalid or missing agent-platform API token".to_string(),
-            ));
+            return Err(AIError::AuthenticationError(auth_failure_detail(
+                response.text().await.unwrap_or_default(),
+            )));
         }
         if !response.status().is_success() {
             let status = response.status();
@@ -587,5 +630,37 @@ impl AIProvider for AgentPlatformProvider {
         self.config = config;
         self.client = Client::new();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::auth_failure_detail;
+
+    fn body(code: &str) -> String {
+        format!(r#"{{"error":{{"message":"blah","code":"{code}"}}}}"#)
+    }
+
+    #[test]
+    fn names_the_check_that_rejected_the_request() {
+        // A missing header and a refused entitlement need opposite fixes, so
+        // the two messages must not read the same.
+        let missing = auth_failure_detail(body("AUTH_REQUIRED"));
+        let entitlement = auth_failure_detail(body("APP_ID_UNKNOWN"));
+        assert!(missing.contains("no Authorization header"), "{missing}");
+        assert!(entitlement.contains("APP_ID_UNKNOWN"), "{entitlement}");
+        assert!(
+            entitlement.contains("not the problem"),
+            "an entitlement refusal must not blame the token: {entitlement}"
+        );
+        assert!(auth_failure_detail(body("TOKEN_EXPIRED")).contains("TOKEN_EXPIRED"));
+    }
+
+    #[test]
+    fn falls_back_to_the_raw_body() {
+        assert!(auth_failure_detail("not json".into()).contains("not json"));
+        assert!(auth_failure_detail(String::new()).contains("no body"));
+        // An unknown code is still reported rather than swallowed.
+        assert!(auth_failure_detail(body("SOMETHING_NEW")).contains("SOMETHING_NEW"));
     }
 }

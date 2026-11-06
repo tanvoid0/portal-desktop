@@ -1,7 +1,7 @@
 ---
 id: QA-087
 title: Coder page logs "Failed to load live catalog: Invalid or missing agent-platform API token"
-status: open
+status: fixed
 severity: major
 kind: bug
 area: coder / agent-platform auth
@@ -49,3 +49,55 @@ Part D of the test plan; switching from `gemma4:e4b` to `qwen3:8b` had to be don
 Not caused by the tool-argument repair (`2ede7cf`). Two separable problems: the catalog
 request needs the credential the chat stream already uses, and the Settings "Default model
 alias" field does not drive the coder.
+
+
+## Verified working — 2026-11-06
+
+The model dropdown populates and switches. Driven over CDP on the running app:
+
+```
+OPTIONS: Your models
+  gemma4:e4b Q4_K_M ollama 8.0B gemma4 LIVE 8.95 GB
+  nomic-embed-text:latest F16 ollama 137M nomic-bert LIVE 261.6 MB
+  qwen2.5-coder:7b Q4_K_M ollama 7.6B qwen2 LIVE 4.36 GB
+  qwen3:8b Q4_K_M ollama 8.2B qwen3 LIVE 4.87 GB
+pref before: {"backendProvider":"ollama","model":"qwen2.5-coder:7b"}
+pref after:  {"backendProvider":"ollama","model":"gemma4:e4b"}
+```
+
+No catalog error in the console on load.
+
+## What was actually changed, and what was not
+
+**Changed:** `agent_platform_provider.rs` no longer throws away the daemon's 401 body.
+Both 401 sites collapsed every rejection into "Invalid or missing agent-platform API
+token", while every *other* status branch in the same function already included the body.
+That one line is why this issue, and an earlier session, both went looking at the token.
+`auth_failure_detail` now reports which check refused: `AUTH_REQUIRED` (no header),
+`TOKEN_INVALID` / `TOKEN_EXPIRED` (bad secret), `APP_ID_REQUIRED` / `APP_ID_UNKNOWN` (token
+fine, no AI entitlement), with the raw body as fallback. Two unit tests cover it.
+
+**Not proven: what restored the auth.** The dropdown was dead when this was filed and works
+now, but the code change only affects the error *message*. The live settings file
+(`%APPDATA%\portal_desktopi-settings.json`) now holds a 64-character `api_key`; the most
+likely explanation is that it was empty before — which matches the daemon's own
+`AUTH_REQUIRED` meaning of "the header was missing" — and that saving the provider config
+from Settings -> AI (done while switching models for the Part D measurement) populated it.
+The before-state was overwritten before anyone thought to record it. If this recurs, the
+new message will name the real code instead of guessing.
+
+## Two traps found on the way
+
+- **A stale duplicate settings file.** `%APPDATA%\portal-desktopi-settings.json`
+  (hyphen) exists alongside `%APPDATA%\portal_desktopi-settings.json` (underscore), from
+  an older app identifier, with a *different* `api_key` and a different `model`
+  (`gemma4:latest` vs the live value). Only the underscore one is read —
+  `app_paths::config_dir()` is the single source, used by both the catalog command and the
+  coder's `PlatformConfig::resolve`. Reading the wrong one makes the config look wrong when
+  it is not.
+- **The Settings "Default model alias" field genuinely does not drive the coder, and that is
+  by design.** The coder's model is the per-user `portal.ai.chatCatalog` localStorage pref;
+  the provider row's `model` is only the fallback when no pref exists
+  (`coderSession.initProviderDefaults`, `platform_config.rs` `default_model`). Not a bug.
+  The bug was that the pref could not be changed, because the only writer of it
+  (`ChatCatalogSelectors.persistSelection`) runs on a *successful* catalog load.
