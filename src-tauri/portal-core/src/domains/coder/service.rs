@@ -2460,7 +2460,14 @@ impl CoderService {
                             }
                             let call_id = data.get("call_id").and_then(Value::as_str).unwrap_or("");
                             let name = data.get("name").and_then(Value::as_str).unwrap_or("");
-                            let args = data.get("arguments").cloned().unwrap_or_else(|| json!({}));
+                            // Salvage aliased arg names here, before the permission
+                            // check and before the call is persisted, so gating,
+                            // approval text, change tracking and execution all see
+                            // the same keys.
+                            let args = tools::normalize_args(
+                                name,
+                                data.get("arguments").cloned().unwrap_or_else(|| json!({})),
+                            );
                             if call_id.is_empty() {
                                 stream_error =
                                     Some("platform tool_call missing call_id".to_string());

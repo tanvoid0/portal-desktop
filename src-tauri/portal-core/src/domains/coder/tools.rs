@@ -225,6 +225,7 @@ pub fn parse_args(call: &ToolCall) -> Result<Value, String> {
         return Ok(json!({}));
     }
     serde_json::from_str(&call.function.arguments)
+        .map(|args| normalize_args(&call.function.name, args))
         .map_err(|e| format!("invalid tool arguments JSON: {e}"))
 }
 
@@ -276,13 +277,17 @@ pub fn suggested_rule(tool: &str, args: &Value) -> String {
 /// Execute a tool. `root` is the absolute workspace root.
 pub fn execute(root: &str, tool: &str, args: &Value) -> Result<String, String> {
     match tool {
-        "read_file" => read_file(root, arg_str(args, "path")?),
-        "write_file" => write_file(root, arg_str(args, "path")?, arg_str(args, "content")?),
+        "read_file" => read_file(root, arg_str(args, tool, "path")?),
+        "write_file" => write_file(
+            root,
+            arg_str(args, tool, "path")?,
+            arg_str(args, tool, "content")?,
+        ),
         "edit_file" => edit_file(
             root,
-            arg_str(args, "path")?,
-            arg_str(args, "old_string")?,
-            arg_str(args, "new_string")?,
+            arg_str(args, tool, "path")?,
+            arg_str(args, tool, "old_string")?,
+            arg_str(args, tool, "new_string")?,
         ),
         "list_dir" => list_dir(
             root,
@@ -290,19 +295,114 @@ pub fn execute(root: &str, tool: &str, args: &Value) -> Result<String, String> {
         ),
         "search_files" => search_files(
             root,
-            arg_str(args, "query")?,
+            arg_str(args, tool, "query")?,
             args.get("path").and_then(Value::as_str).unwrap_or("."),
         ),
-        "run_command" => run_command(root, arg_str(args, "command")?),
+        "run_command" => run_command(root, arg_str(args, tool, "command")?),
         "list_terminals" => Ok("[]".into()),
         other => Err(format!("unknown tool: {other}")),
     }
 }
 
-fn arg_str<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+/// Argument names weak models reach for instead of the ones we declare. A model
+/// trained on other tool schemas emits `file_path`, `old_str` or `cmd`; the
+/// intent is right, so rename rather than bounce the turn. Local 8B models burn
+/// whole turns looping on `missing arg: path` otherwise.
+fn aliases(key: &str) -> &'static [&'static str] {
+    match key {
+        "path" => &[
+            "file_path",
+            "filepath",
+            "filename",
+            "file",
+            "file_name",
+            "target_file",
+            "path_to_file",
+        ],
+        "content" => &["contents", "text", "file_text", "new_content", "body", "data"],
+        "old_string" => &["old_str", "old_text", "old", "search", "find"],
+        "new_string" => &["new_str", "new_text", "new", "replace", "replacement"],
+        "command" => &["cmd", "shell_command", "command_line", "script"],
+        "query" => &["pattern", "search", "q", "text"],
+        "terminal_id" => &["terminalId", "terminal"],
+        _ => &[],
+    }
+}
+
+/// Every argument name a tool declares, read back off the advertised spec so
+/// this cannot drift from what the model was told.
+fn spec_arg_names(tool: &str) -> Vec<String> {
+    spec_field(tool, "properties")
+        .and_then(|p| p.as_object().map(|m| m.keys().cloned().collect()))
+        .unwrap_or_default()
+}
+
+/// A tool's required argument names, from the same spec the model receives.
+fn required_args(tool: &str) -> Vec<String> {
+    spec_field(tool, "required")
+        .and_then(|r| serde_json::from_value::<Vec<String>>(r).ok())
+        .unwrap_or_default()
+}
+
+fn spec_field(tool: &str, field: &str) -> Option<Value> {
+    tool_specs()
+        .iter()
+        .chain(platform_tool_specs().iter())
+        .find(|s| s.pointer("/function/name").and_then(Value::as_str) == Some(tool))
+        .and_then(|s| s.pointer(&format!("/function/parameters/{field}")).cloned())
+}
+
+/// Rename aliased argument keys to the ones this tool declares.
+///
+/// Call this once where tool arguments enter, *before* the permission check:
+/// everything downstream (gating, approval text, change tracking, execution)
+/// reads canonical keys, so salvaging later would gate on one path and write
+/// another.
+pub fn normalize_args(tool: &str, mut args: Value) -> Value {
+    let Some(map) = args.as_object_mut() else {
+        return args;
+    };
+    for key in spec_arg_names(tool) {
+        if map.contains_key(&key) {
+            continue;
+        }
+        let found = aliases(&key)
+            .iter()
+            .copied()
+            .find(|a| map.get(*a).is_some_and(|v| !v.is_null()));
+        if let Some(alias) = found {
+            if let Some(v) = map.remove(alias) {
+                map.insert(key, v);
+            }
+        }
+    }
+    args
+}
+
+/// Error text a weak model can act on: what is missing, the tool's full
+/// required-arg list, what it actually sent, and a correctly shaped call.
+fn arg_error(tool: &str, key: &str, args: &Value) -> String {
+    let required = required_args(tool);
+    let sent = match args.as_object() {
+        Some(m) if !m.is_empty() => m.keys().cloned().collect::<Vec<_>>().join(", "),
+        _ => "nothing".to_string(),
+    };
+    let example = required
+        .iter()
+        .map(|k| format!("\"{k}\": \"...\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "missing arg: {key}. Tool `{tool}` requires: {req}. You sent: {sent}. \
+         Call `{tool}` again with every required argument, e.g. {{{example}}}",
+        req = required.join(", "),
+    )
+}
+
+fn arg_str<'a>(args: &'a Value, tool: &str, key: &str) -> Result<&'a str, String> {
     args.get(key)
         .and_then(Value::as_str)
-        .ok_or_else(|| format!("missing arg: {key}"))
+        .ok_or_else(|| arg_error(tool, key, args))
 }
 
 /// Resolve `rel` under `root`, rejecting escapes outside the workspace.
@@ -521,6 +621,44 @@ mod tests {
         write_file(root_s, "a.txt", "x x").unwrap();
         assert!(edit_file(root_s, "a.txt", "x", "y").is_err());
         std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn normalize_salvages_aliased_args() {
+        // The exact shape a Claude-trained model emits for our write_file.
+        let out = normalize_args(
+            "write_file",
+            json!({ "file_path": "App.tsx", "contents": "hi" }),
+        );
+        assert_eq!(out["path"], "App.tsx");
+        assert_eq!(out["content"], "hi");
+        assert!(out.get("file_path").is_none());
+
+        let out = normalize_args("edit_file", json!({ "old_str": "a", "new_str": "b" }));
+        assert_eq!(out["old_string"], "a");
+        assert_eq!(out["new_string"], "b");
+
+        assert_eq!(
+            normalize_args("run_command", json!({ "cmd": "ls" }))["command"],
+            "ls"
+        );
+    }
+
+    #[test]
+    fn normalize_leaves_canonical_args_alone() {
+        let args = json!({ "path": "a.txt", "content": "x", "file_path": "WRONG" });
+        let out = normalize_args("write_file", args);
+        assert_eq!(out["path"], "a.txt");
+        assert_eq!(out["file_path"], "WRONG", "unknown keys are left untouched");
+    }
+
+    #[test]
+    fn missing_arg_error_names_every_required_arg() {
+        let err = execute("/tmp", "write_file", &json!({ "content": "x" })).unwrap_err();
+        assert!(err.contains("missing arg: path"), "{err}");
+        assert!(err.contains("requires: path, content"), "{err}");
+        assert!(err.contains("You sent: content"), "{err}");
+        assert!(err.contains(r#"{"path": "...", "content": "..."}"#), "{err}");
     }
 
     #[test]
