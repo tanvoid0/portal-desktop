@@ -17,3 +17,6 @@ src-tauri/gen/
 
 # QA board: agent-written issues and repro scripts
 .claude/qa/
+
+# Generated hook cache (impeccable plugin)
+.impeccable/
