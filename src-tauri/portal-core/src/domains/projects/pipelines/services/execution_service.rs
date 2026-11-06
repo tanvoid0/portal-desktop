@@ -18,6 +18,13 @@ use tokio::process::{Child, Command};
 use tokio::sync::watch;
 use uuid::Uuid;
 
+/// A non-long-running step with no explicit `timeout` is killed after this many
+/// seconds, so a process that finishes its work but never exits (e.g.
+/// svelte-check not releasing its `cmd` wrapper on Windows) cannot wedge the
+/// pipeline forever.
+/// ponytail: blanket 1h ceiling; set a step's `timeout` to raise it for a slow build.
+const DEFAULT_STEP_TIMEOUT_SECS: u64 = 3600;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionRequestData {
     pub pipeline_id: String,
@@ -252,6 +259,7 @@ impl ExecutionService {
                     .get("longRunning")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
+                let timeout_secs = resolve_step_timeout(step);
 
                 let mut command = substitute_variables(&command_template, &variables);
 
@@ -295,6 +303,7 @@ impl ExecutionService {
                         &step_dir,
                         &step_env,
                         long_running,
+                        timeout_secs,
                         Arc::clone(&children),
                         &mut cancel_rx,
                         &events,
@@ -405,6 +414,7 @@ impl ExecutionService {
         working_directory: &str,
         env: &HashMap<String, String>,
         long_running: bool,
+        timeout_secs: u64,
         children: Arc<Mutex<Vec<Child>>>,
         cancel_rx: &mut watch::Receiver<bool>,
         events: &Arc<dyn EventSink>,
@@ -523,10 +533,21 @@ impl ExecutionService {
             return Ok(StepRunOutcome::LongRunning);
         }
 
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+
         let exit_status = loop {
             if *cancel_rx.borrow() {
                 kill_children_async(&children).await;
                 return Err("Execution cancelled".to_string());
+            }
+
+            // A command that runs its work but never exits (e.g. svelte-check not
+            // releasing its cmd wrapper on Windows) would otherwise spin here
+            // forever; the deadline kills its process tree and fails the step.
+            if std::time::Instant::now() >= deadline {
+                kill_children_async(&children).await;
+                return Err(format!("Step timed out after {timeout_secs}s"));
             }
 
             let wait_result = {
@@ -1026,6 +1047,17 @@ fn build_initial_step_executions(steps: &[Value]) -> Vec<StepExecutionState> {
         .collect()
 }
 
+/// Seconds before a non-long-running step is force-killed: its own `timeout`
+/// (a positive value) if set, else [`DEFAULT_STEP_TIMEOUT_SECS`]. `timeout` is a
+/// top-level step field in seconds (see the `PipelineStep` type); 0 or absent
+/// means "use the default".
+fn resolve_step_timeout(step: &Value) -> u64 {
+    step.get("timeout")
+        .and_then(|v| v.as_u64())
+        .filter(|s| *s > 0)
+        .unwrap_or(DEFAULT_STEP_TIMEOUT_SECS)
+}
+
 fn substitute_variables(template: &str, variables: &HashMap<String, String>) -> String {
     let mut result = template.to_string();
     for (key, value) in variables {
@@ -1207,4 +1239,20 @@ async fn kill_process_tree(child: &mut Child) {
     }
 
     let _ = tokio::time::timeout(tokio::time::Duration::from_secs(5), child.wait()).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn step_timeout_honors_explicit_value_else_defaults() {
+        // Explicit positive timeout wins.
+        assert_eq!(resolve_step_timeout(&json!({ "timeout": 30 })), 30);
+        // Absent or non-positive falls back to the default, so a hung step is
+        // still killed rather than running forever.
+        assert_eq!(resolve_step_timeout(&json!({})), DEFAULT_STEP_TIMEOUT_SECS);
+        assert_eq!(resolve_step_timeout(&json!({ "timeout": 0 })), DEFAULT_STEP_TIMEOUT_SECS);
+    }
 }
