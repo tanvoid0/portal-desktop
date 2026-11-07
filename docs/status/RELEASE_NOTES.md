@@ -1,5 +1,17 @@
 # Portal Desktop - Release Notes
 
+## Version 0.13.0
+
+### Highlights
+
+- Tasks board revamp: list, archive, sort by active column
+- Claude CLI coder engine: file-change recording, aliased tool-arg salvage, fixed hunk-row a11y and feed status reporting
+- Model/engine catalog resilience: usable selectors when the catalog is down, clearer 401 reporting
+- Daemon pairing: capability gate, hashed-token pairing routes, capability-filtered events
+- UI chrome compaction and duplicate SDK/cloud route collapsing
+
+---
+
 ## Version 0.12.1
 
 ### Highlights
