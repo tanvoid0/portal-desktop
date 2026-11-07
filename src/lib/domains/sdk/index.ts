@@ -11,5 +11,4 @@ export * from './stores/sdkStore';
 // Services
 export { sdkService } from './services/sdkService';
 
-// Components
-export { default as FlyEnvStyleDashboard } from './components/FlyEnvStyleDashboard.svelte';
+// Components are imported directly from ./components/<Name>.svelte.

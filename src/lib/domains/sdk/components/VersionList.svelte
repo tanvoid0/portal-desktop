@@ -78,7 +78,9 @@
   }
 
   function canInstall(version: VersionInfo) {
-    return !version.installed && !version.downloading && !version.error;
+    // A failed install must stay retryable: clearing the row's only action would
+    // leave a reload as the sole way out.
+    return !version.installed && !version.downloading;
   }
 
   function canUninstall(version: VersionInfo) {
@@ -137,7 +139,7 @@
 
   <!-- Version Management Tabs -->
   <Tabs value="installed" class="w-full">
-    <TabsList class="grid w-full grid-cols-2">
+    <TabsList>
       <TabsTrigger value="installed">
         Installed ({installedVersions.length})
       </TabsTrigger>
@@ -168,7 +170,7 @@
             </TableRow>
           </TableHeader>
           <TableBody>
-            {#each installedVersions as version}
+            {#each installedVersions as version (version.version)}
               <TableRow>
                 <TableCell class="font-mono">
                   <div class="flex items-center gap-2">
@@ -210,6 +212,9 @@
                     <div class="mt-1 text-xs text-muted-foreground">
                       Released: {new Date(version.releaseDate).toLocaleDateString()}
                     </div>
+                  {/if}
+                  {#if version.error}
+                    <div class="mt-1 text-xs text-destructive">{version.error}</div>
                   {/if}
                 </TableCell>
                 <TableCell>
@@ -256,7 +261,7 @@
             </TableRow>
           </TableHeader>
           <TableBody>
-            {#each availableVersions as version}
+            {#each availableVersions as version (version.version)}
               <TableRow>
                 <TableCell class="font-mono">
                   <div class="flex items-center gap-2">
@@ -282,12 +287,15 @@
                       Released: {new Date(version.releaseDate).toLocaleDateString()}
                     </div>
                   {/if}
+                  {#if version.error}
+                    <div class="mt-1 text-xs text-destructive">{version.error}</div>
+                  {/if}
                 </TableCell>
                 <TableCell>
                   {#if canInstall(version)}
                     <Button size="sm" onclick={() => handleInstall(version)} disabled={loading}>
                       <Download class="mr-1 h-4 w-4" />
-                      Install
+                      {version.error ? 'Retry install' : 'Install'}
                     </Button>
                   {/if}
                 </TableCell>

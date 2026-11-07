@@ -746,6 +746,24 @@ export class SDKService {
   }
 
   /**
+   * Switch the active version through the SDK manager that owns it (nvm, pyenv, ...).
+   *
+   * `switch_sdk_version` is not a registered Tauri command; `switch_version_via_manager`
+   * is the one the backend actually exposes, and it needs the manager, not the SDK.
+   */
+  async switchVersionViaManager(managerName: string, version: string): Promise<string> {
+    return invoke<string>('switch_version_via_manager', { managerName, version });
+  }
+
+  /**
+   * Uninstall a version through its SDK manager. See switchVersionViaManager for why
+   * this does not go through `uninstall_sdk_version`.
+   */
+  async uninstallVersionViaManager(managerName: string, version: string): Promise<string> {
+    return invoke<string>('uninstall_version_via_manager', { managerName, version });
+  }
+
+  /**
    * Uninstall an SDK manager by name.
    */
   async uninstallManager(managerName: string): Promise<void> {

@@ -801,7 +801,10 @@ pub async fn get_all_available_sdks() -> Result<Vec<serde_json::Value>, String> 
     // Return a curated list of available SDKs without requiring database connection
     let available_sdks = vec![
         serde_json::json!({
-            "id": "node",
+            // "nodejs" is the id used by the SDK configs, the project version files
+            // and download_and_install_version; "node" matched none of them, so every
+            // Node install from the versions view failed with "Unknown SDK type".
+            "id": "nodejs",
             "name": "Node.js",
             "category": "language",
             "description": "JavaScript Runtime",
