@@ -117,5 +117,48 @@ slugs.forEach((slug, i) => {
   );
 });
 
+// 6. sidebar active state + digit shortcuts, replicating CloudNavigation's own logic
+const SHORTCUTS = Object.fromEntries(
+  [
+    ...(await import('node:fs'))
+      .readFileSync(
+        path.join(ROOT, 'src/lib/domains/k8s-navigation/utils/keyboardConstants.ts'),
+        'utf8'
+      )
+      .matchAll(/^\s+([A-Z_]+): '(\d)',$/gm),
+  ].map((m) => [m[1], m[2]])
+);
+
+const navItems = [
+  { id: 'overview', route: '/cloud/workloads', prefixes: [] },
+  ...slugs.map((slug, i) => ({
+    id: slug,
+    route: `/cloud/${slug}`,
+    prefixes: [`/cloud/${slug}/`, `${bases[i]}/`],
+  })),
+];
+const activeFor = (p) =>
+  navItems.filter((i) => p === i.route || i.prefixes.some((x) => p.startsWith(x))).map((i) => i.id);
+
+console.log('\nsidebar active item + digit shortcut per resource:');
+for (const [i, slug] of slugs.entries()) {
+  const listActive = activeFor(`/cloud/${slug}`);
+  const detailActive = activeFor(`${bases[i]}/sample-name`);
+  const key = SHORTCUTS[slug.toUpperCase()] ?? '(none)';
+  const ok =
+    listActive.length === 1 &&
+    listActive[0] === slug &&
+    detailActive.length === 1 &&
+    detailActive[0] === slug;
+  if (!ok) failures++;
+  console.log(
+    `${ok ? 'ok  ' : 'FAIL'} ${slug.padEnd(14)} list->[${listActive}] detail->[${detailActive}] key=${key}`
+  );
+}
+const overviewActive = activeFor('/cloud/workloads');
+const overviewOk = overviewActive.length === 1 && overviewActive[0] === 'overview';
+if (!overviewOk) failures++;
+console.log(`${overviewOk ? 'ok  ' : 'FAIL'} overview       /cloud/workloads -> [${overviewActive}]`);
+
 console.log(`\n${failures === 0 ? 'ALL PASS' : failures + ' FAILURE(S)'}`);
 process.exit(failures === 0 ? 0 : 1);

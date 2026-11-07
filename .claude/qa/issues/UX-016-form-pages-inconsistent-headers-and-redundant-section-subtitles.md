@@ -1,7 +1,7 @@
 ---
 id: UX-016
 title: Create/edit pages disagree on whether they have a heading, and every form section restates its own title
-status: fixed
+status: verified
 severity: minor
 kind: ux
 area: forms (*/create, */new, */edit)
@@ -78,4 +78,42 @@ below it.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-07 — tauri, dev instance 2. Ran `node .claude/qa/scripts/ux016-verify.mjs`,
+`ux016-verify2.mjs`, `ux016-verify3.mjs`.
+
+Exactly one `h1`, one `<main>` and a short run-up to the first field on every route:
+
+| route | h1 | first field y |
+| --- | --- | --- |
+| `/scripts/new` | New script | 190 |
+| `/projects/create` | New project | 218 |
+| `/projects/edit/1` | Edit project | 218 |
+| `/deployments/new` | New deployment | 186 |
+| `/tasks/create` | New task | 158 |
+| `/documents/create` | New document | 158 |
+
+(The only other headings on the page are the app sidebar's own "NAVIGATION" / "TOOLS".)
+
+`/scripts/new`: the header carries `Import JSON`, `Cancel`, `Save Script`. Import JSON opens the
+"Import from JSON" Dialog with both paths — **Load from File** and a paste textarea:
+
+- pasting a valid script JSON filled Name with "QA Pasted Script" and closed the dialog;
+- `Load from File` with `script-good.json` filled Name with "QA Imported Script";
+- a JSON missing `command` showed "Missing required field: command" inline and did not import;
+- `/scripts/new?import=true` auto-opened the dialog.
+
+`/deployments/new`: header holds `Cancel` and `Deploy (build & run)`; `?projectPath=D:/projects/qa-demo`
+prefilled the path input; `Cancel` returned to `/deployments`. I did **not** press Deploy — it
+builds and runs a container, which is a side effect outside the app.
+
+Not covered: `/tasks/<id>/edit` and the `/documents/<id>` "Edit Document" card title — instance 2's
+database has no documents (`a document: null`), and I did not create one to avoid leaving fixtures
+on a route I was not asked to sweep.
+
+The submit/cancel buttons staying in the form footer on the projects, tasks and documents routes is
+recorded as deliberate and was not filed.
+
+Shots: `.claude/qa/shots/UX-016-after-scripts-new-paste-import.png`,
+`.claude/qa/shots/UX-016-after-scripts-new-file-import.png`,
+`.claude/qa/shots/UX-016-after-deployments-new.png`.
+

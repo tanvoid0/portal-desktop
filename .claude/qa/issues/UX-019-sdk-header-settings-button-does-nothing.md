@@ -1,7 +1,7 @@
 ---
 id: UX-019
 title: The Settings button in the /sdk page header does nothing
-status: fixed
+status: verified
 severity: minor
 kind: bug
 area: sdk
@@ -77,4 +77,16 @@ console.log(await app.eval(() => ({ path: location.pathname, dialogs: document.q
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-07 — tauri, dev instance 2. Enumerated every button in the `/sdk` page shell:
+
+```
+Toggle Sidebar, Home, SDK Manager, Toggle theme, Toggle Sidebar,
+SDK Manager / Manage your development environment, Overview, SDK Managers, Services, Versions,
+Refresh
+```
+
+The PageHeader's only action is **Refresh**, which works (it invalidates the `sdk` query key).
+There is no unwired primary button in that header. The dead `Settings` button was removed upstream
+in commit d0fccf8, not by this wave — closing on that basis.
+
+Shot: `.claude/qa/shots/UX-014-after-sdk-overview-loaded.png`.

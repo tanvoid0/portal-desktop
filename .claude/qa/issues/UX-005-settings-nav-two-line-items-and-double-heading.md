@@ -1,7 +1,7 @@
 ---
 id: UX-005
 title: Settings nav is 993px tall for 14 sections, and every page states its title twice
-status: fixed
+status: verified
 severity: major
 kind: ux
 area: settings
@@ -94,4 +94,45 @@ route-level duplicate was removed.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-07 — tauri, dev instance 2 (vite :1421 / CDP :9223, own database).
+Ran `node .claude/qa/scripts/ux005-verify.mjs`, `ux005-verify2.mjs`, `ux005-verify3.mjs`,
+`ux005-verify4.mjs`.
+
+Measured on `/settings/general`:
+
+| | before | now |
+| --- | --- | --- |
+| nav Card | 278 x 993px, scrolled | **288 x 594px** (182px wide at 1024), no inner scroll |
+| nav item height | 71px | **32px** top-level, 38px sub-items |
+| sections reachable without scrolling at 1280x800 | 8 of 14 | **14 of 14** (last item bottom y=756 < 800) |
+| `Configured: 4/7` badge row | present | **gone** (no `Configured: n/m` anywhere in the body) |
+| `h1` count on the page | 2 | **1** |
+
+- All 14 labels render on one line and are visible: General, Updates, Editor, Terminal, IDEs,
+  Languages, Package Managers, Frameworks, GitHub, Theme, Learning, Providers, Training Data,
+  Autonomy, under the two group headers.
+- The layout `h1` names the active section from `activeSectionLabel(pathname)` on every route I
+  tried, grouped ones included: `Settings › General`, `Settings › Updates`, `Settings › IDEs`,
+  `Settings › Autonomy`, `Settings › Theme`, `Settings › AI › Providers`,
+  `Settings › Frameworks & Languages › Languages`.
+- Keyboard: the items are real `<button>`s, focusable with a visible 1px outline; `Enter` on
+  "Updates" navigated to `/settings/updates` and the h1 followed. `aria-current="page"` is on the
+  active top-level item.
+- At 1024x600 the nav keeps the same 14 one-line items at 182px wide; the column scrolls, which a
+  600px-tall window makes unavoidable for a 594px card.
+
+Shots: `.claude/qa/shots/UX-005-after-settings-general-1280.png`,
+`.claude/qa/shots/UX-005-after-settings-nav-1024x600.png`,
+`.claude/qa/shots/UX-005-after-settings-nav-appsidebar-collapsed.png`.
+
+Two things this verification could not close, filed/noted separately:
+
+- The five sub-section items (Languages, Package Managers, Frameworks, Providers, Training Data)
+  carry no `aria-current`, so on `/settings/ai/providers` and `/settings/languages` nothing on the
+  page is marked current for a screen reader. Filed as **QA-091**.
+- The collapsed-rail branch in `SettingsNavigation.svelte` (`sidebar.state === 'collapsed'`, the
+  one with `tooltipContent`) never rendered for me: collapsing the app sidebar — before or after a
+  reload, `data-state="collapsed"`, rail 48px — still leaves the settings nav in its expanded
+  276px form with all 14 labels. So the collapsed tooltips are untested, and the nav stays readable
+  either way. Not filed: no user-visible defect, just a branch I could not reach.
+

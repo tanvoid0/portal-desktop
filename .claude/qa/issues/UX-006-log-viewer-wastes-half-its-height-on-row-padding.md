@@ -1,7 +1,7 @@
 ---
 id: UX-006
 title: Log viewer shows 9 lines where a developer tool should show 25 — nested cards and 44px rows
-status: fixed
+status: verified
 severity: major
 kind: ux
 area: logs
@@ -77,4 +77,38 @@ does not read `all all all`.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-07 — tauri, dev instance 2 (vite :1421 / CDP :9223, own database).
+Ran `node .claude/qa/scripts/ux006-verify.mjs` and `node .claude/qa/scripts/ux006-verify2.mjs`
+(34 log lines in the buffer, reached by client-side navigation so the logger singleton survives).
+
+Measured:
+
+| | before | now |
+| --- | --- | --- |
+| full log lines visible, 1280x800 | 9 | **29** (33 incl. partials) |
+| row height | 44px | **24px** |
+| chrome above the first row, 1280x800 | ~220px | **89px** (one filter row) |
+| chrome above the first row, 1024x600 | — | 129px (filter row wraps to two lines, cleanly) |
+| full lines visible, 1024x600 | — | 19 |
+| gap between scroller bottom and viewport bottom | ~60px | **0px** |
+
+- `/logs` is in `VIEWPORT_FILL_ROUTES`; the route file is 5 lines, no page `h1`, no Card frame.
+- Clear and Export are ghost icon buttons with `aria-label`/`title` "Clear logs" / "Export logs";
+  Export downloaded `logs-2026-11-07.txt`; Clear emptied the list ("Showing 0 of 0", "No logs found").
+- The three selects read "All levels" / "All sources" / "All contexts" when unset, and carry
+  `aria-label` "Filter by level / source / context". Level, source and context filtering and the
+  search box all narrow the list and the trigger then shows the chosen value: level WARN -> 0 of 9,
+  source backend -> 0 of 9, context AppLayout -> 2 of 9, search "Theme" -> 1 of 9.
+- The level glyph is a one-letter coloured glyph with `aria-hidden` on the letter plus an
+  `sr-only` full level name and a `title` — it has a screen-reader name.
+- Auto-scroll pins the view to the newest line on mount (`scrollTop == scrollMax`).
+- `/terminal` still fills the viewport and renders normally (`sweep-terminal-i2-1280.png`).
+
+Shots: `.claude/qa/shots/UX-006-after-logs-1280.png`,
+`.claude/qa/shots/UX-006-after-logs-full-1280.png`,
+`.claude/qa/shots/UX-006-after-logs-1024x600.png`.
+
+One gap found and filed separately, not a regression of this issue: with the footer gone there is
+no way to get back to the live tail after scrolling up during a quiet stream — re-checking
+Auto-scroll does not jump to the bottom. See **QA-090**.
+

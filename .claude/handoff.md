@@ -235,3 +235,119 @@ you need to change the model, **use the dropdown**, not localStorage.
 Open a session in `D:\projects\production\portal\portal_desktop` and say:
 
 > read .claude/handoff.md and .claude/coder-test-plan.md
+
+---
+
+# Handoff 2 — UX density sweep, wave 3 (appended 2026-11-07)
+
+Separate workstream from everything above; that section is about the coder engine and is
+finished. This one is the UX board. **Do not merge the two — they share only the branch.**
+
+## Goal
+
+The owner's complaint: every page is too spacious for small screens, the title bars are too
+tall, space is wasted, and no page uses a right sidebar where one would help. A review sweep
+measured the app at 1280x800 and 1024x600 and filed 20 findings at `.claude/qa/issues/`;
+`UX-000-index.md` ranks them by win / effort. Waves 1 and 2 compacted the shared shell and
+rolled 32 pages onto it. Wave 3, below, did the thirteen findings that were left.
+
+## Done
+
+Eleven fixer agents, then two independent testers. **Both gates green: `pnpm check` 0 errors
+across 3814 files, `npx eslint src --quiet` 0 errors.**
+
+Verified by a tester that did not write the fix: **UX-005** (settings nav — 14/14 sections,
+no scroll at 1280x800, hardcoded `Configured: 4/7` gone), **UX-006** (`/logs` 9 -> 29 lines,
+rows 44 -> 24px), **UX-007** (`/automation/blocks` chrome 278 -> 186px, cards ~300 -> 126px),
+**UX-014** (`/sdk` tabs deleted, `/sdk/manager` -> `/sdk/managers`, all redirects walked),
+**UX-016** (7 form routes on PageHeader), **UX-019** (already fixed upstream in `d0fccf8`),
+**QA-088**. **UX-013** verified by code read only — cloud went 25 -> 18 route files and
+1875 -> 579 lines, with every redirect proved using SvelteKit's own `create_manifest_data` +
+`parse_route_id` over the real route tree (script: `.claude/qa/scripts/UX-013-routes.mjs`).
+
+Splits (UX-018): `tasks/[id]` 965 -> 16, `scripts/[id]` 1031 -> 292, `IdeSettings` 1187 -> 47,
+`SDKSidebar` 959 -> 535 (−584/+165 — deletion, not relocation), `BlocksPage` 1088 -> 319.
+`/scripts/new` lost 246 lines to a shared `ScriptForm`. Deleted outright:
+`FrameworkIdeSettings.svelte` (284 lines, zero references), `WorkloadTabs.svelte`, four
+pods-only cloud components.
+
+## Left
+
+**1. Five findings are fixed but NOT verified — nobody has opened the app since.** Every
+number in them is a fixer's arithmetic: **UX-008** `/projects` (claims 11,731px -> ~1,980px
+collapsed, 190 -> 39 buttons), **UX-009** `/projects/audit` (1 -> 8 rows at 1280, 0 -> ~4 at
+1024), **UX-010** `/pipeline-runs` (sticky rail, `?from=` gone), **UX-011** `/projects/[id]`
+(chrome 192 -> 102px), **UX-012** `/tasks` (three columns at 1280, `?task=` rail). Also
+untested: `/scripts/[id]`, and the SDK sidebar's mobile sheet below 768px.
+
+**2. Six regressions this wave introduced**, each filed: `QA-098` major (SDK sidebar tree
+opens fully collapsed, never expands the selected SDK's category — both `$effect`s defeated
+by `lastSelectedItemId` being set on the first empty pass), `QA-099` polish (sidebar header
+subtitle cut in half), `QA-101` major (block card titles truncate to one letter at 1024),
+`QA-102` major (invisible hover overlay swallows framework-chip clicks), `QA-090` minor
+(`/logs` has no way back to the live tail), `QA-091` minor (settings sub-items lack
+`aria-current`).
+
+**3. Pre-existing, found while testing — do not bill these to the wave:** `QA-097` **blocker**
+(`/sdk` hangs on "Loading SDK data..." on a *direct* load; UX-014's own original screenshot
+already showed this), `QA-096`, `QA-100`, `QA-092`, `QA-093`, `QA-094`, `QA-095`, `QA-103`,
+`QA-089` (fixed at its one call site, but the trap is still in the hook —
+`UseResourceActionsOptions.resources` still accepts a getter and still freezes it silently).
+
+**4. `UX-020`**, which I filed: `--sidebar-width-domain` is 20rem, sized for the two-line nav
+items this wave deleted, so pages have begun pinning it inline one at a time. It is a shared
+token in `src/app.css` and wants one deliberate pass across all four domain sidebars, not a
+page at a time.
+
+## Files that matter
+
+- `.claude/qa/issues/` — the board. `UX-000-index.md` first.
+- Shared notes, fuller version of this with per-fixer detail:
+  `C:\Users\tanvo\AppData\Local\Claude-Data\claude_pzs8sxrjxfjjc\side-session-notes\local_d12dc36e-9cce-401e-9132-361b466b7ab9\ux-board-wave3-handover.md`
+- New this wave: `src/lib/domains/cloud/core/resourceDescriptors.ts`,
+  `src/routes/cloud/[resource]/`, `src/lib/domains/tasks/components/TaskDetail.svelte`,
+  `src/lib/domains/scripts/components/ScriptForm.svelte`,
+  `src/lib/domains/projects/pipelines/components/PipelineRunDetail.svelte`.
+
+## Decisions already made, and why
+
+- `ResponsivePanel side="right"` is the right-rail primitive. `ShellSidebarLayout` is
+  left-only **by design** — adding a right variant was tried in an earlier wave and reverted.
+- Four files are deliberately **not** split despite their size: `ProjectAudit` 960,
+  `CoderPanel` 852, `sdk/ai/ollama` 880, `cloud/workloads/pods/[pod]` 907.
+- Cloud detail pages stay at `/cloud/workloads/<plural>/[singular]`; only the *list* routes
+  collapsed. The redirect is `workloads/[...rest]` and must never swallow a detail URL.
+- The deployments Scale button was dropped by a fixer and I had it **restored** as an opt-in
+  `rowActions?: Snippet<[ICloudResource]>` on `BaseResourceTable`, hover-revealed with
+  `opacity-0 group-hover:opacity-100 focus-within:opacity-100` so it stays in the tab order.
+  A keystroke-only action is not a discoverable action.
+- UX-016's primary actions stay in the `ProjectForm` / `TaskForm` / `DocumentEditor` footers
+  on three routes rather than the header. Hoisting them needs those shared components
+  refactored, and a long form with submit at the end is defensible. **Not a miss, do not file.**
+
+## What bit me
+
+- **A commit landed that no agent of mine made**: `d8ce6e3`, 11:43, sweeping waves 1-3
+  together. Every fixer was told to commit nothing and none reported doing so. It is complete
+  and correct so there is nothing to undo, but **the owner was never asked**. Check with them
+  before pushing.
+- Two fixers reached for an inline `--sidebar-width-domain` override; the first made the rail
+  *wider* than the narrow-screen rule, which is backwards for a small-screen brief. Rejected.
+  That is what UX-020 is about.
+- One agent "diagnosed" QA-051 and QA-052 from their stale Problem sections without noticing
+  both are already `status: verified`. **Read the frontmatter status before trusting any
+  agent's reading of a board file.**
+- A fixer shipped a single shared search box across two tabs, which would have recreated
+  QA-082 (no-match empty state claiming the list is empty). Caught and sent back.
+- `pnpm lint` is red on this very file and was red at HEAD before any of this — ignore it.
+
+## How to run the app
+
+`node scripts/dev-instance.mjs 2` gives vite :1421, CDP :9223 and its own database. Instance 1
+(:1420/:9222) is the owner's — never start, stop or drive it. Playwright over CDP, not pixels;
+`.claude/qa/scripts/i2.mjs` is the instance-2 helper. `role="button"` wrappers swallow nested
+buttons (QA-086), so assert `tagName === 'BUTTON'` when clicking.
+
+Owner's process rule: reviewer -> fixer -> tester as separate agents; none grades its own
+work. Ask before any page merge, move, delete or new route — route map first. Ask before
+committing.

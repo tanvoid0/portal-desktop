@@ -1,7 +1,7 @@
 ---
 id: QA-088
 title: Block and template import were dead — both handlers clicked a file input that did not exist
-status: fixed
+status: verified
 severity: major
 kind: bug
 area: automation
@@ -66,7 +66,37 @@ Landed as part of the UX-007 / UX-018 pass on `BlocksPage.svelte` (1088 → 311 
 
 ## Verification
 
-<!-- qa-tester: confirm both pickers open and that importing a valid block JSON and a valid
-     template JSON each create the item; also confirm a non-JSON and a wrong-shape JSON file
-     report an error rather than failing silently (compare QA-072, which filed exactly that
-     for script import). -->
+2026-11-07 — tauri, dev instance 2. Ran `node .claude/qa/scripts/qa088-verify.mjs`,
+`qa088-verify2.mjs`, `qa088-verify3.mjs`, `qa088-persist.mjs`.
+
+Both file inputs now exist and both pickers open:
+
+- **Block import** — the Import dialog contains one `input[type=file][accept=".json"]` bound with
+  `bind:this`, no `getElementById` anywhere. Importing a valid block JSON created the block:
+  42 → 43 cards, toast "Block imported successfully", "QA Imported Block" rendered, and it was
+  still there after a reload (it persists). Deleting it put the count back to 41.
+- **Template import** — the Templates tab's Import Template button opens a picker from a real
+  file input. A valid template JSON (`key`/`name`/`description`/`steps`) imported: 11 → 12 cards,
+  toast "Template imported successfully".
+
+Bad input is reported, not swallowed (the QA-072 concern):
+
+| file | block import | template import |
+| --- | --- | --- |
+| `bad.txt` (not JSON) | toast "YAML import not yet supported. Please use JSON format." | toast "Invalid JSON format" |
+| `wrong-shape.json` (`{"hello":"world"}`) | toast "Failed to import block" + console "Block name is required" | toast "Invalid template format: missing required fields" |
+
+Neither created anything. Count unchanged in all four cases.
+
+Two notes, neither reopening this issue:
+
+- The block importer's message for a non-JSON file is "YAML import not yet supported. Please use
+  JSON format." — it is keyed off `!file.name.endsWith('.json')`, so a `.txt` file is reported as
+  a YAML problem. Misleading copy, worth a one-line fix next time this file is open.
+- The imported *template* does not survive a reload and can never be deleted — filed as **QA-100**.
+  That is a separate defect in `pipelineTemplateService`, not in the import wiring this issue is
+  about.
+
+Shots: `.claude/qa/shots/QA-088-after-block-import.png`,
+`.claude/qa/shots/QA-088-after-valid-template-import.png`,
+`.claude/qa/shots/QA-088-after-templates-query-empty-state.png`.

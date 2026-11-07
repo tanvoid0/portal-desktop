@@ -157,4 +157,36 @@ with no extraction needed. Do UX-014 first and re-measure before splitting anyth
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-07 — tauri, dev instance 2 (vite :1421 / CDP :9223, own database).
+**Partial — not closing.** Three of the six splits were exercised, one was only sampled, two were
+not reached.
+
+**1. SDKSidebar (959 → 535, one CSS-driven tree).** Collapse and expand both work from the
+right-hand "Toggle Sidebar": expanded 256px, rail 48px with the back arrow, four nav icons and six
+category icons, no clipped labels in the rail. The rail tooltip fires ("Back to Portal Desktop").
+The four Navigation items highlight the right one on `/sdk`, `/sdk/managers`, `/sdk/managers/nvm`,
+`/sdk/services`, `/sdk/versions` and `/sdk/python`. Footer reads "11 of 16 SDKs", matching the
+tree. Expanding a category by hand works and lists its SDKs. The deliberate changes read fine:
+the header is a real back-to-Portal button and `Software Installer` / `Installations` are gone
+from the nav, with the overview's Software Installer button reaching `/sdk/software-installer`.
+Three defects filed: **QA-098** (the tree opens fully collapsed and the selected SDK's category is
+never expanded — the headline behaviour of this component), **QA-099** (header subtitle clipped on
+every `/sdk` page), **QA-097** (`/sdk` itself never finishes loading on a cold load). The mobile
+sheet below 768px and the loading/empty states were not reached.
+
+**2. IdeSettings (1187 → 47).** Full CRUD sweep — see the five issues filed from it: QA-094,
+QA-095, QA-096, QA-102, QA-103. Add, edit, set-default and delete an IDE all work and persist;
+Detect IDEs lists detected executables and a chip opens a prefilled Add dialog; mapping quick-add,
+edit and delete work; deleting an IDE that had a mapping refreshed the mappings list to its empty
+state; custom framework create (with DevIcon search), edit and delete work; the File icon branch
+renders its picker button (I did not open the native dialog). Both empty states — "No IDEs
+configured" with Detect/Add Manually, and "No framework IDE mappings configured" with the
+quick-add chips — render correctly.
+
+**3. scripts/[id] split, ScriptForm sharing, the new /edit route — NOT TESTED.** Ran out of
+session budget before reaching it. Everything in that section is unverified.
+
+**5. BlocksPage (1088 → 319).** Verified under UX-007 and QA-088; QA-100 and QA-101 filed.
+
+Sections 4 and 6 were not in this sweep's scope and were not looked at.
+

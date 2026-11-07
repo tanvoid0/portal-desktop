@@ -1,7 +1,7 @@
 ---
 id: UX-014
 title: /sdk tabs render the same lists as /sdk/manager, /sdk/services and /sdk/versions — two implementations each
-status: fixed
+status: verified
 severity: major
 kind: ux
 area: sdk
@@ -99,4 +99,39 @@ reading `—`, four stretched tabs, and "Loading SDK data…" as the body.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-07 — tauri, dev instance 2 (vite :1421 / CDP :9223, own database).
+Ran `node .claude/qa/scripts/ux014-verify.mjs`, `ux014-verify2.mjs`, `sdk-nav.mjs`.
+
+Every redirect walked by hand:
+
+| typed | landed on | h1 |
+| --- | --- | --- |
+| `/sdk/manager` | `/sdk/managers` | SDK Managers |
+| `/sdk/manager/nvm` | `/sdk/managers/nvm` | (detail page) |
+| `/sdk?tab=managers` | `/sdk/managers` | SDK Managers |
+| `/sdk?tab=services` | `/sdk/services` | SDK Services |
+| `/sdk?tab=versions` | `/sdk/versions` | SDK Versions |
+| `/sdk?tab=overview` | `/sdk` (stays, query kept) | SDK Management |
+| `/sdk/managers`, `/sdk/versions`, `/sdk/services` | themselves | as above |
+
+`/sdk` has no `[role="tab"]` elements left — the tabs are gone. `/sdk/versions` renders.
+
+Overview buttons (checked once the overview had data — see QA-097):
+`SDK Managers` → `/sdk/managers`, `Software Installer` → `/sdk/software-installer`,
+`Services` → `/sdk/services`. A Quick Navigation manager tile (Conda) → `/sdk/managers/conda`,
+and an SDK tile (Python) → `/sdk/python`.
+
+Two things that do not match the claim, neither of them a regression of this issue:
+
+- There is **no Versions button on the overview**. `/sdk/versions` is reachable only from the SDK
+  sidebar's Navigation list. Worth a product call if the overview is meant to be the hub.
+- `/sdk/installations` is not a route and not a 404 either: it loads the SDK shell with an empty
+  main pane and no heading. Pre-existing gap in the catch-all from QA-058; noting rather than
+  filing, since nothing links to it.
+
+Blocking finding on this route, filed separately: a cold load of `/sdk` never finishes loading —
+**QA-097**.
+
+Shots: `.claude/qa/shots/UX-014-after-sdk-overview-1280.png`,
+`.claude/qa/shots/UX-014-after-sdk-overview-loaded.png`, `.claude/qa/shots/sdk-managers-1280.png`.
+

@@ -1,0 +1,11 @@
+import { open } from './i2.mjs';
+const app = await open('automation/blocks', { width: 1280, height: 800 });
+const page = app.page;
+await page.waitForTimeout(2500);
+await page.evaluate(()=>{const b=[...document.querySelectorAll('button,[role="tab"]')].find(x=>x.innerText.trim()==='Templates'); b.click();});
+await page.waitForTimeout(1500);
+const body = await page.innerText('body');
+console.log('after reload, QA Imported Template present:', body.includes('QA Imported Template'));
+console.log('template count text:', (body.match(/\d+ templates? available|Showing \d+/)||['n/a'])[0]);
+console.log('cards:', await page.evaluate(()=>[...document.querySelectorAll('[data-slot="card"]')].filter(c=>c.getBoundingClientRect().y>150).length));
+await app.done();

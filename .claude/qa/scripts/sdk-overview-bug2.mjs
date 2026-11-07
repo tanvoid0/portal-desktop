@@ -1,0 +1,13 @@
+import { open } from './i2.mjs';
+const app = await open('sdk/managers', { width: 1280, height: 800 });
+const page = app.page;
+await page.waitForTimeout(9000);
+await page.evaluate(() => { const a=[...document.querySelectorAll('a[href="/sdk"]')].pop(); a.click(); });
+await page.waitForTimeout(4000);
+let b = await page.innerText('body');
+console.log('url:', page.url(), '| loading:', b.includes('Loading SDK data'), '| quickNav:', b.includes('Quick Navigation'));
+console.log('stats:', (b.match(/Managers installed[\s\S]{0,80}/)||[''])[0].replace(/\n/g,' | '));
+await app.shot('UX-014-after-sdk-overview-loaded');
+const ctl = await page.evaluate(()=>[...document.querySelectorAll('main button, main a')].map(e=>e.tagName+':'+e.innerText.trim().replace(/\n/g,' / ')).filter(Boolean).slice(0,40));
+console.log('overview controls:', JSON.stringify(ctl, null, 0));
+await app.done();

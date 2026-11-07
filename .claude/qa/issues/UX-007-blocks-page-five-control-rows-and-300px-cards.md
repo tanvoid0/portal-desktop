@@ -1,7 +1,7 @@
 ---
 id: UX-007
 title: Blocks page stacks five control rows (238px) above cards that are 300px tall for three facts
-status: fixed
+status: verified
 severity: major
 kind: ux
 area: automation
@@ -78,4 +78,27 @@ Five control rows, then cards whose body is three constants.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-07 — tauri, dev instance 2 (vite :1421 / CDP :9223, own database).
+Ran `node .claude/qa/scripts/ux007-verify.mjs` and `qa088-verify2.mjs`.
+
+| | before | 1280x800 now | 1024x600 now |
+| --- | --- | --- | --- |
+| chrome above the first card | 278px (5 rows) | **186px** | 226px |
+| control rows between the section tabs and the grid | 4 | **1** (sub-tabs + search + 5 categories + Import + Create on one line) | 2 (wraps cleanly, Import/Create drop to a second line) |
+| block card height | ~300px | **126px** | 126px |
+| horizontal overflow | — | none | none |
+
+Exercised on Blocks: category filters All 43 / Build 12 / Test 8 / Deploy 4 / Utility 19, and
+search ("pytest" → 1 card). The no-match state names the query and offers a way out:
+`No matching blocks — No block matches "zzzznope". The library holds 43 blocks. [Clear filters]`.
+Delete is confirmed ("Delete block / Are you sure…? / Cancel / **Delete**") and toasts on success.
+Card icon buttons now carry accessible names (`Delete block QA Imported Block`,
+`Export template …`).
+
+One new defect at the minimum window, filed as **QA-101**: block titles truncate to a single
+letter at 1024 (`I...`, `R...`, `L...`). Import/export findings are under QA-088 and QA-100.
+
+Shots: `.claude/qa/shots/UX-007-after-blocks-1280.png`,
+`.claude/qa/shots/UX-007-after-blocks-1024x600.png`,
+`.claude/qa/shots/UX-007-after-blocks-search-empty.png`.
+
