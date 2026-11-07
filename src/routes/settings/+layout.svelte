@@ -4,10 +4,10 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/state';
-  import { goto } from '$app/navigation';
   import type { Snippet } from 'svelte';
-  import SettingsNavigation from '$lib/domains/settings/components/SettingsNavigation.svelte';
+  import SettingsNavigation, {
+    activeSectionLabel,
+  } from '$lib/domains/settings/components/SettingsNavigation.svelte';
   import ShellSidebarLayout from '$lib/components/shell/shell-sidebar-layout.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
   import {
@@ -18,18 +18,17 @@
   } from '$lib/domains/settings/stores/settingsStore';
   import { Button } from '$lib/components/ui/button';
   import { Card } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
   import Settings from '~icons/fa6-solid/gear';
   import Download from '~icons/fa6-solid/download';
   import RotateCcw from '~icons/fa6-solid/rotate-left';
   import Save from '~icons/fa6-solid/floppy-disk';
-  import RefreshCw from '~icons/fa6-solid/rotate';
   import Loader2 from '~icons/fa6-solid/spinner';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { logger } from '$lib/domains/shared';
   import { PageLoading, PageError } from '$lib/components/shell';
   import { get } from 'svelte/store';
+  import { page } from '$app/state';
 
   // Get children snippet from props for Svelte 5
   let { children }: { children: Snippet<[]> } = $props();
@@ -37,18 +36,6 @@
   let isSaving = $state(false);
   let isExporting = $state(false);
   let isResetting = $state(false);
-
-  // Get current section from URL
-  let currentSection = $derived.by(() => {
-    const path = page.url.pathname;
-    if (path === '/settings' || path === '/settings/') return 'general' as const;
-    const section = path.replace('/settings/', '').replace(/\/$/, '');
-    // Redirect framework-ides to ides
-    if (section === 'framework-ides') return 'ides' as const;
-    if (section.startsWith('ai')) return 'ai' as const;
-    return (section || 'general') as
-      'general' | 'editor' | 'terminal' | 'theme' | 'ides' | 'ai' | 'github' | 'updates';
-  });
 
   onMount(async () => {
     // Only load if settings haven't been loaded yet
@@ -141,18 +128,7 @@
     }
   }
 
-  function getSettingsStats(settingsData: NonNullable<typeof $settings>) {
-    const total = 7; // general, editor, terminal, theme, ides, frameworks, package-managers, languages (framework mappings included)
-    let configured = 0;
-
-    if (settingsData.app) configured++;
-    if (settingsData.editor) configured++;
-    if (settingsData.terminal) configured++;
-    if (settingsData.theme) configured++;
-    // IDEs and Framework IDEs are managed separately via services
-
-    return { total, configured };
-  }
+  const sectionLabel = $derived(activeSectionLabel(page.url.pathname));
 </script>
 
 <svelte:head>
@@ -167,12 +143,12 @@
     <div
       class="flex flex-col gap-3 px-4 py-4 md:px-6 xl:flex-row xl:items-center xl:justify-between 3xl:px-8"
     >
-      <div class="min-w-0">
+      <div class="flex min-w-0 flex-wrap items-baseline gap-x-3">
         <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Settings class="h-6 w-6" />
-          Settings
+          Settings{sectionLabel ? ` › ${sectionLabel}` : ''}
         </h1>
-        <p class="mt-1 text-sm text-muted-foreground">
+        <p class="text-sm text-muted-foreground">
           Configure your application preferences and behavior
         </p>
       </div>
@@ -203,22 +179,13 @@
         </Button>
       </div>
     </div>
-
-    <!-- Settings Stats Bar (space reserved so chips appearing after load don't shift layout) -->
-    <div class="flex min-h-[2.75rem] flex-wrap items-center gap-2 px-4 pb-4 md:px-6 3xl:px-8">
-      {#if $settings}
-        {@const stats = getSettingsStats($settings)}
-        <Badge variant="outline">Configured: {stats.configured}/{stats.total}</Badge>
-        <Badge variant="outline">Language: {$settings.app?.language || 'en'}</Badge>
-      {/if}
-    </div>
   </div>
 
   <ShellSidebarLayout mobileTriggerLabel="Settings menu">
     {#snippet sidebar()}
       <div class="p-4">
-        <Card class="p-3">
-          <SettingsNavigation {currentSection} />
+        <Card class="w-full gap-0 overflow-hidden p-1.5">
+          <SettingsNavigation />
         </Card>
       </div>
     {/snippet}

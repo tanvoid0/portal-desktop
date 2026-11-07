@@ -5,23 +5,37 @@
   interface Props {
     title: string;
     description?: string;
+    /** Richer alternative to `description` — e.g. a path with a copy button. */
+    subtitle?: Snippet;
     badge?: string;
+    /** Lets a page keep a status colour on its badge — e.g. `default` while running. */
+    badgeVariant?: 'default' | 'secondary' | 'destructive' | 'outline';
     actions?: Snippet;
   }
 
-  let { title, description, badge, actions }: Props = $props();
+  let {
+    title,
+    description,
+    subtitle,
+    badge,
+    badgeVariant = 'secondary',
+    actions,
+  }: Props = $props();
 </script>
 
 <div class="flex items-center justify-between gap-4">
-  <div>
-    <div class="flex items-center gap-2">
-      <h1 class="text-3xl font-bold">{title}</h1>
-      {#if badge}
-        <Badge variant="secondary">{badge}</Badge>
-      {/if}
-    </div>
+  <div class="flex min-w-0 items-center gap-2">
+    <h1 class="shrink-0 text-xl font-semibold">{title}</h1>
+    {#if badge}
+      <Badge variant={badgeVariant}>{badge}</Badge>
+    {/if}
     {#if description}
-      <p class="text-muted-foreground">{description}</p>
+      <span class="hidden text-muted-foreground/40 sm:inline" aria-hidden="true">|</span>
+      <p class="hidden min-w-0 truncate text-sm text-muted-foreground sm:block">{description}</p>
+    {/if}
+    {#if subtitle}
+      <span class="hidden text-muted-foreground/40 sm:inline" aria-hidden="true">|</span>
+      <div class="hidden min-w-0 items-center sm:flex">{@render subtitle()}</div>
     {/if}
   </div>
   {#if actions}

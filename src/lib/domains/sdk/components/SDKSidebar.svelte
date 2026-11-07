@@ -1,10 +1,13 @@
 <!--
 	SDK Sidebar - FlyEnv-style sidebar with language and database categories
 	Shows all available SDKs with toggle switches and selection states
+
+	One tree for both sidebar states: the collapsed rail is expressed in CSS with
+	`group-data-[collapsible=icon]:*`, the same mechanism as
+	src/lib/components/layout/app-shell.svelte.
 -->
 
 <script lang="ts">
-  import { Button } from '$lib/components/ui/button';
   import { ScrollArea } from '$lib/components/ui/scroll-area';
   import { Separator } from '$lib/components/ui/separator';
   import Settings from '~icons/fa6-solid/gear';
@@ -30,10 +33,8 @@
 
   interface Props {
     selectedSDK?: string;
-    selectedView?: string;
     navigationItemIds?: string[];
     onSDKSelect?: (sdk: SDKItem) => void;
-    onViewSelect?: (view: string) => void;
   }
 
   interface SDKManager {
@@ -48,17 +49,13 @@
     website: string | null;
   }
 
-  const {
-    selectedSDK,
-    selectedView = 'overview',
-    navigationItemIds,
-    onSDKSelect,
-    onViewSelect,
-  }: Props = $props();
+  const { selectedSDK, navigationItemIds, onSDKSelect }: Props = $props();
 
   // State
-  let currentPath = $derived(page.url.pathname);
+  const currentPath = $derived(page.url.pathname);
   const sidebar = useSidebar();
+  // The rail only exists on the desktop sidebar; the mobile sheet is always full width.
+  const railMode = $derived(sidebar.state === 'collapsed' && !sidebar.isMobile);
   let serviceToggleInFlight = $state<Set<string>>(new Set());
   let openSections = $state<Record<string, boolean>>({
     manager: false,
@@ -75,8 +72,7 @@
   const queryClient = useQueryClient();
   const sdkConfigs = $derived<ProcessedSDKConfig[]>(configsQuery.data ?? []);
   const sdkManagers = $derived<SDKManager[]>(managersQuery.data ?? []);
-  const loading = $derived(configsQuery.isPending);
-  const managersLoading = $derived(managersQuery.isPending);
+  const sidebarLoading = $derived(configsQuery.isPending || managersQuery.isPending);
 
   function refreshSDKConfigsSilent() {
     return queryClient.invalidateQueries({ queryKey: queryKeys.sdk.configs });
@@ -86,7 +82,7 @@
   type NavigationItem = {
     id: string;
     name: string;
-    icon: string;
+    icon: typeof Settings;
     description: string;
   };
 
@@ -94,32 +90,32 @@
     {
       id: '/sdk',
       name: 'Overview',
-      icon: 'lucide:layout-dashboard',
+      icon: Settings,
       description: 'SDK overview and statistics',
     },
     {
-      id: '/sdk/manager',
+      id: '/sdk/managers',
       name: 'SDK Managers',
-      icon: 'lucide:settings',
+      icon: Settings,
       description: 'Manage SDK version managers',
     },
     {
-      id: '/sdk/software-installer',
-      name: 'Software Installer',
-      icon: 'lucide:package',
-      description: 'Install and manage software via package managers',
+      id: '/sdk/services',
+      name: 'Services',
+      icon: Package,
+      description: 'Start and stop SDK services',
     },
     {
-      id: '/sdk/installations',
-      name: 'Installations',
-      icon: 'lucide:download',
-      description: 'View installed SDKs and versions',
+      id: '/sdk/versions',
+      name: 'Versions',
+      icon: Download,
+      description: 'Install and switch SDK versions',
     },
   ];
 
   // Allow the parent layout to trim the sidebar navigation per-section.
   // This keeps the sidebar reusable and avoids page-specific nav markup.
-  let resolvedNavigationItems = $derived.by((): NavigationItem[] =>
+  const resolvedNavigationItems = $derived.by((): NavigationItem[] =>
     navigationItemIds?.length
       ? navigationItems.filter((item) => navigationItemIds.includes(item.id))
       : navigationItems
@@ -131,187 +127,95 @@
 
     const normalizedItemId = itemId.endsWith('/') && itemId !== '/' ? itemId.slice(0, -1) : itemId;
 
-    // Overview should be active for the whole SDK section.
-    if (normalizedItemId === '/sdk') {
-      return (
-        normalizedCurrentPath === normalizedItemId || normalizedCurrentPath.startsWith('/sdk/')
-      );
-    }
-
     // Mark the parent route as active for nested SDK-manager pages.
-    if (normalizedItemId === '/sdk/manager') {
+    if (normalizedItemId === '/sdk/managers') {
       return (
         normalizedCurrentPath === normalizedItemId ||
         normalizedCurrentPath.startsWith(`${normalizedItemId}/`)
       );
     }
 
-    if (normalizedItemId === '/sdk/software-installer') {
-      return normalizedCurrentPath === normalizedItemId;
-    }
-
-    if (normalizedItemId === '/sdk/installations') {
-      return normalizedCurrentPath === normalizedItemId;
-    }
-
     return normalizedCurrentPath === normalizedItemId;
   }
 
-  // Convert SDK configs to SDKItem format
-  let languageSDKs = $derived.by(() => {
+  /**
+   * Convert SDK configs to SDKItem format. Languages are the one category that
+   * can report a version through an installed SDK manager.
+   */
+  function toSDKItems(category: string, viaManagers = false): SDKItem[] {
     return sdkConfigs
-      .filter((config) => config.category === 'language')
+      .filter((config) => config.category === category)
       .map((config) => {
-        // Get version, preferring SDK version over manager version
         const rawVersion =
-          config.sdk_version || config.sdk_managers.find((m) => m.installed)?.version || null;
-        // Format version (remove 'v' prefix if present, but keep it clean)
-        const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
+          config.sdk_version ||
+          (viaManagers ? config.sdk_managers.find((m) => m.installed)?.version : null);
 
         return {
           id: config.id,
           name: config.name,
           displayName: config.display_name,
           icon: config.icon,
-          category: 'language',
-          installed: config.sdk_installed || config.sdk_managers.some((m) => m.installed) || false,
+          category,
+          installed:
+            config.sdk_installed ||
+            (viaManagers && config.sdk_managers.some((m) => m.installed)) ||
+            false,
           enabled: true,
-          version: version || undefined,
+          version: (rawVersion ?? '').trim().replace(/^v/, '') || undefined,
           description: config.description,
           hasToggle: true,
           hasService: config.service_config != null,
           serviceRunning: config.service_running ?? null,
           port: config.service_port ?? null,
-        };
+        } satisfies SDKItem;
       });
-  });
+  }
 
-  let managerSDKs = $derived.by(() => {
-    return sdkManagers.map((m) => {
-      const rawVersion = m.version ? m.version.trim() : null;
-      const version = rawVersion ? rawVersion.replace(/^v/, '') : null;
+  type SDKCategory = { key: string; title: string; icon: typeof Settings; items: SDKItem[] };
 
-      return {
-        id: m.id,
-        name: m.name ?? m.id,
-        displayName: m.display_name ?? m.name ?? m.id,
-        icon: getSDKIcon(m.id),
-        category: 'manager',
-        installed: m.installed,
-        enabled: true,
-        version: version || undefined,
-        description: undefined,
-        hasToggle: false,
-        hasService: false,
-        serviceRunning: null,
-        port: null,
-      } as SDKItem;
-    });
-  });
+  const categories = $derived.by((): SDKCategory[] => [
+    {
+      key: 'manager',
+      title: 'SDK Managers',
+      icon: Settings,
+      items: sdkManagers.map(
+        (m) =>
+          ({
+            id: m.id,
+            name: m.name ?? m.id,
+            displayName: m.display_name ?? m.name ?? m.id,
+            icon: getSDKIcon(m.id),
+            category: 'manager',
+            installed: m.installed,
+            enabled: true,
+            version: (m.version ?? '').trim().replace(/^v/, '') || undefined,
+            description: undefined,
+            hasToggle: false,
+            hasService: false,
+            serviceRunning: null,
+            port: null,
+          }) satisfies SDKItem
+      ),
+    },
+    {
+      key: 'language',
+      title: 'Language & Runtime',
+      icon: Code,
+      items: toSDKItems('language', true),
+    },
+    { key: 'database', title: 'Database Server', icon: Database, items: toSDKItems('database') },
+    { key: 'web', title: 'Web Server', icon: Globe, items: toSDKItems('server') },
+    {
+      key: 'container',
+      title: 'Container Platform',
+      icon: Container,
+      items: toSDKItems('container'),
+    },
+    { key: 'ai', title: 'AI SDKs', icon: Code, items: toSDKItems('ai') },
+  ]);
 
-  let databaseSDKs = $derived.by(() => {
-    return sdkConfigs
-      .filter((config) => config.category === 'database')
-      .map((config) => {
-        // Get version, preferring SDK version
-        const rawVersion = config.sdk_version || null;
-        const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
-
-        return {
-          id: config.id,
-          name: config.name,
-          displayName: config.display_name,
-          icon: config.icon,
-          category: 'database',
-          installed: config.sdk_installed || false,
-          enabled: true,
-          version: version || undefined,
-          description: config.description,
-          hasToggle: true,
-          hasService: config.service_config != null,
-          serviceRunning: config.service_running ?? null,
-          port: config.service_port ?? null,
-        } as SDKItem;
-      });
-  });
-
-  let webServerSDKs = $derived.by(() => {
-    return sdkConfigs
-      .filter((config) => config.category === 'server')
-      .map((config) => {
-        // Get version, preferring SDK version
-        const rawVersion = config.sdk_version || null;
-        const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
-
-        return {
-          id: config.id,
-          name: config.name,
-          displayName: config.display_name,
-          icon: config.icon,
-          category: 'server',
-          installed: config.sdk_installed || false,
-          enabled: true,
-          version: version || undefined,
-          description: config.description,
-          hasToggle: true,
-          hasService: config.service_config != null,
-          serviceRunning: config.service_running ?? null,
-          port: config.service_port ?? null,
-        } as SDKItem;
-      });
-  });
-
-  let containerSDKs = $derived.by(() => {
-    return sdkConfigs
-      .filter((config) => config.category === 'container')
-      .map((config) => {
-        // Get version, preferring SDK version
-        const rawVersion = config.sdk_version || null;
-        const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
-
-        return {
-          id: config.id,
-          name: config.name,
-          displayName: config.display_name,
-          icon: config.icon,
-          category: 'container',
-          installed: config.sdk_installed || false,
-          enabled: true,
-          version: version || undefined,
-          description: config.description,
-          hasToggle: true,
-          hasService: config.service_config != null,
-          serviceRunning: config.service_running ?? null,
-          port: config.service_port ?? null,
-        } as SDKItem;
-      });
-  });
-
-  let aiSDKs = $derived.by(() => {
-    return sdkConfigs
-      .filter((config) => config.category === 'ai')
-      .map((config) => {
-        // Get version, preferring SDK version
-        const rawVersion = config.sdk_version || null;
-        const version = rawVersion ? rawVersion.trim().replace(/^v/, '') : null;
-
-        return {
-          id: config.id,
-          name: config.name,
-          displayName: config.display_name,
-          icon: config.icon,
-          category: 'ai',
-          installed: config.sdk_installed || false,
-          enabled: true,
-          version: version || undefined,
-          description: config.description,
-          hasToggle: true,
-          hasService: config.service_config != null,
-          serviceRunning: config.service_running ?? null,
-          port: config.service_port ?? null,
-        } as SDKItem;
-      });
-  });
+  const visibleCategories = $derived(categories.filter((c) => c.items.length > 0));
+  const allSDKs = $derived(categories.flatMap((c) => c.items));
 
   function isServiceToggleDisabled(sdk: SDKItem) {
     return (
@@ -322,26 +226,10 @@
     );
   }
 
-  function isSelectedInCategory(category: string) {
-    if (!selectedItem) return false;
-    const listForCategory =
-      category === 'manager'
-        ? managerSDKs
-        : category === 'language'
-          ? languageSDKs
-          : category === 'database'
-            ? databaseSDKs
-            : category === 'web'
-              ? webServerSDKs
-              : category === 'container'
-                ? containerSDKs
-                : aiSDKs;
-    return listForCategory.some((s) => s.id === selectedItem);
-  }
-
-  function toggleSection(category: string) {
-    if (isSelectedInCategory(category)) return;
-    openSections = { ...openSections, [category]: !openSections[category] };
+  function toggleSection(category: SDKCategory) {
+    // The selected SDK's category stays open.
+    if (category.items.some((s) => s.id === selectedItem)) return;
+    openSections = { ...openSections, [category.key]: !openSections[category.key] };
   }
 
   async function setServiceRunning(sdk: SDKItem, running: boolean) {
@@ -367,16 +255,6 @@
     }
   }
 
-  // Reactive state
-  let allSDKs = $derived([
-    ...managerSDKs,
-    ...languageSDKs,
-    ...databaseSDKs,
-    ...webServerSDKs,
-    ...containerSDKs,
-    ...aiSDKs,
-  ]);
-
   let selectedItem = $state<string | null>(null);
 
   $effect(() => {
@@ -388,61 +266,35 @@
     if (!selectedItem) return;
     if (selectedItem === lastSelectedItemId) return;
 
-    if (managerSDKs.some((s) => s.id === selectedItem)) {
-      openSections = { ...openSections, manager: true };
+    const open = { ...openSections };
+    for (const category of categories) {
+      if (category.items.some((s) => s.id === selectedItem)) open[category.key] = true;
     }
-    if (languageSDKs.some((s) => s.id === selectedItem)) {
-      openSections = { ...openSections, language: true };
-    }
-    if (databaseSDKs.some((s) => s.id === selectedItem)) {
-      openSections = { ...openSections, database: true };
-    }
-    if (webServerSDKs.some((s) => s.id === selectedItem)) {
-      openSections = { ...openSections, web: true };
-    }
-    if (containerSDKs.some((s) => s.id === selectedItem)) {
-      openSections = { ...openSections, container: true };
-    }
-    if (aiSDKs.some((s) => s.id === selectedItem)) {
-      openSections = { ...openSections, ai: true };
-    }
+    openSections = open;
 
     lastSelectedItemId = selectedItem;
   });
 
   // If nothing is selected yet, show something by default.
   $effect(() => {
-    if (loading || managersLoading) return;
+    if (sidebarLoading) return;
     if (selectedItem) return;
     if (openSections.language) return;
-    const hasManagers = managerSDKs.length > 0;
-    const hasLanguageSDKs = languageSDKs.length > 0;
     openSections = {
       ...openSections,
-      language: hasLanguageSDKs,
-      manager: hasManagers,
+      language: categories.some((c) => c.key === 'language' && c.items.length > 0),
+      manager: categories.some((c) => c.key === 'manager' && c.items.length > 0),
     };
   });
-
-  // Category icons
-  const categoryIcons = {
-    language: Code,
-    database: Database,
-    web: Globe,
-    container: Container,
-    package: Package,
-  };
-
-  let sidebarLoading = $derived(loading || managersLoading);
 
   // Map SDK types to their route paths - use dynamic route
   function getSDKRoute(sdkId: string, category: string): string {
     // Normalize SDK ID for routing
     const normalizedId = sdkId.toLowerCase().trim();
 
-    // SDK Managers go to /sdk/manager/[name] (singular, matches route structure)
+    // SDK Managers go to /sdk/managers/[name]
     if (category === 'manager') {
-      return `/sdk/manager/${normalizedId}`;
+      return `/sdk/managers/${normalizedId}`;
     }
 
     // Use the new dynamic route for all SDKs (language, database, ai, server, container, etc.)
@@ -468,21 +320,6 @@
         route,
       },
     });
-  }
-
-  function getCategoryIcon(category: string) {
-    return categoryIcons[category as keyof typeof categoryIcons] || Code;
-  }
-
-  function getCategoryName(category: string) {
-    const names: Record<string, string> = {
-      language: 'Language & Runtime',
-      database: 'Database Server',
-      web: 'Web Server',
-      container: 'Container Platform',
-      package: 'Package Manager',
-    };
-    return names[category] || category;
   }
 
   function getSDKIcon(sdkType: string): string {
@@ -598,357 +435,101 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden">
-  {#if sidebar.state === 'collapsed'}
-    <!-- Header (icon-only) -->
-    <div class="divider-edge-b divider-edge-full flex-shrink-0 p-1">
-      <SidebarMenuButton
-        size="sm"
-        tooltipContent="Back to Portal Desktop"
-        onclick={() => goto('/')}
-      >
-        <ArrowLeft class="h-4 w-4" />
-      </SidebarMenuButton>
-    </div>
+  <!-- Header -->
+  <div
+    class="divider-edge-b divider-edge-full flex-shrink-0 bg-background p-3 group-data-[collapsible=icon]:p-1"
+  >
+    <SidebarMenuButton size="sm" tooltipContent="Back to Portal Desktop" onclick={() => goto('/')}>
+      <ArrowLeft class="h-4 w-4" />
+      <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+        <span class="block truncate text-base font-semibold">SDK Manager</span>
+        <span class="block truncate text-xs text-muted-foreground"
+          >Manage your development environment</span
+        >
+      </span>
+    </SidebarMenuButton>
+  </div>
 
-    <!-- Sidebar Content -->
-    <ScrollArea class="min-h-0 flex-1 overflow-hidden">
-      <div class="space-y-3 p-1">
-        <!-- Navigation Section (icon-only) -->
+  <!-- Sidebar Content -->
+  <ScrollArea class="min-h-0 flex-1 overflow-hidden">
+    <div
+      class="space-y-4 p-3 group-data-[collapsible=icon]:space-y-3 group-data-[collapsible=icon]:p-1"
+    >
+      <!-- Navigation Section -->
+      <div class="space-y-2">
+        <h3 class="text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">
+          Navigation
+        </h3>
         <div class="space-y-0.5">
           {#each resolvedNavigationItems as item}
+            {@const Icon = item.icon}
             <SidebarMenuButton
               size="sm"
+              class="h-auto"
               isActive={isNavigationItemActive(item.id)}
               tooltipContent={item.name}
               onclick={() => goto(item.id)}
             >
-              <div class="flex h-4 w-4 items-center justify-center">
-                {#if item.icon === 'lucide:layout-dashboard'}
-                  <Settings class="h-4 w-4" />
-                {:else if item.icon === 'lucide:settings'}
-                  <Settings class="h-4 w-4" />
-                {:else if item.icon === 'lucide:download'}
-                  <Download class="h-4 w-4" />
-                {:else if item.icon === 'lucide:package'}
-                  <Package class="h-4 w-4" />
-                {/if}
-              </div>
+              <Icon class="h-4 w-4" />
+              <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                <span class="block truncate text-xs font-medium">{item.name}</span>
+                <span class="block truncate text-xs text-muted-foreground">{item.description}</span>
+              </span>
             </SidebarMenuButton>
           {/each}
         </div>
+      </div>
 
-        <Separator />
+      <Separator />
 
+      {#if sidebarLoading}
+        <div class="py-4 text-center text-muted-foreground">
+          <div class="mb-2 text-xl">⏳</div>
+          <h3 class="mb-1 text-sm font-medium">Loading SDKs...</h3>
+        </div>
+      {:else if visibleCategories.length === 0}
+        <div class="py-4 text-center text-muted-foreground">
+          <div class="mb-2 text-xl">🔍</div>
+          <h3 class="mb-1 text-sm font-medium">No SDKs Detected</h3>
+          <p class="text-xs group-data-[collapsible=icon]:hidden">
+            No SDK managers or SDKs were found on your system. Install SDK managers like NVM, Pyenv,
+            or SDKMAN to get started.
+          </p>
+        </div>
+      {:else}
+        {#each visibleCategories as category, index (category.key)}
+          {#if index > 0}
+            <Separator />
+          {/if}
+          <SDKCategorySection
+            variant={railMode ? 'collapsed' : 'expanded'}
+            title={category.title}
+            iconComponent={category.icon}
+            items={category.items}
+            selectedItemId={selectedItem}
+            collapsible={true}
+            isOpen={openSections[category.key]}
+            onToggle={() => toggleSection(category)}
+            {getSDKIconColor}
+            {isServiceToggleDisabled}
+            onSDKClick={(sdk) => handleSDKClick(sdk)}
+            onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
+          />
+        {/each}
+      {/if}
+    </div>
+  </ScrollArea>
+
+  <!-- Footer -->
+  <div class="divider-edge-t divider-edge-full p-3 group-data-[collapsible=icon]:hidden">
+    <div class="space-y-1 text-center text-xs text-muted-foreground">
+      <div>
         {#if sidebarLoading}
-          <div class="py-4 text-center text-muted-foreground">
-            <div class="mb-1 text-xl">⏳</div>
-            <h3 class="text-sm font-medium">Loading SDKs...</h3>
-          </div>
-        {:else if managerSDKs.length === 0 && languageSDKs.length === 0 && databaseSDKs.length === 0 && webServerSDKs.length === 0 && containerSDKs.length === 0 && aiSDKs.length === 0}
-          <div class="py-4 text-center text-muted-foreground">
-            <div class="mb-1 text-xl">🔍</div>
-            <h3 class="mb-1 text-sm font-medium">No SDKs Detected</h3>
-            <p class="text-xs">Install SDK managers like NVM, Pyenv, or SDKMAN to get started.</p>
-          </div>
+          Loading SDKs...
         {:else}
-          {#if managerSDKs.length > 0}
-            <SDKCategorySection
-              variant="collapsed"
-              title="SDK Managers"
-              iconComponent={Settings}
-              items={managerSDKs}
-              selectedItemId={selectedItem}
-              collapsible={true}
-              isOpen={openSections.manager}
-              onToggle={() => toggleSection('manager')}
-              {getSDKIconColor}
-              {isServiceToggleDisabled}
-              onSDKClick={(sdk) => handleSDKClick(sdk)}
-              onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-            />
-            {#if languageSDKs.length > 0}
-              <Separator />
-            {/if}
-          {/if}
-
-          {#if languageSDKs.length > 0}
-            <SDKCategorySection
-              variant="collapsed"
-              title={getCategoryName('language')}
-              iconComponent={getCategoryIcon('language')}
-              items={languageSDKs}
-              selectedItemId={selectedItem}
-              collapsible={true}
-              isOpen={openSections.language}
-              onToggle={() => toggleSection('language')}
-              {getSDKIconColor}
-              {isServiceToggleDisabled}
-              onSDKClick={(sdk) => handleSDKClick(sdk)}
-              onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-            />
-          {/if}
-
-          {#if databaseSDKs.length > 0}
-            <Separator />
-            <SDKCategorySection
-              variant="collapsed"
-              title={getCategoryName('database')}
-              iconComponent={getCategoryIcon('database')}
-              items={databaseSDKs}
-              selectedItemId={selectedItem}
-              collapsible={true}
-              isOpen={openSections.database}
-              onToggle={() => toggleSection('database')}
-              {getSDKIconColor}
-              {isServiceToggleDisabled}
-              onSDKClick={(sdk) => handleSDKClick(sdk)}
-              onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-            />
-          {/if}
-
-          {#if webServerSDKs.length > 0}
-            <Separator />
-            <SDKCategorySection
-              variant="collapsed"
-              title={getCategoryName('web')}
-              iconComponent={getCategoryIcon('web')}
-              items={webServerSDKs}
-              selectedItemId={selectedItem}
-              collapsible={true}
-              isOpen={openSections.web}
-              onToggle={() => toggleSection('web')}
-              {getSDKIconColor}
-              {isServiceToggleDisabled}
-              onSDKClick={(sdk) => handleSDKClick(sdk)}
-              onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-            />
-          {/if}
-
-          {#if containerSDKs.length > 0}
-            <Separator />
-            <SDKCategorySection
-              variant="collapsed"
-              title={getCategoryName('container')}
-              iconComponent={getCategoryIcon('container')}
-              items={containerSDKs}
-              selectedItemId={selectedItem}
-              collapsible={true}
-              isOpen={openSections.container}
-              onToggle={() => toggleSection('container')}
-              {getSDKIconColor}
-              {isServiceToggleDisabled}
-              onSDKClick={(sdk) => handleSDKClick(sdk)}
-              onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-            />
-          {/if}
-
-          {#if aiSDKs.length > 0}
-            <Separator />
-            <SDKCategorySection
-              variant="collapsed"
-              title="AI SDKs"
-              iconComponent={getCategoryIcon('ai')}
-              items={aiSDKs}
-              selectedItemId={selectedItem}
-              collapsible={true}
-              isOpen={openSections.ai}
-              onToggle={() => toggleSection('ai')}
-              {getSDKIconColor}
-              {isServiceToggleDisabled}
-              onSDKClick={(sdk) => handleSDKClick(sdk)}
-              onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-            />
-          {/if}
+          {allSDKs.filter((sdk) => sdk.installed).length} of {allSDKs.length} SDKs
         {/if}
-      </div>
-    </ScrollArea>
-  {:else}
-    <!-- Header -->
-    <div class="divider-edge-b divider-edge-full flex-shrink-0 bg-background p-3">
-      <h2 class="text-base font-semibold">SDK Manager</h2>
-      <p class="text-xs text-muted-foreground">Manage your development environment</p>
-    </div>
-
-    <!-- Sidebar Content -->
-    <ScrollArea class="min-h-0 flex-1 overflow-hidden">
-      <div class="space-y-4 p-3">
-        <!-- Navigation Section -->
-        <div class="space-y-2">
-          <h3 class="text-xs font-medium text-muted-foreground">Navigation</h3>
-          <div class="space-y-0.5">
-            {#each resolvedNavigationItems as item}
-              <Button
-                variant="ghost"
-                class="flex h-auto w-full cursor-pointer items-center gap-2 rounded-md p-1.5 text-left {isNavigationItemActive(
-                  item.id
-                )
-                  ? 'bg-muted'
-                  : ''}"
-                onclick={() => goto(item.id)}
-              >
-                <div class="flex h-4 w-4 items-center justify-center">
-                  {#if item.icon === 'lucide:layout-dashboard'}
-                    <Settings class="h-4 w-4" />
-                  {:else if item.icon === 'lucide:settings'}
-                    <Settings class="h-4 w-4" />
-                  {:else if item.icon === 'lucide:download'}
-                    <Download class="h-4 w-4" />
-                  {:else if item.icon === 'lucide:package'}
-                    <Package class="h-4 w-4" />
-                  {/if}
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="truncate text-xs font-medium">{item.name}</div>
-                  <div class="truncate text-xs text-muted-foreground">
-                    {item.description}
-                  </div>
-                </div>
-              </Button>
-            {/each}
-          </div>
-        </div>
-
-        <Separator />
-
-        {#if managerSDKs.length > 0}
-          <SDKCategorySection
-            variant="expanded"
-            title="SDK Managers"
-            iconComponent={Settings}
-            items={managerSDKs}
-            selectedItemId={selectedItem}
-            collapsible={true}
-            isOpen={openSections.manager}
-            onToggle={() => toggleSection('manager')}
-            {getSDKIconColor}
-            {isServiceToggleDisabled}
-            onSDKClick={(sdk) => handleSDKClick(sdk)}
-            onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-          />
-        {/if}
-
-        {#if languageSDKs.length > 0}
-          <SDKCategorySection
-            variant="expanded"
-            title={getCategoryName('language')}
-            iconComponent={getCategoryIcon('language')}
-            items={languageSDKs}
-            selectedItemId={selectedItem}
-            collapsible={true}
-            isOpen={openSections.language}
-            onToggle={() => toggleSection('language')}
-            {getSDKIconColor}
-            {isServiceToggleDisabled}
-            onSDKClick={(sdk) => handleSDKClick(sdk)}
-            onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-          />
-        {/if}
-
-        <Separator />
-
-        {#if databaseSDKs.length > 0}
-          <SDKCategorySection
-            variant="expanded"
-            title={getCategoryName('database')}
-            iconComponent={getCategoryIcon('database')}
-            items={databaseSDKs}
-            selectedItemId={selectedItem}
-            collapsible={true}
-            isOpen={openSections.database}
-            onToggle={() => toggleSection('database')}
-            {getSDKIconColor}
-            {isServiceToggleDisabled}
-            onSDKClick={(sdk) => handleSDKClick(sdk)}
-            onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-          />
-        {/if}
-
-        <Separator />
-
-        {#if webServerSDKs.length > 0}
-          <SDKCategorySection
-            variant="expanded"
-            title={getCategoryName('web')}
-            iconComponent={getCategoryIcon('web')}
-            items={webServerSDKs}
-            selectedItemId={selectedItem}
-            collapsible={true}
-            isOpen={openSections.web}
-            onToggle={() => toggleSection('web')}
-            {getSDKIconColor}
-            {isServiceToggleDisabled}
-            onSDKClick={(sdk) => handleSDKClick(sdk)}
-            onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-          />
-        {/if}
-
-        <Separator />
-
-        {#if containerSDKs.length > 0}
-          <SDKCategorySection
-            variant="expanded"
-            title={getCategoryName('container')}
-            iconComponent={getCategoryIcon('container')}
-            items={containerSDKs}
-            selectedItemId={selectedItem}
-            collapsible={true}
-            isOpen={openSections.container}
-            onToggle={() => toggleSection('container')}
-            {getSDKIconColor}
-            {isServiceToggleDisabled}
-            onSDKClick={(sdk) => handleSDKClick(sdk)}
-            onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-          />
-        {/if}
-
-        {#if aiSDKs.length > 0}
-          <SDKCategorySection
-            variant="expanded"
-            title="AI SDKs"
-            iconComponent={getCategoryIcon('ai')}
-            items={aiSDKs}
-            selectedItemId={selectedItem}
-            collapsible={true}
-            isOpen={openSections.ai}
-            onToggle={() => toggleSection('ai')}
-            {getSDKIconColor}
-            {isServiceToggleDisabled}
-            onSDKClick={(sdk) => handleSDKClick(sdk)}
-            onServiceToggle={(sdk, next) => setServiceRunning(sdk, next)}
-          />
-          <Separator />
-        {/if}
-
-        <!-- No Data Fallback -->
-        {#if sidebarLoading}
-          <div class="py-4 text-center text-muted-foreground">
-            <div class="mb-2 text-xl">⏳</div>
-            <h3 class="mb-1 text-sm font-medium">Loading SDKs...</h3>
-          </div>
-        {:else if managerSDKs.length === 0 && languageSDKs.length === 0 && databaseSDKs.length === 0 && webServerSDKs.length === 0 && containerSDKs.length === 0 && aiSDKs.length === 0}
-          <div class="py-4 text-center text-muted-foreground">
-            <div class="mb-2 text-xl">🔍</div>
-            <h3 class="mb-1 text-sm font-medium">No SDKs Detected</h3>
-            <p class="text-xs">
-              No SDK managers or SDKs were found on your system. Install SDK managers like NVM,
-              Pyenv, or SDKMAN to get started.
-            </p>
-          </div>
-        {/if}
-      </div>
-    </ScrollArea>
-
-    <!-- Footer -->
-    <div class="divider-edge-t divider-edge-full p-3">
-      <div class="space-y-1 text-center text-xs text-muted-foreground">
-        <div>
-          {#if sidebarLoading}
-            Loading SDKs...
-          {:else}
-            {allSDKs.filter((sdk) => sdk.installed).length} of {allSDKs.length} SDKs
-          {/if}
-        </div>
       </div>
     </div>
-  {/if}
+  </div>
 </div>

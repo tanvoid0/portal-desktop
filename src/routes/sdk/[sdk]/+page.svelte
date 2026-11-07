@@ -20,7 +20,7 @@
   import Trash2 from '~icons/fa6-solid/trash';
   import Devicon from '$lib/components/ui/devicon.svelte';
   import { goto } from '$app/navigation';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import {
@@ -151,43 +151,39 @@
     {@const isServiceStatusKnown =
       sdkConfig.service_running !== null && sdkConfig.service_running !== undefined}
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <Devicon icon={sdkConfig.icon} class="h-12 w-12" />
-          <div>
-            <h1 class="text-3xl font-bold">{sdkConfig.display_name}</h1>
-            <p class="text-muted-foreground">{sdkConfig.description}</p>
-          </div>
-        </div>
-        <!-- Status Badge in top right -->
-        <div class="flex items-center gap-2">
-          {#if isInstalled}
-            <Badge variant="default" class="bg-green-100 text-green-800">
-              <CheckCircle class="mr-1 h-3 w-3" />
-              Installed
-              {#if displayVersion}
-                <span class="ml-1">({displayVersion})</span>
+      <div class="flex items-center gap-3">
+        <Devicon icon={sdkConfig.icon} class="h-8 w-8 shrink-0" />
+        <div class="min-w-0 flex-1">
+          <PageHeader title={sdkConfig.display_name} description={sdkConfig.description}>
+            {#snippet actions()}
+              {#if isInstalled}
+                <Badge variant="default" class="bg-green-100 text-green-800">
+                  <CheckCircle class="mr-1 h-3 w-3" />
+                  Installed
+                  {#if displayVersion}
+                    <span class="ml-1">({displayVersion})</span>
+                  {/if}
+                </Badge>
+              {:else}
+                <Badge variant="outline">
+                  <XCircle class="mr-1 h-3 w-3" />
+                  Not Installed
+                </Badge>
               {/if}
-            </Badge>
-          {:else}
-            <Badge variant="outline">
-              <XCircle class="mr-1 h-3 w-3" />
-              Not Installed
-            </Badge>
-          {/if}
-          {#if port}
-            <Badge variant="outline" class="text-xs">
-              Port: {port}
-            </Badge>
-          {/if}
-          {#if isServiceStatusKnown}
-            {#if isRunning}
-              <Badge variant="default" class="bg-green-500 text-white">Running</Badge>
-            {:else if isInstalled}
-              <Badge variant="outline" class="bg-yellow-100 text-yellow-800">Stopped</Badge>
-            {/if}
-          {/if}
+              {#if port}
+                <Badge variant="outline" class="text-xs">
+                  Port: {port}
+                </Badge>
+              {/if}
+              {#if isServiceStatusKnown}
+                {#if isRunning}
+                  <Badge variant="default" class="bg-green-500 text-white">Running</Badge>
+                {:else if isInstalled}
+                  <Badge variant="outline" class="bg-yellow-100 text-yellow-800">Stopped</Badge>
+                {/if}
+              {/if}
+            {/snippet}
+          </PageHeader>
         </div>
       </div>
 

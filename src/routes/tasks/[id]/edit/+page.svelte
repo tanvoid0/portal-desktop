@@ -4,7 +4,7 @@
   import TaskForm from '$lib/domains/tasks/components/TaskForm.svelte';
   import { createTaskQuery } from '$lib/domains/tasks/queries/taskQueries';
   import { toastActions } from '$lib/utils/toast';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageError } from '$lib/components/shell';
   import type { Task } from '$lib/domains/tasks/types';
 
   const taskId = $derived(page.params.id);
@@ -45,7 +45,8 @@
   }
 </script>
 
-<div class="container mx-auto p-6">
+<div class="space-y-6">
+  <PageHeader title="Edit task" />
   {#if isLoading}
     <PageLoading message="Loading task..." />
   {:else if error}

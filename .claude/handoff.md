@@ -22,13 +22,13 @@ The owner asked, in order:
 **Nothing is pushed.** The owner has not asked. Five commits were added this session, on top
 of the nine described in the previous handoff:
 
-| commit    | what                                                                        |
-| --------- | --------------------------------------------------------------------------- |
-| `2ede7cf` | salvage aliased tool arguments; repair-shaped error when one is missing      |
-| `6a5ded4` | Part D of the test plan: measured model accuracy; QA-087 raised to major     |
+| commit    | what                                                                           |
+| --------- | ------------------------------------------------------------------------------ |
+| `2ede7cf` | salvage aliased tool arguments; repair-shaped error when one is missing        |
+| `6a5ded4` | Part D of the test plan: measured model accuracy; QA-087 raised to major       |
 | `d61f4b8` | report **which** check rejected a 401 from agent-platform (was always "token") |
-| `e14fca2` | repair mangled paths in the QA-087 file (a `\a` escape ate a backslash)      |
-| `e949648` | keep the model/engine selectors usable when the catalog is down             |
+| `e14fca2` | repair mangled paths in the QA-087 file (a `\a` escape ate a backslash)        |
+| `e949648` | keep the model/engine selectors usable when the catalog is down                |
 
 Gates, read with real exit codes: `cargo check` 0, workspace `cargo clippy --all-targets` 0,
 `cargo test coder::` 66/66, `cargo test agent_platform` 2/2, `pnpm check` **0 errors**.
@@ -104,7 +104,7 @@ blanked both selector lists. Facts worth keeping:
 - **Correction to earlier advice in this session: do not swap the live key for the old
   `agp_` token.** Four settings copies existed; three held the same 52-char `agp_` token and
   only the live file held a 64-char hex secret — and the live file is the one that
-  authenticates. So the `agp_` token is most likely what the daemon was *rejecting* (plausibly
+  authenticates. So the `agp_` token is most likely what the daemon was _rejecting_ (plausibly
   issued by an older daemon instance). If the owner wants off a master-key-shaped secret,
   **issue a fresh `agp_` token**; do not reuse the deleted one.
 - **All four stale settings copies are now deleted, with the owner's approval.** Two under
@@ -158,17 +158,17 @@ you need to change the model, **use the dropdown**, not localStorage.
 
 ## Files that matter
 
-| path                                                                     | why                                                            |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| `.claude/coder-test-plan.md`                                             | Parts A–D. **Part D is the model accuracy measurement.**       |
-| `.claude/qa/issues/QA-086-*.md`                                          | **open** — the role="button" wrappers                          |
-| `.claude/qa/issues/QA-087-*.md`                                          | closed, with an explicit "what fixed it is unproven" section   |
-| `src-tauri/portal-core/src/domains/coder/tools.rs`                       | `normalize_args`, `aliases`, `arg_error`, `required_args` + tests |
-| `src-tauri/portal-core/src/domains/coder/service.rs:2461`                | the **one** place tool args are normalized, before the gate    |
-| `src-tauri/portal-core/src/domains/ai/providers/agent_platform_provider.rs` | `auth_failure_detail` + tests                               |
-| `src/lib/domains/ai/components/chat/ChatCatalogSelectors.svelte`         | the selector resilience fix (`e949648`)                        |
-| `src/lib/domains/ai/utils/chatCatalogPrefs.ts`                           | `portal.ai.chatCatalog` — where the coder's model really lives |
-| `.claude/qa/scripts/app.mjs`                                             | the CDP driver harness — use it, see the traps below           |
+| path                                                                        | why                                                               |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `.claude/coder-test-plan.md`                                                | Parts A–D. **Part D is the model accuracy measurement.**          |
+| `.claude/qa/issues/QA-086-*.md`                                             | **open** — the role="button" wrappers                             |
+| `.claude/qa/issues/QA-087-*.md`                                             | closed, with an explicit "what fixed it is unproven" section      |
+| `src-tauri/portal-core/src/domains/coder/tools.rs`                          | `normalize_args`, `aliases`, `arg_error`, `required_args` + tests |
+| `src-tauri/portal-core/src/domains/coder/service.rs:2461`                   | the **one** place tool args are normalized, before the gate       |
+| `src-tauri/portal-core/src/domains/ai/providers/agent_platform_provider.rs` | `auth_failure_detail` + tests                                     |
+| `src/lib/domains/ai/components/chat/ChatCatalogSelectors.svelte`            | the selector resilience fix (`e949648`)                           |
+| `src/lib/domains/ai/utils/chatCatalogPrefs.ts`                              | `portal.ai.chatCatalog` — where the coder's model really lives    |
+| `.claude/qa/scripts/app.mjs`                                                | the CDP driver harness — use it, see the traps below              |
 
 ## Decisions already made, and why
 
@@ -176,7 +176,7 @@ you need to change the model, **use the dropdown**, not localStorage.
   `permissions.rs:39,94,102`, `summarize`, `suggested_rule` and `mutated_path` all read the
   canonical keys. Salvaging inside `execute` would gate the permission check on an empty
   path while writing the real one, and skip `record_change` — so the write would bypass the
-  allowlist *and* never appear in the Changes panel. One normalization upstream fixes all of
+  allowlist _and_ never appear in the Changes panel. One normalization upstream fixes all of
   them. Do not move it.
 - **The required-argument list in the error is read back off `tool_specs()`**, not duplicated,
   so the message cannot drift from what the model was told.

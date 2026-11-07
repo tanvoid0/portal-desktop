@@ -55,6 +55,8 @@ This is the #1 source of wrong output. Match the existing code (see `src/lib/dom
 
 When unsure about a rune, check the Svelte 5 docs (links at the bottom) — do not guess Svelte 4 syntax.
 
+**The Svelte 4 forms above are lint errors, not advice.** `portal/no-legacy-syntax` fails `pnpm lint` on `export let`, `on:click`, `$:`, `<slot>`, `<svelte:fragment>` and `<svelte:component>`; `no-restricted-imports` fails on `createEventDispatcher`. `writable()` for server data is the one convention still left to review, since it is not decidable from the syntax.
+
 ---
 
 ## UI: use shadcn-svelte primitives

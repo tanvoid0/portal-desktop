@@ -44,10 +44,7 @@
 </script>
 
 <div class="space-y-6">
-  <PageHeader
-    title="Create New Project"
-    description="Create a new project and let us auto-detect its properties from the directory structure."
-  />
+  <PageHeader title="New project" />
 
   <ProjectForm onSubmit={handleSubmit} onCancel={handleCancel} {isLoading} />
 </div>

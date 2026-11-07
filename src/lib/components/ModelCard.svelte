@@ -3,11 +3,16 @@
   import { Badge } from './ui/badge';
   import { Button } from './ui/button';
 
-  export let model: any;
-  export let isInstalled: boolean = false;
-  export let onInstall: ((modelName: string) => void) | undefined = undefined;
-  export let onRemove: ((modelName: string) => void) | undefined = undefined;
-  export let onView: ((modelName: string) => void) | undefined = undefined;
+  interface Props {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    model: any;
+    isInstalled?: boolean;
+    onInstall?: (modelName: string) => void;
+    onRemove?: (modelName: string) => void;
+    onView?: (modelName: string) => void;
+  }
+
+  let { model, isInstalled = false, onInstall, onRemove, onView }: Props = $props();
 
   function handleAction() {
     if (isInstalled && onRemove) {

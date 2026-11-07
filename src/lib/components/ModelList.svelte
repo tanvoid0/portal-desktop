@@ -3,19 +3,36 @@
   import ProgressIndicator from './ProgressIndicator.svelte';
   import { Button } from './ui/button';
 
-  export let models: any[] = [];
-  export let isInstalled: boolean = false;
-  export let loading: boolean = false;
-  export let error: string | null = null;
-  export let installingModel: string | null = null;
-  export let installationProgress: number = 0;
-  export let installationStatus: string = '';
+  interface Props {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    models?: any[];
+    isInstalled?: boolean;
+    loading?: boolean;
+    error?: string | null;
+    installingModel?: string | null;
+    installationProgress?: number;
+    installationStatus?: string;
+    onInstall?: (modelName: string) => void;
+    onRemove?: (modelName: string) => void;
+    onView?: (modelName: string) => void;
+    onRetry?: () => void;
+    onBrowseAvailable?: () => void;
+  }
 
-  export let onInstall: ((modelName: string) => void) | undefined = undefined;
-  export let onRemove: ((modelName: string) => void) | undefined = undefined;
-  export let onView: ((modelName: string) => void) | undefined = undefined;
-  export let onRetry: (() => void) | undefined = undefined;
-  export let onBrowseAvailable: (() => void) | undefined = undefined;
+  let {
+    models = [],
+    isInstalled = false,
+    loading = false,
+    error = null,
+    installingModel = null,
+    installationProgress = 0,
+    installationStatus = '',
+    onInstall,
+    onRemove,
+    onView,
+    onRetry,
+    onBrowseAvailable,
+  }: Props = $props();
 </script>
 
 {#if loading}

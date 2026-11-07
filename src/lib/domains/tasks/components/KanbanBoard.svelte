@@ -145,9 +145,10 @@
                   activate(task);
                 }
               }}
-              role="button"
+              role="group"
               tabindex={0}
-              aria-label="Select task: {task.title}"
+              aria-label="Task: {task.title}"
+              aria-current={taskUi.selectedTaskIds.has(task.id) ? 'true' : undefined}
               class="cursor-pointer gap-0 py-0 hover:shadow-md {taskUi.selectedTaskIds.has(task.id)
                 ? 'bg-warning-50 ring-2 ring-warning-500 dark:bg-warning-900/20'
                 : ''} {getTaskCardClasses(task, dragDropState)}"
@@ -290,9 +291,9 @@
                     handleTaskSelect(subtask);
                   }
                 }}
-                role="button"
+                role="group"
                 tabindex={0}
-                aria-label="Select subtask: {subtask.title}"
+                aria-label="Subtask: {subtask.title}"
                 borderAccent="left"
                 class="mt-2 ml-4 cursor-pointer gap-0 py-0 hover:shadow-md"
               >

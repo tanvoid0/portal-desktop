@@ -1,8 +1,12 @@
 <script lang="ts">
-  export let title: string;
-  export let status: string;
-  export let progress: number = 0;
-  export let showSpinner: boolean = true;
+  interface Props {
+    title: string;
+    status: string;
+    progress?: number;
+    showSpinner?: boolean;
+  }
+
+  let { title, status, progress = 0, showSpinner = true }: Props = $props();
 </script>
 
 <div class="rounded-lg border bg-blue-50 p-4">

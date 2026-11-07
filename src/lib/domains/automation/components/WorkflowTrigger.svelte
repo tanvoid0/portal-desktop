@@ -10,30 +10,38 @@
   import CheckCircle from '~icons/fa6-solid/circle-check';
   import XCircle from '~icons/fa6-solid/circle-xmark';
 
-  export let project: {
-    id: string;
-    name: string;
-    path: string;
-    metadata?: { framework?: string };
-    framework_ids?: number[];
-    package_manager_ids?: number[];
-    build_command?: string;
-    start_command?: string;
-    test_command?: string;
-    output_directory?: string;
-    dev_port?: number;
-    prod_port?: number;
-  };
-  export let onWorkflowComplete: (result: WorkflowResult) => void = () => {};
-
-  let suggestedWorkflows: AvailableWorkflow[] = [];
-  let selectedWorkflow: AvailableWorkflow | null = null;
-  let isTriggering = false;
-  let lastResult: WorkflowResult | null = null;
-
-  $: if (project) {
-    loadSuggestedWorkflows();
+  interface Props {
+    project: {
+      id: string;
+      name: string;
+      path: string;
+      metadata?: { framework?: string };
+      framework_ids?: number[];
+      package_manager_ids?: number[];
+      build_command?: string;
+      start_command?: string;
+      test_command?: string;
+      output_directory?: string;
+      dev_port?: number;
+      prod_port?: number;
+    };
+    onWorkflowComplete?: (result: WorkflowResult) => void;
   }
+
+  let { project, onWorkflowComplete = () => {} }: Props = $props();
+
+  let suggestedWorkflows = $state<AvailableWorkflow[]>([]);
+  let selectedWorkflow = $state<AvailableWorkflow | null>(null);
+  let isTriggering = $state(false);
+  let lastResult = $state<WorkflowResult | null>(null);
+
+  // Tracks `project` only: the `$automationStore` read inside the loader lands
+  // after an await, so it is outside the effect's tracked scope and cannot
+  // feed back in.
+  $effect(() => {
+    if (!project) return;
+    void loadSuggestedWorkflows();
+  });
 
   async function loadSuggestedWorkflows() {
     if (!project) return;

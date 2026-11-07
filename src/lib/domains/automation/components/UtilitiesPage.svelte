@@ -160,7 +160,7 @@
   });
 </script>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <PageHeader title="Utilities" description="Manage and run custom scripts">
     {#snippet actions()}
       <Button onclick={handleCreateScript}>

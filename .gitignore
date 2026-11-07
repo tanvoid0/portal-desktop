@@ -84,3 +84,6 @@ raw/
 # Local-only VPN helper (contains internal infra references)
 scripts/vpn.sh
 .devswarm-temp/
+
+# Generated per-instance tauri dev overrides (scripts/dev-instance.mjs)
+src-tauri/.tauri-instance-*.conf.json

@@ -28,11 +28,6 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <div>
-    <h2 class="text-2xl font-bold tracking-tight">General Settings</h2>
-    <p class="text-muted-foreground">Configure application preferences and general behavior</p>
-  </div>
-
   {#if settingsData}
     <GeneralSettings settings={settingsData.app} onUpdate={handleGeneralUpdate} />
   {:else}

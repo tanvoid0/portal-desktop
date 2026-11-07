@@ -29,7 +29,7 @@
   import Network from '~icons/fa6-solid/network-wired';
   import { podApi } from '$lib/domains/cloud/api/podApi';
   import Loading from '$lib/components/ui/loading.svelte';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import type { PortForwardInfo } from '$lib/domains/cloud/providers/gcp/GCPTypes';
@@ -332,7 +332,7 @@ status:
 
     try {
       await podApi.deletePod(pod.namespace, pod.name);
-      goto('/cloud/workloads/pods');
+      goto('/cloud/pods');
     } catch (err) {
       toastActions.error(
         'Failed to delete pod',
@@ -372,47 +372,44 @@ status:
   {:else if error}
     <PageError title="Failed to load pod" message={error} onRetry={loadPod} />
   {:else if pod}
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onclick={() => goto('/cloud/workloads/pods')}>
-          <ArrowLeft class="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <div>
-          <h1 class="text-3xl font-bold">{pod.name}</h1>
-          <p class="text-muted-foreground">
-            Namespace: {pod.namespace} • Status:
-            <Badge variant={pod.status === 'running' ? 'default' : 'secondary'} class="ml-2">
-              {pod.status}
-            </Badge>
-          </p>
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={async () => {
-            await loadPod();
-            await loadMetrics();
-          }}
+    <div class="flex items-center gap-2">
+      <Button variant="ghost" size="sm" onclick={() => goto('/cloud/pods')}>
+        <ArrowLeft class="mr-2 h-4 w-4" />
+        Back
+      </Button>
+      <div class="min-w-0 flex-1">
+        <PageHeader
+          title={pod.name}
+          description={`Namespace: ${pod.namespace}`}
+          badge={pod.status}
+          badgeVariant={pod.status === 'running' ? 'default' : 'secondary'}
         >
-          <RefreshCw class="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-        <Button variant="outline" size="sm" onclick={() => (showPortForwardDialog = true)}>
-          <Network class="mr-2 h-4 w-4" />
-          Port Forward
-          {#if activePortForwards.length > 0}
-            <Badge variant="secondary" class="ml-2">{activePortForwards.length}</Badge>
-          {/if}
-        </Button>
-        <Button variant="outline" size="sm" onclick={handleExec}>
-          <Terminal class="mr-2 h-4 w-4" />
-          Exec
-        </Button>
-        <Button variant="destructive" size="sm" onclick={handleDelete}>Delete</Button>
+          {#snippet actions()}
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={async () => {
+                await loadPod();
+                await loadMetrics();
+              }}
+            >
+              <RefreshCw class="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" onclick={() => (showPortForwardDialog = true)}>
+              <Network class="mr-2 h-4 w-4" />
+              Port Forward
+              {#if activePortForwards.length > 0}
+                <Badge variant="secondary" class="ml-2">{activePortForwards.length}</Badge>
+              {/if}
+            </Button>
+            <Button variant="outline" size="sm" onclick={handleExec}>
+              <Terminal class="mr-2 h-4 w-4" />
+              Exec
+            </Button>
+            <Button variant="destructive" size="sm" onclick={handleDelete}>Delete</Button>
+          {/snippet}
+        </PageHeader>
       </div>
     </div>
 

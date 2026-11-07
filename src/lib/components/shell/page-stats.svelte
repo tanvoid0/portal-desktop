@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { Component } from 'svelte';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 
   export interface PageStat {
     label: string;
@@ -11,34 +10,25 @@
 
   interface Props {
     stats: PageStat[];
+    /** Kept for API compatibility — the strip is a single wrapping row. */
     columns?: 2 | 3 | 4;
   }
 
-  let { stats, columns = 4 }: Props = $props();
-
-  const gridClass = $derived(
-    columns === 2 ? 'md:grid-cols-2' : columns === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4'
-  );
+  let { stats }: Props = $props();
 </script>
 
-<div class="grid grid-cols-1 gap-4 {gridClass}">
+<div class="flex flex-wrap items-center gap-y-1 rounded-md border bg-card px-3 py-1.5">
   {#each stats as stat}
-    <Card>
-      <CardHeader class="px-4 pb-1">
-        <CardTitle class="flex items-center gap-2 text-sm font-medium">
-          {#if stat.icon}
-            {@const Icon = stat.icon}
-            <Icon class="h-4 w-4 text-muted-foreground" />
-          {/if}
-          {stat.label}
-        </CardTitle>
-      </CardHeader>
-      <CardContent class="px-4 py-3">
-        <div class="text-xl leading-none font-bold">{stat.value}</div>
-        {#if stat.description}
-          <p class="mt-1 text-xs text-muted-foreground">{stat.description}</p>
-        {/if}
-      </CardContent>
-    </Card>
+    <div
+      class="flex items-center gap-1.5 border-l px-4 first:border-l-0 first:pl-0"
+      title={stat.description}
+    >
+      {#if stat.icon}
+        {@const Icon = stat.icon}
+        <Icon class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      {/if}
+      <span class="text-xs text-muted-foreground">{stat.label}</span>
+      <span class="text-sm font-semibold tabular-nums">{stat.value}</span>
+    </div>
   {/each}
 </div>

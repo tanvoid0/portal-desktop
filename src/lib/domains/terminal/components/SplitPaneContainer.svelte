@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
   import ResizablePane from './ResizablePane.svelte';
   import { Button } from '$lib/components/ui/button';
   import Maximize2 from '~icons/fa6-solid/maximize';
@@ -7,17 +6,27 @@
   import Split from '~icons/fa6-solid/code-fork';
   import X from '~icons/fa6-solid/xmark';
 
-  export let direction: 'horizontal' | 'vertical' = 'horizontal';
-  export let panes: Array<{
+  interface Pane {
     id: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     component: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     props: any;
     size: number;
-  }> = [];
+  }
 
-  let container: HTMLDivElement;
-  let isMaximized = false;
-  let maximizedPaneId: string | null = null;
+  interface Props {
+    direction?: 'horizontal' | 'vertical';
+    // Bindable: splitPane/handleResize reassign it, which `export let` used to
+    // allow silently.
+    panes?: Pane[];
+  }
+
+  let { direction = 'horizontal', panes = $bindable([]) }: Props = $props();
+
+  let container = $state<HTMLDivElement | null>(null);
+  let isMaximized = $state(false);
+  let maximizedPaneId = $state<string | null>(null);
 
   function handleResize(event: { size: number }) {
     const { size } = event;

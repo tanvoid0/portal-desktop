@@ -5,13 +5,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
@@ -28,7 +22,6 @@
   import { loadDeployConfig, saveDeployConfig } from '$lib/domains/deployments/utils/deployConfig';
   import { toast } from '$lib/utils/toast';
   import { logger } from '$lib/domains/shared';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import Loader2 from '~icons/fa6-solid/spinner';
   import { PageHeader } from '$lib/components/shell';
 
@@ -104,6 +97,14 @@
     deploymentType !== DeploymentType.DOCKER ||
       exposedPort == null ||
       (Number.isInteger(exposedPort) && exposedPort >= 1 && exposedPort <= 65535)
+  );
+
+  const canSubmit = $derived(
+    !!name.trim() &&
+      !!projectPath.trim() &&
+      portValid &&
+      !(deploymentType === DeploymentType.CLI && !command.trim()) &&
+      !isSubmitting
   );
 
   async function handleSubmit() {
@@ -212,24 +213,35 @@
   <title>Create Deployment - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto max-w-4xl space-y-6 py-6">
-  <Button variant="ghost" onclick={() => goto('/deployments')}>
-    <ArrowLeft class="mr-2 h-4 w-4" />
-    Back to Deployments
-  </Button>
-
-  <PageHeader
-    title="Create New Deployment"
-    description="Set up a new deployment for your project"
-  />
+<div class="mx-auto max-w-4xl space-y-6">
+  <PageHeader title="New deployment">
+    {#snippet actions()}
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={() => goto('/deployments')}
+        disabled={isSubmitting}
+      >
+        Cancel
+      </Button>
+      <Button size="sm" type="submit" form="deployment-form" disabled={!canSubmit}>
+        {#if isSubmitting}
+          <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+          Building &amp; starting…
+        {:else}
+          Deploy (build &amp; run)
+        {/if}
+      </Button>
+    {/snippet}
+  </PageHeader>
 
   <Card>
     <CardHeader>
       <CardTitle>Deployment Configuration</CardTitle>
-      <CardDescription>Configure your deployment settings</CardDescription>
     </CardHeader>
     <CardContent>
       <form
+        id="deployment-form"
         onsubmit={(e) => {
           e.preventDefault();
           handleSubmit();
@@ -430,34 +442,6 @@
               </p>
             {/each}
           </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="divider-edge-t divider-edge-full flex gap-2 pt-4">
-          <Button
-            type="submit"
-            disabled={!name.trim() ||
-              !projectPath.trim() ||
-              !portValid ||
-              (deploymentType === DeploymentType.CLI && !command.trim()) ||
-              isSubmitting}
-            class="flex-1"
-          >
-            {#if isSubmitting}
-              <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-              Building &amp; starting…
-            {:else}
-              Deploy (build &amp; run)
-            {/if}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onclick={() => goto('/deployments')}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
         </div>
       </form>
     </CardContent>

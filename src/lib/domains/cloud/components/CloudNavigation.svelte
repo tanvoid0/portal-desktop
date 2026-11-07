@@ -1,5 +1,5 @@
 <!--
-	Cloud Navigation - Sidebar navigation for cloud resources with grouped sections
+	Cloud Navigation - Sidebar navigation for cloud resources, generated from RESOURCE_DESCRIPTORS
 -->
 
 <script lang="ts">
@@ -8,13 +8,13 @@
   import { goto } from '$app/navigation';
   import { MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
   import NamespaceSelector from '$lib/domains/cloud/components/NamespaceSelector.svelte';
-  import Container from '~icons/fa6-solid/cube';
-  import Network from '~icons/fa6-solid/network-wired';
-  import Settings from '~icons/fa6-solid/gear';
-  import Globe from '~icons/fa6-solid/globe';
   import { useKeyboardShortcuts } from '$lib/domains/k8s-navigation';
   import { RESOURCE_TYPE_SHORTCUTS } from '$lib/domains/k8s-navigation/utils/keyboardConstants';
   import { cloudStore } from '$lib/domains/cloud/stores';
+  import {
+    RESOURCE_DESCRIPTORS,
+    type ResourceDescriptor,
+  } from '$lib/domains/cloud/core/resourceDescriptors';
 
   interface NavItem {
     id: string;
@@ -22,11 +22,26 @@
     description: string;
     icon: string;
     route: string;
+    /** Extra path prefixes that keep this item highlighted — detail and create pages. */
+    prefixes: string[];
   }
 
   interface NavGroup {
     title: string;
     items: NavItem[];
+  }
+
+  const GROUP_ORDER = ['Workloads', 'Configuration', 'Networking'] as const;
+
+  function toNavItem(descriptor: ResourceDescriptor): NavItem {
+    return {
+      id: descriptor.slug,
+      label: descriptor.label,
+      description: descriptor.description,
+      icon: descriptor.icon,
+      route: `/cloud/${descriptor.slug}`,
+      prefixes: [`/cloud/${descriptor.slug}/`, `${descriptor.detailBase}/`],
+    };
   }
 
   const navGroups: NavGroup[] = [
@@ -39,121 +54,28 @@
           description: 'Cluster overview and metrics',
           icon: '☸️',
           route: '/cloud/workloads',
+          prefixes: [],
         },
       ],
     },
-    {
-      title: 'Workloads',
-      items: [
-        {
-          id: 'pods',
-          label: 'Pods',
-          description: 'Container instances',
-          icon: '📦',
-          route: '/cloud/workloads/pods',
-        },
-        {
-          id: 'services',
-          label: 'Services',
-          description: 'Network services',
-          icon: '🔗',
-          route: '/cloud/workloads/services',
-        },
-        {
-          id: 'deployments',
-          label: 'Deployments',
-          description: 'Stateless workloads',
-          icon: '🚀',
-          route: '/cloud/workloads/deployments',
-        },
-        {
-          id: 'statefulsets',
-          label: 'StatefulSets',
-          description: 'Stateful workloads',
-          icon: '🗄️',
-          route: '/cloud/workloads/statefulsets',
-        },
-        {
-          id: 'daemonsets',
-          label: 'DaemonSets',
-          description: 'Node-level workloads',
-          icon: '👹',
-          route: '/cloud/workloads/daemonsets',
-        },
-        {
-          id: 'jobs',
-          label: 'Jobs',
-          description: 'One-time tasks',
-          icon: '⚙️',
-          route: '/cloud/workloads/jobs',
-        },
-        {
-          id: 'cronjobs',
-          label: 'CronJobs',
-          description: 'Scheduled tasks',
-          icon: '⏰',
-          route: '/cloud/workloads/cronjobs',
-        },
-      ],
-    },
-    {
-      title: 'Configuration',
-      items: [
-        {
-          id: 'configmaps',
-          label: 'ConfigMaps',
-          description: 'Configuration data',
-          icon: '⚙️',
-          route: '/cloud/configmaps',
-        },
-        {
-          id: 'secrets',
-          label: 'Secrets',
-          description: 'Sensitive data',
-          icon: '🔐',
-          route: '/cloud/secrets',
-        },
-      ],
-    },
-    {
-      title: 'Networking',
-      items: [
-        {
-          id: 'ingress',
-          label: 'Ingress',
-          description: 'External access rules',
-          icon: '🌐',
-          route: '/cloud/ingress',
-        },
-      ],
-    },
+    ...GROUP_ORDER.map((title) => ({
+      title,
+      items: RESOURCE_DESCRIPTORS.filter((descriptor) => descriptor.group === title).map(toNavItem),
+    })),
   ];
 
-  function isActiveTab(tabRoute: string): boolean {
+  function isActiveTab(item: NavItem): boolean {
     const currentPath = page.url.pathname;
-    // Special handling for overview tab (exact match for /cloud/workloads)
-    if (tabRoute === '/cloud/workloads') {
-      return currentPath === '/cloud/workloads';
-    }
-    // For configmaps, secrets, ingress, check exact match or detail pages
-    if (tabRoute === '/cloud/configmaps') {
-      return currentPath === '/cloud/configmaps' || currentPath.startsWith('/cloud/configmaps/');
-    }
-    if (tabRoute === '/cloud/secrets') {
-      return currentPath === '/cloud/secrets' || currentPath.startsWith('/cloud/secrets/');
-    }
-    if (tabRoute === '/cloud/ingress') {
-      return currentPath === '/cloud/ingress' || currentPath.startsWith('/cloud/ingress/');
-    }
-    // For other tabs, check if current path starts with the tab route
-    return currentPath.startsWith(tabRoute);
+    return (
+      currentPath === item.route || item.prefixes.some((prefix) => currentPath.startsWith(prefix))
+    );
   }
 
   function handleItemClick(route: string) {
     goto(route);
   }
 
-  // Resource type navigation shortcuts
+  // Resource type navigation shortcuts — the digit keys in RESOURCE_TYPE_SHORTCUTS
   const resourceTypeShortcuts = useKeyboardShortcuts(
     [
       {
@@ -161,51 +83,20 @@
         description: 'Go to Overview',
         action: () => goto('/cloud/workloads'),
       },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.PODS,
-        description: 'Go to Pods',
-        action: () => goto('/cloud/workloads/pods'),
-      },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.SERVICES,
-        description: 'Go to Services',
-        action: () => goto('/cloud/workloads/services'),
-      },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.DEPLOYMENTS,
-        description: 'Go to Deployments',
-        action: () => goto('/cloud/workloads/deployments'),
-      },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.STATEFULSETS,
-        description: 'Go to StatefulSets',
-        action: () => goto('/cloud/workloads/statefulsets'),
-      },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.DAEMONSETS,
-        description: 'Go to DaemonSets',
-        action: () => goto('/cloud/workloads/daemonsets'),
-      },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.JOBS,
-        description: 'Go to Jobs',
-        action: () => goto('/cloud/workloads/jobs'),
-      },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.CRONJOBS,
-        description: 'Go to CronJobs',
-        action: () => goto('/cloud/workloads/cronjobs'),
-      },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.CONFIGMAPS,
-        description: 'Go to ConfigMaps',
-        action: () => goto('/cloud/configmaps'),
-      },
-      {
-        key: RESOURCE_TYPE_SHORTCUTS.SECRETS,
-        description: 'Go to Secrets',
-        action: () => goto('/cloud/secrets'),
-      },
+      ...RESOURCE_DESCRIPTORS.flatMap((descriptor) => {
+        const key = (RESOURCE_TYPE_SHORTCUTS as Record<string, string | undefined>)[
+          descriptor.slug.toUpperCase()
+        ];
+        return key
+          ? [
+              {
+                key,
+                description: `Go to ${descriptor.label}`,
+                action: () => goto(`/cloud/${descriptor.slug}`),
+              },
+            ]
+          : [];
+      }),
     ],
     { enabled: $cloudStore.connection.isConnected }
   );
@@ -239,7 +130,7 @@
         </h3>
         <div class="space-y-1">
           {#each group.items as item}
-            {@const isActive = isActiveTab(item.route)}
+            {@const isActive = isActiveTab(item)}
             <SidebarMenuButton
               size="default"
               {isActive}

@@ -33,6 +33,8 @@
     modules?: ProjectModule[];
     /** Rendered under a parent row. */
     nested?: boolean;
+    /** Area path shown before the name when the row stands in for its own group. */
+    pathPrefix?: string;
     /** Bump after the icon registry loads so stack badges re-resolve. */
     registryReady?: boolean;
     eligibleParents?: Array<{ id: string; name: string }>;
@@ -45,6 +47,7 @@
     project,
     modules = [],
     nested = false,
+    pathPrefix = '',
     registryReady = false,
     eligibleParents = [],
     onDelete = () => {},
@@ -104,8 +107,11 @@
       {/if}
     </div>
 
-    <div class="min-w-0 flex-1">
+    <div class="min-w-0 shrink">
       <div class="flex items-center gap-1.5">
+        {#if pathPrefix}
+          <span class="max-w-[14rem] truncate text-sm text-muted-foreground">{pathPrefix}/</span>
+        {/if}
         <span class="truncate text-sm font-medium">{project.name}</span>
         {#if project.starred}
           <Star
@@ -119,7 +125,9 @@
       {/if}
     </div>
 
-    <div class="hidden w-72 shrink-0 items-center gap-1.5 overflow-hidden md:flex">
+    <!-- Badges sit beside the name rather than in a wide fixed column, so the row has
+         no empty middle at 1280 and the name keeps its width at 1024. -->
+    <div class="hidden max-w-56 shrink-0 items-center gap-1.5 overflow-hidden md:flex">
       <!-- The project's own stack first; the module summary only when none is recorded. -->
       {#if badges.length > 0}
         {#each badges as item (item.name)}
@@ -134,14 +142,14 @@
     </div>
 
     <div
-      class="flex w-24 shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
+      class="ml-auto flex w-24 shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
       title="{activity}{lastSeen ? ` · last activity ${when}` : ''}"
     >
       <span class="h-2 w-2 shrink-0 rounded-full {DOT[activity] ?? DOT.stale}"></span>
       <span class="truncate">{when}</span>
     </div>
 
-    <div class="hidden w-40 shrink-0 items-center gap-1.5 text-xs text-muted-foreground lg:flex">
+    <div class="hidden w-36 shrink-0 items-center gap-1.5 text-xs text-muted-foreground xl:flex">
       {#if branch}
         <GitBranch class="h-3.5 w-3.5 shrink-0" />
         <span class="truncate">{branch}</span>
@@ -166,7 +174,7 @@
           {...props}
           variant="ghost"
           size="icon"
-          class="h-8 w-8 shrink-0"
+          class="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 data-[state=open]:opacity-100"
           aria-label="Actions for {project.name}"
         >
           <Ellipsis class="h-4 w-4" />

@@ -35,11 +35,6 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <div>
-    <h2 class="text-2xl font-bold tracking-tight">Theme Settings</h2>
-    <p class="text-muted-foreground">Customize appearance and color schemes</p>
-  </div>
-
   {#if settingsData}
     <ThemeCustomizer settings={settingsData.theme} onUpdate={handleThemeUpdate} />
 

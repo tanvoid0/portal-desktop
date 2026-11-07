@@ -18,7 +18,13 @@
   import Star from '~icons/fa6-solid/star';
   import Plus from '~icons/fa6-solid/plus';
   import ScanSearch from '~icons/fa6-solid/magnifying-glass';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
   import ProjectRow from '$lib/domains/projects/components/ProjectRow.svelte';
+  import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+  } from '$lib/components/ui/collapsible';
   import Select from '$lib/components/ui/select.svelte';
   import { projectService } from '$lib/domains/projects';
   import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
@@ -26,7 +32,8 @@
   import { refreshAllModules } from '$lib/domains/projects/api/moduleApi';
   import { groupByProject } from '$lib/domains/projects/utils/moduleStacks';
   import { nestProjects, descendantIds } from '$lib/domains/projects/utils/nestProjects';
-  import { groupByArea } from '$lib/domains/projects/utils/groupProjects';
+  import { groupByArea, STARRED_KEY } from '$lib/domains/projects/utils/groupProjects';
+  import type { ProjectGroup } from '$lib/domains/projects/utils/groupProjects';
   import { queryClient } from '$lib/domains/shared/query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import type { Project } from '$lib/domains/projects/types';
@@ -128,6 +135,53 @@
   // root row. Computed over the filtered set so a nested project still surfaces
   // as a root when its parent is filtered out.
   const groups = $derived(groupByArea(nestProjects(filteredProjects)));
+
+  // Groups collapse, so 184 rows aren't all in the DOM at once. Open/closed is
+  // remembered per group; localStorage can throw or hold junk, in which case the
+  // defaults below apply and the page still renders.
+  const OPEN_GROUPS_KEY = 'portal.projects.openGroups';
+  const RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+  function readOpenGroups(): Record<string, boolean> {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem(OPEN_GROUPS_KEY) ?? 'null');
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  let openGroups = $state<Record<string, boolean>>(readOpenGroups());
+
+  function setGroupOpen(key: string, open: boolean) {
+    openGroups = { ...openGroups, [key]: open };
+    try {
+      localStorage?.setItem(OPEN_GROUPS_KEY, JSON.stringify(openGroups));
+    } catch {
+      // Quota or private mode — the choice still holds for this session.
+    }
+  }
+
+  // Default open: groups holding something touched in the last 30 days, off the
+  // same `lastSeen` the "Recently active" sort uses.
+  const recentGroupKeys = $derived.by(() => {
+    const cutoff = Date.now() - RECENT_WINDOW_MS;
+    const touched = (p: Project) => lastSeen(p) >= cutoff;
+    return new Set(
+      groups
+        .filter((g) => g.items.some((i) => touched(i.project) || i.children.some(touched)))
+        .map((g) => g.key)
+    );
+  });
+
+  // While searching or filtering, everything matching stays visible.
+  const isGroupOpen = (group: ProjectGroup) =>
+    isFiltered || (openGroups[group.key] ?? recentGroupKeys.has(group.key));
+
+  // A group holding one project doesn't earn a header — the row carries the path.
+  const isLoneProject = (group: ProjectGroup) =>
+    group.key !== STARRED_KEY && group.items.length === 1 && group.items[0].children.length === 0;
 
   const stats = $derived<PageStat[]>([
     { label: 'Total', value: projects.length, icon: FolderOpen },
@@ -299,37 +353,54 @@
       onAction={() => goto('/projects/create')}
     />
   {:else}
+    {#snippet row(project: Project, nested: boolean, pathPrefix: string)}
+      <ProjectRow
+        {project}
+        {nested}
+        {pathPrefix}
+        {registryReady}
+        modules={modulesByProject.get(Number(project.id)) ?? []}
+        eligibleParents={eligibleParents(project)}
+        onDelete={handleProjectDelete}
+        onSetParent={handleSetParent}
+        onToggleStar={handleToggleStar}
+      />
+    {/snippet}
+
     <div class="space-y-6">
       {#each groups as group (group.key)}
-        <section>
-          <h2 class="mb-1 flex items-baseline gap-2 border-b px-3 pb-1 text-sm font-semibold">
-            {group.title}
-            <span class="text-xs font-normal text-muted-foreground">{group.items.length}</span>
-          </h2>
-          {#each group.items as item (item.project.id)}
-            <ProjectRow
-              project={item.project}
-              {registryReady}
-              modules={modulesByProject.get(Number(item.project.id)) ?? []}
-              eligibleParents={eligibleParents(item.project)}
-              onDelete={handleProjectDelete}
-              onSetParent={handleSetParent}
-              onToggleStar={handleToggleStar}
-            />
-            {#each item.children as child (child.id)}
-              <ProjectRow
-                project={child}
-                nested
-                {registryReady}
-                modules={modulesByProject.get(Number(child.id)) ?? []}
-                eligibleParents={eligibleParents(child)}
-                onDelete={handleProjectDelete}
-                onSetParent={handleSetParent}
-                onToggleStar={handleToggleStar}
-              />
-            {/each}
-          {/each}
-        </section>
+        {#if isLoneProject(group)}
+          {@render row(group.items[0].project, false, group.title)}
+        {:else}
+          <Collapsible
+            bind:open={() => isGroupOpen(group), (open) => setGroupOpen(group.key, open)}
+          >
+            <section>
+              <h2 class="mb-1 border-b px-3 pb-1">
+                <!-- While a filter is on, every match stays expanded, so the toggle is inert. -->
+                <CollapsibleTrigger
+                  disabled={isFiltered}
+                  class="group flex w-full items-baseline gap-2 rounded text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ChevronRight
+                    class="h-3 w-3 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+                  />
+                  <span class="truncate">{group.title}</span>
+                  <span class="text-xs font-normal text-muted-foreground">{group.items.length}</span
+                  >
+                </CollapsibleTrigger>
+              </h2>
+              <CollapsibleContent>
+                {#each group.items as item (item.project.id)}
+                  {@render row(item.project, false, '')}
+                  {#each item.children as child (child.id)}
+                    {@render row(child, true, '')}
+                  {/each}
+                {/each}
+              </CollapsibleContent>
+            </section>
+          </Collapsible>
+        {/if}
       {/each}
     </div>
   {/if}

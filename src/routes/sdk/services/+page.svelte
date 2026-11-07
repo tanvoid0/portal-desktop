@@ -10,7 +10,7 @@
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
   import { sdkConfigsQuery } from '$lib/domains/sdk/queries/sdkQueries';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import { toast } from '$lib/utils/toast';
@@ -41,19 +41,18 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <div class="flex items-center gap-4">
-    <div class="flex-1">
-      <h1 class="text-3xl font-bold">SDK Services</h1>
-      <p class="text-muted-foreground">Manage running SDK services</p>
-    </div>
-    <Button
-      variant="outline"
-      onclick={() => configsQuery.refetch()}
-      disabled={configsQuery.isFetching}
-    >
-      Refresh
-    </Button>
-  </div>
+  <PageHeader title="SDK Services" description="Manage running SDK services">
+    {#snippet actions()}
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={() => configsQuery.refetch()}
+        disabled={configsQuery.isFetching}
+      >
+        Refresh
+      </Button>
+    {/snippet}
+  </PageHeader>
 
   {#if configsQuery.isPending}
     <PageLoading message="Loading SDK services..." />

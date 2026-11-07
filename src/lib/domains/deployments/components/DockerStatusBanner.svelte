@@ -51,7 +51,7 @@
   }
 </script>
 
-{#if status}
+{#if status && !status.running}
   <Alert variant={offline ? 'destructive' : 'default'}>
     <Container class="h-4 w-4" />
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import { automationStore } from '../stores/automationStore';
   import type { WorkflowExecution } from '../types';
   import { Card, CardContent } from '$lib/components/ui/card';
@@ -11,15 +10,23 @@
   import Clock from '~icons/fa6-solid/clock';
   import Loader2 from '~icons/fa6-solid/spinner';
 
-  export let executionId: string;
-  export let onStatusChange: (execution: WorkflowExecution) => void = () => {};
+  interface Props {
+    executionId: string;
+    onStatusChange?: (execution: WorkflowExecution) => void;
+  }
 
-  let execution: WorkflowExecution | null = null;
+  let { executionId, onStatusChange = () => {} }: Props = $props();
+
+  let execution = $state<WorkflowExecution | null>(null);
   let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
-  $: if (executionId) {
-    startPolling();
-  }
+  // The old `$: if (executionId) startPolling()` left the previous interval
+  // running whenever executionId changed. The teardown closes that leak.
+  $effect(() => {
+    if (!executionId) return;
+    void startPolling();
+    return stopPolling;
+  });
 
   async function startPolling() {
     if (!executionId) return;
@@ -49,10 +56,6 @@
       pollingInterval = null;
     }
   }
-
-  onDestroy(() => {
-    stopPolling();
-  });
 
   function getStatusIcon(status: string) {
     switch (status) {

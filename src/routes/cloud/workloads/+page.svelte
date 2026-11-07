@@ -6,18 +6,7 @@
   import { Button } from '$lib/components/ui/button';
   import { goto } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge';
-  import Boxes from '~icons/fa6-solid/boxes-stacked';
-  import Network from '~icons/fa6-solid/network-wired';
-  import Rocket from '~icons/fa6-solid/rocket';
-  import Layers from '~icons/fa6-solid/layer-group';
-  import Activity from '~icons/fa6-solid/wave-square';
-  import Briefcase from '~icons/fa6-solid/briefcase';
-  import Clock from '~icons/fa6-solid/clock';
-  import FileText from '~icons/fa6-solid/file-lines';
-  import Lock from '~icons/fa6-solid/lock';
-  import Globe from '~icons/fa6-solid/globe';
-  import Server from '~icons/fa6-solid/server';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageLoading, PageStats } from '$lib/components/shell';
   import MetricsDisplay from '$lib/domains/cloud/components/MetricsDisplay.svelte';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
   import { toast } from '$lib/utils/toast';
@@ -280,173 +269,37 @@
           </Button>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Boxes class="h-4 w-4 text-muted-foreground" />
-                Pods
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.pods.total}
-              </div>
-              <p class="mt-1 text-xs text-muted-foreground">
-                {stats.pods.running} running
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Network class="h-4 w-4 text-muted-foreground" />
-                Services
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.services.total}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Rocket class="h-4 w-4 text-muted-foreground" />
-                Deployments
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.deployments.total}
-              </div>
-              <p class="mt-1 text-xs text-muted-foreground">
-                {stats.deployments.running} running
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Layers class="h-4 w-4 text-muted-foreground" />
-                StatefulSets
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.statefulsets.total}
-              </div>
-              <p class="mt-1 text-xs text-muted-foreground">
-                {stats.statefulsets.running} running
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Activity class="h-4 w-4 text-muted-foreground" />
-                DaemonSets
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.daemonsets.total}
-              </div>
-              <p class="mt-1 text-xs text-muted-foreground">
-                {stats.daemonsets.running} running
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Briefcase class="h-4 w-4 text-muted-foreground" />
-                Jobs
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.jobs.total}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Clock class="h-4 w-4 text-muted-foreground" />
-                CronJobs
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.cronjobs.total}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <FileText class="h-4 w-4 text-muted-foreground" />
-                ConfigMaps
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.configmaps.total}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Lock class="h-4 w-4 text-muted-foreground" />
-                Secrets
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.secrets.total}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Globe class="h-4 w-4 text-muted-foreground" />
-                Ingress
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.ingresses.total}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="px-4 pb-1">
-              <CardTitle class="flex items-center gap-2 text-sm font-medium">
-                <Server class="h-4 w-4 text-muted-foreground" />
-                Namespaces
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="px-4 py-3">
-              <div class="text-xl leading-none font-bold">
-                {stats.namespaces.total}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <PageStats
+          stats={[
+            {
+              label: 'Pods',
+              value: stats.pods.total,
+              description: `${stats.pods.running} running`,
+            },
+            { label: 'Services', value: stats.services.total },
+            {
+              label: 'Deployments',
+              value: stats.deployments.total,
+              description: `${stats.deployments.running} running`,
+            },
+            {
+              label: 'StatefulSets',
+              value: stats.statefulsets.total,
+              description: `${stats.statefulsets.running} running`,
+            },
+            {
+              label: 'DaemonSets',
+              value: stats.daemonsets.total,
+              description: `${stats.daemonsets.running} running`,
+            },
+            { label: 'Jobs', value: stats.jobs.total },
+            { label: 'CronJobs', value: stats.cronjobs.total },
+            { label: 'ConfigMaps', value: stats.configmaps.total },
+            { label: 'Secrets', value: stats.secrets.total },
+            { label: 'Ingress', value: stats.ingresses.total },
+            { label: 'Namespaces', value: stats.namespaces.total },
+          ]}
+        />
       </div>
 
       <!-- Quick Actions -->
@@ -467,7 +320,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto('/cloud/workloads/pods')}
+              onclick={() => goto('/cloud/pods')}
             >
               <span class="mr-2 text-lg">📦</span>
               View Pods
@@ -475,7 +328,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto('/cloud/workloads/services')}
+              onclick={() => goto('/cloud/services')}
             >
               <span class="mr-2 text-lg">🔗</span>
               View Services
@@ -483,7 +336,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto('/cloud/workloads/deployments')}
+              onclick={() => goto('/cloud/deployments')}
             >
               <span class="mr-2 text-lg">🚀</span>
               View Deployments
@@ -491,7 +344,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto('/cloud/workloads/statefulsets')}
+              onclick={() => goto('/cloud/statefulsets')}
             >
               <span class="mr-2 text-lg">🗄️</span>
               View StatefulSets
@@ -499,7 +352,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto('/cloud/workloads/daemonsets')}
+              onclick={() => goto('/cloud/daemonsets')}
             >
               <span class="mr-2 text-lg">👹</span>
               View DaemonSets
@@ -507,7 +360,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto('/cloud/workloads/jobs')}
+              onclick={() => goto('/cloud/jobs')}
             >
               <span class="mr-2 text-lg">⚙️</span>
               View Jobs
@@ -515,7 +368,7 @@
             <Button
               variant="outline"
               class="w-full justify-start"
-              onclick={() => goto('/cloud/workloads/cronjobs')}
+              onclick={() => goto('/cloud/cronjobs')}
             >
               <span class="mr-2 text-lg">⏰</span>
               View CronJobs

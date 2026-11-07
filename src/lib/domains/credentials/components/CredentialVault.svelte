@@ -17,14 +17,12 @@
   import CredentialCard from './CredentialCard.svelte';
   import CredentialForm from './CredentialForm.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
   import Select from '$lib/components/ui/select.svelte';
-  import { Badge } from '$lib/components/ui/badge';
   import Plus from '~icons/fa6-solid/plus';
   import Search from '~icons/fa6-solid/magnifying-glass';
   import Shield from '~icons/fa6-solid/shield';
-  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import { PageEmpty, PageError, PageHeader, PageLoading, PageStats } from '$lib/components/shell';
   import type { CredentialType, Credential } from '../types';
 
   let searchQuery = $state('');
@@ -126,7 +124,7 @@
   }
 </script>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <PageHeader
     title="Credential Vault"
     description="Securely manage your SSH keys, API tokens, and environment variables"
@@ -139,45 +137,13 @@
     {/snippet}
   </PageHeader>
 
-  <!-- Stats Cards -->
-  <div class="grid gap-4 md:grid-cols-4">
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Total Credentials</CardTitle>
-        <Shield class="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold">{stats.total}</div>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Active</CardTitle>
-        <Badge variant="default">{stats.active}</Badge>
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold text-green-600">{stats.active}</div>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Expired</CardTitle>
-        <Badge variant="destructive">{stats.expired}</Badge>
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold text-red-600">{stats.expired}</div>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Types</CardTitle>
-        <Badge variant="outline">{Object.keys(stats.byType).length}</Badge>
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold">{Object.keys(stats.byType).length}</div>
-      </CardContent>
-    </Card>
-  </div>
+  <PageStats
+    stats={[
+      { label: 'Active', value: stats.active, icon: Shield },
+      { label: 'Expired', value: stats.expired },
+      { label: 'Types', value: Object.keys(stats.byType).length },
+    ]}
+  />
 
   <!-- Filters -->
   <div class="flex flex-col gap-4 sm:flex-row">

@@ -111,9 +111,11 @@
 </script>
 
 <Card class="mx-auto max-w-4xl">
-  <CardHeader>
-    <CardTitle>{isCreateMode ? 'Create New Document' : 'Edit Document'}</CardTitle>
-  </CardHeader>
+  {#if !isCreateMode}
+    <CardHeader>
+      <CardTitle>Edit Document</CardTitle>
+    </CardHeader>
+  {/if}
   <CardContent class="space-y-6">
     <!-- Title -->
     <div class="space-y-2">

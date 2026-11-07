@@ -58,9 +58,10 @@
               taskUi.isMultiSelectMode ? handleTaskSelection(task.id) : handleTaskSelect(task);
             }
           }}
-          role="button"
+          role="group"
           tabindex="0"
-          aria-label="Select task: {task.title}"
+          aria-label="Task: {task.title}"
+          aria-current={taskUi.selectedTaskIds.has(task.id) ? 'true' : undefined}
           class="cursor-pointer p-3 transition-colors hover:bg-muted/50 {taskUi.selectedTaskIds.has(
             task.id
           )
@@ -178,9 +179,9 @@
                       handleTaskSelect(subtask);
                     }
                   }}
-                  role="button"
+                  role="group"
                   tabindex="0"
-                  aria-label="Select subtask: {subtask.title}"
+                  aria-label="Subtask: {subtask.title}"
                   class="cursor-pointer border-l-2 border-l-primary p-3 transition-colors hover:bg-muted/50"
                 >
                   <div class="flex items-center justify-between">

@@ -537,7 +537,7 @@
     </CardHeader>
     <CardContent>
       <Tabs bind:value={activeTab}>
-        <TabsList class="grid w-full grid-cols-3">
+        <TabsList>
           <TabsTrigger value="patterns">
             <Sparkles class="mr-2 h-4 w-4" />
             Patterns ({patterns.length})

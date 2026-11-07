@@ -8,7 +8,11 @@
   import FileText from '~icons/fa6-solid/file-lines';
   import Terminal from '~icons/fa6-solid/terminal';
 
-  export let result: WorkflowResult;
+  interface Props {
+    result: WorkflowResult;
+  }
+
+  let { result }: Props = $props();
 
   function formatDuration(duration: number): string {
     if (duration < 60) {

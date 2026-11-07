@@ -9,13 +9,13 @@
   import { goto } from '$app/navigation';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
   import { Button, buttonVariants } from '$lib/components/ui/button';
-  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import Edit from '~icons/fa6-solid/pen-to-square';
   import FolderOpen from '~icons/fa6-solid/folder-open';
   import Star from '~icons/fa6-solid/star';
   import Terminal from '~icons/fa6-solid/terminal';
   import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import Info from '~icons/fa6-solid/circle-info';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Ellipsis from '~icons/fa6-solid/ellipsis';
   import Layers from '~icons/fa6-solid/layer-group';
@@ -52,7 +52,7 @@
     commandKindLabel,
     type ProjectCommandKind,
   } from '$lib/domains/projects/utils/projectCommandRunner';
-  import { PageHeader, PageLoading, PageError } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageError, ResponsivePanel } from '$lib/components/shell';
   import { toast } from '$lib/utils/toast';
   import { deploymentActions } from '$lib/domains/deployments/stores/deploymentStore';
   import {
@@ -126,6 +126,11 @@
   let runningCommand = $state<ProjectCommandKind | null>(null);
   let isDeploying = $state(false);
   let rescanningModules = $state(false);
+  // Below md the facts rail is a Sheet, opened from the header's "Details" button.
+  let factsOpen = $state(false);
+
+  // The one line on this page a human typed — shown in the rail, where it can wrap.
+  const about = $derived(readableDescription(project?.description));
 
   const loading = $derived(
     projectQuery.isPending || (resolvedProjectId === null && projectsQuery.isPending)
@@ -273,10 +278,6 @@
     }
   }
 
-  function handleBack() {
-    goto('/projects');
-  }
-
   async function handleOpenInEditor() {
     if (!project) return;
     try {
@@ -379,11 +380,6 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <Button variant="ghost" size="sm" onclick={handleBack} class="w-fit gap-2">
-    <ArrowLeft class="h-4 w-4" />
-    Back to Projects
-  </Button>
-
   {#if loading}
     <PageLoading message="Loading project details..." />
   {:else if error}
@@ -391,12 +387,20 @@
   {:else if project}
     {@const currentProject = project}
     {@const githubUrl = toGitHubUrl(currentProject.git_repository)}
-    <PageHeader
-      title={currentProject.name}
-      description={readableDescription(currentProject.description)}
-      badge={currentProject.status}
-    >
+    <PageHeader title={currentProject.name} badge={currentProject.status}>
+      {#snippet subtitle()}
+        <ProjectSummary project={currentProject} />
+      {/snippet}
       {#snippet actions()}
+        <Button
+          variant="outline"
+          size="icon"
+          onclick={() => (factsOpen = true)}
+          class="md:hidden"
+          aria-label="Project details"
+        >
+          <Info class="h-4 w-4" />
+        </Button>
         <Button onclick={handleOpenInEditor} class="gap-2">
           <Code class="h-4 w-4" />
           Open in editor
@@ -454,76 +458,105 @@
       {/snippet}
     </PageHeader>
 
-    <ProjectSummary project={currentProject} />
+    <div class="flex items-start gap-6">
+      <div class="min-w-0 flex-1">
+        <Tabs
+          value={displayTab}
+          onValueChange={(v) => setActiveTab(v as ProjectTab)}
+          class="w-full"
+        >
+          <TabsList>
+            <TabsTrigger value="overview" class="gap-2">
+              <FolderOpen class="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            {#if hasModules}
+              <TabsTrigger value="apps" class="gap-2">
+                <Layers class="h-4 w-4" />
+                Apps ({modules.length})
+              </TabsTrigger>
+            {/if}
+            <TabsTrigger value="actions" class="gap-2">
+              <Workflow class="h-4 w-4" />
+              Actions
+            </TabsTrigger>
+            <TabsTrigger value="terminal" class="gap-2">
+              <Terminal class="h-4 w-4" />
+              Terminal
+            </TabsTrigger>
+          </TabsList>
 
-    <Tabs value={displayTab} onValueChange={(v) => setActiveTab(v as ProjectTab)} class="w-full">
-      <TabsList class="grid w-full {hasModules ? 'grid-cols-4' : 'grid-cols-3'}">
-        <TabsTrigger value="overview" class="gap-2">
-          <FolderOpen class="h-4 w-4" />
-          Overview
-        </TabsTrigger>
-        {#if hasModules}
-          <TabsTrigger value="apps" class="gap-2">
-            <Layers class="h-4 w-4" />
-            Apps ({modules.length})
-          </TabsTrigger>
-        {/if}
-        <TabsTrigger value="actions" class="gap-2">
-          <Workflow class="h-4 w-4" />
-          Actions
-        </TabsTrigger>
-        <TabsTrigger value="terminal" class="gap-2">
-          <Terminal class="h-4 w-4" />
-          Terminal
-        </TabsTrigger>
-      </TabsList>
+          <TabsContent value="overview" class="mt-6 space-y-6">
+            <ProjectCommands
+              project={currentProject}
+              {runningCommand}
+              {refreshing}
+              onRun={handleRunCommand}
+              onRedetect={handleRedetect}
+              onSaved={reloadProject}
+            />
+            {#if currentProject.last_opened}
+              <p class="text-xs text-muted-foreground">
+                Last opened {timeAgo(currentProject.last_opened)}
+              </p>
+            {/if}
+          </TabsContent>
 
-      <TabsContent value="overview" class="mt-6 space-y-6">
-        <ProjectCommands
-          project={currentProject}
-          {runningCommand}
-          {refreshing}
-          onRun={handleRunCommand}
-          onRedetect={handleRedetect}
-          onSaved={reloadProject}
-        />
-        <ProjectTechStack
-          project={currentProject}
-          {modules}
-          {refreshing}
-          onRedetect={handleRedetect}
-        />
-        <ProjectGitCard project={currentProject} {githubUrl} />
-        {#if currentProject.last_opened}
-          <p class="text-xs text-muted-foreground">
-            Last opened {timeAgo(currentProject.last_opened)}
-          </p>
-        {/if}
-      </TabsContent>
-
-      {#if hasModules}
-        <TabsContent value="apps" class="mt-6">
-          <ProjectModules {modules} rescanning={rescanningModules} onRescan={handleRescanModules} />
-        </TabsContent>
-      {/if}
-
-      <TabsContent value="actions" class="mt-6 space-y-6">
-        <ProjectActionsPanel project={currentProject} enabled={activeTab === 'actions'} />
-      </TabsContent>
-
-      <TabsContent value="terminal" class="mt-6">
-        <Card class="overflow-hidden">
-          <CardContent class="p-0">
-            <div class="h-[600px]">
-              <ProjectTerminal
-                projectId={currentProject.id}
-                projectName={currentProject.name}
-                projectPath={currentProject.path}
+          {#if hasModules}
+            <TabsContent value="apps" class="mt-6">
+              <ProjectModules
+                {modules}
+                rescanning={rescanningModules}
+                onRescan={handleRescanModules}
               />
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+            </TabsContent>
+          {/if}
+
+          <TabsContent value="actions" class="mt-6 space-y-6">
+            <ProjectActionsPanel project={currentProject} enabled={activeTab === 'actions'} />
+          </TabsContent>
+
+          <TabsContent value="terminal" class="mt-6">
+            <Card class="overflow-hidden">
+              <CardContent class="p-0">
+                <div class="h-[600px]">
+                  <ProjectTerminal
+                    projectId={currentProject.id}
+                    projectName={currentProject.name}
+                    projectPath={currentProject.path}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <!-- Reference facts stay on screen while you work in Actions or Terminal. -->
+      <ResponsivePanel bind:open={factsOpen} side="right" desktopClass="w-80" title="Details">
+        <div class="space-y-4 overflow-y-auto p-4">
+          {#if about}
+            <Card>
+              <CardHeader>
+                <CardTitle class="flex items-center gap-2">
+                  <Info class="h-5 w-5" />
+                  About
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p class="text-sm text-muted-foreground">{about}</p>
+              </CardContent>
+            </Card>
+          {/if}
+          <ProjectTechStack
+            project={currentProject}
+            {modules}
+            {refreshing}
+            onRedetect={handleRedetect}
+          />
+          <ProjectGitCard project={currentProject} {githubUrl} />
+        </div>
+      </ResponsivePanel>
+    </div>
   {/if}
 </div>

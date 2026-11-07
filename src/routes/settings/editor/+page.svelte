@@ -28,11 +28,6 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <div>
-    <h2 class="text-2xl font-bold tracking-tight">Editor Settings</h2>
-    <p class="text-muted-foreground">Configure code editor preferences and behavior</p>
-  </div>
-
   {#if settingsData}
     <EditorSettings settings={settingsData.editor} onUpdate={handleEditorUpdate} />
   {:else}

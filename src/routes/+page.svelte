@@ -11,68 +11,10 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Separator } from '$lib/components/ui/separator';
   import { createDashboardOverviewQuery } from '$lib/domains/dashboard/queries/dashboardQueries';
-  import { PageLoading } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageStats } from '$lib/components/shell';
 
   const dashboardQuery = createDashboardOverviewQuery();
   const overview = $derived(dashboardQuery.data);
-
-  // Get current time for greeting
-  const currentHour = new Date().getHours();
-  const greeting =
-    currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
-
-  // Quick actions configuration
-  const quickActions = [
-    {
-      title: 'New Project',
-      description: 'Create a new project',
-      icon: 'folder-plus',
-      url: '/projects/create',
-      color: 'text-primary',
-    },
-    {
-      title: 'New Task',
-      description: 'Add a new task',
-      icon: 'check-square',
-      url: '/tasks/create',
-      color: 'text-status-success',
-    },
-    {
-      title: 'Terminal',
-      description: 'Open terminal',
-      icon: 'terminal',
-      url: '/terminal',
-      color: 'text-foreground',
-    },
-    {
-      title: 'SDK Manager',
-      description: 'Manage SDK versions',
-      icon: 'code',
-      url: '/sdk',
-      color: 'text-status-warning',
-    },
-    {
-      title: 'Cloud Resources',
-      description: 'Manage cloud resources',
-      icon: 'cloud',
-      url: '/cloud',
-      color: 'text-status-info',
-    },
-    {
-      title: 'Credentials',
-      description: 'Manage credentials',
-      icon: 'lock',
-      url: '/credentials',
-      color: 'text-status-error',
-    },
-    {
-      title: 'Automation',
-      description: 'Manage reusable blocks',
-      icon: 'blocks',
-      url: '/automation',
-      color: 'text-primary',
-    },
-  ];
 
   // Main navigation items
   const mainNavItems = $derived([
@@ -135,182 +77,26 @@
   <title>Overview - Portal Desktop</title>
 </svelte:head>
 
-<div class="space-y-6">
-  <!-- Welcome Header -->
-  <div class="mb-8">
-    <h1 class="mb-2 text-4xl font-bold text-foreground">{greeting}!</h1>
-    <p class="text-lg text-muted-foreground">
-      Welcome to Portal Desktop. Here's what's happening with your workspace.
-    </p>
-  </div>
+<div class="space-y-4">
+  <PageHeader title="Overview" description="What's happening with your workspace">
+    {#snippet actions()}
+      <Button size="sm" onclick={() => goto('/projects/create')}>New Project</Button>
+      <Button size="sm" variant="outline" onclick={() => goto('/tasks/create')}>New Task</Button>
+    {/snippet}
+  </PageHeader>
 
   {#if dashboardQuery.isPending && !overview}
     <PageLoading message="Loading dashboard..." />
   {:else}
-    <!-- Stats Overview -->
-    <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-      <Card>
-        <CardContent class="p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="mb-1 text-sm text-muted-foreground">Total Tasks</p>
-              <p class="text-3xl font-bold">
-                {overview?.task_stats.total ?? 0}
-              </p>
-              {#if (overview?.task_stats.completed ?? 0) > 0}
-                <p class="mt-1 text-xs text-status-success">
-                  {overview?.task_stats.completed ?? 0} completed
-                </p>
-              {/if}
-            </div>
-            <div
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-status-success-bg"
-            >
-              <svg
-                class="h-6 w-6 text-status-success"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent class="p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="mb-1 text-sm text-muted-foreground">Projects</p>
-              <p class="text-3xl font-bold">
-                {overview?.project_stats.total_projects ?? 0}
-              </p>
-              {#if (overview?.project_stats.recent_projects.length ?? 0) > 0}
-                <p class="mt-1 text-xs text-primary">
-                  {overview?.project_stats.recent_projects.length ?? 0} recent
-                </p>
-              {/if}
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <svg
-                class="h-6 w-6 text-primary"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                />
-              </svg>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent class="p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="mb-1 text-sm text-muted-foreground">Running Services</p>
-              <p class="text-3xl font-bold">
-                {overview?.running_services_count ?? 0}
-              </p>
-              <p class="mt-1 text-xs text-muted-foreground">SDK services</p>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <svg
-                class="h-6 w-6 text-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
-                />
-              </svg>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent class="p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="mb-1 text-sm text-muted-foreground">Completion Rate</p>
-              <p class="text-3xl font-bold">
-                {overview?.task_stats.completion_percentage ?? 0}%
-              </p>
-              <p class="mt-1 text-xs text-muted-foreground">Tasks completed</p>
-            </div>
-            <div
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-status-warning-bg"
-            >
-              <svg
-                class="h-6 w-6 text-status-warning"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-
-    <!-- Quick Actions -->
-    <Card>
-      <CardHeader>
-        <CardTitle>Quick Actions</CardTitle>
-        <CardDescription>Common tasks and shortcuts</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {#each quickActions as action}
-            <Button
-              variant="ghost"
-              class="flex h-24 flex-col gap-2 bg-muted/60 transition-colors hover:bg-accent"
-              onclick={() => goto(action.url)}
-            >
-              <svg
-                class="h-6 w-6 {action.color}"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d={getIcon(action.icon)}
-                />
-              </svg>
-              <span class="text-sm font-medium">{action.title}</span>
-            </Button>
-          {/each}
-        </div>
-      </CardContent>
-    </Card>
+    <PageStats
+      stats={[
+        { label: 'Tasks', value: overview?.task_stats.total ?? 0 },
+        { label: 'Completed', value: overview?.task_stats.completed ?? 0 },
+        { label: 'Projects', value: overview?.project_stats.total_projects ?? 0 },
+        { label: 'Running services', value: overview?.running_services_count ?? 0 },
+        { label: 'Completion', value: `${overview?.task_stats.completion_percentage ?? 0}%` },
+      ]}
+    />
 
     <!-- Main Navigation -->
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">

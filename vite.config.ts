@@ -12,6 +12,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const host = process.env.TAURI_DEV_HOST;
 const isProduction = process.env.NODE_ENV === 'production';
+// A second dev instance (scripts/dev-instance.mjs) needs its own ports so it does
+// not collide with, or kill-port, the first. Unset means instance 1: 1420 as before.
+const devPort = Number(process.env.PORTAL_DEV_PORT ?? 1420);
 
 /**
  * devicon's @font-face lists eot/ttf/woff/svg. Vite emits an asset for every
@@ -62,7 +65,7 @@ export default defineConfig({
     minify: isProduction ? 'esbuild' : false,
   },
   server: {
-    port: 1420,
+    port: devPort,
     strictPort: true,
     // Allow network access for QR code sharing feature
     // Set TAURI_DEV_HOST environment variable to your local IP for network access
@@ -73,7 +76,7 @@ export default defineConfig({
       ? {
           protocol: 'ws',
           host,
-          port: 1421,
+          port: devPort + 1,
         }
       : undefined,
     watch: {
@@ -104,7 +107,7 @@ export default defineConfig({
         test: {
           name: 'server',
           environment: 'node',
-          include: ['src/**/*.{test,spec}.{js,ts}'],
+          include: ['src/**/*.{test,spec}.{js,ts}', 'eslint-rules/*.{test,spec}.mjs'],
           exclude: ['src/**/*.svelte.{test,spec}.{js,ts}'],
         },
       },

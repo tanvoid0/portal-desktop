@@ -29,6 +29,8 @@
     showPipeline?: boolean;
     emptyTitle?: string;
     emptyDescription?: string;
+    /** Highlights the row currently shown in a detail view, if any. */
+    selectedId?: string | null;
     onRefresh?: () => void;
     onSelect?: (execution: PipelineExecutionListItem) => void;
   }
@@ -42,6 +44,7 @@
     showPipeline = true,
     emptyTitle = 'No pipeline runs yet',
     emptyDescription = 'Run a pipeline to see execution history here.',
+    selectedId = null,
     onRefresh,
     onSelect,
   }: Props = $props();
@@ -76,7 +79,10 @@
           <Button
             type="button"
             variant="outline"
-            class="h-auto w-full justify-start rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+            class="h-auto w-full justify-start rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 {selectedId ===
+            execution.id
+              ? 'border-primary bg-muted'
+              : ''}"
             onclick={() => onSelect?.(execution)}
             disabled={!onSelect}
           >

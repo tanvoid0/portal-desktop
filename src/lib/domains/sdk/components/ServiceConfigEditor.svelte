@@ -284,7 +284,7 @@
 
     <!-- Main Content -->
     <Tabs bind:value={activeTab} class="flex flex-1 flex-col">
-      <TabsList class="grid w-full grid-cols-2">
+      <TabsList>
         <TabsTrigger value="files">
           <FileText class="mr-2 h-4 w-4" />
           Configuration Files

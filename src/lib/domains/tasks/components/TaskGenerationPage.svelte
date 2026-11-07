@@ -490,7 +490,7 @@
 </script>
 
 <div class="min-h-screen bg-background">
-  <div class="container mx-auto p-6">
+  <div>
     <!-- Header -->
     <div class="mb-6">
       <div class="mb-4 flex items-center justify-between">

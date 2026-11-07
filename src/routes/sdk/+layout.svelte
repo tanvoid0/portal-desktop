@@ -13,7 +13,7 @@
   let { children }: { children: Snippet<[]> } = $props();
 
   let currentPath = $derived(page.url.pathname);
-  const navigationItemIds = ['/sdk'];
+  const navigationItemIds = ['/sdk', '/sdk/managers', '/sdk/services', '/sdk/versions'];
 </script>
 
 <ShellSidebarLayout sidebarClass="flex h-full min-h-0 flex-col" mobileTriggerLabel="SDK menu">

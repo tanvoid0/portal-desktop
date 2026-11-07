@@ -85,7 +85,7 @@
   }
 
   function handleEditScript(script: Block) {
-    goto(`/scripts/${script.id}?edit=true`);
+    goto(`/scripts/${script.id}/edit`);
   }
 
   async function handleDeleteScript(scriptId: string) {
@@ -157,7 +157,7 @@
   <title>Scripts - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <PageHeader
     title="Scripts"
     description="Create, manage, and run reusable scripts for your workflows"

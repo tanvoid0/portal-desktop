@@ -238,7 +238,9 @@
   }
 </script>
 
-<div class="flex h-full flex-col gap-4">
+<!-- @container: the steps/logs split follows this component's own width, so the same
+	 markup works full-page and in the narrow /pipeline-runs rail -->
+<div class="@container flex h-full flex-col gap-4">
   <PageHeader
     title="Pipeline Run"
     description={execution
@@ -276,7 +278,7 @@
   {:else if !execution}
     <PageLoading message="Loading execution..." />
   {:else}
-    <div class="grid min-h-[480px] flex-1 gap-4 lg:grid-cols-[280px_1fr]">
+    <div class="grid min-h-[480px] flex-1 gap-4 @3xl:grid-cols-[280px_1fr]">
       <!-- Step timeline -->
       <Card class="h-fit">
         <CardHeader class="pb-2">

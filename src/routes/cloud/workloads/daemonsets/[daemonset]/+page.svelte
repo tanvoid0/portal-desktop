@@ -13,7 +13,7 @@
   import RefreshCw from '~icons/fa6-solid/rotate';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
   import Loading from '$lib/components/ui/loading.svelte';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
   import { toastActions } from '$lib/utils/toast';
   import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
 
@@ -123,7 +123,7 @@
 
 <div class="space-y-6">
   <div class="flex items-center gap-4">
-    <Button variant="ghost" size="sm" onclick={() => goto('/cloud/workloads/daemonsets')}>
+    <Button variant="ghost" size="sm" onclick={() => goto('/cloud/daemonsets')}>
       <ArrowLeft class="mr-2 h-4 w-4" />
       Back
     </Button>
@@ -139,17 +139,12 @@
     <PageError title="Failed to load daemonset" message={error} onRetry={loadDaemonSet} />
   {:else if daemonSet}
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-3xl font-bold">{daemonSet.name}</h1>
-          <p class="mt-1 text-muted-foreground">
-            Namespace: {daemonSet.namespace}
-          </p>
-        </div>
-        <Badge variant={daemonSet.status === 'running' ? 'default' : 'secondary'}>
-          {daemonSet.status}
-        </Badge>
-      </div>
+      <PageHeader
+        title={daemonSet.name}
+        description={`Namespace: ${daemonSet.namespace}`}
+        badge={daemonSet.status}
+        badgeVariant={daemonSet.status === 'running' ? 'default' : 'secondary'}
+      />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>

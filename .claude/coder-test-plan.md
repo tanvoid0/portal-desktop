@@ -270,7 +270,6 @@ and start a new session; either order is now safe, and neither corrupts the old 
 Gates after the fixes: `pnpm check` 0 errors, `pnpm lint` 0 errors, and
 `src/lib/domains/coder/utils/feedBlocks.test.ts` 5/5.
 
-
 ---
 
 ## Part D — model accuracy, measured. 2026-11-06
@@ -294,12 +293,12 @@ and neither is a non-empty diff.
 
 ### Scoreboard
 
-| task                                           | gemma4:e4b | qwen3:8b  |
-| ---------------------------------------------- | ---------- | --------- |
-| T1 — change one heading string                 | **2/2**    | **2/2**   |
-| T2 — add a Text element showing a derived count | 1/2        | 1/2       |
-| T3 — add a three-option filter row that filters | 0/2        | 0/2       |
-| **total, compiling**                           | **3/6**    | **3/6**   |
+| task                                            | gemma4:e4b | qwen3:8b |
+| ----------------------------------------------- | ---------- | -------- |
+| T1 — change one heading string                  | **2/2**    | **2/2**  |
+| T2 — add a Text element showing a derived count | 1/2        | 1/2      |
+| T3 — add a three-option filter row that filters | 0/2        | 0/2      |
+| **total, compiling**                            | **3/6**    | **3/6**  |
 
 How the failures failed:
 

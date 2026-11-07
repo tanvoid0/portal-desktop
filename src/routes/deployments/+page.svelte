@@ -12,6 +12,6 @@
   <title>Deployments - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto py-6">
+<div>
   <DeploymentDashboard />
 </div>

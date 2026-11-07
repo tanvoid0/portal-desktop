@@ -249,7 +249,7 @@
   <title>Quick Run - Automation - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6">
   <PageHeader
     title="Quick Run"
     description="Pick any folder, queue blocks, and run — no pipeline setup required"

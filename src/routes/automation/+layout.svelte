@@ -24,7 +24,7 @@
 
 <div class="divider-edge-b divider-edge-full bg-background px-[var(--content-gutter)] pt-4">
   <Tabs value={activeTab}>
-    <TabsList class="h-auto w-full justify-start overflow-x-auto">
+    <TabsList class="h-auto overflow-x-auto">
       {#each tabs as tab}
         <TabsTrigger value={tab.id} class="shrink-0" onclick={() => goto(tab.url)}>
           {tab.label}

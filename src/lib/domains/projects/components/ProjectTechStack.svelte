@@ -1,5 +1,5 @@
 <!--
-  "What it's built with": a plain-language sentence plus badges for the detected stack.
+  "What it's built with": badges for the detected stack.
 -->
 
 <script lang="ts">
@@ -9,21 +9,11 @@
   import type { Project, ProjectModule } from '$lib/domains/projects/types';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import TechIcon from '$lib/components/ui/tech-icon.svelte';
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
   import { getFrameworkColor } from '$lib/domains/projects/utils/display';
-  import {
-    describeModules,
-    stackIcon,
-    summarizeStacks,
-  } from '$lib/domains/projects/utils/moduleStacks';
+  import { stackIcon, summarizeStacks } from '$lib/domains/projects/utils/moduleStacks';
 
   interface Props {
     project: Project;
@@ -51,19 +41,6 @@
   const ownStack = $derived(frameworks.length + languages.length + packageManagers.length > 0);
   const isMonorepo = $derived(!ownStack && modules.length > 0);
   const hasStack = $derived(ownStack || isMonorepo);
-
-  const sentence = $derived.by(() => {
-    if (isMonorepo) return `A multi-app project: ${describeModules(modules)}.`;
-    const join = (items: { name: string }[]) => items.map((i) => i.name).join(' and ');
-    const main = frameworks.length ? join(frameworks) : join(languages);
-    if (!main) return packageManagers.length ? `Uses ${join(packageManagers)}.` : '';
-    let text = `A ${main} project`;
-    if (frameworks.length && languages.length) text += ` written in ${join(languages)}`;
-    if (packageManagers.length) text += `, using ${join(packageManagers)}`;
-    text += '.';
-    if (modules.length > 1) text += ` It holds ${modules.length} apps or packages (see Apps).`;
-    return text;
-  });
 </script>
 
 <Card>
@@ -72,13 +49,11 @@
       <Layers class="h-5 w-5" />
       What it's built with
     </CardTitle>
-    <CardDescription>The languages and tools this project uses.</CardDescription>
   </CardHeader>
   <CardContent class="space-y-3">
     {#if !registryReady}
       <p class="text-sm text-muted-foreground">Loading…</p>
     {:else if hasStack}
-      {#if sentence}<p class="text-sm">{sentence}</p>{/if}
       <div class="flex flex-wrap gap-2">
         {#if isMonorepo}
           {#each summarizeStacks(modules) as s (s.stack)}

@@ -45,7 +45,7 @@
   } from '$lib/domains/sdk/services/packageManagerService';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
@@ -349,19 +349,17 @@
   {#if loading && availableManagers.length === 0}
     <PageLoading message="Loading package managers..." />
   {:else}
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex-1">
-        <h1 class="text-3xl font-bold">Software Installer</h1>
-        <p class="text-muted-foreground">Install and manage software via package managers</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" onclick={loadAvailableManagers} disabled={loading}>
+    <PageHeader
+      title="Software Installer"
+      description="Install and manage software via package managers"
+    >
+      {#snippet actions()}
+        <Button variant="outline" size="sm" onclick={loadAvailableManagers} disabled={loading}>
           <RefreshCw class="mr-2 h-4 w-4 {loading ? 'animate-spin' : ''}" />
           Refresh
         </Button>
-      </div>
-    </div>
+      {/snippet}
+    </PageHeader>
 
     {#if error}
       <PageError

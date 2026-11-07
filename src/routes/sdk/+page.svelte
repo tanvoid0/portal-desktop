@@ -5,9 +5,7 @@
 
 <script lang="ts">
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { page } from '$app/state';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import Database from '~icons/fa6-solid/database';
@@ -23,27 +21,13 @@
   import Activity from '~icons/fa6-solid/wave-square';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Zap from '~icons/fa6-solid/bolt';
-  import VersionsPanel from '$lib/domains/sdk/components/VersionsPanel.svelte';
   import Devicon from '$lib/components/ui/devicon.svelte';
   import { PageError, PageHeader, PageStats } from '$lib/components/shell';
   import { sdkConfigsQuery, sdkManagersQuery } from '$lib/domains/sdk/queries/sdkQueries';
   import { formatSdkVersion } from '$lib/domains/sdk/utils/normalizeVersions';
   import { goto } from '$app/navigation';
-  import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
 
-  const SDK_OVERVIEW_TABS = ['overview', 'managers', 'services', 'versions'] as const;
-  type SdkOverviewTab = (typeof SDK_OVERVIEW_TABS)[number];
-
-  const activeTab = $derived(resolveUrlTab(page.url.searchParams, SDK_OVERVIEW_TABS, 'overview'));
-
-  function setActiveTab(tab: SdkOverviewTab) {
-    goto(buildTabUrl(page.url.pathname, page.url.searchParams, tab), {
-      replaceState: true,
-      reset: false,
-    });
-  }
-
-  // Overview counters, Quick Navigation, Managers and Services tabs read the same
+  // Overview counters and Quick Navigation read the same
   // queries as the sidebar.
   const queryClient = useQueryClient();
   const configsQuery = createQuery(sdkConfigsQuery);
@@ -111,8 +95,8 @@
 
   function getSDKRoute(sdkId: string, category: string): string {
     const normalizedId = sdkId.toLowerCase().trim();
-    // SDK Managers go to /sdk/manager/[name]; everything else to /sdk/[sdk].
-    return category === 'manager' ? `/sdk/manager/${normalizedId}` : `/sdk/${normalizedId}`;
+    // SDK Managers go to /sdk/managers/[name]; everything else to /sdk/[sdk].
+    return category === 'manager' ? `/sdk/managers/${normalizedId}` : `/sdk/${normalizedId}`;
   }
 
   // Organize SDKs by category
@@ -251,187 +235,103 @@
     ]}
   />
 
-  <!-- Main Content Tabs -->
-  <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SdkOverviewTab)} class="w-full">
-    <TabsList>
-      <TabsTrigger value="overview">Overview</TabsTrigger>
-      <TabsTrigger value="managers">SDK Managers</TabsTrigger>
-      <TabsTrigger value="services">Services</TabsTrigger>
-      <TabsTrigger value="versions">Versions</TabsTrigger>
-    </TabsList>
+  <!-- Loading State -->
+  {#if pending}
+    <Card>
+      <CardContent class="py-8">
+        <div class="flex flex-col items-center justify-center space-y-4">
+          <RefreshCw class="h-8 w-8 animate-spin text-muted-foreground" />
+          <p class="text-sm text-muted-foreground">Loading SDK data...</p>
+        </div>
+      </CardContent>
+    </Card>
+  {:else}
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Settings class="h-5 w-5 text-muted-foreground" />
+          SDK Tools
+        </CardTitle>
+        <p class="mt-1 text-sm text-muted-foreground">Jump to common SDK sections.</p>
+      </CardHeader>
+      <CardContent>
+        <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+          <Button variant="outline" onclick={() => goto('/sdk/managers')}>
+            <Settings class="mr-2 h-4 w-4" />
+            SDK Managers
+          </Button>
+          <Button variant="outline" onclick={() => goto('/sdk/software-installer')}>
+            <Package class="mr-2 h-4 w-4" />
+            Software Installer
+          </Button>
+          <Button variant="outline" onclick={() => goto('/sdk/services')}>
+            <Play class="mr-2 h-4 w-4" />
+            Services
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
 
-    <TabsContent value="overview" class="space-y-6">
-      <!-- Loading State -->
-      {#if pending}
-        <Card>
-          <CardContent class="py-8">
-            <div class="flex flex-col items-center justify-center space-y-4">
-              <RefreshCw class="h-8 w-8 animate-spin text-muted-foreground" />
-              <p class="text-sm text-muted-foreground">Loading SDK data...</p>
+    <!-- Quick Navigation Section -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Activity class="h-5 w-5" />
+          Quick Navigation
+        </CardTitle>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Quick access to all SDKs and managers. Green indicates installed/active, gray indicates
+          not installed.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div class="space-y-6">
+          {@render sdkGroup('SDK Managers', Package, quickNavSDKs.manager)}
+          {@render sdkGroup('Language & Runtime', Code, quickNavSDKs.language)}
+          {@render sdkGroup('Database Server', Database, quickNavSDKs.database)}
+          {@render sdkGroup('Web Server', Globe, quickNavSDKs.web)}
+          {@render sdkGroup('Container Platform', Container, quickNavSDKs.container)}
+
+          {#if quickNavEmpty}
+            <div class="py-8 text-center text-muted-foreground">
+              <AlertCircle class="mx-auto mb-2 h-12 w-12 opacity-50" />
+              <p class="mb-2 text-sm">No SDKs detected.</p>
+              <p class="text-xs">
+                Click "Refresh" to detect installed SDKs, or install SDK managers to get started.
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      {:else}
-        <Card>
-          <CardHeader>
-            <CardTitle class="flex items-center gap-2">
-              <Settings class="h-5 w-5 text-muted-foreground" />
-              SDK Tools
-            </CardTitle>
-            <p class="mt-1 text-sm text-muted-foreground">Jump to common SDK sections.</p>
-          </CardHeader>
-          <CardContent>
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-              <Button variant="outline" onclick={() => setActiveTab('managers')}>
-                <Settings class="mr-2 h-4 w-4" />
-                SDK Managers
-              </Button>
-              <Button variant="outline" onclick={() => goto('/sdk/software-installer')}>
-                <Package class="mr-2 h-4 w-4" />
-                Software Installer
+          {/if}
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Quick Start Section -->
+    {#if !queryError && installedSDKCount === 0}
+      <Card class="border-dashed">
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2">
+            <Zap class="h-5 w-5 text-primary" />
+            Quick Start
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-4">
+            <p class="text-muted-foreground">
+              Get started with SDK management. Install your first SDK or start a service.
+            </p>
+            <div class="flex gap-2">
+              <Button onclick={() => goto('/sdk/versions')}>
+                <Download class="mr-2 h-4 w-4" />
+                Install SDK
               </Button>
               <Button variant="outline" onclick={() => goto('/sdk/services')}>
                 <Play class="mr-2 h-4 w-4" />
-                Services
+                Start Service
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        <!-- Quick Navigation Section -->
-        <Card>
-          <CardHeader>
-            <CardTitle class="flex items-center gap-2">
-              <Activity class="h-5 w-5" />
-              Quick Navigation
-            </CardTitle>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Quick access to all SDKs and managers. Green indicates installed/active, gray
-              indicates not installed.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div class="space-y-6">
-              {@render sdkGroup('SDK Managers', Package, quickNavSDKs.manager)}
-              {@render sdkGroup('Language & Runtime', Code, quickNavSDKs.language)}
-              {@render sdkGroup('Database Server', Database, quickNavSDKs.database)}
-              {@render sdkGroup('Web Server', Globe, quickNavSDKs.web)}
-              {@render sdkGroup('Container Platform', Container, quickNavSDKs.container)}
-
-              {#if quickNavEmpty}
-                <div class="py-8 text-center text-muted-foreground">
-                  <AlertCircle class="mx-auto mb-2 h-12 w-12 opacity-50" />
-                  <p class="mb-2 text-sm">No SDKs detected.</p>
-                  <p class="text-xs">
-                    Click "Refresh" to detect installed SDKs, or install SDK managers to get
-                    started.
-                  </p>
-                </div>
-              {/if}
-            </div>
-          </CardContent>
-        </Card>
-
-        <!-- Quick Start Section -->
-        {#if !queryError && installedSDKCount === 0}
-          <Card class="border-dashed">
-            <CardHeader>
-              <CardTitle class="flex items-center gap-2">
-                <Zap class="h-5 w-5 text-primary" />
-                Quick Start
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-4">
-                <p class="text-muted-foreground">
-                  Get started with SDK management. Install your first SDK or start a service.
-                </p>
-                <div class="flex gap-2">
-                  <Button onclick={() => setActiveTab('versions')}>
-                    <Download class="mr-2 h-4 w-4" />
-                    Install SDK
-                  </Button>
-                  <Button variant="outline" onclick={() => setActiveTab('services')}>
-                    <Play class="mr-2 h-4 w-4" />
-                    Start Service
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        {/if}
-      {/if}
-    </TabsContent>
-
-    <TabsContent value="managers" class="space-y-6">
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4">
-        {#each managerList as manager (manager.id)}
-          <Card class="min-w-0">
-            <CardHeader class="flex flex-row items-center justify-between gap-2 space-y-0">
-              <CardTitle class="min-w-0 text-base break-words">{manager.display_name}</CardTitle>
-              {#if manager.installed}
-                <Badge variant="default" class="shrink-0 bg-green-100 text-green-800">
-                  <CheckCircle class="mr-1 h-3 w-3" />
-                  Installed
-                </Badge>
-              {:else}
-                <Badge variant="outline" class="shrink-0 text-gray-500">Not Installed</Badge>
-              {/if}
-            </CardHeader>
-            <CardContent class="space-y-3">
-              {#if manager.version}
-                <p class="text-xs text-muted-foreground">{formatSdkVersion(manager.version)}</p>
-              {/if}
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={() => goto(`/sdk/manager/${manager.id}`)}
-              >
-                View Details
-              </Button>
-            </CardContent>
-          </Card>
-        {/each}
-      </div>
-      {#if !pending && managerList.length === 0}
-        <p class="py-8 text-center text-sm text-muted-foreground">No SDK managers found.</p>
-      {/if}
-    </TabsContent>
-
-    <TabsContent value="services" class="space-y-6">
-      <div class="grid gap-3">
-        {#each serviceConfigs as c (c.id)}
-          <Card>
-            <CardContent class="flex items-center justify-between gap-4 p-4">
-              <div class="min-w-0">
-                <div class="font-medium">{c.display_name}</div>
-                {#if c.service_port}
-                  <div class="text-sm text-muted-foreground">Port {c.service_port}</div>
-                {/if}
-              </div>
-              <div class="flex shrink-0 items-center gap-2">
-                {#if c.service_running}
-                  <Badge variant="default" class="bg-green-100 text-green-800">Running</Badge>
-                {:else}
-                  <Badge variant="outline" class="text-gray-500">Stopped</Badge>
-                {/if}
-                <Button variant="outline" size="sm" onclick={() => goto(`/sdk/${c.id}`)}>
-                  Manage
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        {/each}
-      </div>
-      {#if !pending && serviceConfigs.length === 0}
-        <p class="py-8 text-center text-sm text-muted-foreground">No SDK services found.</p>
-      {/if}
-    </TabsContent>
-
-    <TabsContent value="versions" class="space-y-6">
-      {#if activeTab === 'versions'}
-        <VersionsPanel />
-      {/if}
-    </TabsContent>
-  </Tabs>
+          </div>
+        </CardContent>
+      </Card>
+    {/if}
+  {/if}
 </div>

@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import DocumentEditor from '$lib/domains/documents/components/DocumentEditor.svelte';
+  import { PageHeader } from '$lib/components/shell';
   import type { Document } from '$lib/domains/documents';
   import { toastActions } from '$lib/utils/toast';
   import { taskActions } from '$lib/domains/tasks';
@@ -63,7 +64,8 @@
   <title>Create Document - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto py-6">
+<div class="space-y-6">
+  <PageHeader title="New document" />
   <DocumentEditor
     onSave={handleSave}
     onCancel={handleCancel}

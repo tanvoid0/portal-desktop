@@ -72,7 +72,7 @@
   <title>{document ? document.title : 'Document'} - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto py-6">
+<div>
   <div class="mb-4">
     <Button variant="ghost" onclick={() => goto('/documents')}>
       <FaArrowLeft class="mr-2 h-4 w-4" />

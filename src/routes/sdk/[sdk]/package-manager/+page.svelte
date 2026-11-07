@@ -17,7 +17,7 @@
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import Settings from '~icons/fa6-solid/gear';
   import { goto } from '$app/navigation';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
 
   // Get SDK ID from URL
   let sdkId = $derived(page.params.sdk);
@@ -65,19 +65,16 @@
     <PageError title="Failed to load package managers" message={error} onRetry={loadData} />
   {:else if sdkConfig}
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
-            <ArrowLeft class="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 class="text-3xl font-bold">Package Managers</h1>
-            <p class="text-muted-foreground">
-              {sdkConfig.display_name} Package Managers
-            </p>
-          </div>
+      <div class="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
+          <ArrowLeft class="mr-2 h-4 w-4" />
+          Back
+        </Button>
+        <div class="min-w-0 flex-1">
+          <PageHeader
+            title="Package Managers"
+            description={`${sdkConfig.display_name} package managers`}
+          />
         </div>
       </div>
 

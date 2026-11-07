@@ -34,7 +34,7 @@
   import { invokeClient } from '$lib/utils/invokeClient';
   import ModelList from '$lib/components/ModelList.svelte';
   import ModelTreeList from '$lib/components/ModelTreeList.svelte';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
 
   const MODEL_TABS = ['local', 'library'] as const;
@@ -249,25 +249,21 @@
     />
   {:else if sdkConfig}
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
-            <ArrowLeft class="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 class="text-3xl font-bold">Models</h1>
-            <p class="text-muted-foreground">{sdkConfig.display_name}</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          {#if serviceInfo?.running}
-            <Badge variant="default" class="bg-green-500 text-white">Running</Badge>
-          {:else}
-            <Badge variant="outline" class="text-muted-foreground">Stopped</Badge>
-          {/if}
+      <div class="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
+          <ArrowLeft class="mr-2 h-4 w-4" />
+          Back
+        </Button>
+        <div class="min-w-0 flex-1">
+          <PageHeader title="Models" description={sdkConfig.display_name}>
+            {#snippet actions()}
+              {#if serviceInfo?.running}
+                <Badge variant="default" class="bg-green-500 text-white">Running</Badge>
+              {:else}
+                <Badge variant="outline" class="text-muted-foreground">Stopped</Badge>
+              {/if}
+            {/snippet}
+          </PageHeader>
         </div>
       </div>
 

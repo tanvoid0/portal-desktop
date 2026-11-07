@@ -31,7 +31,6 @@
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import ArrowRight from '~icons/fa6-solid/arrow-right';
   import RefreshCw from '~icons/fa6-solid/rotate';
-  import Home from '~icons/fa6-solid/house';
   import QrCode from '~icons/fa6-solid/qrcode';
   import Shield from '~icons/fa6-solid/shield';
   import Gear from '~icons/fa6-solid/gear';
@@ -113,10 +112,6 @@
     if (typeof window !== 'undefined' && canGoForward) {
       window.history.forward();
     }
-  }
-
-  function goHome() {
-    goto('/');
   }
 
   function refresh() {
@@ -231,60 +226,46 @@
     Skip to content
   </a>
   <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-    <div
-      class="flex h-screen min-h-0 w-full flex-col overflow-hidden"
-      style="--header-height: 3.5rem"
-    >
+    <div class="flex h-screen min-h-0 w-full flex-col overflow-hidden">
       <!-- Top Bar -->
       <header
         class="divider-edge-b divider-edge-full flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
       >
-        <div class="flex h-14 items-center gap-2 px-3 md:px-4 3xl:px-6">
+        <div class="flex h-10 items-center gap-2 px-3 md:px-4 3xl:px-6">
           <SidebarTrigger />
           <!-- Navigation Buttons -->
           <div class="divider-edge-r mr-2 flex items-center gap-1 pr-2">
             <Button
               variant="ghost"
               size="icon"
-              class="h-8 w-8"
+              class="h-7 w-7"
               disabled={!canGoBack}
               onclick={goBack}
               title="Go back"
               aria-label="Go back"
             >
-              <ArrowLeft class="h-4 w-4" />
+              <ArrowLeft class="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              class="h-8 w-8"
+              class="h-7 w-7"
               disabled={!canGoForward}
               onclick={goForward}
               title="Go forward"
               aria-label="Go forward"
             >
-              <ArrowRight class="h-4 w-4" />
+              <ArrowRight class="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              class="h-8 w-8"
+              class="h-7 w-7"
               onclick={refresh}
               title="Refresh page"
               aria-label="Refresh page"
             >
-              <RefreshCw class="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              disabled={page.url.pathname === '/'}
-              onclick={goHome}
-              title="Go to home"
-              aria-label="Go to home"
-            >
-              <Home class="h-4 w-4" />
+              <RefreshCw class="h-3.5 w-3.5" />
             </Button>
           </div>
           <Breadcrumb

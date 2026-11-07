@@ -13,6 +13,7 @@
     deploymentError,
     containers,
     isDockerOffline,
+    dockerStatus,
   } from '../stores/deploymentStore';
   import { deploymentService } from '../services/deploymentService';
   import { logger } from '$lib/domains/shared';
@@ -23,14 +24,9 @@
   import DockerStatusBanner from './DockerStatusBanner.svelte';
   import WorkloadList from './WorkloadList.svelte';
   import { Button } from '$lib/components/ui/button';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
+  import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
+  import { PageHeader, PageStats } from '$lib/components/shell';
   import Select from '$lib/components/ui/select.svelte';
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
@@ -68,6 +64,14 @@
   let loading = $derived($isLoadingDeployments);
   let errorMessage = $derived($deploymentError);
   let dockerOffline = $derived($isDockerOffline);
+  // Docker health lives in the header badge; the banner only appears when it is down.
+  const dockerBadge = $derived(
+    $dockerStatus?.running
+      ? $dockerStatus.version
+        ? `Running · v${$dockerStatus.version}`
+        : 'Running'
+      : undefined
+  );
 
   // Reactive stores
   let containerList = $derived($containers);
@@ -274,19 +278,18 @@
 </script>
 
 <div class="space-y-6">
-  <!-- Header -->
-  <div class="flex items-center justify-between">
-    <div>
-      <h1 class="flex items-center gap-2 text-3xl font-bold tracking-tight">
-        <ContainerIcon class="h-8 w-8" />
-        Local Docker
-      </h1>
-      <p class="text-muted-foreground">
-        Containers, resource usage, and Portal-managed deployments
-      </p>
-    </div>
-    <div class="flex gap-2">
-      <Button variant="outline" onclick={handleRefresh} disabled={loading || isLoadingContainers}>
+  <PageHeader
+    title="Local Docker"
+    description="Containers, resource usage, and Portal-managed deployments"
+    badge={dockerBadge}
+  >
+    {#snippet actions()}
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={handleRefresh}
+        disabled={loading || isLoadingContainers}
+      >
         {#if loading || isLoadingContainers}
           <Loader2 class="mr-2 h-4 w-4 animate-spin" />
         {:else}
@@ -295,13 +298,13 @@
         Refresh
       </Button>
       {#if activeTab === 'deployments'}
-        <Button onclick={handleCreateDeployment}>
+        <Button size="sm" onclick={handleCreateDeployment}>
           <Plus class="mr-2 h-4 w-4" />
           New Deployment
         </Button>
       {/if}
-    </div>
-  </div>
+    {/snippet}
+  </PageHeader>
 
   <DockerStatusBanner onReady={loadContainers} />
 
@@ -318,7 +321,7 @@
 
   <!-- Tabs -->
   <Tabs bind:value={activeTab} class="w-full">
-    <TabsList class="grid w-full grid-cols-2">
+    <TabsList>
       <TabsTrigger value="containers">
         <Box class="mr-2 h-4 w-4" />
         Containers
@@ -348,7 +351,7 @@
 
         {#if !isLoadingContainers && containerList.length > 0}
           <Tabs bind:value={containerStatusTab} class="w-full">
-            <TabsList class="grid w-full grid-cols-3 sm:w-fit">
+            <TabsList>
               <TabsTrigger value="running" class="gap-2">
                 <Play class="h-4 w-4" />
                 Running
@@ -448,56 +451,13 @@
 
     <!-- Deployments Tab -->
     <TabsContent value="deployments" class="mt-6 space-y-6">
-      <!-- Stats Cards -->
-      <div class="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Total Deployments</CardTitle>
-            <ContainerIcon class="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Running</CardTitle>
-            <Badge variant="default" class="bg-green-100 text-green-800">
-              <Play class="mr-1 h-3 w-3" />
-              {stats.running}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold text-green-600">{stats.running}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Stopped</CardTitle>
-            <Badge variant="outline">
-              <Square class="mr-1 h-3 w-3" />
-              {stats.stopped}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold text-gray-600">{stats.stopped}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Building</CardTitle>
-            <Badge variant="outline" class="bg-yellow-100 text-yellow-800">
-              <Hammer class="mr-1 h-3 w-3" />
-              {stats.building}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold text-yellow-600">
-              {stats.building}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <PageStats
+        stats={[
+          { label: 'Running', value: stats.running, icon: Play },
+          { label: 'Stopped', value: stats.stopped, icon: Square },
+          { label: 'Building', value: stats.building, icon: Hammer },
+        ]}
+      />
 
       <!-- Filters -->
       <div class="flex flex-col gap-4 sm:flex-row">

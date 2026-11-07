@@ -3,6 +3,7 @@
   import { fmtBytes, fmtPercent, isContainerRunning, shortImageName } from '../utils/format';
   import DonutChart from './DonutChart.svelte';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { PageStats } from '$lib/components/shell';
   import { Progress } from '$lib/components/ui/progress';
   import Cpu from '~icons/fa6-solid/microchip';
   import MemoryStick from '~icons/fa6-solid/memory';
@@ -90,54 +91,17 @@
 </script>
 
 {#if containers.length > 0}
-  <!-- Summary stat cards -->
-  <div class="grid gap-4 md:grid-cols-4">
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Total</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold">{stats.total}</div>
-        <p class="text-xs text-muted-foreground">containers on host</p>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">CPU (running)</CardTitle>
-        <Cpu class="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold tabular-nums">
-          {fmtPercent(stats.totalCpu)}
-        </div>
-        <p class="text-xs text-muted-foreground">aggregate usage</p>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Memory (running)</CardTitle>
-        <MemoryStick class="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold tabular-nums">
-          {fmtBytes(stats.totalMem)}
-        </div>
-        <p class="text-xs text-muted-foreground">in use</p>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Network I/O</CardTitle>
-        <Network class="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div class="text-sm font-semibold tabular-nums">
-          ↓ {fmtBytes(stats.totalNetRx)} · ↑ {fmtBytes(stats.totalNetTx)}
-        </div>
-        <p class="text-xs text-muted-foreground">running containers</p>
-      </CardContent>
-    </Card>
-  </div>
+  <PageStats
+    stats={[
+      { label: 'CPU (running)', value: fmtPercent(stats.totalCpu), icon: Cpu },
+      { label: 'Memory (running)', value: fmtBytes(stats.totalMem), icon: MemoryStick },
+      {
+        label: 'Network I/O',
+        value: `↓ ${fmtBytes(stats.totalNetRx)} · ↑ ${fmtBytes(stats.totalNetTx)}`,
+        icon: Network,
+      },
+    ]}
+  />
 
   <!-- Charts row -->
   <div class="grid gap-4 lg:grid-cols-3">

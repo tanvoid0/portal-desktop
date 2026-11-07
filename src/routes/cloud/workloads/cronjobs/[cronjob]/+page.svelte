@@ -142,7 +142,7 @@
           <RefreshCw class="mr-2 h-4 w-4" />
           Refresh
         </Button>
-        <Button variant="outline" size="sm" onclick={() => goto('/cloud/workloads/cronjobs')}>
+        <Button variant="outline" size="sm" onclick={() => goto('/cloud/cronjobs')}>
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back to CronJobs
         </Button>

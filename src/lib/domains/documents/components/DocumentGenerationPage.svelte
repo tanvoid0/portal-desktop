@@ -158,7 +158,7 @@
 </script>
 
 <div class="min-h-screen bg-background">
-  <div class="container mx-auto p-6">
+  <div>
     <div class="mb-6">
       <h1 class="text-2xl font-bold">
         {taskId ? 'Create Document for Task' : 'Generate Document with AI'}

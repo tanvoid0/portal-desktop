@@ -17,16 +17,9 @@
   import { Badge } from '$lib/components/ui/badge';
   import { ScrollArea } from '$lib/components/ui/scroll-area';
   import Select from '$lib/components/ui/select.svelte';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import Download from '~icons/fa6-solid/download';
   import Trash2 from '~icons/fa6-solid/trash';
   import Search from '~icons/fa6-solid/magnifying-glass';
-  import Filter from '~icons/fa6-solid/filter';
-  import AlertCircle from '~icons/fa6-solid/circle-exclamation';
-  import Info from '~icons/fa6-solid/circle-info';
-  import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
-  import X from '~icons/fa6-solid/xmark';
-  import Bug from '~icons/fa6-solid/bug';
 
   // State
   let logs = $state<LogEntry[]>([]);
@@ -59,8 +52,20 @@
     return Array.from(contexts).sort();
   });
 
-  const logLevels = ['all', 'DEBUG', 'INFO', 'WARN', 'ERROR'];
-  const sources = ['all', 'frontend', 'backend'];
+  // 'all' gets a descriptive label so the closed trigger reads "All levels", not a bare "all".
+  const logLevels = [
+    { value: 'all', label: 'All levels' },
+    ...['DEBUG', 'INFO', 'WARN', 'ERROR'].map((v) => ({ value: v, label: v })),
+  ];
+  const sources = [
+    { value: 'all', label: 'All sources' },
+    { value: 'frontend', label: 'frontend' },
+    { value: 'backend', label: 'backend' },
+  ];
+  let contextOptions = $derived([
+    { value: 'all', label: 'All contexts' },
+    ...availableContexts.map((v) => ({ value: v, label: v })),
+  ]);
 
   let scrollContainer: HTMLElement | null = $state(null);
   let unsubscribe: (() => void) | null = $state(null);
@@ -69,30 +74,15 @@
   function getLevelColor(level: LogLevel): string {
     switch (level) {
       case LogLevel.DEBUG:
-        return 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20';
+        return 'text-cyan-500';
       case LogLevel.INFO:
-        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+        return 'text-blue-500';
       case LogLevel.WARN:
-        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+        return 'text-yellow-500';
       case LogLevel.ERROR:
-        return 'bg-red-500/10 text-red-500 border-red-500/20';
+        return 'text-red-500';
       default:
-        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
-    }
-  }
-
-  function getLevelIcon(level: LogLevel) {
-    switch (level) {
-      case LogLevel.DEBUG:
-        return Bug;
-      case LogLevel.INFO:
-        return Info;
-      case LogLevel.WARN:
-        return AlertTriangle;
-      case LogLevel.ERROR:
-        return AlertCircle;
-      default:
-        return Info;
+        return 'text-gray-500';
     }
   }
 
@@ -138,12 +128,6 @@
     }
   }
 
-  function scrollToBottom() {
-    if (scrollContainer) {
-      scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
-    }
-  }
-
   // Lifecycle
   onMount(() => {
     updateLogs();
@@ -159,100 +143,89 @@
   });
 </script>
 
-<Card class="flex h-full w-full flex-col">
-  <CardHeader>
-    <div class="flex items-center justify-between">
-      <CardTitle class="flex items-center gap-2">
-        <Filter class="h-5 w-5" />
-        Unified Logs
-      </CardTitle>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" onclick={clearLogs}>
-          <Trash2 class="mr-2 h-4 w-4" />
-          Clear
-        </Button>
-        <Button variant="outline" size="sm" onclick={exportLogs}>
-          <Download class="mr-2 h-4 w-4" />
-          Export
-        </Button>
-      </div>
+<div class="flex h-full w-full flex-col">
+  <!-- Filters: the only chrome -->
+  <div class="flex flex-wrap items-center gap-2 border-b px-3 py-1.5">
+    <div class="relative min-w-[200px] flex-1">
+      <Search
+        class="absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
+      />
+      <Input placeholder="Search logs..." bind:value={searchQuery} class="h-8 pl-8" />
     </div>
-  </CardHeader>
-  <CardContent class="flex min-h-0 flex-1 flex-col gap-4">
-    <!-- Filters -->
-    <div class="flex flex-wrap items-center gap-2">
-      <div class="min-w-[200px] flex-1">
-        <div class="relative">
-          <Search
-            class="absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground"
-          />
-          <Input placeholder="Search logs..." bind:value={searchQuery} class="pl-8" />
+    <Select
+      bind:value={selectedLevel}
+      options={logLevels}
+      placeholder="Level"
+      aria-label="Filter by level"
+      class="w-[130px]"
+    />
+    <Select
+      bind:value={selectedSource}
+      options={sources}
+      placeholder="Source"
+      aria-label="Filter by source"
+      class="w-[130px]"
+    />
+    {#if availableContexts.length > 0}
+      <Select
+        bind:value={selectedContext}
+        options={contextOptions}
+        placeholder="Context"
+        aria-label="Filter by context"
+        class="w-[150px]"
+      />
+    {/if}
+    <div class="flex items-center gap-2 text-sm">
+      <Checkbox bind:checked={autoScroll} id="log-auto-scroll" />
+      <Label for="log-auto-scroll">Auto-scroll</Label>
+    </div>
+    <span class="text-sm whitespace-nowrap text-muted-foreground">
+      Showing {filteredLogs.length} of {logs.length}
+    </span>
+    <Button
+      variant="ghost"
+      size="sm"
+      onclick={clearLogs}
+      aria-label="Clear logs"
+      title="Clear logs"
+    >
+      <Trash2 class="h-4 w-4" />
+    </Button>
+    <Button
+      variant="ghost"
+      size="sm"
+      onclick={exportLogs}
+      aria-label="Export logs"
+      title="Export logs"
+    >
+      <Download class="h-4 w-4" />
+    </Button>
+  </div>
+
+  <!-- Logs Display -->
+  <ScrollArea class="min-h-0 flex-1" bind:viewportRef={scrollContainer}>
+    {#if filteredLogs.length === 0}
+      <div class="py-8 text-center text-muted-foreground">No logs found</div>
+    {:else}
+      {#each filteredLogs as entry (entry.timestamp.getTime() + entry.message)}
+        <div
+          class="flex items-baseline gap-2 px-3 py-0.5 font-mono text-xs leading-5 hover:bg-muted/50"
+        >
+          <span
+            class={'w-3 shrink-0 text-center font-bold ' + getLevelColor(entry.level)}
+            title={LogLevel[entry.level]}
+          >
+            <span aria-hidden="true">{LogLevel[entry.level][0]}</span>
+            <span class="sr-only">{LogLevel[entry.level]}</span>
+          </span>
+          <span class="shrink-0 text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
+          <Badge variant="outline" class="px-1 py-0 text-xs">{entry.source}</Badge>
+          {#if entry.context}
+            <Badge variant="outline" class="px-1 py-0 text-xs">{entry.context}</Badge>
+          {/if}
+          <span class="min-w-0 flex-1 break-words">{entry.message}</span>
         </div>
-      </div>
-      <Select
-        bind:value={selectedLevel}
-        options={logLevels}
-        placeholder="Level"
-        aria-label="Filter by level"
-        class="w-[120px]"
-      />
-      <Select
-        bind:value={selectedSource}
-        options={sources}
-        placeholder="Source"
-        aria-label="Filter by source"
-        class="w-[120px]"
-      />
-      {#if availableContexts.length > 0}
-        <Select
-          bind:value={selectedContext}
-          options={['all', ...availableContexts]}
-          placeholder="Context"
-          aria-label="Filter by context"
-          class="w-[150px]"
-        />
-      {/if}
-      <div class="flex items-center gap-2 text-sm">
-        <Checkbox bind:checked={autoScroll} id="log-auto-scroll" />
-        <Label for="log-auto-scroll">Auto-scroll</Label>
-      </div>
-    </div>
-
-    <!-- Logs Display -->
-    <ScrollArea class="flex-1 rounded-md border" bind:viewportRef={scrollContainer}>
-      <div class="space-y-1 p-4">
-        {#if filteredLogs.length === 0}
-          <div class="py-8 text-center text-muted-foreground">No logs found</div>
-        {:else}
-          {#each filteredLogs as entry (entry.timestamp.getTime() + entry.message)}
-            {@const LevelIcon = getLevelIcon(entry.level)}
-            <div class="flex items-start gap-2 rounded p-2 text-sm hover:bg-muted/50">
-              <Badge variant="outline" class={getLevelColor(entry.level) + ' text-xs'}>
-                <LevelIcon class="mr-1 h-3 w-3" />
-                {LogLevel[entry.level]}
-              </Badge>
-              <Badge variant="outline" class="text-xs">
-                {entry.source}
-              </Badge>
-              {#if entry.context}
-                <Badge variant="outline" class="text-xs">
-                  {entry.context}
-                </Badge>
-              {/if}
-              <span class="font-mono text-xs text-muted-foreground">
-                {formatTimestamp(entry.timestamp)}
-              </span>
-              <span class="flex-1">{entry.message}</span>
-            </div>
-          {/each}
-        {/if}
-      </div>
-    </ScrollArea>
-
-    <!-- Stats -->
-    <div class="flex items-center justify-between text-sm text-muted-foreground">
-      <span>Showing {filteredLogs.length} of {logs.length} logs</span>
-      <Button variant="ghost" size="sm" onclick={scrollToBottom}>Scroll to bottom</Button>
-    </div>
-  </CardContent>
-</Card>
+      {/each}
+    {/if}
+  </ScrollArea>
+</div>

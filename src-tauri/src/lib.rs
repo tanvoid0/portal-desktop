@@ -31,8 +31,22 @@ use domains::scripts::commands::ScriptExecutionState;
 use domains::sdk::services::navigation_service::NavigationService;
 use domains::settings::services::settings_service::SettingsService;
 use domains::terminal::manager::TerminalManager;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
+
+/// Per-instance data directory.
+///
+/// `PORTAL_INSTANCE=2` (set by `scripts/dev-instance.mjs`) moves the whole data
+/// directory aside, so a second dev instance gets its own `portal_desktop.db` and
+/// `disk_utility.db` instead of fighting the first over one SQLite file. Instance 1
+/// and every packaged build resolve the default directory, unchanged.
+fn instance_data_dir(base: PathBuf) -> PathBuf {
+    match std::env::var("PORTAL_INSTANCE").ok().as_deref() {
+        None | Some("") | Some("1") => base,
+        Some(n) => base.join(format!("instance-{n}")),
+    }
+}
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 // Owned rather than `&str`: a borrowed parameter cannot be deserialised from an
@@ -86,10 +100,11 @@ pub fn run() {
 
             log_info!("Tauri", "Initializing database manager...");
 
-            let app_data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| format!("Failed to resolve app data directory: {}", e))?;
+            let app_data_dir = instance_data_dir(
+                app.path()
+                    .app_data_dir()
+                    .map_err(|e| format!("Failed to resolve app data directory: {}", e))?,
+            );
 
             let db_manager =
                 tauri::async_runtime::block_on(async { DatabaseManager::new(app_data_dir).await })
@@ -140,10 +155,11 @@ pub fn run() {
             // Initialize disk-cleanup domain (ported from portal_disk_utility).
             // Own rusqlite DB alongside the main app data; state for scan/verify
             // cancellation flags. See docs/development/DISK_UTILITY_MIGRATION.md.
-            let disk_data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| format!("Failed to resolve app data directory: {}", e))?;
+            let disk_data_dir = instance_data_dir(
+                app.path()
+                    .app_data_dir()
+                    .map_err(|e| format!("Failed to resolve app data directory: {}", e))?,
+            );
             let disk_db = domains::disk::db::Db::open(disk_data_dir.join("disk_utility.db"))
                 .map_err(|e| format!("Failed to initialize disk utility database: {}", e))?;
             app.manage(std::sync::Arc::new(disk_db));

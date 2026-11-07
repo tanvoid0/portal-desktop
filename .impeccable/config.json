@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/app.css"
+        ],
+        "createdAt": "2026-11-06T23:25:41.879Z",
+        "reason": "Claude: src/app.css:479 is .chat-blockquote, a markdown blockquote's left rule in the chat renderer — standard typography, not a side-tab accent card. Predates this session (committed ba6281b, 2026-07-08)."
+      }
+    ]
+  }
+}

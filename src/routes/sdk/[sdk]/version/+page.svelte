@@ -19,7 +19,7 @@
   import VersionList from '$lib/domains/sdk/components/VersionList.svelte';
   import { goto } from '$app/navigation';
   import { confirmAction } from '$lib/utils/confirm';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
 
   interface VersionInfo {
     version: string;
@@ -258,19 +258,16 @@
     <PageError title="Failed to load SDK versions" message={error} onRetry={loadData} />
   {:else if sdkConfig}
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
-            <ArrowLeft class="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 class="text-3xl font-bold">Version Management</h1>
-            <p class="text-muted-foreground">
-              {sdkConfig.display_name} Versions
-            </p>
-          </div>
+      <div class="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
+          <ArrowLeft class="mr-2 h-4 w-4" />
+          Back
+        </Button>
+        <div class="min-w-0 flex-1">
+          <PageHeader
+            title="Version Management"
+            description={`${sdkConfig.display_name} versions`}
+          />
         </div>
       </div>
 

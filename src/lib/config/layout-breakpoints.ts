@@ -10,7 +10,6 @@ export type ViewportTier = 'compact' | 'standard' | 'ultrawide';
 
 /** CSS custom property names used by layout components. */
 export const LAYOUT_CSS_VARS = {
-  headerHeight: '--header-height',
   sidebarWidth: '--sidebar-width',
   sidebarWidthIcon: '--sidebar-width-icon',
   contentMaxWidthReadable: '--content-max-width-readable',
@@ -19,7 +18,7 @@ export const LAYOUT_CSS_VARS = {
 } as const;
 
 /** Routes whose pages manage their own full-viewport scroll regions. */
-export const VIEWPORT_FILL_ROUTES = ['/ai/coder', '/ai/chat', '/terminal'] as const;
+export const VIEWPORT_FILL_ROUTES = ['/ai/coder', '/ai/chat', '/terminal', '/logs'] as const;
 
 /** Routes that use ShellSidebarLayout (domain sidebar + fixed height). */
 export const SHELL_SIDEBAR_ROUTES = ['/ai', '/cloud', '/settings', '/sdk', '/utilities'] as const;

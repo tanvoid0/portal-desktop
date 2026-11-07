@@ -19,7 +19,7 @@
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import ServiceCard from '$lib/domains/sdk/components/ServiceCard.svelte';
   import { goto } from '$app/navigation';
-  import { PageLoading, PageError } from '$lib/components/shell';
+  import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
 
   // Get SDK ID from URL
   let sdkId = $derived(page.params.sdk);
@@ -176,19 +176,16 @@
     <PageError title="Failed to load service" message={error} onRetry={loadData} />
   {:else if sdkConfig}
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
-            <ArrowLeft class="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 class="text-3xl font-bold">Service Management</h1>
-            <p class="text-muted-foreground">
-              {sdkConfig.display_name} Services
-            </p>
-          </div>
+      <div class="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onclick={() => goto(`/sdk/${sdkId}`)}>
+          <ArrowLeft class="mr-2 h-4 w-4" />
+          Back
+        </Button>
+        <div class="min-w-0 flex-1">
+          <PageHeader
+            title="Service Management"
+            description={`${sdkConfig.display_name} services`}
+          />
         </div>
       </div>
 

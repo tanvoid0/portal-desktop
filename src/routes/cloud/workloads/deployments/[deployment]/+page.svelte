@@ -233,7 +233,7 @@
           {/if}
           Rollback
         </Button>
-        <Button variant="outline" size="sm" onclick={() => goto('/cloud/workloads/deployments')}>
+        <Button variant="outline" size="sm" onclick={() => goto('/cloud/deployments')}>
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back to Deployments
         </Button>

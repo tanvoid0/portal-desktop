@@ -2,139 +2,57 @@
 	Settings Navigation - Sidebar navigation for settings sections
 -->
 
-<script lang="ts">
-  import { page } from '$app/state';
-  import { goto } from '$app/navigation';
-  import { Button } from '$lib/components/ui/button';
-  import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-  } from '$lib/components/ui/collapsible';
-  import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
+<script lang="ts" module>
   import Settings from '~icons/fa6-solid/gear';
   import Code from '~icons/fa6-solid/code';
   import Terminal from '~icons/fa6-solid/terminal';
   import Palette from '~icons/fa6-solid/palette';
   import Laptop from '~icons/fa6-solid/laptop';
   import Brain from '~icons/fa6-solid/brain';
-  import Package from '~icons/fa6-solid/box-open';
   import Bot from '~icons/fa6-solid/robot';
   import Download from '~icons/fa6-solid/download';
-  import Box from '~icons/fa6-solid/box';
-  import FileCode from '~icons/fa6-solid/file-code';
-  import ChevronDown from '~icons/fa6-solid/chevron-down';
   import Languages from '~icons/fa6-solid/language';
   import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import FolderGit2 from '~icons/fa6-solid/folder-tree';
 
-  type SettingsSectionType =
-    | 'general'
-    | 'editor'
-    | 'terminal'
-    | 'theme'
-    | 'ides'
-    | 'frameworks-languages'
-    | 'frameworks'
-    | 'package-managers'
-    | 'languages'
-    | 'learning'
-    | 'ai'
-    | 'github'
-    | 'autonomy'
-    | 'updates';
-
-  interface Props {
-    currentSection?: SettingsSectionType | 'framework-ides' | 'updates';
-    className?: string;
-  }
-
-  let { currentSection, className = '' }: Props = $props();
-
-  // Check if we're in the AI settings section or any of its sub-sections
-  const isAiSection = $derived.by(() => {
-    const path = page.url.pathname;
-    return path.startsWith('/settings/ai');
-  });
-
-  // State for collapsible open/close per section
-  let submenuExpanded = $state<Record<string, boolean>>({});
-
-  function isSubmenuExpanded(sectionId: string): boolean {
-    if (sectionId === 'frameworks-languages' && isFrameworksLanguagesSection) {
-      return true;
-    }
-    if (sectionId === 'ai' && isAiSection) {
-      return true;
-    }
-    return submenuExpanded[sectionId] ?? false;
-  }
-
-  function handleSubmenuOpenChange(sectionId: string, open: boolean) {
-    if (sectionId === 'frameworks-languages' && isFrameworksLanguagesSection && !open) {
-      return;
-    }
-    if (sectionId === 'ai' && isAiSection && !open) {
-      return;
-    }
-    submenuExpanded = { ...submenuExpanded, [sectionId]: open };
-  }
-
-  // Check if we're in the frameworks-languages section or any of its sub-sections
-  const isFrameworksLanguagesSection = $derived.by(() => {
-    const path = page.url.pathname;
-    return (
-      path.startsWith('/settings/frameworks-languages') ||
-      path.startsWith('/settings/frameworks') ||
-      path.startsWith('/settings/package-managers') ||
-      path.startsWith('/settings/languages')
-    );
-  });
-
-  const sidebar = useSidebar();
-
-  const sections = [
+  // Sections with `subSections` are group labels, not links: their children are the pages.
+  // `path` on a group is only used for the collapsed rail icon.
+  export const sections = [
     {
       id: 'general' as const,
       label: 'General',
-      description: 'Application preferences',
       icon: Settings,
       path: '/settings/general',
     },
     {
       id: 'updates' as const,
       label: 'Updates',
-      description: 'Check for updates',
       icon: Download,
       path: '/settings/updates',
     },
     {
       id: 'editor' as const,
       label: 'Editor',
-      description: 'Code editor settings',
       icon: Code,
       path: '/settings/editor',
     },
     {
       id: 'terminal' as const,
       label: 'Terminal',
-      description: 'Terminal configuration',
       icon: Terminal,
       path: '/settings/terminal',
     },
     {
       id: 'ides' as const,
       label: 'IDEs',
-      description: 'Configure IDEs & framework mappings',
       icon: Laptop,
       path: '/settings/ides',
     },
     {
       id: 'frameworks-languages' as const,
       label: 'Frameworks & Languages',
-      description: 'Languages, frameworks & package managers',
       icon: Languages,
-      path: '/settings/frameworks-languages',
+      path: '/settings/languages',
       subSections: [
         {
           id: 'languages' as const,
@@ -156,35 +74,31 @@
     {
       id: 'github' as const,
       label: 'GitHub',
-      description: 'OAuth app and account connection',
       icon: FolderGit2,
       path: '/settings/github',
     },
     {
       id: 'theme' as const,
       label: 'Theme',
-      description: 'Appearance & colors',
       icon: Palette,
       path: '/settings/theme',
     },
     {
       id: 'learning' as const,
       label: 'Learning',
-      description: 'ML learning & AI settings',
       icon: Brain,
       path: '/settings/learning',
     },
     {
       id: 'ai' as const,
       label: 'AI',
-      description: 'Providers, models, and training data',
       icon: Sparkles,
-      path: '/settings/ai',
+      path: '/settings/ai/providers',
       subSections: [
         {
           id: 'providers' as const,
           label: 'Providers',
-          path: '/settings/ai',
+          path: '/settings/ai/providers',
         },
         {
           id: 'training' as const,
@@ -196,186 +110,103 @@
     {
       id: 'autonomy' as const,
       label: 'Autonomy',
-      description: 'Autonomous action settings',
       icon: Bot,
       path: '/settings/autonomy',
     },
   ];
 
-  // Derive current section from URL if not provided
-  const activeSection = $derived.by((): SettingsSectionType => {
-    if (currentSection) {
-      // Map framework-ides to ides
-      return currentSection === 'framework-ides' ? 'ides' : currentSection;
-    }
-    const path = page.url.pathname;
-    if (path === '/settings' || path === '/settings/') return 'general';
-    const section = path.replace('/settings/', '').replace(/\/$/, '');
-    // Redirect framework-ides to ides
-    if (section === 'framework-ides') return 'ides';
-    if (section.startsWith('ai')) return 'ai';
-    // Map old paths to new structure
-    if (section === 'frameworks' || section === 'package-managers' || section === 'languages') {
-      return 'frameworks-languages';
-    }
-    const normalizedSection = section || 'general';
-    // Type guard to ensure we return a valid section
-    if (
-      [
-        'general',
-        'editor',
-        'terminal',
-        'theme',
-        'ides',
-        'frameworks-languages',
-        'frameworks',
-        'package-managers',
-        'languages',
-        'learning',
-        'ai',
-        'github',
-        'autonomy',
-        'updates',
-      ].includes(normalizedSection)
-    ) {
-      return normalizedSection as SettingsSectionType;
-    }
-    return 'general';
-  });
-
-  // Get active sub-section for frameworks-languages
-  const activeSubSection = $derived.by(() => {
-    if (isAiSection) {
-      const path = page.url.pathname;
-      if (path.startsWith('/settings/ai/training')) return 'training';
-      return 'providers';
-    }
-    if (!isFrameworksLanguagesSection) return null;
-    const path = page.url.pathname;
-    if (path.includes('/languages')) return 'languages';
-    if (path.includes('/package-managers')) return 'package-managers';
-    if (path.includes('/frameworks') && !path.includes('/frameworks-languages'))
-      return 'frameworks';
-    // If on the main frameworks-languages page, check query param
-    if (path.includes('/frameworks-languages')) {
-      const tab = page.url.searchParams.get('tab');
-      if (tab) return tab;
-    }
-    return null;
-  });
-
-  function handleSectionClick(sectionId: string, path: string) {
-    goto(path);
+  function matches(pathname: string, path: string): boolean {
+    return pathname === path || pathname.startsWith(`${path}/`);
   }
 
-  function handleSubSectionClick(path: string) {
-    goto(path);
-  }
-
-  function handleCollapsedSectionClick(sectionId: string, path: string) {
-    // Preserve the "tab" query param when collapsing from a sub-section.
-    if (sectionId === 'frameworks-languages') {
-      const tab = activeSubSection;
-      if (tab) {
-        goto(`${path}?tab=${tab}`);
-        return;
+  /** Label for the active page, e.g. "General" or "AI › Providers"; derived from `sections`. */
+  export function activeSectionLabel(pathname: string): string | undefined {
+    for (const section of sections) {
+      if (!section.subSections) {
+        if (matches(pathname, section.path)) return section.label;
+        continue;
       }
+      const sub = section.subSections.find((s) => matches(pathname, s.path));
+      if (sub) return `${section.label} › ${sub.label}`;
     }
-
-    if (sectionId === 'ai') {
-      const sub = activeSubSection;
-      if (sub === 'training') {
-        goto('/settings/ai/training');
-        return;
-      }
-    }
-
-    goto(path);
   }
 </script>
 
-<nav class="space-y-2 {className}">
+<script lang="ts">
+  import { page } from '$app/state';
+  import { goto } from '$app/navigation';
+  import { Button } from '$lib/components/ui/button';
+  import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
+
+  const sidebar = useSidebar();
+
+  const activePath = $derived(page.url.pathname);
+
+  function isActive(path: string): boolean {
+    return activePath === path || activePath.startsWith(`${path}/`);
+  }
+
+  function isSectionActive(section: (typeof sections)[number]): boolean {
+    return section.subSections
+      ? section.subSections.some((sub) => isActive(sub.path))
+      : isActive(section.path);
+  }
+</script>
+
+<nav class="space-y-0.5">
   {#if sidebar.state === 'collapsed'}
     {#each sections as section}
-      {@const isActive = activeSection === section.id}
       {@const Icon = section.icon}
       <SidebarMenuButton
-        {isActive}
+        isActive={isSectionActive(section)}
         tooltipContent={section.label}
-        onclick={() => handleCollapsedSectionClick(section.id, section.path)}
+        onclick={() => goto(section.path)}
       >
         <Icon class="h-4 w-4 flex-shrink-0" />
       </SidebarMenuButton>
     {/each}
   {:else}
     {#each sections as section}
-      {@const isActive = activeSection === section.id}
+      {@const Icon = section.icon}
       {#if section.subSections}
-        <Collapsible
-          open={isSubmenuExpanded(section.id)}
-          onOpenChange={(open) => handleSubmenuOpenChange(section.id, open)}
-          class="w-full"
-        >
-          <CollapsibleTrigger
-            type="button"
-            onclick={() => handleSectionClick(section.id, section.path)}
-            class="flex h-auto w-full items-start justify-start rounded-lg px-4 py-3 text-base font-medium whitespace-normal transition-colors {isActive
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}"
+        <div class="px-4 pt-3 pb-1">
+          <div
+            class="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
           >
-            {@const Icon = section.icon}
-            <Icon class="mt-0.5 mr-3 h-5 w-5 flex-shrink-0" />
-            <div class="min-w-0 flex-1 text-left">
-              <div class="text-base leading-tight font-semibold">
-                {section.label}
-              </div>
-              <p class="mt-1 text-sm leading-relaxed break-words text-muted-foreground">
-                {section.description}
-              </p>
-            </div>
-            <ChevronDown
-              class="mt-0.5 ml-2 h-4 w-4 transition-transform {isSubmenuExpanded(section.id)
-                ? 'rotate-180'
-                : ''}"
-            />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div class="divider-edge-l mt-1 ml-4 space-y-1 pl-4">
-              {#each section.subSections as subSection}
-                {@const isSubActive = activeSubSection === subSection.id}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onclick={() => handleSubSectionClick(subSection.path)}
-                  class="flex h-auto w-full items-center justify-start rounded-md px-3 py-2 text-sm transition-colors {isSubActive
-                    ? 'bg-accent font-medium text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}"
-                >
-                  <span class="text-sm">{subSection.label}</span>
-                </Button>
-              {/each}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+            <Icon class="h-4 w-4 flex-shrink-0" />
+            {section.label}
+          </div>
+        </div>
+        <div class="divider-edge-l ml-4 space-y-1 pl-4">
+          {#each section.subSections as subSection}
+            <Button
+              type="button"
+              variant="ghost"
+              onclick={() => goto(subSection.path)}
+              class="flex h-auto w-full items-center justify-start rounded-md px-3 py-2 text-sm transition-colors {isActive(
+                subSection.path
+              )
+                ? 'bg-accent font-medium text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}"
+            >
+              <span class="text-sm">{subSection.label}</span>
+            </Button>
+          {/each}
+        </div>
       {:else}
         <Button
           type="button"
           variant="ghost"
-          onclick={() => handleSectionClick(section.id, section.path)}
-          class="flex h-auto w-full items-start justify-start rounded-lg px-4 py-3 text-base font-medium whitespace-normal transition-colors {isActive
+          onclick={() => goto(section.path)}
+          aria-current={isActive(section.path) ? 'page' : undefined}
+          class="h-8 w-full justify-start gap-3 rounded-md px-3 text-sm font-medium transition-colors {isActive(
+            section.path
+          )
             ? 'bg-accent text-accent-foreground'
             : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}"
         >
-          {@const Icon = section.icon}
-          <Icon class="mt-0.5 mr-3 h-5 w-5 flex-shrink-0" />
-          <div class="min-w-0 flex-1 text-left">
-            <div class="text-base leading-tight font-semibold">
-              {section.label}
-            </div>
-            <p class="mt-1 text-sm leading-relaxed break-words text-muted-foreground">
-              {section.description}
-            </p>
-          </div>
+          <Icon class="h-4 w-4 flex-shrink-0" />
+          <span class="truncate">{section.label}</span>
         </Button>
       {/if}
     {/each}

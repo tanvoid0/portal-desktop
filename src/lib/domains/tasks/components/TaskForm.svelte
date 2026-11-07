@@ -1,18 +1,11 @@
 <script lang="ts">
-  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import FaPlus from '~icons/fa6-solid/plus';
   import FaXmark from '~icons/fa6-solid/xmark';
   import FaGear from '~icons/fa6-solid/gear';
   import FaChevronDown from '~icons/fa6-solid/chevron-down';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
+  import { Card, CardContent } from '$lib/components/ui/card';
   import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
   import { Badge } from '$lib/components/ui/badge';
@@ -213,22 +206,6 @@
 </script>
 
 <Card class="mx-auto max-w-2xl">
-  <CardHeader>
-    <div class="flex items-center justify-between">
-      <div>
-        <CardTitle>{task ? 'Edit Task' : 'Create New Task'}</CardTitle>
-        <CardDescription>
-          {task ? 'Update the task details below' : 'Fill in the details to create a new task'}
-        </CardDescription>
-      </div>
-      {#if !task}
-        <Button variant="outline" size="sm" onclick={() => goto('/tasks/generate')}>
-          <FaWandMagicSparkles class="mr-2 h-4 w-4" />
-          Generate Tasks with AI
-        </Button>
-      {/if}
-    </div>
-  </CardHeader>
   <CardContent class="space-y-6" onkeydown={handleKeydown}>
     <!-- Title -->
     <div class="space-y-2">

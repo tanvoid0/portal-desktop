@@ -10,13 +10,7 @@
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import FolderPicker from '$lib/components/ui/folder-picker.svelte';
   import MultiSelect from '$lib/components/ui/multi-select.svelte';
   import {
@@ -374,7 +368,6 @@
         <div class="flex items-center justify-between">
           <div>
             <CardTitle>Basic Information</CardTitle>
-            <CardDescription>Essential details about your project</CardDescription>
           </div>
           <TooltipProvider>
             <Tooltip>
@@ -470,9 +463,6 @@
     <Card>
       <CardHeader>
         <CardTitle>Framework, Package Manager & Languages</CardTitle>
-        <CardDescription>
-          Development tools, frameworks, and languages used in your project
-        </CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3">

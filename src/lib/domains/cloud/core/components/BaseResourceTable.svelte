@@ -1,5 +1,6 @@
 <!-- BaseResourceTable - Generic table component that works with any provider's resources -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { ICloudResource, ResourceType } from '../../types';
   import {
     Table,
@@ -28,6 +29,8 @@
     emptyMessage?: string;
     filteredEmptyMessage?: string;
     isFiltered?: boolean;
+    /** Per-row controls in a trailing column, revealed on row hover or keyboard focus. */
+    rowActions?: Snippet<[ICloudResource]>;
   }
 
   let {
@@ -37,6 +40,7 @@
     onResourceClick,
     onViewLogs,
     onDelete,
+    rowActions,
     emptyMessage = 'No resources found',
     filteredEmptyMessage = 'No resources match your filters',
     isFiltered = false,
@@ -158,12 +162,15 @@
       {#each defaultColumns as column}
         <TableHead class={column.width}>{column.label}</TableHead>
       {/each}
+      {#if rowActions}
+        <TableHead class="w-24 text-right">Actions</TableHead>
+      {/if}
     </TableRow>
   </TableHeader>
   <TableBody>
     {#if resources.length === 0}
       <TableRow>
-        <TableCell colspan={defaultColumns.length} class="py-12">
+        <TableCell colspan={defaultColumns.length + (rowActions ? 1 : 0)} class="py-12">
           <div class="flex flex-col items-center justify-center text-center">
             <Inbox class="mb-3 h-10 w-10 text-muted-foreground" />
             <p class="text-sm font-medium">{displayEmptyMessage}</p>
@@ -173,7 +180,7 @@
     {:else}
       {#each resources as resource, index (resource.id)}
         <TableRow
-          class="cursor-pointer hover:bg-muted/50"
+          class="group cursor-pointer hover:bg-muted/50"
           onclick={() => onResourceClick?.(resource)}
           data-index={index}
         >
@@ -253,6 +260,14 @@
               {/if}
             </TableCell>
           {/each}
+          {#if rowActions}
+            <!-- Always in the DOM so it stays keyboard-reachable; only the opacity changes. -->
+            <TableCell
+              class="text-right opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+            >
+              {@render rowActions(resource)}
+            </TableCell>
+          {/if}
         </TableRow>
       {/each}
     {/if}

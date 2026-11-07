@@ -96,6 +96,33 @@ export default defineConfig(
     },
     rules: {
       'portal/no-raw-ui-elements': 'error',
+      // Svelte 4 syntax: `export let`, `on:click`, `<slot>`, `<svelte:fragment>`,
+      // `$:`, `<svelte:component>`. Kept off the vendored ui/ primitives, which
+      // `shadcn add` rewrites.
+      'portal/no-legacy-syntax': 'error',
+      // The other half of the Svelte 4 component contract. `$:` and `<slot>` are
+      // caught above; this catches the dispatcher that replaced callback props.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'svelte',
+              importNames: ['createEventDispatcher'],
+              message:
+                'createEventDispatcher is Svelte 4. Declare a callback prop (`onEdit?: (p: Project) => void`) instead.',
+            },
+          ],
+        },
+      ],
+      // `$inspect` is a debugger, not production code.
+      'svelte/no-inspect': 'error',
+      // `$state(new Set())` instead of `new SvelteSet()` — reactive-looking, inert.
+      'svelte/no-unnecessary-state-wrap': 'error',
+      // Deliberately NOT enabled: `svelte/require-event-prefix`. It flags every
+      // function-typed prop, not just event callbacks, so formatters like
+      // `projectLabel?: (task) => string` come back as violations. 23 hits, most
+      // of them false. Callback-prop naming stays a review matter.
     },
   },
   {

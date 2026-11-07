@@ -12,6 +12,7 @@
   import { NAVIGATION_SHORTCUTS } from '$lib/domains/k8s-navigation/utils/keyboardConstants';
   import { cloudStore } from '$lib/domains/cloud/stores';
   import { ResourceType } from '$lib/domains/cloud/core/types';
+  import { RESOURCE_DESCRIPTORS } from '$lib/domains/cloud/core/resourceDescriptors';
   import type { Command } from '$lib/domains/k8s-navigation';
   import ShellSidebarLayout from '$lib/components/shell/shell-sidebar-layout.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
@@ -53,41 +54,26 @@
       },
     });
 
-    // Resource navigation commands
-    commands.push(
-      {
-        id: 'nav-overview',
-        label: 'Go to Overview',
-        description: 'Navigate to cluster overview',
-        keywords: ['overview', 'dashboard'],
+    // Resource navigation commands — one per descriptor, so the palette can't drift from the routes
+    commands.push({
+      id: 'nav-overview',
+      label: 'Go to Overview',
+      description: 'Navigate to cluster overview',
+      keywords: ['overview', 'dashboard'],
+      category: 'navigation',
+      action: () => goto('/cloud/workloads'),
+    });
+
+    RESOURCE_DESCRIPTORS.forEach((descriptor) => {
+      commands.push({
+        id: `nav-${descriptor.slug}`,
+        label: `Go to ${descriptor.label}`,
+        description: `Navigate to ${descriptor.label.toLowerCase()} list`,
+        keywords: [descriptor.slug, ...(descriptor.keywords ?? [])],
         category: 'navigation',
-        action: () => goto('/cloud/workloads'),
-      },
-      {
-        id: 'nav-pods',
-        label: 'Go to Pods',
-        description: 'Navigate to pods list',
-        keywords: ['pods', 'pod'],
-        category: 'navigation',
-        action: () => goto('/cloud/workloads/pods'),
-      },
-      {
-        id: 'nav-services',
-        label: 'Go to Services',
-        description: 'Navigate to services list',
-        keywords: ['services', 'service', 'svc'],
-        category: 'navigation',
-        action: () => goto('/cloud/workloads/services'),
-      },
-      {
-        id: 'nav-deployments',
-        label: 'Go to Deployments',
-        description: 'Navigate to deployments list',
-        keywords: ['deployments', 'deployment', 'deploy'],
-        category: 'navigation',
-        action: () => goto('/cloud/workloads/deployments'),
-      }
-    );
+        action: () => goto(`/cloud/${descriptor.slug}`),
+      });
+    });
 
     return commands;
   });

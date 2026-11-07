@@ -14,13 +14,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Input } from '$lib/components/ui/input';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { projectService } from '$lib/domains/projects';
   import { logger } from '$lib/domains/shared/services/logger';
   import { toast } from '$lib/utils/toast';
@@ -116,7 +110,6 @@
       <Terminal class="h-5 w-5" />
       How to run this
     </CardTitle>
-    <CardDescription>Commands that start, build and test this project.</CardDescription>
   </CardHeader>
   <CardContent class="space-y-4">
     {#if !hasRunnable && editingField === null}

@@ -5,13 +5,7 @@
 <script lang="ts">
   import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
   import GitBranch from '~icons/fa6-solid/code-branch';
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import type { Project } from '$lib/domains/projects/types';
   import { getProjectGitBranch } from '$lib/domains/projects/utils/display';
 
@@ -32,7 +26,6 @@
       <GitBranch class="h-5 w-5" />
       Git
     </CardTitle>
-    <CardDescription>Is your work saved and backed up?</CardDescription>
   </CardHeader>
   <CardContent class="space-y-1.5 text-sm">
     {#if !branch && !project.git_repository}

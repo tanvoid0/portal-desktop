@@ -83,10 +83,7 @@
 </script>
 
 <div class="space-y-6">
-  <PageHeader
-    title="Edit Project"
-    description="Update your project details. You can change the path to re-analyze the project structure."
-  />
+  <PageHeader title="Edit project" />
 
   {#if loading}
     <PageLoading message="Loading project..." />

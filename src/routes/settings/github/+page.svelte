@@ -152,13 +152,6 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <div>
-    <h2 class="text-2xl font-bold tracking-tight">GitHub Settings</h2>
-    <p class="text-muted-foreground">
-      Configure the GitHub OAuth app and connect your account for repositories and issues.
-    </p>
-  </div>
-
   <Card>
     <CardHeader>
       <CardTitle>OAuth Configuration</CardTitle>

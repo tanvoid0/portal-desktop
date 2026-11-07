@@ -5,7 +5,7 @@
   "packageManager": "pnpm@9.15.9",
   "type": "module",
   "scripts": {
-    "predev": "npx kill-port 1420 || echo 'Port 1420 not in use'",
+    "predev": "node scripts/dev-instance.mjs --kill-port",
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
+    "tauri:dev:instance": "node scripts/dev-instance.mjs",
     "tauri:build": "tauri build",
     "n8n:start": "cd n8n-workflows && npx n8n start",
     "n8n:dev": "cd n8n-workflows && npx n8n start --tunnel",

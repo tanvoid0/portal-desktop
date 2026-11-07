@@ -54,6 +54,10 @@
 
   const log = logger.createScoped(`${config.itemName}Settings`);
 
+  // Components are dynamic by default in Svelte 5, so this renders directly as
+  // `<EmptyIcon />` — no `<svelte:component>`.
+  const EmptyIcon = $derived(config.emptyIcon);
+
   // State
   let items = $state<T[]>([]);
   let suggestedGroups = $state<BaseItemGroup<TSuggested>[]>([]);
@@ -373,10 +377,7 @@
         {#if filtered.length === 0}
           <Card>
             <CardContent class="flex flex-col items-center justify-center py-12">
-              <svelte:component
-                this={config.emptyIcon}
-                class="mb-4 h-12 w-12 text-muted-foreground"
-              />
+              <EmptyIcon class="mb-4 h-12 w-12 text-muted-foreground" />
               <p class="mb-2 text-muted-foreground">
                 {#if searchQuery}
                   {config.emptySearchMessage}
@@ -436,10 +437,7 @@
         {#if filteredSuggestedGroups.length === 0}
           <Card>
             <CardContent class="flex flex-col items-center justify-center py-12">
-              <svelte:component
-                this={config.emptyIcon}
-                class="mb-4 h-12 w-12 text-muted-foreground"
-              />
+              <EmptyIcon class="mb-4 h-12 w-12 text-muted-foreground" />
               <p class="text-muted-foreground">
                 {#if mergedSuggestedGroups.length === 0}
                   No suggested {config.itemNamePlural.toLowerCase()} available

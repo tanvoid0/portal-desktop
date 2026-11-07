@@ -52,7 +52,7 @@
   {/if}
 
   <Tabs value="components" class="w-full">
-    <TabsList class="grid w-full grid-cols-3">
+    <TabsList>
       <TabsTrigger value="components">Components</TabsTrigger>
       <TabsTrigger value="forms">Forms</TabsTrigger>
       <TabsTrigger value="feedback">Feedback</TabsTrigger>

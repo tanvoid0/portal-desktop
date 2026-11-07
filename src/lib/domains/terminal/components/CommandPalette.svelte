@@ -16,19 +16,24 @@
   import Terminal from '~icons/fa6-solid/terminal';
   import Zap from '~icons/fa6-solid/bolt';
 
-  export let tabId: string;
-  export let onKillProcess: () => void;
-  export let onClearTerminal: () => void;
-  export let onRerunCommand: (command: string) => void;
+  interface Props {
+    tabId: string;
+    onKillProcess: () => void;
+    onClearTerminal: () => void;
+    onRerunCommand: (command: string) => void;
+  }
 
-  let searchInput: HTMLInputElement;
+  let { tabId, onKillProcess, onClearTerminal, onRerunCommand }: Props = $props();
+
+  let searchInput = $state<HTMLInputElement | null>(null);
   let unsubscribe: (() => void) | null = null;
 
-  // Get reactive state
-  $: isOpen = $commandPaletteStore.isOpen;
-  $: query = $commandPaletteStore.query;
-  $: selectedIndex = $commandPaletteStore.selectedIndex;
-  $: filteredActions = $commandPaletteStore.filteredActions;
+  // Read-only views of the store, which is the single source of truth: the
+  // input writes through `handleQueryChange`, not a two-way binding.
+  const isOpen = $derived($commandPaletteStore.isOpen);
+  const query = $derived($commandPaletteStore.query);
+  const selectedIndex = $derived($commandPaletteStore.selectedIndex);
+  const filteredActions = $derived($commandPaletteStore.filteredActions);
 
   onMount(() => {
     // Set up keyboard shortcuts
@@ -169,7 +174,7 @@
       <Search class="mr-3 h-5 w-5 text-muted-foreground" />
       <Input
         bind:ref={searchInput}
-        bind:value={query}
+        value={query}
         placeholder="Search commands and actions..."
         class="flex-1 border-0 bg-transparent text-foreground placeholder:text-muted-foreground focus:ring-0"
         oninput={handleQueryChange}

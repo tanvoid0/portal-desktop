@@ -319,7 +319,7 @@
 
     <Tabs value={tab} onValueChange={(v) => (tab = v as EditableScope)} class="space-y-4">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <TabsList class="w-full sm:w-auto">
+        <TabsList>
           <TabsTrigger value="user" class="gap-2">
             <User class="h-4 w-4" />
             User

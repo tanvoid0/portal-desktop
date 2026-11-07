@@ -158,7 +158,7 @@
           <RefreshCw class="mr-2 h-4 w-4" />
           Refresh
         </Button>
-        <Button variant="outline" size="sm" onclick={() => goto('/cloud/workloads/services')}>
+        <Button variant="outline" size="sm" onclick={() => goto('/cloud/services')}>
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back to Services
         </Button>

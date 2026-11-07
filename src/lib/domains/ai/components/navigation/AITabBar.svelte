@@ -23,7 +23,7 @@
 
 <div class={className}>
   <Tabs value={activeTab} onValueChange={onTabChange}>
-    <TabsList class="h-auto w-full justify-stretch gap-1 p-1">
+    <TabsList class="h-auto gap-1 p-1">
       {#each AI_TABS as tab (tab.id)}
         <TabsTrigger value={tab.id} class="flex-1 gap-1.5 px-2 py-1.5 text-xs">
           <NavIcon icon={tab.icon} class="h-3.5 w-3.5" />

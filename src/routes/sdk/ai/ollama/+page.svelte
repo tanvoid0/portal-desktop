@@ -556,7 +556,7 @@
 <!-- Main Content -->
 <div class="flex-1 p-6">
   <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as OllamaTab)} class="w-full">
-    <TabsList class="grid w-full grid-cols-5">
+    <TabsList>
       <TabsTrigger value="service">Service</TabsTrigger>
       <TabsTrigger value="version">Version</TabsTrigger>
       <TabsTrigger value="models">Models</TabsTrigger>
