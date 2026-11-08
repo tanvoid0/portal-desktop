@@ -39,9 +39,9 @@ jobs:
           # Listed for readability; all jobs start in parallel after smoke passes.
           - platform: windows-2022
             args: ''
-          - platform: macos-14 # Apple Silicon
+          - platform: macos-15 # Apple Silicon
             args: '--target aarch64-apple-darwin'
-          - platform: macos-14 # Intel
+          - platform: macos-15 # Intel
             args: '--target x86_64-apple-darwin'
           - platform: ubuntu-22.04
             args: ''

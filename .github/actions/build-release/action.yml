@@ -2,7 +2,7 @@ name: Build and release portal-desktop
 description: Shared Tauri release build and GitHub Release upload steps
 inputs:
   platform:
-    description: Runner platform label (ubuntu-22.04, windows-2022, macos-14)
+    description: Runner platform label (ubuntu-22.04, windows-2022, macos-15)
     required: true
   args:
     description: Extra args passed to tauri build
@@ -24,7 +24,7 @@ runs:
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
       with:
-        targets: ${{ inputs.platform == 'macos-14' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+        targets: ${{ inputs.platform == 'macos-15' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
     - name: Rust cache
       uses: swatinem/rust-cache@v2

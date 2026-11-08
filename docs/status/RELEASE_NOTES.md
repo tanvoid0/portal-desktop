@@ -1,5 +1,16 @@
 # Portal Desktop - Release Notes
 
+## Version 0.13.2
+
+### Highlights
+
+- Feature: checks for updates on launch and offers a one-click install-and-restart prompt
+- Feature: Settings > Updates has an 'Install updates automatically' toggle
+- Fix: macOS builds use the macos-15 runner (macos-14 is no longer supported by GitHub Actions)
+- Fix: notification/privacy/update settings now save correctly
+
+---
+
 ## Version 0.13.1
 
 ### Highlights
