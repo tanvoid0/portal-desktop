@@ -273,9 +273,15 @@ After running:
 
   const steps =
     nextVersion !== fromVersion || !flags.noNotes
-      ? ['Review docs/status/RELEASE_NOTES.md', 'git add -A', `git commit -m "release: v${nextVersion}"`]
+      ? [
+          'Review docs/status/RELEASE_NOTES.md',
+          'git add -A',
+          `git commit -m "release: v${nextVersion}"`,
+        ]
       : ['git add -A', `git commit -m "release: v${nextVersion}"`];
-  steps.push('pnpm release:verify  # runs the release-smoke job locally via act — fix before tagging');
+  steps.push(
+    'pnpm release:verify  # runs the release-smoke job locally via act — fix before tagging'
+  );
   if (flags.noTag || flags.dryRun) {
     steps.push(`git tag -a ${tag} -m "Portal Desktop v${nextVersion}"`);
   }
