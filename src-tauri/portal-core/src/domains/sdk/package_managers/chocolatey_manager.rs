@@ -3,6 +3,7 @@ use super::super::traits::package_manager::{
 };
 use super::super::SDKError;
 use crate::command_executor::CommandExecutor;
+use crate::domains::elevation;
 /**
  * Chocolatey Package Manager Implementation
  *
@@ -29,6 +30,26 @@ impl ChocolateyManager {
                 "Chocolatey error: {}",
                 result.stderr
             )))
+        }
+    }
+
+    /// Install/upgrade/uninstall need admin. Portal itself stays unprivileged;
+    /// run just this one choco invocation elevated (UAC) unless Portal is
+    /// already running as admin.
+    async fn execute_choco_elevated(&self, args: &[&str]) -> Result<(), SDKError> {
+        if elevation::elevation_status().is_elevated {
+            self.execute_choco(args).await?;
+            return Ok(());
+        }
+
+        let owned_args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+        let result = elevation::run_elevated("choco", &owned_args)
+            .map_err(|e| SDKError::CommandFailed(format!("Chocolatey elevation failed: {}", e)))?;
+
+        if result.success {
+            Ok(())
+        } else {
+            Err(SDKError::CommandFailed(result.message))
         }
     }
 }
@@ -160,18 +181,15 @@ impl PackageManager for ChocolateyManager {
     }
 
     async fn install_package(&self, id: &str, _version: Option<&str>) -> Result<(), SDKError> {
-        self.execute_choco(&["install", id, "-y"]).await?;
-        Ok(())
+        self.execute_choco_elevated(&["install", id, "-y"]).await
     }
 
     async fn upgrade_package(&self, id: &str) -> Result<(), SDKError> {
-        self.execute_choco(&["upgrade", id, "-y"]).await?;
-        Ok(())
+        self.execute_choco_elevated(&["upgrade", id, "-y"]).await
     }
 
     async fn uninstall_package(&self, id: &str) -> Result<(), SDKError> {
-        self.execute_choco(&["uninstall", id, "-y"]).await?;
-        Ok(())
+        self.execute_choco_elevated(&["uninstall", id, "-y"]).await
     }
 
     async fn check_updates(&self) -> Result<Vec<PackageUpdate>, SDKError> {

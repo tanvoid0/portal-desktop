@@ -725,6 +725,10 @@ pub fn run() {
             domains::environment::commands::env_apply_changes,
             domains::environment::commands::env_refresh_process,
             domains::environment::commands::env_request_elevation,
+            // Generic process elevation (UAC / pkexec / osascript)
+            domains::elevation::commands::elevation_status,
+            domains::elevation::commands::run_elevated,
+            domains::elevation::commands::restart_elevated,
         ])
         .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
         .expect("error while running tauri application");

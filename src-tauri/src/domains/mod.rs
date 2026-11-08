@@ -15,6 +15,7 @@ pub mod dashboard;
 pub mod deployments;
 pub mod disk;
 pub mod documents;
+pub mod elevation;
 pub mod environment;
 pub mod github;
 pub mod ide;
