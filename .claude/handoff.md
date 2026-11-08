@@ -289,7 +289,7 @@ subtitle cut in half), `QA-101` major (block card titles truncate to one letter 
 `aria-current`).
 
 **3. Pre-existing, found while testing — do not bill these to the wave:** `QA-097` **blocker**
-(`/sdk` hangs on "Loading SDK data..." on a *direct* load; UX-014's own original screenshot
+(`/sdk` hangs on "Loading SDK data..." on a _direct_ load; UX-014's own original screenshot
 already showed this), `QA-096`, `QA-100`, `QA-092`, `QA-093`, `QA-094`, `QA-095`, `QA-103`,
 `QA-089` (fixed at its one call site, but the trap is still in the hook —
 `UseResourceActionsOptions.resources` still accepts a getter and still freezes it silently).
@@ -315,7 +315,7 @@ page at a time.
   left-only **by design** — adding a right variant was tried in an earlier wave and reverted.
 - Four files are deliberately **not** split despite their size: `ProjectAudit` 960,
   `CoderPanel` 852, `sdk/ai/ollama` 880, `cloud/workloads/pods/[pod]` 907.
-- Cloud detail pages stay at `/cloud/workloads/<plural>/[singular]`; only the *list* routes
+- Cloud detail pages stay at `/cloud/workloads/<plural>/[singular]`; only the _list_ routes
   collapsed. The redirect is `workloads/[...rest]` and must never swallow a detail URL.
 - The deployments Scale button was dropped by a fixer and I had it **restored** as an opt-in
   `rowActions?: Snippet<[ICloudResource]>` on `BaseResourceTable`, hover-revealed with
@@ -332,7 +332,7 @@ page at a time.
   and correct so there is nothing to undo, but **the owner was never asked**. Check with them
   before pushing.
 - Two fixers reached for an inline `--sidebar-width-domain` override; the first made the rail
-  *wider* than the narrow-screen rule, which is backwards for a small-screen brief. Rejected.
+  _wider_ than the narrow-screen rule, which is backwards for a small-screen brief. Rejected.
   That is what UX-020 is about.
 - One agent "diagnosed" QA-051 and QA-052 from their stale Problem sections without noticing
   both are already `status: verified`. **Read the frontmatter status before trusting any

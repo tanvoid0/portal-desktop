@@ -51,8 +51,7 @@ inspirations/
 *.log
 logs/
 # ...but not the log-viewer source that happens to live in `logs/` folders
-!src/lib/components/logs/
-!src/routes/logs/
+!src/**/logs/
 
 # Database files (user-specific, never commit)
 *.db

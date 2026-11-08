@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(capability("get_all_projects"), Some("projects"));
         assert_eq!(capability("create_task"), Some("tasks"));
         assert_eq!(capability("load_command_history"), Some("terminal"));
-        assert_eq!(capability("execute_command"), Some("terminal.exec"));
+        assert_eq!(capability("create_terminal_process"), Some("terminal.exec"));
         assert!(capability("execute_command_in_directory").is_none());
     }
 }
