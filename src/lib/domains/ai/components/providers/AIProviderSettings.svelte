@@ -19,8 +19,9 @@
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Separator } from '$lib/components/ui/separator';
   import { toastActions } from '$lib/utils/toast';
+  import { openExternalUrl } from '$lib/utils/tauri';
   import { aiProviderService } from '../../services/aiProviderService.js';
-  import { aiPlatform } from '../../state/aiPlatform.svelte.js';
+  import { aiPlatform, AGENT_PLATFORM_RELEASES_URL } from '../../state/aiPlatform.svelte.js';
   import { formatModelMetadata, flattenCatalogModels, isAuthError } from '../../utils/catalog.js';
   import type {
     ProviderConfig,
@@ -282,7 +283,11 @@
           {:else if aiPlatform.known}
             <span>{aiPlatform.baseUrl}</span>
             <Badge variant={aiPlatform.reachable ? 'secondary' : 'destructive'}>
-              {aiPlatform.reachable ? 'reachable' : 'not running'}
+              {aiPlatform.reachable
+                ? 'reachable'
+                : aiPlatform.installed
+                  ? 'not running'
+                  : 'not installed'}
             </Badge>
             <Badge variant="secondary">
               {aiPlatform.authRequired ? 'auth required' : 'no auth'}
@@ -297,16 +302,27 @@
             Platform health unavailable.
           {/if}
           {#if aiPlatform.known && !aiPlatform.reachable}
-            <Button
-              size="sm"
-              variant="outline"
-              class="h-6 text-xs"
-              disabled={aiPlatform.starting}
-              onclick={() => aiPlatform.start()}
-            >
-              {#if aiPlatform.starting}<Loader2 class="mr-1 h-3 w-3 animate-spin" />{/if}
-              {aiPlatform.starting ? 'Starting…' : 'Start server'}
-            </Button>
+            {#if aiPlatform.installed}
+              <Button
+                size="sm"
+                variant="outline"
+                class="h-6 text-xs"
+                disabled={aiPlatform.starting}
+                onclick={() => aiPlatform.start()}
+              >
+                {#if aiPlatform.starting}<Loader2 class="mr-1 h-3 w-3 animate-spin" />{/if}
+                {aiPlatform.starting ? 'Launching…' : 'Launch Agent Platform'}
+              </Button>
+            {:else}
+              <Button
+                size="sm"
+                variant="outline"
+                class="h-6 text-xs"
+                onclick={() => openExternalUrl(AGENT_PLATFORM_RELEASES_URL)}
+              >
+                Download latest release
+              </Button>
+            {/if}
           {/if}
         </div>
         <CardDescription>

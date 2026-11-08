@@ -168,8 +168,9 @@ pub async fn ai_platform_health(
     Ok(platform_admin::platform_health(&settings_service).await)
 }
 
-/// Launch the Agent Platform app (which owns the agent-platformd child) if
-/// nothing is already answering on the platform port.
+/// Launch the installed Agent Platform app (which owns the agent-platformd
+/// child) if nothing is already answering on the platform port. Fails with an
+/// `install_url` when the app is not installed.
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn start_agent_platform(
     settings_service: State<'_, Arc<AISettingsService>>,

@@ -1,12 +1,13 @@
 <!--
-  Honest agent-platform state: unreachable -> Start server, unauthenticated ->
-  Settings/pair, healthy (or unknown) -> renders nothing. `blocks` names what is
-  disabled so the reason is visible next to the dead controls.
+  Honest agent-platform state: not_installed -> Download, unreachable -> Launch,
+  unauthenticated -> Settings/pair, healthy (or unknown) -> renders nothing.
+  `blocks` names what is disabled so the reason is visible next to the dead controls.
 -->
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
-  import { aiPlatform } from '../state/aiPlatform.svelte.js';
+  import { openExternalUrl } from '$lib/utils/tauri';
+  import { aiPlatform, AGENT_PLATFORM_RELEASES_URL } from '../state/aiPlatform.svelte.js';
   import ServerOff from '~icons/fa6-solid/server';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Loader2 from '~icons/fa6-solid/spinner';
@@ -17,6 +18,7 @@
   }
   let { blocks = 'Agent Platform features' }: Props = $props();
 
+  const notInstalled = $derived(aiPlatform.status === 'not_installed');
   const unreachable = $derived(aiPlatform.status === 'unreachable');
 </script>
 
@@ -29,16 +31,35 @@
     <ServerOff class="h-4 w-4 shrink-0" />
     <div class="min-w-0 flex-1">
       <p class="text-xs font-medium">
-        {unreachable ? 'Agent Platform is not running' : 'Agent Platform rejected this app’s token'}
+        {#if notInstalled}
+          Agent Platform is not installed
+        {:else if unreachable}
+          Agent Platform is not running
+        {:else}
+          Agent Platform rejected this app’s token
+        {/if}
       </p>
       <p class="truncate text-[11px] opacity-80" title={aiPlatform.detail ?? ''}>
         {blocks} unavailable.
-        {unreachable
-          ? `Nothing is answering at ${aiPlatform.baseUrl}.`
-          : 'Pair again in Settings > AI.'}
+        {#if notInstalled}
+          Download and install it to continue.
+        {:else if unreachable}
+          Nothing is answering at {aiPlatform.baseUrl}.
+        {:else}
+          Pair again in Settings > AI.
+        {/if}
       </p>
     </div>
-    {#if unreachable}
+    {#if notInstalled}
+      <Button
+        size="sm"
+        variant="outline"
+        class="h-7 shrink-0 text-xs"
+        onclick={() => openExternalUrl(AGENT_PLATFORM_RELEASES_URL)}
+      >
+        Download latest release
+      </Button>
+    {:else if unreachable}
       <Button
         size="sm"
         variant="outline"
@@ -47,7 +68,7 @@
         onclick={() => aiPlatform.start()}
       >
         {#if aiPlatform.starting}<Loader2 class="h-3 w-3 animate-spin" />{/if}
-        {aiPlatform.starting ? 'Starting…' : 'Start server'}
+        {aiPlatform.starting ? 'Launching…' : 'Launch Agent Platform'}
       </Button>
     {:else}
       <Button

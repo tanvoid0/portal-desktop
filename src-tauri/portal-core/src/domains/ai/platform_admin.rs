@@ -18,6 +18,9 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// Where to get the app when [`exe_path`] finds nothing installed.
+pub const RELEASES_URL: &str = "https://github.com/tanvoid0/agent-platform/releases/latest";
+
 #[derive(Debug, Clone, Serialize)]
 pub struct PlatformHealth {
     pub base_url: String,
@@ -25,6 +28,8 @@ pub struct PlatformHealth {
     pub auth_required: bool,
     pub authenticated: bool,
     pub detail: Option<String>,
+    /// Whether the Agent Platform app is installed, independent of `reachable`.
+    pub installed: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,6 +38,8 @@ pub struct StartResult {
     pub already_running: bool,
     pub pid: Option<u32>,
     pub detail: String,
+    /// Set instead of launching when the app is not installed.
+    pub install_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -82,6 +89,7 @@ async fn probe(base: &str, token: Option<&str>) -> PlatformHealth {
         auth_required: false,
         authenticated: false,
         detail: None,
+        installed: is_installed(),
     };
     match get(&client, &format!("{base}/health"), 3).send().await {
         Ok(r) => {
@@ -142,12 +150,17 @@ fn exe_path() -> Option<PathBuf> {
     Some(PathBuf::from(local).join("Programs/agent-platform/agent-platform.exe"))
 }
 
+fn is_installed() -> bool {
+    exe_path().filter(|p| p.is_file()).is_some()
+}
+
 pub async fn start_platform(settings: &AISettingsService) -> StartResult {
     let fail = |detail: String| StartResult {
         started: false,
         already_running: false,
         pid: None,
         detail,
+        install_url: None,
     };
     let base = base_of(&config(settings));
     if probe(&base, None).await.reachable {
@@ -156,49 +169,38 @@ pub async fn start_platform(settings: &AISettingsService) -> StartResult {
             already_running: true,
             pid: None,
             detail: "agent-platform is already running".to_string(),
+            install_url: None,
         };
     }
 
-    let (mut cmd, how) = match exe_path().filter(|p| p.is_file()) {
-        Some(exe) => {
-            let mut c = std::process::Command::new(&exe);
-            // Tray-first, like Docker Desktop: the app comes up minimized with
-            // its server running rather than stealing focus from Portal.
-            c.arg("--minimized");
-            (c, exe.display().to_string())
-        }
-        None => match std::env::var_os("AGENT_PLATFORM_MANIFEST") {
-            Some(m) => {
-                let mut c = std::process::Command::new("cargo");
-                c.args(["run", "-p", "agent-platform-desktop", "--manifest-path"])
-                    .arg(m)
-                    .args(["--", "--minimized"]);
-                (c, "cargo run (dev)".to_string())
-            }
-            None => {
-                let shown = exe_path()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_default();
-                return fail(format!(
-                    "The Agent Platform app was not found at {shown} (set AGENT_PLATFORM_APP_EXE, or AGENT_PLATFORM_MANIFEST for a dev build)"
-                ));
-            }
-        },
+    let Some(exe) = exe_path().filter(|p| p.is_file()) else {
+        return StartResult {
+            started: false,
+            already_running: false,
+            pid: None,
+            detail: "The Agent Platform app is not installed".to_string(),
+            install_url: Some(RELEASES_URL.to_string()),
+        };
     };
-    cmd.no_window()
+
+    let mut cmd = std::process::Command::new(&exe);
+    // Tray-first, like Docker Desktop: the app comes up minimized with its
+    // server running rather than stealing focus from Portal.
+    cmd.arg("--minimized")
+        .no_window()
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     let child = match cmd.spawn() {
         Ok(c) => c,
-        Err(e) => return fail(format!("Could not launch {how}: {}", e.kind())),
+        Err(e) => return fail(format!("Could not launch {}: {}", exe.display(), e.kind())),
     };
     let pid = child.id();
     // Detached: dropping a std Child neither kills nor waits on it.
     drop(child);
 
     // The app has to boot, take its single-instance lock, then start the daemon,
-    // which runs migrations on a first launch. 15s was sized for a bare daemon.
+    // which runs migrations on a first launch.
     for _ in 0..120 {
         tokio::time::sleep(Duration::from_millis(500)).await;
         if probe(&base, None).await.reachable {
@@ -206,7 +208,8 @@ pub async fn start_platform(settings: &AISettingsService) -> StartResult {
                 started: true,
                 already_running: false,
                 pid: Some(pid),
-                detail: format!("Started {how}"),
+                detail: format!("Started {}", exe.display()),
+                install_url: None,
             };
         }
     }
@@ -214,7 +217,8 @@ pub async fn start_platform(settings: &AISettingsService) -> StartResult {
         started: false,
         already_running: false,
         pid: Some(pid),
-        detail: format!("Launched {how} but /health did not answer within 60s"),
+        detail: format!("Launched {} but /health did not answer within 60s", exe.display()),
+        install_url: None,
     }
 }
 

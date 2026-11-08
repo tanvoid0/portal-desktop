@@ -186,6 +186,7 @@ export interface PlatformHealth {
   auth_required: boolean;
   authenticated: boolean;
   detail: string | null;
+  installed: boolean;
 }
 
 export interface PlatformStartResult {
@@ -193,6 +194,7 @@ export interface PlatformStartResult {
   already_running: boolean;
   pid: number | null;
   detail: string;
+  install_url: string | null;
 }
 
 export interface PlatformPairResult {
