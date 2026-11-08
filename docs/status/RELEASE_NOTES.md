@@ -1,5 +1,13 @@
 # Portal Desktop - Release Notes
 
+## Version 0.13.4
+
+### Highlights
+
+- Feature: Agent Platform status says when the app isn't installed and links to the download instead of failing to launch
+
+---
+
 ## Version 0.13.3
 
 ### Highlights
