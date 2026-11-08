@@ -14,6 +14,25 @@ runs:
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
 
+    # Was missing here (unlike the matrix build jobs), so every release did a
+    # fully cold cargo build just to run `cargo check`/`cargo test` once.
+    - name: Rust cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: './src-tauri -> target'
+
+    - name: Get pnpm store directory
+      shell: bash
+      run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+    - name: Cache pnpm store
+      uses: actions/cache@v5
+      with:
+        path: ${{ env.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-
+
     - name: Install Linux system dependencies
       shell: bash
       run: |

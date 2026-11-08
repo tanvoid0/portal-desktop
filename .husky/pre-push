@@ -1,1 +1,8 @@
+# Quick local gate: fast enough to run on every push, catches what CI's
+# first jobs would — type errors, lint/format (incl. prettier on docs/scripts,
+# which caught v0.13.0's first release failure), and a Rust compile check.
+# Full tests/build/release-smoke stay for `pnpm release:verify` (act) before tagging.
 pnpm check
+pnpm lint
+cargo check --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/portal-core/Cargo.toml

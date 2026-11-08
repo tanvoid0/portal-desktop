@@ -271,28 +271,19 @@ After running:
     createTag(tag, nextVersion, flags.dryRun);
   }
 
+  const steps =
+    nextVersion !== fromVersion || !flags.noNotes
+      ? ['Review docs/status/RELEASE_NOTES.md', 'git add -A', `git commit -m "release: v${nextVersion}"`]
+      : ['git add -A', `git commit -m "release: v${nextVersion}"`];
+  steps.push('pnpm release:verify  # runs the release-smoke job locally via act — fix before tagging');
+  if (flags.noTag || flags.dryRun) {
+    steps.push(`git tag -a ${tag} -m "Portal Desktop v${nextVersion}"`);
+  }
+  steps.push('git push origin main --tags');
+
   console.log('');
   console.log('Next steps:');
-  if (nextVersion !== fromVersion || !flags.noNotes) {
-    console.log('  1. Review docs/status/RELEASE_NOTES.md');
-    console.log('  2. git add -A');
-    console.log(`  3. git commit -m "release: v${nextVersion}"`);
-  } else {
-    console.log('  1. git add -A');
-    console.log(`  2. git commit -m "release: v${nextVersion}"`);
-  }
-  if (!flags.noTag && !flags.dryRun) {
-    console.log(
-      `  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git push origin main --tags`
-    );
-  } else {
-    console.log(
-      `  ${nextVersion !== fromVersion || !flags.noNotes ? 4 : 3}. git tag -a ${tag} -m "Portal Desktop v${nextVersion}"`
-    );
-    console.log(
-      `  ${nextVersion !== fromVersion || !flags.noNotes ? 5 : 4}. git push origin main --tags`
-    );
-  }
+  steps.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
   console.log('');
   console.log('GitHub Actions will build and publish the release when the tag is pushed.');
 }

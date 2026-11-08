@@ -34,6 +34,7 @@
     "postrun:install": "echo 'Installation complete - no build tools required'",
     "postupdate": "cargo update --manifest-path src-tauri/Cargo.toml",
     "release:prepare": "node scripts/prepare-release.mjs",
+    "release:verify": "act push -W .github/workflows/release.yml -j release-smoke -P ubuntu-22.04=catthehacker/ubuntu:act-latest --pull=false",
     "gen:types": "node scripts/gen-types.mjs"
   },
   "devDependencies": {
