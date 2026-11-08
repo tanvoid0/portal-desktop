@@ -1,5 +1,14 @@
 # Portal Desktop - Release Notes
 
+## Version 0.13.1
+
+### Highlights
+
+- Fix: Kubernetes client redials instead of reusing a dead connection forever
+- Rebuild of v0.13.0 with all platforms; v0.13.0 shipped Windows and Linux only (macOS jobs were cancelled)
+
+---
+
 ## Version 0.13.0
 
 ### Highlights
