@@ -13,6 +13,7 @@
   } from '$lib/components/ui/alert-dialog';
   import { Button } from '$lib/components/ui/button';
   import { Progress } from '$lib/components/ui/progress';
+  import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
   import { updatePrompt } from '../state/updatePrompt.svelte';
   import { installFromPrompt } from '../services/startupUpdate';
 </script>
@@ -33,8 +34,8 @@
       </AlertDialogHeader>
 
       {#if updatePrompt.info.body}
-        <div class="max-h-40 overflow-y-auto text-sm whitespace-pre-wrap text-muted-foreground">
-          {updatePrompt.info.body}
+        <div class="max-h-40 overflow-y-auto text-muted-foreground">
+          <ChatMarkdown content={updatePrompt.info.body} density="compact" />
         </div>
       {/if}
 
