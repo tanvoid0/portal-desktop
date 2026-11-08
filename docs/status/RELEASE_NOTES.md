@@ -1,5 +1,13 @@
 # Portal Desktop - Release Notes
 
+## Version 0.13.3
+
+### Highlights
+
+- Maintenance release to exercise the in-app update flow from 0.13.2
+
+---
+
 ## Version 0.13.2
 
 ### Highlights
