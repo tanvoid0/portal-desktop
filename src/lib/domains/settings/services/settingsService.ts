@@ -99,6 +99,19 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   },
 };
 
+const toSnake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+const toCamel = (k: string) => k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+
+/** These Rust structs have no serde rename, so nested sections need snake_case on the wire. */
+function mapKeys(value: unknown, fn: (key: string) => string): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [fn(k), mapKeys(v, fn)]));
+}
+
+function mergeSection<T extends object>(defaults: T, raw: unknown): T {
+  return { ...defaults, ...(mapKeys(raw, toCamel) as Partial<T> | undefined) };
+}
+
 type RawThemeSettings = Partial<ThemeSettings> & Record<string, unknown>;
 type RawAppSettings = Partial<AppSettings> & Record<string, unknown>;
 
@@ -157,11 +170,9 @@ function normalizeAppSettings(raw: RawAppSettings | null | undefined): AppSettin
         DEFAULT_APP_SETTINGS.startupBehavior.startMinimized
       ),
     },
-    notifications:
-      (app.notifications as AppSettings['notifications'] | undefined) ??
-      DEFAULT_APP_SETTINGS.notifications,
-    privacy: (app.privacy as AppSettings['privacy'] | undefined) ?? DEFAULT_APP_SETTINGS.privacy,
-    updates: (app.updates as AppSettings['updates'] | undefined) ?? DEFAULT_APP_SETTINGS.updates,
+    notifications: mergeSection(DEFAULT_APP_SETTINGS.notifications, app.notifications),
+    privacy: mergeSection(DEFAULT_APP_SETTINGS.privacy, app.privacy),
+    updates: mergeSection(DEFAULT_APP_SETTINGS.updates, app.updates),
     integrations: {
       github: {
         clientId:
@@ -262,9 +273,9 @@ function serializeAppSettings(app: AppSettings): Record<string, unknown> {
       minimize_to_tray: app.startupBehavior.minimizeToTray,
       start_minimized: app.startupBehavior.startMinimized,
     },
-    notifications: app.notifications,
-    privacy: app.privacy,
-    updates: app.updates,
+    notifications: mapKeys(app.notifications, toSnake),
+    privacy: mapKeys(app.privacy, toSnake),
+    updates: mapKeys(app.updates, toSnake),
     integrations: {
       github: {
         client_id: app.integrations?.github?.clientId ?? '',
@@ -322,6 +333,10 @@ function serializeSettingsForRust(
 
 function serializeSettingsUpdateForRust(updates: SettingsUpdate): Record<string, unknown> {
   const serialized: Record<string, unknown> = { ...updates };
+  // The backend replaces the whole `app` section, so callers must pass a full AppSettings.
+  if (updates.app) {
+    serialized.app = serializeAppSettings(updates.app as AppSettings);
+  }
   if (updates.theme) {
     serialized.theme = serializeThemeSettings(updates.theme);
   }

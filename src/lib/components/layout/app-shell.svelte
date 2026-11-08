@@ -23,6 +23,8 @@
   import { settingsActions } from '$lib/domains/settings/stores/settingsStore';
   import ToastContainer from '$lib/components/ui/toast-container.svelte';
   import ConfirmDialog from '$lib/components/ui/confirm-dialog.svelte';
+  import UpdatePrompt from '$lib/domains/updates/components/UpdatePrompt.svelte';
+  import { runStartupUpdateCheck } from '$lib/domains/updates/services/startupUpdate';
   import QRCodeDialog from '$lib/components/QRCodeDialog.svelte';
   import DeviceApprovalDialog from '$lib/components/DeviceApprovalDialog.svelte';
   import DeviceAuthGuard from '$lib/components/DeviceAuthGuard.svelte';
@@ -163,6 +165,9 @@
 
       // Load saved settings so custom theme colors apply on startup
       void settingsActions.loadSettings().catch(() => {});
+
+      // Check for a new release; prompts (or auto-installs, per settings) when one exists
+      void runStartupUpdateCheck();
 
       // Initialize learning service (should be early to start collecting patterns)
       await learningService.initialize();
@@ -428,6 +433,9 @@
 
   <!-- Global confirmation dialog -->
   <ConfirmDialog />
+
+  <!-- Launch-time update prompt -->
+  <UpdatePrompt />
 
   <!-- QR Code Dialog -->
   <QRCodeDialog bind:open={qrCodeDialogOpen} />

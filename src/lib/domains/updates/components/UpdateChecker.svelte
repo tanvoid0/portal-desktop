@@ -15,6 +15,8 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Progress } from '$lib/components/ui/progress';
+  import { Label } from '$lib/components/ui/label';
+  import { Switch } from '$lib/components/ui/switch';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Download from '~icons/fa6-solid/download';
   import CheckCircle2 from '~icons/fa6-solid/circle-check';
@@ -31,6 +33,9 @@
   } from '../services/updateService';
   import { toast } from '$lib/utils/toast';
   import { logger } from '$lib/domains/shared';
+  import { settingsService } from '$lib/domains/settings/services/settingsService';
+  import type { UpdateSettings } from '$lib/domains/settings/types';
+  import { saveUpdatePrefs } from '../services/startupUpdate';
 
   let currentVersion = $state<string | null>(null);
   let updateInfo = $state<UpdateInfo | null>(null);
@@ -39,8 +44,31 @@
   let isChecking = $state(false);
   let isInstalling = $state(false);
   let versionLoadFailed = $state(false);
+  let prefs = $state<UpdateSettings | null>(null);
+  let savingPrefs = $state(false);
+
+  async function setPref(patch: Partial<UpdateSettings>) {
+    if (!prefs) return;
+    const previous = prefs;
+    prefs = { ...prefs, ...patch }; // optimistic
+    savingPrefs = true;
+    try {
+      prefs = await saveUpdatePrefs(patch);
+    } catch (error) {
+      prefs = previous;
+      logger.error('Failed to save update preferences', { error });
+      toast.error('Could not save update settings');
+    } finally {
+      savingPrefs = false;
+    }
+  }
 
   onMount(async () => {
+    settingsService
+      .getSettings()
+      .then((s) => (prefs = s.app.updates))
+      .catch((error) => logger.warn('Update preferences unavailable', { error }));
+
     const version = await getCurrentVersion();
     if (version) {
       currentVersion = version;
@@ -128,6 +156,45 @@
           </AlertDescription>
         </Alert>
       {/if}
+    </CardContent>
+  </Card>
+
+  <!-- Automatic updates -->
+  <Card>
+    <CardHeader>
+      <CardTitle>Automatic Updates</CardTitle>
+      <CardDescription>What happens when Portal Desktop starts</CardDescription>
+    </CardHeader>
+    <CardContent class="space-y-4">
+      <div class="flex items-center justify-between gap-4">
+        <div class="space-y-0.5">
+          <Label for="autoCheck">Check for updates on launch</Label>
+          <p class="text-sm text-muted-foreground">
+            You'll be asked whether to install when a new version is found.
+          </p>
+        </div>
+        <Switch
+          id="autoCheck"
+          checked={prefs?.autoCheck ?? false}
+          disabled={!prefs || savingPrefs}
+          onCheckedChange={(checked) => setPref({ autoCheck: checked })}
+        />
+      </div>
+
+      <div class="flex items-center justify-between gap-4">
+        <div class="space-y-0.5">
+          <Label for="autoInstall">Install updates automatically</Label>
+          <p class="text-sm text-muted-foreground">
+            Download and install the latest version without asking, then restart the app.
+          </p>
+        </div>
+        <Switch
+          id="autoInstall"
+          checked={prefs?.autoInstall ?? false}
+          disabled={!prefs || savingPrefs || !prefs.autoCheck}
+          onCheckedChange={(checked) => setPref({ autoInstall: checked })}
+        />
+      </div>
     </CardContent>
   </Card>
 
