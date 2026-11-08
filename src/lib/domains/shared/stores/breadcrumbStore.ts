@@ -20,8 +20,17 @@ export interface BreadcrumbItem {
 const customBreadcrumbs = writable<BreadcrumbItem[]>([]);
 // Path the custom items were set on; they are ignored once the user navigates elsewhere
 let customPath = '';
-// `page` is rune state; this makes the derived store re-run on navigation
-const currentHref = toStore(() => page.url.href);
+// `page` is rune state; this makes the derived store re-run on navigation.
+// The static-adapter fallback shell has no real request URL, so the one-shot
+// SSR seed read below can throw `state_read_outside_render` during `pnpm build`;
+// that build pass never uses this value, so fall back to an empty href.
+const currentHref = toStore(() => {
+  try {
+    return page.url.href;
+  } catch {
+    return '';
+  }
+});
 
 // Store for page-specific breadcrumb configuration
 const breadcrumbConfig = writable<{
