@@ -72,8 +72,10 @@ pub struct GenerateKubeconfigResult {
     pub stderr: String,
 }
 
-// Static Kubernetes client using OnceLock (thread-safe initialization)
-static K8S_CLIENT: OnceLock<Client> = OnceLock::new();
+// Static Kubernetes client slot. A RwLock<Option<_>> (not a bare OnceLock<Client>) so
+// initialize() can redial and replace a dead client instead of reusing a cached one
+// forever once the cluster endpoint changes or goes away.
+static K8S_CLIENT: OnceLock<std::sync::RwLock<Option<Client>>> = OnceLock::new();
 
 // Global storage for active port forward processes
 type PortForwardMap = Arc<Mutex<HashMap<String, (Child, PortForwardInfo)>>>;
@@ -169,11 +171,16 @@ impl KubernetesManager {
         }
     }
 
+    fn client_slot() -> &'static std::sync::RwLock<Option<Client>> {
+        K8S_CLIENT.get_or_init(|| std::sync::RwLock::new(None))
+    }
+
     // Get the static Kubernetes client
     fn get_client() -> Result<Client, String> {
-        K8S_CLIENT
-            .get()
-            .cloned()
+        Self::client_slot()
+            .read()
+            .unwrap()
+            .clone()
             .ok_or_else(|| "Kubernetes client not initialized".to_string())
     }
 
@@ -207,22 +214,19 @@ impl KubernetesManager {
         Err("No kubeconfig found. Set KUBECONFIG or ensure ~/.kube/config exists.".to_string())
     }
 
+    /// (Re)dial the Kubernetes client and replace whatever is cached. Always redials rather
+    /// than short-circuiting on an existing client, so a cluster that came back up (or moved,
+    /// e.g. Docker Desktop restarting Kubernetes on a new port) is picked up on retry instead
+    /// of leaving every caller stuck on a dead cached client.
     pub async fn initialize() -> Result<(), String> {
-        if K8S_CLIENT.get().is_some() {
-            return Ok(());
-        }
-        if let Ok(client) = Client::try_default().await {
-            K8S_CLIENT
-                .set(client)
-                .map_err(|_| "K8S client already initialized".to_string())?;
-            return Ok(());
-        }
-        let config = Self::load_config().await?;
-        let client = Client::try_from(config)
-            .map_err(|e| format!("Failed to create Kubernetes client: {}", e))?;
-        K8S_CLIENT
-            .set(client)
-            .map_err(|_| "K8S client already initialized".to_string())?;
+        let client = if let Ok(client) = Client::try_default().await {
+            client
+        } else {
+            let config = Self::load_config().await?;
+            Client::try_from(config)
+                .map_err(|e| format!("Failed to create Kubernetes client: {}", e))?
+        };
+        *Self::client_slot().write().unwrap() = Some(client);
         Ok(())
     }
 
@@ -764,7 +768,7 @@ impl KubernetesManager {
     }
 
     pub fn is_connected(&self) -> bool {
-        K8S_CLIENT.get().is_some()
+        Self::client_slot().read().unwrap().is_some()
     }
 
     async fn tool_status(command: &str) -> KubeSetupToolStatus {
