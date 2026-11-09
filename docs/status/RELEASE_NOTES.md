@@ -1,5 +1,21 @@
 # Portal Desktop - Release Notes
 
+## Version 0.13.6
+
+### Highlights
+
+- Fix: a missing master key on disk is no longer silently regenerated (which made every stored credential unreadable); the vault setup dialog can now be dismissed instead of blocking the whole app
+- Fix: a cold/direct load of the SDK overview (fresh launch, window restore, or a typed URL) no longer hangs forever — SDK probes were blocking Tokio's worker pool instead of offloading to it
+- Fix: the deployments list "Restart" action no longer runs a silent rollback — a real restart command was added
+- Fix: the cluster overview's Quick Actions is no longer a hardcoded list missing Ingress
+- Fix: the log viewer no longer crashes on two entries landing in the same millisecond, and autoscroll no longer disables itself during a burst of lines
+- Fix: imported pipeline templates now persist across reload, can be edited/deleted, and re-importing replaces instead of duplicating
+- Fix: a custom framework can be edited/deleted once a mapping references it, and the "Add More Frameworks" overlay no longer lists every chip two or three times or swallows clicks meant for the chip
+- Fix: destructive confirmation dialogs name the actual action instead of saying "Continue"
+- Fix: settings navigation and IDE/mapping row buttons now expose correct accessibility state and labels
+- Fix: block card titles no longer truncate to a single letter at the minimum window width
+- Fix: two more `role="button"` wrappers (session card, terminal tabs) no longer swallow their nested button's label and click
+
 ## Version 0.13.5
 
 ### Highlights
