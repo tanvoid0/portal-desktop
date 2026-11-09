@@ -68,7 +68,7 @@
     onAction={() => onClearFilters()}
   />
 {:else}
-  <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
     {#each filteredTemplates as template (template.key)}
       <Card class="gap-0 p-3">
         <div class="flex items-start gap-2">

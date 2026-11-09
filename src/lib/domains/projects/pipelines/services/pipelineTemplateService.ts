@@ -12,6 +12,7 @@ import type {
   PipelineTemplate,
 } from '../types';
 import { PipelineStepType } from '../types';
+import { loadCustomTemplates, saveCustomTemplates } from '../utils/customTemplates';
 
 const log = logger.createScoped('PipelineTemplateService');
 
@@ -26,8 +27,16 @@ class PipelineTemplateService {
     if (!PipelineTemplateService.instance) {
       PipelineTemplateService.instance = new PipelineTemplateService();
       PipelineTemplateService.instance.initializeTemplates();
+      for (const template of loadCustomTemplates()) {
+        PipelineTemplateService.instance.addTemplate(template);
+      }
     }
     return PipelineTemplateService.instance;
+  }
+
+  /** Persists every template that carries an `id` — the imported/custom ones. */
+  private persistCustomTemplates() {
+    saveCustomTemplates(this.getAllTemplates().filter((t) => t.id));
   }
 
   private initializeTemplates() {
@@ -847,8 +856,15 @@ class PipelineTemplateService {
     });
   }
 
+  /** The bucket key `this.templates` is keyed by — must be identical everywhere a template's
+   *  own `.framework` is looked up, or add/delete/update silently disagree on which array a
+   *  framework-less template actually lives in. */
+  private frameworkKey(template: PipelineTemplate): string {
+    return template.framework || 'other';
+  }
+
   private addTemplate(template: PipelineTemplate) {
-    const framework = template.framework || 'other';
+    const framework = this.frameworkKey(template);
     if (!this.templates.has(framework)) {
       this.templates.set(framework, []);
     }
@@ -1037,9 +1053,32 @@ class PipelineTemplateService {
         );
       }
 
-      // Add the imported template
-      this.addTemplate(template);
-      return template;
+      // Imported templates need an id — that's what marks them as editable/deletable
+      // (see TemplateList.svelte) rather than built-in, and what makes them persist below.
+      const imported: PipelineTemplate = {
+        ...template,
+        id: existing?.id ?? template.id ?? crypto.randomUUID(),
+      };
+
+      if (existing) {
+        // Re-importing a custom template replaces it in place rather than appending a
+        // second copy with the same key — the duplicate would then survive reload and
+        // Delete would only ever remove the first copy. If the re-import changed the
+        // framework, the old bucket entry must be removed too, or it's left orphaned
+        // under the old framework while a second copy lives under the new one.
+        const bucket = this.templates.get(this.frameworkKey(existing));
+        const index = bucket?.findIndex((t) => t.key === existing.key) ?? -1;
+        if (bucket && index >= 0 && this.frameworkKey(existing) === this.frameworkKey(imported)) {
+          bucket[index] = imported;
+        } else {
+          if (bucket && index >= 0) bucket.splice(index, 1);
+          this.addTemplate(imported);
+        }
+      } else {
+        this.addTemplate(imported);
+      }
+      this.persistCustomTemplates();
+      return imported;
     } catch (error) {
       if (error instanceof SyntaxError) {
         throw new Error('Invalid JSON format', { cause: error });
@@ -1063,11 +1102,12 @@ class PipelineTemplateService {
     }
 
     // Remove from the map
-    const frameworkTemplates = this.templates.get(template.framework || '');
+    const frameworkTemplates = this.templates.get(this.frameworkKey(template));
     if (frameworkTemplates) {
       const index = frameworkTemplates.findIndex((t) => t.key === templateKey);
       if (index >= 0) {
         frameworkTemplates.splice(index, 1);
+        this.persistCustomTemplates();
         return true;
       }
     }
@@ -1095,12 +1135,19 @@ class PipelineTemplateService {
       key: template.key, // Preserve the key
     };
 
-    // Replace in the map
-    const frameworkTemplates = this.templates.get(template.framework || '');
+    // Replace in the map — if the update changed the framework, move it to the new
+    // bucket instead of replacing in place, or it's left orphaned under the old one.
+    const frameworkTemplates = this.templates.get(this.frameworkKey(template));
     if (frameworkTemplates) {
       const index = frameworkTemplates.findIndex((t) => t.key === templateKey);
       if (index >= 0) {
-        frameworkTemplates[index] = updatedTemplate;
+        if (this.frameworkKey(template) === this.frameworkKey(updatedTemplate)) {
+          frameworkTemplates[index] = updatedTemplate;
+        } else {
+          frameworkTemplates.splice(index, 1);
+          this.addTemplate(updatedTemplate);
+        }
+        this.persistCustomTemplates();
         return updatedTemplate;
       }
     }
