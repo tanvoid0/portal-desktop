@@ -4251,6 +4251,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "data-encoding",
  "dirs 5.0.1",
  "flate2",
  "futures",
@@ -4348,6 +4349,8 @@ dependencies = [
  "uuid",
  "version-compare 0.1.1",
  "which",
+ "windows 0.62.2",
+ "windows-future",
  "xz2",
  "zip 0.6.6",
 ]

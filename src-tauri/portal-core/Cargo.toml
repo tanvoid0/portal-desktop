@@ -50,6 +50,7 @@ ring = "0.17"
 base64 = "0.22"
 sha2 = "0.10"
 hex = "0.4"
+data-encoding = "2"
 
 # Download and archive handling
 tar = "0.4"

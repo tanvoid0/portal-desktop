@@ -8,6 +8,11 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// PBKDF2 rounds for deriving a key from the master password. Recovery-key
+/// wraps use HKDF instead (see `hkdf_key`) since that input is already
+/// high-entropy and doesn't need the iteration cost.
+pub const PBKDF2_ITERATIONS: u32 = 600_000;
+
 #[derive(Debug, Clone)]
 pub struct EncryptionService {
     rng: Arc<SystemRandom>,
@@ -103,13 +108,49 @@ impl EncryptionService {
         Ok(key)
     }
 
-    /// Generate a random salt
+    /// Generate a random 32-byte salt.
     pub fn generate_salt(&self) -> Result<[u8; 32], CredentialError> {
+        let bytes = self.generate_bytes(32)?;
         let mut salt = [0u8; 32];
-        self.rng
-            .fill(&mut salt)
-            .map_err(|e| CredentialError::EncryptionFailed(e.to_string()))?;
+        salt.copy_from_slice(&bytes);
         Ok(salt)
+    }
+
+    /// Generate `len` cryptographically random bytes.
+    pub fn generate_bytes(&self, len: usize) -> Result<Vec<u8>, CredentialError> {
+        let mut bytes = vec![0u8; len];
+        self.rng
+            .fill(&mut bytes)
+            .map_err(|e| CredentialError::EncryptionFailed(e.to_string()))?;
+        Ok(bytes)
+    }
+
+    /// Derive a 32-byte key via HKDF-SHA256 (extract-then-expand). Used to
+    /// wrap the master key under the recovery key.
+    pub fn hkdf_key(
+        &self,
+        ikm: &[u8],
+        salt: &[u8],
+        info: &[u8],
+    ) -> Result<[u8; 32], CredentialError> {
+        use ring::hkdf;
+
+        struct Len32;
+        impl hkdf::KeyType for Len32 {
+            fn len(&self) -> usize {
+                32
+            }
+        }
+
+        let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, salt).extract(ikm);
+        let info = [info];
+        let okm = prk
+            .expand(&info, Len32)
+            .map_err(|e| CredentialError::EncryptionFailed(e.to_string()))?;
+        let mut key = [0u8; 32];
+        okm.fill(&mut key)
+            .map_err(|e| CredentialError::EncryptionFailed(e.to_string()))?;
+        Ok(key)
     }
 }
 

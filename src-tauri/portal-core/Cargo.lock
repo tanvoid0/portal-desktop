@@ -2689,6 +2689,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "data-encoding",
  "dirs",
  "flate2",
  "futures",

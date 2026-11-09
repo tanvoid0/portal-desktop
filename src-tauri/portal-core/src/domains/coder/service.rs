@@ -30,6 +30,7 @@ use crate::domains::ai::chat_title::{
 use crate::domains::ai::platform_config::{PlatformConfig, DESKTOP_CLIENT_ID};
 use crate::domains::ai::platform_project;
 use crate::domains::ai::services::AISettingsService;
+use crate::domains::credentials::services::VaultSession;
 use crate::domains::github::service::GitHubService;
 use crate::domains::github::types::GitHubIssue;
 use crate::events::{EventSink, EventSinkExt};
@@ -190,7 +191,10 @@ fn cli_edit_targets(event: &Value) -> Vec<(String, String, String)> {
                 .iter()
                 .find(|(t, _)| *t == name)
                 .map(|(_, k)| *k)?;
-            let path = b.get("input").and_then(|i| i.get(key)).and_then(Value::as_str)?;
+            let path = b
+                .get("input")
+                .and_then(|i| i.get(key))
+                .and_then(Value::as_str)?;
             let id = b.get("id").and_then(Value::as_str)?;
             Some((id.to_string(), name.to_string(), path.to_string()))
         })
@@ -334,7 +338,11 @@ mod claude_cli_tests {
         assert_eq!(
             got,
             vec![
-                ("tu_w".to_string(), "Write".to_string(), "/w/App.tsx".to_string()),
+                (
+                    "tu_w".to_string(),
+                    "Write".to_string(),
+                    "/w/App.tsx".to_string()
+                ),
                 (
                     "tu_nb".to_string(),
                     "NotebookEdit".to_string(),
@@ -373,9 +381,15 @@ mod claude_cli_tests {
             "/other/x.rs"
         };
         // Separators are normalised so the stored path matches the platform path's.
-        assert_eq!(workspace_relative(root, inside).as_deref(), Some("src/App.tsx"));
+        assert_eq!(
+            workspace_relative(root, inside).as_deref(),
+            Some("src/App.tsx")
+        );
         // Already-relative paths pass through untouched.
-        assert_eq!(workspace_relative(root, "src/App.tsx").as_deref(), Some("src/App.tsx"));
+        assert_eq!(
+            workspace_relative(root, "src/App.tsx").as_deref(),
+            Some("src/App.tsx")
+        );
         // Outside the workspace is not the review panel's business.
         assert_eq!(workspace_relative(root, outside), None);
         // The root itself is not a file.
@@ -471,6 +485,7 @@ pub enum AgentTurn {
 
 pub struct CoderService {
     db: Arc<DatabaseManager>,
+    session: Arc<VaultSession>,
     /// Set once at startup; used to stream loop-step events to whoever is watching.
     events: OnceLock<Arc<dyn EventSink>>,
     /// Set alongside `events`. The loop hands `Arc<Self>` to spawned runs, and a
@@ -502,13 +517,14 @@ pub struct CoderService {
 
 impl CoderService {
     /// Build the service and hydrate threads + settings from the database.
-    pub async fn new(db: Arc<DatabaseManager>) -> Self {
+    pub async fn new(db: Arc<DatabaseManager>, session: Arc<VaultSession>) -> Self {
         let settings = AISettingsService::new();
         let delegation_team_template_id = std::env::var("CODER_TEAM_TEMPLATE_ID")
             .ok()
             .and_then(|v| v.trim().parse::<i64>().ok());
         let svc = Self {
             db,
+            session,
             events: OnceLock::new(),
             self_ref: OnceLock::new(),
             threads: Mutex::new(HashMap::new()),
@@ -1757,7 +1773,7 @@ impl CoderService {
     }
 
     async fn fetch_github_issue(&self, issue_ref: &GitHubIssueRef) -> Result<GitHubIssue, String> {
-        GitHubService::new(Arc::clone(&self.db))
+        GitHubService::new(Arc::clone(&self.db), Arc::clone(&self.session))
             .get_issue(&issue_ref.owner, &issue_ref.repo, issue_ref.number)
             .await
     }

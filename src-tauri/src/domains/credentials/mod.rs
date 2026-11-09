@@ -9,3 +9,4 @@
 pub use portal_core::domains::credentials::*;
 
 pub mod commands;
+pub mod hello;

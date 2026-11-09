@@ -24,6 +24,7 @@ use database::DatabaseManager;
 use domains::ai::services::AIService;
 use domains::ai::services::AISettingsService;
 use domains::automation::services::automation_service::AutomationService;
+use domains::credentials::services::VaultSession;
 use domains::deployments::services::deployment_service::DeploymentService;
 use domains::kubernetes::manager::KubernetesManager;
 use domains::projects::pipelines::services::{ExecutionService, PipelineService};
@@ -118,6 +119,11 @@ pub fn run() {
             // Manage the database manager wrapped in Arc
             app.manage(db_manager_arc.clone());
 
+            // In-memory vault session (master key, if unlocked). Starts
+            // locked every launch — nothing here persists across restarts.
+            let vault_session = std::sync::Arc::new(VaultSession::default());
+            app.manage(vault_session.clone());
+
             // Initialize automation service
             let automation_service = AutomationService::new(
                 "http://localhost:5678".to_string(),
@@ -180,7 +186,8 @@ pub fn run() {
 
             // Initialize coder agent service (loads threads + rules from DB)
             let coder_service = tauri::async_runtime::block_on(async {
-                domains::coder::CoderService::new(db_manager_arc.clone()).await
+                domains::coder::CoderService::new(db_manager_arc.clone(), vault_session.clone())
+                    .await
             });
             // `init_events` needs the owning `Arc` — it stores a `Weak` back to
             // itself for the runs the loop spawns.
@@ -421,6 +428,12 @@ pub fn run() {
             domains::credentials::commands::delete_credential,
             domains::credentials::commands::decrypt_credential,
             domains::credentials::commands::search_credentials,
+            domains::credentials::commands::vault_status,
+            domains::credentials::commands::vault_setup,
+            domains::credentials::commands::vault_unlock_with_password,
+            domains::credentials::commands::vault_unlock_with_hello,
+            domains::credentials::commands::vault_lock,
+            domains::credentials::commands::vault_reset_password,
             // Automation commands
             domains::automation::trigger_n8n_workflow,
             domains::automation::get_workflow_status,

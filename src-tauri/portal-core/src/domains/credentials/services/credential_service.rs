@@ -1,5 +1,6 @@
 use super::super::CredentialError;
 use super::encryption_service::{DecryptionRequest, EncryptionResult, EncryptionService};
+use super::vault_session::VaultSession;
 use crate::domains::credentials::entities::Column;
 use crate::domains::credentials::entities::{
     ActiveModel as CredentialActive, Entity as CredentialEntity, Model as CredentialModel,
@@ -10,18 +11,21 @@ use chrono::Utc;
  */
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde_json;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct CredentialService {
     db: DatabaseConnection,
     encryption: EncryptionService,
+    session: Arc<VaultSession>,
 }
 
 impl CredentialService {
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: DatabaseConnection, session: Arc<VaultSession>) -> Self {
         Self {
             db,
             encryption: EncryptionService::new(),
+            session,
         }
     }
 
@@ -35,7 +39,7 @@ impl CredentialService {
         let now = Utc::now().naive_utc();
 
         // Encrypt the credential value
-        let master_key = self.get_master_key()?;
+        let master_key = self.session.key()?;
         let encryption_result = self.encryption.encrypt(&request.value, &master_key)?;
 
         // Encrypt additional fields
@@ -128,14 +132,14 @@ impl CredentialService {
 
         // Update encrypted value if provided
         if let Some(value) = request.value {
-            let master_key = self.get_master_key()?;
+            let master_key = self.session.key()?;
             let encryption_result = self.encryption.encrypt(&value, &master_key)?;
             credential.encrypted_value = serde_json::to_string(&encryption_result)?;
         }
 
         // Update encrypted fields if provided
         if let Some(fields) = request.fields {
-            let master_key = self.get_master_key()?;
+            let master_key = self.session.key()?;
             let mut encrypted_fields = std::collections::HashMap::new();
             for (key, value) in fields {
                 let field_result = self.encryption.encrypt(&value, &master_key)?;
@@ -186,7 +190,7 @@ impl CredentialService {
             serde_json::from_str(&credential.encrypted_value)
                 .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
 
-        let master_key = self.get_master_key()?;
+        let master_key = self.session.key()?;
         let request = DecryptionRequest {
             encrypted: encryption_data.encrypted.clone(),
             iv: encryption_data.iv.clone(),
@@ -219,6 +223,17 @@ impl CredentialService {
         Ok(decrypted)
     }
 
+    /// Decrypt without throwing when the vault is locked. A future caller
+    /// (project-env drift checking) needs a non-throwing peek rather than an
+    /// error on every check while locked.
+    pub async fn peek_value(&self, id: &str) -> Result<Option<String>, CredentialError> {
+        match self.decrypt_credential(id).await {
+            Ok(value) => Ok(Some(value)),
+            Err(CredentialError::VaultLocked) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Search credentials
     pub async fn search_credentials(
         &self,
@@ -233,73 +248,6 @@ impl CredentialService {
             .all(&self.db)
             .await?;
         Ok(credentials)
-    }
-
-    /// Get the master encryption key.
-    ///
-    /// The key is a random 32 bytes stored in the OS keychain (Windows Credential
-    /// Manager / macOS Keychain / Linux Secret Service), so it is protected by the
-    /// user's OS login and is NOT derivable from anything on disk. Generated on first
-    /// use and persisted thereafter.
-    ///
-    /// Note: credentials encrypted under the previous path-derived key cannot be
-    /// decrypted with this key and must be re-entered (pre-1.0 migration).
-    fn get_master_key(&self) -> Result<[u8; 32], CredentialError> {
-        const SERVICE: &str = crate::app_paths::APP_IDENTIFIER;
-        const KEY_NAME: &str = "credential-master-key-v1";
-
-        let entry = keyring::Entry::new(SERVICE, KEY_NAME).map_err(|e| {
-            CredentialError::EncryptionFailed(format!("Keychain access failed: {}", e))
-        })?;
-
-        match entry.get_secret() {
-            Ok(bytes) if bytes.len() == 32 => {
-                let mut key = [0u8; 32];
-                key.copy_from_slice(&bytes);
-                Ok(key)
-            }
-            Ok(_) => Err(CredentialError::EncryptionFailed(
-                "Stored master key has unexpected length".to_string(),
-            )),
-            Err(keyring::Error::NoEntry) => {
-                // No entry under the current service name: either a genuine first run,
-                // or an install that predates the bundle-identifier rename. Carry the
-                // old key across when there is one, so existing credentials stay
-                // decryptable; otherwise mint a fresh random key.
-                let key = Self::legacy_master_key(KEY_NAME).unwrap_or_else(|| {
-                    use rand::RngCore;
-                    let mut key = [0u8; 32];
-                    rand::rngs::OsRng.fill_bytes(&mut key);
-                    key
-                });
-                entry.set_secret(&key).map_err(|e| {
-                    CredentialError::EncryptionFailed(format!(
-                        "Failed to store master key in keychain: {}",
-                        e
-                    ))
-                })?;
-                Ok(key)
-            }
-            Err(e) => Err(CredentialError::EncryptionFailed(format!(
-                "Failed to read master key from keychain: {}",
-                e
-            ))),
-        }
-    }
-
-    /// Master key stored under a pre-rename bundle identifier, newest first.
-    /// Drop an identifier once no install remains on it.
-    fn legacy_master_key(key_name: &str) -> Option<[u8; 32]> {
-        crate::app_paths::LEGACY_APP_IDENTIFIERS
-            .iter()
-            .find_map(|identifier| {
-                keyring::Entry::new(identifier, key_name)
-                    .ok()?
-                    .get_secret()
-                    .ok()?
-                    .try_into()
-                    .ok()
-            })
     }
 }
 

@@ -14,6 +14,7 @@ use crate::database::DatabaseManager;
 use crate::domains::credentials::services::credential_service::{
     CredentialCreateRequest, CredentialService, CredentialUpdateRequest,
 };
+use crate::domains::credentials::services::VaultSession;
 use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::services::ProjectService;
 use crate::domains::settings::services::settings_service::SettingsService;
@@ -42,6 +43,7 @@ const WORKFLOW_LOGS_UNAVAILABLE_MSG: &str =
 #[derive(Clone)]
 pub struct GitHubService {
     db: Arc<DatabaseManager>,
+    session: Arc<VaultSession>,
     client: reqwest::Client,
     logs_client: reqwest::Client,
 }
@@ -61,7 +63,7 @@ struct PathClaim {
 }
 
 impl GitHubService {
-    pub fn new(db: Arc<DatabaseManager>) -> Self {
+    pub fn new(db: Arc<DatabaseManager>, session: Arc<VaultSession>) -> Self {
         let client = reqwest::Client::builder()
             .user_agent("portal-desktop")
             .build()
@@ -73,6 +75,7 @@ impl GitHubService {
             .expect("github logs client");
         Self {
             db,
+            session,
             client,
             logs_client,
         }
@@ -197,7 +200,8 @@ impl GitHubService {
     pub async fn disconnect(&self) -> Result<GitHubConnectionStatus, String> {
         let conn = self.db.get_connection();
         if let Some(existing) = self.get_connection_record().await? {
-            let credential_service = CredentialService::new(self.db.get_connection_clone());
+            let credential_service =
+                CredentialService::new(self.db.get_connection_clone(), self.session.clone());
             let _ = credential_service
                 .delete_credential(&existing.credential_id)
                 .await;
@@ -1103,7 +1107,8 @@ impl GitHubService {
     }
 
     async fn upsert_token(&self, token: &str, account: &GitHubAccount) -> Result<String, String> {
-        let credential_service = CredentialService::new(self.db.get_connection_clone());
+        let credential_service =
+            CredentialService::new(self.db.get_connection_clone(), self.session.clone());
         let existing = self.get_connection_record().await?;
         let mut metadata = HashMap::new();
         metadata.insert("provider".to_string(), json!("github"));
@@ -1151,7 +1156,7 @@ impl GitHubService {
             .get_connection_record()
             .await?
             .ok_or_else(|| "GitHub is not connected.".to_string())?;
-        CredentialService::new(self.db.get_connection_clone())
+        CredentialService::new(self.db.get_connection_clone(), self.session.clone())
             .decrypt_credential(&connection.credential_id)
             .await
             .map_err(|e| format!("Failed to decrypt GitHub credential: {e}"))

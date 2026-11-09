@@ -42,6 +42,7 @@ pub mod m20260817_000039_add_project_discovery_columns;
 pub mod m20261016_000040_create_project_modules_table;
 pub mod m20261104_000041_add_parent_id_to_projects;
 pub mod m20261104_000042_add_device_capabilities_and_pairing_secret;
+pub mod m20261108_000043_create_vault_table;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -87,6 +88,7 @@ pub use m20260817_000039_add_project_discovery_columns::Migration as addProjectD
 pub use m20261016_000040_create_project_modules_table::Migration as createProjectModulesTable;
 pub use m20261104_000041_add_parent_id_to_projects::Migration as addParentIdToProjects;
 pub use m20261104_000042_add_device_capabilities_and_pairing_secret::Migration as addDeviceCapabilitiesAndPairingSecret;
+pub use m20261108_000043_create_vault_table::Migration as createVaultTable;
 
 pub struct Migrator;
 
@@ -166,5 +168,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(createProjectModulesTable),
         Box::new(addParentIdToProjects),
         Box::new(addDeviceCapabilitiesAndPairingSecret),
+        Box::new(createVaultTable),
     ]
 }

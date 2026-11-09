@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::database::DatabaseManager;
+use crate::domains::credentials::services::VaultSession;
 
 use super::service::GitHubService;
 use super::types::{
@@ -17,8 +18,9 @@ use super::types::{
 #[portal_rpc_macro::rpc]
 pub async fn github_get_connection_status(
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubConnectionStatus, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .get_connection_status()
         .await
 }
@@ -27,8 +29,9 @@ pub async fn github_get_connection_status(
 pub async fn github_start_device_flow(
     scope: Option<String>,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubDeviceFlowStart, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .start_device_flow(scope)
         .await
 }
@@ -37,8 +40,9 @@ pub async fn github_start_device_flow(
 pub async fn github_poll_device_flow(
     device_code: String,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubDeviceFlowPollResult, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .poll_device_flow(&device_code)
         .await
 }
@@ -46,8 +50,11 @@ pub async fn github_poll_device_flow(
 #[portal_rpc_macro::rpc]
 pub async fn github_disconnect(
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubConnectionStatus, String> {
-    GitHubService::new(db.inner().clone()).disconnect().await
+    GitHubService::new(db.inner().clone(), session.inner().clone())
+        .disconnect()
+        .await
 }
 
 #[portal_rpc_macro::rpc]
@@ -56,8 +63,9 @@ pub async fn github_list_repositories(
     page: Option<u32>,
     per_page: Option<u32>,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<Vec<GitHubRepository>, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .list_repositories(search, page, per_page)
         .await
 }
@@ -65,8 +73,9 @@ pub async fn github_list_repositories(
 #[portal_rpc_macro::rpc]
 pub async fn github_list_linked_repos(
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<Vec<String>, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .list_linked_repo_full_names()
         .await
 }
@@ -76,8 +85,9 @@ pub async fn github_get_repository(
     owner: String,
     repo: String,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubRepoProjects, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .get_repository_with_projects(&owner, &repo)
         .await
 }
@@ -86,8 +96,9 @@ pub async fn github_get_repository(
 pub async fn github_list_issues(
     request: GitHubListIssuesRequest,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<Vec<GitHubIssue>, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .list_issues(request)
         .await
 }
@@ -98,8 +109,9 @@ pub async fn github_get_issue(
     repo: String,
     number: i64,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubIssue, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .get_issue(&owner, &repo, number)
         .await
 }
@@ -108,8 +120,9 @@ pub async fn github_get_issue(
 pub async fn github_create_issue(
     request: GitHubCreateIssueRequest,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubIssue, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .create_issue(request)
         .await
 }
@@ -118,8 +131,9 @@ pub async fn github_create_issue(
 pub async fn github_update_issue(
     request: GitHubUpdateIssueRequest,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubIssue, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .update_issue(request)
         .await
 }
@@ -128,8 +142,9 @@ pub async fn github_update_issue(
 pub async fn github_clone_repository(
     request: GitHubCloneRepositoryRequest,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubProjectLinkResult, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .clone_repository(request)
         .await
 }
@@ -138,8 +153,9 @@ pub async fn github_clone_repository(
 pub async fn github_link_existing_repository(
     request: GitHubLinkExistingRepositoryRequest,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubProjectLinkResult, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .link_existing_repository(request)
         .await
 }
@@ -148,8 +164,9 @@ pub async fn github_link_existing_repository(
 pub async fn github_get_project_link(
     project_id: i32,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<Option<GitHubProjectLink>, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .get_project_link(project_id)
         .await
 }
@@ -158,8 +175,9 @@ pub async fn github_get_project_link(
 pub async fn github_detect_local_repository(
     path: String,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubLocalRepositoryDetection, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .detect_local_repository(&path)
         .await
 }
@@ -168,8 +186,9 @@ pub async fn github_detect_local_repository(
 pub async fn github_list_workflow_runs(
     request: GitHubListWorkflowRunsRequest,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<Vec<GitHubWorkflowRun>, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .list_workflow_runs(request)
         .await
 }
@@ -178,8 +197,9 @@ pub async fn github_list_workflow_runs(
 pub async fn github_list_workflows(
     request: GitHubListWorkflowsRequest,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<Vec<GitHubWorkflow>, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .list_workflows(request)
         .await
 }
@@ -188,8 +208,9 @@ pub async fn github_list_workflows(
 pub async fn github_dispatch_workflow(
     request: GitHubDispatchWorkflowRequest,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<(), String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .dispatch_workflow(request)
         .await
 }
@@ -200,8 +221,9 @@ pub async fn github_get_workflow_run(
     repo: String,
     run_id: i64,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<GitHubWorkflowRunDetail, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .get_workflow_run(&owner, &repo, run_id)
         .await
 }
@@ -212,8 +234,9 @@ pub async fn github_get_workflow_job_logs(
     repo: String,
     job_id: i64,
     db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
 ) -> Result<String, String> {
-    GitHubService::new(db.inner().clone())
+    GitHubService::new(db.inner().clone(), session.inner().clone())
         .get_workflow_job_logs(&owner, &repo, job_id)
         .await
 }
