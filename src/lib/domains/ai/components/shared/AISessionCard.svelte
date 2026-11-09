@@ -73,7 +73,8 @@
 
 <!-- One flat line per session: title left, metric right, actions on hover. -->
 <div
-  role="button"
+  role="group"
+  aria-label={title}
   tabindex="0"
   title={tooltip}
   class={cn(

@@ -183,7 +183,8 @@
           : 'bg-card text-muted-foreground hover:bg-accent/60 hover:text-foreground'} {getTabStatusColor(
           tab
         )}"
-        role="button"
+        role="group"
+        aria-label="Tab: {tab.title}"
         tabindex="0"
         onkeydown={(e) => e.key === 'Enter' && handleTabClick(tab.id)}
         title={tabTooltip(tab)}

@@ -1,7 +1,7 @@
 ---
 id: QA-085
 title: Switching the coder engine rewrites the active thread's llm_provider, falsifying which engine did the work
-status: fixed
+status: verified
 severity: major
 kind: bug
 area: coder / session state
@@ -118,6 +118,19 @@ the time a new session was started. Both paths wrote; both are fixed.
 | new session on the selected engine (non-regression) | new thread `e55cfc54` created as `claude-cli`, turn ran |
 
 Shot: `.claude/qa/shots/coder-QA-085-after-fix.png`.
+
+## Verification
+
+2026-11-09 — tauri (code read, app went down mid-sweep — see QA-104, so the live
+switch-then-requery repro could not be rerun). `coderSession.svelte.ts:1443-1462`
+(`handleBackendProviderChange`) no longer calls `syncThreadLlmConfig` at all — it only sets
+`selectedBackendProvider`, persists it to `localStorage`, and toasts
+`This session stays on <engine>. Start a new session to use <engine>.` when a thread is
+already on a different engine. `createThreadIfNeeded` (`:965-977`) now back-fills only,
+calling `syncThreadLlmConfig` solely when `llmConfigFor(this.thread)` found a missing
+field. Matches the Fix description exactly; the coder's own before/after table
+(thread `77074dc4` provider unchanged after switching the selector) is consistent with this
+code. **Verified.**
 
 ## Known tradeoff
 

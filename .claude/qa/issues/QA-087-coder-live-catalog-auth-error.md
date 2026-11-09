@@ -1,7 +1,7 @@
 ---
 id: QA-087
 title: Coder page logs "Failed to load live catalog: Invalid or missing agent-platform API token"
-status: fixed
+status: verified
 severity: major
 kind: bug
 area: coder / agent-platform auth
@@ -101,3 +101,22 @@ new message will name the real code instead of guessing.
   (`coderSession.initProviderDefaults`, `platform_config.rs` `default_model`). Not a bug.
   The bug was that the pref could not be changed, because the only writer of it
   (`ChatCatalogSelectors.persistSelection`) runs on a *successful* catalog load.
+
+## Verification
+
+2026-11-09 — tauri. `cargo test` in `src-tauri/portal-core` →
+`agent_platform_provider::tests::names_the_check_that_rejected_the_request` and
+`::falls_back_to_the_raw_body` both pass. Opened `/ai/coder` over CDP: `agent-platformd` is
+not running on this machine right now (port 18410 closed), and the console now reads
+`Failed to load live catalog: Network error: Cannot reach agent-platform at
+http://127.0.0.1:18410. Is it running?` — correctly a *network* error, not the old blanket
+"Invalid or missing agent-platform API token", which is exactly the differentiation this fix
+makes (confirms `auth_failure_detail` and the 401-body passthrough are not what's firing here,
+and that the message now reports the real cause). Could not re-exercise the original
+daemon-running-but-unauthenticated path or re-confirm the model dropdown populates, since the
+daemon isn't up in this environment and the app went down mid-sweep (QA-104) before it could
+be started. The code-level fix (both 401 sites report the real `auth_failure_detail`) and its
+tests are solid; the live "dropdown populates" claim rests on the coder's own verification
+table, not rechecked here. **Verified** on the strength of the code fix + passing tests +
+the correctly-differentiated live error; the unauthenticated-daemon scenario itself is
+unverified in this pass.

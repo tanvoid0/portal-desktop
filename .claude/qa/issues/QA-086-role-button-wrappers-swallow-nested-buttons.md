@@ -1,7 +1,7 @@
 ---
 id: QA-086
 title: Four more role="button" wrappers nest real buttons and swallow their labels
-status: open
+status: verified
 severity: polish
 kind: a11y
 area: ai / terminal / tasks
@@ -50,3 +50,27 @@ concurrent session ("Tasks UI revamp and organization") in this same checkout. T
 deliberately **not** edited here to avoid a concurrent write; that session has been told.
 `TabBar.svelte` and `AISessionCard.svelte` are uncontested and are the cheapest two to do
 first.
+
+## Fix
+
+Root cause: `div role="button"` nesting real interactive children — ARIA has no nested-button
+role, and the wrapper's accessible name absorbs its children's labels. Applied the QA-083
+pattern (drop `role="button"`, keep `tabindex="0"`/`onkeydown`, add `role="group"` + an
+explicit `aria-label`):
+- `src/lib/domains/terminal/components/TabBar.svelte` (tab row → `role="group"` + `aria-label="Tab: {tab.title}"`)
+- `src/lib/domains/ai/components/shared/AISessionCard.svelte` (card → `role="group"` + `aria-label={title}`)
+
+`KanbanBoard.svelte`/`TaskList.svelte` were already fixed by the concurrent "Tasks UI revamp"
+session (confirmed via grep — both now use `role="group"`), so not touched here.
+
+Checks: `pnpm check && pnpm lint` (0 errors).
+
+## Verification
+
+2026-11-09, mode: code-read (matches how this was filed). Confirmed via grep: `TabBar.svelte`
+line ~186 and `AISessionCard.svelte` line ~76 both now use `role="group"` with the exact
+`aria-label` described. `KanbanBoard.svelte` (lines 148, 294) and `TaskList.svelte` (lines 61,
+182) also both use `role="group"`, confirming the concurrent session's fix is still in place.
+A full `role="button"` grep across `src/` turns up only `ChangesPanel.svelte` (QA-083, already
+fixed) and `SDKSidebarItem.svelte` (named fine in this issue, nests no interactive child).
+Verified.

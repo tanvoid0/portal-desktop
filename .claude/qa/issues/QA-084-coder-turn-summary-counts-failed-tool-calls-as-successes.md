@@ -1,7 +1,7 @@
 ---
 id: QA-084
 title: Coder turn summary reports "Created 2 files" when both write_file calls failed
-status: fixed
+status: verified
 severity: major
 kind: bug
 area: coder / feed summary
@@ -97,3 +97,13 @@ Failed creating 2 files, Read a file, Listed a directory
 
 where it previously read `Created 2 files, Read a file, Listed a directory`.
 Shot: `.claude/qa/shots/coder-QA-084-after-fix.png`.
+
+## Verification
+
+2026-11-09 — `npx vitest run src/lib/domains/coder/utils/feedBlocks.test.ts` → 5/5 passed,
+including the two-failed-`write_file` case from this report. Read `feedBlocks.ts:150-201`:
+`ToolBucket.failed` is tracked, `succeeded = total - failed`, and a bucket with `failed > 0`
+and `succeeded === 0` renders the gerund ("Failed creating N files") instead of counting the
+work as done. Matches the coder's own verified output above. App went down mid-sweep (QA-104)
+before a fresh live Ollama repro could be re-run, but the unit test covers the exact reported
+case. **Verified.**

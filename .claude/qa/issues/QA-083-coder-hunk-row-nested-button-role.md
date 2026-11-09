@@ -1,7 +1,7 @@
 ---
 id: QA-083
 title: Coder changes panel wraps the per-hunk Accept/Reject buttons in a role="button" div
-status: fixed
+status: verified
 severity: polish
 kind: a11y
 area: coder / ChangesPanel
@@ -99,6 +99,14 @@ only a ring colour. A comment records why it must not go back to `role="button"`
 
 Shots: `.claude/qa/shots/coder-QA-083-after-fix.png`,
 `.claude/qa/shots/coder-QA-083-reject-still-works.png`.
+
+## Verification
+
+2026-11-09 — tauri (code read, app went down mid-sweep — see QA-104). Confirmed
+`ChangesPanel.svelte:391-393` matches the Fix exactly: `role="group"`,
+`aria-label="Hunk {h.index + 1}, line {h.before_start + 1}"`, `tabindex="0"`, both handlers
+kept, and a comment at `:380` records why it must stay `role="group"`. No remaining
+`role="button"` on the hunk wrapper. **Verified.**
 
 ## Same pattern elsewhere
 
