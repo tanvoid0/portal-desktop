@@ -116,7 +116,7 @@
     onAction={() => onClearFilters()}
   />
 {:else}
-  <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
     {#each filteredBlocks as block (block.id)}
       <!-- ?? Code / custom: the category is a backend string, not necessarily in the map. -->
       {@const CategoryIcon = categoryIcons[block.category] ?? Code}

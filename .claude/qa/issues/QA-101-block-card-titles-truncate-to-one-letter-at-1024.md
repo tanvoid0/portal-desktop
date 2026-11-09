@@ -1,7 +1,7 @@
 ---
 id: QA-101
 title: Block card titles truncate to a single letter at the minimum window
-status: open
+status: verified
 severity: major
 kind: ux
 area: automation/blocks
@@ -43,8 +43,22 @@ The title is in a flex row with `badge + 3 buttons` and loses the squeeze every 
 
 ## Fix
 
-<!-- coder -->
+Root cause: `truncate`'s `overflow:hidden` makes the title's flex auto-min-width effectively 0,
+so every bit of squeeze pressure (badge + 3 `shrink-0` icon buttons never give up space) lands
+entirely on the title — at the 3-column breakpoint (`lg`, 1024px) that leaves it almost no
+room. Bumped the grid's 3-column breakpoint from `lg` to `xl` (1280px) so 1024 renders 2 columns
+(~490px/card, comfortable) instead of 3 (~330px/card); at 1280 it still goes 3-up, matching the
+"tight but usable" state this issue already tolerated there. Applied to both grids sharing this
+exact card shape (title + badge + up to 3 icon buttons).
+
+Files: `src/lib/domains/automation/components/BlockList.svelte`,
+`src/lib/domains/automation/components/TemplateList.svelte` (same squeeze risk, same fix).
+Checks: `pnpm check && pnpm lint` (0 errors).
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09, mode: tauri. `node .claude/qa/scripts/QA-101.mjs` at 1024x600 (CDP viewport
+emulation, confirmed `window.innerWidth/innerHeight` actually change on the real app):
+`BlockList` now renders 2 columns and every title is fully readable ("Install NPM
+Dependencies", "Install Python Dependencies", "Run Cargo Tests", etc. — no one-letter
+truncation). `.claude/qa/shots/QA-101-blocks-1024x600.png`. Verified.

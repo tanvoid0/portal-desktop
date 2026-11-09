@@ -200,7 +200,11 @@
     if (!confirmed) return;
 
     try {
-      pipelineTemplateService.deleteTemplate(template.key);
+      const deleted = pipelineTemplateService.deleteTemplate(template.key);
+      if (!deleted) {
+        toast.error('Failed to delete template');
+        return;
+      }
       toast.success('Template deleted successfully');
       loadTemplates();
     } catch (error) {
