@@ -646,6 +646,7 @@ pub fn run() {
             domains::kubernetes::commands::k8s_delete_configmap,
             domains::kubernetes::commands::k8s_delete_secret,
             domains::kubernetes::commands::k8s_rollback_deployment,
+            domains::kubernetes::commands::k8s_restart_deployment,
             domains::kubernetes::commands::k8s_get_pod_metrics,
             domains::kubernetes::commands::k8s_get_all_pods_metrics,
             domains::kubernetes::commands::k8s_list_namespaces,

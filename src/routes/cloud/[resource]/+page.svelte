@@ -138,6 +138,19 @@
       onScale: (resource) => {
         if (descriptor.canScale) openScaleDialog(resource);
       },
+      onRestart: descriptor.canRestart
+        ? async (resource) => {
+            try {
+              await k8sResourceService.restartDeployment(resource.namespace, resource.name);
+              toastActions.success(`Restarted ${resource.name}`);
+              await loadResources(descriptor.type);
+            } catch (error) {
+              toastActions.error(
+                `Failed to restart: ${error instanceof Error ? error.message : 'Unknown error'}`
+              );
+            }
+          }
+        : undefined,
       onRefresh: () => {
         void refreshResources();
       },

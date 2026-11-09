@@ -2,6 +2,7 @@
 <script lang="ts">
   import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
   import { ResourceType } from '$lib/domains/cloud/core/types';
+  import { RESOURCE_DESCRIPTORS } from '$lib/domains/cloud/core/resourceDescriptors';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { goto } from '$app/navigation';
@@ -309,86 +310,16 @@
         </CardHeader>
         <CardContent>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/workloads')}
-            >
-              <span class="mr-2 text-lg">☸️</span>
-              View Workloads
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/pods')}
-            >
-              <span class="mr-2 text-lg">📦</span>
-              View Pods
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/services')}
-            >
-              <span class="mr-2 text-lg">🔗</span>
-              View Services
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/deployments')}
-            >
-              <span class="mr-2 text-lg">🚀</span>
-              View Deployments
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/statefulsets')}
-            >
-              <span class="mr-2 text-lg">🗄️</span>
-              View StatefulSets
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/daemonsets')}
-            >
-              <span class="mr-2 text-lg">👹</span>
-              View DaemonSets
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/jobs')}
-            >
-              <span class="mr-2 text-lg">⚙️</span>
-              View Jobs
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/cronjobs')}
-            >
-              <span class="mr-2 text-lg">⏰</span>
-              View CronJobs
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/configmaps')}
-            >
-              <span class="mr-2 text-lg">⚙️</span>
-              View ConfigMaps
-            </Button>
-            <Button
-              variant="outline"
-              class="w-full justify-start"
-              onclick={() => goto('/cloud/secrets')}
-            >
-              <span class="mr-2 text-lg">🔐</span>
-              View Secrets
-            </Button>
+            {#each RESOURCE_DESCRIPTORS as descriptor}
+              <Button
+                variant="outline"
+                class="w-full justify-start"
+                onclick={() => goto(`/cloud/${descriptor.slug}`)}
+              >
+                <span class="mr-2 text-lg">{descriptor.icon}</span>
+                View {descriptor.label}
+              </Button>
+            {/each}
           </div>
         </CardContent>
       </Card>

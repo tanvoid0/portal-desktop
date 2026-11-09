@@ -1,7 +1,7 @@
 ---
 id: QA-092
 title: Cluster overview Quick Actions is still a hand-written list — no Ingress tile, and one tile links to the page you are on
-status: open
+status: verified
 severity: minor
 kind: ux
 area: cloud
@@ -65,8 +65,21 @@ Manual — steps above, needs a cluster.
 
 ## Fix
 
-<!-- coder: root cause, files changed, checks run, other QA ids this also fixes -->
+Root cause: UX-013 repointed the ten hand-written buttons but left the list itself hardcoded.
+Replaced the ten `Button`s with `{#each RESOURCE_DESCRIPTORS as descriptor}` rendering
+`descriptor.icon` / `descriptor.label` / `goto('/cloud/${descriptor.slug}')`, and dropped the
+self-referential "View Workloads" tile (no entry iterates to itself). This now auto-includes
+Ingress and any future resource type, matching the sidebar and command palette.
+
+File: `src/routes/cloud/workloads/+page.svelte`.
+Checks: `pnpm check && pnpm lint` (0 errors). Not re-verified against a live cluster (none
+available here) — qa-tester should confirm the ten tiles render and each navigates correctly.
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-09, mode: tauri — a local cluster was connected this session (`default`, v1.34.3),
+so this could be tested live. `node .claude/qa/scripts/QA-092-all-tiles.mjs`: all 10 tiles
+(Pods, Services, Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, ConfigMaps, Secrets,
+Ingress) present and each navigates to its correct `/cloud/<slug>` route. No self-referential
+"View Workloads" tile. `.claude/qa/shots/QA-092-after-quick-actions.png` (Ingress tile →
+`/cloud/ingress`, empty state renders correctly). Verified.

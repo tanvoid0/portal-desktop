@@ -44,6 +44,8 @@ export interface ResourceDescriptor {
   hasLogs?: boolean;
   /** Resource can be scaled from the list. */
   canScale?: boolean;
+  /** Resource supports a rollout restart from the list (the `r` shortcut). */
+  canRestart?: boolean;
 }
 
 const count = (resources: ICloudResource[], predicate: (r: ICloudResource) => boolean) =>
@@ -137,6 +139,7 @@ export const RESOURCE_DESCRIPTORS: ResourceDescriptor[] = [
     filter: statusFilter,
     detailBase: '/cloud/workloads/deployments',
     canScale: true,
+    canRestart: true,
   },
   {
     slug: 'statefulsets',

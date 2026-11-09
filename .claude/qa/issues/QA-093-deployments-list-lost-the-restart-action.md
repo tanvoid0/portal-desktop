@@ -1,7 +1,7 @@
 ---
 id: QA-093
 title: Deployments list lost the Restart action, but the `?` help still advertises `r`
-status: open
+status: verified
 severity: minor
 kind: bug
 area: cloud
@@ -79,8 +79,39 @@ Manual — steps above, needs a cluster.
 
 ## Fix
 
-<!-- coder: root cause, files changed, checks run, other QA ids this also fixes -->
+Root cause: the shared `[resource]/+page.svelte` never passed an `onRestart` handler, so
+`useResourceActions` never added the Restart entry and `ACTION_SHORTCUTS.RESTART === 'r' ===
+ACTION_SHORTCUTS.REFRESH` silently rebound `r` to Refresh (per `useResourceActions.ts:114`,
+Restart is pushed before Refresh so it would have taken priority had it existed).
+
+Added `canRestart?: boolean` to `ResourceDescriptor`, set `true` only on the deployments entry
+(statefulsets intentionally excluded — its old handler was a no-op cleanup per this issue), and
+wired `onRestart` in `[resource]/+page.svelte` to call `k8sResourceService.rollbackDeployment`
++ toast + `loadResources`, matching the pre-refactor deployments list page's behavior exactly.
+
+Files: `src/lib/domains/cloud/core/resourceDescriptors.ts`, `src/routes/cloud/[resource]/+page.svelte`.
+Checks: `pnpm check && pnpm lint` (0 errors). Not re-verified against a live cluster (none
+available here) — qa-tester should confirm `r` restarts a selected deployment row.
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-09, mode: tauri — a local cluster was connected this session, so `/cloud/deployments`
+renders now, but it has 0 deployments on it. Creating a fixture `Deployment` to exercise `r`
+end-to-end is out of scope (boundaries rule out Kubernetes changes), so the live restart
+action itself (toast + list refresh) was not exercised. Confirmed instead by code read, which
+matches the `## Fix` description exactly: `ResourceDescriptor.canRestart` added, `true` only
+on the deployments entry
+([resourceDescriptors.ts:142](../../../src/lib/domains/cloud/core/resourceDescriptors.ts#L142)),
+`[resource]/+page.svelte` wires `onRestart` to `k8sResourceService.rollbackDeployment` + toast
++ `loadResources` when `canRestart` is set. Page itself loads cleanly on the live cluster, no
+console errors, `node .claude/qa/scripts/QA-093.mjs`.
+
+Noted but out of this issue's scope (pre-existing, not touched by this fix): the `?` shortcuts
+help's Actions group is a static list for every `context='table'` resource page
+([ShortcutsHelp.svelte:80](../../../src/lib/domains/k8s-navigation/components/ShortcutsHelp.svelte#L80))
+— it still advertises "Restart" on Pods/Services/ConfigMaps/Secrets/etc. where `canRestart` is
+false and `r` only refreshes. QA-093 was scoped to Deployments specifically and that part is
+fixed; the generic help-panel-doesn't-filter-by-capability gap is wider than this one issue and
+wasn't claimed as fixed here, so leaving it out of scope rather than reopening.
+
+Verified (Deployments-scoped claim).

@@ -1,7 +1,7 @@
 ---
 id: UX-017
 title: FlyEnvStyleDashboard is 1049 lines nothing renders
-status: fixed
+status: verified
 severity: minor
 kind: ux
 area: sdk
@@ -55,4 +55,7 @@ Code read.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09 — code read. `src/lib/domains/sdk/components/FlyEnvStyleDashboard.svelte` no
+longer exists; `rg "FlyEnvStyleDashboard" src -g "*.svelte" -g "*.ts"` returns no matches at
+all, including the barrel export at `sdk/index.ts:15`. `pnpm check` (full project) → 0 errors.
+**Verified.**

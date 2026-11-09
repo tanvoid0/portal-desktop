@@ -44,9 +44,16 @@ export const k8sResourceService = {
     });
   },
 
-  /** Restart/rollback a deployment; returns a status message. */
+  /** Roll a deployment back to its previous revision; returns a status message. */
   rollbackDeployment(namespace: string, name: string): Promise<string> {
     return invokeClient.request<string>('k8s_rollback_deployment', {
+      data: { namespace, name },
+    });
+  },
+
+  /** Rolling-restart a deployment (recreates pods, same revision); returns a status message. */
+  restartDeployment(namespace: string, name: string): Promise<string> {
+    return invokeClient.request<string>('k8s_restart_deployment', {
       data: { namespace, name },
     });
   },

@@ -214,6 +214,16 @@ pub async fn k8s_rollback_deployment(
 }
 
 #[portal_rpc_macro::rpc]
+pub async fn k8s_restart_deployment(
+    _manager: State<'_, Mutex<KubernetesManager>>,
+    namespace: String,
+    name: String,
+) -> Result<String, String> {
+    let mgr = KubernetesManager::new();
+    mgr.restart_deployment(&namespace, &name).await
+}
+
+#[portal_rpc_macro::rpc]
 pub async fn k8s_get_pod_metrics(
     _manager: State<'_, Mutex<KubernetesManager>>,
     namespace: String,

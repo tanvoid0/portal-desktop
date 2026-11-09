@@ -1944,6 +1944,44 @@ impl KubernetesManager {
         }
     }
 
+    /// Rolling-restart a deployment: patch the pod template with a
+    /// `kubectl.kubernetes.io/restartedAt` annotation, the same primitive
+    /// `kubectl rollout restart deployment/<name>` uses. Unlike `rollback_deployment`
+    /// below, this does not change the running image/revision — it just forces the
+    /// existing pod spec to be recreated.
+    pub async fn restart_deployment(
+        &self,
+        namespace: &str,
+        deployment_name: &str,
+    ) -> Result<String, String> {
+        let client = Self::get_client()?;
+        let api: Api<Deployment> = Api::namespaced(client, namespace);
+
+        let patch = serde_json::json!({
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": chrono::Utc::now().to_rfc3339(),
+                        }
+                    }
+                }
+            }
+        });
+
+        match api
+            .patch(
+                deployment_name,
+                &PatchParams::default(),
+                &Patch::Merge(&patch),
+            )
+            .await
+        {
+            Ok(_) => Ok(format!("Deployment '{}' restarted successfully", deployment_name)),
+            Err(e) => Err(format!("Failed to restart deployment: {}", e)),
+        }
+    }
+
     pub async fn rollback_deployment(
         &self,
         namespace: &str,
