@@ -1,5 +1,16 @@
 # Portal Desktop - Release Notes
 
+## Version 0.13.5
+
+### Highlights
+
+- Feature: credentials are now protected by a real master-password vault — set a password once, unlock with it or Windows Hello, and a one-time recovery key lets you reset a forgotten password without losing any stored secret
+- Feature: project detail pages have a read-only Env tab that reads a project's `.env*` files live and lets any variable link to a shared credential (e.g. one `OPENAI_API_KEY` reused across projects) instead of copying its value; drift between the file, the link, and the shared credential is flagged rather than hidden
+- Feature: quick actions on each project card to open it in Coder or reveal it in Explorer without leaving the projects list
+- Feature: generic process elevation (UAC/pkexec/osascript) wired into Chocolatey install/upgrade/uninstall, which previously reported "requires elevation" but ran unprivileged and silently failed
+- Fix: update-dialog body renders as markdown instead of showing literal `##`/`**`
+- Fix: domain sidebar width no longer oversized for now-single-line settings nav items
+
 ## Version 0.13.4
 
 ### Highlights
