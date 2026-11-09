@@ -16,6 +16,11 @@ pub enum CredentialError {
     VaultNotSetUp,
     VaultLocked,
     SessionExpired,
+    /// The OS keychain's master key entry is gone (keychain reset, bundle identifier
+    /// change, entry deleted by hand) while encrypted credential rows still exist. Minting a
+    /// fresh key here would silently and permanently orphan every one of them, so this
+    /// refuses instead — see QA-049.
+    MasterKeyMissing(usize),
     DatabaseError(sea_orm::DbErr),
     IOError(std::io::Error),
     SerializationError(serde_json::Error),
@@ -35,6 +40,12 @@ impl std::fmt::Display for CredentialError {
             CredentialError::VaultNotSetUp => write!(f, "Vault is not set up"),
             CredentialError::VaultLocked => write!(f, "Vault is locked"),
             CredentialError::SessionExpired => write!(f, "Session expired"),
+            CredentialError::MasterKeyMissing(count) => write!(
+                f,
+                "master key missing — {} credential{} can't be decrypted; restore the key or reset credentials",
+                count,
+                if *count == 1 { "" } else { "s" }
+            ),
             CredentialError::DatabaseError(err) => write!(f, "Database error: {}", err),
             CredentialError::IOError(err) => write!(f, "IO error: {}", err),
             CredentialError::SerializationError(err) => write!(f, "Serialization error: {}", err),

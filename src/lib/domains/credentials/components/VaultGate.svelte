@@ -13,7 +13,7 @@
   const status = $derived(statusQuery.data);
 </script>
 
-{#if status?.state === 'needs_setup' || vaultGate.setupStep !== null}
+{#if (status?.state === 'needs_setup' && vaultGate.open) || vaultGate.setupStep !== null}
   <VaultSetupDialog hasCredentials={status?.hasCredentials ?? false} />
 {:else if status?.state === 'locked' && vaultGate.open}
   <VaultUnlockDialog helloAvailable={status.helloAvailable} />

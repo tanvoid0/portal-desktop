@@ -1,6 +1,9 @@
 <!--
-	First-time vault setup. Forced, two steps: choose a master password, then
-	save the recovery key — shown exactly once. Cannot be dismissed.
+	Vault setup, prompted whenever something needs a credential and the vault has never been
+	set up. Two steps: choose a master password, then save the recovery key — shown exactly
+	once. The password step can be dismissed ("Not now" / Escape / outside click / X) since
+	setting up a vault is optional; the recovery-key step cannot, since that key is never shown
+	again.
 -->
 
 <script lang="ts">
@@ -71,13 +74,18 @@
     void queryClient.invalidateQueries({ queryKey: queryKeys.credentials.status });
     vaultGate.settle(true);
   }
+
+  /** Only the password step is dismissible — the recovery key is a one-time reveal. */
+  function handleOpenChange(isOpen: boolean) {
+    if (!isOpen && step === 'password') vaultGate.settle(false);
+  }
 </script>
 
-<Dialog.Root open={true}>
+<Dialog.Root open={true} onOpenChange={handleOpenChange}>
   <Dialog.Content
-    showCloseButton={false}
-    interactOutsideBehavior="ignore"
-    escapeKeydownBehavior="ignore"
+    showCloseButton={step === 'password'}
+    interactOutsideBehavior={step === 'password' ? 'close' : 'ignore'}
+    escapeKeydownBehavior={step === 'password' ? 'close' : 'ignore'}
     class="sm:max-w-md"
   >
     {#if step === 'password'}
@@ -122,7 +130,15 @@
           <p class="text-sm text-destructive">{formError}</p>
         {/if}
         <Dialog.Footer>
-          <Button type="submit" disabled={submitting} class="w-full">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={submitting}
+            onclick={() => vaultGate.settle(false)}
+          >
+            Not now
+          </Button>
+          <Button type="submit" disabled={submitting} class="flex-1">
             {submitting ? 'Setting up…' : 'Set up vault'}
           </Button>
         </Dialog.Footer>

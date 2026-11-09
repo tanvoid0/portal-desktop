@@ -79,7 +79,8 @@ impl VaultService {
     /// `setup_with_master_key`. The one real caller; tests use the latter
     /// directly so they never touch the OS keychain.
     pub async fn setup(&self, password: &str) -> Result<String, CredentialError> {
-        let mk = Self::read_keychain_master_key()?;
+        let credential_count = CredentialEntity::find().all(&self.db).await?.len();
+        let mk = Self::read_keychain_master_key(credential_count)?;
         self.setup_with_master_key(mk, password).await
     }
 
@@ -171,7 +172,10 @@ impl VaultService {
         if !exists {
             return Err(CredentialError::VaultNotSetUp);
         }
-        self.session.unlock(Self::read_keychain_master_key()?);
+        let credential_count =
+            futures::executor::block_on(CredentialEntity::find().all(&self.db))?.len();
+        self.session
+            .unlock(Self::read_keychain_master_key(credential_count)?);
         Ok(())
     }
 
@@ -241,7 +245,11 @@ impl VaultService {
     /// Read the raw master key from the OS keychain, minting one on first
     /// run. Relocated from the old `CredentialService::get_master_key` —
     /// `setup` is now its only caller, since MK never changes after setup.
-    fn read_keychain_master_key() -> Result<[u8; 32], CredentialError> {
+    ///
+    /// `credential_count` guards against silently orphaning existing encrypted rows: it is
+    /// only safe to mint a brand new random key when there is nothing encrypted under the
+    /// old one to lose (see QA-049).
+    fn read_keychain_master_key(credential_count: usize) -> Result<[u8; 32], CredentialError> {
         const SERVICE: &str = crate::app_paths::APP_IDENTIFIER;
         const KEY_NAME: &str = "credential-master-key-v1";
 
@@ -262,13 +270,27 @@ impl VaultService {
                 // No entry under the current service name: either a genuine first run,
                 // or an install that predates the bundle-identifier rename. Carry the
                 // old key across when there is one, so existing credentials stay
-                // decryptable; otherwise mint a fresh random key.
-                let key = Self::legacy_master_key(KEY_NAME).unwrap_or_else(|| {
-                    use rand::RngCore;
-                    let mut key = [0u8; 32];
-                    rand::rngs::OsRng.fill_bytes(&mut key);
-                    key
-                });
+                // decryptable.
+                if let Some(key) = Self::legacy_master_key(KEY_NAME) {
+                    entry.set_secret(&key).map_err(|e| {
+                        CredentialError::EncryptionFailed(format!(
+                            "Failed to store master key in keychain: {}",
+                            e
+                        ))
+                    })?;
+                    return Ok(key);
+                }
+
+                // No legacy key either. Minting a fresh one is only safe when nothing is
+                // already encrypted under whatever key used to live here — otherwise this
+                // permanently orphans every existing credential with no warning.
+                if credential_count > 0 {
+                    return Err(CredentialError::MasterKeyMissing(credential_count));
+                }
+
+                use rand::RngCore;
+                let mut key = [0u8; 32];
+                rand::rngs::OsRng.fill_bytes(&mut key);
                 entry.set_secret(&key).map_err(|e| {
                     CredentialError::EncryptionFailed(format!(
                         "Failed to store master key in keychain: {}",
