@@ -1,7 +1,7 @@
 ---
 id: UX-020
 title: --sidebar-width-domain is 20rem for one-line nav items, so pages now override it inline one at a time
-status: open
+status: fixed
 severity: minor
 kind: ux
 area: all (domain sidebars)
@@ -81,6 +81,13 @@ rails.
 ## Fix
 
 <!-- coder -->
+
+Lowered `--sidebar-width-domain` to `14rem` at `:root` in `src/app.css` and deleted the
+`width < 80rem` media query that duplicated it (base and narrow value were now the same).
+Updated `ShellSidebarLayout`'s hardcoded fallback from `20rem` to `14rem`
+(`shell-sidebar-layout.svelte:88`). Deleted the inline `--sidebar-width-domain: 14rem;`
+override (and its now-stale comment) on `TaskManager`'s root — the shell default matches it
+already. `pnpm check` and `pnpm lint` pass with no new warnings.
 
 ## Verification
 

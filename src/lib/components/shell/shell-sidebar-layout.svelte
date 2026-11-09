@@ -85,7 +85,7 @@
   bind:open={domainSidebarOpen}
   cookieName={SIDEBAR_DOMAIN_COOKIE_NAME}
   enableShortcut={false}
-  style="--sidebar-width: var(--sidebar-width-domain, 20rem);"
+  style="--sidebar-width: var(--sidebar-width-domain, 14rem);"
   class="flex h-full min-h-0 w-full flex-col overflow-hidden"
 >
   {#if showMobileTrigger}

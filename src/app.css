@@ -88,7 +88,7 @@
 
     /* Layout variables */
     --sidebar-width: 16rem;
-    --sidebar-width-domain: 20rem;
+    --sidebar-width-domain: 14rem;
     --sidebar-width-icon: 3rem;
     --content-max-width-readable: 48rem;
     --content-max-width-chat: 72rem;
@@ -746,12 +746,5 @@
   .animate-spin {
     animation-duration: 1.5s !important;
     animation-iteration-count: infinite !important;
-  }
-}
-
-/* Narrower domain sidebars on small windows (settings, cloud, sdk, utilities) */
-@media (width < 80rem) {
-  :root {
-    --sidebar-width-domain: 14rem;
   }
 }

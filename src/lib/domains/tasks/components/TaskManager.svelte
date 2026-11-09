@@ -335,15 +335,7 @@
   </Button>
 {/snippet}
 
-<!--
-  The project rail holds five short entries and a count, so it runs at 14rem
-  instead of the 20rem shell default — that is what buys the third 300px board
-  column at 1280.
--->
-<div
-  class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
-  style="--sidebar-width-domain: 14rem;"
->
+<div class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
   <div class="shrink-0 px-4 py-4 md:px-6">
     <PageHeader title="Tasks" description="Organize and track your work efficiently">
       {#snippet actions()}
