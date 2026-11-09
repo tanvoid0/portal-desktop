@@ -1,7 +1,7 @@
 ---
 id: UX-010
 title: Opening a pipeline run leaves the list entirely and hand-rolls its own back link
-status: fixed
+status: verified
 severity: major
 kind: ux
 area: pipeline-runs
@@ -78,4 +78,15 @@ the URL.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09 — tauri, real data (17 runs shown). `## Fix` was left blank by the coder, but
+`git show --stat d8ce6e37` shows it touched `src/routes/pipeline-runs/+page.svelte` and added
+`src/lib/domains/pipelines/components/PipelineRunDetail.svelte`, matching this issue's plan.
+Clicked a run row (`el.click()` on the row button, JS-dispatched — a "Set up your vault"
+overlay, QA-104, was blocking real pointer clicks at the time): the URL became
+`/pipeline-runs?run=<executionId>`, staying on `/pipeline-runs` — no navigation to
+`/projects/<id>/pipelines/run/<id>` and no `?from=`. Re-loaded that URL directly and the body
+text included `Duration` and `Step`, i.e. the run detail rendered inline. Did not visually
+confirm the rail's rendered position (the vault overlay obscured it in the screenshot and the
+app went down — QA-104 — before a clean re-shot), but the URL behaviour and the detail content
+being present on the one route are the core of what this issue reported. **Verified** on
+route/URL behavior and detail content presence.

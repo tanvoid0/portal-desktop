@@ -1,7 +1,7 @@
 ---
 id: UX-011
 title: Project detail stacks three header rows then runs one 1172px column of fact cards
-status: fixed
+status: verified
 severity: major
 kind: ux
 area: projects/[id]
@@ -115,4 +115,13 @@ verified in the running app — no app was listening on CDP 9222 and the brief f
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09 — tauri, `/projects/4` (Devstrail). Single header row: name + `active` badge +
+monospace truncated path with a copy icon + `Open in editor` / `Open folder` / `Terminal` /
+`More`, tabs (`Overview / Actions / Env / Terminal`) directly below at y≈124 — no
+`← Back to Projects` button anywhere (count 0). Right rail titled "Details" holds `What it's
+built with` (badges only — `Next.js`, `Node.js`, `JavaScript`, `TypeScript`, `pnpm` — no
+duplicate prose sentence) and `Git` (branch, uncommitted/unpushed/unbacked-up state, no "Is
+your work saved and backed up?" subtitle). Main column holds `How to run this` (Start/Build/
+Test/Build output rows). Matches the Fix description exactly. Screenshot:
+`.claude/qa/shots/QA-UX011-after-1280x800.png` (clean — no QA-104 overlay on this load).
+**Verified.**

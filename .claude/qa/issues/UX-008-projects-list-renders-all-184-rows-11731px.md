@@ -1,7 +1,7 @@
 ---
 id: UX-008
 title: Projects renders all 184 rows and 33 group headers at once — 11731px of DOM, no way to collapse
-status: fixed
+status: verified
 severity: major
 kind: ux
 area: projects
@@ -115,4 +115,16 @@ told not to start the dev server, so the before/after numbers above are arithmet
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09 — tauri, real data (170 projects, more than the 184 originally measured).
+`main .overflow-y-auto` `scrollHeight` is **2235px** by default (was 11731px) — only groups
+touched in the last 30 days render open, everything else is a collapsed trigger. Single-project
+areas (e.g. `devstrail/`, `portal/`) render their row directly with a muted path prefix and no
+header, as designed. Clicked a collapsed trigger (`practice/java`, `aria-expanded=false`) — it
+expanded (`aria-expanded=true`, `scrollHeight` grew to 2599px) and
+`localStorage['portal.projects.openGroups']` recorded `{"practice/java":true}`, confirming
+persistence. Typing `calculator` into the search box filtered to the matching single-project
+row with no stray disabled triggers blocking the match. Screenshots:
+`.claude/qa/shots/QA-UX008-after-projects-list.png`,
+`.claude/qa/shots/QA-UX008-group-expand-ok.png`, `.claude/qa/shots/QA-UX008-search-filter.png`.
+A "Set up your vault" dialog was covering the page in two of these shots — unrelated to this
+fix, filed as QA-104. **Verified.**

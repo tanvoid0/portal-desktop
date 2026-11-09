@@ -1,7 +1,7 @@
 ---
 id: UX-018
 title: Six components are too big to maintain — split plan with prop boundaries
-status: fixed
+status: verified
 severity: minor
 kind: ux
 area: settings / sdk / scripts / tasks / automation
@@ -189,4 +189,35 @@ session budget before reaching it. Everything in that section is unverified.
 **5. BlocksPage (1088 → 319).** Verified under UX-007 and QA-088; QA-100 and QA-101 filed.
 
 Sections 4 and 6 were not in this sweep's scope and were not looked at.
+
+### 2026-11-09 follow-up — closing out sections 3, 4, 6
+
+tauri + code read (the live app went down mid-sweep — dev server crash, see QA-104 report —
+before section 3 could get a full click-through; done by file inspection plus a passing
+project-wide `pnpm check` instead).
+
+**3. scripts/[id] split.** `wc -l`: `scripts/[id]/+page.svelte` 292 (was 1031),
+`scripts/[id]/edit/+page.svelte` 122 (new route, exists), `ScriptForm.svelte` 268,
+`ScriptRunPanel.svelte` 373, `ScriptExecutionHistory.svelte` 78. `ScriptForm` is imported by
+both `scripts/[id]/edit/+page.svelte` and `scripts/new/+page.svelte` — the duplication this
+split was meant to remove is gone. Not click-tested live (app went down before this route was
+reached).
+
+**4. tasks/[id] split.** Exercised live via UX-012's verification: clicking a task card opens
+`TaskDetail` content (Task Details / Edit / Delete / Generate Tasks with AI) in a right rail on
+`/tasks`, which is exactly what this section asked `TaskDetail.svelte` to enable. `git show
+--stat d8ce6e37` confirms `TaskDetail.svelte` (432 lines), `TaskInfoCard.svelte` (68),
+`TaskLinkedDocument.svelte` (85), `TaskQuickActions.svelte` (54) and `SubtaskList.svelte` (371)
+all exist as separate files, and `tasks/[id]/+page.svelte` dropped from 965 to well under 50
+lines in the diff stat.
+
+**6. sdk/+page.svelte.** 337 lines (was 867, plan said "do UX-014 first and re-measure before
+splitting anything else") — under any threshold that would call for a further split. Not
+re-tested live.
+
+Project-wide `pnpm check`: **0 errors**, 3839 files, 141 pre-existing warnings (none newly
+introduced in the touched files above).
+
+All six splits now accounted for (1, 2, 5 fully live-tested in the 11-07 pass; 3 and 6 by file
+structure + a clean typecheck; 4 live-tested here). **Closing as verified.**
 

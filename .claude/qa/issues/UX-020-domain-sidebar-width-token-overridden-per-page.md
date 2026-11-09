@@ -1,7 +1,7 @@
 ---
 id: UX-020
 title: --sidebar-width-domain is 20rem for one-line nav items, so pages now override it inline one at a time
-status: fixed
+status: verified
 severity: minor
 kind: ux
 area: all (domain sidebars)
@@ -91,4 +91,11 @@ already. `pnpm check` and `pnpm lint` pass with no new warnings.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09 — tauri + code read. `src/app.css:91` has a single `--sidebar-width-domain: 14rem;`
+at `:root`, no narrower breakpoint duplicate. `shell-sidebar-layout.svelte:88` fallback is
+`var(--sidebar-width-domain, 14rem)`. `grep sidebar-width-domain TaskManager.svelte` → no
+matches — the inline override is gone. Live measurement on `/tasks` (taken before the app went
+down mid-sweep, QA-104) found the project rail at **224px** (`getBoundingClientRect().width`),
+i.e. 14rem, matching the shared token rather than a page-local value. Did not get a live
+side-by-side of `/settings` and `/sdk` before the dev server died, but the token, fallback and
+sole call site are all consistent with the Fix description. **Verified.**

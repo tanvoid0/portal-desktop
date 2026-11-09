@@ -1,7 +1,7 @@
 ---
 id: UX-009
 title: Project audit shows zero triage rows at 1024x600 — the scan form sits permanently above the results
-status: fixed
+status: verified
 severity: major
 kind: ux
 area: projects/audit
@@ -133,4 +133,14 @@ below-`md` Sheet path (the `Scan and details` button) since that is new.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09 — tauri, real data (194 projects). At 1280x800 the first two triage rows
+(`portal_desktop`, `pocket_portal`) are visible immediately below the tab/filter row, with a
+one-line `PageStats` strip (`Projects 194 Active 46 At risk 19 Duplicates 18 Undecided 194
+Reclaimable —`) replacing the old 6-card grid, and the right rail showing Scan (collapsed to a
+`Scan and import` button + `2 folders to scan` disclosure), Selected project (full detail for
+the cursor row) and Marked sections — matches the Fix exactly. At 1024x600 the first triage row
+(`portal_desktop`) is on screen too (it was 0 before). Screenshots:
+`.claude/qa/shots/QA-UX009-after-1280x800.png`, `.claude/qa/shots/QA-UX009-after-1024x600.png`.
+Did not reach the below-`md` Sheet path or re-test `j/k/1-4/o/x/esc` live — the app went down
+mid-sweep (QA-104's investigation surfaced a dead vite dev server, see report). **Verified** on
+the row-visibility claim, the rail layout and both window sizes measured.

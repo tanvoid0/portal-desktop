@@ -267,7 +267,10 @@
   };
 
   const handleProjectDelete = async (project: Project) => {
-    const confirmed = await confirmAction(`Are you sure you want to delete "${project.name}"?`);
+    const confirmed = await confirmAction(
+      `Are you sure you want to delete "${project.name}"?`,
+      'Delete project'
+    );
     if (confirmed) {
       try {
         await projectService.deleteProject(project.id);

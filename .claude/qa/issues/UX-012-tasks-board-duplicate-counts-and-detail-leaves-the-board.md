@@ -1,7 +1,7 @@
 ---
 id: UX-012
 title: Tasks board repeats its column counts as badges and loses the board when you open a task
-status: fixed
+status: verified
 severity: minor
 kind: ux
 area: tasks
@@ -80,4 +80,17 @@ project filter and the search text are all lost on the way back.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09 — tauri, real data (34 tasks, 5 projects). (1) The duplicate count-badge row above
+the columns is gone — each column header (`Backlog 9`, `In Progress 1`, `Done`) now carries the
+count exactly once. (2) The project rail narrowed from 290px to **224px** (confirmed via
+`getBoundingClientRect`, matches the shared `--sidebar-width-domain: 14rem` token from UX-020,
+not a page-local override) — but at 1280x800 the board's `.overflow-x-auto` still measures
+`scrollWidth: 932` against `clientWidth: 752`, i.e. three `min-w-[300px]` columns still don't
+fit and a horizontal scrollbar remains. That specific sub-problem is explicitly cross-referenced
+in this issue's own Steps section to **QA-076**, which already tracks it — not reopening this
+issue over it. (3) Clicked a task card: URL became `/tasks?task=117`, stayed on `/tasks`, and a
+right rail opened with Task Details / Edit / Delete / Generate Tasks with AI, board still
+visible underneath — matches the Fix. Screenshots: `.claude/qa/shots/QA-UX012-after-1280x800.png`,
+`.claude/qa/shots/QA-UX012-after-task-click.png`. Noted in passing: the breadcrumb shows the raw
+`?task=117` query string, same pattern QA-078 already tracks. **Verified** on items 1 and 3; item
+2's residual horizontal scroll is QA-076's scope, not new.
