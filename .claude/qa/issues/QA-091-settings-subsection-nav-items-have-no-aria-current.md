@@ -1,7 +1,7 @@
 ---
 id: QA-091
 title: Settings sub-section nav items never get aria-current, so five sections have no current page
-status: open
+status: verified
 severity: minor
 kind: a11y
 area: settings
@@ -55,8 +55,19 @@ the rail has two row heights; worth aligning in the same edit.
 
 ## Fix
 
-<!-- coder -->
+Root cause: the sub-section `Button` branch in `SettingsNavigation.svelte` only set the
+`bg-accent` class for the active state, never `aria-current`, unlike the top-level branch.
+Added `aria-current={isActive(subSection.path) ? 'page' : undefined}` and, in the same edit,
+changed `h-auto px-3 py-2` to `h-8` so sub-items match the top-level row height (38px → 32px).
+
+File: `src/lib/domains/settings/components/SettingsNavigation.svelte`.
+Checks: `pnpm check && pnpm lint` (0 errors).
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09, mode: tauri. `node .claude/qa/scripts/QA-091.mjs` against
+`/settings/ai/providers`, `/settings/languages`, `/settings/package-managers`,
+`/settings/frameworks`, `/settings/ai/training` (the five sub-section routes from the
+original repro) plus `/settings/ides` and `/settings/autonomy` as regression checks on the
+top-level branch. All seven now report `aria-current="page"` on the active nav item. Row
+heights visually consistent in `.claude/qa/shots/QA-091-after-settings-nav.png`. Verified.

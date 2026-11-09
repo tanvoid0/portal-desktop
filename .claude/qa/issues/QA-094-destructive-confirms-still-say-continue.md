@@ -1,7 +1,7 @@
 ---
 id: QA-094
 title: Destructive confirms still say "Continue" on 28 call sites — IDE, mapping and framework delete among them
-status: open
+status: verified
 severity: polish
 kind: copy
 area: settings/ides, sdk, cloud, ai/chat, projects (confirmAction)
@@ -69,8 +69,34 @@ Dialog text quoted above, captured by `node .claude/qa/scripts/ides-verify8.mjs`
 
 ## Fix
 
-<!-- coder -->
+Root cause (one shared fix, not 28 call-site edits): `confirmActions.request()` in
+`confirmStore.ts` defaulted `confirmLabel` to the literal string `'Continue'` whenever a call
+site omitted it — QA-039 only patched the task/document call sites directly instead of this
+default. Added `defaultConfirmLabel(title)`: takes the title's leading word (e.g. "Delete IDE" →
+"Delete", "Uninstall SDK manager" → "Uninstall", "Rollback deployment" → "Rollback") unless the
+title is the bare default `'Confirm'`, in which case it still falls back to "Continue". This
+fixes every omitted-`confirmLabel` call site at once, including all of IDE/mapping/framework
+delete, the SDK uninstalls, cloud pod/ConfigMap/Secret delete, chat/project delete, etc.
+
+One call site (`src/routes/projects/+page.svelte` project delete) passed no title at all, so
+there was nothing for the heuristic to read — gave it an explicit `'Delete project'` title.
+
+Files: `src/lib/domains/shared/stores/confirmStore.ts`, `src/routes/projects/+page.svelte`.
+Checks: `pnpm check && pnpm lint` (0 errors).
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09, mode: tauri. `node .claude/qa/scripts/QA-094.mjs` — created fixtures "QA Editor"
+(IDE) and "QA Framework", added a mapping between them, then tested all three delete confirms
+from the original repro's Steps:
+
+```
+mapping delete confirm:   Delete mapping | Are you sure you want to delete the mapping for "QA Framework"? | Cancel | Delete
+framework delete confirm: Delete framework | Are you sure you want to delete "QA Framework"? | Cancel | Delete
+IDE delete confirm:       Delete IDE | Are you sure you want to delete "QA Editor"? | Cancel | Delete
+```
+
+All three now say the specific action instead of "Continue". Also spot-checked
+`src/routes/projects/+page.svelte` (the one call site needing an explicit title) by reading
+the code — `confirmAction(..., 'Delete project')` confirmed present. All three fixtures
+deleted during the run (confirmed 0 remaining at the end). Verified.

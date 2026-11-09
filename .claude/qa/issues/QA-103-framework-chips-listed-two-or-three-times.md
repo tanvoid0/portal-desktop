@@ -1,7 +1,7 @@
 ---
 id: QA-103
 title: '"Add More Frameworks" lists 70 chips for 30 frameworks — every name repeated two or three times'
-status: open
+status: verified
 severity: minor
 kind: bug
 area: settings/ides
@@ -53,8 +53,22 @@ the split unchanged.
 
 ## Fix
 
-<!-- coder -->
+Root cause: `allFrameworks` concatenated `frameworkGroups` (suggested) and `frameworks`
+(database) without deduplicating, and the no-mappings branch additionally rendered both as two
+separate lists. Replaced with `dedupedFrameworks` — a single pass over `frameworks` then
+`frameworkGroups`, keyed by lowercased name, database entries win a collision (so the chip
+stays editable) — then both branches render from `chipsByCategory`/`unmappedChipsByCategory`
+built on top of it. Each framework now appears exactly once everywhere.
+
+File: `src/lib/domains/settings/components/FrameworkIdeMappings.svelte` (same edit as
+QA-096/QA-102/QA-095 — one file, one rendering pass).
+Checks: `pnpm check && pnpm lint` (0 errors).
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09, mode: tauri. `node .claude/qa/scripts/QA-103.mjs` — counted chip names in both the
+no-mappings branch and the has-mappings branch (after creating a fixture IDE + mapping): 53
+distinct framework names, 0 duplicates in either branch (the one "Toggle Sidebar" dupe in the
+raw count is unrelated page chrome caught by the broad `button` selector, not a framework
+chip). `.claude/qa/shots/QA-103-no-mappings-branch.png`,
+`.claude/qa/shots/QA-103-has-mappings-branch.png`. Fixtures cleaned up. Verified.

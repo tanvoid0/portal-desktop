@@ -1,7 +1,7 @@
 ---
 id: QA-095
 title: IDE row and mapping row edit/delete buttons have no accessible name
-status: open
+status: verified
 severity: minor
 kind: a11y
 area: settings/ides
@@ -48,8 +48,21 @@ and to the two buttons in the framework chip overlay (line 265ff), which are add
 
 ## Fix
 
-<!-- coder -->
+Added `aria-label` to every icon-only button named in this issue:
+- `IdeList.svelte`: "Edit IDE" / "Delete IDE".
+- `FrameworkIdeMappings.svelte`: mapping row Edit/Delete (`Edit/Delete mapping for {framework}`),
+  the chip overlay's Edit/Delete (`Edit/Delete {framework}` — same edit that fixed QA-102's
+  overlay hit-testing), and the new framework-level Edit/Delete added to mapped rows for QA-096.
+
+Files: `src/lib/domains/settings/components/IdeList.svelte`,
+`src/lib/domains/settings/components/FrameworkIdeMappings.svelte`.
+Checks: `pnpm check && pnpm lint` (0 errors). Also fixes the chip-overlay half of QA-102/QA-096
+(same file, same edit pass).
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09, mode: tauri. `node .claude/qa/scripts/QA-095.mjs` — created fixtures "QA Editor"
+(IDE), "QA Framework" + a mapping, then queried by accessible role name: "Edit IDE", "Delete
+IDE", chip overlay "Edit QA Framework" / "Delete QA Framework", mapping row "Edit mapping" /
+"Delete mapping" all resolve to exactly one button each. `.claude/qa/shots/QA-095-mapping-row-names.png`.
+Fixtures cleaned up (0 remaining). Verified.

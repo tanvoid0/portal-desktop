@@ -183,7 +183,8 @@
               type="button"
               variant="ghost"
               onclick={() => goto(subSection.path)}
-              class="flex h-auto w-full items-center justify-start rounded-md px-3 py-2 text-sm transition-colors {isActive(
+              aria-current={isActive(subSection.path) ? 'page' : undefined}
+              class="flex h-8 w-full items-center justify-start rounded-md px-3 text-sm transition-colors {isActive(
                 subSection.path
               )
                 ? 'bg-accent font-medium text-accent-foreground'

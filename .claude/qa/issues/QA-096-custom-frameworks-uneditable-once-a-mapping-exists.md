@@ -1,7 +1,7 @@
 ---
 id: QA-096
 title: Custom frameworks cannot be edited or deleted once any mapping exists
-status: open
+status: verified
 severity: major
 kind: bug
 area: settings/ides
@@ -56,8 +56,28 @@ Pre-existing (the two branches exist on `main` too), carried through the split.
 
 ## Fix
 
-<!-- coder -->
+Root cause: two separate chip renderers — the no-mappings branch (with the edit/delete overlay)
+and the has-mappings branch's `unmappedByCategory` (bare buttons, no overlay) — plus a mapped
+custom framework never appearing in either list at all. Replaced both with one
+`{#snippet frameworkChip}` used by both branches, gated on `framework.isCustom` for the overlay,
+so an unmapped custom framework keeps its edit/delete affordance regardless of which branch is
+showing. For a framework that is itself mapped (never in `unmappedByCategory`), added
+Edit/Delete-the-framework buttons directly to its row in the mappings list (next to the
+existing edit/delete-the-mapping buttons), gated the same way.
+
+This same pass also deduplicates the chip source (`dedupedFrameworks`, fixes QA-103) and fixes
+the invisible-overlay hit-testing (fixes QA-102) and adds the missing `aria-label`s (fixes
+QA-095's chip-overlay half) — all four issues shared this one file and one rendering path.
+
+File: `src/lib/domains/settings/components/FrameworkIdeMappings.svelte`.
+Checks: `pnpm check && pnpm lint` (0 errors).
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09, mode: tauri. `node .claude/qa/scripts/QA-096.mjs` — created "QA Editor" + "QA
+Framework", mapped them (making the framework "mapped"), then confirmed the mapping row now
+carries 4 icon buttons: edit/delete mapping AND edit/delete framework
+(`.claude/qa/shots/QA-096-mapped-framework-still-editable.png` shows all four). Clicked
+"Edit QA Framework" from the row, renamed to "QA Framework edited", chip updated correctly —
+the exact workflow that was previously impossible once a mapping existed. Fixtures fully
+cleaned up afterward. Verified.

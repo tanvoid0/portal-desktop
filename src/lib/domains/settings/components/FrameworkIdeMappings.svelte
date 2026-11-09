@@ -142,31 +142,102 @@
 
   const mappedNames = $derived(new Set(mappings.map((m) => m.framework.toLowerCase())));
 
-  const frameworksByCategory = $derived.by(() => {
-    const byCategory: Record<string, Framework[]> = {};
-    for (const fw of frameworks) (byCategory[fw.category || 'Other'] ??= []).push(fw);
-    return Object.entries(byCategory);
-  });
+  interface FrameworkChip {
+    name: string;
+    icon?: string;
+    icon_type?: 'devicon' | 'file';
+    category: string;
+    isCustom: boolean;
+    /** The underlying database row, present only when `isCustom`. */
+    source?: Framework;
+  }
 
-  // Suggested + user-defined, flattened, for icon lookup and the "add more" list.
-  const allFrameworks = $derived([
-    ...frameworkGroups.flatMap((g) => g.frameworks.map((fw) => ({ ...fw, isCustom: false }))),
-    ...frameworks.map((fw) => ({
-      name: fw.name,
-      icon: fw.icon,
-      category: fw.category,
-      isCustom: true,
-    })),
-  ]);
-
-  const unmappedByCategory = $derived.by(() => {
-    const byCategory: Record<string, typeof allFrameworks> = {};
-    for (const fw of allFrameworks) {
-      if (!mappedNames.has(fw.name.toLowerCase())) (byCategory[fw.category] ??= []).push(fw);
+  // Suggested (backend) + user-defined (database) frameworks, deduplicated by name — the two
+  // sources overlap heavily (a popular framework is both "recommended" and seeded in the
+  // database), so without this every name showed two or three times. The database row wins a
+  // collision so the chip stays editable/deletable.
+  const dedupedFrameworks = $derived.by(() => {
+    const seen = new Set<string>();
+    const result: FrameworkChip[] = [];
+    for (const fw of frameworks) {
+      const key = fw.name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({
+        name: fw.name,
+        icon: fw.icon,
+        icon_type: fw.icon_type,
+        category: fw.category,
+        isCustom: true,
+        source: fw,
+      });
     }
-    return Object.entries(byCategory);
+    for (const group of frameworkGroups) {
+      for (const fw of group.frameworks) {
+        const key = fw.name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push({ name: fw.name, icon: fw.icon, category: fw.category, isCustom: false });
+      }
+    }
+    return result;
   });
+
+  function groupByCategory(list: FrameworkChip[]): [string, FrameworkChip[]][] {
+    const byCategory: Record<string, FrameworkChip[]> = {};
+    for (const fw of list) (byCategory[fw.category || 'Other'] ??= []).push(fw);
+    return Object.entries(byCategory);
+  }
+
+  const chipsByCategory = $derived(groupByCategory(dedupedFrameworks));
+
+  const unmappedChipsByCategory = $derived(
+    groupByCategory(dedupedFrameworks.filter((fw) => !mappedNames.has(fw.name.toLowerCase())))
+  );
 </script>
+
+{#snippet frameworkChip(framework: FrameworkChip)}
+  <div class="group inline-flex items-center gap-1">
+    <Button
+      variant="outline"
+      size="sm"
+      onclick={() => openMappingDialog(null, framework.name)}
+      class="h-8"
+    >
+      {#if framework.icon_type === 'file'}
+        <img src={framework.icon} alt={framework.name} class="mr-1.5 h-3 w-3" />
+      {:else if framework.icon}
+        <Icon icon={framework.icon} class="mr-1.5 h-3 w-3" />
+      {/if}
+      {framework.name}
+    </Button>
+    {#if framework.isCustom && framework.source}
+      {@const custom = framework.source}
+      <!-- Beside the chip, not on top of it — an overlay here would cover the label
+           and swallow clicks meant for the chip's own button (QA-102). -->
+      <div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="h-6 w-6"
+          aria-label={`Edit ${custom.name}`}
+          onclick={() => openFrameworkDialog(custom)}
+        >
+          <Edit class="h-3 w-3" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="h-6 w-6 text-destructive hover:text-destructive"
+          aria-label={`Delete ${custom.name}`}
+          onclick={() => deleteFramework(custom)}
+        >
+          <X class="h-3 w-3" />
+        </Button>
+      </div>
+    {/if}
+  </div>
+{/snippet}
 
 <div class="flex items-center justify-between">
   <div>
@@ -240,74 +311,17 @@
           <div class="space-y-4">
             <p class="text-sm font-medium text-muted-foreground">Frameworks</p>
 
-            {#each frameworksByCategory as [category, categoryFrameworks]}
+            {#each chipsByCategory as [category, categoryFrameworks]}
               <div>
                 <p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   {category}
                 </p>
                 <div class="flex flex-wrap gap-2">
                   {#each categoryFrameworks as framework}
-                    <div class="group relative">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => openMappingDialog(null, framework.name)}
-                        class="h-8 pr-8"
-                      >
-                        {#if framework.icon_type === 'file'}
-                          <img src={framework.icon} alt={framework.name} class="mr-1.5 h-3 w-3" />
-                        {:else}
-                          <Icon icon={framework.icon} class="mr-1.5 h-3 w-3" />
-                        {/if}
-                        {framework.name}
-                      </Button>
-                      <div
-                        class="absolute top-1 right-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          class="h-6 w-6 p-0"
-                          onclick={() => openFrameworkDialog(framework)}
-                        >
-                          <Edit class="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          class="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                          onclick={() => deleteFramework(framework)}
-                        >
-                          <X class="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
+                    {@render frameworkChip(framework)}
                   {/each}
                 </div>
               </div>
-            {/each}
-
-            {#each frameworkGroups as group}
-              {#if group.frameworks.length > 0}
-                <div>
-                  <p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    {group.category}
-                  </p>
-                  <div class="flex flex-wrap gap-2">
-                    {#each group.frameworks as framework}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => openMappingDialog(null, framework.name)}
-                        class="h-8"
-                      >
-                        <Icon icon={framework.icon} class="mr-1.5 h-3 w-3" />
-                        {framework.name}
-                      </Button>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
             {/each}
           </div>
         {/if}
@@ -316,7 +330,7 @@
       <div class="space-y-4">
         <div class="space-y-3">
           {#each mappings as mapping}
-            {@const frameworkInfo = allFrameworks.find(
+            {@const frameworkInfo = dedupedFrameworks.find(
               (f) => f.name.toLowerCase() === mapping.framework.toLowerCase()
             )}
             <div
@@ -336,12 +350,40 @@
               </div>
 
               <div class="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onclick={() => openMappingDialog(mapping)}>
+                {#if frameworkInfo?.isCustom && frameworkInfo.source}
+                  {@const custom = frameworkInfo.source}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Edit ${custom.name}`}
+                    title="Edit the framework definition"
+                    onclick={() => openFrameworkDialog(custom)}
+                  >
+                    <Edit class="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Delete ${custom.name}`}
+                    title="Delete the framework"
+                    class="text-destructive hover:text-destructive"
+                    onclick={() => deleteFramework(custom)}
+                  >
+                    <X class="h-3.5 w-3.5" />
+                  </Button>
+                {/if}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Edit mapping for ${mapping.framework}`}
+                  onclick={() => openMappingDialog(mapping)}
+                >
                   <Edit class="h-4 w-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
+                  aria-label={`Delete mapping for ${mapping.framework}`}
                   onclick={() => deleteMapping(mapping)}
                   class="text-destructive hover:text-destructive"
                 >
@@ -352,29 +394,17 @@
           {/each}
         </div>
 
-        {#if unmappedByCategory.length > 0}
+        {#if unmappedChipsByCategory.length > 0}
           <div class="divider-edge-t divider-edge-full space-y-4 pt-4">
             <p class="mb-3 text-sm font-medium text-muted-foreground">Add More Frameworks</p>
-            {#each unmappedByCategory as [category, categoryFrameworks]}
+            {#each unmappedChipsByCategory as [category, categoryFrameworks]}
               <div>
                 <p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   {category}
                 </p>
                 <div class="flex flex-wrap gap-2">
                   {#each categoryFrameworks as framework}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onclick={() => openMappingDialog(null, framework.name)}
-                      class="h-8"
-                    >
-                      {#if framework.icon && !framework.icon.startsWith('http') && !framework.icon.startsWith('/') && !framework.icon.includes(':')}
-                        <img src={framework.icon} alt={framework.name} class="mr-1.5 h-3 w-3" />
-                      {:else if framework.icon}
-                        <Icon icon={framework.icon} class="mr-1.5 h-3 w-3" />
-                      {/if}
-                      {framework.name}
-                    </Button>
+                    {@render frameworkChip(framework)}
                   {/each}
                 </div>
               </div>

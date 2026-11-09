@@ -206,6 +206,7 @@
               <Button
                 variant="ghost"
                 size="sm"
+                aria-label="Edit IDE"
                 onclick={() => openDialog(ide, ide.name, normalizePath(ide.executable))}
               >
                 <Edit class="h-4 w-4" />
@@ -213,6 +214,7 @@
               <Button
                 variant="ghost"
                 size="sm"
+                aria-label="Delete IDE"
                 onclick={() => deleteIde(ide)}
                 class="text-destructive hover:text-destructive"
               >
