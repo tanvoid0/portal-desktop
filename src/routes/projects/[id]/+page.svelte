@@ -23,6 +23,7 @@
   import Workflow from '~icons/fa6-solid/diagram-project';
   import Rocket from '~icons/fa6-solid/rocket';
   import Code from '~icons/fa6-solid/code';
+  import FileKey from '~icons/fa6-solid/key';
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -40,6 +41,7 @@
   import ProjectCommands from '$lib/domains/projects/components/ProjectCommands.svelte';
   import ProjectTechStack from '$lib/domains/projects/components/ProjectTechStack.svelte';
   import ProjectGitCard from '$lib/domains/projects/components/ProjectGitCard.svelte';
+  import ProjectEnv from '$lib/domains/projects/components/ProjectEnv.svelte';
   import { queryClient, queryKeys } from '$lib/domains/shared/query';
   import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
   import { logger } from '$lib/domains/shared/services/logger';
@@ -90,7 +92,7 @@
     return null;
   });
 
-  const PROJECT_TABS = ['overview', 'apps', 'actions', 'terminal'] as const;
+  const PROJECT_TABS = ['overview', 'apps', 'actions', 'env', 'terminal'] as const;
   type ProjectTab = (typeof PROJECT_TABS)[number];
 
   const activeTab = $derived(
@@ -480,6 +482,10 @@
               <Workflow class="h-4 w-4" />
               Actions
             </TabsTrigger>
+            <TabsTrigger value="env" class="gap-2">
+              <FileKey class="h-4 w-4" />
+              Env
+            </TabsTrigger>
             <TabsTrigger value="terminal" class="gap-2">
               <Terminal class="h-4 w-4" />
               Terminal
@@ -514,6 +520,10 @@
 
           <TabsContent value="actions" class="mt-6 space-y-6">
             <ProjectActionsPanel project={currentProject} enabled={activeTab === 'actions'} />
+          </TabsContent>
+
+          <TabsContent value="env" class="mt-6">
+            <ProjectEnv projectId={Number(currentProject.id)} enabled={activeTab === 'env'} />
           </TabsContent>
 
           <TabsContent value="terminal" class="mt-6">
