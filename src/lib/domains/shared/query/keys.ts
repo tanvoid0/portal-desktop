@@ -8,6 +8,7 @@ export const queryKeys = {
     modules: ['project-modules'] as const,
     /** Under `projects` so any project write refetches it. */
     unavailable: ['projects', 'unavailable'] as const,
+    env: (id: number) => ['projects', id, 'env'] as const,
   },
   github: {
     status: ['github', 'status'] as const,
@@ -29,6 +30,9 @@ export const queryKeys = {
   tasks: {
     all: ['tasks'] as const,
     detail: (id: string) => ['tasks', id] as const,
+  },
+  credentials: {
+    status: ['credentials', 'vault-status'] as const,
   },
   cloud: {
     resources: (type: string, namespace: string) => ['cloud', type, namespace] as const,

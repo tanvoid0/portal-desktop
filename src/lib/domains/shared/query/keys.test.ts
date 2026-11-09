@@ -11,7 +11,15 @@ describe('queryKeys', () => {
     expect(queryKeys.projects.detail('abc')).toEqual(['projects', 'abc']);
   });
 
+  it('builds project env keys with id', () => {
+    expect(queryKeys.projects.env(42)).toEqual(['projects', 42, 'env']);
+  });
+
   it('builds cloud resource keys', () => {
     expect(queryKeys.cloud.resources('pod', 'default')).toEqual(['cloud', 'pod', 'default']);
+  });
+
+  it('builds the vault status key', () => {
+    expect(queryKeys.credentials.status).toEqual(['credentials', 'vault-status']);
   });
 });

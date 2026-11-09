@@ -54,23 +54,16 @@ export interface CredentialMetadata {
   notes?: string;
 }
 
-export interface SecureVault {
-  id: string;
-  name: string;
-  description?: string;
-  credentials: Credential[];
-  createdAt: Date;
-  updatedAt: Date;
-  // Encryption settings
-  encryptionKey: string; // Master key for this vault
-  keyDerivation: KeyDerivationSettings;
+/** Vault lock/setup state — mirrors `VaultStatusResponse` in `commands.rs`. */
+export interface VaultStatus {
+  state: 'needs_setup' | 'locked' | 'unlocked';
+  helloAvailable: boolean;
+  hasCredentials: boolean;
 }
 
-export interface KeyDerivationSettings {
-  algorithm: string; // e.g., 'pbkdf2', 'scrypt', 'argon2'
-  iterations: number;
-  salt: string;
-  keyLength: number;
+/** Returned once, by `vault_setup`, and never again. */
+export interface VaultSetupResult {
+  recoveryKey: string;
 }
 
 export interface CredentialCreateRequest {
@@ -184,26 +177,6 @@ export interface CredentialSearchResult {
   total: number;
   page: number;
   limit: number;
-}
-
-export interface VaultCreateRequest {
-  name: string;
-  description?: string;
-  masterPassword: string;
-  keyDerivation?: Partial<KeyDerivationSettings>;
-}
-
-export interface VaultUnlockRequest {
-  vaultId: string;
-  masterPassword: string;
-  sessionDuration?: number; // minutes
-}
-
-export interface VaultUnlockResult {
-  success: boolean;
-  sessionToken?: string;
-  expiresAt?: Date;
-  error?: string;
 }
 
 export interface EncryptionResult {

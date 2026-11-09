@@ -223,15 +223,30 @@ impl CredentialService {
         Ok(decrypted)
     }
 
-    /// Decrypt without throwing when the vault is locked. A future caller
-    /// (project-env drift checking) needs a non-throwing peek rather than an
-    /// error on every check while locked.
+    /// Decrypt without throwing when the vault is locked, and without the
+    /// side effects of a real credential use: uses `VaultSession::peek_key`
+    /// (not `key`) so it never slides the idle timer, and never bumps
+    /// `last_used` — this is a read-only comparison for drift checking
+    /// (project-env), not a credential access.
     pub async fn peek_value(&self, id: &str) -> Result<Option<String>, CredentialError> {
-        match self.decrypt_credential(id).await {
-            Ok(value) => Ok(Some(value)),
-            Err(CredentialError::VaultLocked) => Ok(None),
-            Err(e) => Err(e),
-        }
+        let credential = self.get_credential(id).await?;
+        let encryption_data: EncryptionResult = serde_json::from_str(&credential.encrypted_value)
+            .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
+
+        let master_key = match self.session.peek_key() {
+            Ok(key) => key,
+            Err(CredentialError::VaultLocked) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+        let request = DecryptionRequest {
+            encrypted: encryption_data.encrypted.clone(),
+            iv: encryption_data.iv.clone(),
+            tag: encryption_data.tag,
+            algorithm: encryption_data.algorithm,
+            key: master_key,
+        };
+
+        Ok(Some(self.encryption.decrypt(request)?))
     }
 
     /// Search credentials

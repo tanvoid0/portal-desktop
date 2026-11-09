@@ -18,12 +18,28 @@
   import CredentialForm from './CredentialForm.svelte';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
+  import { Card, CardContent } from '$lib/components/ui/card';
   import Select from '$lib/components/ui/select.svelte';
   import Plus from '~icons/fa6-solid/plus';
   import Search from '~icons/fa6-solid/magnifying-glass';
   import Shield from '~icons/fa6-solid/shield';
+  import Lock from '~icons/fa6-solid/lock';
   import { PageEmpty, PageError, PageHeader, PageLoading, PageStats } from '$lib/components/shell';
   import type { CredentialType, Credential } from '../types';
+  import { createVaultStatusQuery } from '../queries/vaultQueries';
+  import { vaultGate } from '../state/vault.svelte';
+  import { lockVault } from '../api/vaultApi';
+  import { queryClient } from '$lib/domains/shared/query/queryClient';
+  import { queryKeys } from '$lib/domains/shared/query/keys';
+
+  const vaultStatusQuery = createVaultStatusQuery();
+  const vaultStatus = $derived(vaultStatusQuery.data);
+  const vaultLocked = $derived(vaultStatus?.state === 'locked');
+
+  async function handleLock() {
+    await lockVault();
+    void queryClient.invalidateQueries({ queryKey: queryKeys.credentials.status });
+  }
 
   let searchQuery = $state('');
   let selectedType = $state<CredentialType | null>(null);
@@ -39,6 +55,16 @@
 
   onMount(async () => {
     await loadCredentials();
+  });
+
+  // Forced one-time migration prompt: secrets already exist but the vault was
+  // never set up (pre-vault installs), so gate as soon as status resolves.
+  let setupPromptShown = false;
+  $effect(() => {
+    if (!setupPromptShown && vaultStatus?.state === 'needs_setup') {
+      setupPromptShown = true;
+      void vaultGate.ensureUnlocked();
+    }
   });
 
   async function loadCredentials() {
@@ -130,12 +156,32 @@
     description="Securely manage your SSH keys, API tokens, and environment variables"
   >
     {#snippet actions()}
+      {#if !vaultLocked}
+        <Button variant="ghost" size="sm" onclick={handleLock}>
+          <Lock class="mr-2 h-4 w-4" />
+          Lock
+        </Button>
+      {/if}
       <Button onclick={handleCreateCredential}>
         <Plus class="mr-2 h-4 w-4" />
         Add Credential
       </Button>
     {/snippet}
   </PageHeader>
+
+  {#if vaultLocked}
+    <Card>
+      <CardContent class="flex items-center justify-between gap-4 py-4">
+        <div class="flex items-center gap-3">
+          <Shield class="h-5 w-5 text-muted-foreground" />
+          <span class="text-sm text-muted-foreground">
+            Vault is locked — unlock it to reveal, copy, or decrypt credential values.
+          </span>
+        </div>
+        <Button size="sm" onclick={() => vaultGate.ensureUnlocked()}>Unlock</Button>
+      </CardContent>
+    </Card>
+  {/if}
 
   <PageStats
     stats={[

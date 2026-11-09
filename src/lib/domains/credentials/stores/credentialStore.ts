@@ -4,13 +4,10 @@
 
 import { writable, derived } from 'svelte/store';
 import { logger } from '$lib/domains/shared';
-import type { Credential, CredentialType, SecureVault } from '../types';
+import type { Credential, CredentialType } from '../types';
 
 // Core state
 export const credentials = writable<Credential[]>([]);
-export const vaults = writable<SecureVault[]>([]);
-export const activeVault = writable<SecureVault | null>(null);
-export const isVaultUnlocked = writable<boolean>(false);
 export const searchQuery = writable<string>('');
 export const selectedCredentialType = writable<CredentialType | null>(null);
 export const selectedTags = writable<string[]>([]);
@@ -122,33 +119,6 @@ export const credentialActions = {
   },
 
   /**
-   * Set vaults
-   */
-  setVaults(vaultList: SecureVault[]): void {
-    logger.info('CredentialStore', `Setting vaults: ${vaultList.length} items`);
-    vaults.set(vaultList);
-  },
-
-  /**
-   * Set active vault
-   */
-  setActiveVault(vault: SecureVault | null): void {
-    logger.info('CredentialStore', `Setting active vault: ${vault?.id || 'none'}`);
-    activeVault.set(vault);
-  },
-
-  /**
-   * Set vault unlock state
-   */
-  setVaultUnlocked(unlocked: boolean): void {
-    logger.info(
-      'CredentialStore',
-      `Setting vault unlock state: ${unlocked ? 'unlocked' : 'locked'}`
-    );
-    isVaultUnlocked.set(unlocked);
-  },
-
-  /**
    * Set search query
    */
   setSearchQuery(query: string): void {
@@ -202,9 +172,6 @@ export const credentialActions = {
   clear(): void {
     logger.info('CredentialStore', 'Clearing credential store');
     credentials.set([]);
-    vaults.set([]);
-    activeVault.set(null);
-    isVaultUnlocked.set(false);
     searchQuery.set('');
     selectedCredentialType.set(null);
     selectedTags.set([]);

@@ -6,6 +6,7 @@
   import { credentialService } from '../services/credentialService';
   import { logger } from '$lib/domains/shared';
   import { toast } from '$lib/utils/toast';
+  import { getErrorMessage } from '$lib/utils/errorMessage';
   import type {
     Credential,
     CredentialCreateRequest,
@@ -34,21 +35,24 @@
 
   interface Props {
     credential?: Credential | null;
+    /** Prefills name/value when creating — e.g. "Create shared credential from this .env value". */
+    initialName?: string;
+    initialValue?: string;
     onSave?: (credential: Credential) => void;
     onClose?: () => void;
   }
 
-  const { credential, onSave, onClose }: Props = $props();
+  const { credential, initialName = '', initialValue = '', onSave, onClose }: Props = $props();
 
   let loading = $state(false);
   let error = $state<string | null>(null);
   let validationErrors = $state<string[]>([]);
 
   // Form state
-  let name = $state(credential?.name || '');
+  let name = $state(credential?.name || initialName);
   let type = $state<CredentialType>(credential?.type || CredentialType.OTHER);
   let description = $state(credential?.description || '');
-  let value = $state('');
+  let value = $state(initialValue);
   let tags = $state<string[]>(credential?.tags || []);
   let newTag = $state('');
   let expiresAt = $state<string>('');
@@ -173,12 +177,7 @@
         error: err,
         data: { name, type },
       });
-      error =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'string'
-            ? err
-            : 'Failed to save credential';
+      error = getErrorMessage(err, 'Failed to save credential');
       toast.error(error);
     } finally {
       loading = false;

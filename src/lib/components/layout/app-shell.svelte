@@ -24,6 +24,7 @@
   import ToastContainer from '$lib/components/ui/toast-container.svelte';
   import ConfirmDialog from '$lib/components/ui/confirm-dialog.svelte';
   import UpdatePrompt from '$lib/domains/updates/components/UpdatePrompt.svelte';
+  import VaultGate from '$lib/domains/credentials/components/VaultGate.svelte';
   import { runStartupUpdateCheck } from '$lib/domains/updates/services/startupUpdate';
   import QRCodeDialog from '$lib/components/QRCodeDialog.svelte';
   import DeviceApprovalDialog from '$lib/components/DeviceApprovalDialog.svelte';
@@ -436,6 +437,9 @@
 
   <!-- Launch-time update prompt -->
   <UpdatePrompt />
+
+  <!-- Vault setup/unlock gate -->
+  <VaultGate />
 
   <!-- QR Code Dialog -->
   <QRCodeDialog bind:open={qrCodeDialogOpen} />

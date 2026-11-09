@@ -50,6 +50,21 @@ impl VaultSession {
         }
     }
 
+    /// Read-only peek at the master key for drift comparisons, not a real
+    /// credential use — unlike `key`, never slides the idle timer. Still
+    /// locks (and reports locked) if the session had idle-expired.
+    pub fn peek_key(&self) -> Result<[u8; 32], CredentialError> {
+        let mut guard = self.inner.lock().unwrap();
+        match *guard {
+            Some((mk, last_used)) if last_used.elapsed() < IDLE_TIMEOUT => Ok(mk),
+            Some(_) => {
+                *guard = None;
+                Err(CredentialError::VaultLocked)
+            }
+            None => Err(CredentialError::VaultLocked),
+        }
+    }
+
     /// Status check only — does not slide the idle timer. Still locks the
     /// session if it had idle-expired, same as `key`.
     pub fn is_unlocked(&self) -> bool {

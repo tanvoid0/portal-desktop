@@ -2,17 +2,9 @@
  * Credential Service - Frontend business logic for credential management
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invokeClient } from '$lib/utils/invokeClient';
 import { logger } from '$lib/domains/shared';
-import type {
-  Credential,
-  CredentialCreateRequest,
-  CredentialUpdateRequest,
-  SecureVault,
-  VaultCreateRequest,
-  VaultUnlockRequest,
-  VaultUnlockResult,
-} from '../types';
+import type { Credential, CredentialCreateRequest, CredentialUpdateRequest } from '../types';
 import { normalizeCredential, normalizeCredentials } from '../utils/normalizeCredential';
 
 export class CredentialService {
@@ -32,7 +24,7 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Creating credential: ${request.name} (${request.type})`);
 
-      const credential = await invoke<unknown>('create_credential', {
+      const credential = await invokeClient.post<unknown>('create_credential', {
         name: request.name,
         credentialType: request.type,
         description: request.description,
@@ -62,7 +54,7 @@ export class CredentialService {
     try {
       logger.info('CredentialService', 'Getting credentials');
 
-      const credentials = normalizeCredentials(await invoke<unknown>('get_credentials'));
+      const credentials = normalizeCredentials(await invokeClient.post<unknown>('get_credentials'));
 
       logger.info('CredentialService', `Credentials retrieved: ${credentials.length} items`);
 
@@ -83,7 +75,7 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Getting credential: ${id}`);
 
-      const credential = await invoke<unknown>('get_credential', { id });
+      const credential = await invokeClient.post<unknown>('get_credential', { id });
 
       logger.info('CredentialService', `Credential retrieved: ${id}`);
 
@@ -104,7 +96,7 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Updating credential: ${id}`);
 
-      const credential = await invoke<unknown>('update_credential', {
+      const credential = await invokeClient.post<unknown>('update_credential', {
         id,
         name: request.name,
         description: request.description,
@@ -135,7 +127,7 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Deleting credential: ${id}`);
 
-      await invoke('delete_credential', { id });
+      await invokeClient.post('delete_credential', { id });
 
       logger.info('CredentialService', `Credential deleted successfully: ${id}`);
     } catch (error) {
@@ -154,7 +146,7 @@ export class CredentialService {
     try {
       logger.info('CredentialService', `Decrypting credential: ${id}`);
 
-      const decryptedValue = await invoke<string>('decrypt_credential', { id });
+      const decryptedValue = await invokeClient.post<string>('decrypt_credential', { id });
 
       logger.info('CredentialService', `Credential decrypted successfully: ${id}`);
 
@@ -176,7 +168,7 @@ export class CredentialService {
       logger.info('CredentialService', `Searching credentials: ${query}`);
 
       const credentials = normalizeCredentials(
-        await invoke<unknown>('search_credentials', { query })
+        await invokeClient.post<unknown>('search_credentials', { query })
       );
 
       logger.info(
@@ -187,68 +179,6 @@ export class CredentialService {
       return credentials;
     } catch (error) {
       logger.error('Failed to search credentials', {
-        context: 'CredentialService',
-        error,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Create secure vault
-   */
-  async createVault(request: VaultCreateRequest): Promise<SecureVault> {
-    try {
-      logger.info('CredentialService', `Creating secure vault: ${request.name}`);
-
-      // This would need to be implemented in the backend
-      const vault: SecureVault = {
-        id: crypto.randomUUID(),
-        name: request.name,
-        description: request.description,
-        credentials: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        encryptionKey: '', // Would be derived from master password
-        keyDerivation: {
-          algorithm: 'pbkdf2',
-          iterations: 100000,
-          salt: crypto.randomUUID(),
-          keyLength: 32,
-        },
-      };
-
-      logger.info('CredentialService', `Secure vault created: ${vault.id}`);
-
-      return vault;
-    } catch (error) {
-      logger.error('Failed to create secure vault', {
-        context: 'CredentialService',
-        error,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Unlock vault
-   */
-  async unlockVault(request: VaultUnlockRequest): Promise<VaultUnlockResult> {
-    try {
-      logger.info('CredentialService', `Unlocking vault: ${request.vaultId}`);
-
-      // This would need to be implemented in the backend
-      const result: VaultUnlockResult = {
-        success: true,
-        sessionToken: crypto.randomUUID(),
-        expiresAt: new Date(Date.now() + (request.sessionDuration || 30) * 60 * 1000),
-      };
-
-      logger.info('CredentialService', `Vault unlocked successfully: ${request.vaultId}`);
-
-      return result;
-    } catch (error) {
-      logger.error('Failed to unlock vault', {
         context: 'CredentialService',
         error,
       });
