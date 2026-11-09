@@ -18,11 +18,12 @@
   import Package from '~icons/fa6-solid/box-open';
   import Download from '~icons/fa6-solid/download';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
+  import { getContext } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { logger } from '$lib/domains/shared';
   import type { ProcessedSDKConfig } from '$lib/domains/sdk/services/sdkConfigService';
-  import { sdkConfigsQuery, sdkManagersQuery } from '$lib/domains/sdk/queries/sdkQueries';
-  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { SDK_QUERIES_CONTEXT, type SdkQueries } from '$lib/domains/sdk/queries/sdkQueries';
+  import { useQueryClient } from '@tanstack/svelte-query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -67,8 +68,7 @@
   });
   let lastSelectedItemId = $state<string | null>(null);
 
-  const configsQuery = createQuery(sdkConfigsQuery);
-  const managersQuery = createQuery(sdkManagersQuery);
+  const { configsQuery, managersQuery } = getContext<SdkQueries>(SDK_QUERIES_CONTEXT);
   const queryClient = useQueryClient();
   const sdkConfigs = $derived<ProcessedSDKConfig[]>(configsQuery.data ?? []);
   const sdkManagers = $derived<SDKManager[]>(managersQuery.data ?? []);
@@ -261,17 +261,20 @@
     selectedItem = selectedSDK || null;
   });
 
-  // Keep the currently selected SDK's category expanded.
+  // Keep the currently selected SDK's category expanded. `categories` is still empty while
+  // the SDK queries are pending, so don't commit `lastSelectedItemId` until a category
+  // actually matched — otherwise this short-circuits on the next run (once the data has
+  // arrived) without ever having opened anything.
   $effect(() => {
     if (!selectedItem) return;
     if (selectedItem === lastSelectedItemId) return;
 
-    const open = { ...openSections };
-    for (const category of categories) {
-      if (category.items.some((s) => s.id === selectedItem)) open[category.key] = true;
-    }
-    openSections = open;
+    const matched = categories.find((category) =>
+      category.items.some((s) => s.id === selectedItem)
+    );
+    if (!matched) return;
 
+    openSections = { ...openSections, [matched.key]: true };
     lastSelectedItemId = selectedItem;
   });
 
@@ -439,7 +442,12 @@
   <div
     class="divider-edge-b divider-edge-full flex-shrink-0 bg-background p-3 group-data-[collapsible=icon]:p-1"
   >
-    <SidebarMenuButton size="sm" tooltipContent="Back to Portal Desktop" onclick={() => goto('/')}>
+    <SidebarMenuButton
+      size="sm"
+      class="h-auto"
+      tooltipContent="Back to Portal Desktop"
+      onclick={() => goto('/')}
+    >
       <ArrowLeft class="h-4 w-4" />
       <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
         <span class="block truncate text-base font-semibold">SDK Manager</span>

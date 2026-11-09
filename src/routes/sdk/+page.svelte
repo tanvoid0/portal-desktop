@@ -4,7 +4,8 @@
 -->
 
 <script lang="ts">
-  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { getContext } from 'svelte';
+  import { useQueryClient } from '@tanstack/svelte-query';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
@@ -23,15 +24,16 @@
   import Zap from '~icons/fa6-solid/bolt';
   import Devicon from '$lib/components/ui/devicon.svelte';
   import { PageError, PageHeader, PageStats } from '$lib/components/shell';
-  import { sdkConfigsQuery, sdkManagersQuery } from '$lib/domains/sdk/queries/sdkQueries';
+  import { SDK_QUERIES_CONTEXT, type SdkQueries } from '$lib/domains/sdk/queries/sdkQueries';
   import { formatSdkVersion } from '$lib/domains/sdk/utils/normalizeVersions';
   import { goto } from '$app/navigation';
 
-  // Overview counters and Quick Navigation read the same
-  // queries as the sidebar.
+  // Read from the single pair of queries `/sdk/+layout.svelte` creates — not our own
+  // `createQuery` calls. Two independent observers for the same key, both racing to resolve
+  // on a cold mount, could diverge (one gets `.data`, the other gets stuck); sharing the
+  // layout's observers with the sidebar makes that divergence impossible.
+  const { configsQuery, managersQuery } = getContext<SdkQueries>(SDK_QUERIES_CONTEXT);
   const queryClient = useQueryClient();
-  const configsQuery = createQuery(sdkConfigsQuery);
-  const managersQuery = createQuery(sdkManagersQuery);
   const pending = $derived(configsQuery.isPending || managersQuery.isPending);
   const queryError = $derived(configsQuery.error ?? managersQuery.error);
   const configs = $derived(configsQuery.data ?? []);

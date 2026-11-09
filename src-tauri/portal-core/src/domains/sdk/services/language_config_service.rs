@@ -306,6 +306,18 @@ impl SDKConfigService {
         }
     }
 
+    /// Runs a subprocess and captures its output off the async runtime's worker threads.
+    /// `Command::output()` blocks the calling OS thread until the child exits; calling it
+    /// directly inside an `async fn` (as this file used to, ~16 SDKs x several checks each)
+    /// starves Tokio's small worker pool once more than a couple of probes overlap — a reload
+    /// (or QA-097's repeated direct loads of /sdk) looks like it never resolves because the
+    /// whole async runtime is blocked, not because any single probe is actually stuck.
+    async fn run_detached(mut cmd: std::process::Command) -> std::io::Result<std::process::Output> {
+        tokio::task::spawn_blocking(move || cmd.output())
+            .await
+            .unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, e)))
+    }
+
     /// Check if a manager/binary is installed and get its version
     /// For known SDK managers (nvm, sdkman, etc.), use their specific detection methods
     /// For others, fall back to simple binary check
@@ -345,7 +357,9 @@ impl SDKConfigService {
         }
 
         // Fallback: Try to run version command
-        if let Ok(output) = Command::new(binary).no_window().arg("--version").output() {
+        let mut cmd = Command::new(binary);
+        cmd.no_window().arg("--version");
+        if let Ok(output) = Self::run_detached(cmd).await {
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 // Also check stderr (some commands output version there)
@@ -380,8 +394,9 @@ impl SDKConfigService {
                 for path in &conda_paths {
                     if std::path::Path::new(path).exists() {
                         // Try to get version
-                        if let Ok(output) = Command::new(path).no_window().arg("--version").output()
-                        {
+                        let mut cmd = Command::new(path);
+                        cmd.no_window().arg("--version");
+                        if let Ok(output) = Self::run_detached(cmd).await {
                             if output.status.success() {
                                 let version =
                                     String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -412,7 +427,9 @@ impl SDKConfigService {
                 let binary = parts[0];
                 let args: Vec<&str> = parts[1..].to_vec();
 
-                if let Ok(output) = Command::new(binary).no_window().args(&args).output() {
+                let mut cmd = Command::new(binary);
+                cmd.no_window().args(&args);
+                if let Ok(output) = Self::run_detached(cmd).await {
                     if output.status.success() {
                         // Some commands (like docker --version) output to stderr instead of stdout
                         let raw_output = if !output.stdout.is_empty() {
@@ -435,11 +452,9 @@ impl SDKConfigService {
         for binary_name in &detection.binary_names {
             if which::which(binary_name).is_ok() {
                 // Try to get version
-                if let Ok(version_output) = Command::new(binary_name)
-                    .no_window()
-                    .arg("--version")
-                    .output()
-                {
+                let mut cmd = Command::new(binary_name);
+                cmd.no_window().arg("--version");
+                if let Ok(version_output) = Self::run_detached(cmd).await {
                     if version_output.status.success() {
                         // Some commands output to stderr instead of stdout
                         let raw_output = if !version_output.stdout.is_empty() {

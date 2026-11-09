@@ -1,7 +1,7 @@
 ---
 id: QA-098
 title: SDK sidebar tree opens fully collapsed, and the selected SDK's category is not expanded
-status: open
+status: verified
 severity: major
 kind: bug
 area: sdk (SDKSidebar)
@@ -66,8 +66,33 @@ truthy.
 
 ## Fix
 
-<!-- coder -->
+Two distinct bugs, both in scope:
+
+1. The "keep selected category expanded" effect matched the exact mechanism this issue
+   already named: it committed `lastSelectedItemId = selectedItem` on the first (empty
+   `categories`) pass even when no category matched, short-circuiting the next run once real
+   data arrived. Fixed by only committing `lastSelectedItemId` once a category actually
+   matched (`src/lib/domains/sdk/components/SDKSidebar.svelte`).
+2. On `/sdk` itself (and `/sdk/managers`, `/sdk/services`, `/sdk/versions`), `+layout.svelte`
+   computed `selectedSDK` as the last path segment — for the bare nav routes that's the literal
+   word `"sdk"`/`"managers"`/etc., not `undefined`. That truthy-but-matching-nothing value made
+   `selectedItem` truthy, which blocked the *other* effect ("nothing selected → open `language`
+   and `manager` by default") from ever running on these routes. Fixed by excluding the known
+   nav-route keywords when deriving `selectedSDK` (`src/routes/sdk/+layout.svelte`).
+
+Checks: `pnpm check && pnpm lint` (0 errors). Not re-verified live (see QA-097's note on why);
+qa-tester should rerun `node .claude/qa/scripts/sdk-sidebar5.mjs`.
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09, mode: tauri. `node .claude/qa/scripts/QA-098.mjs` — direct load of `/sdk/python`:
+Python's sidebar row highlighted and visible without any manual expand
+(`.claude/qa/shots/QA-098-direct-load-sdk-python.png` — Node.js/Python/Java/Rust/Go all shown
+under the "SDK Manager" group, Python selected). Direct load of `/sdk` (nothing selected):
+"SDK Managers" and "Language & Runtime" both expanded by default with full contents (Conda,
+Fast Node Manager, NVM, Pyenv, Rustup / Python, Node.js, Java, Rust, Go), Database Server /
+Web Server / Container Platform / AI SDKs correctly stay collapsed
+(`.claude/qa/shots/QA-098-direct-load-sdk-overview.png`). Both bugs named in the Fix are
+confirmed fixed, independent of QA-097 (the main content pane in the same screenshot is still
+stuck on "Loading SDK data..." — that's QA-097, a different code path, reopened separately).
+Verified.

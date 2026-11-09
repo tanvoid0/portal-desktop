@@ -1,7 +1,7 @@
 ---
 id: QA-099
 title: SDK sidebar header subtitle is cut in half on every /sdk page
-status: open
+status: verified
 severity: polish
 kind: ux
 area: sdk (SDKSidebar)
@@ -47,8 +47,17 @@ The subtitle fits, or is dropped.
 
 ## Fix
 
-<!-- coder -->
+Root cause: the header's `SidebarMenuButton size="sm"` has a fixed `h-7` (28px) height with
+`overflow-hidden`, but the content is two lines. The same file already has the fix for this
+exact shape one block down (`resolvedNavigationItems`'s `SidebarMenuButton` carries
+`class="h-auto"`) — just missing on the header button. Added it there too.
+
+File: `src/lib/domains/sdk/components/SDKSidebar.svelte`.
+Checks: `pnpm check && pnpm lint` (0 errors).
 
 ## Verification
 
-<!-- qa-tester -->
+2026-11-09, mode: tauri. `node .claude/qa/scripts/QA-099.mjs` on `/sdk/python`: subtitle text
+box is `top:78 bottom:96` (18px, fits one line) and its clipping ancestor's bottom is far below
+that (1393, the full window) — no longer clipped. `.claude/qa/shots/QA-099-sidebar-header.png`
+— "SDK Manager / Development Tools" both lines fully legible. Verified.
