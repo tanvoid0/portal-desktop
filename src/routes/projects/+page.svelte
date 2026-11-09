@@ -19,7 +19,11 @@
   import Plus from '~icons/fa6-solid/plus';
   import ScanSearch from '~icons/fa6-solid/magnifying-glass';
   import ChevronRight from '~icons/fa6-solid/chevron-right';
+  import ListIcon from '~icons/fa6-solid/list';
+  import GridIcon from '~icons/fa6-solid/table-cells-large';
   import ProjectRow from '$lib/domains/projects/components/ProjectRow.svelte';
+  import ProjectCard from '$lib/domains/projects/components/ProjectCard.svelte';
+  import { ToggleGroup, ToggleGroupItem } from '$lib/components/ui/toggle-group';
   import {
     Collapsible,
     CollapsibleContent,
@@ -158,6 +162,29 @@
     openGroups = { ...openGroups, [key]: open };
     try {
       localStorage?.setItem(OPEN_GROUPS_KEY, JSON.stringify(openGroups));
+    } catch {
+      // Quota or private mode — the choice still holds for this session.
+    }
+  }
+
+  const VIEW_MODE_KEY = 'portal.projects.viewMode';
+  type ViewMode = 'list' | 'grid';
+
+  function readViewMode(): ViewMode {
+    try {
+      return localStorage?.getItem(VIEW_MODE_KEY) === 'grid' ? 'grid' : 'list';
+    } catch {
+      return 'list';
+    }
+  }
+
+  let viewMode = $state<ViewMode>(readViewMode());
+
+  function setViewMode(mode: string) {
+    if (mode !== 'list' && mode !== 'grid') return;
+    viewMode = mode;
+    try {
+      localStorage?.setItem(VIEW_MODE_KEY, mode);
     } catch {
       // Quota or private mode — the choice still holds for this session.
     }
@@ -331,6 +358,15 @@
           Clear filters
         </Button>
       {/if}
+
+      <ToggleGroup type="single" value={viewMode} onValueChange={setViewMode} variant="outline">
+        <ToggleGroupItem value="list" aria-label="List view">
+          <ListIcon class="h-3.5 w-3.5" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="grid" aria-label="Grid view">
+          <GridIcon class="h-3.5 w-3.5" />
+        </ToggleGroupItem>
+      </ToggleGroup>
     {/snippet}
   </PageFilters>
 
@@ -367,10 +403,37 @@
       />
     {/snippet}
 
+    {#snippet card(project: Project)}
+      <ProjectCard
+        {project}
+        {registryReady}
+        modules={modulesByProject.get(Number(project.id)) ?? []}
+        eligibleParents={eligibleParents(project)}
+        onDelete={handleProjectDelete}
+        onSetParent={handleSetParent}
+        onToggleStar={handleToggleStar}
+      />
+    {/snippet}
+
+    {#snippet cardGrid(items: ProjectGroup['items'])}
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {#each items as item (item.project.id)}
+          {@render card(item.project)}
+          {#each item.children as child (child.id)}
+            {@render card(child)}
+          {/each}
+        {/each}
+      </div>
+    {/snippet}
+
     <div class="space-y-6">
       {#each groups as group (group.key)}
         {#if isLoneProject(group)}
-          {@render row(group.items[0].project, false, group.title)}
+          {#if viewMode === 'grid'}
+            {@render cardGrid(group.items)}
+          {:else}
+            {@render row(group.items[0].project, false, group.title)}
+          {/if}
         {:else}
           <Collapsible
             bind:open={() => isGroupOpen(group), (open) => setGroupOpen(group.key, open)}
@@ -391,12 +454,16 @@
                 </CollapsibleTrigger>
               </h2>
               <CollapsibleContent>
-                {#each group.items as item (item.project.id)}
-                  {@render row(item.project, false, '')}
-                  {#each item.children as child (child.id)}
-                    {@render row(child, true, '')}
+                {#if viewMode === 'grid'}
+                  {@render cardGrid(group.items)}
+                {:else}
+                  {#each group.items as item (item.project.id)}
+                    {@render row(item.project, false, '')}
+                    {#each item.children as child (child.id)}
+                      {@render row(child, true, '')}
+                    {/each}
                   {/each}
-                {/each}
+                {/if}
               </CollapsibleContent>
             </section>
           </Collapsible>

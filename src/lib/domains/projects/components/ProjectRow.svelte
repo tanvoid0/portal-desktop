@@ -2,31 +2,16 @@
 <script lang="ts">
   import type { Project, ProjectModule } from '$lib/domains/projects/types';
   import { formatRelativeTime } from '$lib/domains/shared/utils';
-  import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import * as Dialog from '$lib/components/ui/dialog';
-  import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-  } from '$lib/components/ui/dropdown-menu';
-  import Select from '$lib/components/ui/select.svelte';
   import TechIcon from '$lib/components/ui/tech-icon.svelte';
   import { cn } from '$lib/utils';
-  import Ellipsis from '~icons/fa6-solid/ellipsis';
-  import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
   import FolderOpen from '~icons/fa6-solid/folder-open';
-  import FolderTree from '~icons/fa6-solid/folder-tree';
   import GitBranch from '~icons/fa6-solid/code-branch';
   import Star from '~icons/fa6-solid/star';
-  import Trash2 from '~icons/fa6-solid/trash';
-  import Unlink from '~icons/fa6-solid/link-slash';
   import { getProjectGitBranch, readableDescription } from '$lib/domains/projects/utils/display';
   import { describeModules } from '$lib/domains/projects/utils/moduleStacks';
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
-  import { goto } from '$app/navigation';
+  import ProjectQuickActions from './ProjectQuickActions.svelte';
 
   interface Props {
     project: Project;
@@ -55,15 +40,15 @@
     onToggleStar = () => {},
   }: Props = $props();
 
-  const MAX_BADGES = 3;
+  // 2 full badges + a "+N" chip reads cleaner at row width than 3 badges that
+  // get clipped mid-word by the row's overflow.
+  const MAX_BADGES = 2;
   const DOT: Record<string, string> = {
     active: 'bg-green-500',
     recent: 'bg-blue-500',
     dormant: 'bg-amber-500',
     stale: 'bg-muted-foreground/40',
   };
-
-  let groupOpen = $state(false);
 
   const primary = $derived(
     registryReady
@@ -73,14 +58,16 @@
   );
   // Deduped by name: older rows can hold a "Rust" framework beside the Rust language,
   // and a duplicate key would throw in the keyed each below.
-  const badges = $derived.by(() => {
+  const allBadges = $derived.by(() => {
     if (!registryReady) return [];
     const all = [
       ...projectIconRegistry.resolveFrameworks(project),
       ...projectIconRegistry.resolveLanguages(project),
     ];
-    return all.filter((t, i) => all.findIndex((o) => o.name === t.name) === i).slice(0, MAX_BADGES);
+    return all.filter((t, i) => all.findIndex((o) => o.name === t.name) === i);
   });
+  const badges = $derived(allBadges.slice(0, MAX_BADGES));
+  const extraBadges = $derived(Math.max(0, allBadges.length - MAX_BADGES));
   const branch = $derived(getProjectGitBranch(project));
   const description = $derived(readableDescription(project.description));
   const lastSeen = $derived(project.last_activity ?? project.last_opened);
@@ -126,9 +113,9 @@
     </div>
 
     <!-- Badges sit beside the name rather than in a wide fixed column, so the row has
-         no empty middle at 1280 and the name keeps its width at 1024. -->
-    <div class="hidden max-w-56 shrink-0 items-center gap-1.5 overflow-hidden md:flex">
-      <!-- The project's own stack first; the module summary only when none is recorded. -->
+         no empty middle at 1280 and the name keeps its width at 1024. Capped at
+         MAX_BADGES with a "+N" chip instead of clipping a badge mid-word. -->
+    <div class="hidden shrink-0 items-center gap-1.5 md:flex">
       {#if badges.length > 0}
         {#each badges as item (item.name)}
           <Badge variant="outline" class="shrink-0 gap-1.5 font-normal">
@@ -136,6 +123,18 @@
             {item.name}
           </Badge>
         {/each}
+        {#if extraBadges > 0}
+          <Badge
+            variant="outline"
+            class="shrink-0 font-normal text-muted-foreground"
+            title={allBadges
+              .slice(MAX_BADGES)
+              .map((b) => b.name)
+              .join(', ')}
+          >
+            +{extraBadges}
+          </Badge>
+        {/if}
       {:else if modules.length > 0}
         <span class="truncate text-xs text-muted-foreground">{describeModules(modules)}</span>
       {/if}
@@ -167,64 +166,5 @@
     </div>
   </a>
 
-  <DropdownMenu>
-    <DropdownMenuTrigger>
-      {#snippet child({ props })}
-        <Button
-          {...props}
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 data-[state=open]:opacity-100"
-          aria-label="Actions for {project.name}"
-        >
-          <Ellipsis class="h-4 w-4" />
-        </Button>
-      {/snippet}
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuItem onclick={() => goto(`/projects/${project.id}`)}>
-        <ExternalLink class="mr-2 h-4 w-4" />
-        Open
-      </DropdownMenuItem>
-      <DropdownMenuItem onclick={() => onToggleStar(project)}>
-        <Star class="mr-2 h-4 w-4" />
-        {project.starred ? 'Unstar' : 'Star'}
-      </DropdownMenuItem>
-      {#if eligibleParents.length > 0}
-        <DropdownMenuItem onclick={() => (groupOpen = true)}>
-          <FolderTree class="mr-2 h-4 w-4" />
-          Group under…
-        </DropdownMenuItem>
-      {/if}
-      {#if project.parent_id != null}
-        <DropdownMenuItem onclick={() => onSetParent(project.id, null)}>
-          <Unlink class="mr-2 h-4 w-4" />
-          Remove from group
-        </DropdownMenuItem>
-      {/if}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem variant="destructive" onclick={() => onDelete(project)}>
-        <Trash2 class="mr-2 h-4 w-4" />
-        Delete
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
+  <ProjectQuickActions {project} {eligibleParents} {onDelete} {onSetParent} {onToggleStar} />
 </div>
-
-<Dialog.Root bind:open={groupOpen}>
-  <Dialog.Content class="max-w-sm">
-    <Dialog.Header>
-      <Dialog.Title>Group “{project.name}” under…</Dialog.Title>
-    </Dialog.Header>
-    <Select
-      defaultValue=""
-      placeholder="Choose a parent project"
-      options={eligibleParents.map((p) => ({ value: p.id, label: p.name }))}
-      onSelect={(value) => {
-        if (!value) return;
-        onSetParent(project.id, Number(value));
-        groupOpen = false;
-      }}
-    />
-  </Dialog.Content>
-</Dialog.Root>
