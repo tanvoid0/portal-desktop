@@ -20,6 +20,7 @@
   import Download from '~icons/fa6-solid/download';
   import Trash2 from '~icons/fa6-solid/trash';
   import Search from '~icons/fa6-solid/magnifying-glass';
+  import ArrowDown from '~icons/fa6-solid/arrow-down';
 
   // State
   let logs = $state<LogEntry[]>([]);
@@ -69,6 +70,53 @@
 
   let scrollContainer: HTMLElement | null = $state(null);
   let unsubscribe: (() => void) | null = $state(null);
+  let isAtBottom = $state(true);
+  // Scroll events fire async (next frame). Set right before every programmatic scroll so the
+  // resulting `handleScroll` call knows it wasn't the user and skips the auto-scroll-disable
+  // check below — otherwise a burst of 2+ log lines lands before that frame, the scroll-position
+  // gap reads as "the user scrolled away", and autoScroll flips off with nobody touching anything.
+  let suppressScrollCheck = false;
+
+  function scrollToBottom() {
+    if (!scrollContainer) return;
+    // Only arm the suppression when this write will actually move `scrollTop` — a
+    // no-op write (already at the bottom, e.g. a new line hidden by a filter) fires no
+    // scroll event, so the flag would never get cleared and would swallow the user's
+    // next real scroll.
+    if (scrollContainer.scrollTop + scrollContainer.clientHeight < scrollContainer.scrollHeight) {
+      suppressScrollCheck = true;
+    }
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }
+
+  /** The user scrolling away from the bottom on a live stream pauses auto-scroll — it would
+   *  otherwise yank them back down on the very next line. Re-checking the box, or the
+   *  "Scroll to bottom" button below, both jump back down via the `$effect` and `onclick`. */
+  function handleScroll() {
+    if (!scrollContainer) return;
+    if (suppressScrollCheck) {
+      suppressScrollCheck = false;
+      isAtBottom = true;
+      return;
+    }
+    const distanceFromBottom =
+      scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
+    isAtBottom = distanceFromBottom < 40;
+    if (!isAtBottom && autoScroll) autoScroll = false;
+  }
+
+  $effect(() => {
+    const el = scrollContainer;
+    if (!el) return;
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  });
+
+  // Re-checking Auto-scroll jumps to the bottom immediately, rather than waiting for the
+  // next log line (which may never come on a quiet stream).
+  $effect(() => {
+    if (autoScroll) scrollToBottom();
+  });
 
   // Functions
   function getLevelColor(level: LogLevel): string {
@@ -120,11 +168,7 @@
   function updateLogs() {
     logs = logger.getEntries();
     if (autoScroll && scrollContainer) {
-      setTimeout(() => {
-        if (scrollContainer) {
-          scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        }
-      }, 10);
+      setTimeout(scrollToBottom, 10);
     }
   }
 
@@ -203,29 +247,47 @@
   </div>
 
   <!-- Logs Display -->
-  <ScrollArea class="min-h-0 flex-1" bind:viewportRef={scrollContainer}>
-    {#if filteredLogs.length === 0}
-      <div class="py-8 text-center text-muted-foreground">No logs found</div>
-    {:else}
-      {#each filteredLogs as entry (entry.timestamp.getTime() + entry.message)}
-        <div
-          class="flex items-baseline gap-2 px-3 py-0.5 font-mono text-xs leading-5 hover:bg-muted/50"
-        >
-          <span
-            class={'w-3 shrink-0 text-center font-bold ' + getLevelColor(entry.level)}
-            title={LogLevel[entry.level]}
+  <div class="relative min-h-0 flex-1">
+    <ScrollArea class="h-full" bind:viewportRef={scrollContainer}>
+      {#if filteredLogs.length === 0}
+        <div class="py-8 text-center text-muted-foreground">No logs found</div>
+      {:else}
+        {#each filteredLogs as entry, i (i)}
+          <div
+            class="flex items-baseline gap-2 px-3 py-0.5 font-mono text-xs leading-5 hover:bg-muted/50"
           >
-            <span aria-hidden="true">{LogLevel[entry.level][0]}</span>
-            <span class="sr-only">{LogLevel[entry.level]}</span>
-          </span>
-          <span class="shrink-0 text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
-          <Badge variant="outline" class="px-1 py-0 text-xs">{entry.source}</Badge>
-          {#if entry.context}
-            <Badge variant="outline" class="px-1 py-0 text-xs">{entry.context}</Badge>
-          {/if}
-          <span class="min-w-0 flex-1 break-words">{entry.message}</span>
-        </div>
-      {/each}
+            <span
+              class={'w-3 shrink-0 text-center font-bold ' + getLevelColor(entry.level)}
+              title={LogLevel[entry.level]}
+            >
+              <span aria-hidden="true">{LogLevel[entry.level][0]}</span>
+              <span class="sr-only">{LogLevel[entry.level]}</span>
+            </span>
+            <span class="shrink-0 text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
+            <Badge variant="outline" class="px-1 py-0 text-xs">{entry.source}</Badge>
+            {#if entry.context}
+              <Badge variant="outline" class="px-1 py-0 text-xs">{entry.context}</Badge>
+            {/if}
+            <span class="min-w-0 flex-1 break-words">{entry.message}</span>
+          </div>
+        {/each}
+      {/if}
+    </ScrollArea>
+    {#if !isAtBottom}
+      <Button
+        variant="secondary"
+        size="sm"
+        class="absolute right-3 bottom-3 shadow-md"
+        aria-label="Scroll to bottom"
+        onclick={() => {
+          autoScroll = true;
+          scrollToBottom();
+          isAtBottom = true;
+        }}
+      >
+        <ArrowDown class="mr-1 h-3 w-3" />
+        Scroll to bottom
+      </Button>
     {/if}
-  </ScrollArea>
+  </div>
 </div>
