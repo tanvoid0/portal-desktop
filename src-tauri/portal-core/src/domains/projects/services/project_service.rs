@@ -169,6 +169,28 @@ impl ProjectService {
         self.repository.set_parent(id, parent_id).await
     }
 
+    /// Sets or clears a project's SDLC stage (`idea | in_progress | stable |
+    /// released`, or `None` to clear). Rejects anything else rather than
+    /// writing garbage the frontend won't recognize.
+    pub async fn set_project_stage(
+        &self,
+        id: i32,
+        stage: Option<String>,
+    ) -> Result<Option<ProjectResponse>, String> {
+        self.repository.set_stage(id, validate_stage(stage)?).await
+    }
+
+    /// Flags a project archived or active via its own `archived` column —
+    /// independent of `status`, which the disk-scan import writes for an
+    /// unrelated reason (see the `archived` migration's doc comment).
+    pub async fn set_project_archived(
+        &self,
+        id: i32,
+        archived: bool,
+    ) -> Result<Option<ProjectResponse>, String> {
+        self.repository.set_archived(id, archived).await
+    }
+
     pub async fn toggle_project_star(&self, id: i32) -> Result<Option<ProjectResponse>, String> {
         // Get current project to check if it exists and get current starred status
         let current_project = self.repository.get_by_id(id).await?;
@@ -834,4 +856,38 @@ pub struct GitInfo {
     pub commit: Option<String>,
     pub has_uncommitted_changes: bool,
     pub last_commit: Option<chrono::DateTime<Utc>>,
+}
+
+/// Rejects unknown stages rather than storing them: the UI filters and badges
+/// on these exact values, and a typo would make a project silently invisible.
+fn validate_stage(stage: Option<String>) -> Result<Option<String>, String> {
+    match stage.as_deref() {
+        None => Ok(None),
+        Some(s) if matches!(s, "idea" | "in_progress" | "stable" | "released") => {
+            Ok(Some(s.to_string()))
+        }
+        Some(other) => Err(format!(
+            "unknown stage `{other}` (expected idea, in_progress, stable or released)"
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_known_stages_and_none() {
+        for s in ["idea", "in_progress", "stable", "released"] {
+            assert_eq!(validate_stage(Some(s.into())).unwrap(), Some(s.into()));
+        }
+        assert_eq!(validate_stage(None).unwrap(), None);
+    }
+
+    #[test]
+    fn rejects_unknown_stages() {
+        assert!(validate_stage(Some("demo".into())).is_err());
+        assert!(validate_stage(Some("shipped".into())).is_err());
+        assert!(validate_stage(Some("garbage".into())).is_err());
+    }
 }

@@ -1,5 +1,5 @@
 import { invokeClient } from '$lib/utils/invokeClient';
-import type { Project } from '$lib/domains/projects/types';
+import type { Project, ProjectStage } from '$lib/domains/projects/types';
 import { normalizeProject, normalizeProjects } from '$lib/domains/projects/utils/normalizeProject';
 
 export async function fetchAllProjects(): Promise<Project[]> {
@@ -44,5 +44,20 @@ export async function openProjectInIde(id: number): Promise<string> {
 /** Flips the project's star; resolves to the updated project. */
 export async function toggleProjectStar(id: number): Promise<Project | null> {
   const project = await invokeClient.post<unknown>('toggle_project_star', { id });
+  return project ? normalizeProject(project as Record<string, unknown>) : null;
+}
+
+/** Sets or clears a project's SDLC stage. */
+export async function setProjectStage(
+  id: number,
+  stage: ProjectStage | null
+): Promise<Project | null> {
+  const project = await invokeClient.post<unknown>('set_project_stage', { id, stage });
+  return project ? normalizeProject(project as Record<string, unknown>) : null;
+}
+
+/** Flags a project archived or active. */
+export async function setProjectArchived(id: number, archived: boolean): Promise<Project | null> {
+  const project = await invokeClient.post<unknown>('set_project_archived', { id, archived });
   return project ? normalizeProject(project as Record<string, unknown>) : null;
 }

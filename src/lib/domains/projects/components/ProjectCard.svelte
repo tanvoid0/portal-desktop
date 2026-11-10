@@ -1,6 +1,7 @@
 <!-- Grid card: richer than the list row — full stack badges, description, and quick actions always visible. -->
 <script lang="ts">
-  import type { Project, ProjectModule } from '$lib/domains/projects/types';
+  import type { Project, ProjectModule, ProjectStage } from '$lib/domains/projects/types';
+  import { PROJECT_STAGES } from '$lib/domains/projects/types';
   import { formatRelativeTime } from '$lib/domains/shared/utils';
   import { Badge } from '$lib/components/ui/badge';
   import { Card } from '$lib/components/ui/card';
@@ -8,9 +9,14 @@
   import FolderOpen from '~icons/fa6-solid/folder-open';
   import GitBranch from '~icons/fa6-solid/code-branch';
   import Star from '~icons/fa6-solid/star';
-  import { getProjectGitBranch, readableDescription } from '$lib/domains/projects/utils/display';
+  import {
+    getProjectGitBranch,
+    getStatusColor,
+    readableDescription,
+  } from '$lib/domains/projects/utils/display';
   import { describeModules } from '$lib/domains/projects/utils/moduleStacks';
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
+  import { cn } from '$lib/utils';
   import ProjectQuickActions from './ProjectQuickActions.svelte';
 
   interface Props {
@@ -21,6 +27,8 @@
     onDelete?: (project: Project) => void;
     onSetParent?: (projectId: string, parentId: number | null) => void;
     onToggleStar?: (project: Project) => void;
+    onSetStage?: (project: Project, stage: ProjectStage | null) => void;
+    onSetArchived?: (project: Project, archived: boolean) => void;
   }
 
   let {
@@ -31,7 +39,11 @@
     onDelete = () => {},
     onSetParent = () => {},
     onToggleStar = () => {},
+    onSetStage = () => {},
+    onSetArchived = () => {},
   }: Props = $props();
+
+  const stageLabel = $derived(PROJECT_STAGES.find((s) => s.value === project.stage)?.label);
 
   const DOT: Record<string, string> = {
     active: 'bg-green-500',
@@ -85,6 +97,12 @@
               aria-label="Starred project"
             />
           {/if}
+          {#if stageLabel}
+            <Badge variant="secondary" class="shrink-0 font-normal">{stageLabel}</Badge>
+          {/if}
+          {#if project.archived}
+            <Badge class={cn('shrink-0 font-normal', getStatusColor('archived'))}>Archived</Badge>
+          {/if}
         </div>
         <div
           class="flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -132,6 +150,14 @@
   </a>
 
   <div class="absolute top-2.5 right-2.5 z-10">
-    <ProjectQuickActions {project} {eligibleParents} {onDelete} {onSetParent} {onToggleStar} />
+    <ProjectQuickActions
+      {project}
+      {eligibleParents}
+      {onDelete}
+      {onSetParent}
+      {onToggleStar}
+      {onSetStage}
+      {onSetArchived}
+    />
   </div>
 </Card>

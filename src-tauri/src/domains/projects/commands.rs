@@ -124,6 +124,29 @@ pub async fn toggle_project_star(
     service.toggle_project_star(id).await
 }
 
+/// Sets or clears a project's SDLC stage (`idea | in_progress | stable |
+/// released`), or `None` to clear it.
+#[portal_rpc_macro::rpc(cap = "projects")]
+pub async fn set_project_stage(
+    id: i32,
+    stage: Option<String>,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
+    let service = ProjectService::new(&db_manager);
+    service.set_project_stage(id, stage).await
+}
+
+/// Flags a project archived or active (reuses the existing `status` field).
+#[portal_rpc_macro::rpc(cap = "projects")]
+pub async fn set_project_archived(
+    id: i32,
+    archived: bool,
+    db_manager: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
+    let service = ProjectService::new(&db_manager);
+    service.set_project_archived(id, archived).await
+}
+
 #[portal_rpc_macro::rpc(cap = "projects")]
 pub async fn open_project(
     id: i32,

@@ -3,7 +3,7 @@
  * Tauri IPC uses camelCase on the wire; our domain types use snake_case fields.
  */
 
-import type { Project, ProjectMetadata } from '$lib/domains/projects/types';
+import type { Project, ProjectMetadata, ProjectStage } from '$lib/domains/projects/types';
 import { ProjectStatus } from '$lib/domains/projects/types';
 
 type RawProject = Record<string, unknown>;
@@ -80,9 +80,12 @@ export function normalizeProject(raw: RawProject): Project {
     discovery_path: (raw.discovery_path ?? raw.discoveryPath) as string | undefined,
     activity_status: (raw.activity_status ?? raw.activityStatus) as string | undefined,
     last_activity: toOptionalDate(raw.last_activity ?? raw.lastActivity),
+    risk_level: (raw.risk_level ?? raw.riskLevel) as string | undefined,
     unpushed_commits: Number(raw.unpushed_commits ?? raw.unpushedCommits ?? 0),
     has_remote: Boolean(raw.has_remote ?? raw.hasRemote),
     parent_id: (raw.parent_id ?? raw.parentId ?? null) as number | null,
+    stage: (raw.stage ?? null) as ProjectStage | null,
+    archived: Boolean(raw.archived),
     created_at: createdAt,
     updated_at: updatedAt,
     metadata,

@@ -310,6 +310,58 @@ impl ProjectRepository {
         Ok(Some(self.to_response(result).await?))
     }
 
+    /// Sets or clears a project's SDLC stage. `None` marks it not set.
+    pub async fn set_stage(
+        &self,
+        id: i32,
+        stage: Option<String>,
+    ) -> Result<Option<ProjectResponse>, String> {
+        let connection = self.db_manager.get_connection();
+
+        let mut project: ProjectActiveModel = ProjectEntity::find_by_id(id)
+            .one(connection)
+            .await
+            .map_err(|e| format!("Failed to find project: {}", e))?
+            .ok_or_else(|| "Project not found".to_string())?
+            .into();
+
+        project.stage = Set(stage.clone());
+        project.stage_updated_at = Set(Some(chrono::Utc::now().into()));
+
+        let result = project
+            .update(connection)
+            .await
+            .map_err(|e| format!("Failed to update project stage: {}", e))?;
+
+        Ok(Some(self.to_response(result).await?))
+    }
+
+    /// Sets the manual "archived" flag. Separate column from `status` — see
+    /// the migration's doc comment for why they must not share one.
+    pub async fn set_archived(
+        &self,
+        id: i32,
+        archived: bool,
+    ) -> Result<Option<ProjectResponse>, String> {
+        let connection = self.db_manager.get_connection();
+
+        let mut project: ProjectActiveModel = ProjectEntity::find_by_id(id)
+            .one(connection)
+            .await
+            .map_err(|e| format!("Failed to find project: {}", e))?
+            .ok_or_else(|| "Project not found".to_string())?
+            .into();
+
+        project.archived = Set(archived);
+
+        let result = project
+            .update(connection)
+            .await
+            .map_err(|e| format!("Failed to update project archived flag: {}", e))?;
+
+        Ok(Some(self.to_response(result).await?))
+    }
+
     /// Ids for `names` in a lookup table (`frameworks`, `languages` or
     /// `package_managers`), matched case-insensitively. A name the table has never
     /// seen (a stack detected on disk, e.g. `Android`) gets a row of its own.

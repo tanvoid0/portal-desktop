@@ -55,6 +55,13 @@ pub struct Model {
     /// Path of the project that replaces this one.
     pub triage_successor: Option<String>,
     pub triage_updated_at: Option<DateTimeWithTimeZone>,
+    /// idea | in_progress | stable | released. Null = not set.
+    pub stage: Option<String>,
+    pub stage_updated_at: Option<DateTimeWithTimeZone>,
+    /// Manual "don't consider for next work" flag. Independent of `status`,
+    /// which the disk-scan import also writes (`status = "archived"` means
+    /// "missing on disk", a different thing).
+    pub archived: bool,
     pub created_at: Option<DateTimeWithTimeZone>,
     pub updated_at: Option<DateTimeWithTimeZone>,
 }

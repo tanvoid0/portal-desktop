@@ -313,6 +313,8 @@ pub fn run() {
             domains::projects::delete_project,
             domains::projects::set_project_parent,
             domains::projects::toggle_project_star,
+            domains::projects::set_project_stage,
+            domains::projects::set_project_archived,
             domains::projects::open_project,
             domains::projects::refresh_project_metadata,
             domains::projects::get_projects_with_filters,

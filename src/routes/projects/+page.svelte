@@ -16,6 +16,7 @@
   import Activity from '~icons/fa6-solid/wave-square';
   import AlertTriangle from '~icons/fa6-solid/triangle-exclamation';
   import Star from '~icons/fa6-solid/star';
+  import Archive from '~icons/fa6-solid/box-archive';
   import Plus from '~icons/fa6-solid/plus';
   import ScanSearch from '~icons/fa6-solid/magnifying-glass';
   import ChevronRight from '~icons/fa6-solid/chevron-right';
@@ -40,8 +41,13 @@
   import type { ProjectGroup } from '$lib/domains/projects/utils/groupProjects';
   import { queryClient } from '$lib/domains/shared/query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
-  import type { Project } from '$lib/domains/projects/types';
-  import { toggleProjectStar } from '$lib/domains/projects/api/projectApi';
+  import type { Project, ProjectStage } from '$lib/domains/projects/types';
+  import { PROJECT_STAGES } from '$lib/domains/projects/types';
+  import {
+    toggleProjectStar,
+    setProjectStage,
+    setProjectArchived,
+  } from '$lib/domains/projects/api/projectApi';
   import { toast } from '$lib/utils/toast';
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
   import { logger } from '$lib/domains/shared/services/logger';
@@ -65,7 +71,9 @@
   let searchQuery = $state('');
   let filterStack = $state<string | null>(null);
   let filterActivity = $state<string | null>(null);
+  let filterStage = $state<string | null>(null);
   let starredOnly = $state(false);
+  let showArchived = $state(false);
   let sortBy = $state<'recent' | 'name'>('recent');
   let registryReady = $state(false);
 
@@ -125,7 +133,9 @@
         }
         if (filterStack && !stackNames(project).includes(filterStack)) return false;
         if (filterActivity && project.activity_status !== filterActivity) return false;
+        if (filterStage && (project.stage ?? 'none') !== filterStage) return false;
         if (starredOnly && !project.starred) return false;
+        if (!showArchived && project.archived) return false;
         return true;
       })
       .sort((a, b) =>
@@ -224,10 +234,24 @@
       icon: AlertTriangle,
     },
     { label: 'Starred', value: projects.filter((p) => p.starred).length, icon: Star },
+    {
+      label: 'Archived',
+      value: projects.filter((p) => p.archived).length,
+      icon: Archive,
+    },
   ]);
 
+  const hasHiddenArchived = $derived(!showArchived && projects.some((p) => p.archived));
+
   const isFiltered = $derived(
-    Boolean(searchQuery.trim() || filterStack || filterActivity || starredOnly)
+    Boolean(
+      searchQuery.trim() ||
+      filterStack ||
+      filterActivity ||
+      filterStage ||
+      starredOnly ||
+      showArchived
+    )
   );
 
   const uniqueStacks = $derived.by(() => {
@@ -257,6 +281,26 @@
       toast.error('Could not update the star');
     }
   }
+
+  const handleSetStage = async (project: Project, stage: ProjectStage | null) => {
+    try {
+      await setProjectStage(Number(project.id), stage);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    } catch (error) {
+      log.error('Failed to set project stage', error);
+      toast.error('Could not update the stage');
+    }
+  };
+
+  const handleSetArchived = async (project: Project, archived: boolean) => {
+    try {
+      await setProjectArchived(Number(project.id), archived);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    } catch (error) {
+      log.error('Failed to set project archived', error);
+      toast.error('Could not update the archive state');
+    }
+  };
 
   const handleSetParent = async (projectId: string, parentId: number | null) => {
     try {
@@ -330,6 +374,18 @@
       />
 
       <Select
+        value={filterStage ?? ''}
+        placeholder="Any stage"
+        options={[
+          { value: '', label: 'Any stage' },
+          ...PROJECT_STAGES.map((s) => ({ value: s.value, label: s.label })),
+          { value: 'none', label: 'Not set' },
+        ]}
+        onSelect={(value) => (filterStage = value || null)}
+        class="w-[150px]"
+      />
+
+      <Select
         value={sortBy}
         options={[
           { value: 'recent', label: 'Recently active' },
@@ -343,6 +399,11 @@
         <Switch id="starred-only" bind:checked={starredOnly} />
         <Label for="starred-only" class="text-sm">Starred only</Label>
       </div>
+
+      <div class="flex items-center gap-2">
+        <Switch id="show-archived" bind:checked={showArchived} />
+        <Label for="show-archived" class="text-sm">Show archived</Label>
+      </div>
     {/snippet}
 
     {#snippet actions()}
@@ -354,7 +415,9 @@
             searchQuery = '';
             filterStack = null;
             filterActivity = null;
+            filterStage = null;
             starredOnly = false;
+            showArchived = false;
           }}
           class="text-muted-foreground"
         >
@@ -385,8 +448,10 @@
     <PageEmpty
       title="No projects found"
       description="Create your first project to get started"
-      filteredDescription="Try adjusting your search criteria"
-      {isFiltered}
+      filteredDescription={hasHiddenArchived
+        ? 'All matching projects are archived — turn on "Show archived" to see them'
+        : 'Try adjusting your search criteria'}
+      isFiltered={isFiltered || hasHiddenArchived}
       icon={FolderOpen}
       actionLabel="Create Project"
       onAction={() => goto('/projects/create')}
@@ -403,6 +468,8 @@
         onDelete={handleProjectDelete}
         onSetParent={handleSetParent}
         onToggleStar={handleToggleStar}
+        onSetStage={handleSetStage}
+        onSetArchived={handleSetArchived}
       />
     {/snippet}
 
@@ -415,6 +482,8 @@
         onDelete={handleProjectDelete}
         onSetParent={handleSetParent}
         onToggleStar={handleToggleStar}
+        onSetStage={handleSetStage}
+        onSetArchived={handleSetArchived}
       />
     {/snippet}
 

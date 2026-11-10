@@ -41,6 +41,9 @@ export type ProjectResponse = {
   triage_note: string | null;
   triage_successor: string | null;
   triage_updated_at: string | null;
+  stage: string | null;
+  stage_updated_at: string | null;
+  archived: boolean;
   created_at: string | null;
   updated_at: string | null;
   framework_ids: Array<number>;

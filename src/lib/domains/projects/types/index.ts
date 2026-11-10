@@ -36,8 +36,18 @@ export interface Project extends BaseEntity {
   activity_status?: string;
   /** Newest file or commit time seen by discovery. */
   last_activity?: Date;
+  /** `none` | `low` | `med` | `high`, from the last discovery scan. */
+  risk_level?: string;
   unpushed_commits?: number;
   has_remote?: boolean;
+  /** Manually set SDLC stage. null/undefined = not set. */
+  stage?: ProjectStage | null;
+  /**
+   * Manual "don't consider for next work" flag. Independent of `status`,
+   * which the disk-scan import also writes for an unrelated reason
+   * (missing on disk, not "I archived this").
+   */
+  archived: boolean;
   created_at?: Date;
   updated_at?: Date;
   metadata: ProjectMetadata;
@@ -48,6 +58,15 @@ export enum ProjectStatus {
   ARCHIVED = 'archived',
   DELETED = 'deleted',
 }
+
+export type ProjectStage = 'idea' | 'in_progress' | 'stable' | 'released';
+
+export const PROJECT_STAGES: { value: ProjectStage; label: string }[] = [
+  { value: 'idea', label: 'Idea' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'stable', label: 'Stable' },
+  { value: 'released', label: 'Released' },
+];
 
 export interface ProjectSettings {
   buildCommand?: string;

@@ -1,19 +1,28 @@
 <!-- Quick-launch buttons (explorer, Claude) plus the ellipsis menu. Shared by the list row and the grid card. -->
 <script lang="ts">
-  import type { Project } from '$lib/domains/projects/types';
+  import type { Project, ProjectStage } from '$lib/domains/projects/types';
+  import { PROJECT_STAGES } from '$lib/domains/projects/types';
   import { Button } from '$lib/components/ui/button';
   import * as Dialog from '$lib/components/ui/dialog';
   import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
   } from '$lib/components/ui/dropdown-menu';
   import Select from '$lib/components/ui/select.svelte';
   import { cn } from '$lib/utils';
+  import Archive from '~icons/fa6-solid/box-archive';
   import Ellipsis from '~icons/fa6-solid/ellipsis';
   import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
+  import Flag from '~icons/fa6-solid/flag';
   import Folder from '~icons/fa6-solid/folder';
   import FolderTree from '~icons/fa6-solid/folder-tree';
   import Star from '~icons/fa6-solid/star';
@@ -29,6 +38,8 @@
     onDelete?: (project: Project) => void;
     onSetParent?: (projectId: string, parentId: number | null) => void;
     onToggleStar?: (project: Project) => void;
+    onSetStage?: (project: Project, stage: ProjectStage | null) => void;
+    onSetArchived?: (project: Project, archived: boolean) => void;
     class?: string;
   }
 
@@ -38,10 +49,24 @@
     onDelete = () => {},
     onSetParent = () => {},
     onToggleStar = () => {},
+    onSetStage = () => {},
+    onSetArchived = () => {},
     class: className = '',
   }: Props = $props();
 
   let groupOpen = $state(false);
+
+  // Read-only evidence shown next to the stage picker — never sets anything itself.
+  const stageHint = $derived.by(() => {
+    const parts: string[] = [];
+    if (project.activity_status) parts.push(project.activity_status);
+    if (project.risk_level && project.risk_level !== 'none') {
+      parts.push(`risk ${project.risk_level}`);
+    }
+    if (project.unpushed_commits) parts.push(`${project.unpushed_commits} unpushed`);
+    if (project.has_uncommitted_changes) parts.push('uncommitted');
+    return parts.length ? parts.join(' · ') : 'no activity signals yet';
+  });
 
   // The row/card wraps the whole tile in a link; these buttons are siblings of
   // it, so no click-through guarding is needed here.
@@ -91,6 +116,30 @@
       <DropdownMenuItem onclick={() => onToggleStar(project)}>
         <Star class="mr-2 h-4 w-4" />
         {project.starred ? 'Unstar' : 'Star'}
+      </DropdownMenuItem>
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>
+          <Flag class="mr-2 h-4 w-4" />
+          Stage
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>
+          <DropdownMenuLabel class="text-xs text-muted-foreground">{stageHint}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={project.stage ?? ''}
+            onValueChange={(value) => onSetStage(project, value ? (value as ProjectStage) : null)}
+          >
+            {#each PROJECT_STAGES as stage (stage.value)}
+              <DropdownMenuRadioItem value={stage.value}>{stage.label}</DropdownMenuRadioItem>
+            {/each}
+          </DropdownMenuRadioGroup>
+          {#if project.stage}
+            <DropdownMenuItem onclick={() => onSetStage(project, null)}>Clear</DropdownMenuItem>
+          {/if}
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+      <DropdownMenuItem onclick={() => onSetArchived(project, !project.archived)}>
+        <Archive class="mr-2 h-4 w-4" />
+        {project.archived ? 'Unarchive' : 'Archive'}
       </DropdownMenuItem>
       {#if eligibleParents.length > 0}
         <DropdownMenuItem onclick={() => (groupOpen = true)}>

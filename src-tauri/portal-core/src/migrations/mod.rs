@@ -44,6 +44,8 @@ pub mod m20261104_000041_add_parent_id_to_projects;
 pub mod m20261104_000042_add_device_capabilities_and_pairing_secret;
 pub mod m20261108_000043_create_vault_table;
 pub mod m20261108_000044_create_project_env_links_table;
+pub mod m20261110_000045_add_project_stage;
+pub mod m20261110_000046_add_project_archived_flag;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -91,6 +93,8 @@ pub use m20261104_000041_add_parent_id_to_projects::Migration as addParentIdToPr
 pub use m20261104_000042_add_device_capabilities_and_pairing_secret::Migration as addDeviceCapabilitiesAndPairingSecret;
 pub use m20261108_000043_create_vault_table::Migration as createVaultTable;
 pub use m20261108_000044_create_project_env_links_table::Migration as createProjectEnvLinksTable;
+pub use m20261110_000045_add_project_stage::Migration as addProjectStage;
+pub use m20261110_000046_add_project_archived_flag::Migration as addProjectArchivedFlag;
 
 pub struct Migrator;
 
@@ -172,5 +176,7 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(addDeviceCapabilitiesAndPairingSecret),
         Box::new(createVaultTable),
         Box::new(createProjectEnvLinksTable),
+        Box::new(addProjectStage),
+        Box::new(addProjectArchivedFlag),
     ]
 }
