@@ -2,21 +2,20 @@
 //!
 //! The pairing logic lives in `portal_core::domains::network::services::
 //! pairing_service` as free functions over a `&DatabaseConnection`. These
-//! adapters are what the webview invokes over IPC; the daemon's `/pair/*` routes
-//! call the same free functions directly (phase 4 of
-//! `docs/development/REMOTE_ARCHITECTURE.md`).
+//! adapters are what the webview invokes over IPC; the daemon's `/pair/request`
+//! and `/control` routes call the same free functions directly (phase 1 of
+//! the Android remote-control rewrite; see `docs/development/
+//! REMOTE_ARCHITECTURE.md` for the phases before it).
 //!
-//! `verify_device_passcode`, `get_device_status` and `verify_access_token` used
-//! to live here as commands; they are now daemon routes (`/pair/verify`,
-//! `/pair/status`, and bearer auth) and are gone from the IPC surface.
-//!
-//! None of these commands carry a `cap`: pairing is loopback/IPC only. A phone
-//! pairs through the daemon routes, and granting a phone the power to approve
-//! *other* devices or read the pending list would defeat the point.
+//! None of these commands carry a `cap`: device management is loopback/IPC
+//! only. A phone pairs through the daemon routes, and granting a phone the
+//! power to approve/revoke *other* devices or read the device list would
+//! defeat the point.
 
+use crate::daemon::pairing::{resolve_pending, PairResolution};
 use crate::database::DatabaseManager;
-use crate::domains::network::services::network_service::get_passcode_store;
-use crate::domains::network::services::pairing_service::{self, SHARED_PASSCODE_KEY};
+use crate::domains::network::services::pairing_service;
+use crate::domains::settings::services::settings_service::SettingsService;
 use crate::entities::device_approval;
 use chrono::Utc;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
@@ -87,40 +86,6 @@ fn primary_route_ip() -> Option<Ipv4Addr> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GeneratePasscodeRequest {
-    pub device_id: String,
-    pub device_name: String,
-    pub device_info: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GeneratePasscodeResponse {
-    pub passcode: String,
-    pub expires_in_seconds: i64,
-}
-
-/// Mint the single shared pairing passcode the QR code carries. Any device that
-/// presents it registers itself as pending via the daemon's `/pair/verify`.
-#[portal_rpc_macro::rpc]
-pub async fn generate_device_passcode(
-    _request: GeneratePasscodeRequest,
-    _db: tauri::State<'_, Arc<DatabaseManager>>,
-) -> Result<GeneratePasscodeResponse, String> {
-    let store = get_passcode_store();
-    let passcode = store.generate_passcode();
-    store
-        .store_passcode(SHARED_PASSCODE_KEY.to_string(), passcode.clone())
-        .await;
-
-    log_info!("device_auth", "Generated new shared device passcode");
-
-    Ok(GeneratePasscodeResponse {
-        passcode,
-        expires_in_seconds: 300,
-    })
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct ApproveDeviceRequest {
     pub device_id: String,
     pub approval_type: String, // "temporary" or "long_term"
@@ -137,9 +102,10 @@ pub struct ApproveDeviceResponse {
     pub message: String,
 }
 
-/// Approve a pending device from the host UI, granting the chosen capabilities.
-/// The token is minted and staged for the device to collect over `/pair/status`
-/// — it is never returned here.
+/// Approve a pending device from the host UI, granting the chosen
+/// capabilities. Also wakes up a long-polling `/pair/request`, if this device
+/// came in through that path rather than a QR scan — `resolve_pending` is a
+/// no-op when there is no pending request for this device_id.
 #[portal_rpc_macro::rpc]
 pub async fn approve_device(
     request: ApproveDeviceRequest,
@@ -161,11 +127,100 @@ pub async fn approve_device(
     )
     .await?;
 
+    resolve_pending(
+        &request.device_id,
+        PairResolution::Approved {
+            token: outcome.token.clone(),
+            host_name: crate::daemon::host_name(),
+        },
+    );
+
     Ok(ApproveDeviceResponse {
         success: outcome.success,
         expires_at: outcome.expires_at,
         message: outcome.message,
     })
+}
+
+/// Decline a pending `/pair/request` from the host UI (or let it time out on
+/// its own — the daemon calls `pairing_service::reject` for that case too).
+#[portal_rpc_macro::rpc]
+pub async fn reject_device(
+    device_id: String,
+    db: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<(), String> {
+    log_info!("device_auth", "Rejecting device_id: {}", device_id);
+    pairing_service::reject(db.get_connection(), &device_id).await?;
+    resolve_pending(&device_id, PairResolution::Denied);
+    Ok(())
+}
+
+/// End a device's access — the only way to stop an `until_revoked` grant.
+#[portal_rpc_macro::rpc]
+pub async fn revoke_device(
+    device_id: String,
+    db: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<(), String> {
+    log_info!("device_auth", "Revoking device_id: {}", device_id);
+    pairing_service::revoke(db.get_connection(), &device_id).await
+}
+
+/// Change a device's granted capabilities without re-minting its token.
+#[portal_rpc_macro::rpc]
+pub async fn update_device_capabilities(
+    device_id: String,
+    capabilities: Vec<String>,
+    db: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<(), String> {
+    pairing_service::update_capabilities(db.get_connection(), &device_id, &capabilities).await
+}
+
+/// Every device the host has ever seen, most-recent row per device_id, for
+/// the Devices management page.
+#[portal_rpc_macro::rpc]
+pub async fn list_devices(
+    db: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<pairing_service::DeviceSummary>, String> {
+    pairing_service::list_devices(db.get_connection()).await
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PairingQrResponse {
+    pub qr_url: String,
+    pub device_id: String,
+}
+
+/// Mint an until-revoked grant and build the `portalremote://` URL its QR
+/// code carries — scanning it hands the phone a live, already-approved
+/// credential with no server round trip (unlike `/pair/request`, which this
+/// skips entirely; see the module doc on `pairing_service`).
+#[portal_rpc_macro::rpc]
+pub async fn generate_pairing_qr(
+    capabilities: Vec<String>,
+    db: tauri::State<'_, Arc<DatabaseManager>>,
+) -> Result<PairingQrResponse, String> {
+    let (device_id, token) =
+        pairing_service::mint_qr_pairing(db.get_connection(), &capabilities).await?;
+    let host = get_local_network_ip()?;
+    let port = crate::daemon::configured_port();
+    Ok(PairingQrResponse {
+        qr_url: format!("portalremote://{host}:{port}/{token}"),
+        device_id,
+    })
+}
+
+/// Whether the LAN listener and UDP discovery responder are enabled. See
+/// `set_remote_lan_enabled` for why toggling this does not take effect until
+/// the next restart.
+#[portal_rpc_macro::rpc]
+pub fn get_remote_lan_enabled() -> Result<bool, String> {
+    SettingsService::new().get_remote_lan_enabled()
+}
+
+/// Persist the LAN toggle — checked by `daemon::spawn` at startup.
+#[portal_rpc_macro::rpc]
+pub fn set_remote_lan_enabled(enabled: bool) -> Result<(), String> {
+    SettingsService::new().set_remote_lan_enabled(enabled)
 }
 
 /// Pending (unapproved, unexpired) device requests, for the host approval UI.

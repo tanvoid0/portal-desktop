@@ -28,6 +28,11 @@ pub struct AppSettings {
 
     #[serde(default)]
     pub integrations: IntegrationSettings,
+
+    /// Whether the daemon's LAN listener and UDP discovery responder bind on
+    /// `0.0.0.0` (vs. loopback-only). Off by default — see `daemon::spawn`.
+    #[serde(default)]
+    pub remote_lan_enabled: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -329,6 +334,7 @@ impl SettingsService {
                     notify_on_update: true,
                 },
                 integrations: IntegrationSettings::default(),
+                remote_lan_enabled: false,
             },
             editor: EditorSettings {
                 font_family: "Monaco, Consolas, 'Courier New', monospace".to_string(),
@@ -432,6 +438,26 @@ impl SettingsService {
 
         self.save_settings(&settings)?;
         Ok(settings)
+    }
+
+    /// Whether the LAN listener/discovery responder should bind.
+    pub fn get_remote_lan_enabled(&self) -> Result<bool, String> {
+        Ok(self.load_settings()?.app.remote_lan_enabled)
+    }
+
+    /// Persist the LAN toggle.
+    ///
+    /// ponytail: `daemon::spawn` binds its listeners and UDP responder once,
+    /// fire-and-forget, at app startup, and nothing stoppable is kept around
+    /// for them. Flipping this setting does not start/stop anything live — it
+    /// takes effect on the next app restart. Live start/stop would need those
+    /// tasks' handles kept in `AppState` (a `JoinHandle`/cancellation token),
+    /// which phase 1 does not need.
+    pub fn set_remote_lan_enabled(&self, enabled: bool) -> Result<(), String> {
+        let mut settings = self.load_settings()?;
+        settings.app.remote_lan_enabled = enabled;
+        settings.updated_at = Utc::now();
+        self.save_settings(&settings)
     }
 
     /// Reset settings to defaults
