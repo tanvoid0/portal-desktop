@@ -251,6 +251,8 @@ fn classify(
 fn event_cap(event: &str) -> Option<&'static str> {
     if event.starts_with("coder") {
         Some("coder")
+    } else if event.starts_with("agents") {
+        Some("agents")
     } else if event.starts_with("terminal") || event.starts_with("shell-integration") {
         Some("terminal.exec")
     } else {

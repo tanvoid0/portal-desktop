@@ -4,5 +4,4 @@
  * How a linked key's current state compares to the snapshots taken when it
  * was linked. First-match-wins precedence is implemented in [`drift_state`].
  */
-export type DriftState =
-  'inSync' | 'fileChanged' | 'credentialChanged' | 'differs' | 'notInFile' | 'unknown';
+export type DriftState = "inSync" | "fileChanged" | "credentialChanged" | "differs" | "notInFile" | "unknown";

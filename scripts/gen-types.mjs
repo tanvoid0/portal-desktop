@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const GENERATED = [
+  'src/lib/domains/agents/generated',
   'src/lib/domains/coder/generated',
   'src/lib/domains/disk/generated',
   'src/lib/domains/github/generated',

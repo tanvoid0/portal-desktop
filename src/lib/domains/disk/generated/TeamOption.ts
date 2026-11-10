@@ -3,12 +3,8 @@
 /**
  * One team template as shown in the Settings picker.
  */
-export type TeamOption = {
-  id: number;
-  name: string;
-  description: string;
-  /**
-   * True when this is the app's own provisioned team (carries [`TEAM_MARKER`]).
-   */
-  isAppTeam: boolean;
-};
+export type TeamOption = { id: number, name: string, description: string, 
+/**
+ * True when this is the app's own provisioned team (carries [`TEAM_MARKER`]).
+ */
+isAppTeam: boolean, };

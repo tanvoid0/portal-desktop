@@ -351,3 +351,152 @@ buttons (QA-086), so assert `tagName === 'BUTTON'` when clicking.
 Owner's process rule: reviewer -> fixer -> tester as separate agents; none grades its own
 work. Ask before any page merge, move, delete or new route — route map first. Ask before
 committing.
+
+---
+
+# Handoff 3 — Projects dashboard organization: SDLC stage + archive flag (appended 2026-11-10)
+
+Separate workstream from everything above; those are finished (coder engine) or in their
+own cadence (UX board). This one is the owner's ask to get their scattered project list
+organized by state, so they can tell what's demo-ready, what to stabilize, what to park.
+
+## Done this session
+
+- Added a manual `stage` field: `idea | in_progress | stable | released`. Shown as a badge
+  on `ProjectRow`/`ProjectCard`, set via each row's ⋯ menu → a "Stage" submenu
+  (`DropdownMenuRadioGroup`), with a **read-only** hint line above the picker
+  (`activity_status` / `risk_level` / unpushed / uncommitted) — evidence only, never
+  auto-sets anything.
+- Added an independent `archived` boolean — "don't consider this for next work until I
+  un-flag it." Same ⋯ menu (Archive/Unarchive). Hidden from the list by default; a
+  "Show archived" switch on `/projects` reveals it; a new "Archived" `PageStats` tile.
+- **Correction made mid-build, by a reviewer agent, not by me up front:** `archived` does
+  **not** reuse the existing `status` field (`active|archived|deleted`). The disk-scan
+  import (`discovery_repository.rs::import`, `mark_missing`) already writes
+  `status = "archived"` to mean "missing on disk this scan" and never clears it when the
+  project reappears — reusing it for the manual flag would have conflated "I parked this"
+  with "the scanner lost track of it," silently and invisibly, the first time the owner
+  reorganized a folder the scanner had already walked. `archived` is its own column,
+  written only by `set_project_archived`.
+- Deliberately not built: a separate "priority" flag (`starred` already exists for that),
+  group-by-stage (the filter already answers "show me Stable"), stage-change history, bulk
+  stage/archive from the main list (only sketched as an optional step in the plan, from
+  `/projects/audit`'s existing marked-selection panel — not implemented).
+- Full plan, with every file:line target, at `C:\Users\tanvo\.claude\plans\quirky-sparking-castle.md`
+  (local Claude Code plans dir, not in this repo).
+- **Verified for real**, not just gated: drove a second dev instance (`:1421`/`:9223` —
+  instance 1, `:1420`/`:9222`, is the owner's live app and was never touched) and called the
+  Tauri commands directly through the page's own JS console (`window.__TAURI_INTERNALS__.invoke`).
+  Set stage, cleared it, archived, unarchived, confirmed the row hides and reappears with
+  both badges on the "Show archived" toggle, confirmed an unrecognized stage value is
+  rejected with a clear error rather than silently written.
+- Committed: `d81102a7` "feat(projects): manual SDLC stage and an independent archive
+  flag" on `main`, 17 files. **Not pushed** — owner hasn't asked.
+
+## Files that matter
+
+- `src-tauri/portal-core/src/migrations/m20261110_000045_add_project_stage.rs`,
+  `m20261110_000046_add_project_archived_flag.rs` — the two new columns, each independently
+  `has_column`-guarded, each with its own doc comment explaining why it's a separate column.
+- `src-tauri/portal-core/src/domains/projects/services/project_service.rs` —
+  `set_project_stage`/`validate_stage`, `set_project_archived`. Same tier as
+  `toggle_project_star`/`set_project_parent` — **not** the `discovery_*` triage machinery,
+  which is a different concern (disk-scan audit workflow).
+- `src-tauri/portal-core/src/domains/projects/repositories/project_repository.rs` —
+  `set_stage`, `set_archived`.
+- `src/routes/projects/+page.svelte` — `filterStage`, `showArchived` (default `false`),
+  `hasHiddenArchived` (feeds a clearer `PageEmpty` message when a non-empty list is just
+  entirely hidden behind the toggle, instead of claiming there are no projects at all).
+- `src/lib/domains/projects/components/ProjectQuickActions.svelte` — the Stage submenu,
+  hint line, Archive/Unarchive item.
+
+## What bit me — read before you redo any of this
+
+- **The status-field reuse mistake above.** Before reusing any existing enum-ish field for
+  a new meaning, grep every other writer of that field first — don't assume "nothing else
+  touches this" without checking. It cost a full correction cycle here.
+- **`pnpm gen:types` had a silent regression.** Running it a second time in the same
+  session (after the Rust side had already compiled correctly once) made the prettier
+  post-pass in `scripts/gen-types.mjs` quietly stop reformatting ts-rs's raw output —
+  no error, just 110 changed files across all four generated domains (coder/disk/github/
+  projects), each collapsed to one line with double quotes instead of the committed
+  multi-line/single-quote style. The script's own per-file timing output looked identical
+  to a successful run either way. **Always check `git status --porcelain` after a type
+  regen, don't trust the command's own output.** Fix used here: `git restore` the untouched
+  dirs, hand-edit the one real field addition into the one file that actually changed.
+- **The row-is-an-`<a>` trap.** `ProjectRow`'s whole row is a link, so nothing that needs
+  its own click target (a `Select`, in this case) can nest inside it — same shape as the
+  old QA-086 `role="button"` issue. That's why the Stage picker lives inside
+  `ProjectQuickActions`'s dropdown instead of inline on the row.
+
+## Next: safe project relocation (owner's spec — not yet planned or built)
+
+The owner wants to **move a project's directory from inside Portal** as part of
+organizing — consolidating scattered projects under fewer roots, moving things to line up
+with a new stage. Requirements as given, intent preserved rather than paraphrased thin:
+
+1. **Before moving:** check nothing is actively using the project — a running dev server
+   for it, an open Coder thread/session against it, an open terminal cwd'd into it, anything
+   else Portal itself currently has open on that path. The move must refuse to start if
+   something is using it.
+2. **During the move:** lock the project so **nothing else in Portal can open or use it**
+   until the move finishes or aborts — not just a start-time check, active prevention of
+   new use for the whole duration.
+3. **The move itself** must be safe against partial failure: copy first, verify the copy,
+   only then remove the original. Never move-in-place in a way that could leave neither a
+   complete source nor a complete destination if interrupted — crash, disk full,
+   permissions, an antivirus lock, the app itself closing mid-copy.
+4. **Fallback:** something going wrong at any step needs a way back to a known-good state.
+   At minimum: never delete the original before the destination is verified complete, and
+   have a defined recovery path for an interrupted move — resume it, or roll it back, but
+   never silently leave the project in a state Portal itself can't find or open again.
+5. The owner said, and repeated: **"be very very cautious not to lose anything."** Treat
+   that as the constraint every design choice below it has to satisfy, not a footnote to
+   satisfy once and move past.
+
+**Nothing here has been scoped yet** — no plan, no code. Before building, this needs its
+own plan-mode pass, likely with `crew:architect` rather than `crew:planner`: it spans the
+discovery/scan domain, the coder/terminal domains (for "is anything using this"), and raw
+filesystem operations — not a single-subsystem change like the stage/archived work above.
+Open questions a plan would need to settle, not yet decided by anyone:
+
+- **Exact "in use" signal set.** At minimum: `dev_port`/`prod_port` actually listening (via
+  what check — the SDK manager already tracks some service ports, worth reusing rather than
+  reinventing), an open Coder thread with a matching `project_id`, an open terminal tab
+  cwd'd under the path (**prefix** match — a subdirectory counts, not just an exact path
+  match). Audit every place Portal can be "using" a project before finalizing this list;
+  the stage/archived work above only touched the list page, this touches far more of the
+  app's surface.
+- **What "locked" means mechanically.** A DB flag (e.g. `projects.locked_at`) is the obvious
+  shape, but it's only as good as every entry point that opens a project checking it —
+  Coder, terminal, dev-server start, the project detail page's own actions, anywhere else
+  that invokes against a project path. That's an audit of call sites, not a guess.
+- **Verification after copy, before delete.** "Copy succeeded" from the OS isn't enough
+  given the owner's framing — size/file-count comparison at minimum, a hash check for
+  anything small enough to be worth it. Large `node_modules`/build directories are probably
+  excluded from the moved set entirely rather than copied-then-trusted — the audit's own
+  `regenerable_dirs` detection (`discovery/analysis.rs`, already used in `ProjectAudit.svelte`)
+  already identifies exactly these; reuse it. Don't move what can be reinstalled, it's
+  faster and categorically safer than moving it and hoping.
+- **The interrupted-move recovery story**, decided explicitly before any code: e.g. a move
+  writes a small marker (sidecar file at both ends, or a DB row) recording
+  "move in progress: source X, dest Y, started at T" that a startup check can detect and
+  either resume or flag for the owner to resolve by hand. Never have the app silently guess
+  which side is authoritative after a crash mid-move.
+- Whether this reuses any of the existing disk-scan/discovery machinery
+  (`discovery_repository.rs` already walks paths and already tracks `discovery_path`
+  separately from `path`) or needs to be wholly new, given it's a very different operation
+  (scan-and-report vs. mutate-the-filesystem-and-never-lose-data).
+
+This has not been discussed with the owner beyond their original one-message spec above —
+a plan-mode pass should surface the open questions back to them before any code gets
+written, given the stakes they themselves named.
+
+## Starting fresh
+
+Open a session in `D:\projects\production\portal\portal_desktop` and say:
+
+> read .claude/handoff.md
+
+Then decide: keep organizing with stage/archived (usable now, from each project's ⋯ menu),
+or scope the safe-move feature above first — it needs a plan before it needs code.

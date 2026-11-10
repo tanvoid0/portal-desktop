@@ -195,6 +195,12 @@ pub fn run() {
             coder_service.init_events(sink.clone());
             app.manage(coder_service);
 
+            // Agent-CLI integration domain (Claude Code today). In-memory
+            // only — no DB-backed sessions list yet, see docs plan P2.
+            let agents_service = std::sync::Arc::new(domains::agents::AgentRunService::new());
+            tauri::async_runtime::block_on(agents_service.init_events(sink.clone()));
+            app.manage(agents_service);
+
             // Initialize pipeline services
             let pipeline_service = PipelineService::new(db_manager_arc.clone());
             let execution_service = ExecutionService::new(db_manager_arc.clone());
@@ -749,6 +755,14 @@ pub fn run() {
             domains::elevation::commands::elevation_status,
             domains::elevation::commands::run_elevated,
             domains::elevation::commands::restart_elevated,
+            // Agent-CLI integration (Claude Code today)
+            domains::agents::agents_list_backends,
+            domains::agents::agents_start_run,
+            domains::agents::agents_send_user,
+            domains::agents::agents_decide_permission,
+            domains::agents::agents_interrupt,
+            domains::agents::agents_cancel,
+            domains::agents::agents_get_events,
         ])
         .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
         .expect("error while running tauri application");

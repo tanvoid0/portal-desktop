@@ -42,4 +42,7 @@ export const queryKeys = {
     managers: ['sdk', 'managers'] as const,
     versions: (name: string) => ['sdk', name, 'versions'] as const,
   },
+  agents: {
+    backends: ['agents', 'backends'] as const,
+  },
 };

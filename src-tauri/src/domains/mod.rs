@@ -5,6 +5,7 @@
 
 pub use portal_core::domains::*;
 
+pub mod agents;
 pub mod ai;
 pub mod automation;
 pub mod autonomy;
