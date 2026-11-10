@@ -26,16 +26,10 @@
   import UpdatePrompt from '$lib/domains/updates/components/UpdatePrompt.svelte';
   import VaultGate from '$lib/domains/credentials/components/VaultGate.svelte';
   import { runStartupUpdateCheck } from '$lib/domains/updates/services/startupUpdate';
-  import QRCodeDialog from '$lib/components/QRCodeDialog.svelte';
-  import DeviceApprovalDialog from '$lib/components/DeviceApprovalDialog.svelte';
   import DeviceAuthGuard from '$lib/components/DeviceAuthGuard.svelte';
-  import { isTauriEnvironment } from '$lib/utils/tauri';
-  import { InvokeClient } from '$lib/utils/invokeClient';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import ArrowRight from '~icons/fa6-solid/arrow-right';
   import RefreshCw from '~icons/fa6-solid/rotate';
-  import QrCode from '~icons/fa6-solid/qrcode';
-  import Shield from '~icons/fa6-solid/shield';
   import Gear from '~icons/fa6-solid/gear';
   import {
     Provider as SidebarProvider,
@@ -59,16 +53,6 @@
   // Get children snippet from props for Svelte 5
   let { children }: { children: Snippet<[]> } = $props();
 
-  // Show QR code button in Tauri environment or when accessed via network IP (not localhost)
-  let isTauri = isTauriEnvironment();
-  let isLocalhost = $state(false);
-  let showQRButton = $derived(isTauri || !isLocalhost);
-
-  // Check if accessing from localhost
-  $effect(() => {
-    isLocalhost = InvokeClient.isLocalhost();
-  });
-
   let isSdkPage = $derived(page.url.pathname.startsWith('/sdk'));
 
   const dashboardQuery = createDashboardOverviewQuery(() => ({
@@ -81,8 +65,6 @@
   let isFillViewport = $derived(isViewportFillRoute(page.url.pathname));
   let isDomainLayout = $derived(isShellSidebarRoute(page.url.pathname));
   let sidebarOpen = $state(true);
-  let qrCodeDialogOpen = $state(false);
-  let deviceApprovalDialogOpen = $state(false);
 
   // Main application navigation sections — derived from dashboard query cache.
   const navigationSections = $derived<NavSection[]>(buildMainNavSections(dashboardOverview));
@@ -353,36 +335,6 @@
                   <div
                     class="flex items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
                   >
-                    {#if showQRButton}
-                      <SidebarTooltip label="Share via QR Code">
-                        {#snippet trigger({ props })}
-                          <Button
-                            {...props}
-                            variant="ghost"
-                            size="sm"
-                            class="h-8 w-8 px-0"
-                            onclick={() => (qrCodeDialogOpen = true)}
-                            aria-label="Share via QR Code"
-                          >
-                            <QrCode class="h-4 w-4" />
-                          </Button>
-                        {/snippet}
-                      </SidebarTooltip>
-                      <SidebarTooltip label="Device approval requests">
-                        {#snippet trigger({ props })}
-                          <Button
-                            {...props}
-                            variant="ghost"
-                            size="sm"
-                            class="h-8 w-8 px-0"
-                            onclick={() => (deviceApprovalDialogOpen = true)}
-                            aria-label="Device approval requests"
-                          >
-                            <Shield class="h-4 w-4" />
-                          </Button>
-                        {/snippet}
-                      </SidebarTooltip>
-                    {/if}
                     <SidebarTooltip label="Settings">
                       {#snippet trigger({ props })}
                         <Button
@@ -440,12 +392,4 @@
 
   <!-- Vault setup/unlock gate -->
   <VaultGate />
-
-  <!-- QR Code Dialog -->
-  <QRCodeDialog bind:open={qrCodeDialogOpen} />
-
-  <!-- Device Approval Dialog -->
-  {#if showQRButton}
-    <DeviceApprovalDialog bind:open={deviceApprovalDialogOpen} />
-  {/if}
 </DeviceAuthGuard>

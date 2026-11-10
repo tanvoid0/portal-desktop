@@ -1,13 +1,21 @@
-//! The local HTTP/WS surface, and the capability gate in front of it — phases 2
-//! and 4 of `docs/development/REMOTE_ARCHITECTURE.md`.
+//! The local HTTP/WS surface, and the capability gate in front of it — the
+//! Android remote-control pairing flow (phase 1 of the Android rewrite; see
+//! `docs/development/REMOTE_ARCHITECTURE.md` for the phases before it).
 //!
-//! Runs as a task inside the Tauri process. Today it binds loopback only; the
-//! LAN listener (same router, `0.0.0.0`) is spawned behind an explicit toggle
-//! elsewhere, so the one security gate here protects both.
+//! Split into submodules: this file keeps the router, the trust gate, and
+//! `/health`/`/events`/`/rpc`; [`pairing`] is `/pair/request`; `control` is
+//! `/control`; `discovery` is the UDP LAN responder.
+//!
+//! Runs as a task inside the Tauri process. Always binds loopback; the LAN
+//! listener (same router, `0.0.0.0`) and the UDP discovery responder
+//! additionally bind when the LAN toggle is on (the persisted setting, or
+//! `PORTAL_DAEMON_LAN=1` as a dev override) — the one security gate here
+//! protects all three.
 //!
 //! # Trust gate
 //!
-//! Every request passes through [`classify`], which decides what the peer is:
+//! Every HTTP/WS request passes through [`classify`], which decides what the
+//! peer is:
 //!
 //! - **Any `Origin` header → 403, on every route and both listeners.** A browser
 //!   cannot suppress it and WebSockets ignore CORS, so this is the only thing
@@ -15,14 +23,20 @@
 //!   credential vault. Unconditional by design.
 //! - **Loopback peer → `Local`**: the machine itself, unrestricted.
 //! - **Remote peer with a live bearer token → `Remote { caps }`**: a paired
-//!   device, allowed only the commands and events its granted capabilities cover.
-//! - **Remote peer without a token → `Anon`**: may reach `/health` and `/pair/*`
-//!   to pair, nothing else.
+//!   device, allowed only the commands/events its granted capabilities cover.
+//! - **Remote peer without a token → `Anon`**: may reach `/health` and
+//!   `/pair/request` to pair, nothing else — `/control` is deliberately NOT
+//!   public, so an unauthenticated remote gets the same 401 `/rpc` gives it.
 //!
 //! `/rpc/{command}` refuses a remote peer whose caps do not cover the command's
-//! `cap`; `/events` drops frames whose [`event_cap`] the peer does not hold.
+//! `cap`; `/events` and `/control` drop frames whose [`event_cap`] the peer does
+//! not hold.
 //! Credentials and the other un-annotated commands carry no cap, so no remote
 //! peer can ever reach them.
+
+mod control;
+mod discovery;
+pub mod pairing;
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -35,13 +49,14 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Router;
 use serde_json::{json, Value};
 use tokio::sync::broadcast;
 
 use crate::database::DatabaseManager;
 use crate::domains::network::services::pairing_service;
-use crate::events::{EventSink, EventSinkExt, Events};
+use crate::domains::settings::services::settings_service::SettingsService;
+use crate::events::EventSink;
 
 /// Default port. Deliberately clear of agent-platform's 18410.
 pub const DEFAULT_PORT: u16 = 18420;
@@ -50,10 +65,20 @@ pub const DEFAULT_PORT: u16 = 18420;
 /// oldest. Events are a live view, not a log.
 const CHANNEL_CAPACITY: usize = 256;
 
-/// Per-IP rate limit on `/pair/verify`: a brute-forcer gets this many tries per
-/// window before being turned away, so the 6-digit passcode can't be sprayed.
-const VERIFY_WINDOW: Duration = Duration::from_secs(60);
-const VERIFY_MAX: u32 = 10;
+/// Per-IP rate limit on `/pair/request`: a spammer gets this many tries per
+/// window before being turned away.
+const PAIR_REQUEST_WINDOW: Duration = Duration::from_secs(60);
+const PAIR_REQUEST_MAX: u32 = 10;
+
+/// The daemon's port: `PORTAL_DAEMON_PORT` if set and parseable, else
+/// [`DEFAULT_PORT`]. The one place this is decided, so `lib.rs`'s `setup` and
+/// the QR code (which must encode the port actually bound) never drift apart.
+pub fn configured_port() -> u16 {
+    std::env::var("PORTAL_DAEMON_PORT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_PORT)
+}
 
 /// One broadcast item: the serialized frame plus its event name pulled out, so a
 /// per-client capability filter costs a string compare rather than a JSON parse.
@@ -74,11 +99,7 @@ enum Trust {
     /// Remote, unauthenticated. May only pair.
     Anon,
     /// Remote, holding a live token. Scoped to `caps`.
-    Remote {
-        #[allow(dead_code)]
-        device_id: String,
-        caps: Vec<String>,
-    },
+    Remote { device_id: String, caps: Vec<String> },
 }
 
 /// [`EventSink`] that publishes to every attached WebSocket.
@@ -113,18 +134,24 @@ struct AppState {
     tx: broadcast::Sender<Shared>,
     /// Absent only in tests that exercise routing without a running app.
     app: Option<tauri::AppHandle>,
-    /// Per-IP `/pair/verify` attempt counters. A LAN has a handful of IPs, so the
-    /// map stays tiny; entries are reset lazily per window rather than pruned.
+    /// This listener's port, echoed back in `/pair/request`'s approved
+    /// response so Android has it even though it already dialed this same
+    /// port to ask.
+    port: u16,
+    /// Per-IP `/pair/request` attempt counters. A LAN has a handful of IPs, so
+    /// the map stays tiny; entries are reset lazily per window rather than
+    /// pruned.
     // ponytail: fixed-window counter; swap for a token bucket only if abuse shows.
-    verify_hits: Arc<Mutex<HashMap<IpAddr, (Instant, u32)>>>,
+    pair_hits: Arc<Mutex<HashMap<IpAddr, (Instant, u32)>>>,
 }
 
 impl AppState {
-    fn new(tx: broadcast::Sender<Shared>, app: Option<tauri::AppHandle>) -> Self {
+    fn new(tx: broadcast::Sender<Shared>, app: Option<tauri::AppHandle>, port: u16) -> Self {
         Self {
             tx,
             app,
-            verify_hits: Arc::new(Mutex::new(HashMap::new())),
+            port,
+            pair_hits: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -137,43 +164,79 @@ impl AppState {
         })
     }
 
-    /// Record one `/pair/verify` attempt from `ip`; false once over the limit.
-    fn allow_verify(&self, ip: IpAddr) -> bool {
-        let mut hits = self.verify_hits.lock().unwrap();
+    /// Record one `/pair/request` attempt from `ip`; false once over the limit.
+    fn allow_pair_request(&self, ip: IpAddr) -> bool {
+        let mut hits = self.pair_hits.lock().unwrap();
         let now = Instant::now();
         let entry = hits.entry(ip).or_insert((now, 0));
-        if now.duration_since(entry.0) > VERIFY_WINDOW {
+        if now.duration_since(entry.0) > PAIR_REQUEST_WINDOW {
             *entry = (now, 0);
         }
         entry.1 += 1;
-        entry.1 <= VERIFY_MAX
+        entry.1 <= PAIR_REQUEST_MAX
     }
+}
+
+/// This machine's display name, best-effort. Shown to a pairing phone as the
+/// desktop it is connecting to (`/pair/request`'s approved response, built by
+/// the `approve_device` Tauri command outside this module; the `/control`
+/// `hello` frame, built by `control::control` inside it). No crate pulled in
+/// for this — just the env vars the OS already sets. `pub`: reachable
+/// crate-wide the same way `daemon::pairing::resolve_pending` is, even though
+/// `daemon` itself stays a plain `mod` (see the module doc on `lib.rs:1`).
+pub fn host_name() -> String {
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "Portal Desktop".to_string())
+}
+
+/// Whether the LAN listener and UDP discovery responder should bind: the
+/// persisted setting, or `PORTAL_DAEMON_LAN=1` as a dev-time override that
+/// skips the UI toggle.
+fn lan_enabled() -> bool {
+    std::env::var("PORTAL_DAEMON_LAN").ok().as_deref() == Some("1")
+        || SettingsService::new()
+            .get_remote_lan_enabled()
+            .unwrap_or(false)
 }
 
 /// Build the sink and start serving on loopback. Returns the sink immediately so
 /// startup can wire it into the fanout; a bind failure leaves the app running
 /// with the webview transport alone.
+///
+/// Also binds `0.0.0.0` (same port) plus the UDP discovery responder when the
+/// LAN toggle is on (see [`lan_enabled`]) — off by default, since without it a
+/// phone on the LAN times out reaching this port, which is what pairing needs
+/// and what this guards.
 pub fn spawn(port: u16, app: tauri::AppHandle) -> Arc<dyn EventSink> {
     let (tx, _) = broadcast::channel(CHANNEL_CAPACITY);
     let sink = WsSink::new(tx.clone());
+    let state = AppState::new(tx, Some(app), port);
 
-    let state = AppState::new(tx, Some(app));
-    tauri::async_runtime::spawn(async move {
-        let router = router(state);
-        let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-        match tokio::net::TcpListener::bind(addr).await {
-            Ok(listener) => {
-                println!("[daemon] listening on http://{addr}");
-                let service = router.into_make_service_with_connect_info::<SocketAddr>();
-                if let Err(e) = axum::serve(listener, service).await {
-                    eprintln!("[daemon] stopped: {e}");
-                }
-            }
-            Err(e) => eprintln!("[daemon] could not bind {addr}: {e}"),
-        }
-    });
+    serve_on(state.clone(), Ipv4Addr::LOCALHOST, port, "loopback");
+    if lan_enabled() {
+        serve_on(state, Ipv4Addr::UNSPECIFIED, port, "LAN");
+        discovery::spawn_responder(port);
+    }
 
     Arc::new(sink)
+}
+
+fn serve_on(state: AppState, host: Ipv4Addr, port: u16, label: &'static str) {
+    tauri::async_runtime::spawn(async move {
+        let router = router(state);
+        let addr = SocketAddr::from((host, port));
+        match tokio::net::TcpListener::bind(addr).await {
+            Ok(listener) => {
+                println!("[daemon] listening on http://{addr} ({label})");
+                let service = router.into_make_service_with_connect_info::<SocketAddr>();
+                if let Err(e) = axum::serve(listener, service).await {
+                    eprintln!("[daemon] stopped ({label}): {e}");
+                }
+            }
+            Err(e) => eprintln!("[daemon] could not bind {addr} ({label}): {e}"),
+        }
+    });
 }
 
 fn router(state: AppState) -> Router {
@@ -181,8 +244,8 @@ fn router(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/events", get(events))
         .route("/rpc/{command}", post(rpc))
-        .route("/pair/verify", post(pair_verify))
-        .route("/pair/status", post(pair_status))
+        .route("/pair/request", post(pairing::pair_request))
+        .route("/control", get(control::control))
         .layer(middleware::from_fn_with_state(state.clone(), guard))
         .with_state(state)
 }
@@ -202,9 +265,10 @@ fn bearer(headers: &HeaderMap) -> Option<String> {
 }
 
 /// Paths an unauthenticated remote peer may reach: health and the pairing
-/// handshake. Everything else requires loopback or a token.
+/// handshake. Everything else — including `/control` — requires loopback or a
+/// token.
 fn is_public_path(path: &str) -> bool {
-    matches!(path, "/health" | "/pair/verify" | "/pair/status")
+    matches!(path, "/health" | "/pair/request")
 }
 
 /// Decide what a request's peer is trusted as. Pure and synchronous so it can be
@@ -376,108 +440,6 @@ async fn rpc(
     }
 }
 
-#[derive(serde::Deserialize)]
-struct PairVerifyBody {
-    passcode: String,
-    device_id: String,
-    #[serde(default)]
-    device_name: String,
-    #[serde(default)]
-    device_info: String,
-    pairing_secret: String,
-}
-
-/// `POST /pair/verify` — a device presents the shared passcode and its pairing
-/// secret and registers itself as pending. Rate-limited per IP so the passcode
-/// cannot be brute-forced; emits `device://pending` so the host UI lights up.
-async fn pair_verify(
-    ConnectInfo(peer): ConnectInfo<SocketAddr>,
-    State(state): State<AppState>,
-    Json(body): Json<PairVerifyBody>,
-) -> Response {
-    if !state.allow_verify(peer.ip()) {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(json!({ "error": "too many attempts; wait a minute" })),
-        )
-            .into_response();
-    }
-
-    let Some(db) = state.db() else {
-        return (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({ "error": "database unavailable" })),
-        )
-            .into_response();
-    };
-
-    match pairing_service::verify_and_register(
-        db.get_connection(),
-        &body.passcode,
-        &body.device_id,
-        &body.device_name,
-        &body.device_info,
-        &body.pairing_secret,
-    )
-    .await
-    {
-        Ok(outcome) => {
-            if outcome.verified {
-                if let Some(app) = state.app.as_ref() {
-                    tauri::Manager::state::<Events>(app).inner().emit(
-                        "device://pending",
-                        json!({ "device_id": body.device_id, "device_name": body.device_name }),
-                    );
-                }
-            }
-            Json(json!({ "verified": outcome.verified, "message": outcome.message }))
-                .into_response()
-        }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e })),
-        )
-            .into_response(),
-    }
-}
-
-#[derive(serde::Deserialize)]
-struct PairStatusBody {
-    device_id: String,
-    pairing_secret: String,
-}
-
-/// `POST /pair/status` — a device polls for approval, presenting its pairing
-/// secret. Returns the token once, scoped to the granted capabilities.
-async fn pair_status(State(state): State<AppState>, Json(body): Json<PairStatusBody>) -> Response {
-    let Some(db) = state.db() else {
-        return (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({ "error": "database unavailable" })),
-        )
-            .into_response();
-    };
-
-    match pairing_service::device_status(db.get_connection(), &body.device_id, &body.pairing_secret)
-        .await
-    {
-        Ok(s) => Json(json!({
-            "approved": s.approved,
-            "token": s.token,
-            "expires_at": s.expires_at,
-            "capabilities": s.capabilities,
-            "message": s.message,
-        }))
-        .into_response(),
-        // The only error is a pairing-secret mismatch: a forbidden, not a 500.
-        Err(_) => (
-            StatusCode::FORBIDDEN,
-            Json(json!({ "error": "pairing secret does not match" })),
-        )
-            .into_response(),
-    }
-}
-
 /// True if a remote peer holding `caps` may receive this serialized frame. Fail
 /// closed: an unparseable frame or an event mapped to no capability is withheld.
 fn frame_allowed(frame: &str, caps: &[String]) -> bool {
@@ -493,41 +455,44 @@ fn frame_allowed(frame: &str, caps: &[String]) -> bool {
     }
 }
 
+/// One broadcast frame, forwarded to `socket` if `caps` allows it (`None` is
+/// unrestricted, i.e. a local peer). `false` once the socket should be
+/// dropped — a send failure, or the channel closing for good.
+async fn forward_one(
+    socket: &mut WebSocket,
+    frame: Result<Shared, broadcast::error::RecvError>,
+    caps: &Option<Vec<String>>,
+) -> bool {
+    match frame {
+        Ok(wire) => {
+            if let Some(caps) = caps {
+                match event_cap(&wire.event) {
+                    Some(cap) if caps.iter().any(|c| c == cap) => {}
+                    _ => return true,
+                }
+            }
+            socket
+                .send(Message::Text(wire.text.to_string().into()))
+                .await
+                .is_ok()
+        }
+        Err(broadcast::error::RecvError::Lagged(n)) => {
+            let notice = json!({ "event": "events://lagged", "payload": { "skipped": n } });
+            socket
+                .send(Message::Text(notice.to_string().into()))
+                .await
+                .is_ok()
+        }
+        Err(broadcast::error::RecvError::Closed) => false,
+    }
+}
+
 /// Forward frames to one client until it goes away. `caps == None` is a local
 /// peer and gets the whole stream; `Some` is a remote peer and is filtered.
-async fn pump(
-    mut socket: WebSocket,
-    mut rx: broadcast::Receiver<Shared>,
-    caps: Option<Vec<String>>,
-) {
+async fn pump(mut socket: WebSocket, mut rx: broadcast::Receiver<Shared>, caps: Option<Vec<String>>) {
     loop {
-        match rx.recv().await {
-            Ok(wire) => {
-                if let Some(caps) = &caps {
-                    match event_cap(&wire.event) {
-                        Some(cap) if caps.iter().any(|c| c == cap) => {}
-                        _ => continue,
-                    }
-                }
-                if socket
-                    .send(Message::Text(wire.text.to_string().into()))
-                    .await
-                    .is_err()
-                {
-                    return;
-                }
-            }
-            Err(broadcast::error::RecvError::Lagged(n)) => {
-                let notice = json!({ "event": "events://lagged", "payload": { "skipped": n } });
-                if socket
-                    .send(Message::Text(notice.to_string().into()))
-                    .await
-                    .is_err()
-                {
-                    return;
-                }
-            }
-            Err(broadcast::error::RecvError::Closed) => return,
+        if !forward_one(&mut socket, rx.recv().await, &caps).await {
+            return;
         }
     }
 }
@@ -564,7 +529,7 @@ mod tests {
         let h = with_header(header::ORIGIN, "https://evil.example");
         // Even loopback, even a public path.
         assert!(classify("127.0.0.1".parse().unwrap(), &h, "/health", |_| None).is_err());
-        assert!(classify(remote(), &h, "/pair/verify", |_| None).is_err());
+        assert!(classify(remote(), &h, "/pair/request", |_| None).is_err());
         assert!(classify(remote(), &h, "/events", |_| None).is_err());
     }
 
@@ -587,7 +552,7 @@ mod tests {
     #[test]
     fn remote_without_a_token_may_pair_but_not_call() {
         assert!(matches!(
-            classify(remote(), &HeaderMap::new(), "/pair/verify", |_| None).unwrap(),
+            classify(remote(), &HeaderMap::new(), "/pair/request", |_| None).unwrap(),
             Trust::Anon
         ));
         assert!(classify(
@@ -604,6 +569,16 @@ mod tests {
     fn remote_with_a_bad_token_is_refused_on_protected_paths() {
         let h = with_header(header::AUTHORIZATION, "Bearer nope");
         assert!(classify(remote(), &h, "/rpc/coder_list_threads", |_| None).is_err());
+    }
+
+    /// `/control` carries a bearer, not a public path — same 401 an
+    /// unauthenticated remote gets on `/rpc` today, and since `classify`
+    /// returns that `Err` before `guard` ever calls `next.run`, the request
+    /// never reaches the handler, so the WebSocket upgrade never happens
+    /// either.
+    #[test]
+    fn control_is_not_public_and_refuses_an_unauthenticated_remote() {
+        assert!(classify(remote(), &HeaderMap::new(), "/control", |_| None).is_err());
     }
 
     #[test]
@@ -664,8 +639,8 @@ mod tests {
             .unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
-            let service =
-                router(AppState::new(tx, None)).into_make_service_with_connect_info::<SocketAddr>();
+            let service = router(AppState::new(tx, None, 0))
+                .into_make_service_with_connect_info::<SocketAddr>();
             let _ = axum::serve(listener, service).await;
         });
 
@@ -709,8 +684,8 @@ mod tests {
             .unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
-            let service =
-                router(AppState::new(tx, None)).into_make_service_with_connect_info::<SocketAddr>();
+            let service = router(AppState::new(tx, None, 0))
+                .into_make_service_with_connect_info::<SocketAddr>();
             let _ = axum::serve(listener, service).await;
         });
 

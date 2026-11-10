@@ -15,6 +15,7 @@
   import Home from '~icons/fa6-solid/house';
   import Lock from '~icons/fa6-solid/lock';
   import MessageSquare from '~icons/fa6-solid/message';
+  import MobileScreenButton from '~icons/fa6-solid/mobile-screen-button';
   import Rocket from '~icons/fa6-solid/rocket';
   import ScanSearch from '~icons/fa6-solid/magnifying-glass';
   import Settings from '~icons/fa6-solid/gear';
@@ -76,6 +77,8 @@
   <HardDrive class={className} />
 {:else if icon === 'scan-search'}
   <ScanSearch class={className} />
+{:else if icon === 'mobile-screen-button'}
+  <MobileScreenButton class={className} />
 {:else if icon === 'variable'}
   <Variable class={className} />
 {:else}

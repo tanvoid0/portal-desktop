@@ -86,10 +86,7 @@ pub fn run() {
             // Both get every event: the webview because it is the UI, the daemon
             // so anything else attached — a phone, a script — sees the same
             // stream rather than a summary of it.
-            let daemon_port = std::env::var("PORTAL_DAEMON_PORT")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(daemon::DEFAULT_PORT);
+            let daemon_port = daemon::configured_port();
             let sink: Arc<dyn events::EventSink> = Arc::new(events::FanoutSink::new(vec![
                 Arc::new(events::TauriSink::new(app.handle().clone())),
                 daemon::spawn(daemon_port, app.handle().clone()),
@@ -707,12 +704,18 @@ pub fn run() {
             domains::custom_scripts::commands::select_file,
             // Update commands
             domains::updates::commands::get_app_version_command,
-            // Network commands. Pairing verify/status/token-check are daemon
-            // routes (/pair/*), not IPC commands — see domains/network/commands.rs.
+            // Network commands. Pairing itself (/pair/request, /control) is
+            // daemon routes, not IPC commands — see domains/network/commands.rs.
             domains::network::commands::get_local_network_ip,
-            domains::network::commands::generate_device_passcode,
             domains::network::commands::approve_device,
-            domains::network::commands::get_pending_device_approvals,
+            domains::network::commands::reject_device,
+            domains::network::commands::revoke_device,
+            domains::network::commands::update_device_capabilities,
+            domains::network::commands::list_devices,
+            domains::network::commands::generate_pairing_qr,
+            domains::network::commands::remote_list_capabilities,
+            domains::network::commands::get_remote_lan_enabled,
+            domains::network::commands::set_remote_lan_enabled,
             // Script execution commands
             domains::scripts::commands::execute_script,
             domains::scripts::commands::record_interactive_execution,

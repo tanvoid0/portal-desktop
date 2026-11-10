@@ -45,4 +45,9 @@ export const queryKeys = {
   agents: {
     backends: ['agents', 'backends'] as const,
   },
+  devices: {
+    all: ['devices'] as const,
+    capabilities: ['devices', 'capabilities'] as const,
+    lanEnabled: ['devices', 'lan-enabled'] as const,
+  },
 };
