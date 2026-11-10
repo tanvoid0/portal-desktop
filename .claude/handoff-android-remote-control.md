@@ -45,8 +45,8 @@ of the pairing flow, not an addition to it:
 - UDP discovery responder on `:8765`, literal ASCII probe `PORTALREMOTE?` → JSON reply.
   `src-tauri/src/daemon/discovery.rs`.
 - `daemon.rs` (was 755 lines) is now the `daemon/` module (`mod.rs` + `pairing.rs` + `control.rs`
-  + `discovery.rs`). `daemon::spawn`/`daemon::DEFAULT_PORT` unchanged as the public API `lib.rs`
-  calls.
+  - `discovery.rs`). `daemon::spawn`/`daemon::DEFAULT_PORT` unchanged as the public API `lib.rs`
+    calls.
 - `pairing_service.rs` (`src-tauri/portal-core/src/domains/network/services/`) rewritten: three
   approval types now — `"temporary"` (24h), `"long_term"` (30d), `"until_revoked"` (no expiry,
   ends only via `revoke`). New: `request_pairing`, `mint_qr_pairing`, `revoke`, `reject`,
@@ -55,26 +55,26 @@ of the pairing flow, not an addition to it:
   staged-token buffer, `network_service.rs`'s `PasscodeStore` entirely (confirmed zero remaining
   references before deleting).
 - **Decisions already made, don't re-ask:**
-  - *Token lifetime:* `until_revoked` was added specifically so a paired phone doesn't need to
+  - _Token lifetime:_ `until_revoked` was added specifically so a paired phone doesn't need to
     re-pair periodically; revoke-from-the-UI is the only way to end one.
-  - *QR capabilities:* scanning a QR connects **immediately, no click on the phone, ever** (confirmed
+  - _QR capabilities:_ scanning a QR connects **immediately, no click on the phone, ever** (confirmed
     from `PairUrl.kt`/`WsClient.kt` — the QR's token is already a live credential). So capabilities
     for a QR-minted device are chosen by whoever generates the QR **at generation time**, in the
     same UI, not a fixed default and not full access.
-  - *QR leak protection:* a QR-minted grant gets a 5-minute `expires_at` pickup window; the first
+  - _QR leak protection:_ a QR-minted grant gets a 5-minute `expires_at` pickup window; the first
     device to actually authenticate with that token (in `verify_token`) has the expiry cleared in
     the same DB write, making it permanent. An unscanned/leaked QR image grants nothing after 5
     minutes; a real connect makes it permanent immediately. This is the one genuinely subtle piece
     of logic in the backend — read the doc comment on `mint_qr_pairing`/`verify_token` before
     touching either.
-  - *LAN toggle:* promoted from env-var-only to a persisted setting (`settings_service.rs`,
+  - _LAN toggle:_ promoted from env-var-only to a persisted setting (`settings_service.rs`,
     `remote_lan_enabled`) with Tauri commands `get_remote_lan_enabled`/`set_remote_lan_enabled`.
     **Flipping it does not take effect live — requires an app restart.** This was flagged as a
     phase-1 shortcut, not silently chosen: making it live needs `AppState` to hold a cancellable
     handle for the LAN HTTP listener + the UDP responder, which today are fire-and-forget spawned
     tasks. Fine to leave for a later phase unless it actually bothers someone.
-  - *Known gap, not a phase-1 requirement:* a token revoked while its `/control` socket is already
-    open does not drop that socket — only blocks a *new* connect. Noted in a comment in `control.rs`.
+  - _Known gap, not a phase-1 requirement:_ a token revoked while its `/control` socket is already
+    open does not drop that socket — only blocks a _new_ connect. Noted in a comment in `control.rs`.
 - `remote_list_capabilities()` command added (`src-tauri/src/domains/network/commands.rs`) —
   wraps `crate::rpc::capabilities()`, which already existed but had zero callers (its own doc
   comment named a caller, `remote_list_capabilities`, that had never been written). This is the
@@ -114,7 +114,7 @@ the remaining work:
    `PageEmpty`) per `.cursor/rules/page-shell-conventions.md`. Add a nav entry in `$lib/config/main-nav.ts`.
 4. Wire up: `list_devices`, `approve_device` (now 3 approval_type options, not 2),
    `reject_device`, `revoke_device` (needs a confirm step, not raw `confirm()`),
-   `update_device_capabilities`, `generate_pairing_qr` (capabilities chosen *before* the QR is
+   `update_device_capabilities`, `generate_pairing_qr` (capabilities chosen _before_ the QR is
    drawn — render `qr_url` as an actual QR code, check for an existing QR library before adding
    one), `remote_list_capabilities` (the capability checkbox source of truth),
    `get_remote_lan_enabled`/`set_remote_lan_enabled` (UI must say the restart caveat out loud).
@@ -129,11 +129,11 @@ the remaining work:
 
 - **`cargo test` re-exports every ts-rs type in the crate, unprettified.** `scripts/gen-types.mjs`
   runs `cargo test ... export_bindings`, which matches ts-rs's auto-generated per-type
-  `export_bindings_*` test functions — but a *plain* `cargo test --lib` (no filter) also runs all
+  `export_bindings_*` test functions — but a _plain_ `cargo test --lib` (no filter) also runs all
   of them, as a side effect, re-exporting every `#[derive(TS)]` type project-wide in raw
   (non-prettier) form. This makes `git status` show ~90 unrelated `generated/*.ts` files as
   "changed" (cosmetic quote-style diffs) after any full test run. **Don't hand-revert these** —
-  just run `pnpm gen:types` properly once at the end (it re-exports *and* prettifies), and the
+  just run `pnpm gen:types` properly once at the end (it re-exports _and_ prettifies), and the
   unrelated files go back to byte-identical with what's committed. Confirmed this works.
 - **A new ts-rs-exported type needs its domain added to `GENERATED` in `scripts/gen-types.mjs`**
   (the barrel-index array near the top) or its `index.ts` barrel never gets written. Added

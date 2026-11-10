@@ -133,6 +133,13 @@ export function buildMainNavSections(
           badge: null,
         },
         {
+          title: 'Devices',
+          url: '/devices',
+          icon: 'mobile-screen-button',
+          description: 'Pair and manage phones connecting to Portal Desktop',
+          badge: null,
+        },
+        {
           title: 'Cloud (Kubernetes)',
           url: '/cloud',
           icon: 'cloud',

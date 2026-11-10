@@ -42,4 +42,9 @@ export const queryKeys = {
     managers: ['sdk', 'managers'] as const,
     versions: (name: string) => ['sdk', name, 'versions'] as const,
   },
+  devices: {
+    all: ['devices'] as const,
+    capabilities: ['devices', 'capabilities'] as const,
+    lanEnabled: ['devices', 'lan-enabled'] as const,
+  },
 };
