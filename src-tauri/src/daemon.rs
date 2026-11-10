@@ -1,9 +1,9 @@
 //! The local HTTP/WS surface, and the capability gate in front of it — phases 2
 //! and 4 of `docs/development/REMOTE_ARCHITECTURE.md`.
 //!
-//! Runs as a task inside the Tauri process. Today it binds loopback only; the
-//! LAN listener (same router, `0.0.0.0`) is spawned behind an explicit toggle
-//! elsewhere, so the one security gate here protects both.
+//! Runs as a task inside the Tauri process. Always binds loopback; the LAN
+//! listener (same router, `0.0.0.0`) additionally binds when `PORTAL_DAEMON_LAN=1`
+//! is set, so the one security gate here protects both.
 //!
 //! # Trust gate
 //!
@@ -153,27 +153,39 @@ impl AppState {
 /// Build the sink and start serving on loopback. Returns the sink immediately so
 /// startup can wire it into the fanout; a bind failure leaves the app running
 /// with the webview transport alone.
+///
+/// Also binds `0.0.0.0` (same port) when `PORTAL_DAEMON_LAN=1` — the explicit
+/// toggle phase 4 of `docs/development/REMOTE_ARCHITECTURE.md` calls for before
+/// any non-loopback bind. Off by default: without it, a phone on the LAN times
+/// out reaching this port, which is what pairing needs and what this guards.
 pub fn spawn(port: u16, app: tauri::AppHandle) -> Arc<dyn EventSink> {
     let (tx, _) = broadcast::channel(CHANNEL_CAPACITY);
     let sink = WsSink::new(tx.clone());
-
     let state = AppState::new(tx, Some(app));
-    tauri::async_runtime::spawn(async move {
-        let router = router(state);
-        let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-        match tokio::net::TcpListener::bind(addr).await {
-            Ok(listener) => {
-                println!("[daemon] listening on http://{addr}");
-                let service = router.into_make_service_with_connect_info::<SocketAddr>();
-                if let Err(e) = axum::serve(listener, service).await {
-                    eprintln!("[daemon] stopped: {e}");
-                }
-            }
-            Err(e) => eprintln!("[daemon] could not bind {addr}: {e}"),
-        }
-    });
+
+    serve_on(state.clone(), Ipv4Addr::LOCALHOST, port, "loopback");
+    if std::env::var("PORTAL_DAEMON_LAN").ok().as_deref() == Some("1") {
+        serve_on(state, Ipv4Addr::UNSPECIFIED, port, "LAN");
+    }
 
     Arc::new(sink)
+}
+
+fn serve_on(state: AppState, host: Ipv4Addr, port: u16, label: &'static str) {
+    tauri::async_runtime::spawn(async move {
+        let router = router(state);
+        let addr = SocketAddr::from((host, port));
+        match tokio::net::TcpListener::bind(addr).await {
+            Ok(listener) => {
+                println!("[daemon] listening on http://{addr} ({label})");
+                let service = router.into_make_service_with_connect_info::<SocketAddr>();
+                if let Err(e) = axum::serve(listener, service).await {
+                    eprintln!("[daemon] stopped ({label}): {e}");
+                }
+            }
+            Err(e) => eprintln!("[daemon] could not bind {addr} ({label}): {e}"),
+        }
+    });
 }
 
 fn router(state: AppState) -> Router {
