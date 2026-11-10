@@ -616,7 +616,7 @@ fn read_description(dir: &Path) -> Option<String> {
                 }
                 '\n' | '\r' | '\t' => cleaned.push(' '),
                 _ => {
-                    if !in_link_text || true {
+                    if !in_link_text {
                         cleaned.push(ch);
                     }
                 }

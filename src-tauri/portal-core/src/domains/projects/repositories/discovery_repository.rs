@@ -225,9 +225,7 @@ impl DiscoveryRepository {
 /// Windows paths differ only by case and separator; comparing them raw would
 /// create a duplicate row for a project the user already added by hand.
 fn paths_equal(a: &str, b: &str) -> bool {
-    fn norm(s: &str) -> String {
-        s.replace('\\', "/").trim_end_matches('/').to_lowercase()
-    }
+    use crate::domains::projects::move_lock::norm;
     norm(a) == norm(b)
 }
 

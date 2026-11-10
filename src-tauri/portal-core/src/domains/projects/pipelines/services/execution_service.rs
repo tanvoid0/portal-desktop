@@ -60,6 +60,9 @@ enum StepRunOutcome {
 struct RunningExecution {
     cancel_tx: watch::Sender<bool>,
     children: Arc<Mutex<Vec<Child>>>,
+    /// The project path this run executes against — for the relocation
+    /// in-use check (`relocation::usage::running_under`).
+    project_path: String,
 }
 
 #[derive(Clone)]
@@ -78,6 +81,16 @@ impl ExecutionService {
             project_repo: ProjectRepository::new(db_manager),
             running: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// True if any pipeline execution currently running is against a project
+    /// at or under `path`. Used by the project-relocation in-use check.
+    pub fn running_under(&self, path: &str) -> bool {
+        self.running
+            .lock()
+            .unwrap()
+            .values()
+            .any(|r| crate::domains::projects::move_lock::is_under(&r.project_path, path))
     }
 
     pub async fn execute_pipeline(
@@ -153,6 +166,7 @@ impl ExecutionService {
                 RunningExecution {
                     cancel_tx,
                     children: Arc::clone(&children),
+                    project_path: project.path.clone(),
                 },
             );
         }

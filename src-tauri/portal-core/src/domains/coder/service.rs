@@ -33,6 +33,7 @@ use crate::domains::ai::services::AISettingsService;
 use crate::domains::credentials::services::VaultSession;
 use crate::domains::github::service::GitHubService;
 use crate::domains::github::types::GitHubIssue;
+use crate::domains::projects::move_lock;
 use crate::events::{EventSink, EventSinkExt};
 
 use super::agent_mode;
@@ -1379,6 +1380,36 @@ impl CoderService {
 
     pub async fn get_thread(&self, id: &str) -> Option<CoderThread> {
         self.threads.lock().await.get(id).cloned()
+    }
+
+    /// True if any active run, pending `run_command`, or running sub-agent is
+    /// working in a thread whose `workspace_root` is at or under `path`.
+    /// Used by the project-relocation in-use check — a move must not start
+    /// while the coder is mid-edit there.
+    pub async fn uses_under(&self, path: &str) -> bool {
+        let threads = self.threads.lock().await;
+        let thread_under = |id: &str| {
+            threads
+                .get(id)
+                .is_some_and(|t| move_lock::is_under(&t.workspace_root, path))
+        };
+
+        if self.active_runs.lock().await.keys().any(|id| thread_under(id)) {
+            return true;
+        }
+        if self
+            .pending_commands
+            .lock()
+            .await
+            .keys()
+            .any(|key| thread_under(key.split_once(':').map_or(key.as_str(), |(t, _)| t)))
+        {
+            return true;
+        }
+        self.sub_agents.lock().await.values().any(|sa| {
+            sa.status == CoderSubAgentStatus::Running
+                && move_lock::is_under(&sa.workspace_root, path)
+        })
     }
 
     pub async fn delete_thread(&self, id: &str) -> bool {

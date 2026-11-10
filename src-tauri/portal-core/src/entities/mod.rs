@@ -18,6 +18,7 @@ pub mod project;
 pub mod project_framework;
 pub mod project_language;
 pub mod project_module;
+pub mod project_move;
 pub mod project_package_manager;
 pub mod saved_view;
 pub mod script_execution;

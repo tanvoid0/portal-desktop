@@ -46,6 +46,7 @@ pub mod m20261108_000043_create_vault_table;
 pub mod m20261108_000044_create_project_env_links_table;
 pub mod m20261110_000045_add_project_stage;
 pub mod m20261110_000046_add_project_archived_flag;
+pub mod m20261110_000047_create_project_moves_table;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -95,6 +96,7 @@ pub use m20261108_000043_create_vault_table::Migration as createVaultTable;
 pub use m20261108_000044_create_project_env_links_table::Migration as createProjectEnvLinksTable;
 pub use m20261110_000045_add_project_stage::Migration as addProjectStage;
 pub use m20261110_000046_add_project_archived_flag::Migration as addProjectArchivedFlag;
+pub use m20261110_000047_create_project_moves_table::Migration as createProjectMovesTable;
 
 pub struct Migrator;
 
@@ -178,5 +180,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(createProjectEnvLinksTable),
         Box::new(addProjectStage),
         Box::new(addProjectArchivedFlag),
+        Box::new(createProjectMovesTable),
     ]
 }

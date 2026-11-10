@@ -43,6 +43,10 @@ pub struct ScriptExecutionService {
     running_processes: Arc<Mutex<HashMap<String, Child>>>,
     // Map execution_id -> live output buffer (for real-time updates)
     output_buffers: Arc<Mutex<HashMap<String, Vec<String>>>>,
+    // Map execution_id -> working directory, for the relocation in-use check
+    // (`relocation::usage::running_under`) — kept alongside `running_processes`
+    // rather than folded into it so the `Child` map stays untouched.
+    running_dirs: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl ScriptExecutionService {
@@ -52,7 +56,18 @@ impl ScriptExecutionService {
             db_manager,
             running_processes: Arc::new(Mutex::new(HashMap::new())),
             output_buffers: Arc::new(Mutex::new(HashMap::new())),
+            running_dirs: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// True if any execution currently running has a working directory at or
+    /// under `path`. Used by the project-relocation in-use check.
+    pub fn running_under(&self, path: &str) -> bool {
+        self.running_dirs
+            .lock()
+            .unwrap()
+            .values()
+            .any(|dir| crate::domains::projects::move_lock::is_under(dir, path))
     }
 
     /// Resolve parameter placeholders in command
@@ -193,12 +208,17 @@ impl ScriptExecutionService {
             let mut processes = self.running_processes.lock().unwrap();
             processes.insert(execution_id.clone(), child);
         }
+        if let Some(ref wd) = request.working_directory {
+            let mut dirs = self.running_dirs.lock().unwrap();
+            dirs.insert(execution_id.clone(), wd.clone());
+        }
 
         // Spawn background task to read output and wait for completion
         let exec_id_clone = execution_id.clone();
         let repo = self.repository.clone();
         let output_buffers = Arc::clone(&self.output_buffers);
         let running_processes = Arc::clone(&self.running_processes);
+        let running_dirs = Arc::clone(&self.running_dirs);
 
         tokio::spawn(async move {
             // Read stdout + stderr in parallel (sequential reads can deadlock on full pipes)
@@ -256,6 +276,7 @@ impl ScriptExecutionService {
                 let mut processes = running_processes.lock().unwrap();
                 processes.remove(&exec_id_clone)
             };
+            running_dirs.lock().unwrap().remove(&exec_id_clone);
 
             let wait_result = if let Some(mut child) = child_opt {
                 child.wait().await
@@ -385,6 +406,7 @@ impl ScriptExecutionService {
             let mut processes = self.running_processes.lock().unwrap();
             processes.remove(execution_id)
         };
+        self.running_dirs.lock().unwrap().remove(execution_id);
 
         if let Some(mut child) = child_opt {
             let _ = child.kill().await;
@@ -567,6 +589,7 @@ impl Clone for ScriptExecutionService {
             db_manager: self.db_manager.clone(),
             running_processes: Arc::clone(&self.running_processes),
             output_buffers: Arc::clone(&self.output_buffers),
+            running_dirs: Arc::clone(&self.running_dirs),
         }
     }
 }

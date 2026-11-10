@@ -2,6 +2,8 @@ pub mod discovery;
 pub mod entities;
 pub mod env;
 pub mod modules;
+pub mod move_lock;
+pub mod relocation;
 pub mod pipelines;
 pub mod repositories;
 pub mod services;
