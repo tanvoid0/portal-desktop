@@ -25,12 +25,15 @@
   import Flag from '~icons/fa6-solid/flag';
   import Folder from '~icons/fa6-solid/folder';
   import FolderTree from '~icons/fa6-solid/folder-tree';
+  import GitCommitHorizontal from '~icons/fa6-solid/code-commit';
   import Star from '~icons/fa6-solid/star';
   import Trash2 from '~icons/fa6-solid/trash';
   import Unlink from '~icons/fa6-solid/link-slash';
   import WandSparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import { openInExplorer, launchInCoder } from '$lib/domains/projects/utils/launch';
   import { goto } from '$app/navigation';
+  import GitCommitDialog from '$lib/domains/coder/components/GitCommitDialog.svelte';
+  import { queryClient, invalidateProjectsList } from '$lib/domains/shared/query';
 
   interface Props {
     project: Project;
@@ -55,6 +58,11 @@
   }: Props = $props();
 
   let groupOpen = $state(false);
+  let commitOpen = $state(false);
+
+  const needsAttention = $derived(
+    project.has_uncommitted_changes || (project.unpushed_commits ?? 0) > 0
+  );
 
   // Read-only evidence shown next to the stage picker — never sets anything itself.
   const stageHint = $derived.by(() => {
@@ -117,6 +125,12 @@
         <Star class="mr-2 h-4 w-4" />
         {project.starred ? 'Unstar' : 'Star'}
       </DropdownMenuItem>
+      {#if needsAttention}
+        <DropdownMenuItem onclick={() => (commitOpen = true)}>
+          <GitCommitHorizontal class="mr-2 h-4 w-4" />
+          Review & commit…
+        </DropdownMenuItem>
+      {/if}
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>
           <Flag class="mr-2 h-4 w-4" />
@@ -179,3 +193,9 @@
     />
   </Dialog.Content>
 </Dialog.Root>
+
+<GitCommitDialog
+  bind:open={commitOpen}
+  workspaceRoot={project.path}
+  onCommitted={() => invalidateProjectsList(queryClient)}
+/>
