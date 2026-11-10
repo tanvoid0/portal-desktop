@@ -708,6 +708,7 @@ pub fn run() {
             domains::network::commands::get_pending_device_approvals,
             domains::network::commands::list_devices,
             domains::network::commands::generate_pairing_qr,
+            domains::network::commands::remote_list_capabilities,
             domains::network::commands::get_remote_lan_enabled,
             domains::network::commands::set_remote_lan_enabled,
             // Script execution commands

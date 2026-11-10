@@ -209,6 +209,17 @@ pub async fn generate_pairing_qr(
     })
 }
 
+/// Every capability name a device can be granted, for the pairing/capability
+/// checkbox UI. Backed by the same registry `/rpc/{command}` gates against,
+/// so this list can never drift from what capabilities actually do something.
+#[portal_rpc_macro::rpc]
+pub fn remote_list_capabilities() -> Result<Vec<String>, String> {
+    Ok(crate::rpc::capabilities()
+        .into_iter()
+        .map(String::from)
+        .collect())
+}
+
 /// Whether the LAN listener and UDP discovery responder are enabled. See
 /// `set_remote_lan_enabled` for why toggling this does not take effect until
 /// the next restart.
