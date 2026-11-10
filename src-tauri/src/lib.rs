@@ -705,7 +705,6 @@ pub fn run() {
             domains::network::commands::reject_device,
             domains::network::commands::revoke_device,
             domains::network::commands::update_device_capabilities,
-            domains::network::commands::get_pending_device_approvals,
             domains::network::commands::list_devices,
             domains::network::commands::generate_pairing_qr,
             domains::network::commands::remote_list_capabilities,

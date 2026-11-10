@@ -16,9 +16,6 @@ use crate::daemon::pairing::{resolve_pending, PairResolution};
 use crate::database::DatabaseManager;
 use crate::domains::network::services::pairing_service;
 use crate::domains::settings::services::settings_service::SettingsService;
-use crate::entities::device_approval;
-use chrono::Utc;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -232,45 +229,6 @@ pub fn get_remote_lan_enabled() -> Result<bool, String> {
 #[portal_rpc_macro::rpc]
 pub fn set_remote_lan_enabled(enabled: bool) -> Result<(), String> {
     SettingsService::new().set_remote_lan_enabled(enabled)
-}
-
-/// Pending (unapproved, unexpired) device requests, for the host approval UI.
-/// Deduplicated to the most recent row per device_id.
-#[portal_rpc_macro::rpc]
-pub async fn get_pending_device_approvals(
-    db: tauri::State<'_, Arc<DatabaseManager>>,
-) -> Result<Vec<serde_json::Value>, String> {
-    let conn = db.get_connection();
-
-    let now: chrono::DateTime<chrono::FixedOffset> = Utc::now().into();
-    let devices = device_approval::Entity::find()
-        .filter(device_approval::Column::Approved.eq(false))
-        .filter(device_approval::Column::PasscodeExpiresAt.gt(now))
-        .order_by_desc(device_approval::Column::CreatedAt)
-        .all(conn)
-        .await
-        .map_err(|e| format!("Database error: {e}"))?;
-
-    use std::collections::HashMap;
-    let mut by_device: HashMap<String, &device_approval::Model> = HashMap::new();
-    for device in &devices {
-        by_device.entry(device.device_id.clone()).or_insert(device);
-    }
-
-    let result = by_device
-        .values()
-        .map(|d| {
-            serde_json::json!({
-                "device_id": d.device_id,
-                "device_name": d.device_name,
-                "device_info": serde_json::from_str::<serde_json::Value>(&d.device_info)
-                    .unwrap_or_else(|_| serde_json::json!({})),
-                "created_at": d.created_at.to_rfc3339(),
-            })
-        })
-        .collect();
-
-    Ok(result)
 }
 
 fn is_in_range(ip: Ipv4Addr, start: Ipv4Addr, end: Ipv4Addr) -> bool {
