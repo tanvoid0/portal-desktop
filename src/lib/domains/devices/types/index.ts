@@ -15,3 +15,11 @@ export interface PairingQrResponse {
   qr_url: string;
   device_id: string;
 }
+
+/** `get_remote_connectivity_status`'s response — untyped on the wire (request-layer struct, no ts-rs). */
+export interface RemoteConnectivityStatus {
+  lan_enabled: boolean;
+  firewall_rule_present: boolean;
+  port: number;
+  vpn_adapter: string | null;
+}

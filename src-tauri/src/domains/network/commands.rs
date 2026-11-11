@@ -231,6 +231,38 @@ pub fn set_remote_lan_enabled(enabled: bool) -> Result<(), String> {
     SettingsService::new().set_remote_lan_enabled(enabled)
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RemoteConnectivityStatus {
+    pub lan_enabled: bool,
+    pub firewall_rule_present: bool,
+    pub port: u16,
+    /// Name of a connected VPN-looking network adapter, if any — see
+    /// `daemon::firewall::active_vpn_adapter`'s doc for why this is
+    /// report-only (no "fix" an app can apply to someone else's VPN client).
+    pub vpn_adapter: Option<String>,
+}
+
+/// Verifiable facts about whether a phone on the LAN could actually reach
+/// this daemon — deliberately not a reachability probe. A same-host TCP
+/// self-connect to this machine's own LAN IP would succeed via Windows'
+/// loopback short-circuit regardless of whether an external device could
+/// get in, which is exactly the misleading "all clear" this is meant to
+/// avoid; see `daemon::firewall`'s module doc. Untyped on the wire: this
+/// crate's structs don't derive `TS` (that only works in `portal-core`), so
+/// the frontend hand-types this.
+#[portal_rpc_macro::rpc]
+pub fn get_remote_connectivity_status() -> Result<RemoteConnectivityStatus, String> {
+    let firewall_rule_present = crate::daemon::firewall::current_exe_path()
+        .map(|exe| crate::daemon::firewall::rule_present(&exe))
+        .unwrap_or(false);
+    Ok(RemoteConnectivityStatus {
+        lan_enabled: SettingsService::new().get_remote_lan_enabled()?,
+        firewall_rule_present,
+        port: crate::daemon::configured_port(),
+        vpn_adapter: crate::daemon::firewall::active_vpn_adapter(),
+    })
+}
+
 fn is_in_range(ip: Ipv4Addr, start: Ipv4Addr, end: Ipv4Addr) -> bool {
     let ip = u32::from(ip);
     u32::from(start) <= ip && ip <= u32::from(end)

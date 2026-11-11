@@ -13,8 +13,10 @@
   import PairDeviceCard from '$lib/domains/devices/components/PairDeviceCard.svelte';
   import PendingRequestRow from '$lib/domains/devices/components/PendingRequestRow.svelte';
   import DeviceRow from '$lib/domains/devices/components/DeviceRow.svelte';
+  import FirewallWarningBanner from '$lib/domains/devices/components/FirewallWarningBanner.svelte';
   import {
     createCapabilitiesQuery,
+    createConnectivityStatusQuery,
     createDevicesQuery,
   } from '$lib/domains/devices/queries/deviceQueries';
   import { queryKeys } from '$lib/domains/shared/query/keys';
@@ -25,13 +27,31 @@
   const queryClient = useQueryClient();
   const devicesQ = createDevicesQuery();
   const capabilitiesQ = createCapabilitiesQuery();
+  const connectivityQ = createConnectivityStatusQuery();
+
+  const lanOn = $derived(connectivityQ.data?.lan_enabled === true);
+  const firewallRuleMissing = $derived(
+    lanOn && connectivityQ.data?.firewall_rule_present === false
+  );
+  const vpnAdapter = $derived(lanOn ? (connectivityQ.data?.vpn_adapter ?? null) : null);
+  const showConnectivityWarning = $derived(firewallRuleMissing || vpnAdapter !== null);
 
   const capabilities = $derived(capabilitiesQ.data ?? []);
   const devices = $derived(devicesQ.data ?? []);
   const pending = $derived(devices.filter((d) => d.approval_type === 'pending'));
+  // A QR-minted grant keeps its pickup `expires_at` until the first scan
+  // clears it (see `mint_qr_pairing`/`verify_token` in pairing_service.rs) —
+  // so `until_revoked` rows that still carry one haven't been picked up yet,
+  // whether or not the 5-minute window has lapsed. Per the QR card's own
+  // copy ("the grant appears below once scanned"), those don't belong in
+  // "Paired devices" or its count.
   const paired = $derived(
     devices.filter(
-      (d) => d.approved && d.approval_type !== 'revoked' && d.approval_type !== 'rejected'
+      (d) =>
+        d.approved &&
+        d.approval_type !== 'revoked' &&
+        d.approval_type !== 'rejected' &&
+        !(d.approval_type === 'until_revoked' && d.expires_at !== null)
     )
   );
   const history = $derived(
@@ -83,6 +103,10 @@
     <PageStats {stats} />
 
     <LanToggleCard />
+
+    {#if showConnectivityWarning}
+      <FirewallWarningBanner {firewallRuleMissing} {vpnAdapter} />
+    {/if}
 
     <PairDeviceCard {capabilities} onPaired={refetchDevices} />
 

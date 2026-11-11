@@ -717,6 +717,7 @@ pub fn run() {
             domains::network::commands::remote_list_capabilities,
             domains::network::commands::get_remote_lan_enabled,
             domains::network::commands::set_remote_lan_enabled,
+            domains::network::commands::get_remote_connectivity_status,
             // Script execution commands
             domains::scripts::commands::execute_script,
             domains::scripts::commands::record_interactive_execution,

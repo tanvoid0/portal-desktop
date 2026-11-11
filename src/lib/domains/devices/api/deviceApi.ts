@@ -4,6 +4,7 @@ import type {
   ApproveDeviceResponse,
   DeviceSummary,
   PairingQrResponse,
+  RemoteConnectivityStatus,
 } from '../types';
 
 export function fetchDevices(): Promise<DeviceSummary[]> {
@@ -46,4 +47,8 @@ export function updateDeviceCapabilities(deviceId: string, capabilities: string[
 
 export function generatePairingQr(capabilities: string[]): Promise<PairingQrResponse> {
   return invokeClient.post<PairingQrResponse>('generate_pairing_qr', { capabilities });
+}
+
+export function fetchConnectivityStatus(): Promise<RemoteConnectivityStatus> {
+  return invokeClient.post<RemoteConnectivityStatus>('get_remote_connectivity_status');
 }

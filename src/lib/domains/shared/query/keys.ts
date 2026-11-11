@@ -49,5 +49,6 @@ export const queryKeys = {
     all: ['devices'] as const,
     capabilities: ['devices', 'capabilities'] as const,
     lanEnabled: ['devices', 'lan-enabled'] as const,
+    connectivity: ['devices', 'connectivity'] as const,
   },
 };

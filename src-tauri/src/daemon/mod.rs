@@ -36,6 +36,7 @@
 
 mod control;
 mod discovery;
+pub mod firewall;
 pub mod pairing;
 
 use std::collections::HashMap;
@@ -99,7 +100,10 @@ enum Trust {
     /// Remote, unauthenticated. May only pair.
     Anon,
     /// Remote, holding a live token. Scoped to `caps`.
-    Remote { device_id: String, caps: Vec<String> },
+    Remote {
+        device_id: String,
+        caps: Vec<String>,
+    },
 }
 
 /// [`EventSink`] that publishes to every attached WebSocket.
@@ -217,6 +221,7 @@ pub fn spawn(port: u16, app: tauri::AppHandle) -> Arc<dyn EventSink> {
     if lan_enabled() {
         serve_on(state, Ipv4Addr::UNSPECIFIED, port, "LAN");
         discovery::spawn_responder(port);
+        firewall::spawn_check(port);
     }
 
     Arc::new(sink)
@@ -489,7 +494,11 @@ async fn forward_one(
 
 /// Forward frames to one client until it goes away. `caps == None` is a local
 /// peer and gets the whole stream; `Some` is a remote peer and is filtered.
-async fn pump(mut socket: WebSocket, mut rx: broadcast::Receiver<Shared>, caps: Option<Vec<String>>) {
+async fn pump(
+    mut socket: WebSocket,
+    mut rx: broadcast::Receiver<Shared>,
+    caps: Option<Vec<String>>,
+) {
     loop {
         if !forward_one(&mut socket, rx.recv().await, &caps).await {
             return;
