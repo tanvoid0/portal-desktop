@@ -252,6 +252,7 @@ pub fn run() {
             domains::coder::coder_retry,
             domains::coder::coder_edit_message,
             domains::coder::coder_approve,
+            domains::coder::coder_get_claude_cli_pending,
             domains::coder::coder_get_mode,
             domains::coder::coder_set_mode,
             domains::coder::coder_get_permission_mode,

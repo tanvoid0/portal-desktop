@@ -14,6 +14,10 @@
     placeholder?: string;
     disabled?: boolean;
     running?: boolean;
+    /** Show the Stop control — "a live run exists", not just "actively streaming".
+     *  Defaults to `running`; pass `running || pending` so Stop stays reachable
+     *  while a turn is paused on an approval (QA-119). */
+    canStop?: boolean;
     submitOn?: 'enter' | 'modifier-enter';
     rows?: number;
     /** Show queue icon on send when running with text */
@@ -36,6 +40,7 @@
     placeholder = 'Type your message...',
     disabled = false,
     running = false,
+    canStop = running,
     submitOn = 'modifier-enter',
     rows = 2,
     queueSend = false,
@@ -134,7 +139,7 @@
             {@render meta()}
           {/if}
 
-          {#if running && !value.trim() && onStop}
+          {#if canStop && !value.trim() && onStop}
             <Button
               type="button"
               onclick={onStop}

@@ -9,11 +9,11 @@ use tauri::State;
 use crate::domains::ai::platform_config::PlatformConfig;
 use crate::domains::ai::services::AISettingsService;
 
-use super::service::{AgentTurn, CoderService};
+use super::service::{AgentTurn, CoderService, CLAUDE_CLI_PROVIDER};
 use super::types::{
     CoderAgentMode, CoderSubAgent, CoderThread, CoderThreadKind, CoderThreadSummary, FileChange,
-    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PermissionMode,
-    PermissionRule,
+    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PendingApproval,
+    PermissionMode, PermissionRule,
 };
 
 #[portal_rpc_macro::rpc(cap = "coder")]
@@ -127,6 +127,21 @@ pub async fn coder_approve(
     remember_tool: Option<String>,
     remember_args: Option<serde_json::Value>,
 ) -> Result<(), String> {
+    let is_claude_cli = service
+        .get_thread(&thread_id)
+        .await
+        .and_then(|t| t.llm_provider)
+        .as_deref()
+        == Some(CLAUDE_CLI_PROVIDER);
+    if is_claude_cli {
+        // The live hook relay is holding claude's tool call open for exactly
+        // this decision — resolve it directly on the in-flight run instead of
+        // `spawn_run`, which would cancel that very run (see
+        // `CoderService::decide_claude_cli_approval`).
+        return service
+            .decide_claude_cli_approval(&thread_id, &call_id, approve)
+            .await;
+    }
     service
         .prepare_approve(
             &thread_id,
@@ -148,6 +163,20 @@ pub async fn coder_approve(
         },
     );
     Ok(())
+}
+
+/// The live permission request a claude-cli thread's turn is currently
+/// blocked on, if any. The frontend calls this on thread load to
+/// reconstruct the approval banner after a reload — claude-cli's turn
+/// stays open mid-wait rather than returning, so (unlike the platform
+/// engine) nothing lands in the persisted transcript to infer it from
+/// (QA-119).
+#[portal_rpc_macro::rpc(cap = "coder")]
+pub async fn coder_get_claude_cli_pending(
+    service: State<'_, Arc<CoderService>>,
+    thread_id: String,
+) -> Result<Option<PendingApproval>, String> {
+    Ok(service.claude_cli_pending_for(&thread_id).await)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]

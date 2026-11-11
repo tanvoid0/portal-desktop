@@ -468,7 +468,13 @@ class CoderSessionState {
     });
 
     await coderService.onRunning(({ thread_id, running }) => {
-      this.runtimeFor(thread_id).running = running;
+      const rt = this.runtimeFor(thread_id);
+      // A later `running: true` must not override an active pending approval —
+      // claude-cli threads can emit `coder://pending` while Rust still marks
+      // the thread running, which would otherwise re-disable the Accept/Reject
+      // buttons (`busy={running}` on ApprovalBanner). Same invariant as the
+      // agents domain's QA-110 fix in eventsToMessages.ts.
+      rt.running = running && !rt.pending;
       this.touchRuntime();
       this.setRunning(thread_id, running);
       if (running) {
@@ -938,9 +944,20 @@ class CoderSessionState {
     rt.messages = stamped;
     this.thread = { ...t, messages: stamped };
     if (!rt.pending) rt.pending = inferPending(stamped);
+    // claude-cli's live permission state never lands in the transcript the
+    // way the platform engine's does (its turn stays open, blocked in Rust,
+    // rather than returning once a tool call needs a decision) — ask the
+    // backend directly so a reload still shows the banner (QA-119).
+    if (!rt.pending && t.llm_provider === 'claude-cli') {
+      rt.pending = await coderService.getClaudeCliPending(id).catch(() => null);
+    }
     rt.multitaskMode = this.multitaskMode;
     const running = await coderService.listRunning();
-    rt.running = running.includes(id);
+    // claude-cli keeps its backend run alive while paused on an approval, so
+    // `running` can be true at the same time `pending` is — don't let that
+    // re-disable Accept/Reject (same invariant as the `onRunning` handler's
+    // QA-110 fix above).
+    rt.running = running.includes(id) && !rt.pending;
     this.runningThreadIds = new Set(running);
     this.updateRetryFromMessages(rt, rt.messages);
     this.touchRuntime();

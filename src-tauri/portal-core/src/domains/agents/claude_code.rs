@@ -20,6 +20,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -93,6 +94,19 @@ impl AgentBackend for ClaudeCodeBackend {
         } else {
             tokio::process::Command::new("claude")
         };
+        // Empty means the caller wants the backend's own default (every
+        // caller so far sets this explicitly — agents' launcher "manual",
+        // coder "acceptEdits"/"bypassPermissions" per its own permission
+        // mode). The hook relay above is always wired via `--settings`
+        // either way; whether the CLI actually calls into it depends on
+        // this mode — "bypassPermissions" skips permission checks outright
+        // (no hook calls), "acceptEdits" still asks for anything but file
+        // edits, "manual" asks for everything.
+        let permission_mode = if params.permission_mode.is_empty() {
+            "manual"
+        } else {
+            params.permission_mode.as_str()
+        };
         cmd.no_window();
         cmd.current_dir(&params.cwd)
             .arg("-p")
@@ -102,19 +116,20 @@ impl AgentBackend for ClaudeCodeBackend {
             .arg("stream-json")
             .arg("--verbose")
             .arg("--include-partial-messages")
-            // Always ask-per-tool via the hook relay above; never pass
-            // acceptEdits/bypassPermissions as the default (P1 decision).
             .arg("--permission-mode")
-            .arg("manual")
+            .arg(permission_mode)
             .arg("--settings")
-            .arg(&settings_path)
+            .arg(&settings_path);
+        if params.isolate_settings {
             // `--settings` merges with the user's real settings files rather
             // than replacing them, so a global `PreToolUse` hook would fire
             // alongside the per-run one above (double permission prompt).
             // Loading no sources at all still leaves `--settings` and any
-            // admin-managed policy settings in effect.
-            .arg("--setting-sources")
-            .arg("");
+            // admin-managed policy settings in effect. Coder opts out: it
+            // needs the user's real `~/.claude/settings.json` and project
+            // `CLAUDE.md` loaded, same as a `claude` run by hand.
+            cmd.arg("--setting-sources").arg("");
+        }
         if let Some(model) = params.model.as_deref().filter(|m| !m.trim().is_empty()) {
             cmd.arg("--model").arg(model);
         }
@@ -137,24 +152,33 @@ impl AgentBackend for ClaudeCodeBackend {
 
         let stdin = Arc::new(Mutex::new(stdin));
         let child = Arc::new(Mutex::new(child));
+        // Set by `kill()` so the pump task below can tell "we asked for this"
+        // apart from "claude died on its own" when deciding whether a silent
+        // exit deserves its stderr surfaced.
+        let killed = Arc::new(AtomicBool::new(false));
 
-        // Drains stderr quietly so a full pipe can never block claude's
-        // stdout; nothing downstream reads it in P1 — a spawn that produces
-        // no events surfaces as an empty run to the UI instead.
+        // Captured in full (rather than drained and discarded) so a run that
+        // dies before emitting anything can still tell the caller why —
+        // coder's old one-shot path depended on exactly this for its
+        // "claude failed: {stderr}" error.
+        let (stderr_tx, stderr_rx) = oneshot::channel::<String>();
         tokio::spawn(async move {
             let mut buf = String::new();
             let _ = stderr.read_to_string(&mut buf).await;
+            let _ = stderr_tx.send(buf);
         });
 
         {
             let events_tx = events_tx.clone();
             let child = Arc::clone(&child);
+            let killed = Arc::clone(&killed);
             tokio::spawn(async move {
                 // Dropped at the end of this task — i.e. once the run is
                 // over — regardless of which branch below gets there.
                 let _settings_guard = settings_guard;
                 let mut lines = BufReader::new(stdout).lines();
                 let mut subagent_ids: HashSet<String> = HashSet::new();
+                let mut any_event = false;
                 loop {
                     match lines.next_line().await {
                         Ok(Some(line)) => {
@@ -166,6 +190,7 @@ impl AgentBackend for ClaudeCodeBackend {
                                 continue; // non-JSON line on a stream-json stream
                             };
                             for e in parse_stream_json_line(&event, &mut subagent_ids) {
+                                any_event = true;
                                 if events_tx.send(e).is_err() {
                                     break;
                                 }
@@ -173,6 +198,22 @@ impl AgentBackend for ClaudeCodeBackend {
                         }
                         Ok(None) => break, // stdout closed — process is gone or going
                         Err(_) => break,
+                    }
+                }
+                // A run that produced nothing and wasn't killed by us died on
+                // its own (bad flag, auth, model) — surface claude's stderr
+                // instead of leaving the caller with a silently empty run.
+                if !any_event && !killed.load(Ordering::SeqCst) {
+                    let detail = tokio::time::timeout(Duration::from_secs(2), stderr_rx)
+                        .await
+                        .ok()
+                        .and_then(|r| r.ok())
+                        .unwrap_or_default();
+                    let detail = detail.trim();
+                    if !detail.is_empty() {
+                        let _ = events_tx.send(AgentEvent::Raw {
+                            line: detail.to_string(),
+                        });
                     }
                 }
                 // Tokio's `Child::wait` is safe to call after `kill()` already
@@ -189,6 +230,7 @@ impl AgentBackend for ClaudeCodeBackend {
             child,
             pending,
             events_tx,
+            killed,
         }))
     }
 }
@@ -198,6 +240,7 @@ struct ClaudeCodeRun {
     child: Arc<Mutex<Child>>,
     pending: PendingMap,
     events_tx: UnboundedSender<AgentEvent>,
+    killed: Arc<AtomicBool>,
 }
 
 #[async_trait]
@@ -233,6 +276,7 @@ impl RunControl for ClaudeCodeRun {
     }
 
     async fn kill(&self) -> Result<(), String> {
+        self.killed.store(true, Ordering::SeqCst);
         {
             let mut child = self.child.lock().await;
             process::start_kill(&mut child);

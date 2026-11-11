@@ -35,6 +35,10 @@
 
     running?: boolean;
 
+    /** "A live run exists" — defaults to `running`; pass `running || !!pending`
+     *  so Stop stays reachable while paused on an approval banner (QA-119). */
+    canStop?: boolean;
+
     agentMode: CoderAgentMode;
 
     effectiveMode?: CoderAgentMode | null;
@@ -88,6 +92,8 @@
     disabled = false,
 
     running = false,
+
+    canStop = running,
 
     agentMode,
 
@@ -206,6 +212,7 @@
   placeholder={followUpPlaceholder}
   {disabled}
   {running}
+  {canStop}
   {rows}
   submitOn="modifier-enter"
   queueSend={true}

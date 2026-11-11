@@ -127,6 +127,14 @@ export class CoderService {
     return invoke<string[]>('coder_list_running');
   }
 
+  /** Claude-cli engine only: the live permission request this thread's
+   *  backend run is currently blocked on, if any — reconstructs the
+   *  approval banner after a reload (QA-119). `null` for every other
+   *  engine, and once the live request is resolved or the run ends. */
+  getClaudeCliPending(threadId: string): Promise<PendingApproval | null> {
+    return invoke<PendingApproval | null>('coder_get_claude_cli_pending', { threadId });
+  }
+
   getMode(): Promise<CoderAgentMode> {
     return invoke<CoderAgentMode>('coder_get_mode');
   }

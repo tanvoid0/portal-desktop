@@ -34,6 +34,8 @@ pub async fn agents_start_run(
         model,
         prompt,
         resume_session_id,
+        permission_mode: "manual".to_string(),
+        isolate_settings: true,
     };
     service.inner().start_run(&backend_id, params).await
 }

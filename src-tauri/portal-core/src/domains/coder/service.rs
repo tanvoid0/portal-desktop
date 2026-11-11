@@ -20,9 +20,12 @@ use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue::Set, EntityTrait};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tokio::sync::{oneshot, Mutex, Semaphore};
+use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
 
 use crate::database::DatabaseManager;
+use crate::domains::agents::backend::{AgentBackend, RunControl, StartParams};
+use crate::domains::agents::claude_code::ClaudeCodeBackend;
+use crate::domains::agents::events::AgentEvent;
 use crate::domains::ai::chat_title::{
     fallback_title_from_message, is_placeholder_title, should_apply_generated_title,
     PLACEHOLDER_SESSION,
@@ -46,8 +49,8 @@ use super::tools;
 use super::types::{
     ChangeStatus, ChatMessage, CoderAgentMode, CoderRunResult, CoderSubAgent, CoderSubAgentStatus,
     CoderThread, CoderThreadKind, CoderThreadSummary, FileChange, GitHubIssueRef,
-    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PermissionMode,
-    PermissionRule, SpawnSubAgentTask,
+    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PendingApproval,
+    PermissionMode, PermissionRule, SpawnSubAgentTask,
 };
 use super::worktree::{self, WorktreeSpec};
 
@@ -138,29 +141,6 @@ const SYSTEM_PROMPT: &str = concat!(
 /// instead of agent-platform. Overloads the existing column; no migration.
 pub const CLAUDE_CLI_PROVIDER: &str = "claude-cli";
 
-/// What one Claude Code stream-json line contributed.
-#[derive(Default)]
-struct CliParsed {
-    messages: Vec<ChatMessage>,
-    session_id: Option<String>,
-    final_text: Option<String>,
-}
-
-/// Claude tool_result `content` is either a string or an array of
-/// `{type:"text", text}` blocks.
-fn tool_result_text(content: Option<&Value>) -> String {
-    match content {
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Array(arr)) => arr
-            .iter()
-            .filter_map(|b| b.get("text").and_then(Value::as_str))
-            .collect::<Vec<_>>()
-            .join("\n"),
-        Some(other) => other.to_string(),
-        None => String::new(),
-    }
-}
-
 /// Claude's file-editing tools, and the input key each one puts the path in.
 /// Anything not listed here cannot change a file, so it is not worth a snapshot.
 const CLI_EDIT_TOOLS: &[(&str, &str)] = &[
@@ -170,57 +150,13 @@ const CLI_EDIT_TOOLS: &[(&str, &str)] = &[
     ("NotebookEdit", "notebook_path"),
 ];
 
-/// `(tool_use_id, tool name, path)` for every file-editing tool call in an
-/// `assistant` event. The path is whatever Claude wrote — usually absolute.
-/// Pure, so the extraction is unit-tested without spawning the CLI.
-fn cli_edit_targets(event: &Value) -> Vec<(String, String, String)> {
-    if event.get("type").and_then(Value::as_str) != Some("assistant") {
-        return Vec::new();
-    }
-    let blocks = event
-        .get("message")
-        .and_then(|m| m.get("content"))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    blocks
-        .iter()
-        .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_use"))
-        .filter_map(|b| {
-            let name = b.get("name").and_then(Value::as_str)?;
-            let key = CLI_EDIT_TOOLS
-                .iter()
-                .find(|(t, _)| *t == name)
-                .map(|(_, k)| *k)?;
-            let path = b
-                .get("input")
-                .and_then(|i| i.get(key))
-                .and_then(Value::as_str)?;
-            let id = b.get("id").and_then(Value::as_str)?;
-            Some((id.to_string(), name.to_string(), path.to_string()))
-        })
-        .collect()
-}
-
-/// The `tool_use_id`s a `user` event reports results for — i.e. the tool calls
-/// that have now finished, so the file on disk is in its post-edit state.
-fn cli_tool_result_ids(event: &Value) -> Vec<String> {
-    if event.get("type").and_then(Value::as_str) != Some("user") {
-        return Vec::new();
-    }
-    event
-        .get("message")
-        .and_then(|m| m.get("content"))
-        .and_then(Value::as_array)
-        .map(|blocks| {
-            blocks
-                .iter()
-                .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_result"))
-                .filter_map(|b| b.get("tool_use_id").and_then(Value::as_str))
-                .map(str::to_string)
-                .collect()
-        })
-        .unwrap_or_default()
+/// `(tool_use_id, tool name, path)` if a `ToolCall` event is one of
+/// [`CLI_EDIT_TOOLS`] — the file to snapshot before the tool runs. Pure, so
+/// the extraction is unit-tested without spawning the CLI.
+fn edit_target_for_tool_call(id: &str, name: &str, input: &Value) -> Option<(String, String, String)> {
+    let key = CLI_EDIT_TOOLS.iter().find(|(t, _)| *t == name).map(|(_, k)| *k)?;
+    let path = input.get(key).and_then(Value::as_str)?;
+    Some((id.to_string(), name.to_string(), path.to_string()))
 }
 
 /// Express a path Claude reported as relative to the workspace root, which is
@@ -237,135 +173,81 @@ fn workspace_relative(root: &str, path: &str) -> Option<String> {
     (!rel.is_empty()).then_some(rel)
 }
 
-/// Map one Claude Code stream-json event into transcript messages plus any
-/// session id / final result it carries. Pure — so the transcript mapping is
-/// unit-tested without spawning the CLI.
-fn parse_cli_event(event: &Value) -> CliParsed {
-    let mut out = CliParsed::default();
-    match event.get("type").and_then(Value::as_str) {
-        Some("system") => {
-            out.session_id = event
-                .get("session_id")
-                .and_then(Value::as_str)
-                .map(str::to_string);
+/// The transcript message (if any) one backend [`AgentEvent`] contributes.
+/// `SessionStarted`, `PermissionRequest`/`PermissionResolved`, `TurnDone`,
+/// `Exited` and the delta/usage/todo events carry nothing to append — those
+/// are handled separately in the run loop. Pure — unit-tested without
+/// spawning the CLI.
+fn chat_message_for_event(event: &AgentEvent) -> Option<ChatMessage> {
+    match event {
+        AgentEvent::Message { role, text, .. } => Some(ChatMessage {
+            role: role.clone(),
+            content: Some(text.clone()),
+            tool_calls: None,
+            tool_call_id: None,
+            timestamp: Some(now_iso()),
+        }),
+        AgentEvent::ToolCall { id, name, input, .. } => {
+            Some(ChatMessage::assistant_tool_call(id, name, input, None))
         }
-        Some("assistant") => {
-            let blocks = event
-                .get("message")
-                .and_then(|m| m.get("content"))
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
-            for block in blocks {
-                match block.get("type").and_then(Value::as_str) {
-                    Some("text") => {
-                        let text = block.get("text").and_then(Value::as_str).unwrap_or("");
-                        if !text.trim().is_empty() {
-                            out.messages.push(ChatMessage {
-                                role: "assistant".into(),
-                                content: Some(text.to_string()),
-                                tool_calls: None,
-                                tool_call_id: None,
-                                timestamp: Some(now_iso()),
-                            });
-                        }
-                    }
-                    Some("tool_use") => {
-                        let id = block.get("id").and_then(Value::as_str).unwrap_or("");
-                        let name = block.get("name").and_then(Value::as_str).unwrap_or("");
-                        let input = block.get("input").cloned().unwrap_or_else(|| json!({}));
-                        out.messages
-                            .push(ChatMessage::assistant_tool_call(id, name, &input, None));
-                    }
-                    _ => {}
-                }
-            }
+        AgentEvent::ToolResult { tool_use_id, content, .. } => {
+            Some(ChatMessage::tool_result(tool_use_id, content.clone()))
         }
-        Some("user") => {
-            let blocks = event
-                .get("message")
-                .and_then(|m| m.get("content"))
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
-            for block in blocks {
-                if block.get("type").and_then(Value::as_str) == Some("tool_result") {
-                    let call_id = block
-                        .get("tool_use_id")
-                        .and_then(Value::as_str)
-                        .unwrap_or("");
-                    out.messages.push(ChatMessage::tool_result(
-                        call_id,
-                        tool_result_text(block.get("content")),
-                    ));
-                }
-            }
-        }
-        Some("result") => {
-            out.session_id = event
-                .get("session_id")
-                .and_then(Value::as_str)
-                .map(str::to_string);
-            out.final_text = event
-                .get("result")
-                .and_then(Value::as_str)
-                .filter(|s| !s.trim().is_empty())
-                .map(str::to_string);
-        }
-        _ => {}
+        _ => None,
     }
-    out
+}
+
+/// A live hook's ask, as a [`PendingApproval`] for `coder://pending`. Reuses
+/// the platform engine's own summary/rule heuristics for display even though
+/// claude-cli never consults Portal's allowlist — Claude owns its own
+/// permission decisions, so "remember" has no effect for this engine.
+fn pending_from_permission_request(
+    request_id: &str,
+    tool_name: &str,
+    tool_input: &Value,
+) -> PendingApproval {
+    PendingApproval {
+        call_id: request_id.to_string(),
+        tool: tool_name.to_string(),
+        arguments: tool_input.clone(),
+        suggested_rule: tools::suggested_rule(tool_name, tool_input),
+        summary: tools::summarize(tool_name, tool_input),
+    }
 }
 
 #[cfg(test)]
 mod claude_cli_tests {
-    use super::{
-        cli_edit_targets, cli_tool_result_ids, parse_cli_event, tool_result_text,
-        workspace_relative,
-    };
+    use super::{chat_message_for_event, edit_target_for_tool_call, pending_from_permission_request, workspace_relative};
+    use crate::domains::agents::events::AgentEvent;
     use serde_json::json;
 
     #[test]
-    fn edit_targets_picks_only_file_editing_tools() {
-        let asst = json!({"type":"assistant","message":{"content":[
-            {"type":"text","text":"Editing."},
-            {"type":"tool_use","id":"tu_read","name":"Read","input":{"file_path":"a.rs"}},
-            {"type":"tool_use","id":"tu_bash","name":"Bash","input":{"command":"npx tsc"}},
-            {"type":"tool_use","id":"tu_w","name":"Write","input":{"file_path":"/w/App.tsx"}},
-            {"type":"tool_use","id":"tu_nb","name":"NotebookEdit","input":{"notebook_path":"/w/n.ipynb"}}
-        ]}});
-        let got = cli_edit_targets(&asst);
+    fn edit_target_picks_only_file_editing_tools() {
         // Read and Bash cannot change a file, so neither earns a snapshot.
         assert_eq!(
-            got,
-            vec![
-                (
-                    "tu_w".to_string(),
-                    "Write".to_string(),
-                    "/w/App.tsx".to_string()
-                ),
-                (
-                    "tu_nb".to_string(),
-                    "NotebookEdit".to_string(),
-                    "/w/n.ipynb".to_string()
-                ),
-            ]
+            edit_target_for_tool_call("tu_read", "Read", &json!({"file_path": "a.rs"})),
+            None
         );
-        // A user event carries no edit targets, only results.
-        assert!(cli_edit_targets(&json!({"type":"user","message":{"content":[]}})).is_empty());
-    }
-
-    #[test]
-    fn tool_result_ids_come_from_user_events() {
-        let user = json!({"type":"user","message":{"content":[
-            {"type":"tool_result","tool_use_id":"tu_w","content":"ok"},
-            {"type":"text","text":"ignored"}
-        ]}});
-        assert_eq!(cli_tool_result_ids(&user), vec!["tu_w".to_string()]);
-        let asst = json!({"type":"assistant","message":{"content":[
-            {"type":"tool_use","id":"tu_w","name":"Write","input":{"file_path":"a"}}
-        ]}});
-        assert!(cli_tool_result_ids(&asst).is_empty());
+        assert_eq!(
+            edit_target_for_tool_call("tu_bash", "Bash", &json!({"command": "npx tsc"})),
+            None
+        );
+        assert_eq!(
+            edit_target_for_tool_call("tu_w", "Write", &json!({"file_path": "/w/App.tsx"})),
+            Some((
+                "tu_w".to_string(),
+                "Write".to_string(),
+                "/w/App.tsx".to_string()
+            ))
+        );
+        assert_eq!(
+            edit_target_for_tool_call("tu_nb", "NotebookEdit", &json!({"notebook_path": "/w/n.ipynb"})),
+            Some((
+                "tu_nb".to_string(),
+                "NotebookEdit".to_string(),
+                "/w/n.ipynb".to_string()
+            ))
+        );
     }
 
     #[test]
@@ -398,69 +280,66 @@ mod claude_cli_tests {
     }
 
     #[test]
-    fn parses_assistant_text_and_tool_use() {
-        let asst = json!({"type":"assistant","message":{"content":[
-            {"type":"text","text":"Reading the file."},
-            {"type":"tool_use","id":"tu_1","name":"Read","input":{"file_path":"a.rs"}}
-        ]}});
-        let p = parse_cli_event(&asst);
-        assert_eq!(p.messages.len(), 2);
-        assert_eq!(p.messages[0].role, "assistant");
-        assert_eq!(p.messages[0].content.as_deref(), Some("Reading the file."));
-        assert_eq!(p.messages[1].role, "assistant");
-        let tc = p.messages[1].tool_calls.as_ref().expect("tool_calls");
+    fn message_and_tool_call_events_map_to_chat_messages() {
+        let msg = AgentEvent::Message {
+            role: "assistant".into(),
+            text: "Reading the file.".into(),
+            parent_tool_use_id: None,
+        };
+        let got = chat_message_for_event(&msg).expect("message");
+        assert_eq!(got.role, "assistant");
+        assert_eq!(got.content.as_deref(), Some("Reading the file."));
+
+        let call = AgentEvent::ToolCall {
+            id: "tu_1".into(),
+            name: "Read".into(),
+            input: json!({"file_path": "a.rs"}),
+            parent_tool_use_id: None,
+        };
+        let got = chat_message_for_event(&call).expect("tool call");
+        let tc = got.tool_calls.as_ref().expect("tool_calls");
         assert_eq!(tc[0].id, "tu_1");
         assert_eq!(tc[0].function.name, "Read");
     }
 
     #[test]
-    fn skips_empty_assistant_text() {
-        let asst = json!({"type":"assistant","message":{"content":[{"type":"text","text":"   "}]}});
-        assert!(parse_cli_event(&asst).messages.is_empty());
+    fn tool_result_event_maps_to_a_tool_message() {
+        let result = AgentEvent::ToolResult {
+            tool_use_id: "tu_1".into(),
+            content: "file body".into(),
+            is_error: false,
+        };
+        let got = chat_message_for_event(&result).expect("tool result");
+        assert_eq!(got.role, "tool");
+        assert_eq!(got.tool_call_id.as_deref(), Some("tu_1"));
+        assert_eq!(got.content.as_deref(), Some("file body"));
     }
 
+    /// A permission request produces no transcript message and no final
+    /// text — the run stays open, waiting on `coder_approve`'s claude-cli
+    /// branch to resolve it live against the in-flight process.
     #[test]
-    fn parses_tool_result_array_and_string() {
-        let arr = json!({"type":"user","message":{"content":[
-            {"type":"tool_result","tool_use_id":"tu_1","content":[{"type":"text","text":"file body"}]}
-        ]}});
-        let p = parse_cli_event(&arr);
-        assert_eq!(p.messages.len(), 1);
-        assert_eq!(p.messages[0].role, "tool");
-        assert_eq!(p.messages[0].tool_call_id.as_deref(), Some("tu_1"));
-        assert_eq!(p.messages[0].content.as_deref(), Some("file body"));
+    fn permission_request_maps_to_pending_not_a_finished_turn() {
+        let event = AgentEvent::PermissionRequest {
+            request_id: "req_1".into(),
+            tool_name: "Bash".into(),
+            tool_input: json!({"command": "npm test"}),
+            suggestions: vec![],
+        };
+        assert!(chat_message_for_event(&event).is_none());
 
-        let s = json!({"type":"user","message":{"content":[
-            {"type":"tool_result","tool_use_id":"tu_2","content":"plain text"}
-        ]}});
-        assert_eq!(
-            parse_cli_event(&s).messages[0].content.as_deref(),
-            Some("plain text")
-        );
-    }
-
-    #[test]
-    fn captures_session_and_result() {
-        let init = json!({"type":"system","subtype":"init","session_id":"sess-1"});
-        assert_eq!(parse_cli_event(&init).session_id.as_deref(), Some("sess-1"));
-
-        let result =
-            json!({"type":"result","subtype":"success","session_id":"sess-1","result":"Done."});
-        let p = parse_cli_event(&result);
-        assert_eq!(p.session_id.as_deref(), Some("sess-1"));
-        assert_eq!(p.final_text.as_deref(), Some("Done."));
-    }
-
-    #[test]
-    fn tool_result_text_shapes() {
-        assert_eq!(tool_result_text(Some(&json!("x"))), "x");
-        assert_eq!(
-            tool_result_text(Some(
-                &json!([{"type":"text","text":"a"},{"type":"text","text":"b"}])
-            )),
-            "a\nb"
-        );
-        assert_eq!(tool_result_text(None), "");
+        let AgentEvent::PermissionRequest {
+            request_id,
+            tool_name,
+            tool_input,
+            ..
+        } = &event
+        else {
+            unreachable!()
+        };
+        let pending = pending_from_permission_request(request_id, tool_name, tool_input);
+        assert_eq!(pending.call_id, "req_1");
+        assert_eq!(pending.tool, "Bash");
     }
 }
 
@@ -513,6 +392,20 @@ pub struct CoderService {
     /// Claude Code CLI session ids keyed by thread id, for `--resume`. In-memory
     /// only — lost on restart (v1), which just starts a fresh Claude session.
     cli_sessions: Mutex<HashMap<String, String>>,
+    /// Live claude-cli runs keyed by thread id, so `coder_approve` can resolve
+    /// a pending permission directly against the in-flight process instead of
+    /// going through `spawn_run` (which would cancel it — see
+    /// `decide_claude_cli_approval`). Entries live only while the turn that
+    /// started them is still waiting; `advance_claude_cli` removes its own.
+    claude_cli_controls: Mutex<HashMap<String, Box<dyn RunControl>>>,
+    /// Last live `PermissionRequest` per thread for the still-waiting
+    /// claude-cli turn, if any. `advance_claude_cli` inserts one when the
+    /// hook relay asks and removes it once resolved (or the turn ends) —
+    /// the transcript itself never records this wait (unlike the platform
+    /// engine's, whose turn actually returns at that point), so a reload
+    /// would otherwise lose the banner with no durable trace of it having
+    /// been asked (QA-119). Queried by `coder_get_claude_cli_pending`.
+    claude_cli_pending: Mutex<HashMap<String, PendingApproval>>,
     multitask_semaphore: Arc<Semaphore>,
 }
 
@@ -541,6 +434,8 @@ impl CoderService {
             pending_commands: Mutex::new(HashMap::new()),
             edit_prefix: Mutex::new(HashMap::new()),
             cli_sessions: Mutex::new(HashMap::new()),
+            claude_cli_controls: Mutex::new(HashMap::new()),
+            claude_cli_pending: Mutex::new(HashMap::new()),
             multitask_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_PARALLEL_SUBAGENTS)),
         };
         svc.load_from_db().await;
@@ -2234,6 +2129,31 @@ impl CoderService {
         Ok(())
     }
 
+    /// Resolve a claude-cli thread's live permission request directly
+    /// against its running process. `coder_approve`'s claude-cli branch calls
+    /// this instead of `spawn_run` — going through `spawn_run`'s `Approve`
+    /// path would `runs.insert` a new handle over the one already waiting on
+    /// this exact decision, cancelling it (see `claude_cli_controls`).
+    pub async fn decide_claude_cli_approval(
+        &self,
+        thread_id: &str,
+        call_id: &str,
+        approve: bool,
+    ) -> Result<(), String> {
+        let controls = self.claude_cli_controls.lock().await;
+        let control = controls
+            .get(thread_id)
+            .ok_or("no claude-cli run is waiting on an approval for this thread")?;
+        control.decide_permission(call_id.to_string(), approve).await
+    }
+
+    /// The live permission request a claude-cli thread's turn is currently
+    /// blocked on, if any — lets the frontend reconstruct the approval
+    /// banner after a reload (QA-119; see `claude_cli_pending`).
+    pub async fn claude_cli_pending_for(&self, thread_id: &str) -> Option<PendingApproval> {
+        self.claude_cli_pending.lock().await.get(thread_id).cloned()
+    }
+
     /// Legacy synchronous entry points — kept for compatibility, now spawn.
     pub async fn retry(&self, thread_id: &str) -> Result<(), String> {
         self.prepare_retry(thread_id).await?;
@@ -2675,18 +2595,24 @@ impl CoderService {
         }
     }
 
-    /// Run a coder turn with the local Claude Code CLI (`claude -p`) instead of
-    /// agent-platform. Claude runs its *own* full tool-calling loop, so we spawn
-    /// it once, parse its stream-json transcript into [`ChatMessage`]s, stream
-    /// them to the UI via `coder://message`, and append them to the thread — the
-    /// persisted transcript is the audit trail.
+    /// Run a coder turn with the local Claude Code CLI instead of
+    /// agent-platform, via [`ClaudeCodeBackend`] — the same backend the
+    /// `agents` domain's Run launcher uses, one level below `AgentRunService`
+    /// (which has no subscriber API coder needs: it owns its runs' events
+    /// itself rather than exposing the live `RunControl`). Claude runs its
+    /// *own* full tool-calling loop; we map its [`AgentEvent`]s into
+    /// [`ChatMessage`]s, stream them to the UI via `coder://message`, and
+    /// append them to the thread — the persisted transcript is the audit trail.
     ///
     /// Portal's permission mode maps onto Claude's `--permission-mode`:
-    /// `Review` → `acceptEdits` (file edits auto-apply; headless Claude
-    /// auto-denies anything that would otherwise prompt, so it cannot run
-    /// commands), `AutoAcceptAll` → `bypassPermissions` (it can, which is what
-    /// that mode already means for the platform engine). Either way there is no
-    /// `coder://pending` round-trip — Claude owns its own approval loop.
+    /// `Review` → `acceptEdits` (file edits auto-apply; anything else — Bash,
+    /// and so every build/test command — still asks, but now via the
+    /// backend's live permission-hook relay instead of headless `-p`'s old
+    /// silent auto-deny), `AutoAcceptAll` → `bypassPermissions` (skips
+    /// permission checks outright, same as today). A `PermissionRequest`
+    /// emits `coder://pending` and keeps this turn open — `coder_approve`'s
+    /// claude-cli branch resolves it directly against `claude_cli_controls`
+    /// (see `decide_claude_cli_approval`), not through `spawn_run`.
     ///
     /// File changes ARE recorded, so the review panel works on this path too —
     /// but reconstructed from the transcript rather than from Portal's own
@@ -2704,9 +2630,6 @@ impl CoderService {
         turn: AgentTurn,
         cancel: Option<Arc<AtomicBool>>,
     ) -> Result<CoderRunResult, String> {
-        use std::process::Stdio;
-        use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-
         let is_cancelled = || {
             cancel
                 .as_ref()
@@ -2717,8 +2640,11 @@ impl CoderService {
             return Ok(self.finish(thread_id, None, false, true).await);
         }
 
-        // v1 handles a plain user turn. Approve has no meaning (no pending flow);
-        // Retry just re-sends the last user message, same as Send.
+        // A pending approval on a claude-cli thread is resolved directly
+        // against the live run (`decide_claude_cli_approval`, called from
+        // `coder_approve` without going through `spawn_run` at all), so
+        // `Approve` never legitimately reaches here. Retry just re-sends the
+        // last user message, same as Send.
         if matches!(turn, AgentTurn::Approve { .. }) {
             return Ok(self.finish(thread_id, None, false, false).await);
         }
@@ -2745,67 +2671,41 @@ impl CoderService {
         })?;
 
         let resume = self.cli_sessions.lock().await.get(thread_id).cloned();
-
-        let mut cmd = if cfg!(target_os = "windows") {
-            // npm's `claude` shim is a .cmd, which CreateProcess can't run
-            // directly — go through cmd.exe (PATH lookup, which::which confirmed).
-            let mut c = tokio::process::Command::new("cmd");
-            c.arg("/C").arg("claude");
-            c
-        } else {
-            tokio::process::Command::new("claude")
-        };
-        // Portal's own permission mode decides how much Claude may do without
-        // asking. Headless `claude -p` cannot prompt, so under `acceptEdits` any
-        // tool that would prompt (Bash, and therefore every build/test command)
-        // is auto-denied — the user opts into commands via `auto-accept-all`.
+        // Headless `-p` cannot prompt, so under `acceptEdits` anything that
+        // would otherwise prompt (Bash, and therefore every build/test
+        // command) now asks live via the hook relay instead of auto-denying
+        // — the user still opts into unattended commands via `auto-accept-all`.
         let cli_permission_mode = match self.get_permission_mode().await {
             PermissionMode::AutoAcceptAll => "bypassPermissions",
             PermissionMode::Review => "acceptEdits",
         };
-        cmd.current_dir(&workspace_root)
-            .arg("-p")
-            .arg("--output-format")
-            .arg("stream-json")
-            .arg("--verbose") // stream-json requires --verbose in -p mode
-            .arg("--permission-mode")
-            .arg(cli_permission_mode);
-        if let Some(sid) = &resume {
-            cmd.arg("--resume").arg(sid);
-        }
-        cmd.stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
 
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| format!("failed to spawn claude: {e}"))?;
-
-        // Prompt over stdin: no argv quoting of arbitrary user text.
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(prompt.as_bytes())
-                .await
-                .map_err(|e| format!("claude stdin write failed: {e}"))?;
-            // Drop closes the pipe (EOF) so claude starts generating.
-        }
-
-        // Drain stderr in a task so a full pipe can't block claude's stdout.
-        let (err_tx, err_rx) = oneshot::channel::<String>();
-        if let Some(mut stderr) = child.stderr.take() {
-            tokio::spawn(async move {
-                let mut s = String::new();
-                let _ = stderr.read_to_string(&mut s).await;
-                let _ = err_tx.send(s);
-            });
-        }
-
-        let stdout = child.stdout.take().ok_or("claude produced no stdout")?;
-        let mut lines = BufReader::new(stdout).lines();
+        let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
+        let control = ClaudeCodeBackend
+            .start(
+                StartParams {
+                    cwd: workspace_root.clone(),
+                    model: None, // QA-024: the model picker is hidden for the CLI engine
+                    prompt,
+                    resume_session_id: resume,
+                    permission_mode: cli_permission_mode.to_string(),
+                    // Coder needs the user's real `~/.claude/settings.json` and
+                    // project `CLAUDE.md` loaded, same as a `claude` run by
+                    // hand — unlike the agents launcher, which isolates.
+                    isolate_settings: false,
+                },
+                tx,
+            )
+            .await?;
+        self.claude_cli_controls
+            .lock()
+            .await
+            .insert(thread_id.to_string(), control);
 
         let mut new_messages: Vec<ChatMessage> = Vec::new();
         let mut final_text: Option<String> = None;
         let mut session_id: Option<String> = None;
+        let mut last_stderr: Option<String> = None;
         let mut cancelled = false;
         // Claude owns its own tools, so Portal never sees an edit the way the
         // platform path does. Reconstruct the review panel's input from the
@@ -2823,57 +2723,87 @@ impl CoderService {
                         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                     }
                 } => { cancelled = true; None }
-                l = lines.next_line() => Some(l),
+                ev = rx.recv() => Some(ev),
             };
-            let line = match next {
-                None => break, // cancelled
-                Some(Ok(Some(line))) => line,
-                Some(Ok(None)) => break, // eof
-                Some(Err(e)) => return Err(format!("claude stream read error: {e}")),
+            let event = match next {
+                None => break,       // cancelled
+                Some(None) => break, // backend's events_tx dropped — run is over
+                Some(Some(ev)) => ev,
             };
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            let Ok(event) = serde_json::from_str::<Value>(line) else {
-                continue; // non-JSON line on a stream-json stream — skip
-            };
-            // Snapshot before the tool runs: this line is emitted when Claude
-            // decides to call the tool, not after it has written.
-            for (id, tool, path) in cli_edit_targets(&event) {
-                if let Some(rel) = workspace_relative(&workspace_root, &path) {
-                    let before = tools::read_raw(&workspace_root, &rel);
-                    pending_edits.insert(id, (tool, rel, before));
-                }
-            }
-            // The result means the write is done, so `after` is now on disk.
-            for id in cli_tool_result_ids(&event) {
-                if let Some((tool, rel, before)) = pending_edits.remove(&id) {
-                    self.record_change(thread_id, &tool, &workspace_root, rel, before)
-                        .await;
-                }
-            }
 
-            let parsed = parse_cli_event(&event);
-            for msg in &parsed.messages {
+            let mut done = false;
+            match &event {
+                AgentEvent::SessionStarted { session_id: sid } => session_id = Some(sid.clone()),
+                // Snapshot before the tool runs: this event fires when Claude
+                // decides to call the tool, not after it has written.
+                AgentEvent::ToolCall { id, name, input, .. } => {
+                    if let Some((edit_id, tool, path)) = edit_target_for_tool_call(id, name, input)
+                    {
+                        if let Some(rel) = workspace_relative(&workspace_root, &path) {
+                            let before = tools::read_raw(&workspace_root, &rel);
+                            pending_edits.insert(edit_id, (tool, rel, before));
+                        }
+                    }
+                }
+                // The result means the write is done, so `after` is now on disk.
+                AgentEvent::ToolResult { tool_use_id, .. } => {
+                    if let Some((tool, rel, before)) = pending_edits.remove(tool_use_id) {
+                        self.record_change(thread_id, &tool, &workspace_root, rel, before)
+                            .await;
+                    }
+                }
+                // Claude's live ask, relayed through the hook — keep looping:
+                // `coder_approve`'s claude-cli branch resolves it directly on
+                // the control stashed above, so this turn stays open rather
+                // than finishing.
+                AgentEvent::PermissionRequest {
+                    request_id,
+                    tool_name,
+                    tool_input,
+                    ..
+                } => {
+                    let pending = pending_from_permission_request(request_id, tool_name, tool_input);
+                    self.claude_cli_pending
+                        .lock()
+                        .await
+                        .insert(thread_id.to_string(), pending.clone());
+                    self.emit(
+                        "coder://pending",
+                        json!({ "thread_id": thread_id, "pending": pending }),
+                    );
+                }
+                // Decided (by `decide_claude_cli_approval`, live or after a
+                // reload) — the wait this thread's `claude_cli_pending` entry
+                // tracked is over.
+                AgentEvent::PermissionResolved { .. } => {
+                    self.claude_cli_pending.lock().await.remove(thread_id);
+                }
+                AgentEvent::Raw { line } => last_stderr = Some(line.clone()),
+                AgentEvent::TurnDone { final_text: ft } => {
+                    final_text = ft.clone().filter(|s| !s.trim().is_empty());
+                    done = true;
+                }
+                AgentEvent::Exited { .. } => done = true,
+                _ => {}
+            }
+            if let Some(msg) = chat_message_for_event(&event) {
                 self.emit(
                     "coder://message",
                     json!({ "thread_id": thread_id, "message": msg }),
                 );
+                new_messages.push(msg);
             }
-            new_messages.extend(parsed.messages);
-            if parsed.session_id.is_some() {
-                session_id = parsed.session_id;
-            }
-            if parsed.final_text.is_some() {
-                final_text = parsed.final_text;
+            if done {
+                break;
             }
         }
 
-        if cancelled {
-            let _ = child.start_kill();
+        if let Some(control) = self.claude_cli_controls.lock().await.remove(thread_id) {
+            let _ = control.kill().await;
         }
-        let _ = child.wait().await;
+        // Defensive: the turn is over one way or another (done, cancelled, the
+        // process exited) — nothing should still be "pending" for it.
+        self.claude_cli_pending.lock().await.remove(thread_id);
 
         if let Some(sid) = session_id {
             self.cli_sessions
@@ -2885,7 +2815,7 @@ impl CoderService {
         // Nothing produced and not cancelled: surface claude's stderr so the
         // user gets a real reason (bad flag, auth, model) and a Retry.
         if !cancelled && final_text.is_none() && new_messages.is_empty() {
-            let detail = err_rx.await.unwrap_or_default();
+            let detail = last_stderr.unwrap_or_default();
             let detail = detail.trim();
             return Err(if detail.is_empty() {
                 "claude produced no output".to_string()

@@ -771,6 +771,7 @@
                 workspaceRoot={thread?.workspace_root ?? coderSession.workspaceRoot}
                 threadId={activeThreadId ?? undefined}
                 canEdit={canEditMessages}
+                showRemember={!isCli}
                 onEditMessage={(idx, text) => void coderSession.editMessage(idx, text)}
                 onRetry={platformBlocked ? undefined : () => coderSession.retry()}
                 decisionsDisabled={platformBlocked}
@@ -789,6 +790,7 @@
               disabled={composerDisabled}
               placeholder={platformBlocked ? blockedPlaceholder : undefined}
               {running}
+              canStop={running || !!pending}
               {queuedMessages}
               onRemoveQueued={removeQueued}
               agentMode={coderSession.agentMode}
