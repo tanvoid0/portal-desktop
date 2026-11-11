@@ -22,6 +22,10 @@
 //! - `State<'_, T>` — resolved from Tauri managed state, same instance the IPC
 //!   path would get
 //! - `AppHandle` — the running handle
+//! - `Caller` (`crate::rpc::Caller`) — who's calling and what they may do; a
+//!   plain IPC invocation gets an unrestricted one by construction (see its
+//!   `CommandArg` impl in `rpc.rs`), the daemon passes through whatever
+//!   `/rpc`'s trust gate decided
 //! - anything else — deserialised from the JSON argument object, by parameter
 //!   name, accepting the camelCase spelling the frontend sends as well as the
 //!   snake_case one
@@ -131,6 +135,8 @@ enum Source {
     State(Box<Type>),
     /// The `AppHandle` itself.
     Handle,
+    /// `crate::rpc::Caller` — who's calling, passed through from `dispatch`.
+    Caller,
     /// A JSON field, by parameter name.
     Arg { snake: String, camel: String },
 }
@@ -161,6 +167,9 @@ fn expand(func: &ItemFn, cap: Option<&str>) -> Result<proc_macro2::TokenStream, 
             },
             Source::Handle => quote! {
                 let #binding = ::core::clone::Clone::clone(app);
+            },
+            Source::Caller => quote! {
+                let #binding: crate::rpc::Caller = ::core::clone::Clone::clone(caller);
             },
             Source::Arg { snake, camel } => quote! {
                 // Absent reads as `null`, which deserialises for `Option<T>` and
@@ -204,14 +213,15 @@ fn expand(func: &ItemFn, cap: Option<&str>) -> Result<proc_macro2::TokenStream, 
         mod #register {
             use super::*;
 
-            fn call(
-                app: &::tauri::AppHandle,
+            fn call<'a>(
+                app: &'a ::tauri::AppHandle,
+                caller: &'a crate::rpc::Caller,
                 args: ::serde_json::Value,
             ) -> ::std::pin::Pin<
                 ::std::boxed::Box<
                     dyn ::std::future::Future<
                         Output = ::std::result::Result<::serde_json::Value, ::std::string::String>,
-                    > + ::std::marker::Send + '_,
+                    > + ::std::marker::Send + 'a,
                 >,
             > {
                 ::std::boxed::Box::pin(async move {
@@ -246,6 +256,7 @@ fn classify(ty: &Type, pat: &Pat) -> Result<Source, String> {
                     .ok_or_else(|| "State must be written `State<'_, T>`".into());
             }
             "AppHandle" => return Ok(Source::Handle),
+            "Caller" => return Ok(Source::Caller),
             "Window" | "WebviewWindow" => {
                 return Err(
                     "this command needs a window, so it cannot be served over /rpc — mark it \

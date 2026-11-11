@@ -238,12 +238,22 @@ remembered to wire up. So the two entry points are one edit instead:
 replaces `#[tauri::command]` and additionally registers a dispatch entry.
 
 Parameters are classified by type: `State<'_, T>` resolves from managed state
-(the same instance IPC would get), `AppHandle` gets the handle, anything else is
+(the same instance IPC would get), `AppHandle` gets the handle, `Caller`
+(`crate::rpc::Caller`) gets who's calling and what they may do, anything else is
 deserialised from the JSON argument object by name — accepting the camelCase
 spelling the frontend already sends as well as snake_case. A command taking
 `Window` cannot be served without one, so it is a compile error until marked
 `#[rpc(local_only)]`; being absent from the remote surface has to be a decision,
 not an oversight.
+
+`Caller` carries the capabilities a command can additionally check per-call
+(beyond the static `cap = "..."` already gating the whole command) — the
+coder domain's seven commands that can drive the claude-cli engine use it to
+require `agents.exec` on top of `coder` when the thread they're acting on
+runs that engine. Recorded decision: local (loopback HTTP or Tauri IPC) is
+always unrestricted — `Caller` has a hand-written `CommandArg` impl rather
+than `Deserialize` so an IPC call can never hand the daemon its own caller,
+and always resolves to `Caller::local()`.
 
 Entries are collected by `inventory` at link time, so there is no central list to
 keep in step. That mechanism fails by producing an _empty_ registry rather than a

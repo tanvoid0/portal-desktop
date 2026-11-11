@@ -431,18 +431,42 @@ async fn rpc(
     let args = body.map(|axum::Json(v)| v).unwrap_or(Value::Null);
     let args = if args.is_null() { json!({}) } else { args };
 
-    match crate::rpc::dispatch(app, &command, args).await {
+    let caller = caller_for(&trust);
+    match crate::rpc::dispatch(app, &caller, &command, args).await {
         Ok(value) => axum::Json(value).into_response(),
         Err(crate::rpc::DispatchError::Unknown) => (
             StatusCode::NOT_FOUND,
             axum::Json(json!({ "error": format!("no command `{command}`") })),
         )
             .into_response(),
-        Err(crate::rpc::DispatchError::Failed(message)) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(json!({ "error": message })),
-        )
-            .into_response(),
+        // A command-level `caller.require(...)` denial looks like any other
+        // `Failed` to `dispatch` — recovered here via `denied()` so it gets
+        // the same 403 shape the static per-command cap check above does,
+        // rather than a generic 500.
+        Err(crate::rpc::DispatchError::Failed(message)) => match caller.denied() {
+            Some(cap) => (
+                StatusCode::FORBIDDEN,
+                axum::Json(json!({ "error": message, "capability": cap })),
+            )
+                .into_response(),
+            None => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(json!({ "error": message })),
+            )
+                .into_response(),
+        },
+    }
+}
+
+/// `Trust` as the dispatch layer sees it. `Anon` maps to an empty-caps
+/// `Caller` (fails closed) rather than local/unrestricted, even though the
+/// guard above never lets an `Anon` peer reach `/rpc` today — so a future
+/// routing change can't silently hand it one.
+fn caller_for(trust: &Trust) -> crate::rpc::Caller {
+    match trust {
+        Trust::Local => crate::rpc::Caller::local(),
+        Trust::Remote { caps, .. } => crate::rpc::Caller::remote(caps.clone()),
+        Trust::Anon => crate::rpc::Caller::remote(vec![]),
     }
 }
 
@@ -726,5 +750,25 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(registered.status().as_u16(), 503);
+    }
+
+    #[test]
+    fn caller_for_local_may_exec() {
+        assert!(caller_for(&Trust::Local).require("agents.exec").is_ok());
+    }
+
+    #[test]
+    fn caller_for_coder_only_remote_may_not_exec_but_may_coder() {
+        let caller = caller_for(&Trust::Remote {
+            device_id: "dev-1".into(),
+            caps: vec!["coder".into()],
+        });
+        assert!(caller.require("agents.exec").is_err());
+        assert!(caller.require("coder").is_ok());
+    }
+
+    #[test]
+    fn caller_for_anon_fails_closed() {
+        assert!(caller_for(&Trust::Anon).require("coder").is_err());
     }
 }

@@ -16,6 +16,11 @@ use super::service::{AgentRunService, AgentSessionDetail, AgentSessionSummary, B
 // every tool input/output, file content, command output any run ever
 // touched) is sensitive for the same reason: granting it hands a remote
 // device everything, not just the one run it's currently watching.
+//
+// `agents.exec` also gates the coder domain's seven commands that can drive
+// its claude-cli engine (`domains::coder::commands::require_engine`) — same
+// RCE-equivalent shape, checked per-call via `Caller` on top of the plain
+// `coder` cap those commands already carry.
 
 #[portal_rpc_macro::rpc(cap = "agents")]
 pub async fn agents_list_backends(

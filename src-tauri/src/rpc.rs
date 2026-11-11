@@ -7,14 +7,89 @@
 
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::{Arc, OnceLock};
 
 use serde_json::Value;
 use tauri::AppHandle;
 
 type Call = for<'a> fn(
     &'a AppHandle,
+    &'a Caller,
     Value,
 ) -> Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'a>>;
+
+/// Who is making this call, and what it's allowed to do.
+///
+/// `caps: None` is local/IPC — unrestricted, the same convention `events()`,
+/// `pump()`, and `control.rs::input_allowed` already use for a loopback peer.
+/// `Some(caps)` is a remote peer, scoped to the caps its pairing granted.
+///
+/// Deliberately not `Deserialize`: that would collide with the blanket
+/// `impl<D: Deserialize> CommandArg for D` and let a remote client hand the
+/// daemon its own `Caller` as a JSON argument. Instead [`Caller`] gets a
+/// hand-written `CommandArg` impl below that always returns `local()` — this
+/// is what makes every local Tauri IPC call unrestricted, by construction
+/// rather than by a check that could be skipped.
+#[derive(Clone)]
+pub struct Caller {
+    caps: Option<Vec<String>>,
+    /// Set by the first `require()` that fails, so the daemon can read back
+    /// which capability a command's own `DispatchError::Failed` was actually
+    /// about (vs. some unrelated error) — `Arc` so the clone a `#[rpc]`
+    /// handler is handed still reports to the daemon's own copy.
+    denied: Arc<OnceLock<&'static str>>,
+}
+
+impl Caller {
+    /// The machine itself — loopback HTTP or Tauri IPC. Unrestricted. No
+    /// `Default`: unrestricted must always be spelled out at the call site,
+    /// never fallen into silently.
+    pub(crate) fn local() -> Self {
+        Self {
+            caps: None,
+            denied: Arc::new(OnceLock::new()),
+        }
+    }
+
+    /// A remote peer, scoped to `caps`.
+    pub(crate) fn remote(caps: Vec<String>) -> Self {
+        Self {
+            caps: Some(caps),
+            denied: Arc::new(OnceLock::new()),
+        }
+    }
+
+    /// Ok when local, or when `cap` is one of this caller's granted caps.
+    /// Otherwise records `cap` as denied (see [`Caller::denied`]) and
+    /// returns the same refusal message the static per-command cap check
+    /// already uses.
+    pub fn require(&self, cap: &'static str) -> Result<(), String> {
+        match &self.caps {
+            None => Ok(()),
+            Some(caps) if caps.iter().any(|c| c == cap) => Ok(()),
+            Some(_) => {
+                let _ = self.denied.set(cap);
+                Err("this device is not permitted to call this command".to_string())
+            }
+        }
+    }
+
+    /// The capability the most recent failed `require()` denied, if any.
+    pub(crate) fn denied(&self) -> Option<&'static str> {
+        self.denied.get().copied()
+    }
+}
+
+/// Local IPC calls never carry a `Caller` argument from the frontend — this
+/// is what makes them unrestricted rather than relying on every caller to
+/// remember to construct one.
+impl<'de, R: tauri::Runtime> tauri::ipc::CommandArg<'de, R> for Caller {
+    fn from_command(
+        _command: tauri::ipc::CommandItem<'de, R>,
+    ) -> Result<Self, tauri::ipc::InvokeError> {
+        Ok(Caller::local())
+    }
+}
 
 /// One command, as the daemon sees it.
 pub struct Entry {
@@ -50,7 +125,11 @@ pub const DEFAULT_CAPS: &[&str] = &[
 /// permission prompts it raises (arbitrary shell/file-write included) — same
 /// shape of risk as `terminal.exec`, so it gets the same opt-in treatment: a
 /// paired device can still be granted it, just never by leaving the approval
-/// dialog untouched.
+/// dialog untouched. Also covers the coder domain's `claude-cli` engine
+/// (`CLAUDE_CLI_PROVIDER`) for the same reason: a coder thread running it is
+/// an agent-CLI subprocess too, so `coder/commands.rs::require_engine` gates
+/// the seven commands that drive one behind this cap on top of the plain
+/// `coder` one.
 ///
 /// `remote.input` moves the mouse and types on the keyboard — a paired phone
 /// that holds it can do anything a person sitting at this PC could, so it
@@ -62,8 +141,12 @@ pub const DEFAULT_CAPS: &[&str] = &[
 /// produced in an agent run, so it opts in rather than riding the default
 /// grant the way the live `agents` cap (which run/model info, not history)
 /// does.
-pub const SENSITIVE_CAPS: &[&str] =
-    &["terminal.exec", "agents.exec", "agents.history", REMOTE_INPUT_CAP];
+pub const SENSITIVE_CAPS: &[&str] = &[
+    "terminal.exec",
+    "agents.exec",
+    "agents.history",
+    REMOTE_INPUT_CAP,
+];
 
 /// Gates `/control`'s mouse/keyboard frames (`daemon::control::handle_client_frame`),
 /// not an `/rpc` command — there is no command behind it to carry a
@@ -128,10 +211,17 @@ fn lookup(name: &str) -> Option<&'static Entry> {
         .find(|entry| entry.name == name)
 }
 
-/// Run a command by name with a JSON argument object.
-pub async fn dispatch(app: &AppHandle, name: &str, args: Value) -> Result<Value, DispatchError> {
+/// Run a command by name with a JSON argument object, on behalf of `caller`.
+pub async fn dispatch(
+    app: &AppHandle,
+    caller: &Caller,
+    name: &str,
+    args: Value,
+) -> Result<Value, DispatchError> {
     let entry = lookup(name).ok_or(DispatchError::Unknown)?;
-    (entry.call)(app, args).await.map_err(DispatchError::Failed)
+    (entry.call)(app, caller, args)
+        .await
+        .map_err(DispatchError::Failed)
 }
 
 #[cfg(test)]
@@ -314,5 +404,33 @@ mod tests {
         assert_eq!(capability("agents_start_run"), Some("agents.exec"));
         assert_eq!(capability("agents_list_sessions"), Some("agents.history"));
         assert!(capability("execute_command_in_directory").is_none());
+    }
+
+    #[test]
+    fn local_caller_is_unrestricted() {
+        assert!(Caller::local().require("agents.exec").is_ok());
+    }
+
+    #[test]
+    fn remote_caller_is_refused_a_cap_it_lacks_and_records_which_one() {
+        let caller = Caller::remote(vec!["coder".to_string()]);
+        let err = caller.require("agents.exec");
+        assert!(err.is_err());
+        assert_eq!(caller.denied(), Some("agents.exec"));
+    }
+
+    #[test]
+    fn remote_caller_holding_the_cap_is_allowed() {
+        let caller = Caller::remote(vec!["coder".to_string(), "agents.exec".to_string()]);
+        assert!(caller.require("agents.exec").is_ok());
+        assert_eq!(caller.denied(), None);
+    }
+
+    #[test]
+    fn denied_is_visible_through_a_clone() {
+        let caller = Caller::remote(vec!["coder".to_string()]);
+        let clone = caller.clone();
+        assert!(clone.require("agents.exec").is_err());
+        assert_eq!(caller.denied(), Some("agents.exec"));
     }
 }
