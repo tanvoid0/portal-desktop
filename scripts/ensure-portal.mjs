@@ -29,7 +29,12 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SRC_TAURI = join(REPO_ROOT, 'src-tauri');
-const EXE_PATH = join(SRC_TAURI, 'target', 'debug', process.platform === 'win32' ? 'portal_desktop.exe' : 'portal_desktop');
+const EXE_PATH = join(
+  SRC_TAURI,
+  'target',
+  'debug',
+  process.platform === 'win32' ? 'portal_desktop.exe' : 'portal_desktop'
+);
 
 const PORT = process.env.PORTAL_DAEMON_PORT ?? '18420';
 const HEALTH_URL = `http://127.0.0.1:${PORT}/health`;
@@ -138,7 +143,10 @@ async function main() {
     });
   });
   if (buildCode !== 0) {
-    return finish(1, `cargo build failed (exit ${buildCode}).\n--- tail of ${LOG_PATH} ---\n${logTail()}`);
+    return finish(
+      1,
+      `cargo build failed (exit ${buildCode}).\n--- tail of ${LOG_PATH} ---\n${logTail()}`
+    );
   }
 
   log.write(`\n--- ${new Date().toISOString()} run ${EXE_PATH} ---\n`);
@@ -153,7 +161,10 @@ async function main() {
 
   const up = await pollHealth(180_000);
   if (up) return finish(0, `Portal is up on :${PORT}`);
-  finish(1, `Portal did not come up within 180s after launch.\n--- tail of ${LOG_PATH} ---\n${logTail() || '(empty — the process may not have started at all)'}`);
+  finish(
+    1,
+    `Portal did not come up within 180s after launch.\n--- tail of ${LOG_PATH} ---\n${logTail() || '(empty — the process may not have started at all)'}`
+  );
 }
 
 main();
