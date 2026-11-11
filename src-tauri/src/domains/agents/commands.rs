@@ -8,6 +8,11 @@ use super::backend::StartParams;
 use super::events::AgentEvent;
 use super::service::{AgentRunService, BackendInfo};
 
+// `agents` (read-only: which backends/models exist, replaying a run's own
+// events) is in `DEFAULT_CAPS`. `agents.exec` (spawning a process, and
+// approving/denying the tool calls it makes) is RCE-equivalent and lives in
+// `SENSITIVE_CAPS` instead — same split as `terminal`/`terminal.exec`.
+
 #[portal_rpc_macro::rpc(cap = "agents")]
 pub async fn agents_list_backends(
     service: State<'_, Arc<AgentRunService>>,
@@ -15,7 +20,7 @@ pub async fn agents_list_backends(
     Ok(service.list_backends().await)
 }
 
-#[portal_rpc_macro::rpc(cap = "agents")]
+#[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_start_run(
     service: State<'_, Arc<AgentRunService>>,
     backend_id: String,
@@ -33,7 +38,7 @@ pub async fn agents_start_run(
     service.inner().start_run(&backend_id, params).await
 }
 
-#[portal_rpc_macro::rpc(cap = "agents")]
+#[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_send_user(
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,
@@ -42,7 +47,7 @@ pub async fn agents_send_user(
     service.send_user(&run_id, text).await
 }
 
-#[portal_rpc_macro::rpc(cap = "agents")]
+#[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_decide_permission(
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,
@@ -52,7 +57,7 @@ pub async fn agents_decide_permission(
     service.decide_permission(&run_id, request_id, allow).await
 }
 
-#[portal_rpc_macro::rpc(cap = "agents")]
+#[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_interrupt(
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,
@@ -60,7 +65,7 @@ pub async fn agents_interrupt(
     service.interrupt(&run_id).await
 }
 
-#[portal_rpc_macro::rpc(cap = "agents")]
+#[portal_rpc_macro::rpc(cap = "agents.exec")]
 pub async fn agents_cancel(
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,

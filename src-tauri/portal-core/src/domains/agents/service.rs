@@ -4,6 +4,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::json;
@@ -21,6 +22,10 @@ use super::events::AgentEvent;
 const RING_CAPACITY: usize = 500;
 /// How many backend processes may run at once.
 const MAX_CONCURRENT_RUNS: usize = 10;
+/// How long a finished run's entry (ring buffer included) stays in `runs`
+/// after its process exits, so a `get_events` call already in flight still
+/// sees the final events before the entry is freed.
+const EVENT_REPLAY_GRACE: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/agents/generated/")]
@@ -121,9 +126,10 @@ impl AgentRunService {
         let svc = Arc::clone(self);
         let rid = run_id.clone();
         tokio::spawn(async move {
-            let _permit = permit;
-            while let Some(event) = rx.recv().await {
+            loop {
+                let Some(event) = rx.recv().await else { break };
                 svc.emit(&rid, &event).await;
+                let exited = matches!(event, AgentEvent::Exited { .. });
                 let mut runs = svc.runs.lock().await;
                 if let Some(entry) = runs.get_mut(&rid) {
                     if entry.ring.len() >= RING_CAPACITY {
@@ -131,7 +137,23 @@ impl AgentRunService {
                     }
                     entry.ring.push_back(event);
                 }
+                drop(runs);
+                // `rx` otherwise never closes on its own: `runs` still holds
+                // this run's `RunControl`, and so a live `events_tx` clone,
+                // for as long as the entry stays in the map. Breaking here
+                // instead of waiting for channel-close is what releases the
+                // concurrency permit below the moment the run actually ends.
+                if exited {
+                    break;
+                }
             }
+            drop(permit);
+
+            // Grace period for a client mid-poll of `get_events` to still
+            // see the final events, then free the entry so `runs` doesn't
+            // grow for the life of the process.
+            tokio::time::sleep(EVENT_REPLAY_GRACE).await;
+            svc.runs.lock().await.remove(&rid);
         });
 
         Ok(run_id)

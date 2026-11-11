@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invokeClient } from '$lib/utils/invokeClient';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AgentEvent, BackendInfo } from '../generated';
 
@@ -6,7 +6,7 @@ import type { AgentEvent, BackendInfo } from '../generated';
  * process spawn, and the permission-hook relay all live in Rust. */
 export const agentsApi = {
   listBackends(): Promise<BackendInfo[]> {
-    return invoke<BackendInfo[]>('agents_list_backends');
+    return invokeClient.post<BackendInfo[]>('agents_list_backends');
   },
 
   startRun(
@@ -16,7 +16,7 @@ export const agentsApi = {
     model?: string | null,
     resumeSessionId?: string | null
   ): Promise<string> {
-    return invoke<string>('agents_start_run', {
+    return invokeClient.post<string>('agents_start_run', {
       backendId,
       cwd,
       prompt,
@@ -26,24 +26,24 @@ export const agentsApi = {
   },
 
   sendUser(runId: string, text: string): Promise<void> {
-    return invoke<void>('agents_send_user', { runId, text });
+    return invokeClient.post<void>('agents_send_user', { runId, text });
   },
 
   decidePermission(runId: string, requestId: string, allow: boolean): Promise<void> {
-    return invoke<void>('agents_decide_permission', { runId, requestId, allow });
+    return invokeClient.post<void>('agents_decide_permission', { runId, requestId, allow });
   },
 
   interrupt(runId: string): Promise<void> {
-    return invoke<void>('agents_interrupt', { runId });
+    return invokeClient.post<void>('agents_interrupt', { runId });
   },
 
   cancel(runId: string): Promise<void> {
-    return invoke<void>('agents_cancel', { runId });
+    return invokeClient.post<void>('agents_cancel', { runId });
   },
 
   /** Ring-buffer snapshot, for a UI that attaches after the run already started. */
   getEvents(runId: string): Promise<AgentEvent[]> {
-    return invoke<AgentEvent[]>('agents_get_events', { runId });
+    return invokeClient.post<AgentEvent[]>('agents_get_events', { runId });
   },
 
   /** Live event stream for every run — filter by `run_id` in the callback. */

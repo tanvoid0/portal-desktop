@@ -7,7 +7,9 @@
   import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
+  import { PageError, PageLoading } from '$lib/components/shell';
   import CoderFeed from '$lib/domains/coder/components/CoderFeed.svelte';
+  import ApprovalBanner from '$lib/domains/coder/components/ApprovalBanner.svelte';
   import RunLauncherForm from '$lib/domains/agents/components/RunLauncherForm.svelte';
   import { createAgentRunState } from '$lib/domains/agents/state/agentRun.svelte.js';
   import { agentBackendsQuery } from '$lib/domains/agents/queries/agentsQueries.js';
@@ -15,6 +17,12 @@
   const run = createAgentRunState();
   const backendsQuery = createQuery(agentBackendsQuery);
   let draft = $state('');
+
+  // The first pending approval renders inside `CoderFeed` (its existing single-slot
+  // prop, shared with the coder domain); any concurrent extras render as their own
+  // banners right after it — see `eventsToMessages.ts` for why `pending` is a list.
+  const firstPending = $derived(run.view.pending[0] ?? null);
+  const extraPending = $derived(run.view.pending.slice(1));
 
   onMount(() => () => run.destroy());
 
@@ -39,23 +47,55 @@
 
 <div class="flex h-full w-full flex-col overflow-hidden">
   {#if !run.runId}
-    <ScrollArea class="min-h-0 flex-1">
-      <RunLauncherForm
-        backends={backendsQuery.data ?? []}
-        busy={run.starting}
-        onStart={handleStart}
-      />
-    </ScrollArea>
+    {#if backendsQuery.isPending}
+      <PageLoading message="Loading agent backends…" />
+    {:else if backendsQuery.isError}
+      <div class="p-4">
+        <PageError
+          message={backendsQuery.error instanceof Error
+            ? backendsQuery.error.message
+            : 'Failed to load agent backends'}
+          onRetry={() => backendsQuery.refetch()}
+        />
+      </div>
+    {:else}
+      <ScrollArea class="min-h-0 flex-1">
+        <RunLauncherForm
+          backends={backendsQuery.data ?? []}
+          busy={run.starting}
+          onStart={handleStart}
+        />
+      </ScrollArea>
+    {/if}
   {:else}
+    <div
+      class="divider-edge-b flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground"
+    >
+      <span>{run.view.ended ? 'Run ended' : 'Run in progress'}</span>
+      {#if run.view.ended}
+        <Button size="sm" variant="outline" onclick={() => run.reset()}>New run</Button>
+      {:else}
+        <Button size="sm" variant="outline" onclick={() => run.cancel()}>End run</Button>
+      {/if}
+    </div>
+
     <ScrollArea class="min-h-0 flex-1">
-      <div class="mx-auto max-w-3xl p-4">
+      <div class="mx-auto max-w-3xl space-y-3 p-4">
         <CoderFeed
           messages={run.view.messages}
           streamingText={run.view.streamingText}
           running={run.view.running}
-          pending={run.view.pending}
-          onDecision={(approve) => run.decide(approve)}
+          pending={firstPending}
+          showRemember={false}
+          onDecision={(approve) => firstPending && run.decide(firstPending.call_id, approve)}
         />
+        {#each extraPending as approval (approval.call_id)}
+          <ApprovalBanner
+            pending={approval}
+            showRemember={false}
+            onDecision={(approve) => run.decide(approval.call_id, approve)}
+          />
+        {/each}
       </div>
     </ScrollArea>
 

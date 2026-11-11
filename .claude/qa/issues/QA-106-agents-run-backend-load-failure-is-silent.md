@@ -1,7 +1,7 @@
 ---
 id: QA-106
 title: Agents → Run launcher fails silently when the backend list can't load — empty Select, no error, no retry
-status: open
+status: verified
 severity: major
 kind: bug
 area: agents/run
@@ -67,8 +67,46 @@ empty forever with no feedback.
 
 ## Fix
 
-<!-- coder: root cause, files changed, checks run, other QA ids this also fixes -->
+Root cause: `+page.svelte` only ever read `backendsQuery.data`, never
+`.isPending`/`.isError`/`.error`, so a failed or still-loading query rendered
+identically to "zero backends installed" — an empty `Select` forever.
+
+Files changed:
+- `src/routes/agents/run/+page.svelte` — branch on `backendsQuery.isPending` /
+  `.isError` before rendering `RunLauncherForm`, using the shared
+  `PageLoading` / `PageError` (`$lib/components/shell`) components, matching
+  `src/routes/devices/+page.svelte`'s pattern. `PageError`'s `onRetry` calls
+  `backendsQuery.refetch()`.
+
+Checks run: `pnpm check`, `pnpm lint` (see task report).
+
+No other open QA id shares this root cause.
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-11, mode: tauri (real backend, CDP :9222, live app rebuilt from the
+working tree including this fix).
+
+1. Normal path: opened `/agents/run` fresh — `backendsQuery` resolves, the
+   "Agent" Select shows "Claude Code" immediately, no loading flash stuck,
+   no console errors. (`node .claude/qa/scripts/qa-sweep-agents-backends.mjs`,
+   `.claude/qa/shots/sweep-agents-backend-options.png`.)
+2. Forced-error path: intercepted the real
+   `http://ipc.localhost/agents_list_backends` IPC request with
+   Playwright's `page.route()` and made it fail (500), then reloaded the
+   page. Result: the page now renders `PageError` — "Something went wrong"
+   with a "Retry" button — instead of the old silent empty `Select`
+   (`.claude/qa/shots/QA-106-after-forced-error-2.png`). Clicking Retry
+   after clearing the forced failure re-fetches and the form recovers to
+   the normal populated state
+   (`.claude/qa/shots/QA-106-after-forced-error-retry-recovered.png`).
+   Script: `node .claude/qa/scripts/qa-106-forced-error2.mjs`.
+
+Both paths match the fix described above and the `devices/+page.svelte`
+pattern it was modeled on. Closing as verified.
+
+One new, separate issue found while forcing the error: the message text
+shown is the unhelpful `[object ArrayBuffer]` rather than "Failed to load
+agent backends" — filed as QA-108 (root cause is in the shared
+`invokeClient.ts`, not specific to this page, so it doesn't block closing
+this one).

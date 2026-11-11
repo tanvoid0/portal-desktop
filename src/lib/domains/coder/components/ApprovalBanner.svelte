@@ -8,10 +8,13 @@
   interface Props {
     pending: PendingApproval;
     busy?: boolean;
+    /** Hide "Accept & remember" + the rule input for callers with no remember-rule
+     *  persistence (e.g. the agents domain — see QA-112). Defaults on for coder. */
+    showRemember?: boolean;
     onDecision: (approve: boolean, remember: boolean, editedPattern?: string) => void;
   }
 
-  let { pending, busy = false, onDecision }: Props = $props();
+  let { pending, busy = false, showRemember = true, onDecision }: Props = $props();
 
   // Editable allowlist pattern for the "accept & remember" action.
   // Initialized/reset from the current approval via the effect below.
@@ -47,21 +50,25 @@
     {/if}
   </div>
 
-  <div class="mb-3 flex items-center gap-2">
-    <span class="text-xs text-muted-foreground">remember rule</span>
-    <Input bind:value={rule} class="flex-1 font-mono text-xs" placeholder="pattern to allow" />
-  </div>
+  {#if showRemember}
+    <div class="mb-3 flex items-center gap-2">
+      <span class="text-xs text-muted-foreground">remember rule</span>
+      <Input bind:value={rule} class="flex-1 font-mono text-xs" placeholder="pattern to allow" />
+    </div>
+  {/if}
 
   <div class="flex flex-wrap gap-2">
     <Button size="sm" disabled={busy} onclick={() => onDecision(true, false)}>Accept once</Button>
-    <Button
-      size="sm"
-      variant="secondary"
-      disabled={busy}
-      onclick={() => onDecision(true, true, rule)}
-    >
-      Accept &amp; remember
-    </Button>
+    {#if showRemember}
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={busy}
+        onclick={() => onDecision(true, true, rule)}
+      >
+        Accept &amp; remember
+      </Button>
+    {/if}
     <Button
       size="sm"
       variant="destructive"

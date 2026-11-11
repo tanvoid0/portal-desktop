@@ -67,16 +67,23 @@
     </div>
   </div>
 
-  {#if selected && selected.models.length > 0}
+  {#if selected}
     <div class="grid gap-1.5">
       <Label for="agent-model">Model</Label>
-      <Select
-        id="agent-model"
-        options={selected.models.map((m) => ({ value: m.id, label: m.label }))}
-        value={model}
-        onValueChange={(v) => (model = v)}
-        placeholder="Default"
-      />
+      {#if selected.models.length > 0}
+        <Select
+          id="agent-model"
+          options={selected.models.map((m) => ({ value: m.id, label: m.label }))}
+          value={model}
+          onValueChange={(v) => (model = v)}
+          placeholder="Default"
+        />
+      {:else}
+        <!-- This backend has no enumerable model list (see `BackendModel`) —
+             free-text so the user can still pick a model instead of being
+             stuck on the backend's default. -->
+        <Input id="agent-model" bind:value={model} placeholder="Default (type a model name)" />
+      {/if}
     </div>
   {/if}
 

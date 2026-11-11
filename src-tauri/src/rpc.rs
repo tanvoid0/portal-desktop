@@ -34,11 +34,19 @@ inventory::collect!(Entry);
 /// `terminal.exec` is deliberately absent — letting a phone run commands on this
 /// PC is opt-in per device (the dialog renders it unchecked). Credentials carry
 /// no capability at all, so they can never be granted to anyone.
-pub const DEFAULT_CAPS: &[&str] = &["coder", "projects", "tasks", "dashboard", "terminal"];
+pub const DEFAULT_CAPS: &[&str] = &[
+    "coder", "projects", "tasks", "dashboard", "terminal", "agents",
+];
 
 /// Capabilities rendered unchecked in the approval dialog: granting one lets a
 /// remote device do something that reaches outside the app's own data.
-pub const SENSITIVE_CAPS: &[&str] = &["terminal.exec"];
+///
+/// `agents.exec` starts an agent-CLI subprocess and answers the tool-call
+/// permission prompts it raises (arbitrary shell/file-write included) — same
+/// shape of risk as `terminal.exec`, so it gets the same opt-in treatment: a
+/// paired device can still be granted it, just never by leaving the approval
+/// dialog untouched.
+pub const SENSITIVE_CAPS: &[&str] = &["terminal.exec", "agents.exec"];
 
 /// Why a call could not be made, as opposed to a call that ran and failed.
 #[derive(Debug)]
@@ -171,6 +179,21 @@ mod tests {
         );
     }
 
+    /// Starting an agent run spawns a process and answers its tool-call
+    /// permission prompts — RCE-equivalent, so it gets the same opt-in
+    /// treatment as `terminal.exec` rather than the default grant.
+    #[test]
+    fn agents_exec_is_sensitive_not_default() {
+        assert!(
+            !DEFAULT_CAPS.contains(&"agents.exec"),
+            "agents.exec must not be granted by default"
+        );
+        assert!(
+            SENSITIVE_CAPS.contains(&"agents.exec"),
+            "agents.exec must be listed as sensitive so the dialog unchecks it"
+        );
+    }
+
     /// `capabilities()` is what the exact cap-list guard (added once domains are
     /// annotated) and `remote_list_capabilities` build on, so it must come back
     /// sorted and free of duplicates whatever the registry holds.
@@ -197,6 +220,8 @@ mod tests {
         assert_eq!(
             capabilities(),
             vec![
+                "agents",
+                "agents.exec",
                 "coder",
                 "dashboard",
                 "projects",
@@ -214,6 +239,8 @@ mod tests {
         assert_eq!(capability("create_task"), Some("tasks"));
         assert_eq!(capability("load_command_history"), Some("terminal"));
         assert_eq!(capability("create_terminal_process"), Some("terminal.exec"));
+        assert_eq!(capability("agents_list_backends"), Some("agents"));
+        assert_eq!(capability("agents_start_run"), Some("agents.exec"));
         assert!(capability("execute_command_in_directory").is_none());
     }
 }

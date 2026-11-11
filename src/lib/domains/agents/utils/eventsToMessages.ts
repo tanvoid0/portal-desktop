@@ -10,7 +10,9 @@ export interface AgentRunView {
   messages: ChatMessage[];
   /** In-flight assistant text not yet folded into `messages` (a `message` event does that). */
   streamingText: string;
-  pending: PendingApproval | null;
+  /** Every approval still awaiting a decision — a subagent can request its own
+   *  concurrently with the main turn's, so this is a list, not one slot. */
+  pending: PendingApproval[];
   /** A turn is in flight (no tool call/final text yet to show instead). */
   running: boolean;
   /** The backend process itself has exited — the run is over, not just the turn. */
@@ -31,7 +33,7 @@ function summarizePermission(toolName: string, input: unknown): string {
 export function eventsToMessages(events: AgentEvent[]): AgentRunView {
   const messages: ChatMessage[] = [];
   let streamingText = '';
-  let pending: PendingApproval | null = null;
+  const pending: PendingApproval[] = [];
   let running = false;
   let ended = false;
   let sessionId: string | null = null;
@@ -67,18 +69,24 @@ export function eventsToMessages(events: AgentEvent[]): AgentRunView {
       case 'tool_result':
         messages.push({ role: 'tool', content: e.content, tool_call_id: e.tool_use_id });
         break;
-      case 'permission_request':
-        pending = {
+      case 'permission_request': {
+        const existing = pending.findIndex((p) => p.call_id === e.request_id);
+        const approval: PendingApproval = {
           call_id: e.request_id,
           tool: e.tool_name,
           arguments: e.tool_input,
           suggested_rule: '',
           summary: summarizePermission(e.tool_name, e.tool_input),
         };
+        if (existing >= 0) pending[existing] = approval;
+        else pending.push(approval);
         break;
-      case 'permission_resolved':
-        if (pending?.call_id === e.request_id) pending = null;
+      }
+      case 'permission_resolved': {
+        const idx = pending.findIndex((p) => p.call_id === e.request_id);
+        if (idx >= 0) pending.splice(idx, 1);
         break;
+      }
       case 'turn_done':
         running = false;
         break;
@@ -90,5 +98,11 @@ export function eventsToMessages(events: AgentEvent[]): AgentRunView {
         break;
     }
   }
+  // A pending approval pauses the turn — `ApprovalBanner`'s buttons are
+  // disabled via `busy={running}` (shared with the coder domain, where
+  // `running` already means "not safe to submit a decision right now"),
+  // so `running` must go false for as long as anything is unresolved or the
+  // decision buttons can never be clicked. See QA-110.
+  if (pending.length > 0) running = false;
   return { messages, streamingText, pending, running, ended, sessionId };
 }

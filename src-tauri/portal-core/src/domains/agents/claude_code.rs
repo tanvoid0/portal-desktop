@@ -24,12 +24,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::Json;
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin};
 use tokio::sync::{mpsc::UnboundedSender, oneshot, Mutex};
+
+use crate::process_ext::NoWindowExt;
 
 use super::backend::{AgentBackend, BackendModel, RunControl, StartParams};
 use super::events::AgentEvent;
@@ -73,10 +75,25 @@ impl AgentBackend for ClaudeCodeBackend {
             .map_err(|_| "`claude` CLI not found on PATH. Install Claude Code.".to_string())?;
 
         let run_id = uuid::Uuid::new_v4().to_string();
-        let (hook_port, pending, shutdown_tx) = spawn_permission_hook(events_tx.clone()).await?;
-        let settings_path = write_hook_settings(&run_id, hook_port)?;
+        let (hook_port, hook_token, pending, shutdown_tx) =
+            spawn_permission_hook(events_tx.clone()).await?;
+        let settings_path = write_hook_settings(&run_id, hook_port, &hook_token)?;
+        // Removed on every exit path below — spawn failure, an early `?`
+        // return, or (moved into the stdout pump) a normal run end.
+        let settings_guard = TempSettingsFile(settings_path.clone());
 
-        let mut cmd = tokio::process::Command::new("claude");
+        // npm's `claude` shim is a `.cmd`, which `CreateProcess` can't run
+        // directly — go through `cmd.exe` on Windows, same as coder's
+        // `advance_claude_cli` (the `which` call above confirmed `claude` is
+        // on PATH either way, so this resolves the same binary).
+        let mut cmd = if cfg!(target_os = "windows") {
+            let mut c = tokio::process::Command::new("cmd");
+            c.arg("/C").arg("claude");
+            c
+        } else {
+            tokio::process::Command::new("claude")
+        };
+        cmd.no_window();
         cmd.current_dir(&params.cwd)
             .arg("-p")
             .arg("--input-format")
@@ -90,7 +107,14 @@ impl AgentBackend for ClaudeCodeBackend {
             .arg("--permission-mode")
             .arg("manual")
             .arg("--settings")
-            .arg(&settings_path);
+            .arg(&settings_path)
+            // `--settings` merges with the user's real settings files rather
+            // than replacing them, so a global `PreToolUse` hook would fire
+            // alongside the per-run one above (double permission prompt).
+            // Loading no sources at all still leaves `--settings` and any
+            // admin-managed policy settings in effect.
+            .arg("--setting-sources")
+            .arg("");
         if let Some(model) = params.model.as_deref().filter(|m| !m.trim().is_empty()) {
             cmd.arg("--model").arg(model);
         }
@@ -99,7 +123,8 @@ impl AgentBackend for ClaudeCodeBackend {
         }
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
 
         let mut child = cmd
             .spawn()
@@ -124,8 +149,10 @@ impl AgentBackend for ClaudeCodeBackend {
         {
             let events_tx = events_tx.clone();
             let child = Arc::clone(&child);
-            let settings_path = settings_path.clone();
             tokio::spawn(async move {
+                // Dropped at the end of this task — i.e. once the run is
+                // over — regardless of which branch below gets there.
+                let _settings_guard = settings_guard;
                 let mut lines = BufReader::new(stdout).lines();
                 let mut subagent_ids: HashSet<String> = HashSet::new();
                 loop {
@@ -154,7 +181,6 @@ impl AgentBackend for ClaudeCodeBackend {
                 let code = child.lock().await.wait().await.ok().and_then(|s| s.code());
                 let _ = events_tx.send(AgentEvent::Exited { code });
                 let _ = shutdown_tx.send(());
-                let _ = std::fs::remove_file(&settings_path);
             });
         }
 
@@ -207,8 +233,19 @@ impl RunControl for ClaudeCodeRun {
     }
 
     async fn kill(&self) -> Result<(), String> {
-        let mut child = self.child.lock().await;
-        process::kill_and_wait(&mut child).await;
+        {
+            let mut child = self.child.lock().await;
+            process::start_kill(&mut child);
+        }
+        // Emit the terminal event ourselves rather than wait on the
+        // stdout-pump task's own EOF-triggered `Exited` (claude_code.rs's
+        // pump loop above) — that's a race against the OS actually tearing
+        // the process down and, on a kill we requested ourselves, there's no
+        // reason to make the caller (and every other run sharing
+        // `AgentRunService::runs`) wait on it. The pump task still sends its
+        // own `Exited` once it reaps the real exit code; the service-level
+        // loop breaks on the first one and ignores the second.
+        let _ = self.events_tx.send(AgentEvent::Exited { code: None });
         Ok(())
     }
 }
@@ -247,22 +284,28 @@ type PendingMap = Arc<Mutex<HashMap<String, oneshot::Sender<Value>>>>;
 struct HookState {
     events_tx: UnboundedSender<AgentEvent>,
     pending: PendingMap,
+    /// Per-run secret baked into the route path (`/hook/<token>`) so nothing
+    /// else reaching this loopback port during the run's lifetime can inject
+    /// a fake permission decision for it.
+    token: String,
 }
 
 /// Binds an ephemeral localhost listener for this run's `PermissionRequest`
-/// hook and returns its port, the pending-request map `decide_permission`
-/// resolves into, and a shutdown handle torn down when the run's stdout pump
-/// sees the process exit.
+/// hook and returns its port, a per-run token the hook URL embeds, the
+/// pending-request map `decide_permission` resolves into, and a shutdown
+/// handle torn down when the run's stdout pump sees the process exit.
 async fn spawn_permission_hook(
     events_tx: UnboundedSender<AgentEvent>,
-) -> Result<(u16, PendingMap, oneshot::Sender<()>), String> {
+) -> Result<(u16, String, PendingMap, oneshot::Sender<()>), String> {
+    let token = uuid::Uuid::new_v4().to_string();
     let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
     let state = HookState {
         events_tx,
         pending: pending.clone(),
+        token: token.clone(),
     };
     let app = axum::Router::new()
-        .route("/hook", axum::routing::post(permission_hook_handler))
+        .route("/hook/{token}", axum::routing::post(permission_hook_handler))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -282,17 +325,22 @@ async fn spawn_permission_hook(
             .await;
     });
 
-    Ok((port, pending, shutdown_tx))
+    Ok((port, token, pending, shutdown_tx))
 }
 
 /// Claude Code's `PermissionRequest` http-hook POST: holds the connection
 /// open until `decide_permission` answers or `PERMISSION_HOLD` elapses, then
 /// replies with the hook's expected JSON (see `permission_decision`, or `{}`
-/// for "no decision" on timeout).
+/// for "no decision" on timeout). Requests to any path/token but this run's
+/// own are refused (loopback-only, but cheap to close off).
 async fn permission_hook_handler(
     State(state): State<HookState>,
+    Path(token): Path<String>,
     Json(body): Json<Value>,
 ) -> Json<Value> {
+    if token != state.token {
+        return Json(json!({}));
+    }
     let tool_name = body
         .get("tool_name")
         .and_then(Value::as_str)
@@ -324,7 +372,7 @@ async fn permission_hook_handler(
     }
 }
 
-fn write_hook_settings(run_id: &str, port: u16) -> Result<PathBuf, String> {
+fn write_hook_settings(run_id: &str, port: u16, token: &str) -> Result<PathBuf, String> {
     let dir = std::env::temp_dir().join("portal-agents");
     std::fs::create_dir_all(&dir).map_err(|e| format!("failed to create hook settings dir: {e}"))?;
     let path = dir.join(format!("hook-{run_id}.json"));
@@ -334,7 +382,7 @@ fn write_hook_settings(run_id: &str, port: u16) -> Result<PathBuf, String> {
                 "matcher": "*",
                 "hooks": [{
                     "type": "http",
-                    "url": format!("http://127.0.0.1:{port}/hook"),
+                    "url": format!("http://127.0.0.1:{port}/hook/{token}"),
                     // Comfortably above PERMISSION_HOLD so claude doesn't
                     // cancel the hook before our own timeout fires.
                     "timeout": 310,
@@ -345,6 +393,17 @@ fn write_hook_settings(run_id: &str, port: u16) -> Result<PathBuf, String> {
     let body = serde_json::to_vec_pretty(&settings).map_err(|e| e.to_string())?;
     std::fs::write(&path, body).map_err(|e| format!("failed to write hook settings: {e}"))?;
     Ok(path)
+}
+
+/// Deletes the per-run `--settings` temp file on drop, whichever way `start`
+/// exits — spawn failure, an early `?` return, or (moved into the stdout
+/// pump) a normal run end.
+struct TempSettingsFile(PathBuf);
+
+impl Drop for TempSettingsFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
 }
 
 // ---- wire parsing ----------------------------------------------------------

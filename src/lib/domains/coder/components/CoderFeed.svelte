@@ -30,6 +30,9 @@
     canEdit?: boolean;
     /** Platform is down: approving would resume a turn that cannot run. */
     decisionsDisabled?: boolean;
+    /** Forwarded to `ApprovalBanner` — off for callers with no remember-rule
+     *  persistence (see QA-112). */
+    showRemember?: boolean;
     onEditMessage?: (messageIndex: number, content: string) => void;
     onRetry?: () => void;
     onOpenSubAgent?: (childId: string, coordId: string) => void;
@@ -53,6 +56,7 @@
     threadId,
     canEdit = false,
     decisionsDisabled = false,
+    showRemember = true,
     onEditMessage,
     onRetry,
     onOpenSubAgent,
@@ -158,7 +162,7 @@
   {/if}
 
   {#if pending && onDecision}
-    <ApprovalBanner {pending} busy={running || decisionsDisabled} {onDecision} />
+    <ApprovalBanner {pending} busy={running || decisionsDisabled} {showRemember} {onDecision} />
   {/if}
 
   {#if showRetry && !running}
