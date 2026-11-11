@@ -16,18 +16,18 @@ the next person doesn't have to repeat this by hand.
 
 1. **Found and removed a legacy blocker**: the old C# `PortalRemote.exe` server (the one being
    replaced per `.claude/handoff-android-remote-control.md`'s Android-rewrite work) was still
-   installed and running on this dev machine, and had grabbed UDP discovery port `:8765` *before*
+   installed and running on this dev machine, and had grabbed UDP discovery port `:8765` _before_
    the new Rust daemon could bind it — so the phone's discovery probe was getting answered by the
    **old** server (`version: 0.8.0`, real GUID `id`) instead of the new one (which always replies
    `id: null`). Fully uninstalled: process killed, `C:\Users\tanvo\AppData\Local\Programs\Portal
-   Remote\` deleted, its registry uninstall key removed (`HKCU\...\Uninstall\{7A870589-8B8C-4577-
-   B080-E73414CA9C86}_is1`), Start Menu shortcuts removed, and its `HKCU\...\Run\PortalRemote`
+Remote\` deleted, its registry uninstall key removed (`HKCU\...\Uninstall\{7A870589-8B8C-4577-
+B080-E73414CA9C86}_is1`), Start Menu shortcuts removed, and its `HKCU\...\Run\PortalRemote`
    startup entry removed. **If a fresh session ever sees "discovery replies look wrong" again,
    check `tasklist | grep -i portalremote` first** — this could recur on another dev machine.
 2. **Found the real, still-unconfirmed blocker**: even with the legacy server gone and the new
    daemon correctly bound to `0.0.0.0:18420`, the phone still can't connect — TCP connect from the
    phone to the desktop times out on **every** port tested (`18420` with an explicit firewall
-   allow rule, *and* `1421`, vite's dev port, with no rule at all). `ping` is asymmetric: desktop →
+   allow rule, _and_ `1421`, vite's dev port, with no rule at all). `ping` is asymmetric: desktop →
    phone works (23ms), phone → desktop is 100% loss. Ruled out: a competing Windows Firewall Block
    rule (none exists in the Public profile), interface-scope restriction on the existing allow
    rule (scoped `Any`), wrong network profile (confirmed `Public`, matches the rule). **Leading
@@ -36,33 +36,33 @@ the next person doesn't have to repeat this by hand.
    default even when not actively "connected" (no adapter or process was up at time of testing,
    but the background service was). No other 3rd-party AV/firewall is registered in Windows
    Security Center (`root\SecurityCenter2`) — only Windows Defender. Confirming this further needs
-   `netsh wfp show state` (Windows Filtering Platform dump, the layer *below* the Windows Firewall
+   `netsh wfp show state` (Windows Filtering Platform dump, the layer _below_ the Windows Firewall
    where a VPN driver would filter invisibly to `Get-NetFirewallRule`) — **this requires admin
    elevation**, which this session did not do without being asked. Simplest real test: stop the
    `SecureLine` service (or find its "allow local network" setting) and retest from the phone.
 3. **Built self-fix diagnostics** (new code, all in this repo, all uncommitted):
    - `src-tauri/src/daemon/firewall.rs` (**new file**) — on `daemon::spawn()`, when LAN pairing is
-     on: checks whether a Windows Firewall inbound-allow rule already exists for the *current*
+     on: checks whether a Windows Firewall inbound-allow rule already exists for the _current_
      running exe path via `netsh advfirewall firewall show rule name="Portal Desktop" verbose`,
      and best-effort adds one if missing (`netsh ... add rule ...` — silently no-ops without admin
      rights, no UAC prompt, no retry). Also exposes `active_vpn_adapter()`, which parses
-     `ipconfig /all` for a *connected* adapter matching a keyword list (`vpn`, `tap-windows`,
+     `ipconfig /all` for a _connected_ adapter matching a keyword list (`vpn`, `tap-windows`,
      `wintun`, `ppp adapter`, `nordvpn`, `expressvpn`, `avast secureline`, `openvpn`, `wireguard`,
      `tailscale`, etc.) — report-only, there's no way for an app to "fix" someone else's VPN
      client. 8 unit tests on both parsers (pure functions, fed realistic fixture text).
    - `src-tauri/src/daemon/mod.rs` — added `pub mod firewall;` and one call,
      `firewall::spawn_check(port);`, inside the existing `if lan_enabled() { ... }` block.
    - `src-tauri/src/domains/network/commands.rs` — new `RemoteConnectivityStatus { lan_enabled,
-     firewall_rule_present, port, vpn_adapter }` struct (plain `Serialize`/`Deserialize`, **not**
+firewall_rule_present, port, vpn_adapter }` struct (plain `Serialize`/`Deserialize`, **not**
      `TS` — this crate has zero `derive(TS)` anywhere; ts-rs only works in `portal-core`) and
      `get_remote_connectivity_status()` command (loopback/IPC-only, no cap).
    - `src-tauri/src/lib.rs` — registered the command in `generate_handler!`.
    - Frontend, following the devices domain's existing shape: `src/lib/domains/devices/types/
-     index.ts` (hand-typed `RemoteConnectivityStatus`), `src/lib/domains/devices/api/
-     deviceApi.ts` (`fetchConnectivityStatus`), `src/lib/domains/shared/query/keys.ts`
+index.ts` (hand-typed `RemoteConnectivityStatus`), `src/lib/domains/devices/api/
+deviceApi.ts` (`fetchConnectivityStatus`), `src/lib/domains/shared/query/keys.ts`
      (`devices.connectivity`), `src/lib/domains/devices/queries/deviceQueries.ts`
      (`createConnectivityStatusQuery`), `src/lib/domains/devices/components/
-     FirewallWarningBanner.svelte` (**new** — shadcn `Alert variant="destructive"`, takes
+FirewallWarningBanner.svelte` (**new** — shadcn `Alert variant="destructive"`, takes
      `firewallRuleMissing`/`vpnAdapter` props, renders a bulleted warning naming whichever
      problem(s) apply), `src/routes/devices/+page.svelte` (wired the query + two derived flags +
      the banner, rendered between `LanToggleCard` and `PairDeviceCard`).
@@ -75,18 +75,18 @@ the next person doesn't have to repeat this by hand.
    - **`\\?\` path prefix**: `current_exe_path()` called `.canonicalize()`, which on Windows
      prepends the `\\?\` extended-length-path prefix. `netsh`'s `program=` argument rejects that
      prefix outright ("The application contains invalid characters, or is an invalid length"),
-     and it would *also* have silently broken the read-side match against `netsh show rule`'s
+     and it would _also_ have silently broken the read-side match against `netsh show rule`'s
      plain-path output (meaning it would have kept re-attempting the add, and kept failing, every
      single startup). Fixed by stripping the prefix after canonicalizing, in the one place both
      `ensure_rule` and `rule_present` get the path from.
 5. **All gates green** (re-run after the manual fixes above): `cargo check` / `cargo clippy --lib
-   --tests` / `cargo test --lib` (8/8 new tests in `daemon::firewall::tests`, no regressions) from
+--tests` / `cargo test --lib` (8/8 new tests in `daemon::firewall::tests`, no regressions) from
    `src-tauri/`; `pnpm check` (0 errors), `eslint` on touched files (0 errors, only pre-existing
    `prefer-const` warnings on destructured `$props()` — same pattern as sibling files in this
    domain, not a real issue), `prettier --check`/`--write` and `cargo fmt` applied to touched files.
 6. **Verified live** on dev instance-2 (`node scripts/dev-instance.mjs 2` — webview `:1421`, CDP
    `:9223`, daemon `:18420`, data dir `instance-2`): daemon logs `[daemon] firewall rule OK for
-   ...`; `curl -s -X POST http://127.0.0.1:18420/rpc/get_remote_connectivity_status` returns
+...`; `curl -s -X POST http://127.0.0.1:18420/rpc/get_remote_connectivity_status` returns
    `{"firewall_rule_present":true,"lan_enabled":true,"port":18420,"vpn_adapter":null}` (correct —
    matches that Avast's service exists but no adapter was actually up at test time); Devices page
    (`http://localhost:1421/devices`) renders with no console errors, banner correctly hidden since
@@ -165,6 +165,7 @@ the next person doesn't have to repeat this by hand.
 adb connect 192.168.0.235:45867
 adb -s 192.168.0.235:45867 shell "curl -s -m 5 -o /dev/null -w 'http_code=%{http_code} time=%{time_total}\n' http://192.168.0.137:18420/health"
 ```
+
 A `http_code=000` with `time=5.00...` means still blocked. Desktop's LAN IP may differ by the time
 this is read — reconfirm with `ipconfig` (look for the `Wi-Fi` adapter's IPv4 address) and the
 phone's adb mDNS address may also have changed (`adb mdns services`).

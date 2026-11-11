@@ -76,7 +76,7 @@ bool`. Coder passes `isolate_settings: false` — **deliberate, tested**: `--set
    `agents.exec`, same as the `agents` domain's own run-start, not just the default `coder` cap.
    **No per-call capability hook exists to do this today**: `daemon/mod.rs`'s `rpc()` checks a
    remote caller's `Trust::Remote{caps}` against the command's one static cap via `rpc.rs`'s
-   `capability(name)` *before* calling `dispatch()` — `dispatch()` itself never receives caps.
+   `capability(name)` _before_ calling `dispatch()` — `dispatch()` itself never receives caps.
    Worse: a **local** Tauri IPC call (the app's own frontend) never goes through `daemon/mod.rs`
    or `dispatch()` at all — `#[rpc]` expands to a plain `#[tauri::command]`, no trust/caps
    parameter in either path. Doing this right means plumbing `Trust`/caps through the
@@ -133,7 +133,7 @@ bool`. Coder passes `isolate_settings: false` — **deliberate, tested**: `--set
 
 - `cargo test`/`cargo check` leaves generated TS bindings **unprettified** (ts-rs's raw
   single-line output, not the repo's multiline style) — this showed up as a huge, scary-looking
-  diff across *every* domain's `generated/*.ts` files (disk, github, projects, devices — nothing
+  diff across _every_ domain's `generated/*.ts` files (disk, github, projects, devices — nothing
   to do with this session's actual change). Fix: `pnpm gen:types` (regenerates + formats
   correctly). Confirmed via `git status` before/after that this reverted every unrelated file
   back to matching `HEAD` exactly — none of it needed committing. Already noted in the previous

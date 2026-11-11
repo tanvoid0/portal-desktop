@@ -28,17 +28,18 @@ Agents → Run launcher (coder/terminal backends), file what's broken, fix it, v
 A `qa-tester` subagent swept Devices + Agents Run against the real running app (CDP `:9222`,
 real backend). Found and closed, in order:
 
-| id | severity | what | status |
-|---|---|---|---|
-| QA-106 | major | `agents_list_backends` failure was silent, empty Select forever | **verified** (pre-existing fix, confirmed live both normal + forced-error paths) |
-| QA-107 | blocker | axum route `"/hook/:token"` — old pre-0.7 syntax, panicked at router construction on every `agents_start_run`, hung "Start run" forever with no error | **fixed**, `cargo check`/clippy clean. Partially re-confirmed live (saw a run get past "Starting…" into conversation state) before verification was interrupted — **not yet formally verified**. |
-| QA-108 | minor | `invokeClient.ts`'s `new Error(String(error))` rendered non-Error transport rejections as literal `[object ArrayBuffer]` | **fixed** (now uses the existing `getErrorMessage` helper), `pnpm check`/lint clean. **Not yet re-verified live.** |
-| QA-109 | minor/ux | unchecked shadcn `Switch` track invisible in dark theme (17 places; `--input` token aliased to a border-tuned value) | **fixed** (`src/app.css`, dedicated `0 0% 32%` dark value), confirmed live via contrast measurement before/after. **Not yet re-verified by a fresh qa-tester pass**, but the fixing coder's own before/after numbers are solid evidence. |
-| QA-116 *(filed as QA-110, renumbered — see below)* | major | generating a pairing QR counted as "Paired" immediately, before any scan, and never expired from the list even after the 5-min window lapsed | **fixed**, 2 rounds + reviewer clean on both rounds. Round 1: `devices/+page.svelte` excludes unscanned `until_revoked`/`expires_at`-set rows from "paired". Round 2 (closing a reviewer-found gap): `PairDeviceCard.svelte` polls every 3s for up to 5min while a QR is shown, so a real scan shows up without manual refresh (a clean one-shot backend event wasn't viable — `verify_token` runs in `portal-core`, which has no `AppHandle` to emit from). **Not yet re-verified live by qa-tester.** |
+| id                                                 | severity | what                                                                                                                                                  | status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| QA-106                                             | major    | `agents_list_backends` failure was silent, empty Select forever                                                                                       | **verified** (pre-existing fix, confirmed live both normal + forced-error paths)                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| QA-107                                             | blocker  | axum route `"/hook/:token"` — old pre-0.7 syntax, panicked at router construction on every `agents_start_run`, hung "Start run" forever with no error | **fixed**, `cargo check`/clippy clean. Partially re-confirmed live (saw a run get past "Starting…" into conversation state) before verification was interrupted — **not yet formally verified**.                                                                                                                                                                                                                                                                                                        |
+| QA-108                                             | minor    | `invokeClient.ts`'s `new Error(String(error))` rendered non-Error transport rejections as literal `[object ArrayBuffer]`                              | **fixed** (now uses the existing `getErrorMessage` helper), `pnpm check`/lint clean. **Not yet re-verified live.**                                                                                                                                                                                                                                                                                                                                                                                      |
+| QA-109                                             | minor/ux | unchecked shadcn `Switch` track invisible in dark theme (17 places; `--input` token aliased to a border-tuned value)                                  | **fixed** (`src/app.css`, dedicated `0 0% 32%` dark value), confirmed live via contrast measurement before/after. **Not yet re-verified by a fresh qa-tester pass**, but the fixing coder's own before/after numbers are solid evidence.                                                                                                                                                                                                                                                                |
+| QA-116 _(filed as QA-110, renumbered — see below)_ | major    | generating a pairing QR counted as "Paired" immediately, before any scan, and never expired from the list even after the 5-min window lapsed          | **fixed**, 2 rounds + reviewer clean on both rounds. Round 1: `devices/+page.svelte` excludes unscanned `until_revoked`/`expires_at`-set rows from "paired". Round 2 (closing a reviewer-found gap): `PairDeviceCard.svelte` polls every 3s for up to 5min while a QR is shown, so a real scan shows up without manual refresh (a clean one-shot backend event wasn't viable — `verify_token` runs in `portal-core`, which has no `AppHandle` to emit from). **Not yet re-verified live by qa-tester.** |
 
 **Filed, not fixed (intentionally, to avoid over-scoping this sweep):**
-- QA-117 *(filed as QA-111)* — minor: unscanned QR grant can't be revoked/cancelled during its live window (now invisible everywhere, not just "paired").
-- QA-118 *(filed as QA-112)* — minor: `pairing_service.rs`'s `verify_token` swallows its first-use DB-update error silently (`let _ = ...update(m)`).
+
+- QA-117 _(filed as QA-111)_ — minor: unscanned QR grant can't be revoked/cancelled during its live window (now invisible everywhere, not just "paired").
+- QA-118 _(filed as QA-112)_ — minor: `pairing_service.rs`'s `verify_token` swallows its first-use DB-update error silently (`let _ = ...update(m)`).
 - QA-113 — polish: expired, never-scanned QR rows never get pruned from the DB.
 - QA-114 — minor: a single failed devices poll (QA-116's 3s poll) can wipe the whole QR card mid-pairing, because `PageError` unmounts `PairDeviceCard` on any `devicesQ.error` even with stale data present.
 - QA-115 — polish: Refresh button flickers busy every ~3s while a QR is on screen (bound to shared `isFetching`, which the poll also flips).
@@ -54,7 +55,7 @@ landed, this question is already closed; don't re-investigate or re-file it.
 ## ID collision — already resolved, but know why
 
 This session's `qa-tester` filed new issues as QA-110/111/112, **not knowing** a different
-concurrent session's `qa-tester` had *also* independently filed its own QA-110/111/112 (about
+concurrent session's `qa-tester` had _also_ independently filed its own QA-110/111/112 (about
 the Agents-run approval banner / end-run / accept-and-remember — a completely different topic,
 see `.claude/handoff.md`). The file-based board has no shared counter across concurrent
 sessions, so this collided: two different files both claiming the same `id:`. **This session's**
@@ -88,7 +89,7 @@ session's QA-110/111/112 (agents-run topic) are untouched and still theirs.
    since it undermines QA-116's own fix under a real backend hiccup.
 4. **Gates**: `pnpm check` (0 errors) and `pnpm lint` (clean except the pre-existing, unrelated
    `.claude/handoff.md` prettier formatting nit — not this session's file, don't touch it) were
-   last run clean as of this handoff, on top of *all* uncommitted changes in the tree (this
+   last run clean as of this handoff, on top of _all_ uncommitted changes in the tree (this
    session's + the concurrent agents-domain session's). `cargo check`/`clippy` were last
    confirmed clean by the QA-107 fix itself (backend-only diff); re-run if more Rust changes land
    before committing.
@@ -126,7 +127,7 @@ session's QA-110/111/112 (agents-run topic) are untouched and still theirs.
   everything via `git checkout stash@{0} -- <path>` and confirmed byte-identical, but a redundant
   `stash@{0}` entry is still sitting in `git stash list` (confirmed content-identical to the
   current working tree — safe to `git stash drop stash@{0}` whenever, not urgent). **Never `git
-  stash` in this checkout without `-u` scoped to specific paths** — multiple concurrent sessions
+stash` in this checkout without `-u` scoped to specific paths** — multiple concurrent sessions
   are active here (confirmed via `ListAgents`: 328 peer sessions, several explicitly on this
   repo) and a bare `git stash` grabs everyone's work.
 - This is a heavily multi-session checkout right now. Always `git status --short` before assuming
