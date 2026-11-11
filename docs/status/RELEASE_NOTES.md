@@ -1,5 +1,18 @@
 # Portal Desktop - Release Notes
 
+## Version 0.14.0
+
+### Highlights
+
+- Feature: desktop notifications — native OS notifications for background events
+- Feature: control Portal Desktop from an Android phone over the LAN — pair a device, then drive real mouse and keyboard input over an opt-in /control channel with UDP discovery
+- Feature: a Devices page to manage Android pairing, with pending requests surfaced app-wide and self-repair of the LAN firewall rule (warns when a VPN or firewall blocks pairing)
+- Feature: an Agents domain with a Run launcher and session list/detail pages, plus a claude-cli coder engine with live approve/deny of tool calls
+- Feature: projects can be committed from the list, carry a manual SDLC stage and an independent archive flag, with groundwork for safe project relocation
+- Security: claude-cli coder and agent commands are now gated behind the agents.exec capability
+
+---
+
 ## Version 0.13.6
 
 ### Highlights
