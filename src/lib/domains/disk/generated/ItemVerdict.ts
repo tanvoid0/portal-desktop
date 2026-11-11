@@ -4,8 +4,11 @@
  * A structured per-item verdict parsed from the Lead Synthesizer's output, so
  * the UI can badge each proposal inline instead of showing prose only.
  */
-export type ItemVerdict = { path: string, 
-/**
- * One of "safe" | "review" | "dangerous". Anything else is normalized to "review".
- */
-verdict: string, reason: string, };
+export type ItemVerdict = {
+  path: string;
+  /**
+   * One of "safe" | "review" | "dangerous". Anything else is normalized to "review".
+   */
+  verdict: string;
+  reason: string;
+};

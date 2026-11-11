@@ -3,4 +3,4 @@
 /**
  * Live progress while dev-cleaner items are removed.
  */
-export type DevCleanerCleanProgress = { done: number, total: number, currentPath: string, };
+export type DevCleanerCleanProgress = { done: number; total: number; currentPath: string };

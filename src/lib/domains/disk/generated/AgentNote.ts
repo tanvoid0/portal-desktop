@@ -3,4 +3,4 @@
 /**
  * One agent task's contribution to the verdict.
  */
-export type AgentNote = { taskId: number, role: string, status: string, output: string, };
+export type AgentNote = { taskId: number; role: string; status: string; output: string };

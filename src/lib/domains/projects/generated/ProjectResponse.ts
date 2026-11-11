@@ -3,4 +3,50 @@
 /**
  * API response for projects including many-to-many relationship IDs.
  */
-export type ProjectResponse = { id: number, name: string, description: string | null, path: string, status: string, build_command: string | null, start_command: string | null, test_command: string | null, output_directory: string | null, dev_port: number | null, prod_port: number | null, starred: boolean, open_count: number, last_opened: string | null, size: number, file_count: number, git_repository: string | null, git_branch: string | null, git_commit: string | null, has_uncommitted_changes: boolean, last_commit: string | null, parent_id: number | null, discovery_path: string | null, activity_status: string | null, last_activity: string | null, risk_level: string | null, unpushed_commits: number, stash_count: number, has_remote: boolean, module_count: number, duplicate_group: string | null, regenerable_dirs: string | null, discovered_at: string | null, triage_decision: string | null, triage_note: string | null, triage_successor: string | null, triage_updated_at: string | null, stage: string | null, stage_updated_at: string | null, archived: boolean, created_at: string | null, updated_at: string | null, framework_ids: Array<number>, package_manager_ids: Array<number>, language_ids: Array<number>, };
+export type ProjectResponse = {
+  id: number;
+  name: string;
+  description: string | null;
+  path: string;
+  status: string;
+  build_command: string | null;
+  start_command: string | null;
+  test_command: string | null;
+  output_directory: string | null;
+  dev_port: number | null;
+  prod_port: number | null;
+  starred: boolean;
+  open_count: number;
+  last_opened: string | null;
+  size: number;
+  file_count: number;
+  git_repository: string | null;
+  git_branch: string | null;
+  git_commit: string | null;
+  has_uncommitted_changes: boolean;
+  last_commit: string | null;
+  parent_id: number | null;
+  discovery_path: string | null;
+  activity_status: string | null;
+  last_activity: string | null;
+  risk_level: string | null;
+  unpushed_commits: number;
+  stash_count: number;
+  has_remote: boolean;
+  module_count: number;
+  duplicate_group: string | null;
+  regenerable_dirs: string | null;
+  discovered_at: string | null;
+  triage_decision: string | null;
+  triage_note: string | null;
+  triage_successor: string | null;
+  triage_updated_at: string | null;
+  stage: string | null;
+  stage_updated_at: string | null;
+  archived: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+  framework_ids: Array<number>;
+  package_manager_ids: Array<number>;
+  language_ids: Array<number>;
+};

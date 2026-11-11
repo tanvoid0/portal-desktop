@@ -5,7 +5,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { useQueryClient } from '@tanstack/svelte-query';
   import * as Table from '$lib/components/ui/table';
   import { Button } from '$lib/components/ui/button';
   import { PageEmpty, PageError, PageHeader, PageLoading, PageStats } from '$lib/components/shell';
@@ -24,8 +24,8 @@
   import MobileIcon from '~icons/fa6-solid/mobile-screen-button';
 
   const queryClient = useQueryClient();
-  const devicesQ = createQuery(createDevicesQuery);
-  const capabilitiesQ = createQuery(createCapabilitiesQuery);
+  const devicesQ = createDevicesQuery();
+  const capabilitiesQ = createCapabilitiesQuery();
 
   const capabilities = $derived(capabilitiesQ.data ?? []);
   const devices = $derived(devicesQ.data ?? []);

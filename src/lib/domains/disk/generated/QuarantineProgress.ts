@@ -3,8 +3,11 @@
 /**
  * Live progress emitted once per item as the batch is moved to the trash.
  */
-export type QuarantineProgress = { 
-/**
- * Items processed so far (moved + failed).
- */
-done: number, total: number, currentPath: string, };
+export type QuarantineProgress = {
+  /**
+   * Items processed so far (moved + failed).
+   */
+  done: number;
+  total: number;
+  currentPath: string;
+};

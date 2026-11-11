@@ -4,4 +4,4 @@
  * What a backend can run with, for the launcher's model picker. Empty when
  * the backend has no enumerable list (the CLI just takes whatever default).
  */
-export type BackendModel = { id: string, label: string, };
+export type BackendModel = { id: string; label: string };

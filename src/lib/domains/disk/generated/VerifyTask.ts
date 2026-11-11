@@ -4,4 +4,4 @@
  * One agent task's live state, forwarded to the UI while the process runs so
  * the user sees which reviewers are working rather than a frozen spinner.
  */
-export type VerifyTask = { role: string, status: string, };
+export type VerifyTask = { role: string; status: string };

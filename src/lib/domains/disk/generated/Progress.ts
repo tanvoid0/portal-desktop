@@ -5,4 +5,12 @@
  * `counting` = fast first pass (total unknown, bar indeterminate);
  * `scanning`  = metadata pass (percent + ETA are meaningful).
  */
-export type Progress = { phase: string, scannedFiles: number, totalFiles: number, totalBytes: number, currentPath: string, etaMs: number, elapsedMs: number, };
+export type Progress = {
+  phase: string;
+  scannedFiles: number;
+  totalFiles: number;
+  totalBytes: number;
+  currentPath: string;
+  etaMs: number;
+  elapsedMs: number;
+};

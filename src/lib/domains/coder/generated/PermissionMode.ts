@@ -3,4 +3,4 @@
 /**
  * How aggressively mutating tools are auto-approved (independent of agent mode).
  */
-export type PermissionMode = "review" | "auto-accept-all";
+export type PermissionMode = 'review' | 'auto-accept-all';

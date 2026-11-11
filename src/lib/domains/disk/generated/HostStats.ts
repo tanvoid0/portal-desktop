@@ -3,8 +3,11 @@
 /**
  * Host CPU / memory snapshot for the sidebar status chips. Read-only.
  */
-export type HostStats = { 
-/**
- * Whole-machine CPU load, 0-100.
- */
-cpuPercent: number, memoryUsedBytes: number, memoryTotalBytes: number, };
+export type HostStats = {
+  /**
+   * Whole-machine CPU load, 0-100.
+   */
+  cpuPercent: number;
+  memoryUsedBytes: number;
+  memoryTotalBytes: number;
+};

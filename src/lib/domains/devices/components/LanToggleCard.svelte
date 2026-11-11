@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { useQueryClient } from '@tanstack/svelte-query';
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Switch } from '$lib/components/ui/switch';
   import { Label } from '$lib/components/ui/label';
@@ -9,7 +9,7 @@
   import { toast } from '$lib/utils/toast';
 
   const queryClient = useQueryClient();
-  const lanQ = createQuery(createLanEnabledQuery);
+  const lanQ = createLanEnabledQuery();
   let saving = $state(false);
 
   async function onToggle(checked: boolean) {
