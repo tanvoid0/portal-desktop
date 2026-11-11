@@ -1,7 +1,7 @@
 ---
 id: QA-115
 title: Refresh button spins/disables every ~3s while a pairing QR is on screen
-status: open
+status: verified
 severity: polish
 kind: ux
 area: devices
@@ -38,10 +38,22 @@ Manual — code read, not yet reproduced live.
 
 ## Fix
 
-<!-- coder: root cause, files changed, checks run, other QA ids this also fixes -->
-Suggested direction (reviewer): bind the busy state to a local `refreshing` flag set only
-in the button's own click handler, instead of the shared `isFetching`.
+Root cause: the Refresh button's `disabled`/spin state was bound to the shared
+`devicesQ.isFetching`, which QA-116's background 3s poll also flips.
+
+Files changed: `src/routes/devices/+page.svelte` — added a local `refreshing` flag set
+only inside a new `handleRefreshClick` handler (wraps `refetchDevices`), and the button
+now binds to `refreshing` instead of `devicesQ.isFetching`. The background poll still
+calls `refetchDevices` directly and no longer touches the button's visual state.
+
+Checks run: `pnpm check`, `pnpm lint` (both clean).
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-11, mode: tauri (CDP :9223). `node .claude/qa/scripts/QA-115-verify-postfix.mjs`
+— generated a QR to start the 3s background poll, then sampled the Refresh
+button's `disabled` attribute every ~100ms for 15s (139 samples) with no user
+click: 0 busy samples. Previous (pre-fix) 1s-interval sampling had missed the
+flicker; tight sampling now confirms the button stays idle on its own and
+only `handleRefreshClick` touches `refreshing`. Fixture revoked after the
+run. Verified.

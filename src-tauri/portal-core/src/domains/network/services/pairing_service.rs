@@ -350,7 +350,17 @@ pub async fn list_devices(conn: &DatabaseConnection) -> Result<Vec<DeviceSummary
         by_device.entry(row.device_id.clone()).or_insert(row);
     }
 
-    let mut devices: Vec<_> = by_device.into_values().collect();
+    // Expired, never-scanned QR grants: a scan clears `expires_at` on first
+    // use (see `verify_token`), so a `until_revoked` row that still carries
+    // one and is past it was never picked up and never will be — drop it
+    // instead of letting it pile up in every list forever (QA-113).
+    let now: DateTime<FixedOffset> = Utc::now().into();
+    let mut devices: Vec<_> = by_device
+        .into_values()
+        .filter(|row| {
+            !(row.approval_type == "until_revoked" && row.expires_at.is_some_and(|e| e <= now))
+        })
+        .collect();
     devices.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
     Ok(devices
@@ -412,7 +422,10 @@ pub async fn verify_token(
     if is_until_revoked && is_first_use {
         m.expires_at = Set(None);
     }
-    let _ = device_approval::Entity::update(m).exec(conn).await;
+    device_approval::Entity::update(m)
+        .exec(conn)
+        .await
+        .map_err(|e| format!("Failed to update device approval: {e}"))?;
 
     Ok(Some((device_id, capabilities)))
 }
@@ -545,6 +558,23 @@ mod tests {
 
         revoke(&conn, &device_id).await.unwrap();
         assert!(verify_token(&conn, &token).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn expired_unscanned_qr_grant_is_pruned_from_list_devices() {
+        let conn = fresh_db().await;
+        let (device_id, _token) = mint_qr_pairing(&conn, &[]).await.unwrap();
+
+        // Still within its pickup window.
+        assert_eq!(list_devices(&conn).await.unwrap().len(), 1);
+
+        // Force it into the past, as if the 5-minute window lapsed unscanned.
+        let row = most_recent_row(&conn, &device_id).await.unwrap().unwrap();
+        let mut m: device_approval::ActiveModel = row.into();
+        m.expires_at = Set(Some((Utc::now() - Duration::minutes(1)).into()));
+        device_approval::Entity::update(m).exec(&conn).await.unwrap();
+
+        assert!(list_devices(&conn).await.unwrap().is_empty());
     }
 
     #[tokio::test]

@@ -1,7 +1,7 @@
 ---
 id: QA-118
 title: pairing_service verify_token silently swallows the first-use update error
-status: open
+status: verified
 severity: minor
 kind: bug
 area: devices/pairing
@@ -39,8 +39,33 @@ Manual — code read, not yet reproduced live.
 
 ## Fix
 
-<!-- coder: root cause, files changed, checks run, other QA ids this also fixes -->
+Root cause: `verify_token` discarded the first-use update's `Result` with `let _ = ...`
+instead of propagating it, the only spot in the file that didn't follow this service's
+own convention (every sibling mutation — `approve`, `revoke`, `reject`,
+`update_capabilities`, `rename_device` — propagates the DB error via
+`.map_err(...)?`).
+
+Files changed: `src-tauri/portal-core/src/domains/network/services/pairing_service.rs`
+— `verify_token`'s final update now uses the same `.map_err(|e| format!("Failed to
+update device approval: {e}"))?` pattern as its siblings, so a failed write now fails
+the call (and the `/control` guard, which already treats an `Err` the same as an
+unmatched token) instead of silently leaving the grant in its pre-use state.
+
+Checks run: `cargo check` (workspace + `portal-core`), `cargo test pairing_service`
+(9/9 pass).
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-11, mode: tauri (CDP :9223 + `cargo test -p portal-core`), real phone.
+Confirmed the code fix: `verify_token`'s final `device_approval::Entity::update(m)`
+now ends `.map_err(|e| format!("Failed to update device approval: {e}"))?`
+(pairing_service.rs:425-428), matching the sibling-mutation pattern described
+in the Fix. `cargo test -p portal-core pairing_service` → 9/9 pass (no
+dedicated QA-118 test — confirmed none of the 9 test names target this path,
+consistent with the issue noting the failure-injection path is hard to
+black-box). Happy-path regression: real-phone scan → verify → paired covered
+live twice (via QA-117's `QA-117-scan-autoclear.mjs` and separately during
+QA-116-style checks), both picked up within ~2s with `last_used_at` set and
+`expires_at` cleared, so the normal (non-error) path through this exact code
+still works end to end. The failure-injection path itself remains
+code-review-verified only, as expected. Verified.

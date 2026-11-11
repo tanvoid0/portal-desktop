@@ -1,7 +1,7 @@
 ---
 id: QA-117
 title: Unscanned QR grant can't be revoked during its 5-minute window (hidden from every list)
-status: open
+status: verified
 severity: minor
 kind: bug
 area: devices
@@ -42,8 +42,44 @@ Manual — steps above.
 
 ## Fix
 
-<!-- coder: root cause, files changed, checks run, other QA ids this also fixes -->
+Root cause: QA-116's fix correctly hid an unscanned `until_revoked` QR grant from every
+list, but left no UI affordance to cancel it during its 5-minute live window.
+
+Files changed:
+- `src/lib/domains/devices/components/PairDeviceCard.svelte` — `generate()` now keeps
+  the minted `device_id` in state; a new "Cancel" button (shown next to "Regenerate QR
+  code" while a QR is on screen) calls the existing `revokeDevice` on it. A new
+  `pairedDeviceIds` prop + `$effect` auto-clears the card once the grant actually shows
+  up in "Paired devices" (i.e. it was scanned), so Cancel can never fire against an
+  already-real paired device.
+- `src/routes/devices/+page.svelte` — passes a new `pairedDeviceIds` derived `Set` of
+  paired device_ids into `PairDeviceCard`.
+
+Checks run: `pnpm check`, `pnpm lint` (both clean).
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-11, mode: tauri (CDP :9223), real phone (`adb-R5GL150LRCK-N75UEH._adb-tls-connect._tcp`,
+"Tanveer's S26 Ultra").
+
+- `node .claude/qa/scripts/QA-117-cancel-flow.mjs`: generated a QR (Cancel
+  button appears next to "Regenerate QR code"), clicked Cancel before
+  scanning — card resets to "Generate QR code" with the QR image gone, and
+  the grant shows up in History as `Revoked`. Screenshots:
+  `QA-117-before-cancel-click.png`, `QA-117-after-cancel-history.png`.
+- `node .claude/qa/scripts/QA-117-scan-autoclear.mjs`: generated a QR, fired
+  the bearer token from the real phone over adb (phone-side `curl` to the LAN
+  pairing endpoint, same technique as QA-116's e2e check) — the grant picked
+  up as paired and the card auto-cleared to "Generate QR code" (no stale
+  Cancel button left on the now-real paired device) within ~2s, no manual
+  refresh. Screenshot: `QA-117-after-scan-autoclear.png`.
+
+One hiccup along the way: two earlier throwaway probe scripts of mine hung
+because my own Playwright locator regex was wrong (`/^Cancel$/` doesn't match
+via `hasText` in this Playwright version — plain-string `hasText: 'Cancel'`
+does), not an app bug; left two orphaned unrevoked QR fixtures from those
+failed runs, found via raw `list_devices` and revoked directly. All fixtures
+(cancel-flow's row, the scanned/paired row, the two orphans) confirmed
+revoked; final live-row list matches the pre-test baseline (Pending 2, Paired
+1, same 3 pre-existing "Browser" rows, no leftover "Unnamed device" rows).
+Verified.

@@ -57,6 +57,7 @@
   const history = $derived(
     devices.filter((d) => d.approval_type === 'revoked' || d.approval_type === 'rejected')
   );
+  const pairedDeviceIds = $derived(new Set(paired.map((d) => d.device_id)));
 
   const stats = $derived<PageStat[]>([
     { label: 'Pending', value: pending.length, icon: ClockIcon },
@@ -65,6 +66,20 @@
 
   function refetchDevices() {
     return queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
+  }
+
+  // Distinct from `devicesQ.isFetching`, which also flips on QA-116's
+  // background pairing poll every ~3s — this flag is only ever set by the
+  // Refresh button's own click, so the button's busy state reflects a
+  // user-triggered refresh, not the poll (QA-115).
+  let refreshing = $state(false);
+  async function handleRefreshClick() {
+    refreshing = true;
+    try {
+      await refetchDevices();
+    } finally {
+      refreshing = false;
+    }
   }
 
   let historyOpen = $state(false);
@@ -85,8 +100,8 @@
 <div class="space-y-6">
   <PageHeader title="Devices" description="Pair and manage phones connecting to Portal Desktop">
     {#snippet actions()}
-      <Button variant="outline" size="sm" onclick={refetchDevices} disabled={devicesQ.isFetching}>
-        <RefreshCw class="mr-2 h-4 w-4 {devicesQ.isFetching ? 'animate-spin' : ''}" />
+      <Button variant="outline" size="sm" onclick={handleRefreshClick} disabled={refreshing}>
+        <RefreshCw class="mr-2 h-4 w-4 {refreshing ? 'animate-spin' : ''}" />
         Refresh
       </Button>
     {/snippet}
@@ -94,7 +109,7 @@
 
   {#if devicesQ.isPending}
     <PageLoading message="Loading devices..." />
-  {:else if devicesQ.error}
+  {:else if devicesQ.error && !devicesQ.data}
     <PageError
       message={devicesQ.error instanceof Error ? devicesQ.error.message : 'Failed to load devices'}
       onRetry={refetchDevices}
@@ -108,7 +123,7 @@
       <FirewallWarningBanner {firewallRuleMissing} {vpnAdapter} />
     {/if}
 
-    <PairDeviceCard {capabilities} onPaired={refetchDevices} />
+    <PairDeviceCard {capabilities} {pairedDeviceIds} onPaired={refetchDevices} />
 
     {#if pending.length > 0}
       <div class="space-y-3">
