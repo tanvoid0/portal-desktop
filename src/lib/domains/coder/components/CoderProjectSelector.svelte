@@ -44,7 +44,9 @@
 
   function resolveDefaultWorkspace(): string {
     const cached = loadLastWorkspace();
-    if (cached) return cached;
+    // No path-exists command is exposed to the frontend, so only trust a cached path that
+    // is a known project (stale cross-OS paths, e.g. /media/... on Windows, are dropped).
+    if (cached && projects.some((p) => p.path === cached)) return cached;
     return projects[0]?.path ?? '';
   }
 

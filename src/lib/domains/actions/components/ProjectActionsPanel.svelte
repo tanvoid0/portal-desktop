@@ -18,6 +18,7 @@
   import GitBranch from '~icons/fa6-solid/code-branch';
   import Layers from '~icons/fa6-solid/layer-group';
   import History from '~icons/fa6-solid/clock-rotate-left';
+  import Stethoscope from '~icons/fa6-solid/stethoscope';
   import type { Project } from '$lib/domains/projects/types';
   import {
     actions,
@@ -40,6 +41,9 @@
     getExecutionStatusIcon,
   } from '$lib/domains/projects/pipelines/utils/executionDisplay';
   import { untrack } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { coderSession } from '$lib/domains/coder/state/coderSession.svelte.js';
+  import { diagnose, getDoctorRun, resetDoctorRun } from '../state/doctor.svelte';
 
   interface Props {
     project: Project;
@@ -62,6 +66,12 @@
   let runHistory = $state<ScriptExecutionInfo[]>([]);
   let historyLoading = $state(false);
   let selectedExecution = $state<ScriptExecutionInfo | null>(null);
+  // Live, not-yet-persisted stdout/stderr for the running execution (QA-130).
+  let liveOutput = $state('');
+
+  const runningExecId = $derived(
+    selectedExecution?.status === 'running' ? selectedExecution.id : null
+  );
 
   function normalizePath(path: string): string {
     return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
@@ -166,8 +176,16 @@
 
     running = true;
     lastResult = null;
+    liveOutput = '';
+    resetDoctorRun(project.id);
     try {
-      const result = await actions.forProject(project).run(target);
+      const result = await actions.forProject(project).run(target, {
+        // Surface the run the moment its process spawns — not after it finishes.
+        onStepStart: ({ executionId }) => {
+          void openExecution(executionId);
+          void loadHistory();
+        },
+      });
       lastResult = result;
       // Prefer showing the script execution record (has persisted output)
       const localStep = result.steps.find((s) => s.executionId);
@@ -208,6 +226,37 @@
       void loadCatalog();
       void loadHistory();
     });
+  });
+
+  // While the selected run is in flight, poll its live output + status every 1s
+  // so the user sees progress and the terminal result without a manual refresh.
+  $effect(() => {
+    const id = runningExecId;
+    if (!id) {
+      liveOutput = '';
+      return;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const [info, live] = await Promise.all([
+          scriptExecutionService.getExecution(id),
+          scriptExecutionService.getLiveOutput(id),
+        ]);
+        if (cancelled) return;
+        liveOutput = live.join('');
+        if (info && selectedExecution?.id === id) selectedExecution = info;
+      } catch {
+        // best-effort; the run still resolves via runTarget's await
+      }
+    };
+    void tick();
+    const interval = setInterval(() => void tick(), 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      void loadHistory();
+    };
   });
 </script>
 
@@ -386,6 +435,72 @@
 
     <!-- Run details + history -->
     <div class="min-w-0 flex-1 space-y-4">
+      {#if lastResult?.failure}
+        {@const f = lastResult.failure}
+        {@const run = getDoctorRun(project.id)}
+        <Card class="border-destructive/40">
+          <CardHeader class="pb-2">
+            <div class="flex items-center justify-between gap-2">
+              <CardTitle class="text-base text-destructive">Run failed</CardTitle>
+              <Badge variant="outline" class="capitalize">{f.kind}</Badge>
+            </div>
+            {#if f.hint}
+              <CardDescription>{f.hint}</CardDescription>
+            {/if}
+          </CardHeader>
+          <CardContent class="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              class="gap-1"
+              disabled={run.status === 'diagnosing' || run.status === 'verifying'}
+              onclick={async () => {
+                const verify = await diagnose(project, f);
+                if (verify) {
+                  // Reflect the verify run as the latest result; on success the
+                  // "Run failed" card clears because verify.failure is undefined.
+                  lastResult = verify;
+                  const ls = verify.steps.find((s) => s.executionId);
+                  if (ls?.executionId) void openExecution(ls.executionId);
+                  if (verify.success)
+                    toast.success('Doctor fixed it — review the changes in Coder');
+                }
+                await loadHistory();
+              }}
+            >
+              <Stethoscope class="h-3.5 w-3.5" />
+              Diagnose & fix
+            </Button>
+            {#if run.status !== 'idle'}
+              <span class="text-xs text-muted-foreground">
+                {run.status === 'diagnosing'
+                  ? 'Diagnosing…'
+                  : run.status === 'verifying'
+                    ? 'Verifying…'
+                    : run.status === 'fixed'
+                      ? 'Fixed'
+                      : 'Gave up'}
+                {#if run.message}· {run.message}{/if}
+              </span>
+            {/if}
+            {#if run.threadId}
+              <Button
+                type="button"
+                size="sm"
+                variant="link"
+                onclick={async () => {
+                  await coderSession.selectThread(run.threadId!);
+                  void goto('/ai/coder');
+                }}
+              >
+                Review changes in Coder
+              </Button>
+            {/if}
+          </CardContent>
+        </Card>
+      {/if}
+
       {#if selectedExecution}
         {@const StatusIcon = getExecutionStatusIcon(selectedExecution.status)}
         <Card>
@@ -439,12 +554,20 @@
                   class="max-h-40 overflow-auto rounded border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs whitespace-pre-wrap text-destructive">{selectedExecution.error}</pre>
               </div>
             {/if}
-            {#if selectedExecution.output?.trim()}
+            {#if selectedExecution.status === 'running' && liveOutput.trim()}
+              <div>
+                <p class="mb-1 text-xs font-medium text-muted-foreground">Output (live)</p>
+                <pre
+                  class="max-h-72 overflow-auto rounded bg-muted px-2 py-1.5 text-xs whitespace-pre-wrap">{liveOutput}</pre>
+              </div>
+            {:else if selectedExecution.output?.trim()}
               <div>
                 <p class="mb-1 text-xs font-medium text-muted-foreground">Output</p>
                 <pre
                   class="max-h-72 overflow-auto rounded bg-muted px-2 py-1.5 text-xs whitespace-pre-wrap">{selectedExecution.output}</pre>
               </div>
+            {:else if selectedExecution.status === 'running'}
+              <p class="text-xs text-muted-foreground">Running…</p>
             {:else if !selectedExecution.error}
               <p class="text-xs text-muted-foreground">No output captured.</p>
             {/if}

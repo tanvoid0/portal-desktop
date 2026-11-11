@@ -36,6 +36,7 @@ pub struct ExecuteScriptParams {
     pub command: String,
     pub parameters: Option<HashMap<String, String>>,
     pub working_directory: Option<String>,
+    pub env: Option<HashMap<String, String>>,
 }
 
 /// Execute a script
@@ -52,6 +53,7 @@ pub async fn execute_script(
         command: params.command,
         parameters: params.parameters.unwrap_or_default(),
         working_directory: params.working_directory,
+        env: params.env,
     };
 
     service.execute_script(request).await

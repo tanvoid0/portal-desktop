@@ -49,6 +49,12 @@ export interface ActionRunOptions {
   /** Filter workflow steps to these action ids */
   only?: string[];
   projectId?: string;
+  /**
+   * Fired the moment a local step's process is spawned (before it finishes), so
+   * the UI can surface the run as "running" with live output instead of waiting
+   * for the whole run to resolve. See QA-130.
+   */
+  onStepStart?: (step: { actionId: string; executionId: string }) => void;
 }
 
 export interface ActionStepResult {
@@ -71,6 +77,35 @@ export interface ActionRunResult {
   steps: ActionStepResult[];
   /** Remote run id when github/n8n */
   remoteRunId?: string;
+  /** Structured failure signal for a non-zero local run (the Pipeline-Doctor's input). */
+  failure?: ActionFailure;
+}
+
+/**
+ * How a failure is classified, which decides what the doctor does next:
+ * - `pipeline`: the command is wrong/missing (fix the action definition).
+ * - `environment`: the machine/policy is wrong (e.g. pnpm lockfile policy) — the
+ *   app and the pipeline are fine; the user needs an env/PM change.
+ * - `unknown`: likely an app-code failure, or something we can't classify — hand
+ *   to an agent to decide.
+ */
+export type ActionFailureKind = 'pipeline' | 'environment' | 'unknown';
+
+/** Structured, queryable failure event emitted on a non-zero local Action run. */
+export interface ActionFailure {
+  /** script_executions row id — the durable record of this failure. */
+  executionId?: string;
+  actionId: string;
+  runner: ActionRunner;
+  command?: string;
+  exitCode?: number | null;
+  /** Last ~8 KB of combined stdout/stderr, enough for diagnosis without bloat. */
+  outputTail: string;
+  cwd: string;
+  target: string | string[];
+  kind: ActionFailureKind;
+  /** One-line, user-facing hint when the failure class is recognised. */
+  hint?: string;
 }
 
 export interface ActionPlanPreview {

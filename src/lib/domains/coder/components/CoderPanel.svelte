@@ -721,7 +721,9 @@
                   hideModes={isCli}
                   placeholder={platformBlocked
                     ? blockedPlaceholder
-                    : 'Ask the coder… (2+ lines auto-spawns parallel agents)'}
+                    : multitaskMode
+                      ? 'Ask the coder… (one task per line runs parallel agents)'
+                      : 'Ask the coder…'}
                   disabled={composerDisabled}
                   {running}
                   {queuedMessages}

@@ -15,6 +15,7 @@
       label: 'Utilities',
       url: '/automation/utilities',
     },
+    { id: 'workflows', label: 'Workflows', url: '/automation/workflows' },
   ] as const;
 
   const activeTab = $derived(

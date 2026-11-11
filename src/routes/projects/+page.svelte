@@ -344,7 +344,8 @@
     {/snippet}
   </PageHeader>
 
-  <PageStats {stats} />
+  <!-- No fabricated zeros while the list is still loading. -->
+  <PageStats stats={isLoading ? stats.map((s) => ({ ...s, value: '–' })) : stats} />
 
   <PageFilters bind:searchQuery searchPlaceholder="Search projects...">
     {#snippet filters()}

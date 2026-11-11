@@ -15,6 +15,7 @@ import {
   type ResolveCatalogOptions,
 } from './resolver';
 import { profileFromProject, profileVariables } from './profile';
+import { toFailure } from './failure';
 import { createAutomationContext } from '$lib/domains/automation/utils/automationContext';
 import { listGitHubActions } from './adapters/githubAdapter';
 import { listN8nActions, runN8nAction } from './adapters/n8nAdapter';
@@ -444,7 +445,13 @@ class ActionsService {
         const executionId = await scriptExecutionService.executeScript({
           command: action.command,
           workingDirectory: options.cwd,
+          // Action runs are non-interactive: CI=true keeps package managers and
+          // test runners from prompting / dropping into watch mode (QA-129).
+          env: { CI: 'true' },
         });
+        // Surface the run as "running" the instant the process spawns (QA-130),
+        // instead of only after it finishes.
+        options.onStepStart?.({ actionId: action.id, executionId });
         const finished = await this.waitForExecution(executionId, action.longRunning);
         const stepSuccess = finished.status === 'success';
         results.push({
@@ -476,12 +483,14 @@ class ActionsService {
       }
     }
 
-    return {
+    const result: ActionRunResult = {
       success,
       cwd: options.cwd,
       target: options.target,
       steps: results,
     };
+    result.failure = toFailure(result) ?? undefined;
+    return result;
   }
 
   private async waitForExecution(

@@ -16,6 +16,10 @@ pub struct ExecuteScriptRequest {
     pub command: String,
     pub parameters: HashMap<String, String>,
     pub working_directory: Option<String>,
+    /// Extra environment variables for the spawned process (e.g. CI=true for
+    /// non-interactive Action runs). Merged onto the inherited env.
+    #[serde(default)]
+    pub env: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -172,7 +176,15 @@ impl ScriptExecutionService {
             cmd.current_dir(wd);
         }
 
-        // Configure stdio
+        // Extra env (e.g. CI=true so non-interactive runners don't prompt)
+        if let Some(ref env) = request.env {
+            cmd.envs(env);
+        }
+
+        // Configure stdio. stdin is closed (null) so the process can never block
+        // waiting on a prompt that no one will answer (e.g. pnpm's purge
+        // confirmation) — it fails fast instead of hanging the run forever.
+        cmd.stdin(std::process::Stdio::null());
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
         cmd.kill_on_drop(true);

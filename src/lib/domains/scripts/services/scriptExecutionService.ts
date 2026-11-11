@@ -31,6 +31,8 @@ export interface ExecuteScriptParams {
   command: string;
   parameters?: Record<string, string>;
   workingDirectory?: string;
+  /** Extra env vars for the spawned process (e.g. { CI: 'true' } for Action runs). */
+  env?: Record<string, string>;
 }
 
 class ScriptExecutionService {
@@ -61,6 +63,7 @@ class ScriptExecutionService {
           command: params.command,
           parameters: params.parameters || {},
           workingDirectory: params.workingDirectory,
+          env: params.env,
         },
       });
 

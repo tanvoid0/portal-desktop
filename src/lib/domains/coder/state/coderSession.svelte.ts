@@ -1040,6 +1040,12 @@ class CoderSessionState {
 
   private looksLikeMultitaskInput(text: string): boolean {
     if (this.extractIssueUrls(text).length >= 2) return true;
+    // Line-splitting fan-out is explicit: only when Multitask mode is selected (QA-135).
+    const multitask =
+      this.agentMode === 'multitask' ||
+      this.multitaskMode ||
+      this.thread?.thread_kind === 'coordinator';
+    if (!multitask) return false;
     return (this.parseMultitaskTasks(text)?.length ?? 0) >= 2;
   }
 

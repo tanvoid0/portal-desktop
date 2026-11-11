@@ -52,6 +52,31 @@ function isNodeLike(profile: ProjectAutomationProfile): boolean {
   );
 }
 
+function frameworkNames(profile: ProjectAutomationProfile): string[] {
+  return [...profile.frameworks, profile.framework ?? ''].map((f) => f.toLowerCase());
+}
+
+/** Expo / React Native apps have no build/lint package.json scripts. */
+function isExpoLike(profile: ProjectAutomationProfile): boolean {
+  const cmds = `${profile.startCommand ?? ''} ${profile.buildCommand ?? ''}`.toLowerCase();
+  return (
+    /\bexpo\b/.test(cmds) ||
+    frameworkNames(profile).some((f) => f.includes('expo') || f === 'react native')
+  );
+}
+
+/** ponytail: no languages on the profile; TS = framework list says so, or Expo (TS template default). */
+function isTypeScript(profile: ProjectAutomationProfile): boolean {
+  return isExpoLike(profile) || frameworkNames(profile).some((f) => f === 'typescript');
+}
+
+function pmExec(pm: string, bin: string): string {
+  if (pm === 'pnpm') return `pnpm exec ${bin}`;
+  if (pm === 'yarn') return `yarn ${bin}`;
+  if (pm === 'bun') return `bunx ${bin}`;
+  return `npx ${bin}`;
+}
+
 function isRustLike(profile: ProjectAutomationProfile): boolean {
   const pm = profile.packageManager;
   if (pm === 'cargo') return true;
@@ -110,6 +135,7 @@ export function buildDefaultActions(profile: ProjectAutomationProfile): UnifiedA
     );
   } else {
     // Default: Node / generic package-manager projects
+    const expo = isExpoLike(profile);
     actions.push({
       id: 'install',
       name: 'Install Dependencies',
@@ -138,7 +164,9 @@ export function buildDefaultActions(profile: ProjectAutomationProfile): UnifiedA
       source: 'local',
       runner: 'local',
       category: 'build',
-      command: resolveScriptCommand(profile, 'build', profile.buildCommand),
+      command: expo
+        ? pmExec(profile.packageManager, 'expo export')
+        : resolveScriptCommand(profile, 'build', profile.buildCommand),
     });
 
     actions.push({
@@ -158,8 +186,22 @@ export function buildDefaultActions(profile: ProjectAutomationProfile): UnifiedA
       source: 'local',
       runner: 'local',
       category: 'lint',
-      command: resolveScriptCommand(profile, 'lint'),
+      command: expo
+        ? pmExec(profile.packageManager, 'expo lint')
+        : resolveScriptCommand(profile, 'lint'),
     });
+
+    if (isTypeScript(profile)) {
+      actions.push({
+        id: 'typecheck',
+        name: 'Typecheck',
+        description: 'Type-check with tsc --noEmit',
+        source: 'local',
+        runner: 'local',
+        category: 'lint',
+        command: pmExec(profile.packageManager, 'tsc --noEmit'),
+      });
+    }
   }
 
   return actions.map((a) => ({

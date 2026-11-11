@@ -5,6 +5,7 @@
 <script lang="ts">
   import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
   import GitBranch from '~icons/fa6-solid/code-branch';
+  import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import type { Project } from '$lib/domains/projects/types';
   import { getProjectGitBranch } from '$lib/domains/projects/utils/display';
@@ -12,9 +13,11 @@
   interface Props {
     project: Project;
     githubUrl: string | null;
+    refreshing?: boolean;
+    onRedetect?: () => void;
   }
 
-  let { project, githubUrl }: Props = $props();
+  let { project, githubUrl, refreshing = false, onRedetect }: Props = $props();
 
   const branch = $derived(getProjectGitBranch(project));
   const unpushed = $derived(project.unpushed_commits ?? 0);
@@ -29,7 +32,20 @@
   </CardHeader>
   <CardContent class="space-y-1.5 text-sm">
     {#if !branch && !project.git_repository}
-      <p class="text-muted-foreground">This folder is not a git repository.</p>
+      <p class="text-muted-foreground">
+        This folder is not a git repository — or the details are out of date.
+        {#if onRedetect}
+          <Button
+            variant="link"
+            size="sm"
+            class="h-auto p-0"
+            onclick={onRedetect}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Re-detecting…' : 'Re-detect'}
+          </Button>
+        {/if}
+      </p>
     {:else}
       {#if branch}
         <p>On branch <span class="font-mono">{branch}</span></p>

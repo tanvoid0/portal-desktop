@@ -134,8 +134,9 @@
   // The one line on this page a human typed — shown in the rail, where it can wrap.
   const about = $derived(readableDescription(project?.description));
 
+  // isLoading (not isPending): a disabled query — unresolved/invalid id — is pending forever.
   const loading = $derived(
-    projectQuery.isPending || (resolvedProjectId === null && projectsQuery.isPending)
+    projectQuery.isLoading || (resolvedProjectId === null && projectsQuery.isPending)
   );
 
   const modulesQuery = createProjectModulesQuery(() =>
@@ -564,7 +565,12 @@
             {refreshing}
             onRedetect={handleRedetect}
           />
-          <ProjectGitCard project={currentProject} {githubUrl} />
+          <ProjectGitCard
+            project={currentProject}
+            {githubUrl}
+            {refreshing}
+            onRedetect={handleRedetect}
+          />
         </div>
       </ResponsivePanel>
     </div>
