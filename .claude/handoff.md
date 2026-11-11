@@ -1,148 +1,156 @@
-# Handoff — `agents` domain shipped; coder's claude-cli engine now shares it; one infra gap left
+# Handoff — devices/pairing QA sweep: 5 bugs fixed+verified, 1 real blocker found, not yet fixed
 
 Written 2026-11-11, for someone with **no memory** of this session. Supersedes the previous
-version of this file (about the `agents` domain's P1 review-fix + live-QA pass). That work is
-now **committed** — see git history (`cd674366`) if you need the detail; this handoff doesn't
-repeat it.
+version of this file (the `agents`/coder claude-cli-engine work — that's fully committed, see
+`cd674366`/`268121af` in git history, nothing left there).
 
 ## Goal
 
-Same overall goal as before: bring the new `agents` domain to production quality, then extend
-its value by having coder's own claude-cli engine reuse it instead of maintaining a second,
-weaker CLI-spawn path. This session did the second part end to end: scoped it, implemented it,
-found and fixed two live bugs it surfaced, verified, committed.
+User reported "I still can't connect" pairing their phone to Portal Desktop. Continue the
+devices/pairing QA sweep from `.claude/handoff-devices-phone-qa.md` (still present, still
+accurate for its own narrower scope — QA-106/107/108/109/116), find out why real pairing
+fails for the user, and fix what's fixable.
 
-## State: **committed**, two commits this session
+## State: all committed and verified, but **2 commits not pushed**
 
-- `cd674366` — the `agents` domain P1 review-fix pass + QA-110/111/112 fixes (previous
-  handoff's work, finally landed).
-- `268121af` — coder's claude-cli engine (`advance_claude_cli`) reworked to call the `agents`
-  domain's `ClaudeCodeBackend` directly instead of its own one-shot CLI spawn. Includes two live
-  bugs this surfaced (QA-119, QA-120), fixed and verified. **Nothing pushed.**
+```
+320b82a4 docs(qa): file QA-121, pairing approval window too short and invisible
+18cdd163 fix(devices): QA-113/114/115/117/118 pairing polish fixes
+```
 
-### What changed in `268121af`
+Both are on top of `07263832` which **is** pushed (`origin/main` == `07263832` as of this
+session's start). Nobody has asked for these two to be pushed yet — do that first if picking
+this up, probably (`git push origin main`), unless the user wants to review first.
 
-Before: coder's claude-cli engine spawned a fresh `claude -p` process per turn, mapped Portal's
-`PermissionMode` straight onto the CLI's `--permission-mode` flag, and had **no live approve/deny
-at all** — headless mode can't prompt, so Review mode silently auto-denied anything needing one.
+## What got done
 
-After: `advance_claude_cli` calls `ClaudeCodeBackend::start` directly (one level under
-`AgentRunService`, which has no subscriber API coder needs). Review mode now gets a real live
-approval banner via the same permission-hook relay the `agents` Run launcher uses. Concretely:
+1. **QA-113/114/115/117/118 — all fixed by a coder agent, verified live by a qa-tester agent,
+   committed in `18cdd163`.** All were minor/polish bugs found in the devices/pairing domain
+   (expired QR rows never pruned, a poll error could wipe the QR card, Refresh button flickered,
+   unscanned QR grants couldn't be cancelled, a DB error was silently swallowed). Full detail in
+   each `.claude/qa/issues/QA-11{3,4,5,7,8}-*.md` file's `## Fix` and `## Verification` sections.
+   Nothing left to do here — these are done.
 
-- `agents/backend.rs`'s `StartParams` gained `permission_mode: String` and `isolate_settings:
-bool`. Coder passes `isolate_settings: false` — **deliberate, tested**: `--setting-sources ""`
-  was confirmed via a canary-file test to strip project `CLAUDE.md` governance (with it, Claude
-  blindly followed a planted instruction; isolated, it read the file as data and refused,
-  flagging it as a test). Coder's users rely on their real `CLAUDE.md`/hooks loading; the agents
-  Run launcher's own isolation (`true`) is unchanged.
-- `coder_approve` on a claude-cli thread now routes around `spawn_run`'s cancel-and-restart path
-  (which would otherwise kill the in-flight process mid-decision) via a new
-  `claude_cli_controls: Mutex<HashMap<thread_id, Box<dyn RunControl>>>` +
-  `decide_claude_cli_approval`.
-- Old raw-JSON parser (`parse_cli_event`/`cli_edit_targets`/`cli_tool_result_ids`) ported onto
-  the typed `AgentEvent` path. File-change/diff tracking and session continuity (`--resume`)
-  preserved.
-- Frontend: `showRemember={!isCli}` (no remember-rule concept for claude-cli, same call as
-  QA-112); `coderSession.svelte.ts`'s `onRunning` now does `rt.running = running && !rt.pending`
-  so Accept/Reject stay clickable while a banner shows (QA-110-class fix, one layer deeper); new
-  `canStop` prop on `AIComposerShell`/`CoderComposer` keeps Stop reachable while pending,
-  independent of `running`.
-- `ollama` and every other coder provider are untouched — they go through `advance_platform`,
-  a completely separate branch (`service.rs`'s only provider check is `== CLAUDE_CLI_PROVIDER`).
+2. **QA-121 — found live, NOT fixed. This is almost certainly the user's actual bug.** Filed in
+   `.claude/qa/issues/QA-121-pairing-approval-window-too-short-and-invisible.md`, board item #8
+   (Portal MCP, assignee `owner`, priority high).
 
-### QA-119, QA-120 — found live, fixed, verified (qa-tester closed both)
+   **The bug**: `/pair/request` (discovery or manual-IP pairing, not QR) blocks server-side for
+   up to 170s waiting for a human to click Allow on the Devices page
+   (`src-tauri/src/daemon/pairing.rs:29` `PAIR_REQUEST_TIMEOUT`). But `device://pending`
+   (emitted at `pairing.rs:103`) is **only ever listened to by
+   `src/routes/devices/+page.svelte:88`**, and its only effect there is a silent
+   `refetchDevices()` — no toast, no tray alert, nothing anywhere else in the app. So unless the
+   user is already sitting on `/devices` when they start pairing from their phone, the request
+   times out unnoticed, gets auto-rejected (`PairResolution::Denied`), and the Android app shows
+   **"The PC turned the request down"** (`PairApi.kt:53` maps any HTTP 403 to that exact string)
+   — which reads as a deliberate human decision that never actually happened.
 
-- **QA-119**: reloading mid-approval silently dropped the banner, permanently stuck on "Running…
-  Thinking…", with Stop unreachable either (composer swapped to Send because `running` was
-  forced false while pending). Fixed: `canStop` prop (independent of `running`); new
-  `claude_cli_pending: Mutex<HashMap<thread_id, PendingApproval>>` +
-  `coder_get_claude_cli_pending` command so a reload re-fetches live pending state from Rust
-  instead of only replaying events. Verified live, including that the restored banner's
-  Accept/Reject genuinely resolves the original tool call (file gets written on accept), not
-  just that buttons are clickable.
-- **QA-120**: cancelling leaked the real `claude.exe` grandchild on Windows forever — `process.rs`'s
-  `start_kill` only killed the `cmd /C claude` wrapper. A first tree-kill attempt
-  (fire-and-forget `taskkill /T /F`) raced `Child::start_kill()`'s own immediate kill and usually
-  lost. Fixed by running `taskkill /T /F` via `.output()` (blocking on the syscall, not the
-  tree's exit) **before** `child.start_kill()`, so the wrapper is still alive for taskkill to
-  enumerate. Shared code — benefits the `agents` domain too. Verified: 3x repro runs + UI-driven
-  variants, zero leaked PIDs each time.
+   **Reproduced live**: used the real paired test phone (`adb-R5GL150LRCK-N75UEH`, a Samsung
+   S26 Ultra, connected over wifi adb) to pair via "Type address" (manual IP, not QR) to
+   `192.168.0.137:18420`. Took several minutes of normal exploration/debugging to get from
+   "request sent" to "click Allow" on the desktop side (driving the Devices page over
+   Playwright's `chromium.connectOverCDP('http://127.0.0.1:9223')`, the live CDP port of the
+   already-running dev instance) — by the time Allow was clicked, the phone had already shown
+   the "turned down" error, and the late approval produced an orphaned "paired" device on the
+   desktop side with no matching token on the phone (a ghost pairing — cleaned up via
+   `revoke_device` for this report, not left in the DB).
 
-## What's left (in order)
+   **Suggested fix** (not yet implemented, see the issue file for full detail): (a) surface the
+   pending request somewhere visible outside `/devices` — toast/tray at minimum; (b) give the
+   170s-timeout path its own `PairResolution` variant distinct from an explicit Deny, so Android
+   can say something honest like "Nobody answered in time" instead of implying rejection.
 
-1. **`agents.exec` capability gating — infra gap, filed as board task #7 (owner).** Decided
-   coder's claude-cli live-execution path (now better: live-ask, not silent-deny) should require
-   `agents.exec`, same as the `agents` domain's own run-start, not just the default `coder` cap.
-   **No per-call capability hook exists to do this today**: `daemon/mod.rs`'s `rpc()` checks a
-   remote caller's `Trust::Remote{caps}` against the command's one static cap via `rpc.rs`'s
-   `capability(name)` _before_ calling `dispatch()` — `dispatch()` itself never receives caps.
-   Worse: a **local** Tauri IPC call (the app's own frontend) never goes through `daemon/mod.rs`
-   or `dispatch()` at all — `#[rpc]` expands to a plain `#[tauri::command]`, no trust/caps
-   parameter in either path. Doing this right means plumbing `Trust`/caps through the
-   `rpc-macro` proc-macro crate (`src-tauri/rpc-macro/src/lib.rs`), `rpc.rs`'s `dispatch()`, and
-   `daemon/mod.rs` — and deciding what a local call (no remote-Trust concept) should be treated
-   as. Real infra work, not a `commands.rs` edit. Until it lands: a device holding just the
-   default `coder` cap can reach claude-cli's live execution path — **same access as before this
-   session's change**, not worsened by it, just not improved either.
-2. **`cargo test -p portal-core` compile failure — board task #6 (owner), unrelated to this
-   session.** `tempfile` dev-dependency unresolved in several `#[cfg(test)]` modules. Confirmed
-   pre-existing on `main` via `git stash` before this session's changes — don't let it get
-   attributed to the claude-cli rework.
-3. **Push, or don't — your call.** Both commits are local-only on `main`. Nobody's asked for a
-   PR; this was worked directly on `main` per the existing pattern in this repo's recent history
-   (see `git log`).
-4. Continue the original phased roadmap (P2–P6: persistence/Sessions list, Board/Kanban reuse,
-   Analytics/Workflows, Codex/Cursor adapters) — still not started, nothing new to report here.
+3. **Noted, not investigated further**: two stale "Browser"-type pending rows (dated
+   06/07/2026 and 24/11/2025) have been sitting in "Pending requests" indefinitely in this dev
+   instance's DB — same shape of bug (a `/pair/request` that was never answered and never got
+   cleaned up), just for a different trust type than QR. Mentioned in QA-121's "Related" section.
+   Worth a look but out of scope for this session.
+
+4. **Clarified for the user**: the installed Android companion app (`com.portalremote`, in a
+   **separate repo**, `D:/projects/production/portal/portal_remote`, not this one) has no UI at
+   all for the `coder`/`terminal`/`agents`/`dashboard`/`projects`/`tasks` capabilities Portal
+   Desktop's daemon exposes — its screens are Trackpad/Keyboard/Media/Remote/Monitor/
+   Transfer/Deck/Browser/Assistant only (see `portal_remote/README.md`). And Portal Desktop's own
+   `/control` WebSocket (`src-tauri/src/daemon/control.rs`) only implements `ping`/`pong` today —
+   its own doc comment says so explicitly: "Input/mirror/audio/casting are later phases." So
+   **"can the phone control the PC" is currently: pairing works (once QA-121 is fixed), but there
+   is no built control surface yet** — neither trackpad-style input nor any Android UI for the
+   coder/terminal/agents RPC domains that _are_ implemented. This was relayed to the user; they
+   have not yet said whether to pursue testing the raw RPC layer directly (e.g. firing
+   `/rpc/coder...` calls from the phone via `adb shell curl` with a granted token, the same
+   technique used to verify QA-116/118) or to prioritize fixing QA-121 first.
+
+## What's left (in order, per the user's open question)
+
+1. **User was asked**: fix QA-121 first, or test raw RPC control first? Pick up their answer; if
+   none was given, default to fixing QA-121 first — it's the actual blocker they hit.
+2. **Push `18cdd163`/`320b82a4`** to `origin/main` (not yet done, nobody's explicitly asked, but
+   there's no reason to hold them back — they're verified and clean).
+3. If testing raw RPC control: pair the real phone (now revoked, needs re-pairing — Discover or
+   manual IP both work, see QA-121's repro for the exact manual-IP sequence over adb `input text`
+   if driving it headlessly), grant `coder`/`terminal`/`agents` (non-sensitive) caps, then issue
+   an authenticated RPC call from the phone (`adb shell curl` with the device's bearer token
+   against `http://192.168.0.137:18420/rpc/<command>`) to prove the control path works at the
+   protocol level even with no Android UI for it yet. **Do not grant `terminal.exec` or
+   `agents.exec` via automation** — the auto-mode classifier blocked exactly that mid-session
+   (toggling the `terminal.exec` switch on a pending request got refused outright); if that
+   capability needs testing, ask the user to grant it manually or get their explicit sign-off
+   first.
+
+## Files that matter
+
+- `.claude/qa/issues/QA-121-pairing-approval-window-too-short-and-invisible.md` — the real bug,
+  full repro and suggested fix.
+- `src-tauri/src/daemon/pairing.rs` — `PAIR_REQUEST_TIMEOUT` (170s), `pair_request` handler,
+  `PairResolution` enum (would need a third variant for "timed out" vs "denied").
+- `src/routes/devices/+page.svelte:88` — the only `device://pending` listener, silent
+  `refetchDevices()` only.
+- `D:/projects/production/portal/portal_remote/android/.../PairScreen.kt`,
+  `net/PairApi.kt` (`PairRejected`, the 403→"turned down" string), `net/PairUrl.kt` — the
+  Android side, **separate repo**, read-only reference, don't edit without checking that
+  project's own conventions.
+- `src-tauri/src/daemon/control.rs` — confirms input/trackpad control is unbuilt (doc comment at
+  top of file).
+- `.claude/qa/scripts/manual-ip-*.mjs` — the Playwright-over-CDP scripts used to drive the live
+  Devices page for this session's approval flow; `manual-ip-inspect.mjs` has the working pattern
+  for finding/clicking shadcn `Switch`/`Button` elements by scoping through `data-slot`
+  attributes via `page.evaluate` (Playwright's `.locator(...).filter({hasText})` approach failed
+  / timed out for reasons not fully root-caused — the `page.evaluate` + raw DOM query approach
+  worked reliably and is faster; prefer it for this app's shadcn-svelte components).
+- `.claude/handoff-devices-phone-qa.md` — the prior, narrower handoff (QA-106-118 sweep before
+  QA-121 was found). Still accurate, not superseded, just narrower scope than this file.
 
 ## Decisions made, don't re-litigate
 
-- **`--setting-sources ""` for coder: no.** Empirically tested (canary file), confirmed it drops
-  project `CLAUDE.md` governance. Coder keeps real settings loaded; the `agents` Run launcher
-  keeps isolating (unchanged, different tradeoff for a different feature).
-- **`agents.exec` gating: wanted, not done — see "What's left" #1.** Don't silently drop this or
-  reattempt it as a quick fix without reading that section; it needs cross-cutting infra work.
-- **coder calls `ClaudeCodeBackend` directly, not through `AgentRunService`.** The service has no
-  subscriber API coder needs (it fans events to a global ring buffer + `agents://event`, keyed
-  by its own `run_id`) — one layer down is the right seam.
-- Previous handoff's decisions (icon-import non-bug, QA-112's hide-not-build-remember call,
-  paired devices can start agent runs, ambient-session watching not yet implemented) all still
-  stand, unaffected by this session.
-
-## Files that matter (this session's part)
-
-- `src-tauri/portal-core/src/domains/agents/{backend.rs,claude_code.rs,process.rs}` —
-  `StartParams` fields, stderr-on-empty-events, the QA-120 tree-kill fix.
-- `src-tauri/portal-core/src/domains/coder/service.rs` — `advance_claude_cli` rewrite,
-  `claude_cli_controls`, `claude_cli_pending`, `decide_claude_cli_approval`.
-- `src-tauri/src/domains/coder/commands.rs` — `coder_approve`'s claude-cli branch,
-  `coder_get_claude_cli_pending`.
-- `src/lib/domains/coder/state/coderSession.svelte.ts`, `components/{CoderPanel,CoderComposer}.svelte`,
-  `src/lib/domains/ai/components/chat/AIComposerShell.svelte` — `canStop`, `showRemember`,
-  the running/pending invariant.
-- `.claude/qa/issues/QA-119-*.md`, `QA-120-*.md` — both `verified`, closed.
-- **Not this session's concern, don't touch without checking**: `src/app.css`,
-  `src/lib/domains/devices/components/PairDeviceCard.svelte`, `src/routes/devices/+page.svelte`,
-  `src/lib/utils/invokeClient.ts`, `.claude/handoff-devices-phone-qa.md`, and
-  QA-107/108/109/113-118 — a **different, possibly still-active concurrent session** worked the
-  devices/pairing domain in this same checkout, still uncommitted as of this session's end. Don't
-  attribute those diffs to this work, don't revert them, don't "clean them up" as unrelated noise
-  — check with whoever owns that session first.
+- QA-121's root cause is the **notification gap**, not the 170s duration per se — raising the
+  timeout doesn't fix anything if nobody ever sees the request. Fix the visibility first.
+- Declined to grant `terminal.exec`/`agents.exec` to a test device via automation (the harness's
+  own auto-mode classifier refused it) — treat this as a real guardrail, not a bug to work around.
+  Get explicit user sign-off before granting sensitive caps to any device, test or otherwise.
+- The ghost "paired" device created when my own late Allow click landed after the phone's request
+  had already timed out was revoked, not left in the DB — don't be surprised if you don't see it.
 
 ## Things that bit this session
 
-- `cargo test`/`cargo check` leaves generated TS bindings **unprettified** (ts-rs's raw
-  single-line output, not the repo's multiline style) — this showed up as a huge, scary-looking
-  diff across _every_ domain's `generated/*.ts` files (disk, github, projects, devices — nothing
-  to do with this session's actual change). Fix: `pnpm gen:types` (regenerates + formats
-  correctly). Confirmed via `git status` before/after that this reverted every unrelated file
-  back to matching `HEAD` exactly — none of it needed committing. Already noted in the previous
-  handoff; noting again because it bit this session too, for a bigger blast radius than last
-  time.
-- Leaked `claude.exe` processes from QA-120 testing/repro runs needed a manual `taskkill` from
-  the owner — the sandboxed agent environment's auto-mode classifier blocks `Stop-Process`/
-  `taskkill` calls as "Interfere With Workloads," even for cleanup of your own test artifacts.
-  If you hit this, ask the human rather than trying to work around the block.
-- Portal (the board MCP) was down for most of this session — board items got filed late, once it
-  came back up. If `mcp__plugin_crew_portal__add` fails with a connection error, note it once and
-  carry on; retry later rather than blocking on it.
+- Playwright's `locator(...).filter({ hasText: /^cap$/ })` on this app's shadcn-svelte `Switch`
+  components reliably timed out (0 matches) for reasons not root-caused, despite the DOM
+  structure looking correct on manual inspection. Switched to `page.evaluate` + raw
+  `querySelector`/`closest`/`textContent.trim() === x` matching, which worked first try. If you
+  hit the same thing, don't sink time into the Playwright locator API here — go straight to
+  `page.evaluate`.
+- `adb shell input text` with a literal "." does **not** reliably type a literal period into this
+  app's digit-box IP entry fields — the app's own `onOctetChange` treats any non-digit character
+  as "move to next box," so sending "." between octets works for _moving focus_ but can leave
+  wrong values in boxes if cursor position inside a non-empty box isn't what you expect
+  (backspace removes _before_ the cursor, and tapping a box doesn't guarantee cursor-at-end).
+  Safest sequence per box: tap the box, `KEYCODE_MOVE_END`, several `KEYCODE_DEL`, then type the
+  digits for that box only — don't try to type the whole dotted address as one `input text` call.
+- Driving the live app over CDP: `http://127.0.0.1:9223` is this dev instance's actual CDP port
+  (not the more commonly-assumed `:9222` — ports differ per `dev-instance.mjs` instance number).
+  Confirm with `curl -s http://127.0.0.1:PORT/json/version` or `curl -s .../json` (lists open
+  pages/URLs) before assuming a port. The built-in browser tool (`mcp__Claude_Browser__*`)
+  **cannot** attach to an existing CDP target — it opens its own separate browser. Use
+  `playwright`'s `chromium.connectOverCDP(...)` from a `node` script run via Bash instead (the
+  project already has `playwright` in `node_modules`; run scripts from the project root so module
+  resolution works — a script in the OS temp scratchpad dir fails with `ERR_MODULE_NOT_FOUND`).

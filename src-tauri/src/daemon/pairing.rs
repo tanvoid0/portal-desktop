@@ -30,10 +30,14 @@ const PAIR_REQUEST_TIMEOUT: Duration = Duration::from_secs(170);
 
 /// What a pending `/pair/request` was resolved with: `approve_device`/
 /// `reject_device` on the Tauri side, or this module's own timeout branch.
+/// `TimedOut` is kept distinct from `Denied` so the HTTP response (and, in
+/// turn, the Android client) doesn't read a silence as a deliberate human
+/// rejection — see `PAIR_REQUEST_TIMEOUT` above.
 #[derive(Debug)]
 pub enum PairResolution {
     Approved { token: String, host_name: String },
     Denied,
+    TimedOut,
 }
 
 type Pending = HashMap<String, oneshot::Sender<PairResolution>>;
@@ -114,7 +118,7 @@ pub(super) async fn pair_request(
             pending().lock().unwrap().remove(&device_id);
             // Nobody answered in time — stop sitting "pending" forever.
             let _ = pairing_service::reject(db.get_connection(), &device_id).await;
-            PairResolution::Denied
+            PairResolution::TimedOut
         }
     };
 
@@ -126,5 +130,16 @@ pub(super) async fn pair_request(
         }))
         .into_response(),
         PairResolution::Denied => StatusCode::FORBIDDEN.into_response(),
+        // Distinct status from an explicit Deny (403): REQUEST_TIMEOUT so a
+        // future Android client can tell "nobody answered" apart from "a
+        // human said no" instead of both reading as "turned down". The
+        // current Android client only special-cases 403, so this falls
+        // through to its generic "answered HTTP {code}" message — already
+        // more honest than "turned down" for a timeout nobody decided.
+        PairResolution::TimedOut => (
+            StatusCode::REQUEST_TIMEOUT,
+            Json(json!({ "error": "no response from host before timeout" })),
+        )
+            .into_response(),
     }
 }

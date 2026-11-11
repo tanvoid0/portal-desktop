@@ -4,9 +4,11 @@
 
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { page } from '$app/state';
   import { goto, afterNavigate } from '$app/navigation';
   import type { Snippet } from 'svelte';
+  import { toast } from '$lib/utils/toast';
   import { Button } from '$lib/components/ui/button';
   import ThemeToggle from '$lib/components/ui/theme-toggle.svelte';
   import Breadcrumb from '$lib/components/ui/breadcrumb.svelte';
@@ -71,6 +73,7 @@
 
   let unsubscribe: (() => void) | undefined;
   let popStateHandler: (() => void) | undefined;
+  let unlistenPairing: UnlistenFn | undefined;
 
   // Browser navigation state
   let canGoBack = $state(false);
@@ -143,6 +146,25 @@
         window.addEventListener('popstate', popStateHandler);
       }
 
+      // A phone pairing over discovery/manual-IP blocks server-side for up to
+      // ~170s waiting for a human to click Allow on /devices — but that page
+      // is the only place that heard this event before, so a request nobody
+      // is currently looking at timed out unnoticed (QA-121). Surface it
+      // app-wide; the Devices page keeps its own listener for the refetch.
+      listen<{ device_id: string; device_name: string }>('device://pending', (event) => {
+        if (page.url.pathname === '/devices') return;
+        toast.info('A phone wants to pair', {
+          description: `${event.payload.device_name} is waiting for approval.`,
+          duration: 0,
+          action: {
+            label: 'Review',
+            onClick: () => goto('/devices'),
+          },
+        });
+      }).then((fn) => {
+        unlistenPairing = fn;
+      });
+
       // Initialize theme first (now synchronous)
       themeStore.initialize();
 
@@ -193,6 +215,7 @@
     if (typeof window !== 'undefined' && popStateHandler) {
       window.removeEventListener('popstate', popStateHandler);
     }
+    unlistenPairing?.();
   });
 </script>
 

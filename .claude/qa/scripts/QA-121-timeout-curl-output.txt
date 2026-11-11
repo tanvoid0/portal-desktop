@@ -1,0 +1,6 @@
+HTTP/1.1 408 Request Timeout
+content-type: application/json
+content-length: 48
+date: Wed, 11 Nov 2026 14:56:01 GMT
+
+{"error":"no response from host before timeout"}
