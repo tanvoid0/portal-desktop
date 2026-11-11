@@ -25,6 +25,15 @@ export type AgentEvent =
   | { type: 'permission_resolved'; request_id: string; allowed: boolean }
   | { type: 'todos'; items: unknown }
   | { type: 'usage'; total_cost_usd?: number | null; model_usage?: unknown }
-  | { type: 'turn_done'; final_text?: string | null }
+  | {
+      type: 'turn_done';
+      final_text?: string | null;
+      /**
+       * The run ended in an error; the frontend uses this to skip a
+       * "finished" notification that would contradict the `Exited`
+       * failure notification that follows.
+       */
+      is_error: boolean;
+    }
   | { type: 'exited'; code?: number | null }
   | { type: 'raw'; line: string };

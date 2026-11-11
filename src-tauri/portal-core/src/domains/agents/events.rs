@@ -88,6 +88,11 @@ pub enum AgentEvent {
     TurnDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         final_text: Option<String>,
+        /// The run ended in an error; the frontend uses this to skip a
+        /// "finished" notification that would contradict the `Exited`
+        /// failure notification that follows.
+        #[serde(default)]
+        is_error: bool,
     },
     /// The backend process exited; the run is over.
     Exited {

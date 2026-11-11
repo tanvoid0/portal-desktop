@@ -8,7 +8,8 @@
   import { page } from '$app/state';
   import { goto, afterNavigate } from '$app/navigation';
   import type { Snippet } from 'svelte';
-  import { toast } from '$lib/utils/toast';
+  import { notify, initNotify } from '$lib/utils/notify';
+  import { agentsApi } from '$lib/domains/agents/api/agentsApi';
   import { Button } from '$lib/components/ui/button';
   import ThemeToggle from '$lib/components/ui/theme-toggle.svelte';
   import Breadcrumb from '$lib/components/ui/breadcrumb.svelte';
@@ -74,6 +75,8 @@
   let unsubscribe: (() => void) | undefined;
   let popStateHandler: (() => void) | undefined;
   let unlistenPairing: UnlistenFn | undefined;
+  let unlistenNotify: (() => void) | undefined;
+  let unlistenAgentEvents: UnlistenFn | undefined;
 
   // Browser navigation state
   let canGoBack = $state(false);
@@ -152,18 +155,49 @@
       // is currently looking at timed out unnoticed (QA-121). Surface it
       // app-wide; the Devices page keeps its own listener for the refetch.
       listen<{ device_id: string; device_name: string }>('device://pending', (event) => {
-        if (page.url.pathname === '/devices') return;
-        toast.info('A phone wants to pair', {
-          description: `${event.payload.device_name} is waiting for approval.`,
+        notify({
+          title: 'A phone wants to pair',
+          body: `${event.payload.device_name} is waiting for approval.`,
+          route: '/devices',
+          actionLabel: 'Review',
           duration: 0,
-          action: {
-            label: 'Review',
-            onClick: () => goto('/devices'),
-          },
         });
       }).then((fn) => {
         unlistenPairing = fn;
       });
+
+      // Native banner when unfocused + always-on toast for turn/permission/exit
+      // events from any running agent — see domains/agents/service.rs.
+      initNotify().then((fn) => {
+        unlistenNotify = fn;
+      });
+      agentsApi
+        .onEvent(({ run_id, event }) => {
+          const route =
+            page.url.pathname === '/agents/run' ? '/agents/run' : `/agents/sessions/${run_id}`;
+          if (event.type === 'turn_done' && !event.is_error) {
+            // Errored turns are reported by the `exited` branch below instead —
+            // skip here so the user doesn't see "finished" then "failed".
+            notify({ title: 'Agent finished', body: event.final_text?.slice(0, 120), route });
+          } else if (event.type === 'permission_request') {
+            notify({
+              title: 'Agent needs your approval',
+              body: `Wants to run ${event.tool_name}`,
+              route,
+              duration: 0,
+            });
+          } else if (event.type === 'exited' && event.code) {
+            notify({
+              title: 'Agent run failed',
+              body: `Exited with code ${event.code}`,
+              type: 'error',
+              route,
+            });
+          }
+        })
+        .then((fn) => {
+          unlistenAgentEvents = fn;
+        });
 
       // Initialize theme first (now synchronous)
       themeStore.initialize();
@@ -216,6 +250,8 @@
       window.removeEventListener('popstate', popStateHandler);
     }
     unlistenPairing?.();
+    unlistenNotify?.();
+    unlistenAgentEvents?.();
   });
 </script>
 

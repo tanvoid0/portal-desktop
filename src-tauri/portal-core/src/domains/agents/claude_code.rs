@@ -606,7 +606,8 @@ fn parse_stream_json_line(event: &Value, subagent_ids: &mut HashSet<String>) -> 
                 .get("result")
                 .and_then(Value::as_str)
                 .map(str::to_string);
-            out.push(AgentEvent::TurnDone { final_text });
+            let is_error = event.get("is_error").and_then(Value::as_bool).unwrap_or(false);
+            out.push(AgentEvent::TurnDone { final_text, is_error });
             let total_cost_usd = event.get("total_cost_usd").and_then(Value::as_f64);
             let model_usage = event.get("modelUsage").cloned();
             if total_cost_usd.is_some() || model_usage.is_some() {
@@ -656,7 +657,7 @@ mod tests {
         let mut ids = HashSet::new();
         let line = json!({"type":"result","result":"all done","total_cost_usd":0.5,"modelUsage":{"sonnet":{"tokens":10}}});
         let events = parse_stream_json_line(&line, &mut ids);
-        assert!(matches!(&events[0], AgentEvent::TurnDone { final_text } if final_text.as_deref() == Some("all done")));
+        assert!(matches!(&events[0], AgentEvent::TurnDone { final_text, .. } if final_text.as_deref() == Some("all done")));
         assert!(matches!(&events[1], AgentEvent::Usage { total_cost_usd: Some(c), .. } if (*c - 0.5).abs() < f64::EPSILON));
     }
 

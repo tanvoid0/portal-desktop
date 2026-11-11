@@ -9,6 +9,10 @@
     "dialog:default",
     "dialog:allow-confirm",
     "dialog:allow-message",
-    "updater:default"
+    "updater:default",
+    "notification:default",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:window:allow-show"
   ]
 }

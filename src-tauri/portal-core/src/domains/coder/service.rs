@@ -2779,7 +2779,7 @@ impl CoderService {
                     self.claude_cli_pending.lock().await.remove(thread_id);
                 }
                 AgentEvent::Raw { line } => last_stderr = Some(line.clone()),
-                AgentEvent::TurnDone { final_text: ft } => {
+                AgentEvent::TurnDone { final_text: ft, .. } => {
                     final_text = ft.clone().filter(|s| !s.trim().is_empty());
                     done = true;
                 }
