@@ -101,7 +101,10 @@ impl AgentBackend for ClaudeCodeBackend {
         // either way; whether the CLI actually calls into it depends on
         // this mode — "bypassPermissions" skips permission checks outright
         // (no hook calls), "acceptEdits" still asks for anything but file
-        // edits, "manual" asks for everything.
+        // edits, "manual" asks for everything the CLI itself considers
+        // gate-worthy — the CLI still auto-accepts some Bash subcommands via
+        // its own internal "known-safe" fast-path before the hook relay or
+        // this mode get a say (QA-125, confirmed not fixable from here).
         let permission_mode = if params.permission_mode.is_empty() {
             "manual"
         } else {

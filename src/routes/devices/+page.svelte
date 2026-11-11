@@ -20,6 +20,8 @@
     createDevicesQuery,
   } from '$lib/domains/devices/queries/deviceQueries';
   import { queryKeys } from '$lib/domains/shared/query/keys';
+  import { findDuplicatesByName } from '$lib/domains/devices/utils/duplicateDevices';
+  import type { DeviceSummary } from '$lib/domains/devices/types';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import ClockIcon from '~icons/fa6-solid/clock';
   import MobileIcon from '~icons/fa6-solid/mobile-screen-button';
@@ -58,6 +60,16 @@
     devices.filter((d) => d.approval_type === 'revoked' || d.approval_type === 'rejected')
   );
   const pairedDeviceIds = $derived(new Set(paired.map((d) => d.device_id)));
+  // Same device_name among several live grants — the most likely cause is a
+  // stale connection nobody revoked before pairing again, since device_id is
+  // never stable across requests. Flag it so the user can clean up.
+  const duplicatesByDeviceId = $derived.by(() => {
+    const map = new Map<string, DeviceSummary[]>();
+    for (const device of paired) {
+      map.set(device.device_id, findDuplicatesByName(device, paired));
+    }
+    return map;
+  });
 
   const stats = $derived<PageStat[]>([
     { label: 'Pending', value: pending.length, icon: ClockIcon },
@@ -130,7 +142,12 @@
         <h3 class="text-sm font-semibold">Pending requests</h3>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {#each pending as device (device.device_id)}
-            <PendingRequestRow {device} {capabilities} onResolved={refetchDevices} />
+            <PendingRequestRow
+              {device}
+              {capabilities}
+              existing={findDuplicatesByName(device, paired)[0]}
+              onResolved={refetchDevices}
+            />
           {/each}
         </div>
       </div>
@@ -147,7 +164,12 @@
       {:else}
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {#each paired as device (device.device_id)}
-            <DeviceRow {device} {capabilities} onChanged={refetchDevices} />
+            <DeviceRow
+              {device}
+              {capabilities}
+              duplicates={duplicatesByDeviceId.get(device.device_id) ?? []}
+              onChanged={refetchDevices}
+            />
           {/each}
         </div>
       {/if}

@@ -27,14 +27,25 @@
   // `arguments` is `serde_json::Value` on the Rust side, so it arrives as
   // `unknown`. Tool arguments are always a JSON object in practice; anything
   // else renders as no arguments rather than throwing.
-  const display = $derived(
-    getToolCallDisplay(
-      pending.tool,
-      (typeof pending.arguments === 'object' && pending.arguments !== null
-        ? pending.arguments
-        : {}) as Record<string, unknown>
-    )
-  );
+  //
+  // `getToolCallDisplay` only recognizes coder's own synthetic tool names
+  // (`read_file`, `write_file`, …) and returns no detail for anything else —
+  // including the agents backend's native Claude Code CLI tool names
+  // (`Bash`, `Write`, `Edit`, …). `pending.summary` (already computed by
+  // `summarizePermission()` for exactly that case — see
+  // `agents/utils/eventsToMessages.ts`) is the fallback, not the primary
+  // source, so coder's own richer per-tool details keep taking priority. See
+  // QA-126.
+  const display = $derived.by(() => {
+    const args = (
+      typeof pending.arguments === 'object' && pending.arguments !== null ? pending.arguments : {}
+    ) as Record<string, unknown>;
+    const base = getToolCallDisplay(pending.tool, args);
+    if (base.detail) return base;
+    const fallbackDetail =
+      pending.summary && pending.summary !== pending.tool ? pending.summary : '';
+    return { label: base.label, detail: fallbackDetail };
+  });
 </script>
 
 <div class="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">

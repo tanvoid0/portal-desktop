@@ -24,7 +24,10 @@
   const firstPending = $derived(run.view.pending[0] ?? null);
   const extraPending = $derived(run.view.pending.slice(1));
 
-  onMount(() => () => run.destroy());
+  onMount(() => {
+    void run.rehydrate();
+    return () => run.destroy();
+  });
 
   function handleStart(backendId: string, cwd: string, prompt: string, model: string | null) {
     run.start(backendId, cwd, prompt, model);

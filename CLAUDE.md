@@ -117,6 +117,10 @@ These are the source of truth — this file summarizes them:
 - `.cursor/rules/data-loading-conventions.md` — TanStack Query, TTL cache, the `getList`/`[]`-is-truthy trap.
 - `docs/development/SHADCN_COMPONENT_AUDIT.md` — per-file migration status.
 
+## The shared daemon (port 18420)
+
+Portal Desktop's daemon on loopback port 18420 is the one shared task-board backend for every project on this machine — not a per-session instance. Every session/agent must talk to that single running Portal, never assume it owns one. To bring it up, run `pnpm portal:ensure` (idempotent, lock-protected, safe to call from multiple sessions at once) instead of calling `pnpm tauri:dev` blind. `tauri-plugin-single-instance` is the hard backstop: it keeps a second GUI process from ever fully starting even if that convention is skipped.
+
 ## When unsure about Svelte 5 or shadcn-svelte
 
 Prefer fetching the real docs over guessing (training data skews Svelte 4 / React):

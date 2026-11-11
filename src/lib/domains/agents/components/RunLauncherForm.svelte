@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { open } from '@tauri-apps/plugin-dialog';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Textarea } from '$lib/components/ui/textarea';
   import { Label } from '$lib/components/ui/label';
   import Select from '$lib/components/ui/select.svelte';
-  import FolderOpen from '~icons/fa6-solid/folder-open';
+  import ProjectCombobox from '$lib/domains/projects/components/ProjectCombobox.svelte';
   import type { BackendInfo } from '../generated';
+
+  const CWD_STORAGE_KEY = 'portal-agents-last-cwd';
 
   interface Props {
     backends: BackendInfo[];
@@ -28,11 +29,6 @@
   const backendOptions = $derived(backends.map((b) => ({ value: b.id, label: b.display_name })));
   const selected = $derived(backends.find((b) => b.id === backendId));
   const canStart = $derived(!busy && !!backendId && cwd.trim() !== '' && prompt.trim() !== '');
-
-  async function browse() {
-    const dir = await open({ directory: true, multiple: false });
-    if (typeof dir === 'string') cwd = dir;
-  }
 
   function submit() {
     if (!canStart) return;
@@ -58,13 +54,12 @@
   </div>
 
   <div class="grid gap-1.5">
-    <Label for="agent-cwd">Working directory</Label>
-    <div class="flex gap-2">
-      <Input id="agent-cwd" bind:value={cwd} placeholder="Pick a folder…" class="flex-1" />
-      <Button size="icon" variant="ghost" title="Browse for a folder" onclick={browse}>
-        <FolderOpen class="h-4 w-4" />
-      </Button>
-    </div>
+    <Label>Working directory</Label>
+    <ProjectCombobox
+      bind:value={cwd}
+      placeholder="Select a project…"
+      storageKey={CWD_STORAGE_KEY}
+    />
   </div>
 
   {#if selected}

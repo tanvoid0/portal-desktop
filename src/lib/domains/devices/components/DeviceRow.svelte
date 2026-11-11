@@ -10,14 +10,16 @@
   import type { DeviceSummary } from '../types';
   import Pencil from '~icons/fa6-solid/pen';
   import Loader2 from '~icons/fa6-solid/spinner';
+  import TriangleExclamation from '~icons/fa6-solid/triangle-exclamation';
 
   interface Props {
     device: DeviceSummary;
     capabilities: string[];
+    duplicates?: DeviceSummary[];
     onChanged?: () => void;
   }
 
-  let { device, capabilities, onChanged = () => {} }: Props = $props();
+  let { device, capabilities, duplicates = [], onChanged = () => {} }: Props = $props();
 
   const APPROVAL_LABEL: Record<string, string> = {
     pending: 'Pending',
@@ -66,16 +68,16 @@
     }
   }
 
-  async function revoke() {
+  async function revoke(deviceId: string = device.device_id, name: string = device.device_name) {
     const confirmed = await confirmAction(
-      `Revoke access for ${device.device_name}? It will have to be paired again.`,
+      `Revoke access for ${name}? It will have to be paired again.`,
       'Revoke device'
     );
     if (!confirmed) return;
 
     busy = true;
     try {
-      await revokeDevice(device.device_id);
+      await revokeDevice(deviceId);
       toast.success('Device revoked');
       onChanged();
     } catch (err) {
@@ -102,6 +104,29 @@
       {APPROVAL_LABEL[device.approval_type] ?? device.approval_type}
     </Badge>
   </div>
+
+  {#if duplicates.length > 0}
+    <div class="flex flex-col gap-1 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+      {#each duplicates as other (other.device_id)}
+        <div class="flex items-center justify-between gap-2">
+          <span class="flex items-center gap-1.5 truncate">
+            <TriangleExclamation class="h-3 w-3 shrink-0" />
+            Also paired as "{other.device_name}" · {APPROVAL_LABEL[other.approval_type] ??
+              other.approval_type} · {other.capabilities.join(', ') || 'no capabilities'}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 shrink-0 px-2 text-xs"
+            onclick={() => revoke(other.device_id, other.device_name)}
+            disabled={busy}
+          >
+            Archive old
+          </Button>
+        </div>
+      {/each}
+    </div>
+  {/if}
 
   {#if editing}
     <CapabilityChecklist {capabilities} bind:selected disabled={busy} />
@@ -142,7 +167,13 @@
     </div>
 
     {#if isActive}
-      <Button variant="destructive" size="sm" onclick={revoke} disabled={busy} class="self-end">
+      <Button
+        variant="destructive"
+        size="sm"
+        onclick={() => revoke()}
+        disabled={busy}
+        class="self-end"
+      >
         {#if busy}
           <Loader2 class="h-4 w-4 animate-spin" />
         {:else}

@@ -59,6 +59,24 @@ export function createAgentRunState() {
     }
   }
 
+  /** This page has no persisted run id of its own (unlike coder's thread
+   *  list) — on mount, ask the backend if a run is still alive and, if so,
+   *  reattach to it instead of showing a blank launcher while it sits
+   *  blocked on a decision nobody can see anymore (QA-127). The ring buffer
+   *  already carries any unresolved `permission_request`, so no separate
+   *  "pending" fetch is needed — `eventsToMessages` derives it the same way
+   *  it does for a live run. Picks the first if more than one is live; this
+   *  page only ever starts one of its own.
+   */
+  async function rehydrate() {
+    const running = await agentsApi.listRunning().catch(() => []);
+    const liveRunId = running[0];
+    if (!liveRunId) return;
+    await ensureListening();
+    runId = liveRunId;
+    events = await agentsApi.getEvents(liveRunId).catch(() => []);
+  }
+
   async function sendUser(text: string) {
     if (!runId) return;
     try {
@@ -112,6 +130,7 @@ export function createAgentRunState() {
       return view;
     },
     start,
+    rehydrate,
     sendUser,
     decide,
     interrupt,

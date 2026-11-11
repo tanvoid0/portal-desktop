@@ -75,7 +75,20 @@ pub fn run() {
     // or configure in tauri.conf.json under plugins section if supported
     let updater_builder = tauri_plugin_updater::Builder::new();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Hard backstop for the one-shared-daemon rule (see this repo's CLAUDE.md):
+    // a second launch focuses the existing window instead of starting a second
+    // process, which would otherwise fight the first over one SQLite file and
+    // one daemon port. Must be the first plugin registered — Tauri requires it.
+    // Desktop-only: there's no second "instance" to collide with on mobile.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -193,10 +206,23 @@ pub fn run() {
             coder_service.init_events(sink.clone());
             app.manage(coder_service);
 
-            // Agent-CLI integration domain (Claude Code today). In-memory
-            // only — no DB-backed sessions list yet, see docs plan P2.
-            let agents_service = std::sync::Arc::new(domains::agents::AgentRunService::new());
+            // Agent-CLI integration domain (Claude Code today). Live runs
+            // stay in-memory (ring buffer); sessions/messages/events are
+            // persisted to the DB (P2) — see domains::agents::service.
+            let agents_service = std::sync::Arc::new(domains::agents::AgentRunService::new(
+                db_manager_arc.clone(),
+            ));
             tauri::async_runtime::block_on(agents_service.init_events(sink.clone()));
+            // `runs` above always starts empty — any `agent_sessions` row still
+            // "running" belongs to a process that's gone and can never resolve
+            // it itself (QA-127). Settle those before the UI can read them.
+            match tauri::async_runtime::block_on(agents_service.reconcile_stale_sessions()) {
+                Ok(n) if n > 0 => {
+                    log_info!("Agents", "Marked {} stale running sessions interrupted", n)
+                }
+                Ok(_) => {}
+                Err(e) => log_warn!("Agents", "Failed to reconcile stale sessions: {}", e),
+            }
             app.manage(agents_service);
 
             // Initialize pipeline services
@@ -769,6 +795,9 @@ pub fn run() {
             domains::agents::agents_interrupt,
             domains::agents::agents_cancel,
             domains::agents::agents_get_events,
+            domains::agents::agents_list_running,
+            domains::agents::agents_list_sessions,
+            domains::agents::agents_get_session,
         ])
         .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
         .expect("error while running tauri application");

@@ -23,6 +23,7 @@
     "tauri:dev": "tauri dev",
     "tauri:dev:instance": "node scripts/dev-instance.mjs",
     "tauri:build": "tauri build",
+    "portal:ensure": "node scripts/ensure-portal.mjs",
     "n8n:start": "cd n8n-workflows && npx n8n start",
     "n8n:dev": "cd n8n-workflows && npx n8n start --tunnel",
     "ollama:install": "curl -fsSL https://ollama.ai/install.sh | sh",

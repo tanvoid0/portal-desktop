@@ -55,8 +55,21 @@ function run(command, args, env, { tolerateFailure = false } = {}) {
 
 if (process.argv[2] === '--kill-port') {
   // Runs as `predev`, inside the environment `tauri dev` was started with.
-  const port = process.env.PORTAL_DEV_PORT ?? String(PORT_BASE);
-  run('npx', ['kill-port', port], process.env, { tolerateFailure: true });
+  const daemonPort = process.env.PORTAL_DAEMON_PORT ?? '18420';
+  const alreadyUp = await fetch(`http://127.0.0.1:${daemonPort}/health`, {
+    signal: AbortSignal.timeout(1500),
+  })
+    .then((r) => r.ok)
+    .catch(() => false);
+  if (alreadyUp) {
+    // A live instance is already running — killing the vite port would sever
+    // its frontend out from under it. Let `tauri dev` fail loudly on the port
+    // instead of silently wrecking the other instance.
+    console.log('dev-instance: Portal is already running — skipping kill-port');
+  } else {
+    const port = process.env.PORTAL_DEV_PORT ?? String(PORT_BASE);
+    run('npx', ['kill-port', port], process.env, { tolerateFailure: true });
+  }
 } else {
   const n = instanceNumber(process.argv[2]);
   const vitePort = PORT_BASE + (n - 1);

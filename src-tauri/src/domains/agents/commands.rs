@@ -6,12 +6,16 @@ use tauri::State;
 
 use super::backend::StartParams;
 use super::events::AgentEvent;
-use super::service::{AgentRunService, BackendInfo};
+use super::service::{AgentRunService, AgentSessionDetail, AgentSessionSummary, BackendInfo};
 
-// `agents` (read-only: which backends/models exist, replaying a run's own
-// events) is in `DEFAULT_CAPS`. `agents.exec` (spawning a process, and
+// `agents` (read-only: which backends/models exist, replaying a *live* run's
+// own events) is in `DEFAULT_CAPS`. `agents.exec` (spawning a process, and
 // approving/denying the tool calls it makes) is RCE-equivalent and lives in
 // `SENSITIVE_CAPS` instead — same split as `terminal`/`terminal.exec`.
+// `agents.history` (reading back *past* runs' full persisted transcripts —
+// every tool input/output, file content, command output any run ever
+// touched) is sensitive for the same reason: granting it hands a remote
+// device everything, not just the one run it's currently watching.
 
 #[portal_rpc_macro::rpc(cap = "agents")]
 pub async fn agents_list_backends(
@@ -81,4 +85,31 @@ pub async fn agents_get_events(
     run_id: String,
 ) -> Result<Vec<AgentEvent>, String> {
     Ok(service.get_events(&run_id).await)
+}
+
+/// Run ids with a live backend process right now — lets `/agents/run`
+/// reattach to a run still alive on the backend after a reload (QA-127).
+#[portal_rpc_macro::rpc(cap = "agents")]
+pub async fn agents_list_running(
+    service: State<'_, Arc<AgentRunService>>,
+) -> Result<Vec<String>, String> {
+    Ok(service.list_running().await)
+}
+
+/// Persisted sessions, most recent first — the Sessions list page.
+#[portal_rpc_macro::rpc(cap = "agents.history")]
+pub async fn agents_list_sessions(
+    service: State<'_, Arc<AgentRunService>>,
+) -> Result<Vec<AgentSessionSummary>, String> {
+    service.list_sessions().await
+}
+
+/// One session's full persisted transcript + event log, in order — the
+/// Session Detail page (Conversation + Timeline tabs).
+#[portal_rpc_macro::rpc(cap = "agents.history")]
+pub async fn agents_get_session(
+    service: State<'_, Arc<AgentRunService>>,
+    session_id: String,
+) -> Result<Option<AgentSessionDetail>, String> {
+    service.get_session_detail(&session_id).await
 }

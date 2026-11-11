@@ -47,6 +47,7 @@ pub mod m20261108_000044_create_project_env_links_table;
 pub mod m20261110_000045_add_project_stage;
 pub mod m20261110_000046_add_project_archived_flag;
 pub mod m20261110_000047_create_project_moves_table;
+pub mod m20261111_000048_create_agent_tables;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -97,6 +98,7 @@ pub use m20261108_000044_create_project_env_links_table::Migration as createProj
 pub use m20261110_000045_add_project_stage::Migration as addProjectStage;
 pub use m20261110_000046_add_project_archived_flag::Migration as addProjectArchivedFlag;
 pub use m20261110_000047_create_project_moves_table::Migration as createProjectMovesTable;
+pub use m20261111_000048_create_agent_tables::Migration as createAgentTables;
 
 pub struct Migrator;
 
@@ -181,5 +183,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(addProjectStage),
         Box::new(addProjectArchivedFlag),
         Box::new(createProjectMovesTable),
+        Box::new(createAgentTables),
     ]
 }

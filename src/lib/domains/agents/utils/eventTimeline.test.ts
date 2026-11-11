@@ -7,24 +7,33 @@ function row(id: string, event: AgentEventRow['event']): AgentEventRow {
 }
 
 describe('foldTimelineEvents', () => {
-  it('merges consecutive text deltas into one row', () => {
+  it('renders a text/thinking delta row as a safety net, though the pump loop no longer persists them', () => {
     const items = foldTimelineEvents([
-      row('1', { type: 'text_delta', text: 'Hel' }),
-      row('2', { type: 'text_delta', text: 'lo' }),
+      row('1', { type: 'thinking_delta', text: 'hmm' }),
+      row('2', { type: 'text_delta', text: 'ok' }),
       row('3', { type: 'turn_done', is_error: false }),
     ]);
     expect(items).toEqual([
-      { id: '1', created_at: '2026-01-01T00:00:01Z', label: 'Assistant text', detail: 'Hello' },
+      { id: '1', created_at: '2026-01-01T00:00:01Z', label: 'Thinking', detail: 'hmm' },
+      { id: '2', created_at: '2026-01-01T00:00:02Z', label: 'Assistant text', detail: 'ok' },
       { id: '3', created_at: '2026-01-01T00:00:03Z', label: 'Turn finished' },
     ]);
   });
 
-  it('does not merge a thinking delta into an adjacent text delta', () => {
+  it('includes the tool input as detail on a permission request', () => {
     const items = foldTimelineEvents([
-      row('1', { type: 'thinking_delta', text: 'hmm' }),
-      row('2', { type: 'text_delta', text: 'ok' }),
+      row('1', {
+        type: 'permission_request',
+        request_id: 'r1',
+        tool_name: 'Write',
+        tool_input: { file_path: 'a.txt', content: 'hi' },
+        suggestions: [],
+      }),
     ]);
-    expect(items.map((i) => i.label)).toEqual(['Thinking', 'Assistant text']);
+    expect(items[0]).toMatchObject({
+      label: 'Permission requested: Write',
+      detail: '{"file_path":"a.txt","content":"hi"}',
+    });
   });
 
   it('flags a failed tool result and a non-zero exit', () => {
