@@ -6,7 +6,6 @@
   import { onDestroy } from 'svelte';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { useQueryClient } from '@tanstack/svelte-query';
-  import * as Table from '$lib/components/ui/table';
   import { Button } from '$lib/components/ui/button';
   import { PageEmpty, PageError, PageHeader, PageLoading, PageStats } from '$lib/components/shell';
   import type { PageStat } from '$lib/components/shell';
@@ -90,9 +89,11 @@
     {#if pending.length > 0}
       <div class="space-y-3">
         <h3 class="text-sm font-semibold">Pending requests</h3>
-        {#each pending as device (device.device_id)}
-          <PendingRequestRow {device} {capabilities} onResolved={refetchDevices} />
-        {/each}
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {#each pending as device (device.device_id)}
+            <PendingRequestRow {device} {capabilities} onResolved={refetchDevices} />
+          {/each}
+        </div>
       </div>
     {/if}
 
@@ -105,23 +106,11 @@
           icon={MobileIcon}
         />
       {:else}
-        <Table.Root>
-          <Table.Header>
-            <Table.Row>
-              <Table.Head>Name</Table.Head>
-              <Table.Head>Approval</Table.Head>
-              <Table.Head>Capabilities</Table.Head>
-              <Table.Head>Last used</Table.Head>
-              <Table.Head>Expires</Table.Head>
-              <Table.Head></Table.Head>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {#each paired as device (device.device_id)}
-              <DeviceRow {device} {capabilities} onChanged={refetchDevices} />
-            {/each}
-          </Table.Body>
-        </Table.Root>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {#each paired as device (device.device_id)}
+            <DeviceRow {device} {capabilities} onChanged={refetchDevices} />
+          {/each}
+        </div>
       {/if}
     </div>
 
@@ -131,23 +120,11 @@
           {historyOpen ? 'Hide' : 'Show'} history ({history.length})
         </Button>
         {#if historyOpen}
-          <Table.Root>
-            <Table.Header>
-              <Table.Row>
-                <Table.Head>Name</Table.Head>
-                <Table.Head>Approval</Table.Head>
-                <Table.Head>Capabilities</Table.Head>
-                <Table.Head>Last used</Table.Head>
-                <Table.Head>Expires</Table.Head>
-                <Table.Head></Table.Head>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {#each history as device (device.device_id)}
-                <DeviceRow {device} {capabilities} onChanged={refetchDevices} />
-              {/each}
-            </Table.Body>
-          </Table.Root>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {#each history as device (device.device_id)}
+              <DeviceRow {device} {capabilities} onChanged={refetchDevices} />
+            {/each}
+          </div>
         {/if}
       </div>
     {/if}

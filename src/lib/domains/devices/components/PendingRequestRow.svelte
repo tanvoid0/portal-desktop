@@ -6,6 +6,7 @@
   import CapabilityChecklist from './CapabilityChecklist.svelte';
   import { approveDevice, rejectDevice } from '../api/deviceApi';
   import { toast } from '$lib/utils/toast';
+  import { formatRelativeTime } from '$lib/domains/shared/utils';
   import type { ApprovalType, DeviceSummary } from '../types';
   import Loader2 from '~icons/fa6-solid/spinner';
 
@@ -54,22 +55,19 @@
 </script>
 
 <Card>
-  <CardContent class="space-y-3 pt-6">
+  <CardContent class="space-y-2 p-3">
     <div class="flex items-center justify-between gap-2">
-      <p class="font-medium">{device.device_name}</p>
-      <span class="text-xs text-muted-foreground">
-        {new Date(device.created_at).toLocaleString()}
+      <p class="truncate text-sm font-medium" title={device.device_name}>{device.device_name}</p>
+      <span class="shrink-0 text-xs text-muted-foreground">
+        {formatRelativeTime(new Date(device.created_at))}
       </span>
     </div>
 
-    <div>
-      <p class="mb-2 text-sm font-medium">Capabilities to grant</p>
-      <CapabilityChecklist {capabilities} bind:selected disabled={busy} />
-    </div>
+    <CapabilityChecklist {capabilities} bind:selected disabled={busy} />
 
-    <RadioGroup.Root bind:value={approvalType} class="flex flex-wrap gap-4" disabled={busy}>
+    <RadioGroup.Root bind:value={approvalType} class="flex flex-wrap gap-3" disabled={busy}>
       {#each APPROVAL_OPTIONS as option}
-        <Label class="flex items-center gap-2 text-sm font-normal">
+        <Label class="flex items-center gap-1.5 text-xs font-normal">
           <RadioGroup.Item value={option.value} />
           {option.label}
         </Label>
@@ -77,11 +75,13 @@
     </RadioGroup.Root>
 
     <div class="flex gap-2">
-      <Button onclick={allow} disabled={busy} class="flex-1">
+      <Button size="sm" onclick={allow} disabled={busy} class="flex-1">
         {#if busy}<Loader2 class="mr-2 h-4 w-4 animate-spin" />{/if}
         Allow
       </Button>
-      <Button variant="outline" onclick={deny} disabled={busy} class="flex-1">Deny</Button>
+      <Button size="sm" variant="outline" onclick={deny} disabled={busy} class="flex-1">
+        Deny
+      </Button>
     </div>
   </CardContent>
 </Card>

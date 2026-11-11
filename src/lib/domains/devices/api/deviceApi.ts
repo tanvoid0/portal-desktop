@@ -33,15 +33,15 @@ export function approveDevice(
 }
 
 export function rejectDevice(deviceId: string): Promise<void> {
-  return invokeClient.post('reject_device', { device_id: deviceId });
+  return invokeClient.post('reject_device', { deviceId });
 }
 
 export function revokeDevice(deviceId: string): Promise<void> {
-  return invokeClient.post('revoke_device', { device_id: deviceId });
+  return invokeClient.post('revoke_device', { deviceId });
 }
 
 export function updateDeviceCapabilities(deviceId: string, capabilities: string[]): Promise<void> {
-  return invokeClient.post('update_device_capabilities', { device_id: deviceId, capabilities });
+  return invokeClient.post('update_device_capabilities', { deviceId, capabilities });
 }
 
 export function generatePairingQr(capabilities: string[]): Promise<PairingQrResponse> {

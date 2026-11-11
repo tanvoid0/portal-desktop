@@ -1,11 +1,12 @@
 <script lang="ts">
-  import * as Table from '$lib/components/ui/table';
+  import { Card } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import CapabilityChecklist from './CapabilityChecklist.svelte';
   import { revokeDevice, updateDeviceCapabilities } from '../api/deviceApi';
   import { confirmAction } from '$lib/utils/confirm';
   import { toast } from '$lib/utils/toast';
+  import { formatRelativeTime } from '$lib/domains/shared/utils';
   import type { DeviceSummary } from '../types';
   import Pencil from '~icons/fa6-solid/pen';
   import Loader2 from '~icons/fa6-solid/spinner';
@@ -27,11 +28,26 @@
     rejected: 'Rejected',
   };
 
+  // A device is "active" if it has touched the daemon in the last 5 minutes.
+  // There's no live connection tracking to say a device is online right now,
+  // so this is the honest proxy: recent use.
+  const ACTIVE_WINDOW_MS = 5 * 60 * 1000;
+
   let editing = $state(false);
   let selected = $state<string[]>([...device.capabilities]);
   let busy = $state(false);
 
   const isActive = $derived(device.approved && device.approval_type !== 'revoked');
+  const lastUsed = $derived(device.last_used_at ? new Date(device.last_used_at) : null);
+  const isOnline = $derived(
+    isActive && !!lastUsed && Date.now() - lastUsed.getTime() < ACTIVE_WINDOW_MS
+  );
+  const lastSeenLabel = $derived(
+    isOnline ? 'Active now' : lastUsed ? formatRelativeTime(lastUsed) : 'Never used'
+  );
+  const dotClass = $derived(
+    isOnline ? 'bg-green-500' : isActive ? 'bg-muted-foreground/40' : 'bg-destructive/50'
+  );
 
   async function saveCapabilities() {
     busy = true;
@@ -70,57 +86,63 @@
   }
 </script>
 
-<Table.Row>
-  <Table.Cell class="font-medium">{device.device_name}</Table.Cell>
-  <Table.Cell>
-    <Badge variant={isActive ? 'default' : 'outline'}>
+<Card class="flex flex-col gap-2 p-3">
+  <div class="flex items-start justify-between gap-2">
+    <div class="flex min-w-0 items-center gap-2">
+      <span
+        class="h-2 w-2 shrink-0 rounded-full {dotClass}"
+        title={lastSeenLabel}
+        aria-hidden="true"
+      ></span>
+      <span class="truncate text-sm font-medium" title={device.device_name}>
+        {device.device_name}
+      </span>
+    </div>
+    <Badge variant={isActive ? 'default' : 'outline'} class="shrink-0 font-normal">
       {APPROVAL_LABEL[device.approval_type] ?? device.approval_type}
     </Badge>
-  </Table.Cell>
-  <Table.Cell>
-    {#if editing}
-      <div class="space-y-2">
-        <CapabilityChecklist {capabilities} bind:selected disabled={busy} />
-        <div class="flex gap-2">
-          <Button size="sm" onclick={saveCapabilities} disabled={busy}>Save</Button>
-          <Button size="sm" variant="outline" onclick={() => (editing = false)} disabled={busy}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    {:else}
-      <div class="flex flex-wrap items-center gap-1">
-        {#each device.capabilities as cap}
-          <Badge variant="secondary" class="text-xs">{cap}</Badge>
-        {:else}
-          <span class="text-xs text-muted-foreground">none</span>
-        {/each}
-        {#if isActive}
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-6 w-6"
-            onclick={() => {
-              selected = [...device.capabilities];
-              editing = true;
-            }}
-            aria-label="Edit capabilities"
-          >
-            <Pencil class="h-3 w-3" />
-          </Button>
-        {/if}
-      </div>
-    {/if}
-  </Table.Cell>
-  <Table.Cell class="text-xs text-muted-foreground">
-    {device.last_used_at ? new Date(device.last_used_at).toLocaleString() : 'Never'}
-  </Table.Cell>
-  <Table.Cell class="text-xs text-muted-foreground">
-    {device.expires_at ? new Date(device.expires_at).toLocaleString() : '—'}
-  </Table.Cell>
-  <Table.Cell>
+  </div>
+
+  {#if editing}
+    <CapabilityChecklist {capabilities} bind:selected disabled={busy} />
+    <div class="flex gap-2">
+      <Button size="sm" onclick={saveCapabilities} disabled={busy}>Save</Button>
+      <Button size="sm" variant="outline" onclick={() => (editing = false)} disabled={busy}>
+        Cancel
+      </Button>
+    </div>
+  {:else}
+    <div class="flex flex-wrap items-center gap-1">
+      {#each device.capabilities as cap}
+        <Badge variant="secondary" class="text-xs font-normal">{cap}</Badge>
+      {:else}
+        <span class="text-xs text-muted-foreground">no capabilities</span>
+      {/each}
+      {#if isActive}
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-5 w-5"
+          onclick={() => {
+            selected = [...device.capabilities];
+            editing = true;
+          }}
+          aria-label="Edit capabilities"
+        >
+          <Pencil class="h-3 w-3" />
+        </Button>
+      {/if}
+    </div>
+
+    <div class="flex items-center justify-between text-xs text-muted-foreground">
+      <span>{lastSeenLabel}</span>
+      {#if device.expires_at}
+        <span>Expires {new Date(device.expires_at).toLocaleDateString()}</span>
+      {/if}
+    </div>
+
     {#if isActive}
-      <Button variant="destructive" size="sm" onclick={revoke} disabled={busy}>
+      <Button variant="destructive" size="sm" onclick={revoke} disabled={busy} class="self-end">
         {#if busy}
           <Loader2 class="h-4 w-4 animate-spin" />
         {:else}
@@ -128,5 +150,5 @@
         {/if}
       </Button>
     {/if}
-  </Table.Cell>
-</Table.Row>
+  {/if}
+</Card>
