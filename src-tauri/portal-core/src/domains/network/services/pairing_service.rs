@@ -204,6 +204,13 @@ pub async fn approve(
     let rows = device_approval::Entity::find()
         .filter(device_approval::Column::DeviceId.eq(device_id))
         .filter(device_approval::Column::Approved.eq(false))
+        // Only a row still in its initial "pending" state is actually
+        // awaiting a decision. Without this, a row `reject()` already moved
+        // to "rejected" (e.g. the 170s `/pair/request` timeout in
+        // `daemon::pairing`) still matches `Approved.eq(false)` and a later
+        // click on the same stale pending card resurrects it, minting a
+        // token for a phone that already gave up — see QA-123.
+        .filter(device_approval::Column::ApprovalType.eq("pending"))
         .order_by_desc(device_approval::Column::CreatedAt)
         .all(conn)
         .await
@@ -468,6 +475,23 @@ mod tests {
         assert!(approval_expiry("temporary").is_some());
         assert!(approval_expiry("long_term").is_some());
         assert!(approval_expiry("anything_else").is_some());
+    }
+
+    #[tokio::test]
+    async fn approve_after_reject_does_not_ghost_pair() {
+        let conn = fresh_db().await;
+
+        request_pairing(&conn, "dev-timeout", "Phone").await.unwrap();
+        reject(&conn, "dev-timeout").await.unwrap();
+
+        let err = approve(&conn, "dev-timeout", "temporary", &["coder".to_string()])
+            .await
+            .unwrap_err();
+        assert!(err.contains("not found"));
+
+        let devices = list_devices(&conn).await.unwrap();
+        assert_eq!(devices[0].approval_type, "rejected");
+        assert!(!devices[0].approved);
     }
 
     #[tokio::test]
