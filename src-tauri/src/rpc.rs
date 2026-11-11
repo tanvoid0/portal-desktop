@@ -51,7 +51,28 @@ pub const DEFAULT_CAPS: &[&str] = &[
 /// shape of risk as `terminal.exec`, so it gets the same opt-in treatment: a
 /// paired device can still be granted it, just never by leaving the approval
 /// dialog untouched.
-pub const SENSITIVE_CAPS: &[&str] = &["terminal.exec", "agents.exec"];
+///
+/// `remote.input` moves the mouse and types on the keyboard — a paired phone
+/// that holds it can do anything a person sitting at this PC could, so it
+/// gets the same opt-in treatment rather than riding along with pairing.
+///
+/// `agents.history` reads back a past run's full persisted transcript (tool
+/// inputs/outputs, file contents, command output) — not RCE-equivalent like
+/// `agents.exec`, but still a wholesale grant of everything ever typed or
+/// produced in an agent run, so it opts in rather than riding the default
+/// grant the way the live `agents` cap (which run/model info, not history)
+/// does.
+pub const SENSITIVE_CAPS: &[&str] =
+    &["terminal.exec", "agents.exec", "agents.history", REMOTE_INPUT_CAP];
+
+/// Gates `/control`'s mouse/keyboard frames (`daemon::control::handle_client_frame`),
+/// not an `/rpc` command — there is no command behind it to carry a
+/// `#[rpc(cap = ...)]` attribute, so unlike every other entry in
+/// [`capabilities`] this one is listed by hand rather than collected from the
+/// registry. Kept as a named constant (vs. a bare string literal in three
+/// places) so the approval UI, the sensitivity list and the gate itself can't
+/// drift apart on a typo.
+pub const REMOTE_INPUT_CAP: &str = "remote.input";
 
 /// Why a call could not be made, as opposed to a call that ran and failed.
 #[derive(Debug)]
@@ -85,12 +106,16 @@ pub fn capability(name: &str) -> Option<&'static str> {
     lookup(name).and_then(|entry| entry.cap)
 }
 
-/// Every distinct capability the registry declares, sorted. Backs the exact
-/// cap-list guard test and `remote_list_capabilities`.
+/// Every distinct capability a device can be granted: the registry's, plus
+/// the handful (so far just [`REMOTE_INPUT_CAP`]) that gate a `/control`
+/// frame type instead of an `/rpc` command and so have nothing in the
+/// registry to collect. Sorted and deduped. Backs the exact cap-list guard
+/// test and `remote_list_capabilities` — the approval checkbox UI's list.
 pub fn capabilities() -> Vec<&'static str> {
     let mut caps: Vec<_> = inventory::iter::<Entry>
         .into_iter()
         .filter_map(|entry| entry.cap)
+        .chain(std::iter::once(REMOTE_INPUT_CAP))
         .collect();
     caps.sort_unstable();
     caps.dedup();
@@ -199,6 +224,43 @@ mod tests {
         );
     }
 
+    /// Reading back a past run's full transcript is a wholesale data grant
+    /// (every tool input/output, file content, command output that run ever
+    /// touched), so it opts in rather than riding the default `agents` grant.
+    #[test]
+    fn agents_history_is_sensitive_not_default() {
+        assert!(
+            !DEFAULT_CAPS.contains(&"agents.history"),
+            "agents.history must not be granted by default"
+        );
+        assert!(
+            SENSITIVE_CAPS.contains(&"agents.history"),
+            "agents.history must be listed as sensitive so the dialog unchecks it"
+        );
+    }
+
+    /// A paired phone gets to move the mouse and type on this PC, so
+    /// `remote.input` gets the same opt-in treatment as `terminal.exec` — and
+    /// since it has no `/rpc` command behind it, this is also the only thing
+    /// that would catch `capabilities()` forgetting to list it (the registry
+    /// has nothing to collect it from).
+    #[test]
+    fn remote_input_is_sensitive_not_default() {
+        assert!(
+            !DEFAULT_CAPS.contains(&"remote.input"),
+            "remote.input must not be granted by default"
+        );
+        assert!(
+            SENSITIVE_CAPS.contains(&"remote.input"),
+            "remote.input must be listed as sensitive so the dialog unchecks it"
+        );
+        assert!(
+            capabilities().contains(&REMOTE_INPUT_CAP),
+            "remote.input must still reach remote_list_capabilities despite \
+             having no registry entry, or the approval UI can never offer it"
+        );
+    }
+
     /// `capabilities()` is what the exact cap-list guard (added once domains are
     /// annotated) and `remote_list_capabilities` build on, so it must come back
     /// sorted and free of duplicates whatever the registry holds.
@@ -214,10 +276,12 @@ mod tests {
         );
     }
 
-    /// The exact set of capabilities the registry declares. Adding or removing a
-    /// `cap = "..."` anywhere changes this set, so this guard forces the remote
-    /// surface to be a deliberate decision rather than a drift. The dangerous
-    /// project commands (execute_command_in_directory, select_directory,
+    /// The exact set of capabilities a device can be granted: the registry's,
+    /// plus `remote.input` (see [`capabilities`]). Adding or removing a
+    /// `cap = "..."` anywhere, or changing the hand-listed frame-only set,
+    /// changes this, so this guard forces the remote surface to be a
+    /// deliberate decision rather than a drift. The dangerous project
+    /// commands (execute_command_in_directory, select_directory,
     /// open_project_in_explorer) and the whole credential vault are deliberately
     /// absent — loopback only.
     #[test]
@@ -227,9 +291,11 @@ mod tests {
             vec![
                 "agents",
                 "agents.exec",
+                "agents.history",
                 "coder",
                 "dashboard",
                 "projects",
+                "remote.input",
                 "tasks",
                 "terminal",
                 "terminal.exec"
@@ -246,6 +312,7 @@ mod tests {
         assert_eq!(capability("create_terminal_process"), Some("terminal.exec"));
         assert_eq!(capability("agents_list_backends"), Some("agents"));
         assert_eq!(capability("agents_start_run"), Some("agents.exec"));
+        assert_eq!(capability("agents_list_sessions"), Some("agents.history"));
         assert!(capability("execute_command_in_directory").is_none());
     }
 }
