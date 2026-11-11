@@ -1,198 +1,148 @@
-# Handoff — `agents` domain review-fix + live-QA loop, all fixes verified, nothing committed
+# Handoff — `agents` domain shipped; coder's claude-cli engine now shares it; one infra gap left
 
 Written 2026-11-11, for someone with **no memory** of this session. Supersedes the previous
-version of this file (that was about the Android remote-control merge; see git history —
-`ade510ed` — if needed. That work is already committed to `main`, this handoff doesn't touch it).
+version of this file (about the `agents` domain's P1 review-fix + live-QA pass). That work is
+now **committed** — see git history (`cd674366`) if you need the detail; this handoff doesn't
+repeat it.
 
 ## Goal
 
-Bring the new `agents` domain (drives Claude Code CLI as an agent, Run launcher at
-`/agents/run`, modeled on the external `agent-monitor` project's UX, built on Portal's own
-shadcn-svelte/Tauri components) from "builds and type-checks" to "actually works when you click
-through it." Original architect plan (P0–P6 phased) is approved; this session did P1 (core
-`agents` domain: `AgentBackend` trait, `ClaudeCodeBackend`, `AgentRunService`, Run launcher,
-live conversation view), a static-review fix pass on that, and a live-QA cycle on top. P2–P6
-(persistence/Sessions list, Board/Kanban reuse, Analytics/Workflows, Codex/Cursor adapters) are
-**not started**.
+Same overall goal as before: bring the new `agents` domain to production quality, then extend
+its value by having coder's own claude-cli engine reuse it instead of maintaining a second,
+weaker CLI-spawn path. This session did the second part end to end: scoped it, implemented it,
+found and fixed two live bugs it surfaced, verified, committed.
 
-## State: **nothing committed this session.** All of the below is uncommitted working-tree changes.
+## State: **committed**, two commits this session
 
-The P1 `agents` domain code itself (Rust `src-tauri/portal-core/src/domains/agents/*`, Tauri
-commands, frontend `src/lib/domains/agents/*` + `src/routes/agents/*`) was committed earlier by
-a **different concurrent session** as part of merging unrelated Android remote-control work
-(commit `c5de8161` on `main` — see the superseded handoff section in git history for why). Every
-fix described below is **on top of that commit, uncommitted**.
+- `cd674366` — the `agents` domain P1 review-fix pass + QA-110/111/112 fixes (previous
+  handoff's work, finally landed).
+- `268121af` — coder's claude-cli engine (`advance_claude_cli`) reworked to call the `agents`
+  domain's `ClaudeCodeBackend` directly instead of its own one-shot CLI spawn. Includes two live
+  bugs this surfaced (QA-119, QA-120), fixed and verified. **Nothing pushed.**
 
-### Review fix pass (first round) — done, gates green
+### What changed in `268121af`
 
-Delegated to two `coder` subagents (backend Rust / frontend TS+Svelte), fixed all 14 findings
-from a `crew:reviewer` pass plus QA-106:
+Before: coder's claude-cli engine spawned a fresh `claude -p` process per turn, mapped Portal's
+`PermissionMode` straight onto the CLI's `--permission-mode` flag, and had **no live approve/deny
+at all** — headless mode can't prompt, so Review mode silently auto-denied anything needing one.
 
-- Backend: semaphore-permit leak in `service.rs` (never released on run end — would deadlock the
-  11th concurrent run forever); split the `agents` RPC capability into `agents` (read-only,
-  default-on) vs `agents.exec` (sensitive, added to `SENSITIVE_CAPS`, matches the
-  `terminal`/`terminal.exec` pattern); `.no_window()` on the Windows spawn; `--setting-sources
-""` to stop the per-run `--settings` hook merging with (and double-firing alongside) the
-  user's real `~/.claude/settings.json`; `kill_on_drop(true)` + an RAII guard for the per-run
-  temp settings file; a per-run UUID on the permission-hook route (`/hook/:token`); spawn now
-  goes through `cmd /C claude` to match `coder/service.rs`'s existing resolution instead of a
-  `which::which` path that could resolve to an unspawnable `.cmd` shim.
-- Frontend: "End run"/"New run" buttons wired to `cancel()`/a new `reset()`; `pending` approval
-  changed from a single overwritable slot to a list keyed by request id; `agentsApi.ts` moved
-  from raw `invoke` to the repo's `invokeClient` convention; an event-backfill call added to
-  close an early-event-drop race; a free-text model `Input` fallback when the backend's model
-  list is empty; QA-106 (silent backend-list failure) now shows `PageError` + retry.
-- **Deliberately left as-is**: the icon-import finding (`~icons/fa6-solid/folder-open`) — the
-  frontend coder checked and `@lucide/svelte` isn't actually installed/used anywhere in this
-  repo despite what `CLAUDE.md` says; the repo's real convention is `~icons/*`
-  (unplugin-icons). **`CLAUDE.md`'s icon guidance is stale, not the code** — worth a doc fix
-  separately, not done here.
-- Gates after this round: `cargo check`/`cargo clippy`/`cargo test` (incl. the two capability
-  guard tests) and `pnpm check`/`pnpm lint`/shadcn-check all clean, 0 errors.
+After: `advance_claude_cli` calls `ClaudeCodeBackend::start` directly (one level under
+`AgentRunService`, which has no subscriber API coder needs). Review mode now gets a real live
+approval banner via the same permission-hook relay the `agents` Run launcher uses. Concretely:
 
-### Live QA (first pass) — found 3 more issues, all 3 fixed and self-verified
+- `agents/backend.rs`'s `StartParams` gained `permission_mode: String` and `isolate_settings:
+bool`. Coder passes `isolate_settings: false` — **deliberate, tested**: `--setting-sources ""`
+  was confirmed via a canary-file test to strip project `CLAUDE.md` governance (with it, Claude
+  blindly followed a planted instruction; isolated, it read the file as data and refused,
+  flagging it as a test). Coder's users rely on their real `CLAUDE.md`/hooks loading; the agents
+  Run launcher's own isolation (`true`) is unchanged.
+- `coder_approve` on a claude-cli thread now routes around `spawn_run`'s cancel-and-restart path
+  (which would otherwise kill the in-flight process mid-decision) via a new
+  `claude_cli_controls: Mutex<HashMap<thread_id, Box<dyn RunControl>>>` +
+  `decide_claude_cli_approval`.
+- Old raw-JSON parser (`parse_cli_event`/`cli_edit_targets`/`cli_tool_result_ids`) ported onto
+  the typed `AgentEvent` path. File-change/diff tracking and session continuity (`--resume`)
+  preserved.
+- Frontend: `showRemember={!isCli}` (no remember-rule concept for claude-cli, same call as
+  QA-112); `coderSession.svelte.ts`'s `onRunning` now does `rt.running = running && !rt.pending`
+  so Accept/Reject stay clickable while a banner shows (QA-110-class fix, one layer deeper); new
+  `canStop` prop on `AIComposerShell`/`CoderComposer` keeps Stop reachable while pending,
+  independent of `running`.
+- `ollama` and every other coder provider are untouched — they go through `advance_platform`,
+  a completely separate branch (`service.rs`'s only provider check is `== CLAUDE_CLI_PROVIDER`).
 
-A `qa-tester` subagent drove a real isolated second instance
-(`node scripts/dev-instance.mjs 2`, vite `:1421` / CDP `:9223` / `src-tauri/target/instance-2` —
-**left the owner's own instance-1 on `:1420`/`:9222` completely alone**, confirmed untouched at
-the end) over Playwright/CDP against `/agents/run`. Results:
+### QA-119, QA-120 — found live, fixed, verified (qa-tester closed both)
 
-| #   | Check                                    | Result                                                                                |
-| --- | ---------------------------------------- | ------------------------------------------------------------------------------------- |
-| 1   | Approve/deny a tool call                 | blocker — [[QA-110]] — **now fixed**                                                  |
-| 2   | Interrupt mid-run                        | pass                                                                                  |
-| 3   | Cancel + New run                         | blocker — [[QA-111]] — **now fixed**                                                  |
-| 4   | Bad cwd                                  | pass (clean toast, no hang/crash)                                                     |
-| 5   | QA-106 regression                        | confirmed still fixed, live                                                           |
-| 6   | Model fallback (empty list → text input) | pass                                                                                  |
-| 7   | Concurrent approvals                     | not applicable yet — UI is still single-slot (unchanged by the QA-110 fix, see below) |
-
-Filed: `.claude/qa/issues/QA-110-agents-run-approval-banner-buttons-disabled.md`,
-`QA-111-agents-run-end-run-never-completes.md`,
-`QA-112-agents-run-accept-and-remember-does-nothing.md` (needs-decision, minor — decided below).
-
-**All three fixes landed and were self-verified live by the fixing coders** (screenshots +
-repro-script reruns, not just gates):
-
-1. **QA-111 — fixed.** Root cause turned out one level up from QA's own lead: not
-   `process.rs`'s `Child` mutex, but `AgentRunService::cancel()` (`service.rs:189-193`) holding
-   the **service-wide** `runs: Mutex<HashMap<...>>` for the full duration of `kill().await`
-   (which used to block on `child.wait()`) — starving the per-run pump task of the same lock it
-   needs to append the terminal `Exited` event, and (worse) stalling _every other run's_ event
-   delivery while one was being killed. Fix: `process.rs`'s `kill_and_wait` → `start_kill` (sync,
-   no longer awaits exit); `claude_code.rs`'s `ClaudeCodeRun::kill()` now signals the kill (lock
-   held only for an instant) and immediately emits its own `AgentEvent::Exited` rather than
-   waiting on the pump task's EOF-triggered race. Verified live: `qa-sweep2-cancel-raw.mjs`
-   rerun unmodified, `Exited` now arrives at +0.5s (was stuck false after 20s), UI shows "Run
-   ended" / "New run".
-2. **QA-110 — fixed.** One-line root cause: `eventsToMessages.ts`'s reducer never cleared
-   `running` while a `permission_request` was outstanding, and `ApprovalBanner`'s buttons are
-   `disabled={busy}` where `CoderFeed` passes `busy={running}` (coder's own equivalent reducer
-   already does this correctly). Fix: `if (pending.length > 0) running = false;` at the end of
-   the reducer. Verified live: "Accept once" immediately clickable, a real Bash tool call
-   approved and completed end-to-end.
-3. **QA-112 — fixed as "hide the control."** No remember-rule concept exists anywhere in the
-   Agents call chain or backend; decided to hide rather than build persistence (bigger, unscoped
-   work). Added `showRemember?: boolean` (default `true`) to `ApprovalBanner.svelte`, forwarded
-   through `CoderFeed.svelte`, Agents' `+page.svelte` passes `false` on both its main `CoderFeed`
-   and the extra-approval-banner loop. Checked `coder`'s own usage doesn't pass it, so it still
-   defaults `true` there — unaffected. Verified live: no remember button appeared across two
-   approval rounds in a real run.
-
-Gates re-run on the combined state after all three: `cargo check`/`cargo clippy`/`cargo test
-rpc::` (8/8) and `pnpm check` (0 errors)/`pnpm lint` (eslint 0 errors, shadcn-check passed,
-prettier clean on every file touched this session) — all clean.
-
-**An independent `qa-tester` closed all three — status `verified` in their issue files, per this
-repo's convention that closing is the qa-tester's job, not the fixer's:**
-
-- **QA-110 verified**: Accept/Reject both resolve in <40ms (vs. the original 3s+ disabled-button
-  timeout). Approve creates the expected file, reject doesn't; run recovers either way.
-- **QA-111 verified**: single End-run now completes in ~300ms (was stuck forever). Concurrent
-  check (run A cancelled via UI, run B via direct `invoke` on the same shared lock) confirmed B's
-  events kept flowing through A's cancel — the one suspicious flat stretch in B's event count
-  turned out to be the model's own turn pacing (a no-cancel baseline showed the identical shape),
-  not a lock stall. **Stress test: 8 rounds × 3 simultaneous start+cancel (24 overlapping runs)
-  — backend stayed responsive throughout, the previously-unreproduced crash lead did not recur.**
-  Treating that lead as resolved by the lock fix, not filing anything further.
-- **QA-112 verified**: no remember button/input renders on `/agents/run` across two live
-  triggers; `coder`'s own `CoderFeed` usage (grepped) passes no `showRemember`, still defaults
-  `true`, unaffected. One gap: the _second_ concurrent-approval banner's `showRemember={false}`
-  was confirmed by reading the source, not by independently driving a live second concurrent
-  approval (hard to force deterministically) — low risk, same prop, same gate as the first.
-
-All three issue files now have a filled `## Verification` section. **This whole feature's QA
-trail (QA-106 through QA-112) is fully closed.**
+- **QA-119**: reloading mid-approval silently dropped the banner, permanently stuck on "Running…
+  Thinking…", with Stop unreachable either (composer swapped to Send because `running` was
+  forced false while pending). Fixed: `canStop` prop (independent of `running`); new
+  `claude_cli_pending: Mutex<HashMap<thread_id, PendingApproval>>` +
+  `coder_get_claude_cli_pending` command so a reload re-fetches live pending state from Rust
+  instead of only replaying events. Verified live, including that the restored banner's
+  Accept/Reject genuinely resolves the original tool call (file gets written on accept), not
+  just that buttons are clickable.
+- **QA-120**: cancelling leaked the real `claude.exe` grandchild on Windows forever — `process.rs`'s
+  `start_kill` only killed the `cmd /C claude` wrapper. A first tree-kill attempt
+  (fire-and-forget `taskkill /T /F`) raced `Child::start_kill()`'s own immediate kill and usually
+  lost. Fixed by running `taskkill /T /F` via `.output()` (blocking on the syscall, not the
+  tree's exit) **before** `child.start_kill()`, so the wrapper is still alive for taskkill to
+  enumerate. Shared code — benefits the `agents` domain too. Verified: 3x repro runs + UI-driven
+  variants, zero leaked PIDs each time.
 
 ## What's left (in order)
 
-1. **Decide + do the `coder/service.rs` refactor** (deferred from P1, not done): `coder`'s
-   existing one-shot `advance_claude_cli`/`llm_provider = "claude-cli"` path should become a thin
-   wrapper over the new `agents` service instead of its own separate CLI-spawn logic. Deferred
-   originally because of risk to `coder`'s existing live permission behavior without budget to
-   verify — still true, scope this carefully before doing it.
-2. **Commit.** Nothing from this session (review-fix pass, QA-110/111/112 fixes) is committed.
-   Decide commit granularity — probably: one commit for the review-fix pass, one for the
-   QA-110/111/112 fixes, rather than one giant commit, but that's a call for whoever's doing it.
-3. **Concurrent-approvals gap**: QA-112's second-banner `showRemember` path and QA's original
-   checklist item #7 were both only confirmed via source read, not an independently-forced live
-   second concurrent approval (hard to trigger deterministically) — low risk given it's the same
-   prop/gate as the first banner, but worth a live confirmation if an easy way to force two
-   concurrent subagent permission requests turns up.
-4. Continue the phased roadmap: P2 (persistence + Sessions list/detail, a new migration), P3
-   (reuse `KanbanBoard.svelte`/`taskUi.svelte.ts` for an agents board view — needs a
-   `createTaskUiState({ columns })` overload, currently hardcoded to 3 columns — + Activity Feed
-   - Dashboard), P4 (Analytics + Workflows), P5 (Codex adapter — the real test of whether the
-     `AgentBackend` abstraction actually generalizes), P6 (Cursor adapter + the "also watch ambient
-     sessions" decision the owner made, which nothing has implemented yet).
+1. **`agents.exec` capability gating — infra gap, filed as board task #7 (owner).** Decided
+   coder's claude-cli live-execution path (now better: live-ask, not silent-deny) should require
+   `agents.exec`, same as the `agents` domain's own run-start, not just the default `coder` cap.
+   **No per-call capability hook exists to do this today**: `daemon/mod.rs`'s `rpc()` checks a
+   remote caller's `Trust::Remote{caps}` against the command's one static cap via `rpc.rs`'s
+   `capability(name)` *before* calling `dispatch()` — `dispatch()` itself never receives caps.
+   Worse: a **local** Tauri IPC call (the app's own frontend) never goes through `daemon/mod.rs`
+   or `dispatch()` at all — `#[rpc]` expands to a plain `#[tauri::command]`, no trust/caps
+   parameter in either path. Doing this right means plumbing `Trust`/caps through the
+   `rpc-macro` proc-macro crate (`src-tauri/rpc-macro/src/lib.rs`), `rpc.rs`'s `dispatch()`, and
+   `daemon/mod.rs` — and deciding what a local call (no remote-Trust concept) should be treated
+   as. Real infra work, not a `commands.rs` edit. Until it lands: a device holding just the
+   default `coder` cap can reach claude-cli's live execution path — **same access as before this
+   session's change**, not worsened by it, just not improved either.
+2. **`cargo test -p portal-core` compile failure — board task #6 (owner), unrelated to this
+   session.** `tempfile` dev-dependency unresolved in several `#[cfg(test)]` modules. Confirmed
+   pre-existing on `main` via `git stash` before this session's changes — don't let it get
+   attributed to the claude-cli rework.
+3. **Push, or don't — your call.** Both commits are local-only on `main`. Nobody's asked for a
+   PR; this was worked directly on `main` per the existing pattern in this repo's recent history
+   (see `git log`).
+4. Continue the original phased roadmap (P2–P6: persistence/Sessions list, Board/Kanban reuse,
+   Analytics/Workflows, Codex/Cursor adapters) — still not started, nothing new to report here.
 
 ## Decisions made, don't re-litigate
 
-- **Icon-import finding**: not a bug, `CLAUDE.md` is stale on this point. Don't re-flag it in a
-  future review without also fixing the doc.
-- **QA-112 ("Accept & remember")**: fixed by hiding the control, not by implementing real
-  remember-rule persistence. If a future pass wants real persistence, that's new scope, not a
-  reopened bug.
-- **Paired remote devices CAN start agent runs** (owner's explicit call) — this is why
-  `agents.exec`'s sensitivity is "requires explicit grant," not "blocked outright": the fix
-  split the capability so it's possible to grant, not so it's impossible to use remotely.
-- **Also watch ambient Claude/Codex sessions** (owner's explicit call, from the original
-  planning round) — not implemented anywhere yet. Don't assume P1's Run-launcher-only scope was
-  a silent downgrade of this; it's just not reached yet (P6-ish).
-- Don't touch the owner's own already-running dev instance (`:1420`/`:9222`) when testing — use
-  `node scripts/dev-instance.mjs 2` (or higher) for an isolated QA instance, same as this session
-  and the one before it did.
+- **`--setting-sources ""` for coder: no.** Empirically tested (canary file), confirmed it drops
+  project `CLAUDE.md` governance. Coder keeps real settings loaded; the `agents` Run launcher
+  keeps isolating (unchanged, different tradeoff for a different feature).
+- **`agents.exec` gating: wanted, not done — see "What's left" #1.** Don't silently drop this or
+  reattempt it as a quick fix without reading that section; it needs cross-cutting infra work.
+- **coder calls `ClaudeCodeBackend` directly, not through `AgentRunService`.** The service has no
+  subscriber API coder needs (it fans events to a global ring buffer + `agents://event`, keyed
+  by its own `run_id`) — one layer down is the right seam.
+- Previous handoff's decisions (icon-import non-bug, QA-112's hide-not-build-remember call,
+  paired devices can start agent runs, ambient-session watching not yet implemented) all still
+  stand, unaffected by this session.
 
-## Files that matter
+## Files that matter (this session's part)
 
-- `src-tauri/portal-core/src/domains/agents/{service.rs,claude_code.rs,process.rs}` — backend,
-  review-fix pass + QA-111 fix (service-wide lock + `kill()` restructure), all done.
-- `src-tauri/src/domains/agents/commands.rs`, `src-tauri/src/rpc.rs` — capability split
-  (`agents` vs `agents.exec`), done.
-- `src/lib/domains/agents/{api/agentsApi.ts,state/agentRun.svelte.ts,utils/eventsToMessages.ts,
-components/RunLauncherForm.svelte}`, `src/routes/agents/run/+page.svelte` — frontend, review-fix
-  pass + QA-110 fix (`running`/busy flag), all done.
-- `src/lib/domains/coder/components/{ApprovalBanner.svelte,CoderFeed.svelte}` — got a new
-  `showRemember` prop (default `true`, unaffected for `coder`'s own usage) for the QA-112 fix.
-- `.claude/qa/issues/QA-106…QA-112*.md` — the issue trail for this specific feature, **all
-  `verified`**. Fully closed.
+- `src-tauri/portal-core/src/domains/agents/{backend.rs,claude_code.rs,process.rs}` —
+  `StartParams` fields, stderr-on-empty-events, the QA-120 tree-kill fix.
+- `src-tauri/portal-core/src/domains/coder/service.rs` — `advance_claude_cli` rewrite,
+  `claude_cli_controls`, `claude_cli_pending`, `decide_claude_cli_approval`.
+- `src-tauri/src/domains/coder/commands.rs` — `coder_approve`'s claude-cli branch,
+  `coder_get_claude_cli_pending`.
+- `src/lib/domains/coder/state/coderSession.svelte.ts`, `components/{CoderPanel,CoderComposer}.svelte`,
+  `src/lib/domains/ai/components/chat/AIComposerShell.svelte` — `canStop`, `showRemember`,
+  the running/pending invariant.
+- `.claude/qa/issues/QA-119-*.md`, `QA-120-*.md` — both `verified`, closed.
 - **Not this session's concern, don't touch without checking**: `src/app.css`,
   `src/lib/domains/devices/components/PairDeviceCard.svelte`, `src/routes/devices/+page.svelte`,
-  `src/lib/utils/invokeClient.ts`, `.claude/handoff-devices-phone-qa.md`, and QA-109/113/114/115
-  — a **different, still-active concurrent session** is working the devices/pairing domain in
-  this same checkout. Don't attribute those diffs to this work, don't revert them, don't "clean
-  them up" as unrelated noise when committing — check with whoever owns that session first.
+  `src/lib/utils/invokeClient.ts`, `.claude/handoff-devices-phone-qa.md`, and
+  QA-107/108/109/113-118 — a **different, possibly still-active concurrent session** worked the
+  devices/pairing domain in this same checkout, still uncommitted as of this session's end. Don't
+  attribute those diffs to this work, don't revert them, don't "clean them up" as unrelated noise
+  — check with whoever owns that session first.
 
 ## Things that bit this session
 
-- The git history's own prior handoff (superseded by this one) already documents: `pnpm run
-tauri dev` directly doesn't give you CDP (`:9222`) — use `dev-instance.mjs`; a bare
-  `cargo check`/`cargo test` can leave generated TS bindings unprettified, fix with `pnpm
-gen:types`, never hand-format; D: drive filling up is a recurring problem in this checkout
-  (58GB free as of this session, `src-tauri/target/` alone is 38GB with a leftover
-  `target/instance-2/` from an earlier QA attempt — safe to `cargo clean` instance-2 specifically
-  if space gets tight again, don't touch the main `target/debug` the owner's instance-1 uses).
-- Multiple other Claude sessions are active on this same account/checkout concurrently (confirmed
-  via `ListAgents` — dozens of peer sessions, several on this exact repo). Always `git status`
-  before assuming a file you didn't touch is "stray" — it's more likely another session's
-  in-progress work.
+- `cargo test`/`cargo check` leaves generated TS bindings **unprettified** (ts-rs's raw
+  single-line output, not the repo's multiline style) — this showed up as a huge, scary-looking
+  diff across *every* domain's `generated/*.ts` files (disk, github, projects, devices — nothing
+  to do with this session's actual change). Fix: `pnpm gen:types` (regenerates + formats
+  correctly). Confirmed via `git status` before/after that this reverted every unrelated file
+  back to matching `HEAD` exactly — none of it needed committing. Already noted in the previous
+  handoff; noting again because it bit this session too, for a bigger blast radius than last
+  time.
+- Leaked `claude.exe` processes from QA-120 testing/repro runs needed a manual `taskkill` from
+  the owner — the sandboxed agent environment's auto-mode classifier blocks `Stop-Process`/
+  `taskkill` calls as "Interfere With Workloads," even for cleanup of your own test artifacts.
+  If you hit this, ask the human rather than trying to work around the block.
+- Portal (the board MCP) was down for most of this session — board items got filed late, once it
+  came back up. If `mcp__plugin_crew_portal__add` fails with a connection error, note it once and
+  carry on; retry later rather than blocking on it.
