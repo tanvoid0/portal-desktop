@@ -20,6 +20,25 @@
   let qrUrl = $state('');
   let generating = $state(false);
 
+  // Scanning a QR completes pairing with no round trip through this window —
+  // the backend has nothing to push an event on (see QA-110). Poll instead
+  // while the code is on screen, so "Paired devices" picks up the scan
+  // without a manual refresh. Matches the backend's 5-minute pickup window
+  // (QR_PICKUP_TTL_MINUTES in pairing_service.rs); no point polling longer,
+  // the token is dead by then.
+  const QR_POLL_INTERVAL_MS = 3000;
+  const QR_POLL_WINDOW_MS = 5 * 60 * 1000;
+
+  $effect(() => {
+    if (!qrDataUrl) return;
+    const poll = setInterval(onPaired, QR_POLL_INTERVAL_MS);
+    const stop = setTimeout(() => clearInterval(poll), QR_POLL_WINDOW_MS);
+    return () => {
+      clearInterval(poll);
+      clearTimeout(stop);
+    };
+  });
+
   async function generate() {
     generating = true;
     try {

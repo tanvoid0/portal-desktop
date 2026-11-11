@@ -182,9 +182,11 @@ mod tests {
             .unwrap();
         next_json(&mut ws).await; // the hello frame, not under test here
 
-        ws.send(WsMessage::Text(json!({ "t": "ping", "seq": 42 }).to_string()))
-            .await
-            .unwrap();
+        ws.send(WsMessage::Text(
+            json!({ "t": "ping", "seq": 42 }).to_string(),
+        ))
+        .await
+        .unwrap();
         assert_eq!(next_json(&mut ws).await, json!({ "t": "pong", "seq": 42 }));
     }
 }

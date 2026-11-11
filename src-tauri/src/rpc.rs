@@ -35,7 +35,12 @@ inventory::collect!(Entry);
 /// PC is opt-in per device (the dialog renders it unchecked). Credentials carry
 /// no capability at all, so they can never be granted to anyone.
 pub const DEFAULT_CAPS: &[&str] = &[
-    "coder", "projects", "tasks", "dashboard", "terminal", "agents",
+    "coder",
+    "projects",
+    "tasks",
+    "dashboard",
+    "terminal",
+    "agents",
 ];
 
 /// Capabilities rendered unchecked in the approval dialog: granting one lets a

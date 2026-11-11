@@ -242,7 +242,11 @@ export class InvokeClient {
       return response;
     } catch (error) {
       // Apply error interceptors
-      let finalError = error instanceof Error ? error : new Error(String(error));
+      // `getErrorMessage` only trusts strings and Errors; anything else (an ArrayBuffer,
+      // a plain object, etc. from a transport-level rejection) falls back to a readable
+      // message instead of `String(error)`'s "[object ArrayBuffer]".
+      let finalError =
+        error instanceof Error ? error : new Error(getErrorMessage(error, 'Request failed'));
       for (const interceptor of this.errorInterceptors) {
         finalError = await interceptor(finalError);
       }

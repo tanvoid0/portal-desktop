@@ -1,0 +1,11 @@
+import { open } from './app.mjs';
+const app = await open('devices');
+await app.page.waitForTimeout(500);
+const text = await app.page.evaluate(() => document.body.innerText);
+console.log('Paired count:', text.match(/Paired\s+(\d+)/)?.[1]);
+await app.page.mouse.wheel(0, 1200);
+await app.page.waitForTimeout(300);
+await app.shot('QA-110-after-curl-from-phone-check');
+const text2 = await app.page.evaluate(() => document.body.innerText);
+console.log(text2.slice(text2.indexOf('Paired devices'), text2.indexOf('Paired devices') + 500));
+await app.done();

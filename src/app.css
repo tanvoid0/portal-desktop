@@ -151,7 +151,12 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: var(--sidebar-foreground);
     --border: var(--sidebar-border);
-    --input: var(--sidebar-border);
+    /* Deliberately not aliased to --sidebar-border: that value (16%) is tuned for a
+       1px border line, but --input also backs Switch's unchecked *fill* track
+       (bg-input/80) on a Card background (10.5%) — at 16% the two are close enough
+       in luminance that the track disappears. 32% keeps hairline borders subtle
+       while making the switch track read as a shape. See QA-109. */
+    --input: 0 0% 32%;
     --ring: 217.2 91.2% 59.8%;
 
     /* Gradient variables (dark mode) */

@@ -91,7 +91,11 @@ pub(super) async fn pair_request(
     if let Err(e) =
         pairing_service::request_pairing(db.get_connection(), &device_id, &body.device).await
     {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e }))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e })),
+        )
+            .into_response();
     }
 
     if let Some(app) = state.app.as_ref() {
