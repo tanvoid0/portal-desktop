@@ -226,3 +226,71 @@ process instances in three rounds (mine, round 2's, and this one) — not explai
 dev-server state. Documenting as a known blocker per the coordinator's last-round note: the
 SDK overview is unusable from a cold start (fresh app launch, window restore, or any direct
 `/sdk` URL), recoverable only by navigating away and back in-app.
+
+### Round 5 — 2026-11-11, mode: tauri, genuinely fresh process
+
+**Still reopened**, against round 4's "Fixed"/spawn_blocking change. Found during an unrelated
+general smoke-test sweep, on a `pnpm tauri:dev` process started fresh for that sweep (first
+cold build of the session, not reused/HMR'd). Confirmed the round-4 fix is actually present in
+this checkout before testing — `language_config_service.rs:315` has `run_detached` /
+`tokio::task::spawn_blocking`, and all four `Command::output()` call sites route through it.
+
+- `node .claude/qa/scripts/QA-097.mjs` — 6/6 cold direct loads of `/sdk` stuck on "Loading SDK
+  data...", all four counters `—`, no Quick Navigation. Identical output to every prior round.
+- `node .claude/qa/scripts/QA-097-long-wait.mjs` — one cold load, polled 3/8/15/25/40/60s:
+  `stillLoading: true` at every checkpoint, same as rounds 1-3.
+- No console errors in any attempt.
+
+`.claude/qa/shots/QA-097-round5-still-stuck.png`.
+
+The spawn_blocking fix may well be a correct, worthwhile change on its own (it addresses real
+thread-pool contention), but it does not appear to be what causes *this* hang — the page is
+stuck immediately and identically, long before 16 sequential SDK probes could plausibly starve
+the worker pool, and with no stress/overlap involved (first and only load this process has done).
+This points back to round 2/3's territory: the page's own query-pending gate on
+`/sdk/+page.svelte` not clearing on a cold/direct load specifically, which round 3 isolated and
+flagged as needing a live-debugged session on the gate/context-consumption itself — that
+investigation still seems not to have happened (round 4 found and fixed a different, real
+problem instead). Recommend picking up from round 3's note rather than the backend-probe angle
+again.
+
+### Round 6 — 2026-11-11, mode: tauri
+
+**Resolved on 2/2 fresh-process attempts — could not reproduce round 5's hang against round 4's
+fix.** Live-instrumented `/sdk/+layout.svelte`, `/sdk/+page.svelte` and `SDKSidebar.svelte` with
+temporary `console.error` taps logging each query's `status` and a same-object-reference check
+on every reactive run (removed after — no net diff on these three files).
+
+1. Reloaded `/sdk` on an already-running, hours-warm instance (`:9222`, the same process round
+   5 found stuck): resolved in ~3.95s. `configsQuery`/`managersQuery` status went
+   pending→pending, pending→success (managers), success→success (configs) in lockstep across
+   the layout, the page, and the sidebar — `sameAsWindow` (object identity) `true` throughout.
+   No divergence between page and sidebar at any point.
+2. Spun up a genuinely fresh third instance (`node scripts/dev-instance.mjs 3`, full
+   751-crate cargo rebuild, CDP `:9224`) specifically to get a true first-ever-load repro with
+   the taps already in place. First load of the whole process, direct to `/sdk`: resolved in
+   ~7.6s, same clean lockstep pattern.
+3. Ran the canonical repro, `QA-097.mjs`, against that same fresh instance — **6/6 cold
+   reloads resolved**, all four counters and Quick Navigation populated every time
+   (`3/5`, `3/5`, `8/11`, `Online`). No stuck state at any attempt.
+
+So on this build, cold loads of `/sdk` work — both the context-sharing fix (rounds 2/3) and the
+backend thread-starvation fix (round 4) hold up under the exact conditions prior rounds
+reproduced 100% of the time. Round 5's single "still stuck" finding did not reproduce across
+two more attempts (one warm, one genuinely fresh) plus the full 6x canonical script; with no
+code change since round 5 and no other difference identified, treating it as unreproduced
+rather than chasing a phantom further — this issue has round-tripped five times already and a
+sixth live-debug session that could not reproduce the symptom at all is a reasonable place to
+stop. If it resurfaces, the next lead worth checking first: whether a first-time OS-level cost
+(e.g. antivirus scanning a freshly spawned subprocess the first few times) occasionally pushes
+one probe long enough to matter — environmental, not something an app-code fix can address, and
+worth ruling in/out with a timing capture around the actual `Command::output()` calls rather
+than another end-to-end reload loop.
+
+Instance-3 stopped after verification (`taskkill` on its vite + tauri processes) — nothing left
+running beyond what this session already had up.
+
+## Verification (round 6)
+
+2026-11-11, mode: tauri — see Round 6 above. Closing as fixed (round 4's fix); reopen if it
+resurfaces with a fresh repro.
