@@ -12,6 +12,7 @@ use crate::utils::pnpm_workspace::{prepare_shell_command, warn_if_broken_pnpm_wo
 use serde_json::{json, Value};
 
 use super::types::ToolCall;
+use crate::domains::projects::move_lock;
 
 /// OpenAI-format tool specs advertised to the model on every request.
 pub fn tool_specs() -> Vec<Value> {
@@ -203,6 +204,7 @@ pub fn read_raw(root: &str, rel: &str) -> Option<String> {
 /// Write raw content to a file under `root` (used when accepting/rejecting a
 /// reviewed change rewrites the file). Creates parent dirs.
 pub fn write_raw(root: &str, rel: &str, content: &str) -> Result<(), String> {
+    move_lock::ensure_unlocked(Path::new(root))?;
     let path = resolve(root, rel)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {e}"))?;
@@ -407,6 +409,7 @@ fn arg_str<'a>(args: &'a Value, tool: &str, key: &str) -> Result<&'a str, String
 
 /// Resolve `rel` under `root`, rejecting escapes outside the workspace.
 fn resolve(root: &str, rel: &str) -> Result<PathBuf, String> {
+    move_lock::ensure_unlocked(Path::new(root))?;
     let root = PathBuf::from(root);
     let joined = root.join(rel);
     // Normalize without touching the filesystem (path may not exist yet).
@@ -556,6 +559,7 @@ fn walk(dir: &Path, f: &mut dyn FnMut(&Path) -> bool) -> bool {
 }
 
 fn run_command(root: &str, command: &str) -> Result<String, String> {
+    move_lock::ensure_unlocked(Path::new(root))?;
     let exec_command = prepare_shell_command(command, root);
     let warning = warn_if_broken_pnpm_workspace(root);
 

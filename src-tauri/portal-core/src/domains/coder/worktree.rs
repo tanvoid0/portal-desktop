@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::domains::projects::move_lock;
 use crate::process_ext::NoWindowExt;
 
 pub struct WorktreeSpec {
@@ -21,6 +22,7 @@ pub fn has_uncommitted_changes(path: &Path) -> bool {
 }
 
 pub fn create_worktree(repo_root: &Path, spec: &WorktreeSpec) -> Result<(), String> {
+    move_lock::ensure_unlocked(repo_root)?;
     if let Some(parent) = spec.path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("create worktree dir: {e}"))?;
     }
@@ -36,6 +38,7 @@ pub fn create_worktree(repo_root: &Path, spec: &WorktreeSpec) -> Result<(), Stri
 }
 
 pub fn remove_worktree(repo_root: &Path, path: &Path, force: bool) -> Result<(), String> {
+    move_lock::ensure_unlocked(repo_root)?;
     let mut args = vec!["worktree".to_string(), "remove".to_string()];
     if force {
         args.push("--force".to_string());

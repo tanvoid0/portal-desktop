@@ -13,9 +13,11 @@ use chrono::{DateTime, TimeZone, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, Unchanged,
 };
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::database::DatabaseManager;
+use crate::domains::projects::move_lock;
 use crate::domains::projects::discovery::{DiscoveredProject, DiscoveryReport};
 use crate::entities::project::{self, Entity as Project};
 
@@ -63,6 +65,14 @@ impl DiscoveryRepository {
         report: &DiscoveryReport,
         mark_missing: bool,
     ) -> Result<ImportOutcome, String> {
+        let locked_sources =
+            crate::domains::projects::relocation::usage::in_flight_move_sources(&self.db).await;
+        // A project mid-move is neither re-imported at its old path nor archived as missing.
+        let moving = |abs: &str| {
+            move_lock::is_locked(Path::new(abs))
+                || locked_sources.iter().any(|s| move_lock::is_under(abs, s))
+        };
+
         let conn = self.db.get_connection();
         let txn = conn.begin().await.map_err(|e| e.to_string())?;
 
@@ -72,6 +82,9 @@ impl DiscoveryRepository {
         let now = Utc::now();
 
         for p in &report.projects {
+            if moving(&p.abs) {
+                continue;
+            }
             let by_discovery = existing
                 .iter()
                 .find(|e| e.discovery_path.as_deref() == Some(p.path.as_str()));
@@ -133,7 +146,7 @@ impl DiscoveryRepository {
                 report.roots_scanned.iter().map(String::as_str).collect();
             for row in existing
                 .iter()
-                .filter(|r| r.discovery_path.is_some() && r.status != "archived")
+                .filter(|r| r.discovery_path.is_some() && r.status != "archived" && !moving(&r.path))
             {
                 let key = row.discovery_path.as_deref().unwrap_or_default();
                 if seen.contains(key) {

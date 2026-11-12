@@ -1,9 +1,11 @@
 use crate::database::DatabaseManager;
+use crate::domains::projects::move_lock;
 use crate::domains::scripts::repositories::ScriptExecutionRepository;
 use crate::process_ext::NoWindowExt;
 use crate::utils::pnpm_workspace::prepare_shell_command;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
@@ -114,6 +116,9 @@ impl ScriptExecutionService {
 
     /// Execute a script and track it persistently
     pub async fn execute_script(&self, request: ExecuteScriptRequest) -> Result<String, String> {
+        if let Some(wd) = &request.working_directory {
+            move_lock::ensure_unlocked(Path::new(wd))?;
+        }
         let execution_id = Uuid::new_v4().to_string();
         let parameters_json = serde_json::to_string(&request.parameters)
             .map_err(|e| format!("Failed to serialize parameters: {}", e))?;

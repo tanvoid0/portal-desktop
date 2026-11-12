@@ -1,5 +1,7 @@
 use crate::domains::projects::pipelines::executors::{ExecutionRequest, ExecutionResult, Executor};
+use crate::domains::projects::move_lock;
 use crate::process_ext::NoWindowExt;
+use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
 
@@ -90,6 +92,7 @@ impl Executor for SDKExecutor {
             }
         };
 
+        move_lock::ensure_unlocked(Path::new(&request.working_directory))?;
         let mut cmd = Command::new(&program);
         cmd.no_window();
         cmd.args(&args);

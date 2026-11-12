@@ -10,6 +10,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::process::Command;
 
+use crate::domains::projects::move_lock;
 use crate::process_ext::NoWindowExt;
 
 /// Command execution result
@@ -101,6 +102,7 @@ impl CommandExecutor {
 
         // Set working directory
         if let Some(working_dir) = &opts.working_directory {
+            move_lock::ensure_unlocked(Path::new(working_dir))?;
             cmd.current_dir(Path::new(working_dir));
         }
 
@@ -133,6 +135,7 @@ impl CommandExecutor {
 
         // Set working directory
         if let Some(working_dir) = &opts.working_directory {
+            move_lock::ensure_unlocked(Path::new(working_dir))?;
             cmd.current_dir(Path::new(working_dir));
         }
 
@@ -177,6 +180,7 @@ impl CommandExecutor {
 
         // Set working directory
         if let Some(working_dir) = &opts.working_directory {
+            move_lock::ensure_unlocked(Path::new(working_dir))?;
             cmd.current_dir(Path::new(working_dir));
         }
 

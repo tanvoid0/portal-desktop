@@ -9,6 +9,7 @@ use crate::database::DatabaseManager;
 use crate::domains::projects::entities::ProjectAnalysis;
 use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::modules::stack::{self, Stack};
+use crate::domains::projects::move_lock;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use crate::error::{AppError, AppResult};
 use std::sync::Arc;
@@ -123,6 +124,12 @@ impl ProjectService {
         dev_port: Option<i32>,
         prod_port: Option<i32>,
     ) -> Result<Option<ProjectResponse>, String> {
+        if let Some(current) = self.repository.get_by_id(id).await? {
+            move_lock::ensure_unlocked(Path::new(&current.path))?;
+        }
+        if let Some(p) = &path {
+            move_lock::ensure_unlocked(Path::new(p))?;
+        }
         self.repository
             .update(
                 id,
@@ -154,6 +161,9 @@ impl ProjectService {
     }
 
     pub async fn delete_project(&self, id: i32) -> Result<bool, String> {
+        if let Some(current) = self.repository.get_by_id(id).await? {
+            move_lock::ensure_unlocked(Path::new(&current.path))?;
+        }
         self.repository.delete(id).await
     }
 
@@ -276,6 +286,7 @@ impl ProjectService {
         let Some(project) = self.repository.get_by_id(id).await? else {
             return Ok(None);
         };
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
         let (size, file_count) = self.scan_project_directory(&project.path).await?;
         let git_info = self.get_git_info(&project.path).await.ok();
         let stack = detect_stack(&project.path).await;
@@ -509,6 +520,7 @@ impl ProjectService {
             .get_by_id(id)
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
         if !Path::new(&project.path).is_dir() {
             return Err(format!("Folder not found: {}", project.path));
         }

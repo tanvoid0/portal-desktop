@@ -375,6 +375,7 @@ pub fn coder_write_file(
 
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub fn coder_open_in_explorer(workspace_root: String, path: String) -> Result<(), String> {
+    portal_core::domains::projects::move_lock::ensure_unlocked(std::path::Path::new(&workspace_root))?;
     let root = PathBuf::from(&workspace_root);
     let joined = root.join(path);
 

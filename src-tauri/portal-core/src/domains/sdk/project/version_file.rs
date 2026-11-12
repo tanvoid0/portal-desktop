@@ -5,6 +5,7 @@
  * Supports multiple version file formats: .portal-version, .nvmrc, .python-version, etc.
  */
 use super::ProjectEnvironment;
+use crate::domains::projects::move_lock;
 use crate::domains::sdk::SDKError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -54,6 +55,7 @@ impl VersionFileManager {
         sdk_type: &str,
         version: &str,
     ) -> Result<(), SDKError> {
+        move_lock::ensure_unlocked(project_path).map_err(SDKError::ManagerNotFound)?;
         let version_file_path = project_path.join(".portal-version");
 
         let mut versions = HashMap::new();
@@ -117,6 +119,7 @@ impl VersionFileManager {
         sdk_type: &str,
         version: &str,
     ) -> Result<(), SDKError> {
+        move_lock::ensure_unlocked(project_path).map_err(SDKError::ManagerNotFound)?;
         let version_file_path = project_path.join(".portal-version");
 
         let mut version_file = if version_file_path.exists() {
@@ -159,6 +162,7 @@ impl VersionFileManager {
 
     /// Remove version for a specific SDK from a project
     pub async fn remove_version(project_path: &Path, sdk_type: &str) -> Result<(), SDKError> {
+        move_lock::ensure_unlocked(project_path).map_err(SDKError::ManagerNotFound)?;
         let version_file_path = project_path.join(".portal-version");
 
         if !version_file_path.exists() {
@@ -398,6 +402,7 @@ impl VersionFileManager {
         sdk_type: &str,
         version: &str,
     ) -> Result<(), SDKError> {
+        move_lock::ensure_unlocked(project_path).map_err(SDKError::ManagerNotFound)?;
         let (filename, format) = match sdk_type {
             "nodejs" => (".nvmrc", VersionFileFormat::Nvmrc),
             "python" => (".python-version", VersionFileFormat::PythonVersion),

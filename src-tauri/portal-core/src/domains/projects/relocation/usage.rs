@@ -186,6 +186,19 @@ fn check_free_space(source: &Path, dest: &Path) -> Option<Signal> {
     }
 }
 
+/// `source_path` of every move not yet done/aborted/failed. Discovery skips
+/// anything under these. A query error yields none — discovery must not break.
+pub async fn in_flight_move_sources(db: &DatabaseManager) -> Vec<String> {
+    project_move::Entity::find()
+        .all(db.get_connection())
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|r| !matches!(r.state.as_str(), "done" | "aborted" | "failed"))
+        .map(|r| r.source_path)
+        .collect()
+}
+
 /// Any other `project_moves` row, still in flight, whose source or dest
 /// overlaps either path in this move.
 async fn check_overlapping_moves(db: &DatabaseManager, source: &Path, dest: &Path) -> Option<Signal> {

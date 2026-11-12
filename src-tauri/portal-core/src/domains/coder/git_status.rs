@@ -5,6 +5,7 @@ use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 
+use crate::domains::projects::move_lock;
 use crate::process_ext::NoWindowExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -126,6 +127,7 @@ fn default_branch(workspace: &str) -> Option<String> {
 }
 
 fn git_output(workspace: &str, args: &[&str]) -> Result<String, String> {
+    move_lock::ensure_unlocked(Path::new(workspace))?;
     let output = Command::new("git")
         .no_window()
         .args(args)

@@ -1648,6 +1648,7 @@ impl CoderService {
             .await
             .ok_or("coordinator thread not found")?;
         let repo_root = PathBuf::from(coordinator.workspace_root.clone());
+        move_lock::ensure_unlocked(&repo_root)?;
         let targets = if request.sub_agent_ids.is_empty() {
             self.list_sub_agents(&request.coordinator_thread_id).await
         } else {
@@ -3183,6 +3184,7 @@ fn validate_workspace_root(root: &str) -> Result<(), String> {
             "Workspace folder does not exist or is not a directory: {trimmed}"
         ));
     }
+    move_lock::ensure_unlocked(path)?;
     Ok(())
 }
 

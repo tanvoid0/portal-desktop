@@ -7,7 +7,8 @@ use crate::domains::projects::repositories::project_repository::ProjectRepositor
 use crate::domains::projects::services::project_service::ProjectService;
 use crate::entities::project_module::{ActiveModel, Column, Entity, Model};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
-use std::path::PathBuf;
+use crate::domains::projects::move_lock;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub struct ModuleService {
@@ -49,6 +50,7 @@ impl ModuleService {
             .get_by_id(project_id)
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
         let root = PathBuf::from(&project.path);
         let needs_stack = !project.has_stack();
         let (found, detected) = tokio::task::spawn_blocking(move || {
@@ -71,6 +73,9 @@ impl ModuleService {
     /// page and must not compete with the UI for the disk.
     pub async fn refresh_all(&self) -> Result<Vec<Model>, String> {
         for project in self.projects.get_all().await? {
+            if move_lock::is_locked(Path::new(&project.path)) {
+                continue;
+            }
             let _ = self.refresh(project.id).await;
         }
         self.list_all().await

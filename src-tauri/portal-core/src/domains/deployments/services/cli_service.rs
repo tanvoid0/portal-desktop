@@ -1,7 +1,8 @@
+use crate::domains::projects::move_lock;
 use crate::process_ext::NoWindowExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
@@ -62,6 +63,7 @@ impl CliService {
 
         // Set working directory
         if let Some(wd) = working_directory {
+            move_lock::ensure_unlocked(Path::new(wd))?;
             let path = PathBuf::from(wd);
             if !path.exists() {
                 return Err(format!("Working directory does not exist: {}", wd));

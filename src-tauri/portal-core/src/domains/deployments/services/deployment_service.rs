@@ -6,9 +6,11 @@ use super::docker_service::{
 };
 use crate::database::DatabaseManager;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
+use crate::domains::projects::move_lock;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -87,6 +89,7 @@ impl DeploymentService {
         &self,
         request: CreateDeploymentRequest,
     ) -> Result<Deployment, String> {
+        move_lock::ensure_unlocked(Path::new(&request.project_path))?;
         let deployment_id = Uuid::new_v4().to_string();
         let now = Utc::now();
 

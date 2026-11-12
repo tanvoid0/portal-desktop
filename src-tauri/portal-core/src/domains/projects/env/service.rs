@@ -6,6 +6,7 @@
 //! never "the app wasn't running." Portal never writes to a project's `.env`
 //! file: linking only touches `project_env_links`.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
@@ -16,6 +17,7 @@ use super::entity::{ActiveModel, Column, Entity, Model};
 use crate::database::DatabaseManager;
 use crate::domains::credentials::services::{CredentialService, VaultSession};
 use crate::domains::deployments::services::detect::list_env_files;
+use crate::domains::projects::move_lock;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 
 /// How a linked key's current state compares to the snapshots taken when it
@@ -195,6 +197,7 @@ impl ProjectEnvService {
             .get_by_id(project_id)
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
         let credential = self.credentials.get_credential(&credential_id).await?;
         let current_value = current_file_value(&project.path, &file_name, &env_key);
 
@@ -243,6 +246,7 @@ impl ProjectEnvService {
             .get_by_id(model.project_id)
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
         let credential = self.credentials.get_credential(&model.credential_id).await?;
         let current_value = current_file_value(&project.path, &model.file_name, &model.env_key);
 

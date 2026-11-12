@@ -1,3 +1,4 @@
+use crate::domains::projects::move_lock;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -87,6 +88,19 @@ pub fn quarantine<F: FnMut(QuarantineProgress)>(
             current_path: item.path.clone(),
         });
         let path = std::path::Path::new(&item.path);
+        if move_lock::is_locked(path) {
+            failed.push(FailedItem {
+                path: item.path,
+                kind: item.kind,
+                error: "locked by an in-progress project move".to_string(),
+            });
+            on_progress(QuarantineProgress {
+                done: i + 1,
+                total,
+                current_path: String::new(),
+            });
+            continue;
+        }
         let size = path_size(path);
         match trash::delete(path) {
             Ok(_) => {

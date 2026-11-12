@@ -1,7 +1,8 @@
+use crate::domains::projects::move_lock;
 use crate::process_ext::NoWindowExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::process::Command;
 
 /// Workflow step types
@@ -260,11 +261,15 @@ impl WorkflowEngine {
         if let Some(wd) = working_dir {
             let wd_path = self.substitute_variables(wd, context);
             if let Some(project_path) = &context.project_path {
-                cmd_builder.current_dir(project_path.join(wd_path));
+                let dir = project_path.join(wd_path);
+                move_lock::ensure_unlocked(&dir)?;
+                cmd_builder.current_dir(dir);
             } else {
+                move_lock::ensure_unlocked(Path::new(&wd_path))?;
                 cmd_builder.current_dir(wd_path);
             }
         } else if let Some(project_path) = &context.project_path {
+            move_lock::ensure_unlocked(project_path)?;
             cmd_builder.current_dir(project_path);
         }
 
@@ -316,6 +321,7 @@ impl WorkflowEngine {
         let file_content = self.substitute_variables(content, context);
 
         let final_path = if let Some(project_path) = &context.project_path {
+            move_lock::ensure_unlocked(project_path)?;
             project_path.join(&file_path)
         } else {
             PathBuf::from(&file_path)

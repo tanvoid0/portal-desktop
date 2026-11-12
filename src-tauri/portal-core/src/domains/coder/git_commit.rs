@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::domains::ai::platform_config::{PlatformConfig, DESKTOP_CLIENT_ID};
+use crate::domains::projects::move_lock;
 use crate::process_ext::NoWindowExt;
 
 use super::git_status::{git_diff_stats, git_list_changes, GitFileChange};
@@ -212,6 +213,7 @@ fn parse_commit_json(raw: &str) -> Result<(String, String), String> {
 }
 
 pub fn git_commit(workspace: &str, title: &str, summary: Option<&str>) -> Result<String, String> {
+    move_lock::ensure_unlocked(std::path::Path::new(workspace))?;
     let title = title.trim();
     if title.is_empty() {
         return Err("Commit title is required".into());
@@ -249,6 +251,7 @@ pub fn git_commit(workspace: &str, title: &str, summary: Option<&str>) -> Result
 }
 
 fn git_output(workspace: &str, args: &[&str]) -> Result<String, String> {
+    move_lock::ensure_unlocked(std::path::Path::new(workspace))?;
     let output = Command::new("git")
         .no_window()
         .args(args)

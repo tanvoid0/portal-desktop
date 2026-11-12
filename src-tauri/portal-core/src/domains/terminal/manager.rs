@@ -1,3 +1,4 @@
+use crate::domains::projects::move_lock;
 use crate::domains::terminal::shell_integration::{
     ShellIntegrationEventV2, ShellIntegrationParser,
 };
@@ -167,6 +168,7 @@ impl TerminalManager {
         } else {
             request.working_directory.clone()
         };
+        move_lock::ensure_unlocked(Path::new(&working_dir))?;
         let mut environment = request.environment.clone();
 
         // Fill in essential env vars from the real process environment when the

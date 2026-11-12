@@ -2,6 +2,7 @@ use crate::database::DatabaseManager;
 use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::pipelines::repositories::{ExecutionRepository, PipelineRepository};
 use crate::domains::projects::pipelines::services::pipeline_file;
+use crate::domains::projects::move_lock;
 use crate::domains::projects::pipelines::utils::dependency_resolver::resolve_execution_order;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use crate::events::{EventSink, EventSinkExt};
@@ -115,6 +116,7 @@ impl ExecutionService {
             .get_by_id(pipeline.project_id)
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
 
         let steps: Vec<Value> = serde_json::from_str(&pipeline.steps_json).unwrap_or_default();
 
@@ -760,6 +762,7 @@ impl ExecutionService {
             .get_by_id(project_id)
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
         let file = pipeline_file::load(&project.path)?
             .ok_or_else(|| "No .portal/pipeline.yml in this project".to_string())?;
 
