@@ -149,3 +149,18 @@ Most likely cause of the original report: the reporter read the DB at the old
 (dev builds now use `com.tanvoid0.portal-desktop.dev`), and the phone's own attempts did land
 (`Tanveer's S26 Ultra` rows at 2026-11-11 16:08-16:40, later `rejected` by the 170s timeout because
 the pending card was not surfaced app-wide until QA-121, `f8bea0a3`). Not re-tested with the real phone.
+
+## Real-phone retest 2026-11-12 (SM_S948B over wifi adb, dev daemon :18421)
+
+Passes. Phone typed address 192.168.0.137:18421 -> "Waiting for 192.168.0.137" -> pending row
+`Tanveer's S26 Ultra` landed in the DB within seconds -> `approve_device` -> phone moved to the
+Control screen. `/pair/request` is fine.
+
+Two findings that explain the "never pairs" experience, neither in `/pair/request`:
+1. **UDP discovery found nothing** ("No PCs found") while the phone had a local VPN running
+   (`org.adaway`); the app's own VPN warning was showing. TCP from the phone shell to
+   :18421 worked, so only discovery was affected. Typed-address pairing works.
+2. A stale "Last used" pairing whose token Portal had revoked shows "Pairing token was rejected"
+   and **Forget did not clear it** on one tap (not investigated further).
+Also: the Devices page stacks stale `pending` cards (10 here, all old test rows) with no expiry;
+approve by id, not card position. Script: `.claude/qa/scripts/QA-263-phone-allow.mjs`.
