@@ -1,7 +1,7 @@
 ---
 id: QA-124
 title: "/pair/request from a real phone (and from curl) never creates a pending row — phone stuck on \"Waiting for <PC>\" forever"
-status: open
+status: not-reproduced
 severity: blocker
 kind: bug
 area: devices/pairing
@@ -137,3 +137,15 @@ that's a platform question a loopback test on one machine can't settle, and
 doesn't matter for a normal single-instance install (no bind contention
 there at all). Still open: an actual real-phone repro end to end, and
 clicking Allow through to a live token, have not been re-tested.
+
+## Re-test 2026-11-12 (main @ 9e3156bd, dev build, daemon :18421)
+
+Not reproduced. `curl -X POST -H 'Content-Type: application/json' -d '{"device":"QA263E2E"}' /pair/request`
+inserted a `pending` row immediately, the Devices page showed the card, `approve_device` woke the
+long-poll and curl returned `200 {"name","port","token"}`. Script: `.claude/qa/scripts/QA-263.mjs`.
+
+Most likely cause of the original report: the reporter read the DB at the old
+`.../com.tanvoid0.portal-desktop/instance-2/` path while the process wrote to its own data dir
+(dev builds now use `com.tanvoid0.portal-desktop.dev`), and the phone's own attempts did land
+(`Tanveer's S26 Ultra` rows at 2026-11-11 16:08-16:40, later `rejected` by the 170s timeout because
+the pending card was not surfaced app-wide until QA-121, `f8bea0a3`). Not re-tested with the real phone.
