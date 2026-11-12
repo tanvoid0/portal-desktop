@@ -1,5 +1,17 @@
 # Portal Desktop - Release Notes
 
+## Version 0.15.0
+
+### Highlights
+
+- Feature: Portal Mobile — Android companion app with QR pairing, a mobile shell and a /whoami endpoint for token verification
+- Feature: AI pipeline doctor — failed action runs are classified, with Diagnose & fix (app or pipeline), pipeline self-repair and natural-language pipeline generation
+- Feature: pipeline templates follow the project's real stack; the old pipeline builder is folded into Actions
+- Fix: action runs stream live output and no longer deadlock on stdin or non-TTY (QA-129/130)
+- Fix: dev builds get their own data, config and daemon port, never sharing the release's
+
+---
+
 ## Version 0.14.0
 
 ### Highlights
