@@ -20,6 +20,34 @@ use crate::{log_info, log_warn};
 /// and the OS keychain entry is keyed off it.
 pub const APP_IDENTIFIER: &str = "com.tanvoid0.portal-desktop";
 
+/// True for debug builds — `tauri dev`, `cargo build`, `pnpm portal:ensure`'s old
+/// path. A dev build runs under its own identity ([`app_identifier`]): own data dir,
+/// config dir, keychain entry, WebView storage and daemon port. It used to share the
+/// installed release's, ran its newer migrations on the release's database, and left
+/// the release unable to start ("migration file ... is missing").
+pub const DEV: bool = cfg!(debug_assertions);
+
+const DEV_APP_IDENTIFIER: &str = "com.tanvoid0.portal-desktop.dev";
+
+/// The identifier this build runs under. `lib.rs` writes it into the Tauri config at
+/// startup, so Tauri's own paths and the single-instance lock follow it too.
+pub fn app_identifier() -> &'static str {
+    if DEV {
+        DEV_APP_IDENTIFIER
+    } else {
+        APP_IDENTIFIER
+    }
+}
+
+/// Where a first run copies data and the keychain master key from, newest first.
+/// A dev build starts from a copy of the release's data, so it has real projects to
+/// work against and never writes to the release's own files.
+pub fn seed_identifiers() -> impl Iterator<Item = &'static str> {
+    std::iter::once(APP_IDENTIFIER)
+        .filter(|_| DEV)
+        .chain(LEGACY_APP_IDENTIFIERS.iter().copied())
+}
+
 /// Identifiers this app has shipped under before, newest first. Data dirs and
 /// keychain entries are looked up in this order and the first hit wins. Remove an
 /// entry once no install can still be sitting on it.
@@ -32,21 +60,27 @@ pub const LEGACY_APP_IDENTIFIERS: &[&str] = &[
 ];
 
 const CONFIG_DIR: &str = "portal_desktop";
+const DEV_CONFIG_DIR: &str = "portal_desktop-dev";
 const LEGACY_CONFIG_DIR: &str = "portal-desktop";
 
 /// Per-user config directory (`settings.json`, `ai-settings.json`).
 ///
-/// Migrates the pre-rename directory across on first call, so callers get a
-/// populated directory without having to know the rename happened.
+/// Seeds itself on first call from the first older directory that exists — the
+/// release's for a dev build, the pre-rename one otherwise — so callers get a
+/// populated directory without having to know either happened.
 pub fn config_dir() -> PathBuf {
     let base = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    let dir = base.join(CONFIG_DIR);
+    let dir = base.join(if DEV { DEV_CONFIG_DIR } else { CONFIG_DIR });
 
     if !dir.exists() {
-        let legacy = base.join(LEGACY_CONFIG_DIR);
-        if legacy.is_dir() {
+        let seeds: &[&str] = if DEV {
+            &[CONFIG_DIR, LEGACY_CONFIG_DIR]
+        } else {
+            &[LEGACY_CONFIG_DIR]
+        };
+        if let Some(seed) = seeds.iter().map(|d| base.join(d)).find(|d| d.is_dir()) {
             match std::fs::create_dir_all(&dir) {
-                Ok(()) => copy_files_into(&legacy, &dir),
+                Ok(()) => copy_files_into(&seed, &dir),
                 Err(e) => log_warn!(
                     "AppPaths",
                     "Failed to create config dir {}: {}",
@@ -110,6 +144,17 @@ mod tests {
             !LEGACY_APP_IDENTIFIERS.contains(&APP_IDENTIFIER),
             "current identifier is also listed as legacy; migration would read its own dir"
         );
+    }
+
+    /// The whole point of the dev identity: a debug build (which is what runs this
+    /// test) must never resolve the release's identifier, and must never seed from
+    /// itself.
+    #[test]
+    #[cfg(debug_assertions)]
+    fn dev_build_never_runs_as_the_release() {
+        assert_ne!(app_identifier(), APP_IDENTIFIER);
+        assert_eq!(seed_identifiers().next(), Some(APP_IDENTIFIER));
+        assert!(!seed_identifiers().any(|id| id == app_identifier()));
     }
 
     #[test]

@@ -63,6 +63,11 @@ use crate::events::EventSink;
 /// Default port. Deliberately clear of agent-platform's 18410.
 pub const DEFAULT_PORT: u16 = 18420;
 
+/// Debug builds' default. 18420 is the installed release's — the shared task
+/// board — and a dev build answering there would take the board into its own
+/// database.
+pub const DEV_PORT: u16 = 18421;
+
 /// How many frames a slow client may fall behind before it starts losing the
 /// oldest. Events are a live view, not a log.
 const CHANNEL_CAPACITY: usize = 256;
@@ -73,13 +78,18 @@ const PAIR_REQUEST_WINDOW: Duration = Duration::from_secs(60);
 const PAIR_REQUEST_MAX: u32 = 10;
 
 /// The daemon's port: `PORTAL_DAEMON_PORT` if set and parseable, else
-/// [`DEFAULT_PORT`]. The one place this is decided, so `lib.rs`'s `setup` and
-/// the QR code (which must encode the port actually bound) never drift apart.
+/// [`DEV_PORT`] for a debug build and [`DEFAULT_PORT`] for a release. The one
+/// place this is decided, so `lib.rs`'s `setup` and the QR code (which must
+/// encode the port actually bound) never drift apart.
 pub fn configured_port() -> u16 {
     std::env::var("PORTAL_DAEMON_PORT")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_PORT)
+        .unwrap_or(if crate::app_paths::DEV {
+            DEV_PORT
+        } else {
+            DEFAULT_PORT
+        })
 }
 
 /// One broadcast item: the serialized frame plus its event name pulled out, so a

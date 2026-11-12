@@ -75,6 +75,23 @@ pub fn run() {
     // or configure in tauri.conf.json under plugins section if supported
     let updater_builder = tauri_plugin_updater::Builder::new();
 
+    // Debug builds run under their own identifier (see `app_paths::DEV`). Set here,
+    // before anything reads it, so Tauri's app data dir, the WebView2 profile and
+    // the single-instance lock all follow — dev and the installed release can run
+    // side by side without touching each other's data.
+    // The window title carries the version always, and DEBUG on a dev build.
+    let mut context = tauri::generate_context!();
+    let title_suffix = format!(
+        " v{}{}",
+        context.package_info().version,
+        if app_paths::DEV { " — DEBUG" } else { "" }
+    );
+    let config = context.config_mut();
+    config.identifier = app_paths::app_identifier().to_string();
+    for window in &mut config.app.windows {
+        window.title.push_str(&title_suffix);
+    }
+
     let builder = tauri::Builder::default();
     // Hard backstop for the one-shared-daemon rule (see this repo's CLAUDE.md):
     // a second launch focuses the existing window instead of starting a second
@@ -799,6 +816,6 @@ pub fn run() {
             domains::agents::agents_list_sessions,
             domains::agents::agents_get_session,
         ])
-        .run(tauri::generate_context!()) // Note: OUT_DIR linter error is a false positive - resolves after build
+        .run(context)
         .expect("error while running tauri application");
 }

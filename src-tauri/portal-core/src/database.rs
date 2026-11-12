@@ -73,11 +73,14 @@ impl DatabaseManager {
             return;
         }
 
-        // Data dirs of the pre-rename identifiers, newest first. Copy the whole
-        // directory so the disk-utility DB and any sibling state come across with the
-        // main DB.
+        // Data dirs to seed from, newest first: the release's for a dev build, then
+        // the pre-rename identifiers. Copy the whole directory so the disk-utility DB
+        // and any sibling state come across with the main DB. A dev build then runs
+        // its migrations on the copy, never on the release's file.
+        // ponytail: plain file copy, so a release writing at that instant can hand dev
+        // a torn copy; `VACUUM INTO` if that ever bites.
         if let Some(base) = dirs::data_dir() {
-            for identifier in crate::app_paths::LEGACY_APP_IDENTIFIERS {
+            for identifier in crate::app_paths::seed_identifiers() {
                 let legacy_dir = base.join(identifier);
                 if legacy_dir.join("portal_desktop.db").exists() {
                     crate::app_paths::copy_files_into(&legacy_dir, data_dir);

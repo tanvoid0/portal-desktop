@@ -29,6 +29,10 @@
   import UpdatePrompt from '$lib/domains/updates/components/UpdatePrompt.svelte';
   import VaultGate from '$lib/domains/credentials/components/VaultGate.svelte';
   import { runStartupUpdateCheck } from '$lib/domains/updates/services/startupUpdate';
+  import { getCurrentVersion } from '$lib/domains/updates/services/updateService';
+  import { getIdentifier } from '@tauri-apps/api/app';
+  import { Badge } from '$lib/components/ui/badge';
+  import { cn } from '$lib/utils';
   import DeviceAuthGuard from '$lib/components/DeviceAuthGuard.svelte';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import ArrowRight from '~icons/fa6-solid/arrow-right';
@@ -124,6 +128,18 @@
     if (raw === 'false') return false;
     return null;
   }
+
+  // Build identity for the sidebar header. Debug builds run as `<identifier>.dev`
+  // with their own data (portal-core `app_paths::DEV`), so say so loudly.
+  let appVersion = $state<string | null>(null);
+  let isDebugBuild = $state(false);
+
+  onMount(() => {
+    getCurrentVersion().then((v) => (appVersion = v));
+    getIdentifier()
+      .then((id) => (isDebugBuild = id.endsWith('.dev')))
+      .catch((error) => log.warn('App identifier unavailable', { error }));
+  });
 
   onMount(async () => {
     try {
@@ -331,7 +347,9 @@
           <SidebarRoot collapsible="icon">
             <div class="flex h-full min-h-0 min-w-0 flex-col">
               <!-- Sidebar Header -->
-              <SidebarTooltip label={isSdkPage ? 'SDK Manager' : 'Portal Desktop'}>
+              <SidebarTooltip
+                label={`${isSdkPage ? 'SDK Manager' : 'Portal Desktop'}${appVersion ? ` v${appVersion}` : ''}${isDebugBuild ? ' (debug build)' : ''}`}
+              >
                 {#snippet trigger({ props })}
                   <Button
                     {...props}
@@ -340,8 +358,12 @@
                     class="divider-edge-b divider-edge-full divider-edge-sidebar h-auto w-full justify-start gap-3 px-4 py-4 text-left transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 hover:bg-sidebar-accent/50"
                     onclick={() => goto('/')}
                   >
+                    <!-- Debug builds tint the logo tile so the rail says so even collapsed. -->
                     <div
-                      class="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary"
+                      class={cn(
+                        'flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary',
+                        isDebugBuild && 'bg-destructive/15 text-destructive ring-2 ring-destructive'
+                      )}
                     >
                       {#if isSdkPage}
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,11 +386,19 @@
                       {/if}
                     </div>
                     <div class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                      <span class="block truncate text-sm font-semibold text-sidebar-foreground">
-                        {isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
+                      <span class="flex items-center gap-1.5">
+                        <span class="truncate text-sm font-semibold text-sidebar-foreground">
+                          {isSdkPage ? 'SDK Manager' : 'Portal Desktop'}
+                        </span>
+                        {#if isDebugBuild}
+                          <Badge variant="destructive" class="px-1.5 py-0 text-[10px]">DEBUG</Badge>
+                        {/if}
                       </span>
-                      <span class="block text-xs text-sidebar-foreground/60">
-                        {isSdkPage ? 'Development Tools' : 'Development Environment'}
+                      <span class="block truncate text-xs text-sidebar-foreground/60">
+                        <!-- Version first: the 16rem rail truncates the tagline, not it. -->
+                        {appVersion ? `v${appVersion} · ` : ''}{isSdkPage
+                          ? 'Development Tools'
+                          : 'Development Environment'}
                       </span>
                     </div>
                   </Button>

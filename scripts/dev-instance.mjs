@@ -9,6 +9,7 @@
 //   vite      1420 + (N-1)   — vite.config.ts reads PORTAL_DEV_PORT
 //   CDP       9222 + (N-1)   — WebView2 reads WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
 //   data dir  <app data>/instance-N — src-tauri/src/lib.rs reads PORTAL_INSTANCE
+//   daemon    18421 + (N-1)  — daemon::configured_port reads PORTAL_DAEMON_PORT
 //   target    src-tauri/target/instance-N — Windows will not relink a running .exe
 //
 // The data directory is the one that actually matters: both instances otherwise
@@ -55,7 +56,9 @@ function run(command, args, env, { tolerateFailure = false } = {}) {
 
 if (process.argv[2] === '--kill-port') {
   // Runs as `predev`, inside the environment `tauri dev` was started with.
-  const daemonPort = process.env.PORTAL_DAEMON_PORT ?? '18420';
+  // 18421 is a debug build's daemon (daemon::DEV_PORT); 18420 is the installed
+  // release, which has no vite port to protect.
+  const daemonPort = process.env.PORTAL_DAEMON_PORT ?? '18421';
   const alreadyUp = await fetch(`http://127.0.0.1:${daemonPort}/health`, {
     signal: AbortSignal.timeout(1500),
   })
@@ -87,6 +90,8 @@ if (process.argv[2] === '--kill-port') {
   // instance 2 cannot link at all until it builds somewhere else. Costs a separate
   // build tree per instance; there is no sharing a target dir with a running .exe.
   if (n > 1) {
+    // Instance 1's daemon holds 18421 (daemon::DEV_PORT).
+    env.PORTAL_DAEMON_PORT = String(18421 + (n - 1));
     env.CARGO_TARGET_DIR = resolve('src-tauri/target', `instance-${n}`);
     // Every process sharing a WebView2 user-data folder must pass identical browser
     // arguments. Ours differ by --remote-debugging-port, so instance 2 dies on startup

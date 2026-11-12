@@ -250,12 +250,13 @@ impl VaultService {
     /// only safe to mint a brand new random key when there is nothing encrypted under the
     /// old one to lose (see QA-049).
     fn read_keychain_master_key(credential_count: usize) -> Result<[u8; 32], CredentialError> {
-        const SERVICE: &str = crate::app_paths::APP_IDENTIFIER;
         const KEY_NAME: &str = "credential-master-key-v1";
 
-        let entry = keyring::Entry::new(SERVICE, KEY_NAME).map_err(|e| {
-            CredentialError::EncryptionFailed(format!("Keychain access failed: {}", e))
-        })?;
+        // A dev build keeps its own entry, so it can never overwrite the release's key.
+        let entry =
+            keyring::Entry::new(crate::app_paths::app_identifier(), KEY_NAME).map_err(|e| {
+                CredentialError::EncryptionFailed(format!("Keychain access failed: {}", e))
+            })?;
 
         match entry.get_secret() {
             Ok(bytes) if bytes.len() == 32 => {
@@ -306,19 +307,18 @@ impl VaultService {
         }
     }
 
-    /// Master key stored under a pre-rename bundle identifier, newest first.
-    /// Drop an identifier once no install remains on it.
+    /// Master key stored under a seed identifier, newest first: the release's for a
+    /// dev build (its database is a copy of the release's, encrypted under that key),
+    /// then the pre-rename ones. Drop a legacy identifier once no install remains on it.
     fn legacy_master_key(key_name: &str) -> Option<[u8; 32]> {
-        crate::app_paths::LEGACY_APP_IDENTIFIERS
-            .iter()
-            .find_map(|identifier| {
-                keyring::Entry::new(identifier, key_name)
-                    .ok()?
-                    .get_secret()
-                    .ok()?
-                    .try_into()
-                    .ok()
-            })
+        crate::app_paths::seed_identifiers().find_map(|identifier| {
+            keyring::Entry::new(identifier, key_name)
+                .ok()?
+                .get_secret()
+                .ok()?
+                .try_into()
+                .ok()
+        })
     }
 }
 

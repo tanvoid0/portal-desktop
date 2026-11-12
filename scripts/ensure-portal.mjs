@@ -5,36 +5,33 @@
 //
 //   node scripts/ensure-portal.mjs
 //
-// Builds and runs the plain Rust binary directly — `cargo build` then launch
-// the exe — rather than going through `tauri dev`/vite. This is a background
-// service launch, not an interactive dev session: nobody here wants hot
-// reload, and routing through the tauri-cli -> pnpm -> vite chain turned out
-// to swallow the child's stdout/stderr entirely when detached on Windows
-// (the log stayed empty however it was piped), with no error to explain why.
-// A plain `cargo build` + direct exe launch has none of that: both report to
-// stdout the normal way, which is all we need to pipe to a log file.
-// The webview's content (devUrl vs bundled frontendDist) is irrelevant here —
-// the HTTP daemon binds during `setup()` regardless of whether the window
-// has anything to show, and the daemon is the only thing any of this cares
-// about.
+// Launches the INSTALLED RELEASE, never a build from this repo. The board is
+// real data and lives in the release's database. A debug build runs under its
+// own identifier, data dir and daemon port (18421) — see portal-core's
+// app_paths.rs — so it can never answer here or migrate the release's
+// database. `PORTAL_EXE` overrides where the release is looked for.
 //
 // ponytail: a lock file + PID liveness check is a simpler guard than a real
 // mutex/IPC mechanism — good enough for "don't launch two of these on one
 // machine". Upgrade to something more robust only if this races in practice.
 import { spawn } from 'node:child_process';
-import { createWriteStream, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const SRC_TAURI = join(REPO_ROOT, 'src-tauri');
-const EXE_PATH = join(
-  SRC_TAURI,
-  'target',
-  'debug',
-  process.platform === 'win32' ? 'portal_desktop.exe' : 'portal_desktop'
-);
+// Where the Windows installer puts a per-user install. Elsewhere: set PORTAL_EXE.
+const EXE_PATH =
+  process.env.PORTAL_EXE ??
+  (process.platform === 'win32' && process.env.LOCALAPPDATA
+    ? join(process.env.LOCALAPPDATA, 'Portal Desktop', 'portal_desktop.exe')
+    : '');
 
 const PORT = process.env.PORTAL_DAEMON_PORT ?? '18420';
 const HEALTH_URL = `http://127.0.0.1:${PORT}/health`;
@@ -96,6 +93,15 @@ async function main() {
     return;
   }
 
+  if (!EXE_PATH || !existsSync(EXE_PATH)) {
+    console.error(
+      `No installed Portal Desktop at ${EXE_PATH || '(unknown path)'}.\n` +
+        'Install the release build, or set PORTAL_EXE to its executable.'
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   mkdirSync(LOCK_DIR, { recursive: true });
 
   let haveLock = false;
@@ -117,7 +123,7 @@ async function main() {
 
   if (!haveLock) {
     console.log('Another process is already starting Portal — waiting for it...');
-    const up = await pollHealth(180_000);
+    const up = await pollHealth(60_000);
     if (up) {
       console.log(`Portal is up on :${PORT}`);
       return;
@@ -127,31 +133,12 @@ async function main() {
     return;
   }
 
-  console.log(`Building Portal (cargo build)... logging to ${LOG_PATH}`);
   const log = createWriteStream(LOG_PATH, { flags: 'a' });
   await new Promise((resolve, reject) => log.once('open', resolve).once('error', reject));
-  log.write(`\n--- ${new Date().toISOString()} build ---\n`);
-
-  const buildCode = await new Promise((resolve) => {
-    const build = spawn('cargo', ['build'], { cwd: SRC_TAURI, stdio: ['ignore', 'pipe', 'pipe'] });
-    build.stdout.pipe(log, { end: false });
-    build.stderr.pipe(log, { end: false });
-    build.on('exit', (code) => resolve(code ?? 1));
-    build.on('error', (err) => {
-      log.write(`cargo build failed to start: ${err.message}\n`);
-      resolve(1);
-    });
-  });
-  if (buildCode !== 0) {
-    return finish(
-      1,
-      `cargo build failed (exit ${buildCode}).\n--- tail of ${LOG_PATH} ---\n${logTail()}`
-    );
-  }
 
   log.write(`\n--- ${new Date().toISOString()} run ${EXE_PATH} ---\n`);
   const app = spawn(EXE_PATH, [], {
-    cwd: SRC_TAURI,
+    cwd: dirname(EXE_PATH),
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
@@ -159,11 +146,11 @@ async function main() {
   app.stderr.pipe(log);
   app.unref();
 
-  const up = await pollHealth(180_000);
+  const up = await pollHealth(60_000);
   if (up) return finish(0, `Portal is up on :${PORT}`);
   finish(
     1,
-    `Portal did not come up within 180s after launch.\n--- tail of ${LOG_PATH} ---\n${logTail() || '(empty — the process may not have started at all)'}`
+    `Portal did not come up within 60s after launch.\n--- tail of ${LOG_PATH} ---\n${logTail() || '(empty — the process may not have started at all)'}`
   );
 }
 

@@ -119,7 +119,21 @@ These are the source of truth — this file summarizes them:
 
 ## The shared daemon (port 18420)
 
-Portal Desktop's daemon on loopback port 18420 is the one shared task-board backend for every project on this machine — not a per-session instance. Every session/agent must talk to that single running Portal, never assume it owns one. To bring it up, run `pnpm portal:ensure` (idempotent, lock-protected, safe to call from multiple sessions at once) instead of calling `pnpm tauri:dev` blind. `tauri-plugin-single-instance` is the hard backstop: it keeps a second GUI process from ever fully starting even if that convention is skipped.
+The **installed release's** daemon on loopback port 18420 is the one shared task-board backend for every project on this machine — not a per-session instance. Every session/agent must talk to that single running Portal, never assume it owns one. To bring it up, run `pnpm portal:ensure` (idempotent, lock-protected, safe to call from multiple sessions at once): it launches the installed release (`%LOCALAPPDATA%\Portal Desktop\portal_desktop.exe`, or `PORTAL_EXE`), never a build from this repo. `tauri-plugin-single-instance` is the hard backstop: one release process and one dev process at most.
+
+## Dev and release never share data
+
+Debug builds (`pnpm tauri:dev`, `cargo build`) run as `com.tanvoid0.portal-desktop.dev` — decided by `app_paths::DEV` (`cfg!(debug_assertions)`), not by a script, so nothing can forget it:
+
+|                  | release (`pnpm tauri:build`, installed)      | dev (any debug build)                            |
+| ---------------- | -------------------------------------------- | ------------------------------------------------ |
+| data dir (DB)    | `%APPDATA%\com.tanvoid0.portal-desktop`      | `%APPDATA%\com.tanvoid0.portal-desktop.dev`      |
+| config dir       | `%APPDATA%\portal_desktop`                   | `%APPDATA%\portal_desktop-dev`                   |
+| WebView2 storage | `%LOCALAPPDATA%\com.tanvoid0.portal-desktop` | `%LOCALAPPDATA%\com.tanvoid0.portal-desktop.dev` |
+| keychain entry   | `com.tanvoid0.portal-desktop`                | `com.tanvoid0.portal-desktop.dev`                |
+| daemon port      | 18420 (the board)                            | 18421 (+N-1 for `dev-instance.mjs N`)            |
+
+A dev build's first launch **copies** the release's DB, config and master key into its own — real data to work against; its migrations then run on the copy only. Reset dev data by deleting the two `.dev`/`-dev` dirs. The release only ever runs migrations it shipped with.
 
 ## When unsure about Svelte 5 or shadcn-svelte
 
