@@ -188,6 +188,30 @@ No regressions found in the neighbourhood (pending-row capability toggles,
 Select-all, expiry radio buttons, the confirm dialog on Revoke all behaved
 as expected while driving these flows).
 
+## Follow-up: "Review" button looked dead (2026-11-12)
+
+Reported after the phone→desktop pairing test: clicking **Review** on the
+"A phone wants to pair" toast did nothing.
+
+Reproduced with a real mouse on the installed release (v0.15.0): the window was
+already on `/devices`, so `goto('/devices')` was a same-route no-op, and the toast
+(`duration: 0`) never dismissed itself — nothing visibly changed. Toasts raised
+while the window is unfocused also skip `notify()`'s "already on the target
+route" early-return, so this is the normal case, not an edge. Off `/devices` the
+button always navigated correctly (re-checked over CDP on the dev app with a real
+`/pair/request` and a coordinate click), so the `notify`/`goto` wiring was fine.
+
+Root cause is shared: `src/lib/components/ui/toast.svelte` wired the action
+button straight to `action.onClick` and never closed the toast, for every caller
+(`notify`, the agent notifications, the CoderPanel / Ollama / AI-dialog toasts).
+Fix: `handleAction()` runs the action, then dismisses the toast (animated, via
+the existing `handleClose`). Verified in the browser against this worktree's
+dev server — both off-route (navigates and clears) and already-on-route (clears).
+
+Not fixed here: a persistent pairing toast outlives its request (it still says
+"is waiting for approval" after the request is approved, denied or timed out).
+Auto-dismissing it once the request resolves would be a separate change.
+
 ## Related
 
 Two other pending rows ("Browser", dated 06/07/2026 and 24/11/2025) have been
