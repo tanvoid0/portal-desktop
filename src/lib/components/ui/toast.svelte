@@ -100,6 +100,17 @@
     dismiss();
   }
 
+  // An action is a one-shot: run it, then clear the toast. Otherwise a
+  // persistent (duration 0) toast whose action lands on the page already open
+  // — e.g. "Review" on /devices — looks like the click did nothing.
+  function handleAction() {
+    try {
+      action?.onClick();
+    } finally {
+      handleClose();
+    }
+  }
+
   onMount(() => {
     // Show toast with animation
     setTimeout(() => {
@@ -136,7 +147,7 @@
   </div>
 
   {#if action}
-    <Button variant="outline" size="sm" onclick={action.onClick} class="ml-2 shrink-0">
+    <Button variant="outline" size="sm" onclick={handleAction} class="ml-2 shrink-0">
       {action.label}
     </Button>
   {/if}
