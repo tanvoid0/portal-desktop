@@ -258,6 +258,7 @@ fn serve_on(state: AppState, host: Ipv4Addr, port: u16, label: &'static str) {
 fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        .route("/whoami", get(whoami))
         .route("/events", get(events))
         .route("/rpc/{command}", post(rpc))
         .route("/pair/request", post(pairing::pair_request))
@@ -379,6 +380,30 @@ async fn health() -> Response {
         "ok": true,
         "name": "portal-desktop",
         "version": env!("CARGO_PKG_VERSION"),
+    }))
+    .into_response()
+}
+
+/// Who the caller is, for a paired phone verifying its token (a bad token is
+/// already a 401 from the guard). Local peers hold every capability.
+async fn whoami(Extension(trust): Extension<Trust>) -> Response {
+    let (local, device_id, caps) = match trust {
+        Trust::Remote { device_id, caps } => (false, Some(device_id), caps),
+        _ => (
+            true,
+            None,
+            crate::rpc::capabilities()
+                .into_iter()
+                .map(String::from)
+                .collect(),
+        ),
+    };
+    axum::Json(json!({
+        "name": host_name(),
+        "version": env!("CARGO_PKG_VERSION"),
+        "local": local,
+        "device_id": device_id,
+        "caps": caps,
     }))
     .into_response()
 }
@@ -760,6 +785,34 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(registered.status().as_u16(), 503);
+    }
+
+    #[tokio::test]
+    async fn whoami_reports_local_with_every_cap_and_refuses_remote_anon() {
+        let reply = whoami(Extension(Trust::Local)).await;
+        let body = axum::body::to_bytes(reply.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["local"], true);
+        assert!(v["device_id"].is_null());
+        assert_eq!(v["caps"].as_array().unwrap().len(), crate::rpc::capabilities().len());
+
+        let paired = whoami(Extension(Trust::Remote {
+            device_id: "dev-1".into(),
+            caps: vec!["coder".into()],
+        }))
+        .await;
+        let body = axum::body::to_bytes(paired.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["local"], false);
+        assert_eq!(v["device_id"], "dev-1");
+        assert_eq!(v["caps"], json!(["coder"]));
+
+        // `/whoami` is not public: an unauthenticated remote gets the 401.
+        assert!(classify(remote(), &HeaderMap::new(), "/whoami", |_| None).is_err());
     }
 
     #[test]

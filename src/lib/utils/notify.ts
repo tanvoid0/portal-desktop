@@ -14,6 +14,8 @@ import { toastActions, type Toast } from '$lib/domains/shared/stores/toastStore'
 import { appSettings } from '$lib/domains/settings/stores/settingsStore';
 import { createLogger } from '$lib/domains/shared/services/logger';
 
+import { isMobileShell } from '$lib/domains/mobile/shell';
+
 const log = createLogger('notify');
 
 export interface NotifyPayload {
@@ -44,7 +46,7 @@ export function notify(p: NotifyPayload): void {
     desktopNotifications: true,
     soundEnabled: true,
   };
-  if (!n.enabled || !n.desktopNotifications) return;
+  if (isMobileShell || !n.enabled || !n.desktopNotifications) return;
   if (focused) return;
 
   try {

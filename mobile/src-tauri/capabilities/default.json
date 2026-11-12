@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "default",
+  "description": "Main window: core IPC (events, window).",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

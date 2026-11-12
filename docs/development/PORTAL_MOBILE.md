@@ -1,0 +1,196 @@
+# Portal Mobile — the phone as a client of Portal Desktop
+
+**Status:** plan only. Phase 0 has an unverified draft on `feat/portal-mobile`
+(2026-11-12) — see "State of the tree".
+Supersedes "Phase 5 — Android client" in
+[REMOTE_ARCHITECTURE.md](REMOTE_ARCHITECTURE.md), which planned to extend Portal
+Remote's Kotlin app.
+
+## Product
+
+Portal is a tool for software developers: it automates and simplifies day-to-day
+development, on the PC and from the phone. The phone is the same product at a
+distance — check a pipeline, answer an agent's permission prompt, steer a coder
+thread, triage the board — not a media remote. Same Wi-Fi today; an
+intermediate relay for any-internet access later.
+
+That ordering decides priorities: developer workflows first, PC control
+(trackpad, mirror) after.
+
+## Decision
+
+One Android app, built from **this repo**, as a Tauri 2 mobile target that ships
+the **same SvelteKit frontend** and talks to the desktop daemon.
+
+| Option                                | UI reuse                 | Cost of each new Portal feature on phone | Verdict   |
+| ------------------------------------- | ------------------------ | ---------------------------------------- | --------- |
+| Extend Portal Remote (Kotlin/Compose) | none — different toolkit | rebuilt by hand in Compose, forever      | rejected  |
+| React Native                          | none — Svelte ≠ React    | rebuilt by hand, plus a third UI stack   | rejected  |
+| **Tauri Android, thin client**        | all of `src/`            | add a `cap` to the command; UI is free   | **taken** |
+
+Why the Kotlin app loses despite being 23k lines of working code: it is a PC
+remote with its own design language (HUD, cut corners, monospace). Controlling
+Portal itself means tasks, projects, coder, agents, terminal, pipelines — about
+30 frontend domains that already exist here in Svelte. Rebuilding them in
+Compose doubles every future feature. With the thin client the phone UI _is_ the
+desktop UI, so it cannot drift.
+
+## How it works
+
+```
+phone                                         desktop
+┌─────────────────────────────┐               ┌──────────────────────────┐
+│ webview: same src/ build    │               │ Portal Desktop           │
+│   invoke('get_tasks', args) │               │  daemon :18420 (axum)    │
+│        │                    │               │                          │
+│ mobile/src-tauri (~300 LOC) │  HTTP + WS    │                          │
+│   catch-all invoke handler ─┼──────────────▶│ POST /rpc/get_tasks      │
+│   events bridge ◀───────────┼───────────────│ WS   /events             │
+│   mobile_pair / _connect    │──────────────▶│ POST /pair/request       │
+└─────────────────────────────┘  Bearer token └──────────────────────────┘
+```
+
+- **No transport layer in the frontend.** `invoke` and `listen` are untouched;
+  the mobile Rust shell forwards any command name to `/rpc/{command}` and
+  re-emits `/events` frames as Tauri events. The frontend only knows
+  `VITE_PORTAL_MOBILE=1` (connect screen, nav filtered by capability, desktop-only
+  startup calls skipped).
+- **Requests leave from Rust, not the webview**, so they carry no `Origin`
+  header. The daemon's "refuse every Origin" rule stays exactly as it is.
+- **Security model is the daemon's, unchanged:** per-device token, capabilities
+  chosen at approval, credentials/vault never remote, sensitive caps opt-in.
+- `mobile/src-tauri` is a separate crate on purpose: it must not link
+  `portal-core` (pty, enigo, sqlite have no business on a phone), and the
+  desktop build cannot be broken by it.
+
+## Phases
+
+Each ships on its own.
+
+0. **Shell + connect** — `mobile/src-tauri`, `GET /whoami`, `/connect` screen
+   (discover / QR / manual), nav filtered by caps, startup hardening.
+1. **Phone polish of the capped domains** — dashboard, tasks, projects, coder,
+   agents, terminal at phone width. Fix per page; no redesign.
+2. **Widen the remote surface to the dev workflows** — give caps to
+   pipelines/actions (run, watch, Diagnose & fix), n8n, github, and
+   notifications (`event_cap` currently withholds them). One attribute per
+   command, plus a row in the approval UI.
+3. **Push when it matters** — agent needs a permission decision, pipeline
+   failed, run finished: Android notification with the action on it. This is
+   the feature that makes the phone worth carrying for development.
+4. **Relay (any internet)** — an intermediate server both sides dial out to.
+   Prerequisites, in order: end-to-end encryption keyed at pairing (the relay
+   must only ever see ciphertext — it would otherwise sit in front of terminal
+   exec), then the relay itself. The phone side is a one-file change: the
+   connection becomes a URL instead of `host:port`; `/rpc` and `/events` keep
+   their shape. Not built until LAN use is solid.
+5. **PC control in Svelte** — trackpad + keyboard page over `/control`
+   (`remote.input` is already served by the daemon), resource monitor (one
+   `sysinfo` command + page, which the desktop gets for free too).
+6. **Media-remote features** — screen mirror, files, now-playing/volume. Port
+   from Portal Remote's C# server into the daemon only as each is wanted.
+
+## Phase 0 spec (for whoever executes)
+
+**Preconditions**
+
+- **Disk:** `D:` had 0 GB free on 2026-11-12 (3.7 GB after deleting the mobile
+  `target/`). An Android build needs roughly 10–15 GB (cargo target per ABI +
+  Gradle + NDK sysroot). Free space or point `CARGO_TARGET_DIR` at `C:` first.
+- `ANDROID_HOME=D:\sdk\android`, `NDK_HOME=D:\sdk\android\ndk\28.2.13676358`,
+  `JAVA_HOME` = `~/.sdkman/candidates/java/21-tem` (default JDK 25 will likely
+  break AGP).
+- `rustup target add aarch64-linux-android x86_64-linux-android` (not installed).
+- AVDs exist (`Pixel_9a`, `portal_claude`, …). No physical device attached.
+
+**Rust shell — `mobile/src-tauri/`** (crate `portal-mobile`, id
+`com.tanvoid0.portal.mobile`; must not depend on `src-tauri` or `portal-core`)
+
+- `frontendDist` = root SvelteKit build, built with `VITE_PORTAL_MOBILE=1`.
+- Stored connection `{host, port, token, name}`: JSON in the app data dir.
+- Local commands — the contract the frontend codes against:
+
+| Command                               | Behaviour                                                                                                       |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `mobile_status()`                     | `{connected, host, port, name, caps: string[]}`                                                                 |
+| `mobile_pair({host, port, device})`   | `POST /pair/request`, long-poll ≤175 s. 403 denied / 408 timeout / 429 rate-limited → distinct readable errors. |
+| `mobile_connect({host, port, token})` | Verify with `GET /whoami`, store, start events bridge. QR payload: `portalremote://{ip}:{port}/{token}`.        |
+| `mobile_disconnect()`                 | Stop bridge, delete stored connection.                                                                          |
+| `mobile_discover()`                   | UDP broadcast `PORTALREMOTE?` to 8765, collect replies ~1.5 s → `[{host, port, name, version}]`.                |
+
+- Event `mobile://connection` (payload = status) on every change, including a
+  401 from the daemon (token revoked → disconnected).
+- **Catch-all:** custom `Builder::invoke_handler` closure. `mobile_*` handled
+  locally; every other command → `POST /rpc/{command}`, Bearer token, JSON args
+  as sent (`/rpc` accepts camelCase). Non-2xx → reject with the body text.
+  `plugin:*` commands are routed by Tauri and never reach the closure. Check the
+  `Invoke` / `InvokeResolver` / `InvokeBody` API against the tauri source —
+  don't guess it.
+- **Events bridge:** tokio-tungstenite to `/events` with the Authorization
+  header, `app.emit(event, payload)` per frame, capped-backoff reconnect.
+- `tauri-plugin-barcode-scanner` for QR. Android manifest: INTERNET +
+  cleartext traffic allowed (daemon has no TLS).
+
+**Daemon — `src-tauri/src/daemon/mod.rs`, additive**
+
+- `GET /whoami` (same guard as `/rpc`) →
+  `{name, version, local, device_id, caps}`; local caller → all caps. One test.
+
+**Frontend — `src/**`, everything behind `VITE_PORTAL_MOBILE === '1'`\*\*
+
+- `src/lib/domains/mobile/`: `isMobileShell`, runes connection state over
+  `mobile_status` + `mobile://connection`, pure `parsePairUrl` + one vitest.
+- `/connect` route: discovered list → pair (waiting-for-approval state), Scan
+  QR, manual host/port (default 18420), editable device name.
+- Root layout: not connected → `/connect`; dropped/revoked → `/connect` + toast.
+- Nav (`src/lib/config/main-nav.ts`) filtered to what the device's caps can
+  serve; entries with no capped backend hidden; Disconnect entry + PC name.
+  Reuse the existing sidebar's mobile drawer.
+- Guard desktop-only startup calls (updater, window APIs, notification/dialog/
+  opener plugins, uncapped settings commands) so they don't throw or toast.
+- `viewport-fit=cover`, safe-area padding, inputs ≥16px.
+
+**Gates**
+
+- `pnpm check && pnpm lint` (redirect output; piping masks the exit code).
+- `cargo check` + `cargo test` in `src-tauri`; `cargo check` in
+  `mobile/src-tauri` for host and `aarch64-linux-android`.
+- `tauri android build --debug` → APK; install on an AVD. Note `10.0.2.2` is
+  loopback to the daemon, so UI can be exercised there but pairing/token/caps
+  need a real phone on the LAN (blocked by the network issue under Known
+  ceilings until that is resolved).
+- Reviewer pass on the catch-all handler and `/whoami` (trust boundary).
+
+**State of the tree (2026-11-12)** — a first attempt was started and stopped
+mid-flight; it is **unverified and never compiled to completion** (one build
+died on the full disk). Treat as a draft to read or discard, not as done:
+
+- `mobile/` (Cargo.toml, tauri.conf.json, capabilities, `src/lib.rs`,
+  `frontend.mjs`; no `gen/android` yet)
+- `src/lib/domains/mobile/*`, `src/routes/connect/+page.svelte`
+- edits to `package.json`, `pnpm-lock.yaml`, `src/app.css`, `src/app.html`,
+  `src/lib/components/layout/app-shell.svelte`, `src/lib/utils/notify.ts`,
+  `src/routes/+layout.svelte`, `src-tauri/src/daemon/mod.rs`
+
+Other modified files on the branch (`actions/**`, `CLAUDE.md`, `scripts/*`,
+`portal-core/*`, `src-tauri/src/lib.rs`, handoffs) belong to other sessions.
+
+## What happens to Portal Remote
+
+Frozen, not deleted. It stays the tool for what it alone does well today
+(mirror, phone-as-speaker, casting, in-app browser) until phase 4 covers the
+parts worth keeping. No new features go there.
+
+## Known ceilings
+
+- No TLS: token and traffic are cleartext on the LAN. Same as Portal Remote;
+  fix belongs in the daemon (self-signed cert pinned at pairing) before any
+  internet relay.
+- Token is stored in an app-private file, not the Android Keystore.
+- `remote_lan_enabled` needs an app restart to take effect.
+- Revoking a device does not close its already-open `/control` socket.
+- Open network issue from 2026-11-11: the S26 Ultra could not TCP-connect to the
+  desktop (Avast SecureLine suspected) — see
+  `.claude/handoff-phone-pairing-vpn-firewall.md`. Emulator testing goes through
+  `10.0.2.2`, which the daemon sees as loopback (so it bypasses token auth — fine
+  for UI work, useless for testing pairing).

@@ -38,6 +38,7 @@
   import ArrowRight from '~icons/fa6-solid/arrow-right';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Gear from '~icons/fa6-solid/gear';
+  import Unplug from '~icons/fa6-solid/link-slash';
   import {
     Provider as SidebarProvider,
     Trigger as SidebarTrigger,
@@ -49,6 +50,9 @@
   import SidebarTooltip from '$lib/components/shell/sidebar-tooltip.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
   import { buildMainNavSections } from '$lib/config/main-nav';
+  import { isMobileShell } from '$lib/domains/mobile/shell';
+  import { mobileConnection } from '$lib/domains/mobile/connection.svelte';
+  import { filterNavForCaps } from '$lib/domains/mobile/navCaps';
   import {
     isViewportFillRoute,
     isShellSidebarRoute,
@@ -74,7 +78,14 @@
   let sidebarOpen = $state(true);
 
   // Main application navigation sections — derived from dashboard query cache.
-  const navigationSections = $derived<NavSection[]>(buildMainNavSections(dashboardOverview));
+  const navigationSections = $derived<NavSection[]>(
+    isMobileShell
+      ? filterNavForCaps(
+          buildMainNavSections(dashboardOverview),
+          mobileConnection.status?.caps ?? []
+        )
+      : buildMainNavSections(dashboardOverview)
+  );
 
   let unsubscribe: (() => void) | undefined;
   let popStateHandler: (() => void) | undefined;
@@ -170,23 +181,27 @@
       // is the only place that heard this event before, so a request nobody
       // is currently looking at timed out unnoticed (QA-121). Surface it
       // app-wide; the Devices page keeps its own listener for the refetch.
-      listen<{ device_id: string; device_name: string }>('device://pending', (event) => {
-        notify({
-          title: 'A phone wants to pair',
-          body: `${event.payload.device_name} is waiting for approval.`,
-          route: '/devices',
-          actionLabel: 'Review',
-          duration: 0,
+      // Desktop-only: pairing approval happens on the PC.
+      if (!isMobileShell)
+        listen<{ device_id: string; device_name: string }>('device://pending', (event) => {
+          notify({
+            title: 'A phone wants to pair',
+            body: `${event.payload.device_name} is waiting for approval.`,
+            route: '/devices',
+            actionLabel: 'Review',
+            duration: 0,
+          });
+        }).then((fn) => {
+          unlistenPairing = fn;
         });
-      }).then((fn) => {
-        unlistenPairing = fn;
-      });
 
       // Native banner when unfocused + always-on toast for turn/permission/exit
       // events from any running agent — see domains/agents/service.rs.
-      initNotify().then((fn) => {
-        unlistenNotify = fn;
-      });
+      // Mobile: no notification plugin / window APIs (toasts only).
+      if (!isMobileShell)
+        initNotify().then((fn) => {
+          unlistenNotify = fn;
+        });
       agentsApi
         .onEvent(({ run_id, event }) => {
           const route =
@@ -219,13 +234,13 @@
       themeStore.initialize();
 
       // Load saved settings so custom theme colors apply on startup
-      void settingsActions.loadSettings().catch(() => {});
+      if (!isMobileShell) void settingsActions.loadSettings().catch(() => {});
 
       // Check for a new release; prompts (or auto-installs, per settings) when one exists
-      void runStartupUpdateCheck();
+      if (!isMobileShell) void runStartupUpdateCheck();
 
       // Initialize learning service (should be early to start collecting patterns)
-      await learningService.initialize();
+      if (!isMobileShell) await learningService.initialize();
 
       // Dashboard overview loads via TanStack Query (skipped on /sdk/* routes).
 
@@ -289,7 +304,11 @@
     Skip to content
   </a>
   <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-    <div class="flex h-screen min-h-0 w-full flex-col overflow-hidden">
+    <div
+      class="flex h-screen min-h-0 w-full flex-col overflow-hidden {isMobileShell
+        ? 'pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]'
+        : ''}"
+    >
       <!-- Top Bar -->
       <header
         class="divider-edge-b divider-edge-full flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
@@ -424,20 +443,35 @@
                   <div
                     class="flex items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
                   >
-                    <SidebarTooltip label="Settings">
-                      {#snippet trigger({ props })}
-                        <Button
-                          {...props}
-                          variant="ghost"
-                          size="sm"
-                          class="h-8 w-8 px-0"
-                          onclick={() => goto('/settings')}
-                          aria-label="Settings"
-                        >
-                          <Gear class="h-4 w-4" />
-                        </Button>
-                      {/snippet}
-                    </SidebarTooltip>
+                    {#if isMobileShell}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        class="h-8 gap-2 px-2"
+                        onclick={() => mobileConnection.disconnect()}
+                        aria-label="Disconnect"
+                      >
+                        <Unplug class="h-4 w-4" />
+                        <span class="max-w-32 truncate text-xs">
+                          Disconnect {mobileConnection.status?.name ?? ''}
+                        </span>
+                      </Button>
+                    {:else}
+                      <SidebarTooltip label="Settings">
+                        {#snippet trigger({ props })}
+                          <Button
+                            {...props}
+                            variant="ghost"
+                            size="sm"
+                            class="h-8 w-8 px-0"
+                            onclick={() => goto('/settings')}
+                            aria-label="Settings"
+                          >
+                            <Gear class="h-4 w-4" />
+                          </Button>
+                        {/snippet}
+                      </SidebarTooltip>
+                    {/if}
                   </div>
                 </div>
               </div>
@@ -477,8 +511,10 @@
   <ConfirmDialog />
 
   <!-- Launch-time update prompt -->
-  <UpdatePrompt />
+  {#if !isMobileShell}
+    <UpdatePrompt />
 
-  <!-- Vault setup/unlock gate -->
-  <VaultGate />
+    <!-- Vault setup/unlock gate -->
+    <VaultGate />
+  {/if}
 </DeviceAuthGuard>

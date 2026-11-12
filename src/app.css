@@ -753,3 +753,10 @@
     animation-iteration-count: infinite !important;
   }
 }
+
+/* Portal Mobile: >=16px form fields stop iOS/Android WebView zoom-on-focus. */
+html.portal-mobile input,
+html.portal-mobile textarea,
+html.portal-mobile select {
+  font-size: 16px;
+}
