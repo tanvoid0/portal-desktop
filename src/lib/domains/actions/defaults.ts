@@ -136,6 +136,12 @@ export function buildDefaultActions(profile: ProjectAutomationProfile): UnifiedA
   } else {
     // Default: Node / generic package-manager projects
     const expo = isExpoLike(profile);
+    // QA-140/154: offer a script action only when package.json defines it (undefined = unprobed).
+    const sc = profile.scripts;
+    if (sc === null) return [];
+    const has = (s: string) => sc === undefined || !!sc[s]?.trim();
+    // npm init's placeholder test script only prints an error (mirrors stack.rs).
+    const hasTest = sc === undefined || (has('test') && !sc['test'].includes('no test specified'));
     actions.push({
       id: 'install',
       name: 'Install Dependencies',
@@ -146,50 +152,60 @@ export function buildDefaultActions(profile: ProjectAutomationProfile): UnifiedA
       command: resolveScriptCommand(profile, 'install'),
     });
 
-    actions.push({
-      id: 'dev',
-      name: 'Dev Server',
-      description: 'Start the development server',
-      source: 'local',
-      runner: 'local',
-      category: 'dev',
-      command: resolveScriptCommand(profile, 'dev', profile.startCommand),
-      longRunning: true,
-    });
+    // A real `dev` script beats a metadata start command (`next start` needs a prior build).
+    if (has('dev') || has('start')) {
+      actions.push({
+        id: 'dev',
+        name: 'Dev Server',
+        description: 'Start the development server',
+        source: 'local',
+        runner: 'local',
+        category: 'dev',
+        command: sc?.dev?.trim()
+          ? resolveScriptCommand(profile, 'dev')
+          : sc?.start?.trim()
+            ? `${profile.packageManager} start`
+            : resolveScriptCommand(profile, 'dev', profile.startCommand),
+        longRunning: true,
+      });
+    }
 
-    actions.push({
-      id: 'build',
-      name: 'Build',
-      description: 'Create a production build',
-      source: 'local',
-      runner: 'local',
-      category: 'build',
-      command: expo
-        ? pmExec(profile.packageManager, 'expo export')
-        : resolveScriptCommand(profile, 'build', profile.buildCommand),
-    });
+    if (expo || has('build'))
+      actions.push({
+        id: 'build',
+        name: 'Build',
+        description: 'Create a production build',
+        source: 'local',
+        runner: 'local',
+        category: 'build',
+        command: expo
+          ? pmExec(profile.packageManager, 'expo export')
+          : resolveScriptCommand(profile, 'build', profile.buildCommand),
+      });
 
-    actions.push({
-      id: 'test',
-      name: 'Test',
-      description: 'Run the test suite',
-      source: 'local',
-      runner: 'local',
-      category: 'test',
-      command: resolveScriptCommand(profile, 'test', profile.testCommand),
-    });
+    if (hasTest)
+      actions.push({
+        id: 'test',
+        name: 'Test',
+        description: 'Run the test suite',
+        source: 'local',
+        runner: 'local',
+        category: 'test',
+        command: resolveScriptCommand(profile, 'test', profile.testCommand),
+      });
 
-    actions.push({
-      id: 'lint',
-      name: 'Lint',
-      description: 'Run the linter',
-      source: 'local',
-      runner: 'local',
-      category: 'lint',
-      command: expo
-        ? pmExec(profile.packageManager, 'expo lint')
-        : resolveScriptCommand(profile, 'lint'),
-    });
+    if (expo || has('lint'))
+      actions.push({
+        id: 'lint',
+        name: 'Lint',
+        description: 'Run the linter',
+        source: 'local',
+        runner: 'local',
+        category: 'lint',
+        command: expo
+          ? pmExec(profile.packageManager, 'expo lint')
+          : resolveScriptCommand(profile, 'lint'),
+      });
 
     if (isTypeScript(profile)) {
       actions.push({

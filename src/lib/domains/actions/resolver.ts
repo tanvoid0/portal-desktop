@@ -3,6 +3,7 @@
  * Highest priority wins for the same action/workflow id.
  */
 
+import { invokeClient } from '$lib/utils/invokeClient';
 import type { Project } from '$lib/domains/projects/types';
 import { buildDefaultActions, buildDefaultWorkflows } from './defaults';
 import { loadPortalPipelineFile, parsePortalPipelineFile } from './pipelineFile';
@@ -116,6 +117,34 @@ export function mergeCatalog(
   return { profile, actions, workflows, warnings };
 }
 
+/**
+ * Read package.json `scripts` from the project root.
+ * null = file confirmed missing; undefined = could not tell (BOM-safe parse, bad JSON,
+ * IPC error) -> defaults fall back to "assume scripts exist".
+ */
+async function loadPackageScripts(
+  root: string
+): Promise<Record<string, string> | null | undefined> {
+  let raw: string;
+  try {
+    raw = await invokeClient.post<string>('coder_read_file', {
+      workspaceRoot: root,
+      path: 'package.json',
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return /os error [23]\b|no such file|cannot find the (file|path)|not found/i.test(msg)
+      ? null
+      : undefined;
+  }
+  try {
+    const parsed = JSON.parse(raw.replace(/^\uFEFF/, '')) as { scripts?: Record<string, string> };
+    return parsed.scripts ?? {};
+  } catch {
+    return undefined;
+  }
+}
+
 /** Resolve catalog for a registered project (loads `.portal/pipeline.yml` when present). */
 export async function resolveProjectCatalog(
   project: Project,
@@ -126,6 +155,7 @@ export async function resolveProjectCatalog(
   );
 
   const profile = profileFromProject(project);
+  profile.scripts = await loadPackageScripts(project.path);
   let file = options.file ?? null;
   let filePath: string | undefined;
 
@@ -147,6 +177,7 @@ export async function resolveDirectoryCatalog(
   options: ResolveCatalogOptions & { packageManager?: string } = {}
 ): Promise<ActionCatalog> {
   const profile = profileFromDirectory(cwd, options.packageManager ?? 'npm');
+  profile.scripts = await loadPackageScripts(cwd);
   let file = options.file ?? null;
   let filePath: string | undefined;
 

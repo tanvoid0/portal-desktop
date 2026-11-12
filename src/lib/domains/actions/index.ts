@@ -31,6 +31,7 @@ export {
   parsePortalPipelineFile,
   validatePortalPipelineFile,
   loadPortalPipelineFile,
+  reloadAndValidatePortalPipelineFile,
 } from './pipelineFile';
 
 export {

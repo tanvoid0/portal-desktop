@@ -162,6 +162,11 @@ export interface ProjectAutomationProfile {
   buildCommand?: string;
   startCommand?: string;
   testCommand?: string;
+  /**
+   * package.json `scripts`. `undefined` = not probed (assume all exist);
+   * `null` = no package.json at the project root.
+   */
+  scripts?: Record<string, string> | null;
 }
 
 /** `release:` block of `.portal/pipeline.yml`: which workflow ships, which rehearses. */

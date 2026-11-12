@@ -12,7 +12,8 @@ const PIPELINE_RELATIVE_PATHS = [
   '.portal/pipeline.json',
 ];
 
-export function parsePortalPipelineFile(raw: string): PortalPipelineFile {
+/** `strict` (doctor verify only) also rejects workflow steps naming unknown actions. */
+export function parsePortalPipelineFile(raw: string, strict = false): PortalPipelineFile {
   const trimmed = raw.trim();
   if (!trimmed) {
     throw new Error('Empty pipeline file');
@@ -25,10 +26,15 @@ export function parsePortalPipelineFile(raw: string): PortalPipelineFile {
     data = parseYaml(trimmed);
   }
 
-  return validatePortalPipelineFile(data);
+  return validatePortalPipelineFile(data, strict);
 }
 
-export function validatePortalPipelineFile(data: unknown): PortalPipelineFile {
+// ponytail: known-action set for workflow refs is the file's own actions plus the
+// built-in default ids (defaults.ts never has a profile here). A file workflow that
+// references a *custom* DB action is the only false-reject; mergeCatalog still warns.
+const RESERVED_ACTION_IDS = ['install', 'build', 'test', 'dev', 'lint', 'typecheck'];
+
+export function validatePortalPipelineFile(data: unknown, strict = false): PortalPipelineFile {
   if (!data || typeof data !== 'object') {
     throw new Error('Pipeline file must be an object');
   }
@@ -38,11 +44,44 @@ export function validatePortalPipelineFile(data: unknown): PortalPipelineFile {
     throw new Error(`Unsupported pipeline file version: ${String(version)}`);
   }
 
+  const actions = (obj.actions ?? undefined) as PortalPipelineFile['actions'];
+  if (actions != null) {
+    if (typeof actions !== 'object' || Array.isArray(actions)) {
+      throw new Error('`actions` must be a map of action id → definition');
+    }
+    for (const [id, def] of Object.entries(actions)) {
+      if (!def || typeof def !== 'object' || typeof def.run !== 'string' || !def.run.trim()) {
+        throw new Error(`Action "${id}" must have a non-empty \`run\` command`);
+      }
+    }
+  }
+
+  const workflows = (obj.workflows ?? undefined) as PortalPipelineFile['workflows'];
+  if (workflows != null) {
+    if (typeof workflows !== 'object' || Array.isArray(workflows)) {
+      throw new Error('`workflows` must be a map of workflow id → definition');
+    }
+    const known = new Set([...RESERVED_ACTION_IDS, ...Object.keys(actions ?? {})]);
+    for (const [id, def] of Object.entries(workflows)) {
+      if (!def || !Array.isArray(def.steps) || def.steps.length === 0) {
+        throw new Error(`Workflow "${id}" must have a non-empty \`steps\` array`);
+      }
+      for (const step of def.steps) {
+        if (!step || typeof step.action !== 'string' || !step.action.trim()) {
+          throw new Error(`Workflow "${id}" has a step with no \`action\``);
+        }
+        if (strict && !known.has(step.action)) {
+          throw new Error(`Workflow "${id}" references unknown action "${step.action}"`);
+        }
+      }
+    }
+  }
+
   return {
     version: 1,
     release: (obj.release as PortalPipelineFile['release']) ?? undefined,
-    actions: (obj.actions as PortalPipelineFile['actions']) ?? undefined,
-    workflows: (obj.workflows as PortalPipelineFile['workflows']) ?? undefined,
+    actions: actions ?? undefined,
+    workflows: workflows ?? undefined,
   };
 }
 
@@ -64,6 +103,31 @@ export async function loadPortalPipelineFile(
     } catch {
       // Missing file or outside workspace — try next candidate
     }
+  }
+  return null;
+}
+
+/**
+ * Reload + validate for the Pipeline-Doctor verify step. Unlike
+ * `loadPortalPipelineFile`, a present-but-invalid file throws (parse/validation
+ * error) instead of being silently treated as missing — so a bad agent edit is
+ * surfaced rather than falling back to the wrong default and re-failing.
+ */
+export async function reloadAndValidatePortalPipelineFile(
+  projectPath: string
+): Promise<{ path: string; file: PortalPipelineFile } | null> {
+  for (const relative of PIPELINE_RELATIVE_PATHS) {
+    let content: string;
+    try {
+      content = await invoke<string>('coder_read_file', {
+        workspaceRoot: projectPath,
+        path: relative,
+      });
+    } catch {
+      continue; // candidate missing / outside workspace — not an error
+    }
+    if (!content?.trim()) continue;
+    return { path: relative, file: parsePortalPipelineFile(content, true) }; // invalid → throws
   }
   return null;
 }

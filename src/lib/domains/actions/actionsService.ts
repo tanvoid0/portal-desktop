@@ -55,6 +55,9 @@ export interface ProjectActionsHandle {
   workflows: () => Promise<UnifiedWorkflow[]>;
   catalog: () => Promise<ActionCatalog>;
   run: (target: string | string[], options?: ActionRunOptions) => Promise<ActionRunResult>;
+  /** Run these already-resolved actions as-is — no catalog re-resolve, so what the
+   *  caller checked is exactly what executes (doctor Verify, QA-153). */
+  runResolved: (actions: UnifiedAction[], options?: ActionRunOptions) => Promise<ActionRunResult>;
   preview: (target: string | string[], options?: ActionRunOptions) => Promise<ActionPlanPreview>;
 }
 
@@ -137,6 +140,13 @@ class ActionsService {
       workflows: async () => (await this.catalogForProject(project)).workflows,
       catalog: () => this.catalogForProject(project),
       run: (target, options) => this.run(target, { ...options, project }),
+      runResolved: (list, options) =>
+        this.runActionList(list, {
+          ...options,
+          project,
+          cwd: project.path,
+          target: list.map((a) => a.id),
+        }),
       preview: (target, options) => this.preview(target, { ...options, project }),
     };
   }

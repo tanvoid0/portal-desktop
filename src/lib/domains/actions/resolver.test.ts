@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const read = vi.hoisted(() => vi.fn());
+vi.mock('$lib/utils/invokeClient', () => ({ invokeClient: { post: read } }));
+
 import { buildDefaultActions, buildDefaultWorkflows } from './defaults';
 import { profileFromDirectory } from './profile';
-import { mergeCatalog, resolveCatalogFromFileContent } from './resolver';
+import { mergeCatalog, resolveCatalogFromFileContent, resolveDirectoryCatalog } from './resolver';
 import { parsePortalPipelineFile } from './pipelineFile';
 import type { ProjectAutomationProfile } from './types';
 
@@ -51,6 +55,26 @@ workflows:
 
   it('rejects unsupported version', () => {
     expect(() => parsePortalPipelineFile('version: 99\n')).toThrow(/version/);
+  });
+
+  it('rejects an action with an empty run command', () => {
+    expect(() =>
+      parsePortalPipelineFile('version: 1\nactions:\n  build:\n    run: "   "\n')
+    ).toThrow(/non-empty `run`/);
+  });
+
+  it('strict mode rejects a workflow step referencing an unknown action; default keeps the file', () => {
+    const raw =
+      'version: 1\nactions:\n  a:\n    run: echo\nworkflows:\n  bad:\n    steps:\n      - action: nope\n';
+    expect(() => parsePortalPipelineFile(raw, true)).toThrow(/unknown action "nope"/);
+    expect(parsePortalPipelineFile(raw).actions?.a?.run).toBe('echo');
+  });
+
+  it('accepts a workflow referencing a reserved default id', () => {
+    const file = parsePortalPipelineFile(
+      'version: 1\nworkflows:\n  ok:\n    steps:\n      - action: install\n'
+    );
+    expect(file.workflows?.ok?.steps[0].action).toBe('install');
   });
 });
 
@@ -146,5 +170,55 @@ workflows:
       skipFileLoad: true,
     });
     expect(catalog.warnings.some((w) => w.includes('does-not-exist'))).toBe(true);
+  });
+});
+
+describe('defaults follow package.json scripts (QA-140/154)', () => {
+  const ids = (p: ProjectAutomationProfile) => buildDefaultActions(p).map((a) => a.id);
+
+  it('no test script -> no Test action, CI skipped', () => {
+    const p = nodeProfile({ scripts: { dev: 'next dev', build: 'next build' } });
+    expect(ids(p)).toEqual(['install', 'dev', 'build']);
+    expect(buildDefaultWorkflows(buildDefaultActions(p))).toHaveLength(0);
+  });
+
+  it('real dev script wins over metadata start command', () => {
+    const p = nodeProfile({ scripts: { dev: 'next dev' }, startCommand: 'pnpm run start' });
+    expect(buildDefaultActions(p).find((a) => a.id === 'dev')?.command).toBe('pnpm dev');
+  });
+
+  it('no package.json -> no npm defaults', () => {
+    expect(ids(nodeProfile({ scripts: null }))).toEqual([]);
+  });
+});
+
+describe('package.json probing and edge cases', () => {
+  const ids = (p: ProjectAutomationProfile) => buildDefaultActions(p).map((a) => a.id);
+  const catalogIds = async () =>
+    (await resolveDirectoryCatalog('D:/x', { skipFileLoad: true })).actions.map((a) => a.id);
+
+  it('BOM package.json still yields defaults', async () => {
+    read.mockResolvedValueOnce('﻿{"scripts":{"build":"x"}}');
+    expect(await catalogIds()).toEqual(['install', 'build']);
+  });
+
+  it('read error is not "no package.json"; confirmed-missing is', async () => {
+    read.mockRejectedValueOnce(new Error('ipc broke'));
+    expect((await catalogIds()).length).toBeGreaterThan(2);
+    read.mockRejectedValueOnce(new Error('read package.json: os error 2'));
+    expect(await catalogIds()).toEqual([]);
+  });
+
+  it('placeholder test script -> no Test, no CI', () => {
+    const p = nodeProfile({
+      scripts: { build: 'b', test: 'echo "Error: no test specified" && exit 1' },
+    });
+    expect(ids(p)).not.toContain('test');
+    expect(buildDefaultWorkflows(buildDefaultActions(p))).toHaveLength(0);
+  });
+
+  it('start-only -> npm start', () => {
+    const p = nodeProfile({ packageManager: 'npm', scripts: { start: 'node .' } });
+    expect(buildDefaultActions(p).find((a) => a.id === 'dev')?.command).toBe('npm start');
   });
 });

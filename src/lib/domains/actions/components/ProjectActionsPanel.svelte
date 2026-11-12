@@ -2,6 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Checkbox } from '$lib/components/ui/checkbox';
+  import { Textarea } from '$lib/components/ui/textarea';
   import {
     Card,
     CardContent,
@@ -19,6 +20,8 @@
   import Layers from '~icons/fa6-solid/layer-group';
   import History from '~icons/fa6-solid/clock-rotate-left';
   import Stethoscope from '~icons/fa6-solid/stethoscope';
+  import Copy from '~icons/fa6-solid/copy';
+  import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import type { Project } from '$lib/domains/projects/types';
   import {
     actions,
@@ -43,7 +46,17 @@
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { coderSession } from '$lib/domains/coder/state/coderSession.svelte.js';
-  import { diagnose, getDoctorRun, resetDoctorRun } from '../state/doctor.svelte';
+  import {
+    diagnose,
+    generatePipeline,
+    getDoctorRun,
+    getGenerateRun,
+    resetDoctorRun,
+    dismissReviewPointer,
+    verifyProposal,
+  } from '../state/doctor.svelte';
+  import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
+  import type { PipelineFixReport } from '../state/doctor.svelte';
 
   interface Props {
     project: Project;
@@ -63,6 +76,7 @@
   let sourceFilter = $state<SourceFilter>('all');
   let selected = $state<Set<string>>(new Set());
   let lastResult = $state<ActionRunResult | null>(null);
+  let seenProjectId: string | number | undefined;
   let runHistory = $state<ScriptExecutionInfo[]>([]);
   let historyLoading = $state(false);
   let selectedExecution = $state<ScriptExecutionInfo | null>(null);
@@ -72,6 +86,75 @@
   const runningExecId = $derived(
     selectedExecution?.status === 'running' ? selectedExecution.id : null
   );
+
+  const doctorRun = $derived(getDoctorRun(project.id));
+  const doctorBusy = $derived(
+    doctorRun.status === 'diagnosing' || doctorRun.status === 'verifying'
+  );
+  // Doctor state outlives this component (QA-156): back from Coder mid-run, the
+  // card still shows the failure being worked on.
+  const shownFailure = $derived(lastResult?.failure ?? doctorRun.failure);
+
+  // Stage 4 — requirement-driven pipeline generation.
+  let requirement = $state('');
+  const genRun = $derived(getGenerateRun(project.id));
+  const genRunning = $derived(
+    genRun.status === 'generating' ||
+      genRun.status === 'validating' ||
+      genRun.status === 'previewing'
+  );
+
+  async function generate() {
+    if (genRunning || !requirement.trim()) return;
+    await generatePipeline(project, requirement);
+    // Pick up the new/changed actions the agent wrote.
+    await loadCatalog({ silent: true });
+    await loadHistory();
+    const run = getGenerateRun(project.id);
+    if (run.status === 'done') toast.success('Pipeline generated — review the changes in Coder');
+    else if (run.status === 'failed' && run.message) toast.error(run.message);
+  }
+
+  async function openThread(id: string) {
+    await coderSession.selectThread(id);
+    void goto('/ai/coder');
+  }
+
+  async function verifyFix() {
+    const verify = await verifyProposal(project);
+    if (verify) {
+      lastResult = verify;
+      const ls = verify.steps.find((s) => s.executionId);
+      if (ls?.executionId) void openExecution(ls.executionId);
+      if (verify.success) toast.success('Verified — review the changes in Coder');
+    }
+    await loadHistory();
+  }
+
+  function reportMarkdown(r: PipelineFixReport): string {
+    const profile = r.frameworks.length
+      ? `${r.packageManager} · ${r.frameworks.join(', ')}`
+      : r.packageManager;
+    return [
+      `Portal default needs a fix — action \`${r.actionId}\``,
+      '',
+      `- Profile: ${profile}`,
+      `- Portal default command (failed): \`${r.defaultCommand}\``,
+      `- Command that passed: \`${r.greenCommand}\``,
+      '',
+      'Portal generated the wrong default for this profile. Update `buildDefaultActions`',
+      'in `src/lib/domains/actions/defaults.ts` so this profile maps to the passing command.',
+    ].join('\n');
+  }
+
+  async function copyReport(r: PipelineFixReport) {
+    try {
+      await navigator.clipboard.writeText(reportMarkdown(r));
+      toast.success('Report copied to clipboard');
+    } catch {
+      toast.error('Could not copy report');
+    }
+  }
 
   function normalizePath(path: string): string {
     return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
@@ -202,11 +285,14 @@
       } else {
         const failed =
           result.steps.find((s) => s.error) ?? result.steps.find((s) => s.status === 'failed');
+        // Short + auto-dismissing: the failure card / run details carry the output.
         const err =
-          failed?.error?.trim() ||
           (failed?.exitCode != null ? `Exit code ${failed.exitCode}` : null) ||
+          failed?.error?.trim().split('\n')[0]?.slice(0, 120) ||
           'Action run finished with errors';
-        toast.error(err);
+        toast.error(typeof target === 'string' ? `${target} failed` : 'Run failed', err, {
+          duration: 5000,
+        });
       }
       await loadHistory();
     } catch (err) {
@@ -223,6 +309,15 @@
     // Only re-fetch when the project id / tab enablement changes —
     // not when the project object identity updates from query refetches.
     untrack(() => {
+      // The panel is reused across /projects/[id] navigations: drop the previous
+      // project's failure/selection so Diagnose never runs A's failure against B.
+      if (seenProjectId !== undefined && seenProjectId !== projectId) {
+        lastResult = null;
+        selectedExecution = null;
+        selected = new Set();
+        requirement = '';
+      }
+      seenProjectId = projectId;
       void loadCatalog();
       void loadHistory();
     });
@@ -299,10 +394,32 @@
     </div>
   </div>
 
-  <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
+  {#snippet platformDownActions()}
+    {#if aiPlatform.status === 'unreachable'}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={aiPlatform.starting}
+        onclick={() => void aiPlatform.start()}
+      >
+        {aiPlatform.starting ? 'Launching…' : 'Launch Agent Platform'}
+      </Button>
+    {/if}
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onclick={() => void coderSession.handleBackendProviderChange('claude-cli')}
+    >
+      Use Claude Code (CLI)
+    </Button>
+  {/snippet}
+
+  <div class="flex flex-col gap-6 xl:flex-row xl:items-start">
     <!-- Actions sidebar -->
     <aside
-      class="w-full shrink-0 space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-8rem)] lg:w-80 lg:overflow-y-auto xl:w-96"
+      class="w-full shrink-0 space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:w-80 xl:overflow-y-auto"
     >
       <div class="flex flex-wrap gap-2">
         {#each FILTERS as filter (filter.id)}
@@ -435,9 +552,75 @@
 
     <!-- Run details + history -->
     <div class="min-w-0 flex-1 space-y-4">
-      {#if lastResult?.failure}
-        {@const f = lastResult.failure}
-        {@const run = getDoctorRun(project.id)}
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="flex items-center gap-2 text-base">
+            <Sparkles class="h-4 w-4" />
+            Generate a pipeline
+          </CardTitle>
+          <CardDescription>
+            Describe what you want and an agent writes or extends
+            <code class="text-xs">.portal/pipeline.yml</code> for this project's stack. Nothing is committed
+            — review the changes in Coder.
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-2">
+          <Textarea
+            bind:value={requirement}
+            rows={3}
+            placeholder="e.g. Add a lint + typecheck gate and a release workflow that builds then tests."
+            disabled={genRunning}
+          />
+          <div class="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              class="gap-1"
+              disabled={genRunning || running || doctorBusy || !requirement.trim()}
+              onclick={() => void generate()}
+            >
+              <Sparkles class="h-3.5 w-3.5" />
+              {genRunning ? 'Generating…' : 'Generate'}
+            </Button>
+            {#if genRun.status !== 'idle'}
+              <span class="text-xs text-muted-foreground">
+                {genRun.status === 'generating'
+                  ? 'Generating…'
+                  : genRun.status === 'validating'
+                    ? 'Validating…'
+                    : genRun.status === 'previewing'
+                      ? 'Dry-checking…'
+                      : genRun.status === 'done'
+                        ? 'Done'
+                        : 'Failed'}
+                {#if genRun.message}· {genRun.message}{/if}
+              </span>
+            {/if}
+            {#if genRun.waiting}
+              <span class="text-xs text-amber-600 dark:text-amber-400">
+                Waiting for your approval in Coder
+              </span>
+            {/if}
+            {#if genRun.unavailable}
+              {@render platformDownActions()}
+            {/if}
+            {#if genRun.threadId}
+              <Button
+                type="button"
+                size="sm"
+                variant="link"
+                onclick={() => void openThread(genRun.threadId!)}
+              >
+                {genRunning ? 'Open in Coder' : 'Review changes in Coder'}
+              </Button>
+            {/if}
+          </div>
+        </CardContent>
+      </Card>
+
+      {#if shownFailure}
+        {@const f = shownFailure}
+        {@const run = doctorRun}
         <Card class="border-destructive/40">
           <CardHeader class="pb-2">
             <div class="flex items-center justify-between gap-2">
@@ -454,7 +637,7 @@
               size="sm"
               variant="outline"
               class="gap-1"
-              disabled={run.status === 'diagnosing' || run.status === 'verifying'}
+              disabled={doctorBusy || genRunning || run.status === 'awaiting-verify'}
               onclick={async () => {
                 const verify = await diagnose(project, f);
                 if (verify) {
@@ -466,6 +649,8 @@
                   if (verify.success)
                     toast.success('Doctor fixed it — review the changes in Coder');
                 }
+                const after = getDoctorRun(project.id);
+                if (after.unavailable && after.message) toast.error(after.message);
                 await loadHistory();
               }}
             >
@@ -480,23 +665,160 @@
                     ? 'Verifying…'
                     : run.status === 'fixed'
                       ? 'Fixed'
-                      : 'Gave up'}
+                      : run.status === 'awaiting-verify'
+                        ? 'Fix proposed'
+                        : run.unavailable
+                          ? 'Could not start'
+                          : 'Gave up'}
                 {#if run.message}· {run.message}{/if}
               </span>
+            {/if}
+            {#if run.waiting}
+              <span class="text-xs text-amber-600 dark:text-amber-400">
+                Waiting for your approval in Coder
+              </span>
+            {/if}
+            {#if run.unavailable}
+              {@render platformDownActions()}
             {/if}
             {#if run.threadId}
               <Button
                 type="button"
                 size="sm"
                 variant="link"
-                onclick={async () => {
-                  await coderSession.selectThread(run.threadId!);
-                  void goto('/ai/coder');
-                }}
+                onclick={() => void openThread(run.threadId!)}
               >
-                Review changes in Coder
+                {run.status === 'diagnosing' ? 'Open in Coder' : 'Review changes in Coder'}
               </Button>
             {/if}
+          </CardContent>
+        </Card>
+      {/if}
+
+      {#if doctorRun.proposal}
+        {@const pr = doctorRun.proposal}
+        <Card class="border-amber-500/40">
+          <CardHeader class="pb-2">
+            <CardTitle class="text-base">Review the agent's change</CardTitle>
+            <CardDescription>
+              Nothing has run. {pr.note ?? 'The agent changed what this action runs.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-2">
+            <div>
+              <p class="mb-1 text-xs font-medium text-muted-foreground">Was</p>
+              <code class="block rounded bg-muted px-2 py-1 text-xs break-all">
+                {pr.oldCommand || '—'}
+              </code>
+            </div>
+            <div>
+              <p class="mb-1 text-xs font-medium text-muted-foreground">
+                Agent wrote (not run yet)
+              </p>
+              <code class="block rounded bg-muted px-2 py-1 text-xs break-all">
+                {pr.newCommand || '—'}
+              </code>
+            </div>
+            {#if pr.scriptChanges.length}
+              <div>
+                <p class="mb-1 text-xs font-medium text-muted-foreground">
+                  package.json scripts changed
+                </p>
+                {#each pr.scriptChanges as line (line)}
+                  <code class="mb-1 block rounded bg-muted px-2 py-1 text-xs break-all">{line}</code
+                  >
+                {/each}
+              </div>
+            {/if}
+            <div class="flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" class="gap-1" onclick={() => void verifyFix()}>
+                <Play class="h-3.5 w-3.5" />
+                Verify
+              </Button>
+              {#if doctorRun.reviewThreadId}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="link"
+                  onclick={() => void openThread(doctorRun.reviewThreadId!)}
+                >
+                  Review changes in Coder
+                </Button>
+              {/if}
+            </div>
+          </CardContent>
+        </Card>
+      {/if}
+
+      {#if doctorRun.reviewThreadId && !shownFailure && !doctorRun.proposal}
+        <Card class="border-primary/30">
+          <CardContent class="flex flex-wrap items-center gap-2 py-3">
+            <span class="text-sm">
+              {doctorRun.status === 'fixed' ? 'Fixed' : 'Agent changes'} · pending your review in Coder
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="link"
+              onclick={() => void openThread(doctorRun.reviewThreadId!)}
+            >
+              Review changes in Coder
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              class="ml-auto"
+              onclick={() => dismissReviewPointer(project.id)}
+            >
+              Dismiss
+            </Button>
+          </CardContent>
+        </Card>
+      {/if}
+
+      {#if doctorRun.report}
+        {@const r = doctorRun.report}
+        <Card class="border-amber-500/40">
+          <CardHeader class="pb-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle class="text-base">Portal default needs a fix</CardTitle>
+              <Badge variant="outline" class="shrink-0">suggestion</Badge>
+            </div>
+            <CardDescription>
+              A <code class="text-xs">.portal/pipeline.yml</code> override fixed the
+              <code class="text-xs">{r.actionId}</code> action. Portal's built-in default was wrong for
+              this profile — review it, nothing was changed in Portal.
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-2">
+            <p class="text-xs text-muted-foreground">
+              Profile: {r.packageManager}{r.frameworks.length
+                ? ` · ${r.frameworks.join(', ')}`
+                : ''}
+            </p>
+            <div>
+              <p class="mb-1 text-xs font-medium text-muted-foreground">Portal default (failed)</p>
+              <code class="block rounded bg-muted px-2 py-1 text-xs break-all">
+                {r.defaultCommand || '—'}
+              </code>
+            </div>
+            <div>
+              <p class="mb-1 text-xs font-medium text-muted-foreground">Command that passed</p>
+              <code class="block rounded bg-muted px-2 py-1 text-xs break-all">
+                {r.greenCommand || '—'}
+              </code>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              class="gap-1"
+              onclick={() => void copyReport(r)}
+            >
+              <Copy class="h-3.5 w-3.5" />
+              Copy report
+            </Button>
           </CardContent>
         </Card>
       {/if}
