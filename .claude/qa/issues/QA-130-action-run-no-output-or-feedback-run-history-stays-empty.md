@@ -49,6 +49,7 @@ non-zero.
 
 - Driven over CDP `:9223`; Run click registered (card matched), history unchanged after 75s.
 - Screenshot of the empty history after Run in the session scratchpad.
+- 2026-11-12 Reproduced on release v0.14.0 (partially): Run works and a run row + Run details panel appear, but only after the run finishes - for a 62s `pnpm lint` on aipairs, Local run history said "No action runs yet" the whole time (no running row/spinner on the card). Success also toasts only "Ran lint".
 
 ## Fix
 

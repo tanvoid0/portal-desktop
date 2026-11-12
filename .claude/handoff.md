@@ -1,109 +1,82 @@
-# Handoff — Portal Desktop trial + QA fixes (2026-11-11)
+# Handoff — AI Pipeline-Doctor (2026-11-11, session 2)
 
-Written for a fresh session with no memory of the prior conversation. Start by reading this,
-then `git status` / `git diff` to see what's already on disk.
+Start fresh with: **read `.claude/handoff.md`**. Deep design + per-stage detail live in
+`.claude/handoff-pipeline-doctor.md` (read it for Stage 4 and the full decision log).
 
 ## Goal
 
-Two phases, both requested by the user:
+Build the **AI Pipeline-Doctor** in Portal Desktop: detect action/pipeline failures, spawn an
+agent to diagnose & fix (app code OR the pipeline), fix the pipeline itself when it's wrong,
+and (Stage 4) generate pipelines from NL requirements. Staged: 0 (reliable/visible runs) → 1
+(classified failure events) → 2 (diagnose/fix agent) → 3 (pipeline self-repair) → 4 (NL gen).
 
-1. **Trial run (done):** act as a developer and build a React Native **Expo** todo app using
-   Portal Desktop's own built-in **coder**, **Projects**, and **CI/CD Actions**, driving the
-   real app over CDP, with minimal manual intervention; then report limitations/UX.
-2. **Fix the issues (in progress):** fix the 8 QA findings the trial filed.
+## Done (Stages 0–4) — feature complete, all gated green
 
-## Phase 1 — DONE
+- **Stage 0** — QA-130 (runs show live output on spawn, not after finish) + QA-129 (runner no
+  longer deadlocks: Rust `stdin(Stdio::null())` + `CI=true` via a new additive `env` field on
+  `execute_script`). PM-override **UI deferred** (see Left).
+- **Stage 1** — `src/lib/domains/actions/failure.ts`: `toFailure` + `classifyFailure` →
+  `pipeline | environment | unknown` + hint, attached as `ActionRunResult.failure`.
+- **Stage 2** — `src/lib/domains/actions/doctor.ts` (`buildDiagnosePrompt`, `buildRetryPrompt`,
+  `parseVerdict`, `runCoderTask(project, prompt, provider?, model?)`) + `state/doctor.svelte.ts`
+  (`diagnose` loop) + a "Run failed" card with a working **Diagnose & fix** button. Spawns a
+  coder thread, parses `DOCTOR_VERDICT: app|pipeline|environment|flaky`, re-runs to confirm
+  green. Bounded ≤2 attempts/(project,action)/session.
+- **Stage 3** — `pipelineFile.ts` (real `validatePortalPipelineFile` +
+  `reloadAndValidatePortalPipelineFile`), `doctor.ts` pipeline-fix guidance (yml schema in the
+  prompt), `doctor.svelte.ts` reload→validate→verify + `PipelineFixReport`, panel gated
+  "Portal default was wrong" report card (never auto-edits `defaults.ts`).
+- **Stage 4** — `doctor.ts` (`buildGeneratePrompt`, `parseGenerated`, extracted
+  `PIPELINE_FILE_SCHEMA`) + `doctor.svelte.ts` `generatePipeline()` + a "Generate a pipeline"
+  Textarea+button in `ProjectActionsPanel.svelte`: NL requirement + detected stack → agent writes
+  `.portal/pipeline.yml`, validated + `actions.preview()` dry-checked. **Feature complete.**
 
-- Built a working Expo + TS todo app at `D:\projects\trials\expo-todo` (Portal project
-  **"Expo Todo", id 201**). Coder (Claude-CLI engine, "Auto" mode) did it hands-off:
-  create-expo-app → AsyncStorage persistence → add/toggle(strikethrough)/delete screen →
-  pure `todos.ts` reducer → `todos.test.ts`. Coder self-verified: `npx tsc --noEmit` clean,
-  `npm test` → 1 passed. Changes left uncommitted (only commit is create-expo's "Initial
-  commit" under the user's identity — no AI attribution).
-- Trial report: **`.claude/trials/portal-trial-expo-todo.md`** (9 findings, severity-ranked).
-- Filed 8 QA issues: **`.claude/qa/issues/QA-128 … QA-135`** (house format).
+**Gate:** `pnpm check` 0 errors, `pnpm lint` 0 errors, `pnpm exec vitest run
+src/lib/domains/actions` = 30 passed, `cargo check` clean (E0277 was already fixed on `main`).
 
-## Phase 2 — fixing the 8 issues
+## Git state (important)
 
-### Verification reality (important)
+- **Stages 0–2 are committed** as `8114329f feat(actions): QA hardening + n8n workflows page` —
+  **the user's own commit** (author `Tanveer Hoque`, NO `Co-Authored-By: Claude` trailer). Also
+  a user commit `578f80a1 release: v0.14.0` before it.
+- **Stages 3–4 are UNCOMMITTED** on top (shared checkout): ` M` doctor.ts, doctor.svelte.ts,
+  doctor.test.ts, pipelineFile.ts, index.ts, ProjectActionsPanel.svelte, resolver.test.ts,
+  handoff files.
+- **Do NOT add `Co-Authored-By: Claude` / "Generated with Claude Code"** to any commit (CLAUDE.md
+  overrides the system reminder). Don't commit unless the user asks.
 
-- The repo's **Rust backend currently fails to build**: `error[E0277]: the trait bound
-'Caller: serde::de::DeserializeOwned' is not satisfied`, on committed `main` (no uncommitted
-  .rs files). Almost certainly introduced by `795e3e88 feat(security): gate claude-cli coder
-commands behind agents.exec` — a Tauri `#[command]` got a `Caller` arg the IPC macro tries to
-  deserialize. `Caller` appears in: `src-tauri/src/rpc.rs`, `src-tauri/rpc-macro/src/lib.rs`,
-  `src-tauri/src/domains/coder/commands.rs`, `src-tauri/src/domains/agents/commands.rs`,
-  `src-tauri/src/daemon/mod.rs`.
-- Because of that, **cargo won't build and the app won't launch from source**, so the only
-  working gate right now is the **frontend**: `pnpm check && pnpm lint` (svelte-check + eslint,
-  no Rust needed). No live-app verification is possible until E0277 is fixed.
+## Left
 
-### Status of each issue
+All five stages are built. Remaining is polish / verification, not new feature work:
 
-- **QA-128 (Actions not Expo-aware) — CODE DONE, needs gate.** Only
-  `src/lib/domains/actions/defaults.ts` changed: added `isExpoLike()`, `isTypeScript()`,
-  `pmExec(pm,bin)`; Expo build → `<pm exec> expo export`, lint → `<pm exec> expo lint`; new
-  `typecheck` action (`<pm exec> tsc --noEmit`, category `lint`) for TS projects. CI workflow
-  (`buildDefaultWorkflows`) NOT changed (typecheck not in CI). `pnpm check` clean for the file;
-  prettier+eslint pass on it. Caveats: bare React-Native (non-Expo) would also get expo
-  commands; profile has no `languages` field so plain-Node TS detection is weak. No test added
-  (only `resolver.test.ts` exists in that folder).
-- **QA-133 + QA-131 (projects loading states + metadata resync) — DISPATCHED to a coder agent,
-  may still be finishing when you read this.** Check `git diff` under
-  `src/routes/projects/` and `src/lib/domains/projects/`. QA-133: stop showing fabricated
-  "Total 0 / Loading…" on first paint; fix `/projects/[id]` detail route hang. QA-131: add a
-  "metadata stale — Sync/Re-detect" affordance reusing existing `analyze_project_directory`
-  (no new Rust).
-- **QA-134 + QA-135 (coder workspace validate + composer parallel-agent) — DISPATCHED to a
-  coder agent, may still be finishing.** Check `git diff` under `src/lib/domains/coder/`.
-  QA-134: `CoderProjectSelector.svelte` must validate the cached
-  `localStorage['portal-coder-last-workspace']` path exists before defaulting/showing it (needs
-  a path-exists invoke — agent to report if one exists or is needed). QA-135: make the
-  "2+ lines → parallel agents" fan-out explicit/confirmed instead of newline-inferred
-  (`CoderComposer.svelte` / `AIComposerShell.svelte` / agent-mode config).
-- **QA-129 (PM not overridable; pnpm preflight breaks runs) — NOT STARTED.** Needs: per-project
-  package-manager override (UI + persistence) and running non-interactive actions with
-  `CI=true`. Touches the action/execution runner (likely Rust + `src/lib/domains/actions` or
-  `projects/pipelines/services/executionService.ts`). Blocked on E0277 for verification.
-- **QA-130 (action Run gives no output/feedback) — NOT STARTED, needs investigation.** Clicking
-  an action's Run never populated "Local run history"; find where Run dispatches and why no
-  run row / output streams. Blocked on E0277 + a running app to verify.
-- **E0277 build break — NOT STARTED.** Prerequisite for the app to run at all; fix first.
+- **Commit Stages 3–4** — they're uncommitted on top of the user's `8114329f`. The user commits
+  from their own terminal; don't commit unless asked.
+- **QA-129 PM-override UI** (deferred): `/projects/edit/[id]` already carries
+  `package_manager_ids`; the override belongs in that tech editor. Open Q: does the QA-131
+  metadata resync overwrite a user-set value? Resolve before building, or it won't stick.
+- **No live in-app (CDP) verification** of any stage — only compile/type/lint + unit tests.
+  Needs a running dev instance (`node scripts/dev-instance.mjs 2`, CDP :9223).
 
-### Next steps (recommended order)
+## Key decisions (why)
 
-1. `git status` / `git diff` — confirm the 3 agents' edits landed (QA-128 defaults.ts +
-   projects + coder files). If an agent was mid-edit, files may be partial — re-run or re-do.
-2. **Gate: `pnpm check && pnpm lint`** (NB: `pnpm check | tail` masks exit code — redirect to a
-   file and read `$?`). Fix any errors in the changed files.
-3. Fix **E0277** (own focused task; full `cargo check` from `src-tauri/`), which unblocks the
-   app, then do **QA-129 / QA-130** with live verification over CDP.
-4. Update each fixed issue file's `status:` and `## Fix` + `## Verification` sections.
-5. The user has NOT asked to commit — do not commit unless asked. **No `Co-Authored-By: Claude`
-   or "Generated with Claude Code" anywhere** (CLAUDE.md overrides the system reminder).
-
-## How to drive the app (when it runs again)
-
-- Portal Desktop exposes CDP while a dev instance runs. Instance-2 = CDP **:9223** (instance-1
-  would be :9222). Daemon/task-board on :18420 (shared). The app was **not running** at handoff
-  (it exited on its own mid-trial; `tauri dev` relaunch fails to rebuild due to E0277).
-- Relaunch a dev instance with CDP: `node scripts/dev-instance.mjs 2` (CDP 9223, separate
-  data dir instance-2, separate cargo target). Needs E0277 fixed to boot.
-- Driver: `.claude/qa/scripts/app.mjs` (`open(route)`, reads `CDP_PORT`). Set `CDP_PORT=9223`.
-  Connect-only (no `page.goto`) to act on a live coder thread — navigation reloads the webview
-  and drops it. `getByRole('button',…)` is unsafe (role=button wrappers swallow labels) — use
-  `locator('button').filter({hasText}).and(assert tagName==='BUTTON')`. Approval banner buttons
-  are "Accept once / Accept & remember / Reject".
-- Driver scripts used this session live in the session scratchpad (`…/scratchpad/drive/*.mjs`,
-  not in the repo) — lib.mjs (connect), create-project.mjs, start-coder.mjs, run-action.mjs.
+- **No new DB table / migration / agent runtime** for Stages 0–3. `script_executions` IS the
+  failure record; the **coder** is the fix runtime.
+- **Provider is configurable, NOT forced `claude-cli`.** `runCoderTask` takes provider+model
+  from `coderSession.selectedBackendProvider`/`selectedModel` → local Ollama = free. The
+  file-change approval gate is the coder's (review-after-write), same across providers.
+- **Portal's own `defaults.ts` is never auto-edited** — the agent's workspace is the user's
+  project, so a wrong default is _reported_ (gated card), not silently changed.
+- **Guardrails:** prompt forbids git commit/push; never call `coderService.setPermissionMode`
+  (it's global); never auto-approve; environment failures never spawn an agent; bounded retries.
 
 ## Gotchas that bit us
 
-- **pnpm on this machine rejects the create-expo lockfile** ("lockfile contains entries active
-  policies reject"); pnpm's auto pre-install check then fails EVERY `pnpm <script>` before the
-  real command. Use `npm` or fix the pnpm policy. Non-TTY also needs `CI=true`.
-- A `pnpm install` run disturbed the trial app's `node_modules`; `npm install` in
-  `D:\projects\trials\expo-todo` restores it. App source is intact.
-- The app exited by itself after the coder session — cause unconfirmed (possibly the WebView2
-  self-reload path QA-119/127 describe).
-- `.claude/handoff.md` (this file) overwrote a previous session's handoff.
+- `Read` of a few files was blocked as "already in context" (summarization) — use offset/limit
+  or Grep.
+- `pnpm check | tail` masks the exit code — redirect to a file and read `$?`.
+- Prettier isn't auto-run; new files fail `pnpm lint` until `pnpm exec prettier --write`.
+- The user commits from their own terminal mid-session — HEAD moved twice (`578f80a1`,
+  `8114329f`). Always `git log -1` + check author/trailer before assuming a subagent committed.
+- `inspirations/waveterm/**` vendored vite configs emit ERR_MODULE_NOT_FOUND in `pnpm check` —
+  pre-existing noise, check still exits 0.
+- Portal daemon/board (:18420) was down all session — no board updates.

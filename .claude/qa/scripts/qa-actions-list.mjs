@@ -1,0 +1,11 @@
+import { open } from './app.mjs';
+const id = process.argv[2], name = process.argv[3] ?? `sweep-actions-${id}-catalog-release`;
+const app = await open(`projects/${id}/pipelines`);
+const p = app.page;
+const t0 = Date.now();
+await p.waitForFunction(() => !document.body.innerText.includes('Loading actions catalog'), null, { timeout: 90000 }).catch(() => console.log('CATALOG STILL LOADING after 90s'));
+console.log('catalog load ms', Date.now() - t0);
+await p.waitForTimeout(500);
+console.log((await p.locator('main').innerText().catch(() => p.locator('body').innerText())).slice(0, 3500));
+console.log(await app.shot(name));
+await app.done();

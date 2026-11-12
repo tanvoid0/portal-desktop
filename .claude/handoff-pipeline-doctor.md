@@ -118,12 +118,20 @@ Ceilings: doctor state is in-memory (failure↔thread link lost on restart); `ru
 timeout (user stops a hung thread in Coder); `triggeredBy:'doctor'` plumbing + auto-spawn
 skipped by design.
 
-### Next increment — Stage 3+ (NOT started; spawns coder agents on the user's configured backend — free if local)
+### Stage 3 (pipeline self-repair) — DONE (2026-11-11, session 3), gated green
 
-- **Stage 3 (pipeline self-repair):** `pipeline` verdict → agent edits `.portal/pipeline.yml`
-  (overrides a wrong default by id); real `validatePortalPipelineFile`. Portal's own
-  `defaults.ts` is never auto-edited — surfaced as a gated "Open fix in Coder" card only when
-  the Portal repo is itself a registered project.
+`pipeline` verdict → the agent writes/overrides the action in `.portal/pipeline.yml` (same id
+beats the default). `validatePortalPipelineFile` now really validates (non-empty `run`; workflow
+steps reference a known action = file actions + reserved default ids) and rejects bad files. New
+`reloadAndValidatePortalPipelineFile` surfaces an invalid agent edit (the old loader swallowed
+parse errors → re-ran the wrong default → looped). `buildDiagnosePrompt(failure, action?)` adds the
+file schema + current command on a pipeline-kind failure. `diagnose` reloads+validates then
+verify-runs; on green, when the wrong command was a Portal _default_ (`source==='local'`), it
+attaches a `PipelineFixReport` and the panel shows a gated amber "Portal default needs a fix" card
+(profile fingerprint + default vs green command + Copy report) — `defaults.ts` is never auto-edited.
+Gates: vitest 26 passed, `pnpm check` 0, `pnpm lint` 0. **Not committed.**
+Skipped (ceiling): the optional "Open fix in Coder" button (needs Portal-repo-is-a-project lookup).
+
 - **Stage 4 (requirement-driven gen):** NL textarea → `buildGeneratePrompt` → coder writes
   `.portal/pipeline.yml` + scripts; validate + `preview()` dry-check.
 

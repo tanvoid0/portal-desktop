@@ -1,0 +1,16 @@
+import { open } from './app.mjs';
+const app = await open(`projects/14/pipelines/new`); const p = app.page;
+await p.waitForTimeout(3000);
+await p.locator('button', { hasText: 'All Templates' }).click(); await p.waitForTimeout(1000);
+await p.getByText('Next.js Full Pipeline', { exact: true }).first().click(); await p.waitForTimeout(2000);
+const rm = async (name) => { const ok = await p.evaluate((name) => { for (const b of document.querySelectorAll('button')) { if (b.innerText.trim() !== 'Remove') continue; let a = b.parentElement; if (a.parentElement.innerText.trim().startsWith(name)) { b.click(); return true; } } return false; }, name); console.log('removed', name, ok); await p.waitForTimeout(400); };
+for (const n of ['Build Docker Image', 'Run Tests', 'Type Check', 'Install Dependencies']) await rm(n);
+await p.getByLabel('Pipeline Name').fill('QA aipairs lint+build');
+console.log((await p.locator('main').innerText()).replace(/\n+/g,' | ').slice(0,1200));
+console.log(await app.shot('sweep-pipelines-aipairs-builder-edited-release'));
+await p.locator('button', { hasText: 'Save Pipeline' }).click();
+await p.waitForTimeout(3000);
+console.log(p.url());
+console.log((await p.locator('body').innerText()).replace(/\n+/g,' | ').slice(0,1500));
+console.log(await app.shot('sweep-pipelines-aipairs-after-save-release'));
+await app.done();

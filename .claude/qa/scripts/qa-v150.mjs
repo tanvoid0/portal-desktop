@@ -1,0 +1,18 @@
+import { open } from './app.mjs';
+const app = await open('projects/14/pipelines'); const p = app.page;
+await p.evaluate(() => localStorage.removeItem('portal.coder.backendProvider'));
+await p.goto(new URL('/projects/14/pipelines', p.url()).href);
+await p.getByText('Local run history').first().waitFor({timeout:60000}); await p.waitForTimeout(3000);
+console.log('provider stored:', await p.evaluate(()=>localStorage.getItem('portal.coder.backendProvider')));
+const h = await p.evaluateHandle(() => { for (const b of document.querySelectorAll('button')) { if (b.innerText.trim()!=='Run') continue; let a=b.parentElement; while(a && !(a.innerText.trimStart().startsWith('Typecheck') && [...a.querySelectorAll('button')].filter(x=>x.innerText.trim()==='Run').length===1)) a=a.parentElement; if(a) return b;} return null;});
+await h.asElement().click();
+await p.getByText('Run failed').first().waitFor({timeout:120000});
+const before = await p.evaluate(()=>0);
+await p.locator('button').filter({hasText:'Diagnose & fix'}).first().click();
+await p.waitForTimeout(6000);
+const t = await p.locator('body').innerText(); const i = t.indexOf('Run failed');
+console.log(t.slice(i,i+600).replace(/\n+/g,' | '));
+console.log('toasts', await p.locator('[data-sonner-toast]').allInnerTexts());
+await p.getByText('Run failed').first().scrollIntoViewIfNeeded();
+console.log(await app.shot('QA-150-after-platform-down-card'));
+await app.done();

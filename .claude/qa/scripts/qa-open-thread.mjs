@@ -1,0 +1,10 @@
+import { open } from './app.mjs';
+const [shot] = process.argv.slice(2);
+const app = await open('ai/coder'); const p = app.page; await p.waitForTimeout(2500);
+await p.getByPlaceholder('Search sessions...').fill('A Portal Action');
+await p.waitForTimeout(800);
+const items = p.getByText(/A Portal Action command/);
+console.log('matches', await items.count());
+await items.first().click(); await p.waitForTimeout(2500);
+console.log((await p.locator('body').innerText()).slice(0,2500));
+console.log(await app.shot(shot)); await app.done();

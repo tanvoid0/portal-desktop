@@ -1,0 +1,10 @@
+import { open } from './app.mjs';
+const id = process.argv[2];
+const app = await open(`projects/${id}/pipelines/new`); const p = app.page;
+await p.waitForTimeout(8000);
+const main = async () => (await p.locator('main').innerText().catch(()=>'')).replace(/\n+/g,' | ').slice(0,1500);
+console.log('recommended:', await main());
+await p.locator('button', { hasText: 'All Templates' }).click(); await p.waitForTimeout(2000);
+console.log('all:', await main());
+console.log(await app.shot(`sweep-pipelines-new-${id}-all-templates-release`));
+await app.done();
