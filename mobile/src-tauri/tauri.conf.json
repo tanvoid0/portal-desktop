@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.tanvoid0.portal.mobile",
   "build": {
-    "beforeDevCommand": "node ../frontend.mjs dev",
+    "beforeDevCommand": "node frontend.mjs dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "node ../frontend.mjs build",
+    "beforeBuildCommand": "node frontend.mjs build",
     "frontendDist": "../../build"
   },
   "app": {

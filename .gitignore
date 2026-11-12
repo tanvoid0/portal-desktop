@@ -27,6 +27,8 @@ vite.config.ts.timestamp-*
 # Tauri
 src-tauri/target/
 src-tauri/gen/
+mobile/src-tauri/target/
+mobile/src-tauri/gen/android/
 # Tauri signing keys (NEVER commit private keys!)
 ~/.tauri/
 *.key
