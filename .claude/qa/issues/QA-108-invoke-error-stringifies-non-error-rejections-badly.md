@@ -104,3 +104,5 @@ clearing the route recovers normally. Verified.
 instance-2 (CDP :9223) since that's the sanctioned instance for this pass —
 `src/lib/utils/invokeClient.ts` is unchanged since the fix above, still
 reuses `getErrorMessage`; no further live rerun needed. Still verified.
+
+**Re-check 2026-11-12 (task #247, dev app CDP :9222, tauri mode):** qa-247-108.mjs forces agents_list_backends to 500 (sessionStorage snapshot cleared so the form is not restored): PageError shows "Something went wrong / Request failed" + Retry, no "[object ArrayBuffer]"; Retry recovers. Shot QA-108-recheck2-forced-error-2.png. Still verified.

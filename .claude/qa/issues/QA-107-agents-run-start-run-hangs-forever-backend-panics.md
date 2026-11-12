@@ -131,3 +131,5 @@ session's own scratchpad dir as a throwaway cwd — the original
 `qa-sweep-agents-run1.mjs`'s hardcoded cwd was a different, no-longer-present
 session's scratchpad path, so this is a fresh script rather than an edit to
 that one). Verified.
+
+**Re-check 2026-11-12 (task #247, dev app CDP :9222, tauri mode):** Reran claude-code run via qa-247-107.mjs (cwd via last-cwd picker key): Start run left "Starting…", approval banner, Accept once -> Stop -> End run OK; second run Reject -> End run OK; no console errors. Shots QA-107-recheck2-*.png. Still verified.

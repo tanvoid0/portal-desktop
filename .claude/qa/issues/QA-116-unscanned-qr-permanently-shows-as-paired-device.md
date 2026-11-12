@@ -240,3 +240,5 @@ pre-test baseline, "Paired 1 / Pending 2", no "Unnamed device" rows left
 (`.claude/qa/shots/QA-116-final-cleanup-check.png`).
 
 Still verified — holds on instance-2 as well as instance-1.
+
+**Re-check 2026-11-12 (task #247, dev app CDP :9222, tauri mode):** qa-247-116.mjs: unscanned QR left Paired 3 -> 3, no ghost card, new row has expires_at set/last_used null; setInterval(3000) registered when QR shown. Fixture revoked (real phone row untouched). Scan-to-appear not rerun this pass. Shot QA-116-recheck2-qr-unscanned.png. Still verified.

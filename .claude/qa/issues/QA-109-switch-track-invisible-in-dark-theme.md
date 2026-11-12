@@ -149,3 +149,5 @@ instance-2 (CDP :9223, sanctioned instance for this pass) via
 pairing over the local network" switch both read as clear pill+thumb
 shapes, not dots. `src/app.css`'s `--input` value is unchanged since the
 fix. Still verified.
+
+**Re-check 2026-11-12 (task #247, dev app CDP :9222, tauri mode):** qa-247-109.mjs, dark class forced on Devices: unchecked switch track composited rgb(71,71,71) on card rgb(27,27,27) = 1.85:1 (was ~1.14). Shot QA-109-recheck2-dark-devices.png. Still verified.
