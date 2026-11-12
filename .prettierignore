@@ -13,7 +13,7 @@ src-tauri/Cargo.lock
 /static/
 node_modules/
 .svelte-kit/
-src-tauri/gen/
+**/src-tauri/gen/
 
 # QA board: agent-written issues and repro scripts
 .claude/qa/
