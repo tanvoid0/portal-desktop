@@ -69,6 +69,27 @@ pub async fn check(
     UsageReport { blockers, warnings }
 }
 
+/// The in-use checks only — Portal's own usage plus OS processes under `path` —
+/// without the start-only preconditions ([`check_preconditions`]).
+///
+/// Resume and source-removal re-check usage on a path that is already mid-move,
+/// where the preconditions would wrongly fire: `dest_exists` (the destination
+/// is supposed to exist by then), the move's own row counted as an overlapping
+/// move, and free space measured against a volume that now holds the copy.
+pub async fn check_in_use(
+    path: &Path,
+    coder: &CoderService,
+    terminal: &TerminalManager,
+    pipelines: &ExecutionService,
+    scripts: &ScriptExecutionService,
+    deployments: &DeploymentRepository,
+) -> Vec<Signal> {
+    let p = path.to_string_lossy().into_owned();
+    let mut blockers = check_portal_usage(&p, coder, terminal, pipelines, scripts, deployments).await;
+    blockers.extend(check_os_processes(&p));
+    blockers
+}
+
 /// Hard preconditions: paths and filesystem state, nothing about who's using
 /// them. All blockers — there's no "warn and proceed" version of these.
 pub async fn check_preconditions(db: &DatabaseManager, source: &Path, dest: &Path) -> Vec<Signal> {
