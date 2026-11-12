@@ -211,7 +211,27 @@ fn pending_from_permission_request(
         tool: tool_name.to_string(),
         arguments: tool_input.clone(),
         suggested_rule: tools::suggested_rule(tool_name, tool_input),
-        summary: tools::summarize(tool_name, tool_input),
+        summary: native_tool_summary(tool_name, tool_input),
+    }
+}
+
+/// `tools::summarize` only knows coder's own tool names and falls back to the
+/// bare tool name, so a native Claude Code `Bash` / `PowerShell` / `Write` ask
+/// showed the owner nothing to approve (#283). Show the command or path.
+fn native_tool_summary(tool_name: &str, input: &Value) -> String {
+    let field = |k: &str| {
+        input
+            .get(k)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    };
+    if let Some(cmd) = field("command") {
+        format!("$ {cmd}")
+    } else if let Some(path) = field("file_path").or_else(|| field("path")) {
+        format!("{tool_name} {path}")
+    } else {
+        tools::summarize(tool_name, input)
     }
 }
 
@@ -340,6 +360,21 @@ mod claude_cli_tests {
         let pending = pending_from_permission_request(request_id, tool_name, tool_input);
         assert_eq!(pending.call_id, "req_1");
         assert_eq!(pending.tool, "Bash");
+    }
+
+    #[test]
+    fn native_approval_summary_shows_the_command_or_path() {
+        // #283: the banner showed only "PowerShell" with no command.
+        let ps = pending_from_permission_request(
+            "r",
+            "PowerShell",
+            &json!({"command": "Remove-Item x -Recurse"}),
+        );
+        assert_eq!(ps.summary, "$ Remove-Item x -Recurse");
+        let w = pending_from_permission_request("r", "Write", &json!({"file_path": "a/b.rs"}));
+        assert_eq!(w.summary, "Write a/b.rs");
+        let bare = pending_from_permission_request("r", "Task", &json!({}));
+        assert_eq!(bare.summary, "Task");
     }
 }
 
@@ -2144,7 +2179,17 @@ impl CoderService {
         let control = controls
             .get(thread_id)
             .ok_or("no claude-cli run is waiting on an approval for this thread")?;
-        control.decide_permission(call_id.to_string(), approve).await
+        control
+            .decide_permission(call_id.to_string(), approve)
+            .await?;
+        // Clear now rather than waiting for the run loop to read
+        // `PermissionResolved`: a thread sync in that gap would restore the
+        // already-decided request as a live banner (#283).
+        let mut pending = self.claude_cli_pending.lock().await;
+        if pending.get(thread_id).is_some_and(|p| p.call_id == call_id) {
+            pending.remove(thread_id);
+        }
+        Ok(())
     }
 
     /// The live permission request a claude-cli thread's turn is currently

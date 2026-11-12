@@ -315,10 +315,20 @@ async fn write_line(stdin: &mut ChildStdin, value: &Value) -> Result<(), String>
 }
 
 fn permission_decision(allow: bool) -> Value {
+    // A deny with a reason lets the model carry on (try another approach or
+    // report back) instead of stalling on a silent refusal (#283).
+    let decision = if allow {
+        json!({ "behavior": "allow" })
+    } else {
+        json!({
+            "behavior": "deny",
+            "message": "The user rejected this tool call. Do not retry it; continue without it or ask what they want instead.",
+        })
+    };
     json!({
         "hookSpecificOutput": {
             "hookEventName": "PermissionRequest",
-            "decision": { "behavior": if allow { "allow" } else { "deny" } },
+            "decision": decision,
         },
     })
 }
