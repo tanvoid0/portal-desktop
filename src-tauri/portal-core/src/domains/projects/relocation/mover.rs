@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf, MAIN_SEPARATOR_STR};
 use std::process::Command;
 use std::time::UNIX_EPOCH;
 
-use sea_orm::{ActiveModelTrait, EntityTrait, Set, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -134,6 +134,32 @@ impl std::fmt::Display for MoveError {
 }
 
 impl std::error::Error for MoveError {}
+
+/// A recovery action the user can pick for a move the previous run left
+/// mid-flight. Which ones are legal depends on the move's state and what is
+/// still on disk — see [`recovery_options`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RecoveryAction {
+    /// Pick up a `copying`/`verifying` move where it stopped.
+    Resume,
+    /// Complete a `verified` move: promote the staging copy if that hadn't
+    /// happened, then (re)commit — never re-copies.
+    Finish,
+    /// Abandon the move. Deletes the staging tree only (the source was never
+    /// touched) and marks the move aborted.
+    Rollback,
+}
+
+/// What recovery offers for one interrupted move: the actions the user may take
+/// and, when none apply or one is held back, a human-readable reason.
+#[derive(Debug, Clone, Serialize)]
+pub struct RecoveryStatus {
+    pub id: String,
+    pub state: String,
+    pub actions: Vec<RecoveryAction>,
+    pub note: Option<String>,
+}
 
 type ProgressFn<'a> = &'a mut dyn FnMut(Progress);
 
@@ -461,24 +487,43 @@ impl Mover<'_> {
         Ok(())
     }
 
-    /// Finish a move whose copy crashed between the promote (rename) and the
-    /// commit, or between commit and the `done` bookkeeping. The destination is
-    /// already in place, so there is nothing to copy — just (re)apply the
-    /// commit (idempotent) and mark it done. `#206` routes `verified`/
-    /// `committed` rows here. Refuses a `verified` row whose destination isn't
-    /// the one this move produced.
+    /// Finish a `verified`/`committed` move whose copy crashed after the verify
+    /// — never re-copies. A `verified` move may have crashed either side of the
+    /// promote (rename): if the destination already carries this move's marker
+    /// the promote is done and only the commit is re-applied; if it doesn't but
+    /// the staging copy does, the (already-verified) staging is promoted now and
+    /// then committed. The commit is idempotent and the move is marked done.
+    /// `#206` routes recovery here. Refuses a `verified` move when neither the
+    /// destination nor the staging copy is this move's — roll back instead.
     pub async fn finish_move(&self, move_id: &str) -> Result<project_move::Model, MoveError> {
         let row = load_row(self.db, move_id).await.map_err(MoveError::Failed)?;
         let dest = PathBuf::from(&row.dest_path);
         let _guard = LockGuard::new(vec![PathBuf::from(&row.source_path), dest.clone()]);
 
         match row.state.as_str() {
-            // Promote done, commit not: the dest must carry this move's marker.
             "verified" => {
+                // The crash could have landed either side of the promote
+                // (`update_state(verified)` runs just before the rename).
                 if read_sidecar(&dest).as_deref() != Some(row.id.as_str()) {
-                    return Err(MoveError::Failed(
-                        "destination was not produced by this move — roll back instead".into(),
-                    ));
+                    // Promote hadn't happened: the verified tree is still in
+                    // staging. Carry it into place now — the exact tail of
+                    // `run_move`, which promotes the already-verified staging
+                    // without re-hashing (the source can't invalidate a copy
+                    // already proven; `remove_moved_source` re-verifies before
+                    // it ever deletes the source).
+                    let staging = PathBuf::from(&row.staging_path);
+                    if read_sidecar(&staging).as_deref() != Some(row.id.as_str()) {
+                        return Err(MoveError::Failed(
+                            "neither the destination nor the staging copy is this move's — roll back instead".into(),
+                        ));
+                    }
+                    fs::rename(&staging, &dest).map_err(|e| {
+                        MoveError::Failed(format!(
+                            "promote {} -> {}: {e}",
+                            staging.display(),
+                            dest.display()
+                        ))
+                    })?;
                 }
             }
             // Commit is already durable; nothing to prove, just finish.
@@ -517,6 +562,13 @@ impl Mover<'_> {
             }
             s => return Err(format!("move is {s}, nothing to roll back")),
         }
+        // Staging lives on the destination volume. If that drive is offline we
+        // can neither delete staging nor read the dest marker — refuse rather
+        // than abort the move and strand an orphaned staging tree on a drive
+        // that will come back (board #206: destination drive absent → retry).
+        if !volume_present(&dest) {
+            return Err("destination drive not available — reconnect it and retry the rollback".into());
+        }
         let staging = PathBuf::from(&row.staging_path);
         if staging.exists() {
             match read_sidecar(&staging) {
@@ -532,6 +584,28 @@ impl Mover<'_> {
         move_lock::unlock(&[PathBuf::from(&row.source_path), dest]);
         Ok(())
     }
+
+    /// Carry out the user's chosen recovery for an interrupted move. A thin
+    /// dispatcher: each engine method enforces that the action is legal for the
+    /// move's current state and on-disk facts and refuses otherwise, so the
+    /// mapping in [`recovery_options`] is advisory for the UI, not a second
+    /// gate here. `Resume`/`Finish` return the updated row; `Rollback` returns
+    /// `None` (the move is gone).
+    pub async fn resolve_interrupted_move(
+        &self,
+        move_id: &str,
+        action: RecoveryAction,
+        on_progress: ProgressFn<'_>,
+    ) -> Result<Option<project_move::Model>, MoveError> {
+        match action {
+            RecoveryAction::Resume => self.resume_move(move_id, on_progress).await.map(Some),
+            RecoveryAction::Finish => self.finish_move(move_id).await.map(Some),
+            RecoveryAction::Rollback => {
+                self.rollback(move_id).await.map_err(MoveError::Failed)?;
+                Ok(None)
+            }
+        }
+    }
 }
 
 // ── Lock guard ───────────────────────────────────────────────────────────────
@@ -545,12 +619,17 @@ struct LockGuard {
 impl LockGuard {
     fn new(paths: Vec<PathBuf>) -> Self {
         move_lock::lock(&paths);
+        // A held guard is exactly "an engine op is running now" — what the close
+        // guard watches. Boot recovery re-locks via the raw `lock`, deliberately
+        // without a guard, so a merely-interrupted move never counts as active.
+        move_lock::begin_active();
         Self { paths }
     }
 }
 
 impl Drop for LockGuard {
     fn drop(&mut self) {
+        move_lock::end_active();
         move_lock::unlock(&self.paths);
     }
 }
@@ -763,6 +842,29 @@ fn can_resume(
     manifest: &Manifest,
     logged: &HashMap<String, String>,
 ) -> Result<(), String> {
+    resume_structural_ok(move_id, source, staging, manifest)?;
+    // The one expensive check: every already-copied file's *source* must still
+    // hash to what the log recorded. Split out of the structural checks so the
+    // UI classifier ([`recovery_options`]) can decide Resume-vs-rollback from
+    // metadata alone, leaving this full re-hash to the actual resume.
+    for (rel, sha) in logged {
+        if &hash_file(&os_join(source, rel))? != sha {
+            return Err(format!("source file {rel} changed since it was copied — roll back"));
+        }
+    }
+    Ok(())
+}
+
+/// The metadata-only half of the resume gate: staging sidecar matches, the live
+/// source file *set* still matches the manifest, and staging holds nothing the
+/// manifest doesn't know. No content hashing, so it is cheap enough to run just
+/// to render the recovery dialog.
+fn resume_structural_ok(
+    move_id: &str,
+    source: &Path,
+    staging: &Path,
+    manifest: &Manifest,
+) -> Result<(), String> {
     match read_sidecar(staging) {
         Some(id) if id == move_id => {}
         _ => return Err("staging marker missing or from another move — roll back".into()),
@@ -771,11 +873,6 @@ fn can_resume(
     if !same_set(&current, &manifest.entries) {
         return Err("source changed since the copy began — roll back".into());
     }
-    for (rel, sha) in logged {
-        if &hash_file(&os_join(source, rel))? != sha {
-            return Err(format!("source file {rel} changed since it was copied — roll back"));
-        }
-    }
     let known: HashSet<&str> = manifest.entries.iter().map(|e| e.rel.as_str()).collect();
     for rel in list_rel_files(staging)? {
         if rel != SIDECAR && !known.contains(rel.as_str()) {
@@ -783,6 +880,106 @@ fn can_resume(
         }
     }
     Ok(())
+}
+
+// ── Boot recovery ──────────────────────────────────────────────────────────
+
+/// Re-arm the move lock for every move the previous run left mid-flight, so no
+/// coder/terminal/pipeline touches those trees before the user decides what to
+/// do. Loads the `copying`/`verifying`/`verified` rows and re-locks each one's
+/// source and destination. Takes **no** filesystem action — `committed`/`done`
+/// moves need no lock, and recovery itself waits for an explicit user choice
+/// ([`Mover::resolve_interrupted_move`]). Returns the ids re-armed.
+pub async fn rearm_interrupted_moves(db: &DatabaseManager) -> Result<Vec<String>, String> {
+    let rows = project_move::Entity::find()
+        .filter(project_move::Column::State.is_in(["copying", "verifying", "verified"]))
+        .all(db.get_connection())
+        .await
+        .map_err(|e| format!("load interrupted moves: {e}"))?;
+    let mut ids = Vec::with_capacity(rows.len());
+    for row in &rows {
+        move_lock::lock(&[
+            PathBuf::from(&row.source_path),
+            PathBuf::from(&row.dest_path),
+        ]);
+        ids.push(row.id.clone());
+    }
+    Ok(ids)
+}
+
+/// Map an interrupted move's state and on-disk facts to the recovery actions
+/// the UI should offer (board #206):
+/// - `copying`/`verifying` → Resume (unless the resume gate refuses) + Rollback;
+///   destination drive offline → nothing, retry later.
+/// - `verified` + destination already promoted → Finish (commit only).
+/// - `verified` + staging copy still present → Finish or Rollback.
+/// - `committed`, or anything with no recoverable tree → nothing, facts only.
+///
+/// Reads the filesystem (cheap metadata/sidecar checks only, never a full
+/// content re-hash), so it is for on-demand UI use, not the no-FS boot scan.
+pub fn recovery_options(row: &project_move::Model) -> RecoveryStatus {
+    use RecoveryAction::{Finish, Resume, Rollback};
+    let dest = PathBuf::from(&row.dest_path);
+    let staging = PathBuf::from(&row.staging_path);
+    let mine = |p: &Path| read_sidecar(p).as_deref() == Some(row.id.as_str());
+
+    let (actions, note) = match row.state.as_str() {
+        "copying" | "verifying" => {
+            if !volume_present(&dest) {
+                (vec![], Some("destination drive not available — retry when it is connected".into()))
+            } else if let Some(reason) = resume_refusal(row) {
+                (vec![Rollback], Some(format!("resume unavailable — {reason}")))
+            } else {
+                (vec![Resume, Rollback], None)
+            }
+        }
+        "verified" if mine(&dest) => (vec![Finish], None),
+        // staging sits on the dest volume (staging_path = dest.parent()/…), so
+        // its existence already implies the drive is present — no volume check.
+        "verified" if staging.exists() && mine(&staging) => (vec![Finish, Rollback], None),
+        "verified" if !volume_present(&dest) => (
+            vec![],
+            Some("destination drive not available — retry when it is connected".into()),
+        ),
+        "verified" => (
+            vec![],
+            Some("neither the staging copy nor the destination marker is present — nothing to recover automatically".into()),
+        ),
+        "committed" => (vec![], Some("already committed — nothing to recover".into())),
+        other => (vec![], Some(format!("state {other} is not an interrupted move"))),
+    };
+    RecoveryStatus { id: row.id.clone(), state: row.state.clone(), actions, note }
+}
+
+/// `None` if resume looks safe on the cheap (structural) checks, else why it is
+/// refused. The full per-file source re-hash is left to [`Mover::resume_move`].
+fn resume_refusal(row: &project_move::Model) -> Option<String> {
+    let manifest = match read_validated_manifest(row) {
+        Ok(m) => m,
+        Err(e) => return Some(e),
+    };
+    match progress_path_of(row).and_then(|p| read_progress(&p)) {
+        Ok(_) => {}
+        Err(e) => return Some(e),
+    }
+    resume_structural_ok(
+        &row.id,
+        Path::new(&row.source_path),
+        Path::new(&row.staging_path),
+        &manifest,
+    )
+    .err()
+}
+
+/// Whether the volume `path` sits on is mounted. ponytail: naive — stats the
+/// path's root (e.g. `E:\`). Enough to tell an offline destination drive from a
+/// present one; swap for a real volume query if a mounted-but-unwritable case
+/// ever matters.
+fn volume_present(path: &Path) -> bool {
+    match path.ancestors().last() {
+        Some(root) => root.exists(),
+        None => false,
+    }
 }
 
 // ── Hashing / small fs helpers ───────────────────────────────────────────────
@@ -1257,5 +1454,63 @@ mod tests {
         let mut files = list_rel_files(dir.path()).unwrap();
         files.sort();
         assert_eq!(files, vec![".portal-move", "d/y.txt", "x.txt"]);
+    }
+
+    /// Bare row with the five fields `recovery_options` reads; everything else
+    /// is a don't-care default.
+    fn mv(id: &str, state: &str, source: &str, dest: &str, staging: &str) -> project_move::Model {
+        project_move::Model {
+            id: id.into(),
+            project_id: 1,
+            source_path: source.into(),
+            dest_path: dest.into(),
+            staging_path: staging.into(),
+            state: state.into(),
+            include_regenerable: false,
+            skipped_dirs: "[]".into(),
+            manifest_path: None,
+            manifest_sha256: None,
+            manifest_version: None,
+            progress_path: None,
+            file_count: 0,
+            total_bytes: 0,
+            files_done: 0,
+            bytes_done: 0,
+            resume_count: 0,
+            unrewritten: "[]".into(),
+            error: None,
+            started_at: "t".into(),
+            updated_at: "t".into(),
+            finished_at: None,
+        }
+    }
+
+    #[test]
+    fn recovery_options_maps_states_to_actions() {
+        use RecoveryAction::{Finish, Rollback};
+        let dir = tempdir().unwrap(); // a present volume for `dest`
+        let dest = dir.path().join("dest");
+        let staging = dir.path().join("staging");
+
+        // copying, but no manifest on the row → resume refused, rollback only.
+        let r = recovery_options(&mv("m1", "copying", dir.path().to_str().unwrap(), dest.to_str().unwrap(), staging.to_str().unwrap()));
+        assert_eq!(r.actions, vec![Rollback]);
+        assert!(r.note.is_some());
+
+        // verified, promote already done (dest carries this move's marker) → finish only.
+        fs::create_dir_all(&dest).unwrap();
+        write_sidecar(&dest, "m2").unwrap();
+        let r = recovery_options(&mv("m2", "verified", dir.path().to_str().unwrap(), dest.to_str().unwrap(), staging.to_str().unwrap()));
+        assert_eq!(r.actions, vec![Finish]);
+
+        // verified, promote not done, staging copy present → finish or rollback.
+        fs::create_dir_all(&staging).unwrap();
+        write_sidecar(&staging, "m3").unwrap();
+        let destless = dir.path().join("destless");
+        let r = recovery_options(&mv("m3", "verified", dir.path().to_str().unwrap(), destless.to_str().unwrap(), staging.to_str().unwrap()));
+        assert_eq!(r.actions, vec![Finish, Rollback]);
+
+        // committed / unknown → nothing to recover.
+        assert!(recovery_options(&mv("m4", "committed", "s", "d", "g")).actions.is_empty());
     }
 }

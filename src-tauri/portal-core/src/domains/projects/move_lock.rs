@@ -9,9 +9,32 @@
 
 use once_cell::sync::Lazy;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 
 static LOCKED_ROOTS: Lazy<RwLock<Vec<PathBuf>>> = Lazy::new(|| RwLock::new(Vec::new()));
+
+/// Count of moves whose copy/verify/promote/commit is *running right now* in
+/// this process. Distinct from `LOCKED_ROOTS`: boot recovery re-arms a lock for
+/// an interrupted move without running anything, so a held lock alone does not
+/// mean work is in flight. The close guard uses this to tell "a move is
+/// actually copying" from "a move is journaled, waiting for the user".
+static ACTIVE_MOVES: AtomicUsize = AtomicUsize::new(0);
+
+/// Mark an engine operation as running. Paired with [`end_active`]; the engine's
+/// lock guard calls these so every path (success, error, `?`) balances.
+pub fn begin_active() {
+    ACTIVE_MOVES.fetch_add(1, Ordering::SeqCst);
+}
+
+pub fn end_active() {
+    ACTIVE_MOVES.fetch_sub(1, Ordering::SeqCst);
+}
+
+/// True while a move's copy/verify/promote/commit is running in this process.
+pub fn any_active() -> bool {
+    ACTIVE_MOVES.load(Ordering::SeqCst) > 0
+}
 
 /// Windows paths differ only by case and separator; comparing them raw would
 /// miss matches. Moved here from `discovery_repository::paths_equal` (its

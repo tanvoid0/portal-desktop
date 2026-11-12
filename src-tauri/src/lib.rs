@@ -147,6 +147,24 @@ pub fn run() {
             // Manage the database manager wrapped in Arc
             app.manage(db_manager_arc.clone());
 
+            // Re-arm the move lock for any project relocation the previous run
+            // left mid-flight (copying/verifying/verified). No filesystem action
+            // here — this only re-locks the source/dest so nothing touches those
+            // trees before the user resolves the move. Must run before the coder
+            // service (and the other domains) come up and could read a tree that
+            // is really mid-move. See domains::projects::relocation::mover.
+            match tauri::async_runtime::block_on(
+                portal_core::domains::projects::relocation::mover::rearm_interrupted_moves(
+                    db_manager_arc.as_ref(),
+                ),
+            ) {
+                Ok(ids) if !ids.is_empty() => {
+                    log_info!("Moves", "Re-armed lock for {} interrupted move(s)", ids.len())
+                }
+                Ok(_) => {}
+                Err(e) => log_warn!("Moves", "Failed to re-arm interrupted moves: {}", e),
+            }
+
             // In-memory vault session (master key, if unlocked). Starts
             // locked every launch — nothing here persists across restarts.
             let vault_session = std::sync::Arc::new(VaultSession::default());
@@ -282,6 +300,20 @@ pub fn run() {
         .manage(terminal_manager)
         .manage(kubernetes_manager)
         .manage(navigation_service)
+        // Don't let the window close while a project move is actively
+        // copying/verifying/promoting — quitting mid-copy would strand it. Veto
+        // the close and tell the UI, which asks the user what to do. Only an
+        // *actively running* move counts (move_lock::any_active); a move merely
+        // journaled-and-re-armed after a crash does not block quitting.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if portal_core::domains::projects::move_lock::any_active() {
+                    use tauri::Emitter;
+                    api.prevent_close();
+                    let _ = window.emit("project-move:close-blocked", ());
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             // Coder agent commands
