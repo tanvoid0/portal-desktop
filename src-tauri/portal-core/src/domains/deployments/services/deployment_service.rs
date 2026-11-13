@@ -7,6 +7,7 @@ use super::docker_service::{
 use crate::database::DatabaseManager;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
 use crate::domains::projects::move_lock;
+use crate::domains::projects::relocation::mover::rebased_path;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -647,6 +648,69 @@ impl DeploymentService {
         } else {
             Err(format!("Deployment with id {} not found", request.id))
         }
+    }
+
+    /// `#221`: rewrites `dockerfile_path`/`working_directory` for every cached
+    /// deployment of `project_id` that is absolute and under `old`, onto
+    /// `new`, writing through [`Self::persist`] so the shared cache never
+    /// goes stale after a move. `command` is free text and is never edited —
+    /// a deployment whose `command` looks like it still holds `old` is
+    /// flagged instead, for `project_moves.unrewritten`.
+    pub async fn rebase_paths(&self, project_id: &str, old: &Path, new: &Path) -> Vec<String> {
+        let old_s = old.to_string_lossy();
+        let new_s = new.to_string_lossy();
+        let matches: Vec<Deployment> = self
+            .cache
+            .read()
+            .await
+            .iter()
+            .filter(|d| d.project_id == project_id)
+            .cloned()
+            .collect();
+
+        let mut flagged = Vec::new();
+        for d in matches {
+            let new_dockerfile = d
+                .dockerfile_path
+                .as_deref()
+                .filter(|p| Path::new(p).is_absolute())
+                .and_then(|p| rebased_path(p, &old_s, &new_s));
+            let new_wd = d
+                .working_directory
+                .as_deref()
+                .filter(|p| Path::new(p).is_absolute())
+                .and_then(|p| rebased_path(p, &old_s, &new_s));
+            if d.command
+                .as_deref()
+                .is_some_and(|c| move_lock::norm(c).contains(&move_lock::norm(&old_s)))
+            {
+                flagged.push(d.id.clone());
+            }
+            if new_dockerfile.is_none() && new_wd.is_none() {
+                continue;
+            }
+
+            // Re-read the live cache entry right before writing and replay
+            // only these two path fields onto it, rather than the clone taken
+            // above (which was snapshotted before this loop ran, and could by
+            // now be stale next to a concurrent write such as
+            // `refresh_deployment_statuses`). ponytail: a narrow read-then-
+            // write gap remains between this re-read and `persist`'s own write
+            // lock — move the mutation under the cache's write lock directly
+            // if that ever matters in practice.
+            let current = self.cache.read().await.iter().find(|c| c.id == d.id).cloned();
+            let Some(mut current) = current else { continue };
+            if let Some(p) = new_dockerfile {
+                current.dockerfile_path = Some(p);
+            }
+            if let Some(p) = new_wd {
+                current.working_directory = Some(p);
+            }
+            if self.persist(&current).await.is_err() {
+                flagged.push(d.id.clone());
+            }
+        }
+        flagged
     }
 
     /// Get container status for all deployments

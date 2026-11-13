@@ -31,9 +31,11 @@
 //!   stays the backstop for what a hold can't catch (a new file appearing) or
 //!   doesn't apply to (unix).
 //! - `#221` stored-path rewrite: the commit repoints every project row under
-//!   the source (the moved project and any nested registered ones). Rewriting
-//!   absolute paths buried in deployment/pipeline config is `TODO(#221)`; those
-//!   rows get listed in `project_moves.unrewritten` for the UI.
+//!   the source (the moved project and any nested registered ones), then
+//!   [`Mover::rewrite_configs`] rebases the absolute paths buried in those
+//!   projects' deployment/pipeline config onto the destination. Anything that
+//!   can't be safely rewritten — free text that might hold the old path —
+//!   is listed in `project_moves.unrewritten` for the UI instead.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -50,8 +52,10 @@ use uuid::Uuid;
 use crate::database::DatabaseManager;
 use crate::domains::coder::CoderService;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
+use crate::domains::deployments::services::deployment_service::DeploymentService;
 use crate::domains::projects::discovery::scan::REGENERABLE;
 use crate::domains::projects::move_lock::{self, is_under};
+use crate::domains::projects::pipelines::repositories::pipeline_repository::PipelineRepository;
 use crate::domains::projects::pipelines::services::ExecutionService;
 use crate::domains::projects::relocation::source_hold::{self, SourceHold};
 use crate::domains::projects::relocation::usage::{self, UsageReport};
@@ -187,6 +191,12 @@ pub struct Mover<'a> {
     pub pipelines: &'a ExecutionService,
     pub scripts: &'a ScriptExecutionService,
     pub deployments: &'a DeploymentRepository,
+    /// `#221`: the live, cached service — stored-path rewrite writes through
+    /// this (not `deployments` above) so the app's in-memory cache doesn't go
+    /// stale after a move. `deployments` stays a throwaway instance used only
+    /// by `usage::check`.
+    pub deployment_service: &'a DeploymentService,
+    pub pipelines_repo: &'a PipelineRepository,
     /// Directory the manifest and progress files live under (app-data `moves/`).
     pub moves_dir: PathBuf,
 }
@@ -432,8 +442,10 @@ impl Mover<'_> {
         // The marker has done its job; a committed/done move needs no recovery.
         let _ = fs::remove_file(dest.join(SIDECAR));
 
-        // TODO(#221): rebase absolute paths inside deployment/pipeline config;
-        // append the rows it can't fix to project_moves.unrewritten here.
+        // #221: rebase absolute paths inside deployment/pipeline config; append
+        // the rows it can't fix to project_moves.unrewritten. Best-effort: the
+        // move is already committed, so nothing past this point may fail it.
+        self.rewrite_configs(&row.id, &source, &dest).await;
 
         update_done(self.db, &row.id).await?;
         load_row(self.db, &row.id).await
@@ -472,6 +484,35 @@ impl Mover<'_> {
         }
 
         txn.commit().await.map_err(|e| format!("commit txn: {e}"))
+    }
+
+    /// `#221`: rewrite the absolute paths that every project currently living
+    /// under `dest` has stashed in its deployments/pipelines, from `source`
+    /// onto `dest`, then journal (merging with whatever was already flagged)
+    /// whichever rows hold free text that might still reference the old path.
+    ///
+    /// The scope is recomputed fresh every call — whoever is under `dest` right
+    /// now, never "whichever ids `commit()` happened to rebase this call" — so
+    /// a `finish_move`/`resolve_interrupted_move(Finish)` re-run after `commit()`
+    /// already landed (and so rebased nothing this time) still rewrites every
+    /// affected project instead of wiping `unrewritten` with an empty list.
+    /// Best-effort throughout: nothing here may fail an already-committed move.
+    async fn rewrite_configs(&self, move_id: &str, source: &Path, dest: &Path) {
+        let dest_s = dest.to_string_lossy();
+        let projects = match project_entity::Entity::find().all(self.db.get_connection()).await {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+        let project_ids = projects.into_iter().filter(|p| is_under(&p.path, &dest_s)).map(|p| p.id);
+
+        let mut flagged = Vec::new();
+        for project_id in project_ids {
+            flagged.extend(self.deployment_service.rebase_paths(&project_id.to_string(), source, dest).await);
+            if let Ok(f) = rebase_pipeline_paths(self.pipelines_repo, project_id, source, dest).await {
+                flagged.extend(f);
+            }
+        }
+        let _ = update_unrewritten(self.db, move_id, &flagged).await;
     }
 
     /// Delete the original, after the move is committed. Re-runs the in-use
@@ -565,7 +606,8 @@ impl Mover<'_> {
             .await
             .map_err(MoveError::Failed)?;
         let _ = fs::remove_file(dest.join(SIDECAR));
-        // TODO(#221): stored-path rewrite seam, as in run_move.
+        // #221: same config rewrite seam as run_move.
+        self.rewrite_configs(&row.id, Path::new(&row.source_path), &dest).await;
         update_done(self.db, &row.id).await.map_err(MoveError::Failed)?;
         load_row(self.db, &row.id).await.map_err(MoveError::Failed)
     }
@@ -1222,6 +1264,35 @@ async fn update_counts(db: &DatabaseManager, id: &str, files_done: u64, bytes_do
     .map_err(|e| format!("update move counts: {e}"))
 }
 
+/// `#221`: journals which deployment/pipeline rows the config rewrite couldn't
+/// safely touch — free text (`command`/`steps_json`/`variables_json`) that
+/// might still hold the old path, flagged rather than edited. Merges `new`
+/// into whatever is already stored rather than overwriting it, so a re-run
+/// (crash recovery's `finish_move`) never loses flags a first attempt recorded.
+async fn update_unrewritten(db: &DatabaseManager, id: &str, new: &[String]) -> Result<(), String> {
+    let mut existing: HashSet<String> = load_row(db, id)
+        .await
+        .ok()
+        .and_then(|r| serde_json::from_str::<Vec<String>>(&r.unrewritten).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+    existing.extend(new.iter().cloned());
+    let mut merged: Vec<String> = existing.into_iter().collect();
+    merged.sort();
+
+    project_move::ActiveModel {
+        id: Set(id.to_string()),
+        unrewritten: Set(serde_json::to_string(&merged).unwrap_or_else(|_| "[]".into())),
+        updated_at: Set(now()),
+        ..Default::default()
+    }
+    .update(db.get_connection())
+    .await
+    .map(|_| ())
+    .map_err(|e| format!("record unrewritten rows: {e}"))
+}
+
 async fn update_done(db: &DatabaseManager, id: &str) -> Result<(), String> {
     let now = now();
     project_move::ActiveModel {
@@ -1311,8 +1382,10 @@ fn rel_path(root: &Path, path: &Path) -> String {
 
 /// New path for a project row sitting under `source`, rebased onto `dest`. The
 /// relative tail keeps its original case and separators; only the prefix moves.
-/// `None` when `old` isn't under `source`.
-fn rebased_path(old: &str, source: &str, dest: &str) -> Option<String> {
+/// `None` when `old` isn't under `source`. `pub(crate)`: also the rewrite rule
+/// [`DeploymentService::rebase_paths`] and [`rebase_pipeline_paths`] mirror for
+/// `#221`'s stored-path rewrite.
+pub(crate) fn rebased_path(old: &str, source: &str, dest: &str) -> Option<String> {
     if !is_under(old, source) {
         return None;
     }
@@ -1330,6 +1403,76 @@ fn rebased_path(old: &str, source: &str, dest: &str) -> Option<String> {
 
 fn split_components(s: &str) -> Vec<&str> {
     s.split(['/', '\\']).filter(|c| !c.is_empty()).collect()
+}
+
+/// `#221`: rewrites the `workingDirectory`/`dockerContext`/`dockerfile` keys of
+/// every pipeline's `execution_context_json` for `project_id` that are
+/// absolute and under `source`, onto `dest` — same prefix-replace rule as
+/// [`rebased_path`]. A row whose `execution_context_json` doesn't parse as a
+/// JSON object is left as-is, not flagged (spec: unparseable rows are left
+/// alone). Returns the ids of pipelines whose `steps_json`/`variables_json`
+/// (free text, never edited) looks like it holds `source` as a substring.
+async fn rebase_pipeline_paths(
+    repo: &PipelineRepository,
+    project_id: i32,
+    source: &Path,
+    dest: &Path,
+) -> Result<Vec<String>, String> {
+    let source_s = source.to_string_lossy();
+    let dest_s = dest.to_string_lossy();
+    let mut flagged = Vec::new();
+    for p in repo.get_all_by_project(project_id).await? {
+        if json_text_holds_path(&p.steps_json, &source_s) || json_text_holds_path(&p.variables_json, &source_s) {
+            flagged.push(p.id.to_string());
+        }
+
+        let Ok(mut ctx) = serde_json::from_str::<serde_json::Value>(&p.execution_context_json) else {
+            continue;
+        };
+        let Some(obj) = ctx.as_object_mut() else {
+            continue;
+        };
+        let mut changed = false;
+        for key in ["workingDirectory", "dockerContext", "dockerfile"] {
+            if let Some(new_path) = obj
+                .get(key)
+                .and_then(|v| v.as_str())
+                .filter(|v| Path::new(v).is_absolute())
+                .and_then(|v| rebased_path(v, &source_s, &dest_s))
+            {
+                obj.insert(key.to_string(), serde_json::Value::String(new_path));
+                changed = true;
+            }
+        }
+        if changed {
+            // Best-effort per row: a DB error rewriting one pipeline must not
+            // abort the rest of this project's (or any other project's)
+            // rewrite — the move is already committed by the time this runs.
+            let ok = match serde_json::to_string(&ctx) {
+                Ok(json) => repo
+                    .update(p.id, None, None, None, None, None, Some(json), None, None, None)
+                    .await
+                    .is_ok(),
+                Err(_) => false,
+            };
+            if !ok {
+                flagged.push(p.id.to_string());
+            }
+        }
+    }
+    Ok(flagged)
+}
+
+/// `#221`: does `haystack` (raw JSON text) look like it holds `needle` (a
+/// filesystem path) as a substring? Case-insensitive, and checks both the raw
+/// and the JSON-escaped-backslash form of `needle` — a Windows path's
+/// backslashes are escaped when the path sits inside JSON text (`D:\old\proj`
+/// appears in `steps_json`/`variables_json` as `D:\\old\\proj`), so comparing
+/// against the raw needle alone never matches on Windows.
+fn json_text_holds_path(haystack: &str, needle: &str) -> bool {
+    let haystack = haystack.to_lowercase();
+    let needle = needle.to_lowercase();
+    haystack.contains(&needle) || haystack.contains(&needle.replace('\\', "\\\\"))
 }
 
 fn same_set(a: &[ManifestEntry], b: &[ManifestEntry]) -> bool {
