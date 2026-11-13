@@ -48,6 +48,13 @@ export const queryKeys = {
     sessions: ['agents', 'sessions'] as const,
     session: (id: string) => ['agents', 'sessions', id] as const,
   },
+  database: {
+    sources: ['database', 'sources'] as const,
+    tables: (sourceId: string) => ['database', sourceId, 'tables'] as const,
+    columns: (sourceId: string, table: string) => ['database', sourceId, table, 'columns'] as const,
+    rows: (sourceId: string, table: string, page: number) =>
+      ['database', sourceId, table, 'rows', page] as const,
+  },
   devices: {
     all: ['devices'] as const,
     capabilities: ['devices', 'capabilities'] as const,

@@ -133,6 +133,13 @@ export function buildMainNavSections(
           badge: null,
         },
         {
+          title: 'Database',
+          url: '/database',
+          icon: 'database',
+          description: 'Browse SQLite databases',
+          badge: null,
+        },
+        {
           title: 'Devices',
           url: '/devices',
           icon: 'mobile-screen-button',

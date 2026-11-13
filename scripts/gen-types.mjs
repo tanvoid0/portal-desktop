@@ -55,4 +55,11 @@ for (const dir of GENERATED) {
 // prettier that has no `prettier-plugin-svelte` and dies on this repo's config.
 // That failed every CI run from v0.11.0 onward.
 const prettierBin = fileURLToPath(import.meta.resolve('prettier/bin/prettier.cjs'));
-execFileSync(process.execPath, [prettierBin, '--write', ...GENERATED], { stdio: 'inherit' });
+// ts-rs also emits serde_json's `JsonValue` to portal-core/bindings/ (shared by any
+// exported type that uses serde_json::Value). Format it here too, or `prettier
+// --check .` fails on the unformatted output and the no-op-regen CI assert breaks.
+execFileSync(
+  process.execPath,
+  [prettierBin, '--write', ...GENERATED, 'src-tauri/portal-core/bindings'],
+  { stdio: 'inherit' }
+);
