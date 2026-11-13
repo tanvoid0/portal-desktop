@@ -7,4 +7,14 @@
  * before ending anything is `end_port_process`'s own pid + `start_time` +
  * port recheck, never this report.
  */
-export type PortWarning = { port: number, pid: number, process_name: string, start_time: number, killable: boolean, reason: string, exe: string | null, cmdline: Array<string>, cwd: string | null, };
+export type PortWarning = {
+  port: number;
+  pid: number;
+  process_name: string;
+  start_time: number;
+  killable: boolean;
+  reason: string;
+  exe: string | null;
+  cmdline: Array<string>;
+  cwd: string | null;
+};
