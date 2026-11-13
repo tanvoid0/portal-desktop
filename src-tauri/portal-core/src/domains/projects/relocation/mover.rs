@@ -913,6 +913,23 @@ fn copy_entry(source: &Path, staging: &Path, e: &ManifestEntry) -> Result<String
     }
     fs::copy(&src, &dst).map_err(|err| format!("copy {} -> {}: {err}", src.display(), dst.display()))?;
 
+    // fs::copy (CopyFileExW) carries the source's ReadOnly attribute onto dst
+    // on Windows, so reopening it below for fsync fails with "Access is
+    // denied" for any read-only source (e.g. git's pack/idx files). Clear it
+    // first, then restore it so the staged copy ends up matching the source's
+    // real mode. Unix permission bits don't carry the same way through
+    // fs::copy, so this is a no-op there.
+    #[cfg(windows)]
+    let dst_perms = {
+        let perms = fs::metadata(&dst).map_err(|err| format!("stat {}: {err}", dst.display()))?.permissions();
+        if perms.readonly() {
+            let mut writable = perms.clone();
+            writable.set_readonly(false);
+            fs::set_permissions(&dst, writable).map_err(|err| format!("clear readonly {}: {err}", dst.display()))?;
+        }
+        perms
+    };
+
     // Reopen for write and fsync: flushing OS buffers needs write access on
     // Windows (FlushFileBuffers).
     fs::OpenOptions::new()
@@ -920,6 +937,9 @@ fn copy_entry(source: &Path, staging: &Path, e: &ManifestEntry) -> Result<String
         .open(&dst)
         .and_then(|f| f.sync_all())
         .map_err(|err| format!("fsync {}: {err}", dst.display()))?;
+
+    #[cfg(windows)]
+    fs::set_permissions(&dst, dst_perms).map_err(|err| format!("restore permissions {}: {err}", dst.display()))?;
 
     let src_h = hash_file(&src)?;
     let dst_h = hash_file(&dst)?;
@@ -1577,6 +1597,26 @@ mod tests {
         // Tampered destination: verify must catch it (it re-hashes dest vs src).
         fs::write(stg.path().join("a.txt"), "ALPHA!").unwrap();
         assert!(final_verify(src.path(), stg.path(), &manifest).is_err());
+    }
+
+    #[test]
+    fn copy_entry_survives_a_readonly_source_file() {
+        // #412: fs::copy carries ReadOnly onto the staging copy on Windows;
+        // reopening it for fsync must not choke on that, and the staged copy
+        // should end up read-only again, matching the source.
+        let src = tempdir().unwrap();
+        let stg = tempdir().unwrap();
+        let src_file = src.path().join("packed.idx");
+        write(&src_file, "immutable");
+        let mut perms = fs::metadata(&src_file).unwrap().permissions();
+        perms.set_readonly(true);
+        fs::set_permissions(&src_file, perms).unwrap();
+
+        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        copy_entry(src.path(), stg.path(), &entries[0]).unwrap();
+
+        let dst = stg.path().join("packed.idx");
+        assert!(fs::metadata(&dst).unwrap().permissions().readonly());
     }
 
     #[test]
