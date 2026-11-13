@@ -5,6 +5,7 @@ pub mod autonomy;
 pub mod coder;
 pub mod credentials;
 pub mod custom_scripts;
+pub mod database_explorer;
 pub mod deployments;
 pub mod disk;
 pub mod documents;

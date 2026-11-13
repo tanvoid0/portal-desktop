@@ -149,6 +149,9 @@ pub fn run() {
                     .map_err(|e| format!("Failed to resolve app data directory: {}", e))?,
             );
 
+            // Portal's own SQLite DB — the database explorer's built-in source.
+            let portal_db_path = app_data_dir.join("portal_desktop.db");
+
             let db_manager =
                 tauri::async_runtime::block_on(async { DatabaseManager::new(app_data_dir).await })
                     .map_err(|e| format!("Failed to initialize database manager: {}", e))?;
@@ -198,6 +201,11 @@ pub fn run() {
             // locked every launch — nothing here persists across restarts.
             let vault_session = std::sync::Arc::new(VaultSession::default());
             app.manage(vault_session.clone());
+
+            // Database explorer state, seeded with Portal's own DB as a source.
+            app.manage(std::sync::Arc::new(
+                domains::database_explorer::DbExplorerState::new(portal_db_path),
+            ));
 
             // Initialize automation service
             let automation_service = AutomationService::new(
@@ -558,6 +566,13 @@ pub fn run() {
             domains::credentials::commands::vault_unlock_with_hello,
             domains::credentials::commands::vault_lock,
             domains::credentials::commands::vault_reset_password,
+            // Database explorer commands
+            domains::database_explorer::commands::db_list_sources,
+            domains::database_explorer::commands::db_open_sqlite,
+            domains::database_explorer::commands::db_list_tables,
+            domains::database_explorer::commands::db_describe_table,
+            domains::database_explorer::commands::db_fetch_rows,
+            domains::database_explorer::commands::db_run_query,
             // Automation commands
             domains::automation::trigger_n8n_workflow,
             domains::automation::get_workflow_status,
