@@ -171,10 +171,27 @@ pub async fn start_project_move(
         moves_dir: moves_dir(&app)?,
     };
     let mut emit = progress_emitter(&events);
+    // board #419: breadcrumb the long synchronous copy. If the process dies
+    // silently mid-move (no panic, no handled error), this "beginning" line is
+    // the last thing in the tauri-cli output and pins the abort to the copy.
+    crate::log_info!(
+        "Moves",
+        "start_project_move: beginning copy of project {} ({}) -> {}",
+        project.id,
+        project.path,
+        dest
+    );
     let row = mv
         .start_move(&project, Path::new(&dest), include_regenerable, acknowledged_warnings, &mut emit)
         .await
         .map_err(describe_move_error)?;
+    crate::log_info!(
+        "Moves",
+        "start_project_move: finished project {} (move {} state={})",
+        project.id,
+        row.id,
+        row.state
+    );
     Ok(MoveSummary::from_row(row, false, false))
 }
 

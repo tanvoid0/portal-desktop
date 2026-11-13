@@ -1046,27 +1046,104 @@ fn resume_structural_ok(
 
 // ── Boot recovery ──────────────────────────────────────────────────────────
 
+/// What boot recovery did with the moves the previous run left mid-flight:
+/// which got their lock re-armed to await the user, and which zero-progress
+/// `copying` moves were auto-rolled-back instead (board #419).
+#[derive(Debug, Default)]
+pub struct RearmOutcome {
+    /// Moves whose source/dest lock was re-armed; the user resolves these.
+    pub rearmed: Vec<String>,
+    /// `copying` moves that provably never copied a byte and were aborted here.
+    pub auto_aborted: Vec<String>,
+}
+
 /// Re-arm the move lock for every move the previous run left mid-flight, so no
 /// coder/terminal/pipeline touches those trees before the user decides what to
-/// do. Loads the `copying`/`verifying`/`verified` rows and re-locks each one's
-/// source and destination. Takes **no** filesystem action — `committed`/`done`
-/// moves need no lock, and recovery itself waits for an explicit user choice
-/// ([`Mover::resolve_interrupted_move`]). Returns the ids re-armed.
-pub async fn rearm_interrupted_moves(db: &DatabaseManager) -> Result<Vec<String>, String> {
+/// do. Loads the `copying`/`verifying`/`verified` rows and, for each, either
+/// auto-rolls-back a zero-progress `copying` move ([`never_started`]) or
+/// re-locks its source and destination. Beyond that one rollback it takes
+/// **no** filesystem action — `committed`/`done` moves need no lock, and
+/// recovery otherwise waits for an explicit user choice
+/// ([`Mover::resolve_interrupted_move`]).
+pub async fn rearm_interrupted_moves(db: &DatabaseManager) -> Result<RearmOutcome, String> {
     let rows = project_move::Entity::find()
         .filter(project_move::Column::State.is_in(["copying", "verifying", "verified"]))
         .all(db.get_connection())
         .await
         .map_err(|e| format!("load interrupted moves: {e}"))?;
-    let mut ids = Vec::with_capacity(rows.len());
+    let mut out = RearmOutcome::default();
     for row in &rows {
+        // board #419: a `copying` move that provably never copied a byte. Its
+        // process is gone — nothing runs this early at boot — and the copy
+        // writes only to staging, so the source was never touched and there is
+        // nothing to resume. A silent process abort can leave such a row at
+        // `copying` with error=null forever (the Err branch's `mark_error`
+        // never ran), so re-locking it would wedge the project behind the
+        // interrupted-move banner on every launch. Roll it back here instead.
+        // Anything with real progress still re-locks and waits for the user.
+        if never_started(row) {
+            if abort_never_started(db, row).await.is_ok() {
+                out.auto_aborted.push(row.id.clone());
+                continue;
+            }
+            // Couldn't clean staging (e.g. drive offline): fall through and
+            // re-lock so the user can still resolve it by hand.
+        }
         move_lock::lock(&[
             PathBuf::from(&row.source_path),
             PathBuf::from(&row.dest_path),
         ]);
-        ids.push(row.id.clone());
+        out.rearmed.push(row.id.clone());
     }
-    Ok(ids)
+    Ok(out)
+}
+
+/// True for a `copying` move with no recorded progress at all: an empty (or
+/// absent) progress log *and* no staged files beyond the sidecar. The copy loop
+/// copies a file into staging and fsyncs its progress line before it counts the
+/// file done, so "nothing logged and nothing staged" means not one byte was
+/// copied and the source is untouched — safe to abandon without asking.
+/// Conservative on any read error (returns false): an unreadable log or staging
+/// dir re-locks for manual recovery rather than being auto-aborted.
+fn never_started(row: &project_move::Model) -> bool {
+    if row.state != "copying" {
+        return false;
+    }
+    let progress_empty = match progress_path_of(row).and_then(|p| read_progress(&p)) {
+        Ok(logged) => logged.is_empty(),
+        Err(_) => return false,
+    };
+    if !progress_empty {
+        return false;
+    }
+    let staging = PathBuf::from(&row.staging_path);
+    if !staging.exists() {
+        return true; // no staging tree ⇒ nothing was copied
+    }
+    match list_rel_files(&staging) {
+        Ok(files) => files.iter().all(|rel| rel.as_str() == SIDECAR),
+        Err(_) => false,
+    }
+}
+
+/// Remove a never-started move's staging tree (only when its sidecar is this
+/// move's, or it was never marked) and mark the move aborted. Never touches the
+/// source. Boot-recovery only, for a [`never_started`] row.
+async fn abort_never_started(db: &DatabaseManager, row: &project_move::Model) -> Result<(), String> {
+    let staging = PathBuf::from(&row.staging_path);
+    if staging.exists() {
+        match read_sidecar(&staging) {
+            Some(id) if id == row.id => remove_staging(&staging)?,
+            None => remove_staging(&staging)?,
+            Some(_) => {
+                return Err(format!(
+                    "staging {} belongs to another move — not removing",
+                    staging.display()
+                ))
+            }
+        }
+    }
+    update_aborted(db, &row.id).await
 }
 
 /// Map an interrupted move's state and on-disk facts to the recovery actions
@@ -1795,5 +1872,41 @@ mod tests {
 
         // committed / unknown → nothing to recover.
         assert!(recovery_options(&mv("m4", "committed", "s", "d", "g")).actions.is_empty());
+    }
+
+    #[test]
+    fn never_started_only_for_zero_progress_copying_moves() {
+        // board #419: boot recovery auto-rolls-back a `copying` move only when
+        // nothing was copied — this predicate is that gate.
+        let dir = tempdir().unwrap();
+        let progress = dir.path().join("p.jsonl");
+        let staging = dir.path().join("staging");
+        let base = |state: &str| project_move::Model {
+            progress_path: Some(progress.to_string_lossy().into_owned()),
+            ..mv("m", state, "src", "dst", staging.to_str().unwrap())
+        };
+
+        // No progress file and no staging dir → nothing was copied.
+        assert!(never_started(&base("copying")));
+
+        // Empty progress log + staging holding only the sidecar → still nothing.
+        fs::write(&progress, "").unwrap();
+        fs::create_dir_all(&staging).unwrap();
+        write_sidecar(&staging, "m").unwrap();
+        assert!(never_started(&base("copying")));
+
+        // A real staged file → something was copied; leave it for the user.
+        write(&staging.join("a.txt"), "data");
+        assert!(!never_started(&base("copying")));
+        fs::remove_file(staging.join("a.txt")).unwrap();
+
+        // A logged progress line → not zero-progress.
+        fs::write(&progress, "{\"rel\":\"a.txt\",\"sha256\":\"h\"}\n").unwrap();
+        assert!(!never_started(&base("copying")));
+
+        // Non-copying states never qualify, however empty the log.
+        fs::write(&progress, "").unwrap();
+        assert!(!never_started(&base("verifying")));
+        assert!(!never_started(&base("verified")));
     }
 }

@@ -63,6 +63,20 @@ pub fn run() {
     utils::logger::init_logger(None);
     log_info!("Tauri", "Application starting...");
 
+    // board #419: a move crashed the whole process with no Rust panic in the
+    // output, leaving nothing to diagnose from. Log any panic straight to
+    // stderr (where tauri-cli surfaces it) before the default hook runs, so a
+    // panic-driven exit is at least on the record. Writes directly, not through
+    // the mutex-guarded logger — a panic can fire while that lock is held, and
+    // re-locking here would deadlock or double-panic into the very silent abort
+    // this is meant to make visible. (A non-unwinding abort — stack overflow,
+    // OOM — never reaches a panic hook; the move breadcrumbs cover that path.)
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        eprintln!("[PANIC] portal backend panicked: {info}");
+        default_hook(info);
+    }));
+
     // Initialize domain managers
     let terminal_manager = TerminalManager::new();
     let kubernetes_manager = tokio::sync::Mutex::new(KubernetesManager::new());
@@ -158,10 +172,25 @@ pub fn run() {
                     db_manager_arc.as_ref(),
                 ),
             ) {
-                Ok(ids) if !ids.is_empty() => {
-                    log_info!("Moves", "Re-armed lock for {} interrupted move(s)", ids.len())
+                Ok(outcome) => {
+                    if !outcome.rearmed.is_empty() {
+                        log_info!(
+                            "Moves",
+                            "Re-armed lock for {} interrupted move(s)",
+                            outcome.rearmed.len()
+                        );
+                    }
+                    // board #419: a zero-progress `copying` move left by a silent
+                    // crash is auto-rolled-back here instead of wedging forever.
+                    if !outcome.auto_aborted.is_empty() {
+                        log_warn!(
+                            "Moves",
+                            "Auto-rolled-back {} zero-progress move(s) from a prior crash: {}",
+                            outcome.auto_aborted.len(),
+                            outcome.auto_aborted.join(", ")
+                        );
+                    }
                 }
-                Ok(_) => {}
                 Err(e) => log_warn!("Moves", "Failed to re-arm interrupted moves: {}", e),
             }
 
