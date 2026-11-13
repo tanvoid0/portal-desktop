@@ -7,6 +7,7 @@ use super::docker_service::{
 use crate::database::DatabaseManager;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
 use crate::domains::projects::move_lock;
+use crate::domains::projects::relocation::mover::rebased_path;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -647,6 +648,49 @@ impl DeploymentService {
         } else {
             Err(format!("Deployment with id {} not found", request.id))
         }
+    }
+
+    /// `#221`: rewrites `dockerfile_path`/`working_directory` for every cached
+    /// deployment of `project_id` that is absolute and under `old`, onto
+    /// `new`, writing through [`Self::persist`] so the shared cache never
+    /// goes stale after a move. `command` is free text and is never edited —
+    /// a deployment whose `command` looks like it still holds `old` is
+    /// flagged instead, for `project_moves.unrewritten`.
+    pub async fn rebase_paths(&self, project_id: &str, old: &Path, new: &Path) -> Vec<String> {
+        let old_s = old.to_string_lossy();
+        let new_s = new.to_string_lossy();
+        let matches: Vec<Deployment> = self
+            .cache
+            .read()
+            .await
+            .iter()
+            .filter(|d| d.project_id == project_id)
+            .cloned()
+            .collect();
+
+        let mut flagged = Vec::new();
+        for mut d in matches {
+            let mut changed = false;
+            if let Some(new_path) = d.dockerfile_path.as_deref().and_then(|p| rebased_path(p, &old_s, &new_s)) {
+                d.dockerfile_path = Some(new_path);
+                changed = true;
+            }
+            if let Some(new_path) = d.working_directory.as_deref().and_then(|p| rebased_path(p, &old_s, &new_s)) {
+                d.working_directory = Some(new_path);
+                changed = true;
+            }
+            if d.command.as_deref().is_some_and(|c| c.contains(old_s.as_ref())) {
+                flagged.push(d.id.clone());
+            }
+            if changed {
+                // ponytail: a persist failure here is swallowed, same as every
+                // other best-effort write in the move's commit path (mover.rs's
+                // `update_counts`/`mark_error`) — a move already promoted and
+                // committed shouldn't fail over a stale deployment row.
+                let _ = self.persist(&d).await;
+            }
+        }
+        flagged
     }
 
     /// Get container status for all deployments

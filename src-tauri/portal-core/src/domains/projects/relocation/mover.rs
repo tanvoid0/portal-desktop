@@ -31,9 +31,11 @@
 //!   stays the backstop for what a hold can't catch (a new file appearing) or
 //!   doesn't apply to (unix).
 //! - `#221` stored-path rewrite: the commit repoints every project row under
-//!   the source (the moved project and any nested registered ones). Rewriting
-//!   absolute paths buried in deployment/pipeline config is `TODO(#221)`; those
-//!   rows get listed in `project_moves.unrewritten` for the UI.
+//!   the source (the moved project and any nested registered ones), then
+//!   [`Mover::rewrite_configs`] rebases the absolute paths buried in those
+//!   projects' deployment/pipeline config onto the destination. Anything that
+//!   can't be safely rewritten — free text that might hold the old path —
+//!   is listed in `project_moves.unrewritten` for the UI instead.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -50,8 +52,10 @@ use uuid::Uuid;
 use crate::database::DatabaseManager;
 use crate::domains::coder::CoderService;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
+use crate::domains::deployments::services::deployment_service::DeploymentService;
 use crate::domains::projects::discovery::scan::REGENERABLE;
 use crate::domains::projects::move_lock::{self, is_under};
+use crate::domains::projects::pipelines::repositories::pipeline_repository::PipelineRepository;
 use crate::domains::projects::pipelines::services::ExecutionService;
 use crate::domains::projects::relocation::source_hold::{self, SourceHold};
 use crate::domains::projects::relocation::usage::{self, UsageReport};
@@ -187,6 +191,12 @@ pub struct Mover<'a> {
     pub pipelines: &'a ExecutionService,
     pub scripts: &'a ScriptExecutionService,
     pub deployments: &'a DeploymentRepository,
+    /// `#221`: the live, cached service — stored-path rewrite writes through
+    /// this (not `deployments` above) so the app's in-memory cache doesn't go
+    /// stale after a move. `deployments` stays a throwaway instance used only
+    /// by `usage::check`.
+    pub deployment_service: &'a DeploymentService,
+    pub pipelines_repo: &'a PipelineRepository,
     /// Directory the manifest and progress files live under (app-data `moves/`).
     pub moves_dir: PathBuf,
 }
@@ -427,13 +437,14 @@ impl Mover<'_> {
             .map_err(|e| format!("promote {} -> {}: {e}", staging.display(), dest.display()))?;
 
         // ── Commit ── repoint the moved project (and any nested ones) to dest.
-        self.commit(&row.id, &row.source_path, &row.dest_path).await?;
+        let rebased_ids = self.commit(&row.id, &row.source_path, &row.dest_path).await?;
 
         // The marker has done its job; a committed/done move needs no recovery.
         let _ = fs::remove_file(dest.join(SIDECAR));
 
-        // TODO(#221): rebase absolute paths inside deployment/pipeline config;
-        // append the rows it can't fix to project_moves.unrewritten here.
+        // #221: rebase absolute paths inside deployment/pipeline config; append
+        // the rows it can't fix to project_moves.unrewritten.
+        self.rewrite_configs(&row.id, &rebased_ids, &source, &dest).await?;
 
         update_done(self.db, &row.id).await?;
         load_row(self.db, &row.id).await
@@ -441,7 +452,9 @@ impl Mover<'_> {
 
     /// One transaction: flip the move to `committed` and rebase every project
     /// row whose path sits under the old source onto the new destination.
-    async fn commit(&self, move_id: &str, source: &str, dest: &str) -> Result<(), String> {
+    /// Returns the ids of the rows it rebased (the moved project plus any
+    /// nested ones) — `#221`'s config rewrite runs over exactly those.
+    async fn commit(&self, move_id: &str, source: &str, dest: &str) -> Result<Vec<i32>, String> {
         let txn = self
             .db
             .get_connection()
@@ -463,15 +476,38 @@ impl Mover<'_> {
             .all(&txn)
             .await
             .map_err(|e| format!("load projects for rebase: {e}"))?;
+        let mut rebased_ids = Vec::new();
         for p in projects {
             if let Some(new_path) = rebased_path(&p.path, source, dest) {
+                let id = p.id;
                 let mut am: project_entity::ActiveModel = p.into();
                 am.path = Set(new_path);
                 am.update(&txn).await.map_err(|e| format!("rebase project path: {e}"))?;
+                rebased_ids.push(id);
             }
         }
 
-        txn.commit().await.map_err(|e| format!("commit txn: {e}"))
+        txn.commit().await.map_err(|e| format!("commit txn: {e}"))?;
+        Ok(rebased_ids)
+    }
+
+    /// `#221`: for every project `commit()` just rebased, rewrite the absolute
+    /// paths its deployments and pipelines hold under `source` onto `dest`,
+    /// then journal whichever rows hold free text that might still reference
+    /// the old path (never edited, just flagged) onto `project_moves.unrewritten`.
+    async fn rewrite_configs(
+        &self,
+        move_id: &str,
+        project_ids: &[i32],
+        source: &Path,
+        dest: &Path,
+    ) -> Result<(), String> {
+        let mut flagged = Vec::new();
+        for &project_id in project_ids {
+            flagged.extend(self.deployment_service.rebase_paths(&project_id.to_string(), source, dest).await);
+            flagged.extend(rebase_pipeline_paths(self.pipelines_repo, project_id, source, dest).await?);
+        }
+        update_unrewritten(self.db, move_id, &flagged).await
     }
 
     /// Delete the original, after the move is committed. Re-runs the in-use
@@ -561,11 +597,15 @@ impl Mover<'_> {
             s => return Err(MoveError::Failed(format!("move is {s}, cannot finish"))),
         }
 
-        self.commit(&row.id, &row.source_path, &row.dest_path)
+        let rebased_ids = self
+            .commit(&row.id, &row.source_path, &row.dest_path)
             .await
             .map_err(MoveError::Failed)?;
         let _ = fs::remove_file(dest.join(SIDECAR));
-        // TODO(#221): stored-path rewrite seam, as in run_move.
+        // #221: same config rewrite seam as run_move.
+        self.rewrite_configs(&row.id, &rebased_ids, Path::new(&row.source_path), &dest)
+            .await
+            .map_err(MoveError::Failed)?;
         update_done(self.db, &row.id).await.map_err(MoveError::Failed)?;
         load_row(self.db, &row.id).await.map_err(MoveError::Failed)
     }
@@ -1222,6 +1262,22 @@ async fn update_counts(db: &DatabaseManager, id: &str, files_done: u64, bytes_do
     .map_err(|e| format!("update move counts: {e}"))
 }
 
+/// `#221`: journals which deployment/pipeline rows the config rewrite couldn't
+/// safely touch — free text (`command`/`steps_json`/`variables_json`) that
+/// might still hold the old path, flagged rather than edited.
+async fn update_unrewritten(db: &DatabaseManager, id: &str, unrewritten: &[String]) -> Result<(), String> {
+    project_move::ActiveModel {
+        id: Set(id.to_string()),
+        unrewritten: Set(serde_json::to_string(unrewritten).unwrap_or_else(|_| "[]".into())),
+        updated_at: Set(now()),
+        ..Default::default()
+    }
+    .update(db.get_connection())
+    .await
+    .map(|_| ())
+    .map_err(|e| format!("record unrewritten rows: {e}"))
+}
+
 async fn update_done(db: &DatabaseManager, id: &str) -> Result<(), String> {
     let now = now();
     project_move::ActiveModel {
@@ -1311,8 +1367,10 @@ fn rel_path(root: &Path, path: &Path) -> String {
 
 /// New path for a project row sitting under `source`, rebased onto `dest`. The
 /// relative tail keeps its original case and separators; only the prefix moves.
-/// `None` when `old` isn't under `source`.
-fn rebased_path(old: &str, source: &str, dest: &str) -> Option<String> {
+/// `None` when `old` isn't under `source`. `pub(crate)`: also the rewrite rule
+/// [`DeploymentService::rebase_paths`] and [`rebase_pipeline_paths`] mirror for
+/// `#221`'s stored-path rewrite.
+pub(crate) fn rebased_path(old: &str, source: &str, dest: &str) -> Option<String> {
     if !is_under(old, source) {
         return None;
     }
@@ -1330,6 +1388,53 @@ fn rebased_path(old: &str, source: &str, dest: &str) -> Option<String> {
 
 fn split_components(s: &str) -> Vec<&str> {
     s.split(['/', '\\']).filter(|c| !c.is_empty()).collect()
+}
+
+/// `#221`: rewrites the `workingDirectory`/`dockerContext`/`dockerfile` keys of
+/// every pipeline's `execution_context_json` for `project_id` that are
+/// absolute and under `source`, onto `dest` — same prefix-replace rule as
+/// [`rebased_path`]. A row whose `execution_context_json` doesn't parse as a
+/// JSON object is left as-is, not flagged (spec: unparseable rows are left
+/// alone). Returns the ids of pipelines whose `steps_json`/`variables_json`
+/// (free text, never edited) looks like it holds `source` as a substring.
+async fn rebase_pipeline_paths(
+    repo: &PipelineRepository,
+    project_id: i32,
+    source: &Path,
+    dest: &Path,
+) -> Result<Vec<String>, String> {
+    let source_s = source.to_string_lossy();
+    let dest_s = dest.to_string_lossy();
+    let mut flagged = Vec::new();
+    for p in repo.get_all_by_project(project_id).await? {
+        if p.steps_json.contains(source_s.as_ref()) || p.variables_json.contains(source_s.as_ref()) {
+            flagged.push(p.id.to_string());
+        }
+
+        let Ok(mut ctx) = serde_json::from_str::<serde_json::Value>(&p.execution_context_json) else {
+            continue;
+        };
+        let Some(obj) = ctx.as_object_mut() else {
+            continue;
+        };
+        let mut changed = false;
+        for key in ["workingDirectory", "dockerContext", "dockerfile"] {
+            if let Some(new_path) = obj
+                .get(key)
+                .and_then(|v| v.as_str())
+                .and_then(|v| rebased_path(v, &source_s, &dest_s))
+            {
+                obj.insert(key.to_string(), serde_json::Value::String(new_path));
+                changed = true;
+            }
+        }
+        if changed {
+            let json = serde_json::to_string(&ctx).map_err(|e| format!("serialize execution context: {e}"))?;
+            repo.update(p.id, None, None, None, None, None, Some(json), None, None, None)
+                .await?;
+        }
+    }
+    Ok(flagged)
 }
 
 fn same_set(a: &[ManifestEntry], b: &[ManifestEntry]) -> bool {

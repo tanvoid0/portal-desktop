@@ -17,6 +17,8 @@ use tauri::{Manager, State};
 use crate::database::DatabaseManager;
 use crate::domains::coder::CoderService;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
+use crate::domains::deployments::services::deployment_service::DeploymentService;
+use crate::domains::projects::pipelines::repositories::pipeline_repository::PipelineRepository;
 use crate::domains::projects::pipelines::services::ExecutionService;
 use crate::domains::scripts::commands::ScriptExecutionState;
 use crate::domains::terminal::manager::TerminalManager;
@@ -147,6 +149,7 @@ pub async fn start_project_move(
     execution_state: State<'_, ScriptExecutionState>,
     events: State<'_, Events>,
     control: State<'_, MoveControl>,
+    deployment_service: State<'_, Arc<DeploymentService>>,
 ) -> Result<MoveSummary, String> {
     let project = load_project(&db_manager, id).await?;
     if control.running.lock().unwrap().contains(&project.id) {
@@ -155,6 +158,7 @@ pub async fn start_project_move(
     let _running = RunningGuard::new(&control.running, project.id);
     let scripts = execution_state.get_or_init(db_manager.inner()).await;
     let deployments = DeploymentRepository::new(db_manager.inner().clone());
+    let pipelines_repo = PipelineRepository::new(db_manager.inner().clone());
     let mv = mover::Mover {
         db: db_manager.inner(),
         coder: coder.inner(),
@@ -162,6 +166,8 @@ pub async fn start_project_move(
         pipelines: pipelines.inner(),
         scripts: &scripts,
         deployments: &deployments,
+        deployment_service: deployment_service.inner(),
+        pipelines_repo: &pipelines_repo,
         moves_dir: moves_dir(&app)?,
     };
     let mut emit = progress_emitter(&events);
@@ -220,6 +226,7 @@ pub async fn resolve_interrupted_move(
     execution_state: State<'_, ScriptExecutionState>,
     events: State<'_, Events>,
     control: State<'_, MoveControl>,
+    deployment_service: State<'_, Arc<DeploymentService>>,
 ) -> Result<Option<MoveSummary>, String> {
     if action == mover::RecoveryAction::Resume && control.cancelled.lock().unwrap().contains(&id) {
         return Err("this move was cancelled — roll back instead of resuming".into());
@@ -236,6 +243,7 @@ pub async fn resolve_interrupted_move(
     let _running = RunningGuard::new(&control.running, project_id);
     let scripts = execution_state.get_or_init(db_manager.inner()).await;
     let deployments = DeploymentRepository::new(db_manager.inner().clone());
+    let pipelines_repo = PipelineRepository::new(db_manager.inner().clone());
     let mv = mover::Mover {
         db: db_manager.inner(),
         coder: coder.inner(),
@@ -243,6 +251,8 @@ pub async fn resolve_interrupted_move(
         pipelines: pipelines.inner(),
         scripts: &scripts,
         deployments: &deployments,
+        deployment_service: deployment_service.inner(),
+        pipelines_repo: &pipelines_repo,
         moves_dir: moves_dir(&app)?,
     };
     let mut emit = progress_emitter(&events);
@@ -323,9 +333,11 @@ pub async fn remove_moved_source(
     terminal: State<'_, TerminalManager>,
     pipelines: State<'_, Arc<ExecutionService>>,
     execution_state: State<'_, ScriptExecutionState>,
+    deployment_service: State<'_, Arc<DeploymentService>>,
 ) -> Result<(), String> {
     let scripts = execution_state.get_or_init(db_manager.inner()).await;
     let deployments = DeploymentRepository::new(db_manager.inner().clone());
+    let pipelines_repo = PipelineRepository::new(db_manager.inner().clone());
     let mv = mover::Mover {
         db: db_manager.inner(),
         coder: coder.inner(),
@@ -333,6 +345,8 @@ pub async fn remove_moved_source(
         pipelines: pipelines.inner(),
         scripts: &scripts,
         deployments: &deployments,
+        deployment_service: deployment_service.inner(),
+        pipelines_repo: &pipelines_repo,
         moves_dir: moves_dir(&app)?,
     };
     mv.remove_moved_source(&id).await.map_err(describe_move_error)
