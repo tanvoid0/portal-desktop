@@ -669,25 +669,45 @@ impl DeploymentService {
             .collect();
 
         let mut flagged = Vec::new();
-        for mut d in matches {
-            let mut changed = false;
-            if let Some(new_path) = d.dockerfile_path.as_deref().and_then(|p| rebased_path(p, &old_s, &new_s)) {
-                d.dockerfile_path = Some(new_path);
-                changed = true;
-            }
-            if let Some(new_path) = d.working_directory.as_deref().and_then(|p| rebased_path(p, &old_s, &new_s)) {
-                d.working_directory = Some(new_path);
-                changed = true;
-            }
-            if d.command.as_deref().is_some_and(|c| c.contains(old_s.as_ref())) {
+        for d in matches {
+            let new_dockerfile = d
+                .dockerfile_path
+                .as_deref()
+                .filter(|p| Path::new(p).is_absolute())
+                .and_then(|p| rebased_path(p, &old_s, &new_s));
+            let new_wd = d
+                .working_directory
+                .as_deref()
+                .filter(|p| Path::new(p).is_absolute())
+                .and_then(|p| rebased_path(p, &old_s, &new_s));
+            if d.command
+                .as_deref()
+                .is_some_and(|c| move_lock::norm(c).contains(&move_lock::norm(&old_s)))
+            {
                 flagged.push(d.id.clone());
             }
-            if changed {
-                // ponytail: a persist failure here is swallowed, same as every
-                // other best-effort write in the move's commit path (mover.rs's
-                // `update_counts`/`mark_error`) — a move already promoted and
-                // committed shouldn't fail over a stale deployment row.
-                let _ = self.persist(&d).await;
+            if new_dockerfile.is_none() && new_wd.is_none() {
+                continue;
+            }
+
+            // Re-read the live cache entry right before writing and replay
+            // only these two path fields onto it, rather than the clone taken
+            // above (which was snapshotted before this loop ran, and could by
+            // now be stale next to a concurrent write such as
+            // `refresh_deployment_statuses`). ponytail: a narrow read-then-
+            // write gap remains between this re-read and `persist`'s own write
+            // lock — move the mutation under the cache's write lock directly
+            // if that ever matters in practice.
+            let current = self.cache.read().await.iter().find(|c| c.id == d.id).cloned();
+            let Some(mut current) = current else { continue };
+            if let Some(p) = new_dockerfile {
+                current.dockerfile_path = Some(p);
+            }
+            if let Some(p) = new_wd {
+                current.working_directory = Some(p);
+            }
+            if self.persist(&current).await.is_err() {
+                flagged.push(d.id.clone());
             }
         }
         flagged
