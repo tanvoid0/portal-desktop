@@ -13,6 +13,7 @@
 //! hence a chain of legacy identifiers rather than a single one.
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use crate::{log_info, log_warn};
 
@@ -31,12 +32,21 @@ const DEV_APP_IDENTIFIER: &str = "com.tanvoid0.portal-desktop.dev";
 
 /// The identifier this build runs under. `lib.rs` writes it into the Tauri config at
 /// startup, so Tauri's own paths and the single-instance lock follow it too.
+///
+/// `PORTAL_INSTANCE=2` (set by `scripts/dev-instance.mjs`, same env var as
+/// `instance_data_dir` in `lib.rs`) suffixes the identifier so a second dev instance
+/// gets its own single-instance lock instead of fighting the first over it. Instance 1
+/// and every packaged build resolve the plain identifier, unchanged.
 pub fn app_identifier() -> &'static str {
-    if DEV {
-        DEV_APP_IDENTIFIER
-    } else {
-        APP_IDENTIFIER
-    }
+    static ID: OnceLock<String> = OnceLock::new();
+    ID.get_or_init(|| {
+        let base = if DEV { DEV_APP_IDENTIFIER } else { APP_IDENTIFIER };
+        match std::env::var("PORTAL_INSTANCE").ok().as_deref() {
+            None | Some("") | Some("1") => base.to_string(),
+            Some(n) => format!("{base}.instance-{n}"),
+        }
+    })
+    .as_str()
 }
 
 /// Where a first run copies data and the keychain master key from, newest first.
