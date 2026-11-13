@@ -282,7 +282,7 @@ impl Mover<'_> {
 
         let total_bytes: i64 = manifest.entries.iter().map(|e| e.len as i64).sum();
         let now = now();
-        let row = project_move::ActiveModel {
+        let am = project_move::ActiveModel {
             id: Set(id.clone()),
             project_id: Set(project.id),
             source_path: Set(source.to_string_lossy().into_owned()),
@@ -305,10 +305,24 @@ impl Mover<'_> {
             started_at: Set(now.clone()),
             updated_at: Set(now),
             finished_at: Set(None),
-        }
-        .insert(self.db.get_connection())
-        .await
-        .map_err(|e| MoveError::Failed(format!("journal move: {e}")))?;
+        };
+        // SQLite string-PK insert can report RecordNotFound though the row exists;
+        // verify by id instead of trusting the error (see block_repository.rs).
+        let row = match am.insert(self.db.get_connection()).await {
+            Ok(model) => model,
+            Err(e) => {
+                let s = e.to_string();
+                if s.contains("RecordNotFound") || s.contains("Failed to find inserted item") {
+                    project_move::Entity::find_by_id(id.clone())
+                        .one(self.db.get_connection())
+                        .await
+                        .map_err(|e| MoveError::Failed(format!("journal move: verify: {e}")))?
+                        .ok_or_else(|| MoveError::Failed(format!("journal move: inserted row {id} not found")))?
+                } else {
+                    return Err(MoveError::Failed(format!("journal move: {e}")));
+                }
+            }
+        };
 
         match self.run_move(&row, &manifest, hold, on_progress).await {
             Ok(done) => Ok(done),
