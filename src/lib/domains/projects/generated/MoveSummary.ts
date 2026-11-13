@@ -4,8 +4,8 @@
  * A `project_moves` journal row, the shape the UI reads. The raw
  * `project_move::Model` isn't `TS`-derived (entities stay DB-internal, see
  * `ProjectResponse` for the established pattern), so this mirrors its
- * columns plus `cancel_requested`, which lives in the command layer's
- * `MoveControl`, not the row.
+ * columns plus `cancel_requested` and `running`, which live in the command
+ * layer's `MoveControl`, not the row.
  */
 export type MoveSummary = {
   id: string;
@@ -25,4 +25,11 @@ export type MoveSummary = {
   updated_at: string;
   finished_at: string | null;
   cancel_requested: boolean;
+  /**
+   * A move command for this row's project is actively awaiting right now
+   * — not just journaled mid-flight. Lets the interrupted-move banner
+   * skip a `copying`/`verifying` row that is someone's live move, not a
+   * crash left for the user to resolve (board #207/#208 review).
+   */
+  running: boolean;
 };

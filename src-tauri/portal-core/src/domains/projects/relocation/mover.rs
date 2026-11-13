@@ -106,6 +106,10 @@ struct ProgressLine {
 #[derive(Debug, Clone, Serialize)]
 pub struct Progress {
     pub id: String,
+    /// Which project this tick belongs to — lets a listener with several
+    /// moves' dialogs/events in flight filter to its own, instead of binding
+    /// to whichever move's event arrives first (board #207/#208 review).
+    pub project_id: i32,
     /// `copying` | `verifying`
     pub phase: String,
     pub files_done: u64,
@@ -371,6 +375,7 @@ impl Mover<'_> {
             bytes_done += e.len;
             on_progress(Progress {
                 id: row.id.clone(),
+                project_id: row.project_id,
                 phase: "copying".into(),
                 files_done,
                 file_count,
@@ -387,6 +392,7 @@ impl Mover<'_> {
         update_state(self.db, &row.id, "verifying").await?;
         on_progress(Progress {
             id: row.id.clone(),
+            project_id: row.project_id,
             phase: "verifying".into(),
             files_done,
             file_count,

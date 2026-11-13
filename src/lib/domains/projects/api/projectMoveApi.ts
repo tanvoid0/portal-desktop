@@ -6,6 +6,7 @@ import type { PreflightResult } from '$lib/domains/projects/generated/PreflightR
  *  hoc on the event sink, not returned from a command — so this mirrors its fields by hand. */
 export interface MoveProgress {
   id: string;
+  project_id: number;
   phase: 'copying' | 'verifying';
   files_done: number;
   file_count: number;

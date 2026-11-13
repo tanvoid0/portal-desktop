@@ -44,6 +44,35 @@ const EMIT_EVERY_MS: u128 = 120;
 #[derive(Default)]
 pub struct MoveControl {
     pub cancelled: Mutex<HashSet<String>>,
+    /// Project ids with a move command (`start_project_move`, or
+    /// `resolve_interrupted_move`'s dispatch) actively awaiting right now —
+    /// not just journaled as `copying`/`verifying`. Guarded by [`RunningGuard`]
+    /// so every return path (success, error, early `?`) clears it. Without
+    /// this, the interrupted-move banner and `resolve_interrupted_move`
+    /// can't tell a live move from one a crash actually left mid-flight
+    /// (board #207/#208 review).
+    pub running: Mutex<HashSet<i32>>,
+}
+
+/// RAII marker: `project_id` counts as "running" (see [`MoveControl::running`])
+/// for as long as this guard lives, cleared on drop so a failed/short-circuited
+/// command never wedges a project as permanently running.
+struct RunningGuard<'a> {
+    running: &'a Mutex<HashSet<i32>>,
+    project_id: i32,
+}
+
+impl<'a> RunningGuard<'a> {
+    fn new(running: &'a Mutex<HashSet<i32>>, project_id: i32) -> Self {
+        running.lock().unwrap().insert(project_id);
+        Self { running, project_id }
+    }
+}
+
+impl Drop for RunningGuard<'_> {
+    fn drop(&mut self) {
+        self.running.lock().unwrap().remove(&self.project_id);
+    }
 }
 
 /// Everything a move audit needs before it starts, and nothing it needs
@@ -116,8 +145,13 @@ pub async fn start_project_move(
     pipelines: State<'_, Arc<ExecutionService>>,
     execution_state: State<'_, ScriptExecutionState>,
     events: State<'_, Events>,
+    control: State<'_, MoveControl>,
 ) -> Result<MoveSummary, String> {
     let project = load_project(&db_manager, id).await?;
+    if control.running.lock().unwrap().contains(&project.id) {
+        return Err("a move for this project is already running".into());
+    }
+    let _running = RunningGuard::new(&control.running, project.id);
     let scripts = execution_state.get_or_init(db_manager.inner()).await;
     let deployments = DeploymentRepository::new(db_manager.inner().clone());
     let mv = mover::Mover {
@@ -134,7 +168,7 @@ pub async fn start_project_move(
         .start_move(&project, Path::new(&dest), include_regenerable, acknowledged_warnings, &mut emit)
         .await
         .map_err(describe_move_error)?;
-    Ok(MoveSummary::from_row(row, false))
+    Ok(MoveSummary::from_row(row, false, false))
 }
 
 /// Flags a move as cancel-requested. See [`MoveControl`] for why this is
@@ -157,11 +191,13 @@ pub async fn list_project_moves(
         .await
         .map_err(|e| format!("load moves: {e}"))?;
     let cancelled = control.cancelled.lock().unwrap();
+    let running = control.running.lock().unwrap();
     Ok(rows
         .into_iter()
         .map(|r| {
             let cancel_requested = cancelled.contains(&r.id);
-            MoveSummary::from_row(r, cancel_requested)
+            let is_running = running.contains(&r.project_id);
+            MoveSummary::from_row(r, cancel_requested, is_running)
         })
         .collect())
 }
@@ -187,6 +223,16 @@ pub async fn resolve_interrupted_move(
     if action == mover::RecoveryAction::Resume && control.cancelled.lock().unwrap().contains(&id) {
         return Err("this move was cancelled — roll back instead of resuming".into());
     }
+    let project_id = project_move::Entity::find_by_id(&id)
+        .one(db_manager.get_connection())
+        .await
+        .map_err(|e| format!("load move {id}: {e}"))?
+        .ok_or_else(|| format!("no move with id {id}"))?
+        .project_id;
+    if control.running.lock().unwrap().contains(&project_id) {
+        return Err("a move for this project is currently running — wait for it to finish".into());
+    }
+    let _running = RunningGuard::new(&control.running, project_id);
     let scripts = execution_state.get_or_init(db_manager.inner()).await;
     let deployments = DeploymentRepository::new(db_manager.inner().clone());
     let mv = mover::Mover {
@@ -204,7 +250,7 @@ pub async fn resolve_interrupted_move(
         .await
         .map_err(describe_move_error)?;
     control.cancelled.lock().unwrap().remove(&id);
-    Ok(row.map(|r| MoveSummary::from_row(r, false)))
+    Ok(row.map(|r| MoveSummary::from_row(r, false, false)))
 }
 
 /// Ends the process bound to `port`, after re-verifying `pid` is still the

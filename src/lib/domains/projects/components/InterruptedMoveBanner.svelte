@@ -17,8 +17,10 @@
   import { toast } from '$lib/utils/toast';
 
   const movesQuery = createProjectMovesQuery();
+  // `running` excludes a move whose `start_project_move`/resume call is actively awaiting
+  // right now — that's a live move, not one a crash left for the user to resolve.
   const interrupted = $derived(
-    (movesQuery.data ?? []).filter((m) => ACTIVE_MOVE_STATES.has(m.state))
+    (movesQuery.data ?? []).filter((m) => ACTIVE_MOVE_STATES.has(m.state) && !m.running)
   );
 
   let busyId = $state<string | null>(null);

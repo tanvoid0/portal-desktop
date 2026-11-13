@@ -93,17 +93,14 @@
     if (!open) reset();
   });
 
-  // First progress event after our own `startProjectMoveMutation` call wins the id — the
-  // dialog only ever starts one move for this project, so there's nothing to disambiguate
-  // against in the common case. Two dialogs mid-move for two different projects at the
-  // same time could in theory cross-talk here; `list_project_moves` stays the source of
-  // truth, this is only the live progress readout.
+  // Filtered by project_id, not "whichever id arrives first" — closing a dialog mid-move
+  // doesn't stop its events, so a move started on another project right after could
+  // otherwise bind to the still-arriving events of this one (board #207/#208 review).
   let unlisten: UnlistenFn | null = null;
   onMount(() => {
     listen<MoveProgress>(MOVE_PROGRESS_EVENT, (e) => {
-      if (!starting) return;
-      if (liveMoveId && e.payload.id !== liveMoveId) return;
-      liveMoveId ??= e.payload.id;
+      if (!starting || e.payload.project_id !== Number(project.id)) return;
+      liveMoveId = e.payload.id;
       progress = e.payload;
     }).then((fn) => (unlisten = fn));
   });
@@ -172,7 +169,7 @@
   async function handleCancel() {
     if (!liveMoveId) return;
     await cancelProjectMoveMutation(liveMoveId);
-    toast.info('Cancel requested — finishes the current file first, then rolls back');
+    toast.info("Cancel requested — the move still runs to completion, it won't roll back");
   }
 
   async function handleRemoveSource() {
@@ -333,7 +330,7 @@
 
           {#if preflight.blockers.length > 0}
             <div class="space-y-1.5">
-              {#each preflight.blockers as b (b.kind)}
+              {#each preflight.blockers as b, i (i)}
                 <div
                   class="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
                 >
@@ -346,7 +343,7 @@
 
           {#if preflight.warnings.length > 0}
             <div class="space-y-1.5">
-              {#each preflight.warnings as w, i (w.port)}
+              {#each preflight.warnings as w, i (i)}
                 <div
                   class="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm dark:border-amber-800 dark:bg-amber-950"
                 >

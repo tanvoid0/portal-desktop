@@ -47,8 +47,8 @@ pub struct PreflightResult {
 /// A `project_moves` journal row, the shape the UI reads. The raw
 /// `project_move::Model` isn't `TS`-derived (entities stay DB-internal, see
 /// `ProjectResponse` for the established pattern), so this mirrors its
-/// columns plus `cancel_requested`, which lives in the command layer's
-/// `MoveControl`, not the row.
+/// columns plus `cancel_requested` and `running`, which live in the command
+/// layer's `MoveControl`, not the row.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export, export_to = "../../../src/lib/domains/projects/generated/")]
 pub struct MoveSummary {
@@ -74,10 +74,15 @@ pub struct MoveSummary {
     pub updated_at: String,
     pub finished_at: Option<String>,
     pub cancel_requested: bool,
+    /// A move command for this row's project is actively awaiting right now
+    /// — not just journaled mid-flight. Lets the interrupted-move banner
+    /// skip a `copying`/`verifying` row that is someone's live move, not a
+    /// crash left for the user to resolve (board #207/#208 review).
+    pub running: bool,
 }
 
 impl MoveSummary {
-    pub fn from_row(row: project_move::Model, cancel_requested: bool) -> Self {
+    pub fn from_row(row: project_move::Model, cancel_requested: bool, running: bool) -> Self {
         Self {
             id: row.id,
             project_id: row.project_id,
@@ -96,6 +101,7 @@ impl MoveSummary {
             updated_at: row.updated_at,
             finished_at: row.finished_at,
             cancel_requested,
+            running,
         }
     }
 }
