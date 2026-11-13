@@ -20,10 +20,12 @@ use sea_orm::EntityTrait;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use sysinfo::System;
+use ts_rs::TS;
 
 /// One reported signal. `kind` is a short machine tag the UI maps to
 /// copy/icon; `detail` is the human-readable reason.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/projects/generated/")]
 pub struct Signal {
     pub kind: String,
     pub detail: String,
@@ -36,10 +38,27 @@ fn signal(kind: &str, detail: impl Into<String>) -> Signal {
     }
 }
 
-#[derive(Debug, Clone, Default, serde::Serialize)]
+/// A port conflict warning: who owns the port, and enough to let the UI offer
+/// "end it and continue". `killable` is a cheap hint only (can we even see the
+/// process's exe path) — the real guard before ending anything is
+/// `end_port_process`'s pid + `start_time` + port recheck, never this report.
+#[derive(Debug, Clone, serde::Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/projects/generated/")]
+pub struct PortWarning {
+    pub port: u16,
+    pub pid: u32,
+    pub process_name: String,
+    #[ts(type = "number")]
+    pub start_time: u64,
+    pub killable: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/projects/generated/")]
 pub struct UsageReport {
     pub blockers: Vec<Signal>,
-    pub warnings: Vec<Signal>,
+    pub warnings: Vec<PortWarning>,
 }
 
 /// Run every check and combine them into one report. `dev_port`/`prod_port`
@@ -331,7 +350,7 @@ fn check_open_for_write(_path: &Path) -> Option<Signal> {
 /// Warning (not blocker): something is listening on `dev_port`/`prod_port`
 /// but its owner isn't running from this project. A later step offers to end
 /// it; this just surfaces the pid + name.
-fn check_port_warnings(path: &str, dev_port: Option<u16>, prod_port: Option<u16>) -> Vec<Signal> {
+fn check_port_warnings(path: &str, dev_port: Option<u16>, prod_port: Option<u16>) -> Vec<PortWarning> {
     let mut sys = System::new_all();
     sys.refresh_processes();
 
@@ -347,20 +366,27 @@ fn check_port_warnings(path: &str, dev_port: Option<u16>, prod_port: Option<u16>
             if under {
                 return None;
             }
-            let name = proc.name().to_string();
-            Some(signal(
-                "port_owner_outside_project",
-                format!("Port {port} is in use by {name} (pid {pid}), which isn't running from this project"),
-            ))
+            let process_name = proc.name().to_string();
+            Some(PortWarning {
+                port,
+                pid,
+                reason: format!(
+                    "Port {port} is in use by {process_name} (pid {pid}), which isn't running from this project"
+                ),
+                process_name,
+                start_time: proc.start_time(),
+                killable: proc.exe().is_some(),
+            })
         })
         .collect()
 }
 
 /// PID of whatever is `LISTENING` on `port`, via `netstat -ano`. sysinfo has
 /// no per-socket API, so this is the pragmatic way to get from a port to a
-/// process on Windows.
+/// process on Windows. `pub`: also the recheck `end_port_process` (the Tauri
+/// command layer, a different crate) uses before it kills anything.
 #[cfg(target_os = "windows")]
-fn owning_pid(port: u16) -> Option<u32> {
+pub fn owning_pid(port: u16) -> Option<u32> {
     let out = Command::new("netstat").no_window().args(["-ano"]).output().ok()?;
     if !out.status.success() {
         return None;
@@ -374,7 +400,7 @@ fn owning_pid(port: u16) -> Option<u32> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn owning_pid(_port: u16) -> Option<u32> {
+pub fn owning_pid(_port: u16) -> Option<u32> {
     None // ponytail: netstat-based lookup is Windows-only for now; add a /proc or lsof path if this ships cross-platform.
 }
 

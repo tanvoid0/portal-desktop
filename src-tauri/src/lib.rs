@@ -218,6 +218,7 @@ pub fn run() {
             app.manage(domains::disk::commands::ScanControl::default());
             app.manage(domains::disk::commands::VerifyControl::default());
             app.manage(domains::projects::discovery_commands::DiscoveryControl::default());
+            app.manage(domains::projects::move_commands::MoveControl::default());
             log_info!("Tauri", "Disk utility domain initialized");
 
             // Initialize IDE storage
@@ -419,6 +420,14 @@ pub fn run() {
             domains::projects::discovery_commands::set_project_triage,
             domains::projects::discovery_commands::set_project_triage_bulk,
             domains::projects::discovery_commands::find_unavailable_projects,
+            // Project relocation (move engine command surface)
+            domains::projects::move_commands::preflight_project_move,
+            domains::projects::move_commands::start_project_move,
+            domains::projects::move_commands::cancel_project_move,
+            domains::projects::move_commands::list_project_moves,
+            domains::projects::move_commands::resolve_interrupted_move,
+            domains::projects::move_commands::end_port_process,
+            domains::projects::move_commands::remove_moved_source,
             // Pipeline commands
             domains::projects::get_project_modules,
             domains::projects::get_all_project_modules,

@@ -161,7 +161,11 @@ pub struct RecoveryStatus {
     pub note: Option<String>,
 }
 
-type ProgressFn<'a> = &'a mut dyn FnMut(Progress);
+// `+ Send`: every caller of `start_move`/`resume_move`/etc. is itself an
+// `async fn` whose future the Tauri command layer awaits on its (multi-
+// threaded) runtime, which requires the whole future — closures captured
+// inside it included — to be `Send`.
+type ProgressFn<'a> = &'a mut (dyn FnMut(Progress) + Send);
 
 // ── Engine ───────────────────────────────────────────────────────────────────
 
@@ -632,6 +636,45 @@ impl Drop for LockGuard {
         move_lock::end_active();
         move_lock::unlock(&self.paths);
     }
+}
+
+/// What a move of `source` would copy, for the preflight display: the same
+/// walk and skip rules [`build_manifest`] uses (so what's reported matches
+/// what a real move would do), plus the size of each skipped dir — which the
+/// manifest itself doesn't carry, to keep the journal small.
+#[derive(Debug)]
+pub struct PreflightWalk {
+    pub file_count: u64,
+    pub total_bytes: u64,
+    /// `(rel dir, bytes)`, one entry per dir [`build_manifest`] skipped.
+    pub skipped: Vec<(String, u64)>,
+}
+
+pub fn preflight_walk(source: &Path, include_regenerable: bool) -> Result<PreflightWalk, String> {
+    let (entries, skipped_dirs) = build_manifest(source, include_regenerable)?;
+    let file_count = entries.len() as u64;
+    let total_bytes = entries.iter().map(|e| e.len).sum();
+    let skipped = skipped_dirs
+        .into_iter()
+        .map(|rel| {
+            let bytes = dir_size(&os_join(source, &rel));
+            (rel, bytes)
+        })
+        .collect();
+    Ok(PreflightWalk { file_count, total_bytes, skipped })
+}
+
+/// Total size of every file under `dir` — used only to report a skipped dir's
+/// size; it is never copied, so this doesn't need the manifest's skip logic.
+fn dir_size(dir: &Path) -> u64 {
+    jwalk::WalkDir::new(dir)
+        .follow_links(false)
+        .into_iter()
+        .flatten()
+        .filter(|e| e.file_type().is_file())
+        .filter_map(|e| e.metadata().ok())
+        .map(|m| m.len())
+        .sum()
 }
 
 // ── Manifest / walk ──────────────────────────────────────────────────────────
