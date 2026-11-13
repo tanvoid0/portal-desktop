@@ -22,10 +22,14 @@
 //!
 //! ## Seams for later steps
 //!
-//! - `#217` source hold: before the manifest is built we would take deny-write
-//!   handles on the source tree and drop them before the commit/trash step.
-//!   Marked `TODO(#217)` at the call sites; until then the post-copy re-walk in
-//!   [`final_verify`] is the backstop against the source changing mid-move.
+//! - `#217` source hold: [`source_hold::acquire`] takes deny-write handles on
+//!   the whole move set once the manifest is built (it needs that file list)
+//!   and both [`Mover::start_move`] and [`Mover::resume_move`] hold them
+//!   through [`Mover::run_move`]'s copy/verify/promote/commit, dropping them
+//!   when that returns — well before a later, separate call to
+//!   [`Mover::remove_moved_source`] ever runs. [`final_verify`]'s re-walk
+//!   stays the backstop for what a hold can't catch (a new file appearing) or
+//!   doesn't apply to (unix).
 //! - `#221` stored-path rewrite: the commit repoints every project row under
 //!   the source (the moved project and any nested registered ones). Rewriting
 //!   absolute paths buried in deployment/pipeline config is `TODO(#221)`; those
@@ -49,6 +53,7 @@ use crate::domains::deployments::repositories::deployment_repository::Deployment
 use crate::domains::projects::discovery::scan::REGENERABLE;
 use crate::domains::projects::move_lock::{self, is_under};
 use crate::domains::projects::pipelines::services::ExecutionService;
+use crate::domains::projects::relocation::source_hold::{self, SourceHold};
 use crate::domains::projects::relocation::usage::{self, UsageReport};
 use crate::domains::scripts::ScriptExecutionService;
 use crate::domains::terminal::manager::TerminalManager;
@@ -240,9 +245,14 @@ impl Mover<'_> {
             return Err(MoveError::Blocked(report));
         }
 
-        // TODO(#217): take the deny-write source hold here, drop it before the
-        // commit. Until then final_verify's re-walk is the backstop.
         let (entries, skipped) = build_manifest(&source, include_regenerable).map_err(MoveError::Failed)?;
+
+        // #217: deny-write hold on the move set, held through the copy below.
+        // Needs the file list, so it can't come before the walk above — but it
+        // still comes before anything else touches the source or starts
+        // copying. A sharing violation here is itself a usage blocker.
+        let hold = source_hold::acquire(&source, &rel_paths(&entries))
+            .map_err(|s| MoveError::Blocked(UsageReport { blockers: vec![s], warnings: vec![] }))?;
 
         let id = Uuid::new_v4().to_string();
         let staging = staging_path(&dest, &id).map_err(MoveError::Failed)?;
@@ -291,7 +301,7 @@ impl Mover<'_> {
         .await
         .map_err(|e| MoveError::Failed(format!("journal move: {e}")))?;
 
-        match self.run_move(&row, &manifest, on_progress).await {
+        match self.run_move(&row, &manifest, hold, on_progress).await {
             Ok(done) => Ok(done),
             Err(e) => {
                 // Leave the state in copying/verifying so a later resume can
@@ -330,8 +340,14 @@ impl Mover<'_> {
             .map_err(MoveError::Failed)?;
         can_resume(&row.id, &source, &staging, &manifest, &logged).map_err(MoveError::Failed)?;
 
+        // #217: a resume re-acquires its own hold — nothing survives a crash
+        // or restart to resume from, so this is not optional on the resumed
+        // path either.
+        let hold = source_hold::acquire(&source, &rel_paths(&manifest.entries))
+            .map_err(|s| MoveError::Blocked(UsageReport { blockers: vec![s], warnings: vec![] }))?;
+
         let _ = bump_resume_count(self.db, &row.id).await;
-        match self.run_move(&row, &manifest, on_progress).await {
+        match self.run_move(&row, &manifest, hold, on_progress).await {
             Ok(done) => Ok(done),
             Err(e) => {
                 let _ = mark_error(self.db, &row.id, &e).await;
@@ -342,11 +358,14 @@ impl Mover<'_> {
 
     /// The copy → verify → promote → commit core, shared by fresh and resumed
     /// moves. On entry the row is in `copying`, the manifest/progress files and
-    /// staging dir exist.
+    /// staging dir exist. `_hold` is the caller's `#217` source hold — it does
+    /// nothing here beyond staying alive (and so held) until this returns,
+    /// right after commit.
     async fn run_move(
         &self,
         row: &project_move::Model,
         manifest: &Manifest,
+        _hold: SourceHold,
         on_progress: ProgressFn<'_>,
     ) -> Result<project_move::Model, String> {
         let source = PathBuf::from(&row.source_path);
@@ -700,6 +719,12 @@ fn build_manifest(source: &Path, include_regenerable: bool) -> Result<(Vec<Manif
     entries.sort_by(|a, b| a.rel.cmp(&b.rel));
     skipped.sort();
     Ok((entries, skipped))
+}
+
+/// `rel` of every manifest entry, for [`source_hold::acquire`] — it doesn't
+/// know about [`ManifestEntry`], just the relative paths it needs to hold.
+fn rel_paths(entries: &[ManifestEntry]) -> Vec<String> {
+    entries.iter().map(|e| e.rel.clone()).collect()
 }
 
 fn walk(
