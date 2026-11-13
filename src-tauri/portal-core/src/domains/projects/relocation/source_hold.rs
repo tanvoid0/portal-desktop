@@ -24,9 +24,10 @@
 //!   editors clear it on save anyway), so it's not an option here at all.
 
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use super::usage::Signal;
+use super::mover::{os_join, MoveError};
+use super::usage::{Signal, UsageReport};
 
 /// Live deny-write handles on every file/dir in a move's source tree.
 /// Dropping it closes every handle — that's the only "release" there is.
@@ -38,13 +39,15 @@ pub struct SourceHold {
 
 /// Acquire the hold over every file in `rel_files` (manifest-relative, forward
 /// slashes) plus every directory that contains one, under `source`. On
-/// Windows, a sharing violation on any path — something else already has it
-/// open for write — becomes a [`Signal`] so it slots into [`UsageReport`]'s
-/// `blockers` list [`super::usage::UsageReport`] the same as any other
-/// preflight blocker. Any handles already opened before the failure are
-/// dropped (closed) along with the error.
+/// Windows, a sharing or lock violation on any path — something else already
+/// has it open for write — becomes a [`MoveError::Blocked`] signal, the same
+/// as any other preflight blocker. Any other I/O error (the path vanished,
+/// was denied by an ACL, ...) becomes a plain [`MoveError::Failed`] instead,
+/// since "close whatever has it open" would be the wrong thing to tell the
+/// user. Any handles already opened before the failure are dropped (closed)
+/// along with the error.
 #[cfg(target_os = "windows")]
-pub fn acquire(source: &Path, rel_files: &[String]) -> Result<SourceHold, Signal> {
+pub fn acquire(source: &Path, rel_files: &[String]) -> Result<SourceHold, MoveError> {
     use std::io;
     use std::os::windows::fs::OpenOptionsExt;
 
@@ -61,13 +64,23 @@ pub fn acquire(source: &Path, rel_files: &[String]) -> Result<SourceHold, Signal
         opts.open(path)
     }
 
-    fn sharing_signal(path: &Path, e: io::Error) -> Signal {
-        Signal {
-            kind: "source_in_use".into(),
-            detail: format!(
-                "{} is already open elsewhere for writing, so it can't be held for the move: {e}",
-                path.display()
-            ),
+    // ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION mean something else has
+    // the path open for write — an actionable, user-facing blocker. Anything
+    // else (deleted between the manifest walk and here, ACL denial, ...) is
+    // a real failure, not "close the other program".
+    fn hold_error(path: &Path, e: io::Error) -> MoveError {
+        match e.raw_os_error() {
+            Some(32) | Some(33) => MoveError::Blocked(UsageReport {
+                blockers: vec![Signal {
+                    kind: "source_in_use".into(),
+                    detail: format!(
+                        "{} is already open elsewhere for writing, so it can't be held for the move: {e}",
+                        path.display()
+                    ),
+                }],
+                warnings: vec![],
+            }),
+            _ => MoveError::Failed(format!("hold {}: {e}", path.display())),
         }
     }
 
@@ -83,21 +96,16 @@ pub fn acquire(source: &Path, rel_files: &[String]) -> Result<SourceHold, Signal
     }
 
     let mut handles = Vec::with_capacity(rel_files.len() + rel_dirs.len() + 1);
-    handles.push(open_deny_write(source, true).map_err(|e| sharing_signal(source, e))?);
+    handles.push(open_deny_write(source, true).map_err(|e| hold_error(source, e))?);
     for rel in &rel_dirs {
         let path = os_join(source, rel);
-        handles.push(open_deny_write(&path, true).map_err(|e| sharing_signal(&path, e))?);
+        handles.push(open_deny_write(&path, true).map_err(|e| hold_error(&path, e))?);
     }
     for rel in rel_files {
         let path = os_join(source, rel);
-        handles.push(open_deny_write(&path, false).map_err(|e| sharing_signal(&path, e))?);
+        handles.push(open_deny_write(&path, false).map_err(|e| hold_error(&path, e))?);
     }
     Ok(SourceHold { handles })
-}
-
-#[cfg(target_os = "windows")]
-fn os_join(base: &Path, rel: &str) -> PathBuf {
-    base.join(rel.replace('/', std::path::MAIN_SEPARATOR_STR))
 }
 
 /// ponytail: no portable "deny other writers" open mode exists on unix, so
@@ -105,7 +113,7 @@ fn os_join(base: &Path, rel: &str) -> PathBuf {
 /// no-op rather than a hold that only looks like one. Detection is still
 /// `usage::check_in_use`, run by the caller before this.
 #[cfg(not(target_os = "windows"))]
-pub fn acquire(_source: &Path, _rel_files: &[String]) -> Result<SourceHold, Signal> {
+pub fn acquire(_source: &Path, _rel_files: &[String]) -> Result<SourceHold, MoveError> {
     Ok(SourceHold { handles: Vec::new() })
 }
 
@@ -138,6 +146,13 @@ mod tests {
             .unwrap_err();
         assert_eq!(err.raw_os_error(), Some(32)); // ERROR_SHARING_VIOLATION
 
+        // The directory hold must block a rename/delete too, not just a file
+        // write open.
+        let sub = dir.path().join("sub");
+        let sub2 = dir.path().join("sub2");
+        assert_eq!(fs::rename(&sub, &sub2).unwrap_err().raw_os_error(), Some(32));
+        assert_eq!(fs::remove_file(dir.path().join("a.txt")).unwrap_err().raw_os_error(), Some(32));
+
         drop(hold);
         // Released: the same write open now succeeds.
         fs::OpenOptions::new().write(true).open(dir.path().join("a.txt")).unwrap();
@@ -152,7 +167,17 @@ mod tests {
         let _busy = fs::OpenOptions::new().write(true).open(&path).unwrap();
 
         let err = acquire(dir.path(), &["locked.txt".to_string()]).unwrap_err();
-        assert_eq!(err.kind, "source_in_use");
-        assert!(err.detail.contains("locked.txt"));
+        let MoveError::Blocked(report) = err else { panic!("expected Blocked, got {err:?}") };
+        assert_eq!(report.blockers[0].kind, "source_in_use");
+        assert!(report.blockers[0].detail.contains("locked.txt"));
+    }
+
+    #[test]
+    fn acquire_propagates_a_missing_path_as_failed_not_blocked() {
+        let dir = tempdir().unwrap();
+        // Named in rel_files but never created — NotFound, not a sharing
+        // violation, so this must not read as "close the other program".
+        let err = acquire(dir.path(), &["missing.txt".to_string()]).unwrap_err();
+        assert!(matches!(err, MoveError::Failed(_)), "expected Failed, got {err:?}");
     }
 }

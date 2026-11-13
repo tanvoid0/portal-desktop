@@ -251,8 +251,7 @@ impl Mover<'_> {
         // Needs the file list, so it can't come before the walk above — but it
         // still comes before anything else touches the source or starts
         // copying. A sharing violation here is itself a usage blocker.
-        let hold = source_hold::acquire(&source, &rel_paths(&entries))
-            .map_err(|s| MoveError::Blocked(UsageReport { blockers: vec![s], warnings: vec![] }))?;
+        let hold = source_hold::acquire(&source, &rel_paths(&entries))?;
 
         let id = Uuid::new_v4().to_string();
         let staging = staging_path(&dest, &id).map_err(MoveError::Failed)?;
@@ -338,13 +337,15 @@ impl Mover<'_> {
         let manifest = read_validated_manifest(&row).map_err(MoveError::Failed)?;
         let logged = read_progress(&progress_path_of(&row).map_err(MoveError::Failed)?)
             .map_err(MoveError::Failed)?;
-        can_resume(&row.id, &source, &staging, &manifest, &logged).map_err(MoveError::Failed)?;
+        resume_structural_ok(&row.id, &source, &staging, &manifest).map_err(MoveError::Failed)?;
 
         // #217: a resume re-acquires its own hold — nothing survives a crash
         // or restart to resume from, so this is not optional on the resumed
-        // path either.
-        let hold = source_hold::acquire(&source, &rel_paths(&manifest.entries))
-            .map_err(|s| MoveError::Blocked(UsageReport { blockers: vec![s], warnings: vec![] }))?;
+        // path either. Acquired before the hash loop below so those hashes
+        // come from content already denied to other writers, not content
+        // that could still be rewritten in the gap between hash and hold.
+        let hold = source_hold::acquire(&source, &rel_paths(&manifest.entries))?;
+        resume_source_hashes_ok(&source, &logged).map_err(MoveError::Failed)?;
 
         let _ = bump_resume_count(self.db, &row.id).await;
         match self.run_move(&row, &manifest, hold, on_progress).await {
@@ -905,10 +906,14 @@ fn final_verify(source: &Path, staging: &Path, manifest: &Manifest) -> Result<()
     Ok(())
 }
 
-/// Resume gate. `Ok` only when the staging sidecar matches, the live source
-/// still matches the manifest, every logged file's source still hashes to its
-/// logged value, and staging holds nothing the manifest doesn't know. Any `Err`
-/// means resume is unsafe and the caller should offer rollback only.
+/// Resume gate: [`resume_structural_ok`] then [`resume_source_hashes_ok`]. `Ok`
+/// only when the staging sidecar matches, the live source still matches the
+/// manifest, every logged file's source still hashes to its logged value, and
+/// staging holds nothing the manifest doesn't know. Any `Err` means resume is
+/// unsafe and the caller should offer rollback only. [`Mover::resume_move`]
+/// runs the two halves itself, with the `#217` hold acquired in between —
+/// this combined form is test-only convenience.
+#[cfg(test)]
 fn can_resume(
     move_id: &str,
     source: &Path,
@@ -917,10 +922,17 @@ fn can_resume(
     logged: &HashMap<String, String>,
 ) -> Result<(), String> {
     resume_structural_ok(move_id, source, staging, manifest)?;
-    // The one expensive check: every already-copied file's *source* must still
-    // hash to what the log recorded. Split out of the structural checks so the
-    // UI classifier ([`recovery_options`]) can decide Resume-vs-rollback from
-    // metadata alone, leaving this full re-hash to the actual resume.
+    resume_source_hashes_ok(source, logged)
+}
+
+/// The one expensive check: every already-copied file's *source* must still
+/// hash to what the log recorded. Split out of the structural checks so the
+/// UI classifier ([`recovery_options`]) can decide Resume-vs-rollback from
+/// metadata alone, and so [`Mover::resume_move`] can run it after acquiring
+/// the `#217` hold rather than before — otherwise a file rewritten at the
+/// same length in the gap between this hash and the hold would pass here and
+/// only be caught later, after a wasted re-copy, by [`final_verify`].
+fn resume_source_hashes_ok(source: &Path, logged: &HashMap<String, String>) -> Result<(), String> {
     for (rel, sha) in logged {
         if &hash_file(&os_join(source, rel))? != sha {
             return Err(format!("source file {rel} changed since it was copied — roll back"));
@@ -1286,7 +1298,7 @@ fn progress_path_of(row: &project_move::Model) -> Result<PathBuf, String> {
 }
 
 /// Join a forward-slash manifest rel onto an OS path.
-fn os_join(base: &Path, rel: &str) -> PathBuf {
+pub(super) fn os_join(base: &Path, rel: &str) -> PathBuf {
     base.join(rel.replace('/', MAIN_SEPARATOR_STR))
 }
 
