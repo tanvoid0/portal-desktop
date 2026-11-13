@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { HTMLAttributes } from 'svelte/elements';
   import { Button } from '$lib/components/ui/button';
   import Trash2 from '~icons/fa6-solid/trash';
   import { cn } from '$lib/utils';
@@ -43,7 +44,8 @@
     inlineBadges = [],
     trailingBadges = [],
     queuedCount = 0,
-  }: Props = $props();
+    ...rest
+  }: Props & Omit<HTMLAttributes<HTMLDivElement>, 'title' | 'onclick'> = $props();
 
   const updatedIso = $derived(updatedAt instanceof Date ? updatedAt.toISOString() : updatedAt);
   const updatedLabel = $derived(updatedIso ? formatSessionDateTime(updatedIso) : '');
@@ -73,6 +75,7 @@
 
 <!-- One flat line per session: title left, metric right, actions on hover. -->
 <div
+  {...rest}
   role="group"
   aria-label={title}
   tabindex="0"

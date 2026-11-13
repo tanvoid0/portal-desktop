@@ -1,5 +1,10 @@
 <script lang="ts">
   import AISessionCard from '$lib/domains/ai/components/shared/AISessionCard.svelte';
+  import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
+  import { buildReference } from '$lib/domains/shared/utils/entityReference';
+  import { copyText } from '$lib/domains/shared/utils/clipboard';
+  import { openCoderSession } from '../utils/launch';
+  import { buildCoderThreadMenu } from '../utils/threadMenu';
   import type { CoderThread } from '../types.js';
 
   interface Props {
@@ -59,17 +64,40 @@
   });
 </script>
 
-<AISessionCard
-  title={thread.title}
-  {isActive}
-  {isRunning}
-  {queuedCount}
-  updatedAt={thread.updated_at}
-  {messageCount}
-  subtitle={hideProject ? null : thread.workspace_root || null}
-  {inlineBadges}
-  {trailingBadges}
-  deleteTitle="Delete session"
-  {onClick}
-  onDelete={onDelete ? () => onDelete(thread) : undefined}
-/>
+<ContextMenuList
+  items={buildCoderThreadMenu(thread, {
+    onOpen: onClick ? () => onClick() : undefined,
+    onCopyReference: () =>
+      copyText(
+        buildReference({
+          kind: 'coder session',
+          id: thread.id,
+          title: thread.title,
+          fields: { Workspace: thread.workspace_root },
+        }),
+        'Session reference copied'
+      ),
+    onLaunchWorkspace: thread.workspace_root
+      ? () => openCoderSession({ workspaceRoot: thread.workspace_root })
+      : undefined,
+    onDelete,
+  })}
+>
+  {#snippet trigger(menuProps)}
+    <AISessionCard
+      {...menuProps}
+      title={thread.title}
+      {isActive}
+      {isRunning}
+      {queuedCount}
+      updatedAt={thread.updated_at}
+      {messageCount}
+      subtitle={hideProject ? null : thread.workspace_root || null}
+      {inlineBadges}
+      {trailingBadges}
+      deleteTitle="Delete session"
+      {onClick}
+      onDelete={onDelete ? () => onDelete(thread) : undefined}
+    />
+  {/snippet}
+</ContextMenuList>

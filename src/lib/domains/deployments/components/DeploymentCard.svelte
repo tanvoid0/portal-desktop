@@ -13,6 +13,10 @@
   import Container from '~icons/fa6-solid/cube';
   import Terminal from '~icons/fa6-solid/terminal';
   import { openExternalUrl } from '$lib/utils/tauri';
+  import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
+  import { buildReference } from '$lib/domains/shared/utils/entityReference';
+  import { copyText } from '$lib/domains/shared/utils/clipboard';
+  import { buildDeploymentMenu } from '../utils/deploymentMenu';
 
   interface Props {
     deployment: Deployment;
@@ -22,6 +26,36 @@
   }
 
   let { deployment, onStart, onStop, onDelete }: Props = $props();
+
+  const isRunning = $derived(deployment.status === DeploymentStatus.RUNNING);
+  const isBusy = $derived(
+    deployment.status === DeploymentStatus.BUILDING ||
+      deployment.status === DeploymentStatus.CREATING
+  );
+  // Same URL the card shows for running docker deployments.
+  const menuUrl = $derived(
+    isRunning && deployment.type === DeploymentType.DOCKER
+      ? (deployment.url ?? (deployment.host ? `http://${deployment.host}` : undefined))
+      : undefined
+  );
+  const menu = $derived(
+    buildDeploymentMenu({
+      onStart: !isRunning && !isBusy && onStart ? () => onStart(deployment.id) : undefined,
+      onStop: isRunning && onStop ? () => onStop(deployment.id) : undefined,
+      onOpenUrl: menuUrl ? () => openExternalUrl(menuUrl) : undefined,
+      onCopyReference: () =>
+        copyText(
+          buildReference({
+            kind: 'deployment',
+            id: deployment.id,
+            title: deployment.name,
+            fields: { Status: deployment.status },
+          }),
+          'Deployment reference copied'
+        ),
+      onDelete: onDelete ? () => onDelete(deployment.id) : undefined,
+    })
+  );
 
   function getStatusColor(status: DeploymentStatus): string {
     switch (status) {
@@ -40,102 +74,114 @@
   }
 </script>
 
-<Card class="w-full">
-  <CardHeader>
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        {#if deployment.type === DeploymentType.DOCKER}
-          <Container class="h-5 w-5 text-muted-foreground" />
-        {:else}
-          <Terminal class="h-5 w-5 text-muted-foreground" />
-        {/if}
-        <div>
-          <CardTitle class="text-lg">{deployment.name}</CardTitle>
-          <CardDescription>{deployment.description || 'No description'}</CardDescription>
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <Badge variant="outline">
-          {deployment.type === DeploymentType.DOCKER ? 'Docker' : 'CLI'}
-        </Badge>
-        <Badge class={getStatusColor(deployment.status)}>
-          {deployment.status}
-        </Badge>
-      </div>
-    </div>
-  </CardHeader>
-  <CardContent>
-    <div class="space-y-2">
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-muted-foreground">Project Path:</span>
-        <span class="max-w-[200px] truncate font-mono text-sm" title={deployment.projectPath}>
-          {deployment.projectPath}
-        </span>
-      </div>
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-muted-foreground">Project Type:</span>
-        <span class="text-sm">{deployment.projectType}</span>
-      </div>
-      {#if deployment.type === DeploymentType.DOCKER && deployment.dockerImageName}
+<ContextMenuList items={menu}>
+  {#snippet trigger(menuProps)}
+    <Card {...menuProps} class="w-full">
+      <CardHeader>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-muted-foreground">Image:</span>
-          <span class="max-w-[200px] truncate font-mono text-sm" title={deployment.dockerImageName}>
-            {deployment.dockerImageName}
-          </span>
+          <div class="flex items-center gap-2">
+            {#if deployment.type === DeploymentType.DOCKER}
+              <Container class="h-5 w-5 text-muted-foreground" />
+            {:else}
+              <Terminal class="h-5 w-5 text-muted-foreground" />
+            {/if}
+            <div>
+              <CardTitle class="text-lg">{deployment.name}</CardTitle>
+              <CardDescription>{deployment.description || 'No description'}</CardDescription>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <Badge variant="outline">
+              {deployment.type === DeploymentType.DOCKER ? 'Docker' : 'CLI'}
+            </Badge>
+            <Badge class={getStatusColor(deployment.status)}>
+              {deployment.status}
+            </Badge>
+          </div>
         </div>
-        {#if deployment.container?.ports && deployment.container.ports.length > 0}
-          <!-- ports is PortMapping[] | string[]; the string form is already "host:container". -->
-          {@const port = deployment.container.ports[0]}
+      </CardHeader>
+      <CardContent>
+        <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-sm text-muted-foreground">Port:</span>
-            <span class="text-sm"
-              >{typeof port === 'string' ? port : `${port.hostPort}:${port.containerPort}`}</span
-            >
+            <span class="text-sm text-muted-foreground">Project Path:</span>
+            <span class="max-w-[200px] truncate font-mono text-sm" title={deployment.projectPath}>
+              {deployment.projectPath}
+            </span>
           </div>
-        {/if}
-        {#if deployment.status === DeploymentStatus.RUNNING && (deployment.url || deployment.host)}
-          {@const deployUrl = deployment.url ?? `http://${deployment.host}`}
           <div class="flex items-center justify-between">
-            <span class="text-sm text-muted-foreground">URL:</span>
-            <Button
-              variant="link"
-              class="h-auto max-w-[200px] truncate p-0 text-sm"
-              title={deployUrl}
-              onclick={() => openExternalUrl(deployUrl)}
-            >
-              {deployUrl}
-            </Button>
+            <span class="text-sm text-muted-foreground">Project Type:</span>
+            <span class="text-sm">{deployment.projectType}</span>
           </div>
-        {/if}
-      {:else if deployment.type === DeploymentType.CLI && deployment.command}
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-muted-foreground">Command:</span>
-          <span class="max-w-[200px] truncate font-mono text-sm" title={deployment.command}>
-            {deployment.command}
-          </span>
+          {#if deployment.type === DeploymentType.DOCKER && deployment.dockerImageName}
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-muted-foreground">Image:</span>
+              <span
+                class="max-w-[200px] truncate font-mono text-sm"
+                title={deployment.dockerImageName}
+              >
+                {deployment.dockerImageName}
+              </span>
+            </div>
+            {#if deployment.container?.ports && deployment.container.ports.length > 0}
+              <!-- ports is PortMapping[] | string[]; the string form is already "host:container". -->
+              {@const port = deployment.container.ports[0]}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-muted-foreground">Port:</span>
+                <span class="text-sm"
+                  >{typeof port === 'string'
+                    ? port
+                    : `${port.hostPort}:${port.containerPort}`}</span
+                >
+              </div>
+            {/if}
+            {#if deployment.status === DeploymentStatus.RUNNING && (deployment.url || deployment.host)}
+              {@const deployUrl = deployment.url ?? `http://${deployment.host}`}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-muted-foreground">URL:</span>
+                <Button
+                  variant="link"
+                  class="h-auto max-w-[200px] truncate p-0 text-sm"
+                  title={deployUrl}
+                  onclick={() => openExternalUrl(deployUrl)}
+                >
+                  {deployUrl}
+                </Button>
+              </div>
+            {/if}
+          {:else if deployment.type === DeploymentType.CLI && deployment.command}
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-muted-foreground">Command:</span>
+              <span class="max-w-[200px] truncate font-mono text-sm" title={deployment.command}>
+                {deployment.command}
+              </span>
+            </div>
+            {#if deployment.processId}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-muted-foreground">PID:</span>
+                <span class="text-sm">{deployment.processId}</span>
+              </div>
+            {/if}
+          {/if}
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">Created:</span>
+            <span class="text-sm">{new Date(deployment.createdAt).toLocaleDateString()}</span>
+          </div>
         </div>
-        {#if deployment.processId}
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-muted-foreground">PID:</span>
-            <span class="text-sm">{deployment.processId}</span>
-          </div>
-        {/if}
-      {/if}
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-muted-foreground">Created:</span>
-        <span class="text-sm">{new Date(deployment.createdAt).toLocaleDateString()}</span>
-      </div>
-    </div>
 
-    <div class="mt-4 flex gap-2">
-      {#if deployment.status === DeploymentStatus.RUNNING}
-        <Button variant="outline" size="sm" onclick={() => onStop?.(deployment.id)}>Stop</Button>
-      {:else if deployment.status !== DeploymentStatus.BUILDING && deployment.status !== DeploymentStatus.CREATING}
-        <Button variant="default" size="sm" onclick={() => onStart?.(deployment.id)}>Start</Button>
-      {/if}
-      <Button variant="destructive" size="sm" onclick={() => onDelete?.(deployment.id)}>
-        Delete
-      </Button>
-    </div>
-  </CardContent>
-</Card>
+        <div class="mt-4 flex gap-2">
+          {#if deployment.status === DeploymentStatus.RUNNING}
+            <Button variant="outline" size="sm" onclick={() => onStop?.(deployment.id)}>Stop</Button
+            >
+          {:else if deployment.status !== DeploymentStatus.BUILDING && deployment.status !== DeploymentStatus.CREATING}
+            <Button variant="default" size="sm" onclick={() => onStart?.(deployment.id)}
+              >Start</Button
+            >
+          {/if}
+          <Button variant="destructive" size="sm" onclick={() => onDelete?.(deployment.id)}>
+            Delete
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  {/snippet}
+</ContextMenuList>

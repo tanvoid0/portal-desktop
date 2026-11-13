@@ -31,6 +31,10 @@
     blockLibraryStore,
     blocks as blocksStore,
   } from '$lib/domains/projects/pipelines';
+  import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
+  import { buildScriptMenu } from '../utils/scriptMenu';
+  import { buildReference } from '$lib/domains/shared/utils/entityReference';
+  import { copyText } from '$lib/domains/shared/utils/clipboard';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { setBreadcrumbs } from '$lib/domains/shared/stores/breadcrumbStore';
@@ -125,6 +129,18 @@
   function handleCopyCommand(command: string) {
     navigator.clipboard.writeText(command);
     toast.success('Command copied to clipboard');
+  }
+
+  function handleCopyReference(script: Block) {
+    void copyText(
+      buildReference({
+        kind: 'script',
+        id: script.id,
+        title: script.name,
+        body: script.command || undefined,
+      }),
+      'Script reference copied'
+    );
   }
 
   function handleImportJson() {
@@ -232,107 +248,122 @@
   {:else}
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {#each filteredScripts as script (script.id)}
-        <Card
-          class="cursor-pointer transition-colors hover:border-primary/50"
-          onclick={() => handleViewScript(script)}
+        <ContextMenuList
+          items={buildScriptMenu(script, {
+            onView: handleViewScript,
+            onEdit: handleEditScript,
+            onExport: handleExportScript,
+            onCopyCommand: (s) => handleCopyCommand(s.command),
+            onCopyReference: handleCopyReference,
+            onDelete: (s) => handleDeleteScript(s.id),
+          })}
         >
-          <CardHeader class="pb-3">
-            <div class="flex items-start justify-between">
-              <div class="min-w-0 flex-1">
-                <CardTitle class="truncate text-lg">{script.name}</CardTitle>
-                <CardDescription class="mt-1 line-clamp-2">{script.description}</CardDescription>
-              </div>
-              <Badge variant="outline" class="ml-2 shrink-0">{script.category}</Badge>
-            </div>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <!-- Command Preview -->
-            <div
-              class="group relative rounded-md bg-muted p-2"
-              onclick={(e) => e.stopPropagation()}
+          {#snippet trigger(menuProps)}
+            <Card
+              {...menuProps}
+              class="cursor-pointer transition-colors hover:border-primary/50"
+              onclick={() => handleViewScript(script)}
             >
-              <code class="line-clamp-2 font-mono text-xs text-muted-foreground"
-                >{script.command}</code
-              >
-              <Button
-                variant="ghost"
-                size="sm"
-                class="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label={`Copy command for ${script.name}`}
-                onclick={(e) => {
-                  e.stopPropagation();
-                  handleCopyCommand(script.command);
-                }}
-              >
-                <Copy class="h-3 w-3" />
-              </Button>
-            </div>
+              <CardHeader class="pb-3">
+                <div class="flex items-start justify-between">
+                  <div class="min-w-0 flex-1">
+                    <CardTitle class="truncate text-lg">{script.name}</CardTitle>
+                    <CardDescription class="mt-1 line-clamp-2">{script.description}</CardDescription
+                    >
+                  </div>
+                  <Badge variant="outline" class="ml-2 shrink-0">{script.category}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent class="space-y-4">
+                <!-- Command Preview -->
+                <div
+                  class="group relative rounded-md bg-muted p-2"
+                  onclick={(e) => e.stopPropagation()}
+                >
+                  <code class="line-clamp-2 font-mono text-xs text-muted-foreground"
+                    >{script.command}</code
+                  >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-label={`Copy command for ${script.name}`}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleCopyCommand(script.command);
+                    }}
+                  >
+                    <Copy class="h-3 w-3" />
+                  </Button>
+                </div>
 
-            <!-- Info -->
-            <div class="flex items-center gap-4 text-sm text-muted-foreground">
-              <span class="flex items-center gap-1">
-                <Terminal class="h-3 w-3" />
-                {script.executionType}
-              </span>
-              {#if script.parameters.length > 0}
-                <span>{script.parameters.length} params</span>
-              {/if}
-              <span>v{script.version}</span>
-            </div>
+                <!-- Info -->
+                <div class="flex items-center gap-4 text-sm text-muted-foreground">
+                  <span class="flex items-center gap-1">
+                    <Terminal class="h-3 w-3" />
+                    {script.executionType}
+                  </span>
+                  {#if script.parameters.length > 0}
+                    <span>{script.parameters.length} params</span>
+                  {/if}
+                  <span>v{script.version}</span>
+                </div>
 
-            <!-- Tags -->
-            {#if script.tags && script.tags.length > 0}
-              <div class="flex flex-wrap gap-1">
-                {#each script.tags.slice(0, 4) as tag}
-                  <Badge variant="secondary" class="text-xs">{tag}</Badge>
-                {/each}
-                {#if script.tags.length > 4}
-                  <Badge variant="secondary" class="text-xs">+{script.tags.length - 4}</Badge>
+                <!-- Tags -->
+                {#if script.tags && script.tags.length > 0}
+                  <div class="flex flex-wrap gap-1">
+                    {#each script.tags.slice(0, 4) as tag}
+                      <Badge variant="secondary" class="text-xs">{tag}</Badge>
+                    {/each}
+                    {#if script.tags.length > 4}
+                      <Badge variant="secondary" class="text-xs">+{script.tags.length - 4}</Badge>
+                    {/if}
+                  </div>
                 {/if}
-              </div>
-            {/if}
 
-            <!-- Actions -->
-            <div
-              class="divider-edge-t divider-edge-full flex gap-2 pt-2"
-              onclick={(e) => e.stopPropagation()}
-            >
-              <Button
-                size="sm"
-                variant="outline"
-                onclick={() => handleViewScript(script)}
-                class="flex-1"
-              >
-                <Eye class="mr-1 h-3 w-3" />
-                View
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                aria-label={`Edit script ${script.name}`}
-                onclick={() => handleEditScript(script)}
-              >
-                <Edit class="h-3 w-3" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                aria-label={`Export script ${script.name}`}
-                onclick={() => handleExportScript(script)}
-              >
-                <Download class="h-3 w-3" />
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                aria-label={`Delete script ${script.name}`}
-                onclick={() => handleDeleteScript(script.id)}
-              >
-                <Trash2 class="h-3 w-3" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                <!-- Actions -->
+                <div
+                  class="divider-edge-t divider-edge-full flex gap-2 pt-2"
+                  onclick={(e) => e.stopPropagation()}
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onclick={() => handleViewScript(script)}
+                    class="flex-1"
+                  >
+                    <Eye class="mr-1 h-3 w-3" />
+                    View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Edit script ${script.name}`}
+                    onclick={() => handleEditScript(script)}
+                  >
+                    <Edit class="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Export script ${script.name}`}
+                    onclick={() => handleExportScript(script)}
+                  >
+                    <Download class="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    aria-label={`Delete script ${script.name}`}
+                    onclick={() => handleDeleteScript(script.id)}
+                  >
+                    <Trash2 class="h-3 w-3" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          {/snippet}
+        </ContextMenuList>
       {/each}
     </div>
   {/if}
