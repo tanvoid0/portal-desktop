@@ -260,8 +260,15 @@
         console.error('coder: ensureInit failed', e);
       }
 
+      const pendingPrompt = coderSession.pendingPrompt;
+      coderSession.pendingPrompt = null;
       const urlId = page.url.searchParams.get('id');
-      if (urlId) {
+      if (pendingPrompt && !urlId) {
+        // Launched from another page ("Open in Coder") with a starting prompt.
+        // openCoderSession already set up the fresh session + workspace; just
+        // pre-fill the composer and don't attach to a running thread.
+        input = pendingPrompt;
+      } else if (urlId) {
         const exists = coderSession.threads.find((t) => t.id === urlId);
         if (exists) await selectThread(exists.id);
         else {

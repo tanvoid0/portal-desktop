@@ -1,6 +1,4 @@
-import { goto } from '$app/navigation';
-import { coderSession } from '$lib/domains/coder/state/coderSession.svelte.js';
-import { coderUi } from '$lib/domains/coder/state/coderUi.svelte';
+import { openCoderSession } from '$lib/domains/coder/utils/launch';
 import { toast } from '$lib/utils/toast';
 import type { Project } from '$lib/domains/projects/types';
 
@@ -14,9 +12,6 @@ export async function openInExplorer(path: string): Promise<void> {
 }
 
 /** Points the Coder page at this project's workspace and switches to it. */
-export function launchInCoder(project: Project): void {
-  coderUi.setActiveProject(project.path, project.id);
-  coderSession.newSession();
-  coderSession.workspaceRoot = project.path;
-  void goto('/ai/coder');
+export function launchInCoder(project: Project, prompt?: string): void {
+  openCoderSession({ workspaceRoot: project.path, projectId: project.id, prompt });
 }

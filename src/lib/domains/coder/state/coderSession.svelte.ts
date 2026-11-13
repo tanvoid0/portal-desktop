@@ -260,6 +260,9 @@ class CoderSessionState {
   runtimeRevision = $state(0);
   /** Session terminal panel visibility (shared across threads). */
   terminalOpen = $state(false);
+  /** Composer text to pre-fill on the next fresh session (set by "Open in
+   *  Coder" from another page; consumed once by CoderPanel on mount). */
+  pendingPrompt = $state<string | null>(null);
 
   /** Per-thread ephemeral UI + streaming state. */
   private runtimes = $state<Record<string, ThreadRuntime>>({});

@@ -13,7 +13,9 @@
     type TaskUiState,
   } from '../state/taskUi.svelte';
   import { defaultDisplay, type TaskDisplay } from '../utils/taskDisplay';
-  import { taskStatusLabel, type Task } from '../types';
+  import { taskStatusLabel, type Task, type TaskStatus } from '../types';
+  import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
+  import { buildTaskMenu } from '../utils/taskMenu';
 
   interface Props {
     ui?: TaskUiState;
@@ -21,6 +23,12 @@
     handleTaskStatusToggle: (taskId: string) => void;
     handleTaskSelection: (taskId: string) => void;
     handleCreateSubtask: (task: Task) => void;
+    /** Right-click menu actions — omit to hide the matching item. */
+    onSetStatus?: (taskId: string, status: TaskStatus) => void;
+    onCopyReference?: (task: Task) => void;
+    onLaunchCoder?: (task: Task) => void;
+    onEditTask?: (task: Task) => void;
+    onDeleteTask?: (task: Task) => void;
     /** Project name shown next to the title (All-projects mode). */
     projectLabel?: (task: Task) => string | undefined;
     /** Override status/priority colours and icons (GitHub issues use their own). */
@@ -34,6 +42,11 @@
     handleTaskStatusToggle,
     handleTaskSelection,
     handleCreateSubtask,
+    onSetStatus,
+    onCopyReference,
+    onLaunchCoder,
+    onEditTask,
+    onDeleteTask,
     projectLabel,
     display = defaultDisplay,
     showSubtaskActions = true,
@@ -68,100 +81,114 @@
             ? 'bg-warning-50 dark:bg-warning-900/20'
             : ''}"
         >
-          <div class="flex min-w-0 items-center justify-between">
-            <!-- min-w-0 all the way down: the title's own truncate does nothing
-                 unless every flex ancestor is allowed to shrink below content. -->
-            <div class="flex min-w-0 items-center gap-3">
-              {#if taskUi.isMultiSelectMode}
-                <Checkbox
-                  checked={taskUi.selectedTaskIds.has(task.id)}
-                  onCheckedChange={() => handleTaskSelection(task.id)}
-                  onclick={(e) => e.stopPropagation()}
-                />
-              {/if}
-              <div class="flex items-center gap-1">
-                {#if showSubtaskActions && !task.parentId}
-                  <Button
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      handleCreateSubtask(task);
-                    }}
-                    variant="ghost"
-                    size="sm"
-                    class="h-8 w-8 p-0"
-                    title="Create subtask"
-                  >
-                    <FaPlus class="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                {/if}
-                <Button
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    handleTaskStatusToggle(task.id);
-                  }}
-                  variant="ghost"
-                  size="sm"
-                  class="h-8 w-8 p-0"
-                >
-                  <Icon
-                    icon={display.icon(task)}
-                    class="h-5 w-5 {display.statusColor(task.status)}"
-                  />
-                </Button>
-              </div>
+          <ContextMenuList
+            items={buildTaskMenu(task, {
+              onOpen: handleTaskSelect,
+              onSetStatus,
+              onCreateSubtask: showSubtaskActions ? handleCreateSubtask : undefined,
+              onCopyReference,
+              onLaunchCoder,
+              onEdit: onEditTask,
+              onDelete: onDeleteTask,
+            })}
+          >
+            {#snippet trigger(menuProps)}
+              <div {...menuProps} class="flex min-w-0 items-center justify-between">
+                <!-- min-w-0 all the way down: the title's own truncate does nothing
+                     unless every flex ancestor is allowed to shrink below content. -->
+                <div class="flex min-w-0 items-center gap-3">
+                  {#if taskUi.isMultiSelectMode}
+                    <Checkbox
+                      checked={taskUi.selectedTaskIds.has(task.id)}
+                      onCheckedChange={() => handleTaskSelection(task.id)}
+                      onclick={(e) => e.stopPropagation()}
+                    />
+                  {/if}
+                  <div class="flex items-center gap-1">
+                    {#if showSubtaskActions && !task.parentId}
+                      <Button
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          handleCreateSubtask(task);
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        class="h-8 w-8 p-0"
+                        title="Create subtask"
+                      >
+                        <FaPlus class="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    {/if}
+                    <Button
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        handleTaskStatusToggle(task.id);
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      class="h-8 w-8 p-0"
+                    >
+                      <Icon
+                        icon={display.icon(task)}
+                        class="h-5 w-5 {display.statusColor(task.status)}"
+                      />
+                    </Button>
+                  </div>
 
-              <div class="min-w-0">
-                <div class="flex min-w-0 items-center gap-2">
-                  <!-- A title with no spaces has no break opportunity: without
+                  <div class="min-w-0">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <!-- A title with no spaces has no break opportunity: without
                        min-w-0 + break-words it runs past the row and shoves the
                        badges out of view. -->
-                  <h4 class="min-w-0 flex-1 truncate font-medium break-words text-foreground">
-                    {task.title}
-                  </h4>
-                  {#if projectLabel?.(task)}
-                    <Badge variant="outline" class="max-w-[10rem] truncate text-xs">
-                      {projectLabel(task)}
+                      <h4 class="min-w-0 flex-1 truncate font-medium break-words text-foreground">
+                        {task.title}
+                      </h4>
+                      {#if projectLabel?.(task)}
+                        <Badge variant="outline" class="max-w-[10rem] truncate text-xs">
+                          {projectLabel(task)}
+                        </Badge>
+                      {/if}
+                      {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
+                        <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                          <FaTurnDown class="h-3 w-3" />
+                          <span>{getSubtaskCount(task.id, taskUi.tasks)}</span>
+                        </div>
+                      {/if}
+                    </div>
+                    {#if task.description}
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {task.description}
+                      </p>
+                    {/if}
+                    {#if task.tags?.length}
+                      <p class="mt-1 text-xs text-muted-foreground">
+                        {task.tags.map((t) => '#' + t).join(' ')}
+                      </p>
+                    {/if}
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                  {#if task.type}
+                    <Badge variant="outline" class="text-xs">
+                      {task.type}
                     </Badge>
                   {/if}
-                  {#if getSubtaskCount(task.id, taskUi.tasks) > 0}
-                    <div class="flex items-center gap-1 text-xs text-muted-foreground">
-                      <FaTurnDown class="h-3 w-3" />
-                      <span>{getSubtaskCount(task.id, taskUi.tasks)}</span>
-                    </div>
-                  {/if}
+
+                  <div class="flex items-center gap-1">
+                    <FaFlag class="h-4 w-4 {display.priorityColor(task.priority)}" />
+                    <Badge variant="outline" class="text-xs uppercase">
+                      {task.priority}
+                    </Badge>
+                  </div>
+
+                  <Badge class="text-sm {display.statusBadge(task.status)}">
+                    {taskStatusLabel(task.status)}
+                  </Badge>
                 </div>
-                {#if task.description}
-                  <p class="mt-1 text-sm text-muted-foreground">
-                    {task.description}
-                  </p>
-                {/if}
-                {#if task.tags?.length}
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    {task.tags.map((t) => '#' + t).join(' ')}
-                  </p>
-                {/if}
               </div>
-            </div>
-
-            <div class="flex items-center gap-3">
-              {#if task.type}
-                <Badge variant="outline" class="text-xs">
-                  {task.type}
-                </Badge>
-              {/if}
-
-              <div class="flex items-center gap-1">
-                <FaFlag class="h-4 w-4 {display.priorityColor(task.priority)}" />
-                <Badge variant="outline" class="text-xs uppercase">
-                  {task.priority}
-                </Badge>
-              </div>
-
-              <Badge class="text-sm {display.statusBadge(task.status)}">
-                {taskStatusLabel(task.status)}
-              </Badge>
-            </div>
-          </div>
+            {/snippet}
+          </ContextMenuList>
 
           <!-- Subtasks in List View -->
           {#if getTaskSubtasks(task.id).length > 0}

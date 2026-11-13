@@ -38,6 +38,9 @@
     ResponsivePanel,
   } from '$lib/components/shell';
   import { taskStatusLabel, type Task, type TaskStatus, type TaskPriority } from '../types';
+  import { copyText } from '$lib/domains/shared/utils/clipboard';
+  import { openCoderSession } from '$lib/domains/coder/utils/launch';
+  import { buildTaskReference, buildCoderPrompt } from '../utils/taskReference';
   import TaskDetail from './TaskDetail.svelte';
   import TaskFilterModal from './TaskFilterModal.svelte';
   import KanbanBoard from './KanbanBoard.svelte';
@@ -210,6 +213,60 @@
 
   function handleCreateSubtask(parentTask: Task) {
     goto(`/tasks/create?parentId=${parentTask.id}`);
+  }
+
+  /** Resolve a task's linked project (name + filesystem path) for the context menu. */
+  function taskProject(task: Task): { name?: string; path?: string; id?: string } {
+    if (task.resourceType !== 'project' || !task.resourceId) return {};
+    const p = (projectsQuery.data ?? []).find((pr) => String(pr.id) === task.resourceId);
+    return { name: p?.name, path: p?.path, id: p ? String(p.id) : task.resourceId };
+  }
+
+  async function handleSetStatus(taskId: string, status: TaskStatus) {
+    try {
+      await taskActions.updateTask(taskId, { status });
+    } catch (err) {
+      toastActions.error(
+        'Failed to update status',
+        err instanceof Error ? err.message : 'An unexpected error occurred'
+      );
+    }
+  }
+
+  function handleCopyReference(task: Task) {
+    void copyText(buildTaskReference(task, taskProject(task).name), 'Task reference copied');
+  }
+
+  function handleLaunchCoder(task: Task) {
+    const { name, path, id } = taskProject(task);
+    openCoderSession({
+      workspaceRoot: path,
+      projectId: id ?? null,
+      prompt: buildCoderPrompt(task, name),
+    });
+  }
+
+  function handleEditTask(task: Task) {
+    goto(`/tasks/${task.id}/edit`);
+  }
+
+  async function handleDeleteTask(task: Task) {
+    const subtaskCount = getSubtaskCount(task.id, taskUi.tasks);
+    const confirmed = await confirmAction(
+      `Delete "${task.title}"?${subtaskCount ? ` Also deletes ${subtaskCount} subtask${subtaskCount === 1 ? '' : 's'}.` : ''}`,
+      'Delete task',
+      { confirmLabel: 'Delete', destructive: true }
+    );
+    if (!confirmed) return;
+    try {
+      await taskActions.deleteTask(task.id);
+      toastActions.success('Task deleted');
+    } catch (err) {
+      toastActions.error(
+        'Failed to delete task',
+        err instanceof Error ? err.message : 'An unexpected error occurred'
+      );
+    }
   }
 
   function handleSelectAll() {
@@ -660,6 +717,11 @@
               {handleTaskStatusToggle}
               {handleTaskSelection}
               {handleCreateSubtask}
+              onSetStatus={handleSetStatus}
+              onCopyReference={handleCopyReference}
+              onLaunchCoder={handleLaunchCoder}
+              onEditTask={handleEditTask}
+              onDeleteTask={handleDeleteTask}
               {projectLabel}
               onShowArchive={() => navigate(selectedProject, 'archive')}
             />
@@ -669,6 +731,11 @@
               {handleTaskStatusToggle}
               {handleTaskSelection}
               {handleCreateSubtask}
+              onSetStatus={handleSetStatus}
+              onCopyReference={handleCopyReference}
+              onLaunchCoder={handleLaunchCoder}
+              onEditTask={handleEditTask}
+              onDeleteTask={handleDeleteTask}
               {projectLabel}
             />
           {/if}
