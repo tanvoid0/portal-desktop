@@ -254,39 +254,53 @@ pub async fn resolve_interrupted_move(
     Ok(row.map(|r| MoveSummary::from_row(r, false, false)))
 }
 
-/// Ends the process bound to `port`, after re-verifying `pid` is still the
-/// same process `start_time` recorded (the classic PID-reuse guard) and is
-/// still the one actually listening on `port` — the pid a caller holds could
-/// be stale by the time they act on it. Kills via `taskkill /T /F` (Windows)
-/// or `kill -9` (unix), mirroring `kill_process_tree` in
-/// `pipelines::services::execution_service` — plain `sysinfo` `kill()` only
-/// signals one process and doesn't reliably tear down a tree. Then polls up
-/// to 3s for the port to actually free, so the caller's next preflight (it
-/// always re-runs one after this resolves) sees settled state instead of
-/// racing the OS's own cleanup. `local_only`: killing an arbitrary local
-/// process by pid is squarely a this-machine action.
+/// Ends whatever's bound to `port`, after re-verifying `pid` is still the
+/// same process `start_time` recorded (the classic PID-reuse guard), is
+/// still among the pids actually listening on `port` — the pid a caller
+/// holds could be stale by the time they act on it — and passes
+/// [`usage::kill_refusal`], the same refusal rules that produced
+/// `PortWarning.killable`, now actually enforced rather than just advised.
+/// Kills every pid `usage::owning_pids` reports for `port`, not just `pid`:
+/// a pre-fork server (gunicorn/uvicorn --reload) shares its listening
+/// socket across a master + worker pids, and ending only one would leave
+/// the port held. Via `taskkill /T /F` (Windows) or `kill -9` (unix) per
+/// pid, mirroring `kill_process_tree` in
+/// `pipelines::services::execution_service`. Then polls up to 3s for the
+/// port to actually free, so the caller's next preflight (it always re-runs
+/// one after this resolves) sees settled state instead of racing the OS's
+/// own cleanup. `local_only`: killing an arbitrary local process by pid is
+/// squarely a this-machine action.
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn end_port_process(port: u16, pid: u32, start_time: u64) -> Result<(), String> {
     let mut sys = sysinfo::System::new_all();
     sys.refresh_processes();
-    let proc = sys
-        .process(sysinfo::Pid::from(pid as usize))
-        .ok_or_else(|| format!("pid {pid} is no longer running"))?;
-    if proc.start_time() != start_time {
-        return Err(format!(
-            "pid {pid} belongs to a different process now (start time changed) — refusing to end it"
-        ));
-    }
-    if usage::owning_pid(port) != Some(pid) {
+    verify_pid(&sys, pid, start_time)?;
+
+    let owners = usage::owning_pids(port);
+    if !owners.contains(&pid) {
         return Err(format!("pid {pid} is no longer the process listening on port {port}"));
     }
 
-    let out = kill_command(pid)
-        .output()
-        .map_err(|e| format!("failed to run the kill command for pid {pid}: {e}"))?;
-    if !out.status.success() {
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        return Err(format!("failed to end pid {pid}: {}", stderr.trim()));
+    // Targeted re-check right before the kill, minimizing the gap between
+    // the snapshot above and the actual kill (vs. reusing a `System` that
+    // could be hundreds of ms stale by now).
+    sys.refresh_process(sysinfo::Pid::from(pid as usize));
+    verify_pid(&sys, pid, start_time)?;
+
+    for &owner in &owners {
+        if let Some(reason) = usage::kill_refusal(&sys, owner) {
+            return Err(reason);
+        }
+    }
+
+    for owner in owners {
+        let out = kill_command(owner)
+            .output()
+            .map_err(|e| format!("failed to run the kill command for pid {owner}: {e}"))?;
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            return Err(format!("failed to end pid {owner}: {}", stderr.trim()));
+        }
     }
 
     for _ in 0..15 {
@@ -294,6 +308,18 @@ pub async fn end_port_process(port: u16, pid: u32, start_time: u64) -> Result<()
             break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+    Ok(())
+}
+
+fn verify_pid(sys: &sysinfo::System, pid: u32, start_time: u64) -> Result<(), String> {
+    let proc = sys
+        .process(sysinfo::Pid::from(pid as usize))
+        .ok_or_else(|| format!("pid {pid} is no longer running"))?;
+    if proc.start_time() != start_time {
+        return Err(format!(
+            "pid {pid} belongs to a different process now (start time changed) — refusing to end it"
+        ));
     }
     Ok(())
 }
@@ -432,4 +458,33 @@ fn moves_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .app_data_dir()
         .map_err(|e| format!("resolve app data dir: {e}"))?;
     Ok(crate::instance_data_dir(base).join("moves"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// board #216 HIGH: `end_port_process` must refuse to end the caller's
+    /// own process even when every pid/start_time/port-ownership check it
+    /// runs would otherwise pass. Binds a real listener so this process is
+    /// genuinely the OS-reported owner of `port`, then calls the command
+    /// end-to-end exactly as the command layer would.
+    #[tokio::test]
+    async fn end_port_process_refuses_to_kill_self() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let pid = std::process::id();
+
+        let mut sys = sysinfo::System::new_all();
+        sys.refresh_processes();
+        let start_time = sys
+            .process(sysinfo::Pid::from(pid as usize))
+            .expect("self pid must be visible to sysinfo")
+            .start_time();
+
+        let result = end_port_process(port, pid, start_time).await;
+        drop(listener);
+
+        assert!(result.is_err(), "must refuse to kill the caller's own process, got {result:?}");
+    }
 }

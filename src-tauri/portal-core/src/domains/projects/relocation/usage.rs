@@ -359,13 +359,6 @@ fn check_open_for_write(_path: &Path) -> Option<Signal> {
 fn check_port_warnings(path: &str, dev_port: Option<u16>, prod_port: Option<u16>) -> Vec<PortWarning> {
     let mut sys = System::new_all();
     sys.refresh_processes();
-    let self_chain = self_and_ancestors(&sys);
-    let self_uid = sysinfo::get_current_pid()
-        .ok()
-        .and_then(|pid| sys.process(pid))
-        .and_then(|p| p.user_id())
-        .cloned();
-    let windir = std::env::var("WINDIR").or_else(|_| std::env::var("SystemRoot")).ok();
 
     [dev_port, prod_port]
         .into_iter()
@@ -381,16 +374,7 @@ fn check_port_warnings(path: &str, dev_port: Option<u16>, prod_port: Option<u16>
             }
             let process_name = proc.name().to_string();
             let exe = proc.exe().map(|e| e.to_string_lossy().into_owned());
-            // ponytail: different-user detection only fires when sysinfo can read
-            // both uids; it can't on every pid (e.g. protected processes), and a
-            // miss here just leaves the check silently not blocking — a real gap,
-            // not faked as a pass.
-            let different_user = matches!(
-                (proc.user_id(), self_uid.as_ref()),
-                (Some(a), Some(b)) if a != b
-            );
-            let refusal =
-                refuse_kill(pid, &process_name, exe.as_deref(), &self_chain, different_user, windir.as_deref());
+            let refusal = kill_refusal(&sys, pid);
             let reason = refusal.clone().unwrap_or_else(|| {
                 format!("Port {port} is in use by {process_name} (pid {pid}), which isn't running from this project")
             });
@@ -426,11 +410,39 @@ fn self_and_ancestors(sys: &System) -> Vec<u32> {
     chain
 }
 
-/// Port-forwarders that proxy a port without being the real server behind
-/// it — ending one of these doesn't free the port's actual owner, it just
-/// kills the relay and confuses the user. Matched by name substring,
-/// case-insensitive, since the on-disk name varies (`wslrelay.exe` etc).
-const PORT_FORWARDERS: [&str; 3] = ["com.docker.backend", "wslrelay", "wslhost"];
+/// Builds whatever [`refuse_kill`] needs from a live `sys` snapshot and
+/// `pid`, then runs it — the single source of truth both the UI hint
+/// (`check_port_warnings`'s `killable`) and the actual kill enforcement
+/// (`end_port_process`, in the Tauri command layer / a different crate) call
+/// through. `None` means `pid` may be ended; `Some(reason)` is why not.
+pub fn kill_refusal(sys: &System, pid: u32) -> Option<String> {
+    let proc = sys.process(sysinfo::Pid::from(pid as usize))?;
+    let self_chain = self_and_ancestors(sys);
+    let self_uid = sysinfo::get_current_pid()
+        .ok()
+        .and_then(|p| sys.process(p))
+        .and_then(|p| p.user_id())
+        .cloned();
+    let windir = std::env::var("WINDIR").or_else(|_| std::env::var("SystemRoot")).ok();
+    let process_name = proc.name().to_string();
+    let exe = proc.exe().map(|e| e.to_string_lossy().into_owned());
+    // Fail closed: either uid unreadable (common for SYSTEM/elevated/protected
+    // processes on Windows, exactly when the check matters most) now counts
+    // as "different/unverifiable", not "assume same user".
+    let different_user = !matches!(
+        (proc.user_id(), self_uid.as_ref()),
+        (Some(a), Some(b)) if a == b
+    );
+    refuse_kill(pid, &process_name, exe.as_deref(), &self_chain, different_user, windir.as_deref())
+}
+
+/// Docker's own port-forwarder family — on Linux the full name can also show
+/// up truncated to 15 chars (`comm` via `/proc`), so this is a prefix check
+/// against the basename, not an exact match.
+const DOCKER_FORWARDER_PREFIX: &str = "com.docker.";
+/// Other known forwarders/relays that proxy a port without being the real
+/// server behind it.
+const OTHER_FORWARDERS: [&str; 3] = ["wslrelay", "wslhost", "vpnkit"];
 
 /// Decides whether `end_port_process` should ever be allowed to try `pid`.
 /// Pure on plain data (no sysinfo lookups) so it's unit-testable; `None`
@@ -452,15 +464,27 @@ fn refuse_kill(
         );
     }
     if different_user {
-        return Some("this process runs as a different OS user — ending it needs that user's permissions".into());
+        return Some(
+            "this process runs as a different or unverifiable OS user — ending it needs that user's permissions"
+                .into(),
+        );
     }
-    if let (Some(exe), Some(windir)) = (exe, windir) {
+    // Fail closed: an unreadable exe means the Windows-binary rule below
+    // can't fire either way, so an unknown executable is refused rather than
+    // silently waved through.
+    let Some(exe) = exe else {
+        return Some("this process's executable path couldn't be read — refusing to end it unverified".into());
+    };
+    if let Some(windir) = windir {
         if is_under(exe, windir) {
             return Some("this is a core Windows system binary and shouldn't be ended".into());
         }
     }
-    let lower = name.to_ascii_lowercase();
-    if PORT_FORWARDERS.iter().any(|f| lower.contains(f)) {
+    // Match the forwarder lists against the exe's basename, not the
+    // (possibly OS-truncated) process name — over-matching here just refuses
+    // a kill that might have been fine, which is the safe direction.
+    let basename = exe.rsplit(['/', '\\']).next().unwrap_or(exe).to_ascii_lowercase();
+    if basename.starts_with(DOCKER_FORWARDER_PREFIX) || OTHER_FORWARDERS.iter().any(|f| basename.contains(f)) {
         return Some(format!(
             "{name} only forwards this port — ending it won't free the real server behind it"
         ));
@@ -468,40 +492,55 @@ fn refuse_kill(
     None
 }
 
-/// PID of whatever is `LISTENING` on `port`, via `netstat -ano`. sysinfo has
-/// no per-socket API, so this is the pragmatic way to get from a port to a
-/// process on Windows. `pub`: also the recheck `end_port_process` (the Tauri
-/// command layer, a different crate) uses before it kills anything.
+/// Every pid `LISTENING` on `port`, via `netstat -ano`. Usually one, but
+/// listed per-line so [`owning_pid`] and the kill path (`end_port_process`,
+/// a different crate) agree on how multiple owners are handled rather than
+/// each guessing independently.
 #[cfg(target_os = "windows")]
-pub fn owning_pid(port: u16) -> Option<u32> {
-    let out = Command::new("netstat").no_window().args(["-ano"]).output().ok()?;
+pub fn owning_pids(port: u16) -> Vec<u32> {
+    let Ok(out) = Command::new("netstat").no_window().args(["-ano"]).output() else {
+        return Vec::new();
+    };
     if !out.status.success() {
-        return None;
+        return Vec::new();
     }
     let needle = format!(":{port} ");
+    let mut seen = std::collections::HashSet::new();
     String::from_utf8_lossy(&out.stdout)
         .lines()
-        .find(|l| l.contains("LISTENING") && l.contains(&needle))
-        .and_then(|l| l.split_whitespace().last())
-        .and_then(|pid| pid.parse::<u32>().ok())
+        .filter(|l| l.contains("LISTENING") && l.contains(&needle))
+        .filter_map(|l| l.split_whitespace().last())
+        .filter_map(|pid| pid.parse::<u32>().ok())
+        .filter(|pid| seen.insert(*pid))
+        .collect()
 }
 
 /// Same, via `lsof` (present on both macOS and Linux) — `-t` prints just the
-/// bare pid, one per line if several processes share the listening socket;
-/// the first is as good a guess as any.
+/// bare pid, one per line, and a pre-fork server (gunicorn/uvicorn --reload)
+/// genuinely has several worker pids sharing the inherited listening socket,
+/// so all of them are returned rather than just the first.
 #[cfg(not(target_os = "windows"))]
-pub fn owning_pid(port: u16) -> Option<u32> {
-    let out = Command::new("lsof")
+pub fn owning_pids(port: u16) -> Vec<u32> {
+    let Ok(out) = Command::new("lsof")
         .args(["-nP", &format!("-iTCP:{port}"), "-sTCP:LISTEN", "-t"])
         .output()
-        .ok()?;
+    else {
+        return Vec::new();
+    };
     if !out.status.success() {
-        return None;
+        return Vec::new();
     }
     String::from_utf8_lossy(&out.stdout)
         .lines()
-        .next()
-        .and_then(|l| l.trim().parse::<u32>().ok())
+        .filter_map(|l| l.trim().parse::<u32>().ok())
+        .collect()
+}
+
+/// First (or only) pid [`owning_pids`] finds — the display-only case
+/// (`check_port_warnings`'s single `PortWarning` per port) doesn't need the
+/// full set, the kill path does.
+pub fn owning_pid(port: u16) -> Option<u32> {
+    owning_pids(port).into_iter().next()
 }
 
 #[cfg(test)]
@@ -535,13 +574,20 @@ mod tests {
 
     #[test]
     fn refuse_kill_blocks_self_and_ancestors() {
-        assert!(refuse_kill(42, "whatever.exe", None, &[1, 42, 99], false, None).is_some());
-        assert!(refuse_kill(43, "whatever.exe", None, &[1, 42, 99], false, None).is_none());
+        let exe = Some("D:\\projects\\foo\\whatever.exe");
+        assert!(refuse_kill(42, "whatever.exe", exe, &[1, 42, 99], false, None).is_some());
+        assert!(refuse_kill(43, "whatever.exe", exe, &[1, 42, 99], false, None).is_none());
     }
 
     #[test]
     fn refuse_kill_blocks_different_user() {
         assert!(refuse_kill(42, "whatever.exe", None, &[], true, None).is_some());
+    }
+
+    #[test]
+    fn refuse_kill_blocks_unknown_exe() {
+        // Fail closed: an unreadable exe is refused, not waved through.
+        assert!(refuse_kill(42, "node.exe", None, &[], false, None).is_some());
     }
 
     #[test]
@@ -554,8 +600,25 @@ mod tests {
 
     #[test]
     fn refuse_kill_blocks_known_forwarders() {
-        assert!(refuse_kill(42, "wslrelay.exe", None, &[], false, None).is_some());
-        assert!(refuse_kill(42, "com.docker.backend.exe", None, &[], false, None).is_some());
-        assert!(refuse_kill(42, "node.exe", None, &[], false, None).is_none());
+        assert!(refuse_kill(42, "wslrelay.exe", Some("C:\\x\\wslrelay.exe"), &[], false, None).is_some());
+        assert!(refuse_kill(42, "com.docker.backend.exe", Some("/usr/bin/com.docker.backend"), &[], false, None).is_some());
+        assert!(refuse_kill(42, "vpnkit.exe", Some("C:\\x\\vpnkit.exe"), &[], false, None).is_some());
+        assert!(refuse_kill(42, "node.exe", Some("D:\\projects\\foo\\node.exe"), &[], false, None).is_none());
+    }
+
+    #[test]
+    fn refuse_kill_matches_forwarder_by_exe_basename_despite_truncated_name() {
+        // Linux's `/proc/<pid>/comm` truncates to 15 chars, so the process
+        // name alone can't carry "com.docker.backend" — the exe basename
+        // (untruncated) must still catch it.
+        let reason = refuse_kill(42, "com.docker.back", Some("/usr/bin/com.docker.backend"), &[], false, None);
+        assert!(reason.is_some());
+    }
+
+    #[test]
+    fn kill_refusal_blocks_self() {
+        let mut sys = System::new_all();
+        sys.refresh_processes();
+        assert!(kill_refusal(&sys, std::process::id()).is_some());
     }
 }
