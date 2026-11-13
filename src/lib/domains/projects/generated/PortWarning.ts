@@ -2,15 +2,9 @@
 
 /**
  * A port conflict warning: who owns the port, and enough to let the UI offer
- * "end it and continue". `killable` is a cheap hint only (can we even see the
- * process's exe path) — the real guard before ending anything is
- * `end_port_process`'s pid + `start_time` + port recheck, never this report.
+ * "end it and continue". `killable` runs the real refusal rules (see
+ * [`refuse_kill`]) — but it's still only a recommendation: the actual guard
+ * before ending anything is `end_port_process`'s own pid + `start_time` +
+ * port recheck, never this report.
  */
-export type PortWarning = {
-  port: number;
-  pid: number;
-  process_name: string;
-  start_time: number;
-  killable: boolean;
-  reason: string;
-};
+export type PortWarning = { port: number, pid: number, process_name: string, start_time: number, killable: boolean, reason: string, exe: string | null, cmdline: Array<string>, cwd: string | null, };

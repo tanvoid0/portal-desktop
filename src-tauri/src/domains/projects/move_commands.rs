@@ -22,6 +22,7 @@ use crate::domains::scripts::commands::ScriptExecutionState;
 use crate::domains::terminal::manager::TerminalManager;
 use crate::entities::{project as project_entity, project_move};
 use crate::events::{EventSinkExt, Events};
+use crate::process_ext::NoWindowExt;
 use portal_core::domains::projects::move_lock;
 use portal_core::domains::projects::relocation::types::{
     MoveSummary, NestedProject, PreflightResult, SkippedDir,
@@ -256,8 +257,14 @@ pub async fn resolve_interrupted_move(
 /// Ends the process bound to `port`, after re-verifying `pid` is still the
 /// same process `start_time` recorded (the classic PID-reuse guard) and is
 /// still the one actually listening on `port` — the pid a caller holds could
-/// be stale by the time they act on it. `local_only`: killing an arbitrary
-/// local process by pid is squarely a this-machine action.
+/// be stale by the time they act on it. Kills via `taskkill /T /F` (Windows)
+/// or `kill -9` (unix), mirroring `kill_process_tree` in
+/// `pipelines::services::execution_service` — plain `sysinfo` `kill()` only
+/// signals one process and doesn't reliably tear down a tree. Then polls up
+/// to 3s for the port to actually free, so the caller's next preflight (it
+/// always re-runs one after this resolves) sees settled state instead of
+/// racing the OS's own cleanup. `local_only`: killing an arbitrary local
+/// process by pid is squarely a this-machine action.
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn end_port_process(port: u16, pid: u32, start_time: u64) -> Result<(), String> {
     let mut sys = sysinfo::System::new_all();
@@ -273,10 +280,36 @@ pub async fn end_port_process(port: u16, pid: u32, start_time: u64) -> Result<()
     if usage::owning_pid(port) != Some(pid) {
         return Err(format!("pid {pid} is no longer the process listening on port {port}"));
     }
-    if !proc.kill() {
-        return Err(format!("failed to end pid {pid}"));
+
+    let out = kill_command(pid)
+        .output()
+        .map_err(|e| format!("failed to run the kill command for pid {pid}: {e}"))?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        return Err(format!("failed to end pid {pid}: {}", stderr.trim()));
+    }
+
+    for _ in 0..15 {
+        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
     Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn kill_command(pid: u32) -> std::process::Command {
+    let mut cmd = std::process::Command::new("taskkill");
+    cmd.no_window().args(["/PID", &pid.to_string(), "/T", "/F"]);
+    cmd
+}
+
+#[cfg(not(target_os = "windows"))]
+fn kill_command(pid: u32) -> std::process::Command {
+    let mut cmd = std::process::Command::new("kill");
+    cmd.args(["-9", &pid.to_string()]);
+    cmd
 }
 
 /// Deletes a committed move's source tree (to the Recycle Bin). `local_only`:
