@@ -20,6 +20,7 @@
   import Select from '$lib/components/ui/select.svelte';
   import { cn } from '$lib/utils';
   import Archive from '~icons/fa6-solid/box-archive';
+  import TruckMoving from '~icons/fa6-solid/truck-moving';
   import Ellipsis from '~icons/fa6-solid/ellipsis';
   import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
   import Flag from '~icons/fa6-solid/flag';
@@ -33,7 +34,10 @@
   import { openInExplorer, launchInCoder } from '$lib/domains/projects/utils/launch';
   import { goto } from '$app/navigation';
   import GitCommitDialog from '$lib/domains/coder/components/GitCommitDialog.svelte';
+  import MoveProjectDialog from './MoveProjectDialog.svelte';
   import { queryClient, invalidateProjectsList } from '$lib/domains/shared/query';
+  import { createProjectMovesQuery } from '$lib/domains/projects/queries/projectMoveQueries';
+  import { findActiveMove } from '$lib/domains/projects/api/projectMoveApi';
 
   interface Props {
     project: Project;
@@ -59,6 +63,10 @@
 
   let groupOpen = $state(false);
   let commitOpen = $state(false);
+  let moveOpen = $state(false);
+
+  const movesQuery = createProjectMovesQuery();
+  const activeMove = $derived(findActiveMove(movesQuery.data, Number(project.id)));
 
   const needsAttention = $derived(
     project.has_uncommitted_changes || (project.unpushed_commits ?? 0) > 0
@@ -155,6 +163,10 @@
         <Archive class="mr-2 h-4 w-4" />
         {project.archived ? 'Unarchive' : 'Archive'}
       </DropdownMenuItem>
+      <DropdownMenuItem disabled={!!activeMove} onclick={() => (moveOpen = true)}>
+        <TruckMoving class="mr-2 h-4 w-4" />
+        {activeMove ? 'Moving…' : 'Move folder…'}
+      </DropdownMenuItem>
       {#if eligibleParents.length > 0}
         <DropdownMenuItem onclick={() => (groupOpen = true)}>
           <FolderTree class="mr-2 h-4 w-4" />
@@ -199,3 +211,5 @@
   workspaceRoot={project.path}
   onCommitted={() => invalidateProjectsList(queryClient)}
 />
+
+<MoveProjectDialog bind:open={moveOpen} {project} />

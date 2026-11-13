@@ -9,6 +9,7 @@ export const queryKeys = {
     /** Under `projects` so any project write refetches it. */
     unavailable: ['projects', 'unavailable'] as const,
     env: (id: number) => ['projects', id, 'env'] as const,
+    moves: ['projects', 'moves'] as const,
   },
   github: {
     status: ['github', 'status'] as const,

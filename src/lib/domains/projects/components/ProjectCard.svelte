@@ -18,6 +18,8 @@
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
   import { cn } from '$lib/utils';
   import ProjectQuickActions from './ProjectQuickActions.svelte';
+  import { createProjectMovesQuery } from '$lib/domains/projects/queries/projectMoveQueries';
+  import { findActiveMove } from '$lib/domains/projects/api/projectMoveApi';
 
   interface Props {
     project: Project;
@@ -66,6 +68,8 @@
     ];
     return all.filter((t, i) => all.findIndex((o) => o.name === t.name) === i);
   });
+  const movesQuery = createProjectMovesQuery();
+  const isMoving = $derived(!!findActiveMove(movesQuery.data, Number(project.id)));
   const branch = $derived(getProjectGitBranch(project));
   const description = $derived(readableDescription(project.description));
   const lastSeen = $derived(project.last_activity ?? project.last_opened);
@@ -102,6 +106,14 @@
           {/if}
           {#if project.archived}
             <Badge class={cn('shrink-0 font-normal', getStatusColor('archived'))}>Archived</Badge>
+          {/if}
+          {#if isMoving}
+            <Badge
+              variant="outline"
+              class="shrink-0 font-normal text-amber-600 dark:text-amber-400"
+            >
+              Moving…
+            </Badge>
           {/if}
         </div>
         <div

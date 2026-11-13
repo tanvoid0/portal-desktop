@@ -12,6 +12,8 @@
   import type { CreateProjectRequest } from '$lib/domains/projects/types';
   import { breadcrumbActions } from '$lib/domains/shared/stores/breadcrumbStore';
   import { PageHeader, PageLoading, PageError } from '$lib/components/shell';
+  import { createProjectMovesQuery } from '$lib/domains/projects/queries/projectMoveQueries';
+  import { findActiveMove } from '$lib/domains/projects/api/projectMoveApi';
 
   const log = logger.createScoped('ProjectEditPage');
 
@@ -21,6 +23,8 @@
   let isLoading = $state(false);
 
   const project = $derived(projectQuery.data ?? null);
+  const movesQuery = createProjectMovesQuery();
+  const isMoving = $derived(!!findActiveMove(movesQuery.data, project ? Number(project.id) : -1));
   const loading = $derived(projectQuery.isPending);
   const loadError = $derived(
     projectQuery.isError
@@ -83,7 +87,11 @@
 </script>
 
 <div class="space-y-6">
-  <PageHeader title="Edit project" />
+  <PageHeader
+    title="Edit project"
+    badge={isMoving ? 'Moving…' : undefined}
+    badgeVariant="outline"
+  />
 
   {#if loading}
     <PageLoading message="Loading project..." />

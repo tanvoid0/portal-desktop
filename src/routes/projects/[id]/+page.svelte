@@ -62,6 +62,9 @@
     buildCreateRequest,
   } from '$lib/domains/deployments/utils/deployConfig';
   import { actions } from '$lib/domains/actions';
+  import { Badge } from '$lib/components/ui/badge';
+  import { createProjectMovesQuery } from '$lib/domains/projects/queries/projectMoveQueries';
+  import { findActiveMove } from '$lib/domains/projects/api/projectMoveApi';
 
   const log = logger.createScoped('ProjectDetailsPage');
 
@@ -141,6 +144,10 @@
 
   const modulesQuery = createProjectModulesQuery(() =>
     resolvedProjectId ? Number(resolvedProjectId) : null
+  );
+  const movesQuery = createProjectMovesQuery();
+  const isMoving = $derived(
+    !!findActiveMove(movesQuery.data, resolvedProjectId ? Number(resolvedProjectId) : -1)
   );
   const modules = $derived(modulesQuery.data ?? []);
   const hasModules = $derived(modules.length > 0);
@@ -392,6 +399,14 @@
     {@const githubUrl = toGitHubUrl(currentProject.git_repository)}
     <PageHeader title={currentProject.name} badge={currentProject.status}>
       {#snippet subtitle()}
+        {#if isMoving}
+          <Badge
+            variant="outline"
+            class="mr-2 shrink-0 font-normal text-amber-600 dark:text-amber-400"
+          >
+            Moving…
+          </Badge>
+        {/if}
         <ProjectSummary project={currentProject} />
       {/snippet}
       {#snippet actions()}

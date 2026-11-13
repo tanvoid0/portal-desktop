@@ -17,6 +17,8 @@
   import { describeModules } from '$lib/domains/projects/utils/moduleStacks';
   import { projectIconRegistry } from '$lib/domains/projects/utils/iconRegistry';
   import ProjectQuickActions from './ProjectQuickActions.svelte';
+  import { createProjectMovesQuery } from '$lib/domains/projects/queries/projectMoveQueries';
+  import { findActiveMove } from '$lib/domains/projects/api/projectMoveApi';
 
   interface Props {
     project: Project;
@@ -77,6 +79,8 @@
     ];
     return all.filter((t, i) => all.findIndex((o) => o.name === t.name) === i);
   });
+  const movesQuery = createProjectMovesQuery();
+  const isMoving = $derived(!!findActiveMove(movesQuery.data, Number(project.id)));
   const badges = $derived(allBadges.slice(0, MAX_BADGES));
   const extraBadges = $derived(Math.max(0, allBadges.length - MAX_BADGES));
   const branch = $derived(getProjectGitBranch(project));
@@ -122,6 +126,11 @@
         {/if}
         {#if project.archived}
           <Badge class={cn('shrink-0 font-normal', getStatusColor('archived'))}>Archived</Badge>
+        {/if}
+        {#if isMoving}
+          <Badge variant="outline" class="shrink-0 font-normal text-amber-600 dark:text-amber-400">
+            Moving…
+          </Badge>
         {/if}
       </div>
       {#if description}

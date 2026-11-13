@@ -34,6 +34,7 @@
   import { Badge } from '$lib/components/ui/badge';
   import { cn } from '$lib/utils';
   import DeviceAuthGuard from '$lib/components/DeviceAuthGuard.svelte';
+  import InterruptedMoveBanner from '$lib/domains/projects/components/InterruptedMoveBanner.svelte';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import ArrowRight from '~icons/fa6-solid/arrow-right';
   import RefreshCw from '~icons/fa6-solid/rotate';
@@ -358,6 +359,10 @@
           />
         </div>
       </header>
+
+      {#if !isMobileShell}
+        <InterruptedMoveBanner />
+      {/if}
 
       <!-- Main Content Area -->
       <div class="flex h-full min-h-0 w-full flex-1 overflow-hidden">
