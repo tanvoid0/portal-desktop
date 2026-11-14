@@ -55,6 +55,10 @@ impl Db {
                 path     TEXT PRIMARY KEY,
                 added_ts INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS dev_scan_roots (
+                path     TEXT PRIMARY KEY,
+                added_ts INTEGER NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS scan_cache (
                 root          TEXT PRIMARY KEY,
                 ts            INTEGER NOT NULL,
@@ -169,6 +173,42 @@ impl Db {
     pub fn remove_protected(&self, path: &str) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM protected WHERE path = ?1", params![path])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    // --- Dev scan roots ---------------------------------------------------
+
+    /// Custom folders added to the Developer tab's scan scope, so they
+    /// survive a restart instead of resetting to just drives and Home.
+    pub fn list_dev_scan_roots(&self) -> Result<Vec<String>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("SELECT path FROM dev_scan_roots ORDER BY path")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(|e| e.to_string())?);
+        }
+        Ok(out)
+    }
+
+    pub fn add_dev_scan_root(&self, path: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT OR REPLACE INTO dev_scan_roots (path, added_ts) VALUES (?1, ?2)",
+            params![path, now_secs() as i64],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn remove_dev_scan_root(&self, path: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM dev_scan_roots WHERE path = ?1", params![path])
             .map_err(|e| e.to_string())?;
         Ok(())
     }

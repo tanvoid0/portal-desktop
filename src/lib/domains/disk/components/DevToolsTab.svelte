@@ -55,6 +55,9 @@
     invoke<Location[]>('list_locations')
       .then((l) => (locations = l))
       .catch(() => (locations = []));
+    invoke<string[]>('list_dev_scan_roots')
+      .then((roots) => (scanRoots = new Set([...scanRoots, ...roots])))
+      .catch(() => {});
     const offs = [
       listen<DevCleanerCleanProgress>('dev-clean://progress', (e) => (cleanProgress = e.payload)),
       listen<ScanProgress>('scan://progress', (e) => (scanProgress = e.payload)),
@@ -72,7 +75,7 @@
     locations.filter((l) => l.kind === 'drive' || l.label === 'Home')
   );
   const customRoots = $derived(
-    [...scanRoots].filter((p) => !suggestedRoots.some((l) => l.path === p))
+    [...scanRoots].filter((p) => !suggestedRoots.some((l) => l.path === p)).sort()
   );
 
   // Deep link from the project audit: "clean this project's build output".
@@ -87,13 +90,21 @@
 
   function toggleRoot(path: string) {
     const next = new Set(scanRoots);
-    next.has(path) ? next.delete(path) : next.add(path);
+    if (next.has(path)) {
+      next.delete(path);
+      void invoke('remove_dev_scan_root', { path }).catch(() => {});
+    } else {
+      next.add(path);
+      void invoke('add_dev_scan_root', { path }).catch(() => {});
+    }
     scanRoots = next;
   }
 
   async function pickFolder() {
     const dir = await open({ directory: true, multiple: false });
-    if (typeof dir === 'string') scanRoots = new Set([...scanRoots, dir]);
+    if (typeof dir !== 'string') return;
+    scanRoots = new Set([...scanRoots, dir]);
+    void invoke('add_dev_scan_root', { path: dir }).catch(() => {});
   }
 
   function projectSubgroups(items: DevCleanerItem[]) {

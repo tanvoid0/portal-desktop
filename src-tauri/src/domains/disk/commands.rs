@@ -267,6 +267,21 @@ pub fn remove_protected(path: String, db: State<'_, Arc<Db>>) -> Result<(), Stri
     db.remove_protected(&path)
 }
 
+#[portal_rpc_macro::rpc]
+pub fn list_dev_scan_roots(db: State<'_, Arc<Db>>) -> Result<Vec<String>, String> {
+    db.list_dev_scan_roots()
+}
+
+#[portal_rpc_macro::rpc]
+pub fn add_dev_scan_root(path: String, db: State<'_, Arc<Db>>) -> Result<(), String> {
+    db.add_dev_scan_root(&path)
+}
+
+#[portal_rpc_macro::rpc]
+pub fn remove_dev_scan_root(path: String, db: State<'_, Arc<Db>>) -> Result<(), String> {
+    db.remove_dev_scan_root(&path)
+}
+
 /// Suggested scan starting points — mounted drives and common user folders.
 /// Read-only enumeration; lets the UI propose targets instead of forcing a pick.
 #[portal_rpc_macro::rpc]
