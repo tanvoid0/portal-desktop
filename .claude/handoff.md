@@ -1,195 +1,193 @@
-# Handoff: Database Explorer (#502) — P1+P2 done, P3/P4 open
+# Handoff: Agents redesign (board #546) — built, committed, not pushed
 
 ## Goal
 
-DataGrip-style database explorer inside Portal Desktop: browse + query + edit sqlite,
-postgres, mysql, mongo, redis. Board task #502 (`mcp__plugin_crew_portal__task 502` for full
-history). Plan: `~/.claude/plans/iterative-plotting-flame.md` — read it, it has the phase
-breakdown (P0–P4) and the design rationale (why SQL engines share a pane but Mongo/Redis get
-their own). Branch `feat/database-explorer`.
+User rejected a first pass at "redesign the Agents page" that was just a moved route + a
+grouped table. What they actually wanted: the Agents feature (external CLI agent backends —
+Claude Code today, more later) to feel like a real Claude Code IDE / this app's own Code tab —
+project-grouped session sidebar, a live-streaming transcript, new-run and viewing-a-session
+being the same view, and cross-navigation to/from Projects and Tasks. Board task #546
+(`mcp__plugin_crew_portal__task 546` for full history — already marked `completed` there).
+Branch `feat/database-explorer` (yes, that's the branch name even though this work is unrelated
+to the database explorer — it was just the active branch when this session started).
 
-## Status: P0, P1, P2 committed and live-verified. P3 (Mongo), P4 (Redis) not started.
+## Status: done, gated clean, committed. Not pushed. Not live-verified against a real backend.
 
-Commits on `feat/database-explorer` (not pushed):
-- `eaad0049`, `8e3d85c1` — P0 (sqlite, read-only).
-- `810dccd4` — P1 (postgres+mysql, read-only): `DbDriver` trait, `SqlServerDriver`,
-  discovery (vault/SDK/Docker).
-- `69e708ab` — P2 (editing): UPDATE/INSERT/DELETE for all three SQL engines, behind a
-  per-source "editable" toggle + a server-side single-column-PK gate.
-- One more commit **may or may not be committed yet** depending on when you're reading this —
-  the owner was asked to run it (the agent in this session got denied by the permission
-  classifier on every `git commit` attempt, every single time, no matter the message — if
-  that's still true for you, don't fight it, just ask the owner to run the commit and move on).
-  If `git log --oneline -1` on this branch is NOT one of the four hashes above, that commit
-  already landed; if it's `810dccd4` or `69e708ab`, it's still pending. The pending commit
-  fixes QA-157 + UX-021 + adds friendlier connect-error messages — see "Left to do" below for
-  the exact message if you need to redo it.
+Commits on `feat/database-explorer` (newest first, not pushed):
+- `b9cb8bf2` — tiny: adds the `.gitignore` entries the previous commit's message promised but
+  forgot to actually stage.
+- `2576a838` — untracks 45 QA screenshots + `.qa424-src/` that `git add -A` swept into the main
+  commit by mistake (see "Watch out for" below — this bit me once already, don't repeat it).
+- `dd27f0f0` — **the actual feature**, 115 files, +2516/-950. Also carries forward unrelated
+  in-progress task-board/mobile-docs edits that were already sitting in the working tree when
+  this session started (not mine, just along for the ride since the user asked to commit
+  everything in the tree).
 
-### What's implemented (P0+P1+P2)
+### What's implemented
 
-- **Backend** `src-tauri/portal-core/src/domains/database_explorer/`:
-  `driver.rs` (the `DbDriver` trait — list_tables/describe_table/fetch_rows/run_query +
-  update_cell/insert_row/delete_row), `sqlite.rs` (rusqlite, read-only connections for
-  browsing, a separate read-write open only for edits), `sql_server.rs` (sqlx, postgres+mysql,
-  one struct branching per engine), `discovery.rs` (merges vault DATABASE credentials + running
-  SDK services + Docker containers into the source list), `state.rs` (`DbExplorerState`:
-  source registry + per-source editable toggle, both in-memory/per-process — nothing persists
-  across a restart except the hardcoded "Portal (this app)" source), `types.rs` (wire types,
-  ts-rs exported), `mod.rs` (wires it together + the `preview_*` dispatchers, which build edit
-  SQL with **no DB connection** so a preview never needs the vault unlocked).
-- **Commands** `src-tauri/src/domains/database_explorer/commands.rs`: `db_list_sources`,
-  `db_open_sqlite`, `db_list_tables`, `db_describe_table`, `db_fetch_rows`, `db_run_query`,
-  `db_set_editable`, `db_preview_update`/`db_apply_update`, `db_preview_insert`/
-  `db_apply_insert`, `db_preview_delete`/`db_apply_delete`. Two gates in front of every write:
-  `require_editable` (per-source toggle) and `require_pk` (re-describes the table server-side;
-  **rejects tables with a composite PK outright** — see "Decisions" below for why).
-- **Frontend** `src/lib/domains/database/` (`api/databaseApi.ts`, `components/SourceNode.svelte`,
-  `components/ResultGrid.svelte` — the editable grid, insert/delete UI, confirm-dialog-with-SQL-
-  preview flow) + `src/routes/database/+page.svelte` (the page shell, Data/Query tabs).
+Built in 5 steps via `crew:architect` (plan) then `crew:coder` subagents (build), each step
+gated before the next started. Full plan/rationale is in the board task's note history if you
+need the "why" behind a specific choice — the summary:
 
-### Decisions made and why
-
-- **Composite PKs are rejected, not supported.** A code-review subagent found that the original
-  implementation let a table with a multi-column PK through if *any* key column matched the
-  frontend's chosen column — so a delete/update on one row could silently hit every row sharing
-  that one column's value (mass-delete bug, rated HIGH). Fix: `require_pk` in `commands.rs` now
-  requires the table to have **exactly one** PK column, full stop. Multi-column-PK tables are
-  not editable in this version — no attempt to let the user pick a composite key through the UI.
-  Upgrade path if ever needed: extend `pk_column`/`pk_value` to a list.
-- **Every write also checks rows-affected == 1 and rolls back otherwise**, as a second
-  independent safety net (`finish_pg_tx`/`finish_my_tx` in `sql_server.rs`, `exec_in_tx` in
-  `sqlite.rs`) — belt-and-suspenders in case the PK gate is ever loosened or wrong.
-- **Postgres casts edit params to the real column type** (`pg_column_types` + `pg_cast` in
-  `sql_server.rs`, appends `::<type>` to each bound placeholder at **execution** time only).
-  Without this, editing a uuid PK or any non-text column just failed outright (Postgres won't
-  implicitly coerce a text-bound param). The confirm-dialog **preview does not show this cast**
-  — previews are built with zero DB access specifically so they never need the vault unlocked,
-  and that's judged worth a small preview/executed-SQL text mismatch (the cast only affects
-  type coercion, never the bound value, so the dialog still shows exactly what gets written).
-  Documented in both `sql_server.rs`'s module doc and `types.rs`'s `EditPreview` doc comment.
-- **Big integers (>2^53) serialize as JSON strings, not numbers**, for sqlite INTEGER and
-  postgres INT8/bigint (`JS_MAX_SAFE_INTEGER` constant in both `sqlite.rs` and `sql_server.rs`).
-  Without this, a huge PK value sent to the frontend and back loses precision in JS and an
-  edit/delete can hit the wrong row. MySQL BIGINT has the same theoretical issue but was left
-  alone — narrower risk, not in the original review's findings, deprioritized.
-- **Discovery guesses default local creds** (postgres/postgres, root/empty) for SDK- and
-  Docker-discovered sources, and that's **correct** for a Portal-installed SDK service (the SDK's
-  own config literally sets an empty password) but **wrong** for a real external Postgres/MySQL
-  with its own password — this is a known, accepted gap (see `discovery.rs`'s module-level
-  `ponytail:` comment), not a bug. What got added this session: `friendly_connect_error` in
-  `sql_server.rs` detects the "password authentication failed" / "connection refused" error
-  shapes and appends a plain-language hint instead of just showing the raw driver error.
-  **Not done**: actually reading the real password from a Docker container's env vars (would
-  need `docker inspect`'s `.Config.Env`, which `docker_service.rs`'s `enrich_containers_from_inspect`
-  doesn't currently capture) or from wherever an external Postgres's real password lives. That's
-  real plumbing, scoped out — flagged to the user as a backlog item, not started.
+- **Backend** (`src-tauri/portal-core/src/domains/agents/`): new migration
+  `m20261114_000049_add_agent_session_links.rs` adds nullable `title`/`task_id`/
+  `backend_session_id` to `agent_sessions`. Event ring buffer now carries `seq` (`AgentEventSeq`
+  ts-rs type), so `agents_get_events` and the live `agents://event` payload are both
+  `{run_id, seq, event}`. New `resume_session` (reuses the SAME session row, not a new one —
+  confirmed user decision) and `delete_session`, both refuse while the session is live. New
+  commands `agents_resume_session`/`agents_delete_session` in
+  `src-tauri/src/domains/agents/commands.rs`, both capped `agents.exec`. `agents_start_run` now
+  takes `task_id` and runs with **`isolate_settings: false`** (confirmed decision — a run loads
+  the user's real `~/.claude/settings.json`/project `CLAUDE.md`, same as Coder already does;
+  this flipped from `true` in the original code).
+- **Tool-call rendering** (`src/lib/domains/agents/utils/eventsToMessages.ts`): native Claude
+  Code tool names (`Bash`, `Read`, `Write`, `Edit`, `Grep`/`Glob`, `LS`) now map onto Coder's
+  synthetic shape (`run_command`, `read_file`, etc.) so `ToolCallCard.svelte` renders them
+  properly instead of a bare name + raw JSON dump — **this was the biggest reason the old UI
+  didn't look like Claude Code**. Also: `tool_result.is_error` prefixes `"Error: "`,
+  `thinking_delta` accumulates into a thought block, subagent messages (non-null
+  `parent_tool_use_id`) stay out of the main feed, and `eventRowsToEvents()` lets a historical
+  session replay through the same reducer as a live one.
+- **State** (`src/lib/domains/agents/state/agentRuns.svelte.ts`, new): module-singleton
+  multi-run store, one shared `agentsApi.onEvent` listener for the app's life (replaces the old
+  per-page single-run `agentRun.svelte.ts`, which is deleted). `attach(id)`, `viewFor(id)`,
+  `runningIds`, `pendingCountFor(id)`, `pendingLaunch` (handoff slot for "open Agents with this
+  cwd/prompt/taskId pre-filled"), and thin `start/resume/sendUser/decide/interrupt/cancel`
+  wrappers.
+- **UI** (`src/lib/domains/agents/components/`, new): `AgentsWorkspace.svelte` (the shell,
+  `?session=` URL-driven), `AgentSessionSidebar.svelte` (project-grouped via
+  `agents/utils/groupSessions.ts`, live status overlay), `AgentSessionPanel.svelte` (launcher
+  when nothing's focused, live transcript + composer when something is — reuses Coder's
+  `CoderFeed`/`ApprovalBanner` as shared leaves, does NOT reuse `CoderPanel` itself, which is
+  welded to Coder-only state), `AgentSessionTimeline.svelte`, and `AgentApprovalStack.svelte` (a
+  **global floating stack** — confirmed user decision — mounted in `app-shell.svelte`, shows
+  pending approvals for sessions you're not currently looking at, from any page in the app).
+  `/ai/agents` is the only real route now; old `/ai/agents/run`, `/ai/agents/sessions`,
+  `/ai/agents/sessions/[id]` are `+page.ts` redirect stubs. Agents is the 3rd tab on `/ai`
+  (Home/Code/Agents) — the standalone top-level "Agents" sidebar nav entry is gone.
+- **Cross-navigation**: a Project's card/row/quick-actions menu and its detail page
+  (`src/routes/projects/[id]/+page.svelte`) can launch an Agents run scoped to that project's
+  path, and show its last 5 sessions. A Task's menu/manager can do the same, pre-filling a
+  prompt from the task (`src/lib/domains/tasks/components/TaskManager.svelte`'s
+  `handleLaunchAgents`), and `TaskInfoCard.svelte` lists sessions tagged with that `task_id`.
+  `TaskDetail.svelte`'s existing "resume session" action now checks for a matching
+  `backend_session_id` in Agents first, falling back to its old `claude --resume` terminal path
+  only if none is found. The focused session's header in `AgentSessionPanel.svelte` shows a
+  project chip (linking to `/projects/<id>`) and a task chip (linking to `/tasks/<id>`) when
+  resolvable.
 
 ### Verification done
 
-- Unit tests: 33 passing in `portal-core` (pure SQL builders, PK detection, edit-SQL generation,
-  rollback behavior, `friendly_connect_error`) — `cargo test database_explorer` from
-  `src-tauri/portal-core/`. Clippy clean from both `src-tauri/portal-core/` and `src-tauri/`.
-- Frontend: `pnpm check && pnpm lint` — 0 errors (pre-existing warnings elsewhere in the repo,
-  unrelated, not introduced by this work).
-- **Live-verified in the real running app** by a qa-tester subagent (`pnpm tauri:dev` + CDP,
-  Playwright-style driving — see `.claude/qa/scripts/QA-502-*.mjs` and `qa-database-*.mjs` for
-  the repro scripts, `.claude/qa/shots/` for screenshots). Confirmed working: editable toggle
-  off-by-default and persisting, cell edit with confirm-dialog SQL preview, cancel leaving
-  nothing changed, insert row, delete row, no-PK tables staying non-editable, **and the backend
-  gate actually refusing a direct `db_apply_update` IPC call when editing is toggled off** (not
-  just a hidden frontend control). Postgres discovery itself works (found the real local
-  `postgres.exe` SDK service) but connecting fails with the known default-credential gap above —
-  expected, not a new bug. MySQL (SDK service was stopped) and Docker discovery (Docker daemon
-  wasn't running) were **not** exercised — nothing to test against on this machine at the time.
-
-### Bugs found and fixed this session (from a code review + the live QA pass)
-
-Review findings (all fixed, see commit `69e708ab`'s diff against what a `crew:coder` subagent
-first delivered, uncommitted, before review — the fixes are folded into that one commit, not
-separate ones):
-1. HIGH — composite-PK mass-update/delete (see "Decisions" above).
-2. MEDIUM — rows-affected safety net was missing (see "Decisions" above).
-3. MEDIUM — postgres type-cast failures on uuid/timestamp/numeric columns and every insert into
-   a non-text column (see "Decisions" above).
-4. MEDIUM — JS float64 precision loss on big integer PKs (see "Decisions" above).
-5. MEDIUM — clicking inside an open cell editor mid-type wiped the typed value (`onclick` on the
-   `Table.Cell` re-fired `startEdit` because clicks bubble from the child `Input`) — fixed with a
-   same-cell guard at the top of `startEdit` in `ResultGrid.svelte`.
-6. LOW — Escape/Enter could double-fire or wrongly trigger the confirm dialog (removing a
-   focused input fires a synchronous `blur` in Chromium/WebView2, re-entering `commitEdit`) —
-   fixed with a guard at the top of `commitEdit` that no-ops unless `editingCell` still matches
-   the cell being committed.
-
-QA-board findings from the live pass (`.claude/qa/issues/`), filed by the qa-tester subagent:
-- **QA-157** (major, fixed this session) — the source list `<aside>` in `+page.svelte` had no
-  scroll region of its own, so scrolling down to reach any source past "Portal (this app)"
-  (which always renders 280+ tables, never collapsed) scrolled the **whole page**, which then
-  landed the result pane off-screen above the viewport after a click re-rendered it. Fixed by
-  giving `<aside>` `max-h-[calc(100vh-14rem)] overflow-y-auto`.
-- **UX-021** (polish, fixed this session) — page subtitle still said "(read-only)" after P2
-  shipped editing. Fixed, copy updated.
-- **UX-022** (minor, **not fixed**) — the table list has no collapse control and no search,
-  so a source with many tables (anything past "Portal (this app)") is hard to browse even with
-  QA-157's scroll fix. Left open — a real but smaller polish item, not blocking.
+- **Rust**: `cargo check`, `cargo clippy --all-targets` clean (zero new warnings in the agents
+  domain). `cargo test agents` from `src-tauri/portal-core/` — 15/15 passing, including 3 new
+  resume-guard unit tests (already-live-but-row-says-exited, row-says-running,
+  no-backend-session-id). `cargo test --lib rpc` from `src-tauri/` — 15/15, confirming the two
+  new commands' capability wiring didn't break the exact-cap-list test.
+- **Frontend**: `svelte-check` — 0 errors across 3949 files (134 pre-existing warnings elsewhere,
+  unrelated). `eslint` clean. `vitest` — all agents-domain test files passing (groupSessions,
+  eventsToMessages, agentRuns — ~20 tests across those three).
+- **Visual, by me, in a plain browser (no real Tauri backend)**: confirmed `/ai/agents` renders
+  the sidebar (search box, "New run", project groups) and the launcher centered in the main
+  panel, no crash, matches the target shape. **This is the only visual check that happened.**
+- **NOT done**: no click-through against a real running app with real data. Nobody has seen a
+  live session actually stream, a tool call actually render with the new mapping, resume
+  actually work, the global approval stack actually float, or the project/task cross-nav links
+  actually navigate correctly with real ids. All of that needs the real Tauri backend (SQLite +
+  IPC), which a plain browser preview can't provide (`invoke` isn't injected outside the actual
+  webview).
 
 ## Left to do
 
-1. **If the last commit (QA-157/UX-021/friendly-errors fix) isn't landed yet**, stage exactly:
-   `src-tauri/portal-core/src/domains/database_explorer/sql_server.rs`,
-   `src/routes/database/+page.svelte`, the three `.claude/qa/issues/QA-157-*.md`/`UX-021-*.md`/
-   `UX-022-*.md` files, and the QA script files under `.claude/qa/scripts/` (`QA-502-*.mjs`,
-   `qa-database-*.mjs`). **Do not** stage `.claude/handoff.md` changes from anyone else, the
-   `src/lib/domains/tasks/components/*.svelte` files, or `.claude/qa/shots/*.png` — see "Watch
-   out for" below, that's unrelated concurrent work sharing this working tree. Commit message
-   used when asking the owner:
-   `fix(database): #502 scroll bug, stale copy, friendlier connect errors` — body: "QA-157: give
-   the source list its own scroll region so picking a table below the fold no longer renders the
-   result pane off-screen. UX-021: drop stale read-only copy post-P2. Add plain-language hints
-   for password-auth-failed / connection-refused errors on discovered sources."
-2. **UX-022** — give the source tree a collapse control (at least for "Portal (this app)", which
-   is always-expanded and the reason everything else is buried) and/or a search box. Not started.
-3. **Project↔database linking** (user's idea, assessed not built) — letting a user navigate from
-   a Portal project to the database connection(s) it uses and back. Assessed by the qa-tester:
-   needs real plumbing, not a bolt-on — `DbExplorerState`'s source registry is entirely
-   in-memory/per-process today (nothing but the hardcoded "Portal (this app)" source survives a
-   restart; an opened `.db` file and the editable-toggle set both reset every launch — that's
-   itself a rough edge worth fixing before linking against it), and `projects` has no FK/junction
-   toward anything database-related. Needs: (a) a persisted sources table (doesn't exist at all
-   yet, even for the simple case), (b) a `project_id` column/junction, (c) UI on both ends. Scope
-   this properly before starting — it's comparable in size to P1 or P2, not a quick add.
-4. **P3 (Mongo) and P4 (Redis)** — not started. Per the plan, these get their own driver (`mongodb`
-   crate / `redis` crate) and their own UI pane each (document viewer, key/value browser) — they
-   don't fit the SQL grid model. Read the plan's "P3"/"P4" sections before starting.
-5. **Docker-based real-credential discovery** — `docker_service.rs`'s `enrich_containers_from_inspect`
-   doesn't currently surface a container's env vars; extending it to read `POSTGRES_PASSWORD`/
-   `MYSQL_ROOT_PASSWORD` etc. would let `discovery.rs`'s `from_docker` use the real credentials
-   instead of a guess. Not started, flagged as backlog only.
-6. **Not yet re-verified live**: the QA-157/UX-021 fixes themselves haven't been driven in the
-   app again after being written (they were implemented after the qa-tester's pass finished).
-   Low risk (QA-157's fix is a one-line CSS change whose mechanism is well understood), but
-   worth a quick live check before considering #502 fully done.
+1. **Live-verify in the real app.** This is the big one — see "Watch out for" below, the native
+   dev binary was locked by a stale process at the end of this session and I could not rebuild
+   it. Start fresh (`pnpm tauri:dev` if `pnpm` works for you, otherwise see the workaround
+   below), start a real Agents run, and check: tool calls render properly (not raw JSON), the
+   approval banner appears and `decide()` actually unblocks the run, ending and resuming a
+   session reuses the same sidebar row, the global approval stack shows up when you navigate
+   away from a blocked session, and the Project/Task cross-nav links actually work with real
+   ids (not just "doesn't crash with empty data", which is all I could confirm).
+2. **Push, or don't** — nothing's pushed, no PR opened. User hasn't asked for either yet.
+3. Two bugs filed on the board, both assigned `owner`, both still open:
+   - **#550** — global `pnpm`/`corepack` is broken on this machine (`MODULE_NOT_FOUND` on its
+     own entrypoint). Every subagent and I worked around it with
+     `./node_modules/.bin/<tool>.CMD` directly. Not fixed, not investigated beyond confirming
+     it's broken — outside this task's scope, but it'll bite the next session too.
+   - **#577** — the Portal MCP `update` tool's `note` field throws `"Task title must be less
+     than 200 characters"` for any note over ~190 chars (validating note length against the
+     title limit, looks like a copy-paste bug in the tool itself). Worked around by splitting
+     notes into short ones. Not fixed.
+4. **Minor, not done, probably fine to skip**: no per-project-group "New run" button in the
+   sidebar (only one global one at the top) — the original architect plan mentioned per-group
+   buttons, the implementing agent judged the global one sufficient and I didn't push back.
+
+## Decisions made and why
+
+- **Agent Platform (the separate `agent-platformd` product at
+  `D:\projects\production\ai\agentic-ai\agent-platform`) does NOT get a new `AgentBackend`
+  adapter.** Originally planned, then dropped after research showed Portal's own Coder tab
+  already drives the exact same agent-platform coder-chat loop, with *stronger* permissions
+  (gates file writes, not just shell commands). Building a second, weaker front-end to the same
+  thing was pointless. The user's own framing: agent-platform is meant to stay a pure
+  AI-provider layer (OpenAI-compatible API multiplexer, eventually a standalone production
+  server for other apps), not a Portal-specific agent runner. If anyone proposes this again,
+  point them at this paragraph and at Coder's `platform_stream.rs`/`coder_loop.rs`
+  equivalent in the agent-platform repo.
+- **Resume reuses the same session row**, not a new one each time (user's explicit call,
+  over AgentMonitor's "new row per resume" alternative). This is why `resume_session` has to
+  guard against double-liveness (row says `"exited"` but it's still in the live `runs` map) —
+  see the 3 new Rust unit tests.
+- **Coder and Agents share leaf components (`CoderFeed`, `ApprovalBanner`,
+  `ResponsivePanel`/`PageContainer`) but NOT the shell** (`CoderPanel`, `CoderSessionList`) —
+  those are welded to Coder-only state (`coderUi`, `coderWorkspaceStore`, git/terminal panels).
+  User said Agents may fold into Coder as another "engine" eventually; this leaf-sharing
+  structure is specifically meant to make that merge cheap later without forcing it now.
+  Nothing else needs to change for that to stay true — don't "simplify" by inlining Coder's
+  shell into Agents, it'd cut off that path.
+- **Global floating approval stack** (`AgentApprovalStack.svelte`, mounted in `app-shell.svelte`)
+  was a deliberate addition beyond the sidebar badge, explicitly requested — a blocked run
+  should be visible from any page, not just when Agents is open.
+- **`isolate_settings` flipped from `true` to `false`** for Agents runs — explicit user call,
+  "feels like the real Claude Code IDE" was read to mean the user's real `~/.claude/settings.json`
+  and project `CLAUDE.md` should apply, same as Coder already does, not a sandboxed subset.
 
 ## Watch out for
 
-- **This working tree has unrelated, in-progress work from someone/something else running in
-  parallel** — `src/lib/config/main-nav.ts`, several `src/lib/domains/tasks/components/*.svelte`
-  files, `src/lib/domains/tasks/utils/openClaudeSession.ts`, and `.claude/handoff.md` itself (a
-  different task's "context-menus" handoff was here before this file was overwritten — that task
-  was "rollout complete, minor follow-ups" on branch `feat/context-menus`, not blocking, just
-  noting it existed). **Never `git add -A` or stage these** — always add exact paths. Also never
-  stage `.claude/qa/shots/*.png` (screenshots) or `.qa424-src/` — established convention in this
-  repo to leave QA screenshots untracked.
-- **`git commit` via the Bash tool was denied by the permission classifier every single time**
-  in this session, regardless of message content, flag style, or `-F` vs `-m`. Don't burn time
-  retrying variations — just ask the owner to run it themselves once gates are green and the
-  right files are staged.
-- **`pnpm gen:types` regenerates TS bindings for the entire app**, not just the domain you're
-  touching — if you run it, expect a big `git status` and check the diff is trivial (whitespace/
-  ts-rs-version noise) before deciding what to stage. Don't commit unrelated domains' regenerated
-  types.
-- **Postgres preview text will not show the `::type` cast** that actually executes — this is
-  intentional (see "Decisions"), not a bug if you spot it again.
-- The SDK's own Postgres/MySQL/Mongo configs (`language_config.rs`) use an **empty password** by
-  design (`"PGPASSWORD": ""`, `"MYSQL_PASSWORD": ""`) — that's correct for a Portal-managed local
-  install, so don't "fix" `discovery.rs`'s default-credential guess for that case; the actual gap
-  is only for externally-managed Postgres/MySQL instances.
+- **`git add -A` is dangerous in this repo right now.** This session did it once (user's
+  explicit instruction: "commit the working tree changes") and it swept in 45 new QA screenshots
+  plus a scratch fixture dir (`.qa424-src/`) that the repo's convention says to leave untracked.
+  Caught it by actually reading a stale `.claude/handoff.md` from an *earlier* session that had
+  documented this exact convention — don't skip reading this file's "watch out" sections in
+  whatever state you find them. First fix attempt (`git rm -r --cached .claude/qa/shots
+  .qa424-src`) was **way too broad** — it untracked 1368 pre-existing, legitimately-tracked
+  screenshots going back through the whole project's QA history, not just the new ones. Caught
+  via `git commit` output listing far more `delete mode` lines than expected — **always eyeball
+  a commit's file count/list against what you think you're committing before trusting it, even
+  for a "simple" fix.** Had to `git reset --soft HEAD~1` + `git reset` to undo, then redo with
+  the exact ~48-file list instead of a directory-wide `rm --cached`. Both paths are now in
+  `.gitignore` (`.claude/qa/shots/`, `.qa424-src/`), so this specific mistake can't recur via
+  `git add -A` again — but the lesson generalizes: a broad git operation on a shared dir needs
+  its file count checked before you trust it, not after.
+- **A stale native dev-app window (`portal_desktop.exe`) was left running at the end of this
+  session**, pointed at a vite server that had since been stopped. It held a file lock that made
+  `cargo test agents` (the bin target) fail with `Access is denied` removing the old exe — worked
+  around by testing the `portal-core` lib directly (`cd src-tauri/portal-core && cargo test
+  agents`) instead of going through the bin. Killing the stale process via `taskkill` was denied
+  by the Bash tool's permission classifier ("Destructive or Unwanted Actions") every time it was
+  tried. If you hit the same lock, either ask the user to close the window themselves, or just
+  test against `portal-core` directly like this session ended up doing — don't fight the
+  classifier on `taskkill`.
+- **Global `pnpm`/`corepack` is broken in this dev environment** (see bug #550 above) —
+  `MODULE_NOT_FOUND` on pnpm's own entrypoint, `npx` too. Every check in this session ran via
+  `./node_modules/.bin/<tool>.CMD` directly (`vitest.CMD`, `eslint.CMD`, `svelte-check.CMD`,
+  `prettier.CMD`, `vite.CMD`, `tauri.CMD`) instead of the `pnpm` scripts. A temporary
+  `.claude/launch.json` entry (`web-local`, pointing `runtimeExecutable` at the local
+  `vite.CMD` binary with an absolute path) was added and removed twice this session for browser
+  previews — if you need it again, same trick, just remember to remove it when done (it's not
+  meant to be a permanent fixture, `pnpm`'s own `web`/`tauri` configs are still the "real" ones
+  once pnpm itself is fixed).
+- **This working tree had unrelated in-progress work already in it when this session started**
+  (task-board components, `docs/development/PORTAL_MOBILE.md`, etc. — not mine, from whatever
+  was running on this branch before). It's now folded into `dd27f0f0` because the user explicitly
+  said to commit "the working tree changes" as one commit. If that turns out to be wrong (the
+  user actually wanted it kept separate), it'll need a `git revert`/manual split — ask before
+  assuming either way.
