@@ -98,7 +98,7 @@ impl SqlServerDriver {
             .acquire_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
             .connect_with(opts)
             .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| friendly_connect_error(e.to_string()))
     }
 
     async fn my_pool(&self) -> Result<MySqlPool, String> {
@@ -117,7 +117,25 @@ impl SqlServerDriver {
             .acquire_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
             .connect_with(opts)
             .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| friendly_connect_error(e.to_string()))
+    }
+}
+
+/// Discovered (SDK/Docker) sources guess default local credentials (see the
+/// module doc) — when that guess is wrong, the raw driver error is a wall of
+/// text a non-DBA user won't parse. Recognize the two common failure shapes
+/// and append a plain-language hint; anything else passes through unchanged.
+fn friendly_connect_error(raw: String) -> String {
+    let lower = raw.to_lowercase();
+    if lower.contains("password authentication failed") || lower.contains("access denied for user") {
+        format!(
+            "{raw} — the default credentials didn't work, so this is a real password, not a down \
+             service. Save the real username/password as a vault credential for this connection."
+        )
+    } else if lower.contains("connection refused") || lower.contains("os error 10061") {
+        format!("{raw} — nothing is listening on this host/port; is the service actually running?")
+    } else {
+        raw
     }
 }
 
@@ -854,6 +872,20 @@ mod tests {
         let p = preview_update(Engine::Postgres, "orders", "id", &Value::from(7), "status", &Value::from("done"));
         assert_eq!(p.sql, "UPDATE \"orders\" SET \"status\" = $1 WHERE \"id\" = $2");
         assert_eq!(p.params, vec![Value::from("done"), Value::from(7)]);
+    }
+
+    #[test]
+    fn friendly_connect_error_hints_at_the_likely_cause() {
+        let auth = friendly_connect_error(
+            "error returned from database: password authentication failed for user \"postgres\"".to_string(),
+        );
+        assert!(auth.contains("not a down service"), "{auth}");
+
+        let refused = friendly_connect_error("Connection refused (os error 111)".to_string());
+        assert!(refused.contains("is the service actually running"), "{refused}");
+
+        let other = friendly_connect_error("relation \"orders\" does not exist".to_string());
+        assert_eq!(other, "relation \"orders\" does not exist");
     }
 
     #[test]

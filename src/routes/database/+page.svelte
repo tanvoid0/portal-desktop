@@ -75,7 +75,7 @@
 <div class="space-y-6 p-6">
   <PageHeader
     title="Database Explorer"
-    description="Browse SQLite, Postgres & MySQL (read-only) — vault, SDK and Docker sources auto-discovered"
+    description="Browse & edit SQLite, Postgres and MySQL — vault, SDK and Docker sources auto-discovered"
   >
     {#snippet actions()}
       <Button variant="outline" size="sm" onclick={pickFile} disabled={openDb.isPending}>
@@ -101,7 +101,7 @@
     />
   {:else}
     <div class="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
-      <aside class="space-y-3 rounded-md border p-2">
+      <aside class="max-h-[calc(100vh-14rem)] space-y-3 overflow-y-auto rounded-md border p-2">
         {#each sources.data as source (source.id)}
           <SourceNode
             {source}
