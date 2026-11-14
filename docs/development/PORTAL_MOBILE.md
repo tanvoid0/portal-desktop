@@ -1,7 +1,11 @@
 # Portal Mobile — the phone as a client of Portal Desktop
 
-**Status:** plan only. Phase 0 has an unverified draft on `feat/portal-mobile`
-(2026-11-12) — see "State of the tree".
+**Status:** Phase 0 (Android shell) shipped and is verified on `main`. The
+browser/other-desktop client ("Other clients", below) is in progress on
+`claude/eager-mcclintock-79e007` — Rust/daemon side compiles and the existing
+daemon tests pass; the frontend shim has not yet been exercised in a real
+browser because this environment's node/pnpm toolchain is broken (board bug
+#552) — see that section for what's done vs. still needs a live check.
 Supersedes "Phase 5 — Android client" in
 [REMOTE_ARCHITECTURE.md](REMOTE_ARCHITECTURE.md), which planned to extend Portal
 Remote's Kotlin app.
@@ -174,6 +178,67 @@ died on the full disk). Treat as a draft to read or discard, not as done:
 
 Other modified files on the branch (`actions/**`, `CLAUDE.md`, `scripts/*`,
 `portal-core/*`, `src-tauri/src/lib.rs`, handoffs) belong to other sessions.
+
+## Other clients: browser and other-desktop (2026-11-14)
+
+Phase 0's "one Android app" decision extends to any device with a browser on
+the LAN — a laptop, another PC, a tablet — with no install at all, by serving
+the same thin-client frontend build straight off the daemon instead of a
+second native shell.
+
+**Trust change (prerequisite, already landed):** `classify()` in
+`src-tauri/src/daemon/mod.rs` used to give any `Origin`-bearing request a flat
+403, which also meant the free loopback pass never had to consider browsers.
+Narrowed to: loopback only gets the free `Local` pass when there is **no**
+`Origin` header (every native command is loopback-no-Origin); an
+`Origin`-bearing request — browser-originated, loopback or remote — instead
+falls through to the same bearer-token check a remote peer needs. A visited
+page can't forge a token it was never handed, so this is what actually keeps
+it off the port, not the `Origin` value itself. `/events`'s browser
+`WebSocket` handshake can't set a custom header, so it additionally accepts
+the token as `?token=` on that one path.
+
+**The browser shim** (`src/lib/domains/mobile/browserShim.ts`) is the
+web-client counterpart to `mobile/src-tauri/src/lib.rs`: it installs
+`window.__TAURI_INTERNALS__` when `isMobileShell` is true and nothing is
+there already (so it never touches the real Android Tauri runtime), and
+mirrors the Rust shell's contract exactly — `mobile_status/_pair/_connect/
+_disconnect/_discover` run locally against `localStorage` (no filesystem in a
+browser); everything else forwards to `POST /rpc/{command}` with a bearer
+token after the same ascii-alnum/underscore command-name check
+(`mobile/src-tauri`'s `forward()`, mirrored in `commandName.ts`'s
+`isForwardableCommand`) so a command like `plugin:barcode-scanner|scan` (no
+browser equivalent — no QR scanning here, manual/discovered pairing only)
+rejects cleanly instead of forwarding garbage; `/events` is bridged with a
+plain `WebSocket` and the same capped-backoff reconnect as the Rust client. No
+transport code in the rest of the frontend changes — `invoke`/`listen` stay
+exactly what the desktop app already calls.
+
+**Serving it:** `pnpm build:client` builds the SvelteKit frontend with
+`VITE_PORTAL_MOBILE=1` to its own `build-client/` output dir (NOT `build/` —
+the desktop app's `frontendDist` already points there, and Android's mobile
+build also lands in the repo-root `build/`; a third build sharing that folder
+would silently stomp whichever one built last). The daemon serves it via a
+`fallback_service` (`tower-http`'s `ServeDir`) added to the router *after*
+`.with_state()`, which — because axum's `Router::layer` only wraps routes
+registered before it's called — puts it outside the `guard` middleware
+entirely: anyone who can reach the port gets the app shell unauthenticated,
+same as any other static site, since it holds no data or secrets; pairing and
+every `/rpc` call the shell itself then makes still go through `guard` like
+any other page-originated request. Open design call: where the daemon finds
+`build-client/` at runtime. Dev resolves it at compile time relative to
+`src-tauri`'s own manifest dir (mirrors `frontendDist` being a relative path
+in dev). Release resolves it via Tauri's own resource dir, shipped there by
+`tauri.conf.json`'s `bundle.resources` + a `beforeBundleCommand: "pnpm
+build:client"` hook — so packaging fails loudly if the client build is
+missing rather than shipping an app with a silently absent web client.
+`build-client/.gitkeep` is tracked (empty) so `cargo check`/`build` succeed
+before anyone has run the real build — `tauri-build` validates `bundle.
+resources` paths exist on every compile, not only on package.
+
+**Reachability:** unchanged from phase 0 — the LAN listener only binds when
+the remote toggle is on, so this is opt-in, not a port that's always open to
+the network.
 
 ## What happens to Portal Remote
 
