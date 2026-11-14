@@ -4,6 +4,7 @@ import FaStar from '~icons/fa6-solid/star';
 import FaBoxArchive from '~icons/fa6-solid/box-archive';
 import FaClipboard from '~icons/fa6-solid/clipboard';
 import FaRobot from '~icons/fa6-solid/robot';
+import FaBolt from '~icons/fa6-solid/bolt';
 import FaTrash from '~icons/fa6-solid/trash';
 import type { MenuItem } from '$lib/components/menu/types';
 import { buildReference } from '$lib/domains/shared/utils/entityReference';
@@ -15,6 +16,7 @@ export interface ProjectMenuHandlers {
   onSetArchived?: (project: Project, archived: boolean) => void;
   onCopyReference?: (project: Project) => void;
   onLaunchCoder?: (project: Project) => void;
+  onLaunchAgents?: (project: Project) => void;
   onDelete?: (project: Project) => void;
 }
 
@@ -71,6 +73,14 @@ export function buildProjectMenu(project: Project, h: ProjectMenuHandlers): Menu
       icon: FaRobot,
       separatorBefore: !h.onCopyReference,
       onSelect: () => h.onLaunchCoder!(project),
+    });
+  }
+  if (h.onLaunchAgents) {
+    items.push({
+      label: 'Run agent here',
+      icon: FaBolt,
+      separatorBefore: !h.onCopyReference && !h.onLaunchCoder,
+      onSelect: () => h.onLaunchAgents!(project),
     });
   }
 

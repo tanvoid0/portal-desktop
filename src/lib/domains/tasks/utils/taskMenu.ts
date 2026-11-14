@@ -3,6 +3,7 @@ import FaListCheck from '~icons/fa6-solid/list-check';
 import FaPlus from '~icons/fa6-solid/plus';
 import FaClipboard from '~icons/fa6-solid/clipboard';
 import FaRobot from '~icons/fa6-solid/robot';
+import FaBolt from '~icons/fa6-solid/bolt';
 import FaPen from '~icons/fa6-solid/pen';
 import FaTrash from '~icons/fa6-solid/trash';
 import type { MenuItem } from '$lib/components/menu/types';
@@ -14,6 +15,7 @@ export interface TaskMenuHandlers {
   onCreateSubtask?: (task: Task) => void;
   onCopyReference?: (task: Task) => void;
   onLaunchCoder?: (task: Task) => void;
+  onLaunchAgents?: (task: Task) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
 }
@@ -55,6 +57,14 @@ export function buildTaskMenu(task: Task, h: TaskMenuHandlers): MenuItem[] {
       icon: FaRobot,
       separatorBefore: !h.onCopyReference,
       onSelect: () => h.onLaunchCoder!(task),
+    });
+  }
+  if (h.onLaunchAgents) {
+    items.push({
+      label: 'Run agent here',
+      icon: FaBolt,
+      separatorBefore: !h.onCopyReference && !h.onLaunchCoder,
+      onSelect: () => h.onLaunchAgents!(task),
     });
   }
 

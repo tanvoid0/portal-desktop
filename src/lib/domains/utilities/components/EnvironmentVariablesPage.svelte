@@ -10,6 +10,7 @@
   } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
   import { Label } from '$lib/components/ui/label';
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
@@ -25,6 +26,7 @@
   import Variable from '~icons/fa6-solid/square-root-variable';
   import User from '~icons/fa6-solid/user';
   import Monitor from '~icons/fa6-solid/desktop';
+  import ListIcon from '~icons/fa6-solid/list';
   import { toast } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { isTauriEnvironment } from '$lib/utils/tauri';
@@ -50,6 +52,22 @@
   let original = $state<EnvVariable[]>([]);
   let rows = $state<EnvRow[]>([]);
   let nextId = 1;
+  let expandedValues = $state<Set<string>>(new Set());
+
+  function segments(value: string): string[] {
+    return value.split(';');
+  }
+
+  function hasMultipleSegments(value: string): boolean {
+    return segments(value).filter((s) => s.trim() !== '').length > 1;
+  }
+
+  function toggleExpanded(id: string) {
+    const next = new Set(expandedValues);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    expandedValues = next;
+  }
 
   function matchesSearch(row: EnvRow, query: string): boolean {
     const q = query.trim().toLowerCase();
@@ -134,6 +152,7 @@
         value: v.value,
         scope: v.scope,
       }));
+      expandedValues = new Set(rows.filter((r) => hasMultipleSegments(r.value)).map((r) => r.id));
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load environment variables';
     } finally {
@@ -244,16 +263,49 @@
           />
         </div>
         <div>
-          <Label for="value-{row.id}" class="mb-1.5 block text-xs">Value</Label>
-          <Input
-            id="value-{row.id}"
-            value={row.value}
-            placeholder="value"
-            oninput={(e) =>
-              updateRow(row.id, {
-                value: (e.currentTarget as HTMLInputElement).value,
-              })}
-          />
+          <div class="mb-1.5 flex items-center justify-between">
+            <Label for="value-{row.id}" class="block text-xs">Value</Label>
+            {#if hasMultipleSegments(row.value)}
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-5 w-5 {expandedValues.has(row.id) ? 'text-primary' : ''}"
+                onclick={() => toggleExpanded(row.id)}
+                aria-pressed={expandedValues.has(row.id)}
+                aria-label={expandedValues.has(row.id)
+                  ? 'Collapse to single line'
+                  : 'Split ; separated value into lines'}
+                title={expandedValues.has(row.id)
+                  ? 'Collapse to single line'
+                  : 'Split into one entry per line'}
+              >
+                <ListIcon class="h-3 w-3" />
+              </Button>
+            {/if}
+          </div>
+          {#if expandedValues.has(row.id)}
+            <Textarea
+              id="value-{row.id}"
+              value={segments(row.value).join('\n')}
+              placeholder="value"
+              rows={Math.min(Math.max(segments(row.value).length, 2), 10)}
+              class="font-mono text-sm"
+              oninput={(e) =>
+                updateRow(row.id, {
+                  value: (e.currentTarget as HTMLTextAreaElement).value.split('\n').join(';'),
+                })}
+            />
+          {:else}
+            <Input
+              id="value-{row.id}"
+              value={row.value}
+              placeholder="value"
+              oninput={(e) =>
+                updateRow(row.id, {
+                  value: (e.currentTarget as HTMLInputElement).value,
+                })}
+            />
+          {/if}
         </div>
         <div class="flex items-end">
           <Button

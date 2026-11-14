@@ -5,8 +5,9 @@ use std::sync::Arc;
 use tauri::State;
 
 use super::backend::StartParams;
-use super::events::AgentEvent;
-use super::service::{AgentRunService, AgentSessionDetail, AgentSessionSummary, BackendInfo};
+use super::service::{
+    AgentEventSeq, AgentRunService, AgentSessionDetail, AgentSessionSummary, BackendInfo,
+};
 
 // `agents` (read-only: which backends/models exist, replaying a *live* run's
 // own events) is in `DEFAULT_CAPS`. `agents.exec` (spawning a process, and
@@ -37,16 +38,42 @@ pub async fn agents_start_run(
     prompt: String,
     model: Option<String>,
     resume_session_id: Option<String>,
+    task_id: Option<String>,
 ) -> Result<String, String> {
     let params = StartParams {
         cwd,
         model,
         prompt,
         resume_session_id,
+        task_id,
         permission_mode: "manual".to_string(),
-        isolate_settings: true,
+        // #546: Agents runs should see the user's real `~/.claude/settings.json`
+        // and project `CLAUDE.md`, same as a `claude` CLI session by hand —
+        // same as coder already does (`coder/service.rs`'s own `start` call).
+        isolate_settings: false,
     };
     service.inner().start_run(&backend_id, params).await
+}
+
+/// Resumes a prior session in place (same row, same id, same backend
+/// conversation) rather than starting a new one.
+#[portal_rpc_macro::rpc(cap = "agents.exec")]
+pub async fn agents_resume_session(
+    service: State<'_, Arc<AgentRunService>>,
+    run_id: String,
+    text: String,
+) -> Result<String, String> {
+    service.inner().resume_session(&run_id, text).await
+}
+
+/// Deletes a persisted session and its transcript/event log. Refused while
+/// the session is live or persisted as `"running"`.
+#[portal_rpc_macro::rpc(cap = "agents.exec")]
+pub async fn agents_delete_session(
+    service: State<'_, Arc<AgentRunService>>,
+    session_id: String,
+) -> Result<(), String> {
+    service.delete_session(&session_id).await
 }
 
 #[portal_rpc_macro::rpc(cap = "agents.exec")]
@@ -88,7 +115,7 @@ pub async fn agents_cancel(
 pub async fn agents_get_events(
     service: State<'_, Arc<AgentRunService>>,
     run_id: String,
-) -> Result<Vec<AgentEvent>, String> {
+) -> Result<Vec<AgentEventSeq>, String> {
     Ok(service.get_events(&run_id).await)
 }
 

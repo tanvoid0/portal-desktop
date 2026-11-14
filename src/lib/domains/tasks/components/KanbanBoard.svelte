@@ -50,12 +50,15 @@
     handleCreateSubtask: (task: Task) => void;
     /** Project name to show on the card (All-projects mode); undefined hides it. */
     projectLabel?: (task: Task) => string | undefined;
+    /** Navigates to the task's linked project when its badge is clicked. */
+    onProjectClick?: (task: Task) => void;
     onTaskMove?: (taskId: string, newStatus: string) => void;
     onShowArchive?: () => void;
     /** Right-click menu actions — omit to hide the matching item. */
     onSetStatus?: (taskId: string, status: TaskStatus) => void;
     onCopyReference?: (task: Task) => void;
     onLaunchCoder?: (task: Task) => void;
+    onLaunchAgents?: (task: Task) => void;
     onEditTask?: (task: Task) => void;
     onDeleteTask?: (task: Task) => void;
     /** Override status/priority colours and icons (GitHub issues use their own). */
@@ -70,11 +73,13 @@
     handleTaskSelection,
     handleCreateSubtask,
     projectLabel,
+    onProjectClick,
     onTaskMove,
     onShowArchive,
     onSetStatus,
     onCopyReference,
     onLaunchCoder,
+    onLaunchAgents,
     onEditTask,
     onDeleteTask,
     display = defaultDisplay,
@@ -153,6 +158,7 @@
                 onCreateSubtask: showSubtaskActions ? handleCreateSubtask : undefined,
                 onCopyReference,
                 onLaunchCoder,
+                onLaunchAgents,
                 onEdit: onEditTask,
                 onDelete: onDeleteTask,
               })}
@@ -250,7 +256,21 @@
                       <div
                         class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
                       >
-                        {#if project}
+                        {#if project && onProjectClick}
+                          <Button
+                            variant="link"
+                            size="sm"
+                            class="flex h-auto min-w-0 items-center gap-1 p-0 text-xs text-muted-foreground hover:text-foreground"
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              onProjectClick?.(task);
+                            }}
+                            title={project}
+                          >
+                            <FaFolder class="h-3 w-3 shrink-0" />
+                            <span class="max-w-[10rem] truncate">{project}</span>
+                          </Button>
+                        {:else if project}
                           <span class="flex min-w-0 items-center gap-1" title={project}>
                             <FaFolder class="h-3 w-3 shrink-0" />
                             <span class="max-w-[10rem] truncate">{project}</span>
@@ -321,6 +341,7 @@
                   onSetStatus,
                   onCopyReference,
                   onLaunchCoder,
+                  onLaunchAgents,
                   onEdit: onEditTask,
                   onDelete: onDeleteTask,
                 })}

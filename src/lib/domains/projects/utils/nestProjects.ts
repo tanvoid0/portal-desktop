@@ -14,7 +14,7 @@ export interface NestedProject {
 }
 
 /** Lowercase, forward slashes, no trailing slash — Windows paths are case-insensitive. */
-function normalizePath(path: string): string {
+export function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 }
 

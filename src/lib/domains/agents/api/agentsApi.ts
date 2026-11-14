@@ -2,6 +2,7 @@ import { invokeClient } from '$lib/utils/invokeClient';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
   AgentEvent,
+  AgentEventSeq,
   AgentSessionDetail,
   AgentSessionSummary,
   BackendInfo,
@@ -19,7 +20,8 @@ export const agentsApi = {
     cwd: string,
     prompt: string,
     model?: string | null,
-    resumeSessionId?: string | null
+    resumeSessionId?: string | null,
+    taskId?: string | null
   ): Promise<string> {
     return invokeClient.post<string>('agents_start_run', {
       backendId,
@@ -27,7 +29,18 @@ export const agentsApi = {
       prompt,
       model: model ?? null,
       resumeSessionId: resumeSessionId ?? null,
+      taskId: taskId ?? null,
     });
+  },
+
+  /** Resumes a prior session in place — same row/id, same backend conversation. */
+  resumeSession(sessionId: string, text: string): Promise<string> {
+    return invokeClient.post<string>('agents_resume_session', { runId: sessionId, text });
+  },
+
+  /** Deletes a persisted session + its transcript/event log. Refused while live. */
+  deleteSession(sessionId: string): Promise<void> {
+    return invokeClient.post<void>('agents_delete_session', { sessionId });
   },
 
   sendUser(runId: string, text: string): Promise<void> {
@@ -46,20 +59,27 @@ export const agentsApi = {
     return invokeClient.post<void>('agents_cancel', { runId });
   },
 
-  /** Ring-buffer snapshot, for a UI that attaches after the run already started. */
-  getEvents(runId: string): Promise<AgentEvent[]> {
-    return invokeClient.post<AgentEvent[]>('agents_get_events', { runId });
+  /** Ring-buffer snapshot, for a UI that attaches after the run already
+   *  started — `{seq, event}` pairs so a late-attach client can tell which
+   *  persisted rows it already has. */
+  getEvents(runId: string): Promise<AgentEventSeq[]> {
+    return invokeClient.post<AgentEventSeq[]>('agents_get_events', { runId });
   },
 
   /** Run ids with a live backend process right now, so a reloaded
-   *  `/agents/run` can reattach instead of showing a blank launcher (QA-127). */
+   *  `/ai/agents/run` can reattach instead of showing a blank launcher (QA-127). */
   listRunning(): Promise<string[]> {
     return invokeClient.post<string[]>('agents_list_running');
   },
 
-  /** Live event stream for every run — filter by `run_id` in the callback. */
-  onEvent(cb: (p: { run_id: string; event: AgentEvent }) => void): Promise<UnlistenFn> {
-    return listen<{ run_id: string; event: AgentEvent }>('agents://event', (e) => cb(e.payload));
+  /** Live event stream for every run — filter by `run_id` in the callback.
+   *  `seq` orders it against the persisted/ring snapshots (`getEvents`/`getSession`). */
+  onEvent(
+    cb: (p: { run_id: string; seq: number; event: AgentEvent }) => void
+  ): Promise<UnlistenFn> {
+    return listen<{ run_id: string; seq: number; event: AgentEvent }>('agents://event', (e) =>
+      cb(e.payload)
+    );
   },
 
   /** Persisted sessions, most recent first. */

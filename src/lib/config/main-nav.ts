@@ -138,13 +138,6 @@ export function buildMainNavSections(
           badge: null,
         },
         {
-          title: 'Agents',
-          url: '/agents/run',
-          icon: 'sparkles',
-          description: 'Run an agent CLI (Claude Code) and watch it work',
-          badge: null,
-        },
-        {
           title: 'Automation',
           url: '/automation',
           icon: 'workflow',

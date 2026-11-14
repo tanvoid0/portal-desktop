@@ -2734,6 +2734,7 @@ impl CoderService {
                     model: None, // QA-024: the model picker is hidden for the CLI engine
                     prompt,
                     resume_session_id: resume,
+                    task_id: None,
                     permission_mode: cli_permission_mode.to_string(),
                     // Coder needs the user's real `~/.claude/settings.json` and
                     // project `CLAUDE.md` loaded, same as a `claude` run by

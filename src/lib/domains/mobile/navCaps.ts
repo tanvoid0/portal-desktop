@@ -6,18 +6,29 @@ const NAV_CAP: Record<string, string> = {
   '/projects': 'projects',
   '/tasks': 'tasks',
   '/terminal': 'terminal',
-  '/agents/run': 'agents',
-  '/ai': 'coder',
 };
+
+/** `/ai` hosts both the Code tab (cap `coder`) and the Agents tab (cap `agents`) —
+ *  keep the entry if either is served, and land on whichever tab the device has. */
+function aiEntryUrl(caps: string[]): string | null {
+  if (caps.includes('coder')) return '/ai/coder';
+  if (caps.includes('agents')) return '/ai/agents';
+  return null;
+}
 
 /** Keep only entries the device's caps can serve; submenus are dropped (not remote-capable). */
 export function filterNavForCaps(sections: NavSection[], caps: string[]): NavSection[] {
   return sections
     .map((s) => ({
       ...s,
-      items: s.items
-        .filter((i) => caps.includes(NAV_CAP[i.url] ?? ''))
-        .map((i) => ({ ...i, url: i.url === '/ai' ? '/ai/coder' : i.url, submenu: undefined })),
+      items: s.items.flatMap((i) => {
+        if (i.url === '/ai') {
+          const url = aiEntryUrl(caps);
+          return url ? [{ ...i, url, submenu: undefined }] : [];
+        }
+        if (!caps.includes(NAV_CAP[i.url] ?? '')) return [];
+        return [{ ...i, submenu: undefined }];
+      }),
     }))
     .filter((s) => s.items.length > 0);
 }

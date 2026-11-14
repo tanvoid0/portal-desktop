@@ -23,6 +23,8 @@
   import { confirmAction } from '$lib/utils/confirm';
   import { taskActions } from '../stores/taskStore';
   import { createTasksQuery } from '../queries/taskQueries';
+  import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
+  import { ResourceType } from '$lib/domains/shared/types/resourceType';
   import {
     getTaskStatusColor,
     getStatusBadgeColor,
@@ -31,6 +33,10 @@
     formatMinutes,
     activeSession,
   } from '../utils/taskDisplay';
+  import { openClaudeSession } from '../utils/openClaudeSession';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { agentSessionsQuery } from '$lib/domains/agents/queries/agentsQueries';
+  import { openAgentsSessionById } from '$lib/domains/agents/utils/launch';
   import SubtaskList from './SubtaskList.svelte';
   import TaskInfoCard from './TaskInfoCard.svelte';
   import TaskLinkedDocument from './TaskLinkedDocument.svelte';
@@ -62,6 +68,32 @@
   const allTasks = $derived(tasksQuery.data ?? []);
   const task = $derived(allTasks.find((t: Task) => t.id === taskId) ?? null);
   const subtasks = $derived(task ? allTasks.filter((t: Task) => t.parentId === task.id) : []);
+
+  const projectsQuery = createProjectsQuery();
+  const taskProjectPath = $derived(
+    task?.resourceType === ResourceType.PROJECT && task.resourceId
+      ? (projectsQuery.data ?? []).find((p) => String(p.id) === task.resourceId)?.path
+      : undefined
+  );
+
+  const agentSessionsResult = createQuery(agentSessionsQuery);
+
+  // A session claimed via the task board's `session:<id>` tag may now also be
+  // an Agents-page run (it persists `backend_session_id`) — prefer jumping
+  // there over a bare terminal when one matches, falling back otherwise.
+  function handleResumeSession(sessionId: string) {
+    const agentsMatch = (agentSessionsResult.data ?? []).find(
+      (s) => s.backend_session_id === sessionId
+    );
+    if (agentsMatch) {
+      openAgentsSessionById(agentsMatch.id);
+      return;
+    }
+    openClaudeSession(sessionId, {
+      title: `Claude: ${task?.title ?? sessionId}`,
+      cwd: taskProjectPath,
+    });
+  }
   const isLoading = $derived(tasksQuery.isPending);
   const error = $derived(
     tasksQuery.isError
@@ -215,7 +247,12 @@
               {taskStatusLabel(task.status)}
             </Badge>
             {#if activeSession(task)}
-              <Badge variant="outline" class="gap-1.5 text-xs">
+              <Badge
+                variant="outline"
+                class="cursor-pointer gap-1.5 text-xs hover:bg-accent"
+                title="Resume this Claude Code session in a terminal"
+                onclick={() => handleResumeSession(activeSession(task)!)}
+              >
                 <span
                   class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_6px_theme(colors.emerald.500)]"
                 ></span>

@@ -902,6 +902,7 @@ pub fn run() {
             // Agent-CLI integration (Claude Code today)
             domains::agents::agents_list_backends,
             domains::agents::agents_start_run,
+            domains::agents::agents_resume_session,
             domains::agents::agents_send_user,
             domains::agents::agents_decide_permission,
             domains::agents::agents_interrupt,
@@ -910,6 +911,7 @@ pub fn run() {
             domains::agents::agents_list_running,
             domains::agents::agents_list_sessions,
             domains::agents::agents_get_session,
+            domains::agents::agents_delete_session,
         ])
         .run(context)
         .expect("error while running tauri application");

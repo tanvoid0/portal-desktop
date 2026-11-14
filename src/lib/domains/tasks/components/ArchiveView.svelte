@@ -12,9 +12,11 @@
     tasks: Task[];
     onSelect: (task: Task) => void;
     projectLabel?: (task: Task) => string | undefined;
+    /** Navigates to the task's linked project when its badge is clicked. */
+    onProjectClick?: (task: Task) => void;
   }
 
-  let { tasks, onSelect, projectLabel }: Props = $props();
+  let { tasks, onSelect, projectLabel, onProjectClick }: Props = $props();
 
   const monthFmt = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' });
   const dayFmt = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
@@ -61,7 +63,20 @@
                 <span class="line-clamp-2 break-words">{task.title}</span>
               </Button>
               {#if project}
-                <Badge variant="outline" class="max-w-[10rem] truncate">{project}</Badge>
+                <Badge
+                  variant="outline"
+                  class={onProjectClick ? 'max-w-[10rem] cursor-pointer truncate hover:bg-accent' : 'max-w-[10rem] truncate'}
+                  onclick={
+                    onProjectClick
+                      ? (e: MouseEvent) => {
+                          e.stopPropagation();
+                          onProjectClick?.(task);
+                        }
+                      : undefined
+                  }
+                >
+                  {project}
+                </Badge>
               {/if}
               <Badge class={getStatusBadgeColor(task.status)}>{taskStatusLabel(task.status)}</Badge>
               <span class="w-14 shrink-0 text-right text-xs text-muted-foreground">

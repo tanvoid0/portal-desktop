@@ -7,6 +7,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import Icon from '@iconify/svelte';
+  import { cn } from '$lib/utils';
   import {
     taskUi as defaultTaskUi,
     getSubtaskCount,
@@ -27,10 +28,13 @@
     onSetStatus?: (taskId: string, status: TaskStatus) => void;
     onCopyReference?: (task: Task) => void;
     onLaunchCoder?: (task: Task) => void;
+    onLaunchAgents?: (task: Task) => void;
     onEditTask?: (task: Task) => void;
     onDeleteTask?: (task: Task) => void;
     /** Project name shown next to the title (All-projects mode). */
     projectLabel?: (task: Task) => string | undefined;
+    /** Navigates to the task's linked project when its badge is clicked. */
+    onProjectClick?: (task: Task) => void;
     /** Override status/priority colours and icons (GitHub issues use their own). */
     display?: TaskDisplay;
     showSubtaskActions?: boolean;
@@ -45,9 +49,11 @@
     onSetStatus,
     onCopyReference,
     onLaunchCoder,
+    onLaunchAgents,
     onEditTask,
     onDeleteTask,
     projectLabel,
+    onProjectClick,
     display = defaultDisplay,
     showSubtaskActions = true,
   }: Props = $props();
@@ -88,6 +94,7 @@
               onCreateSubtask: showSubtaskActions ? handleCreateSubtask : undefined,
               onCopyReference,
               onLaunchCoder,
+              onLaunchAgents,
               onEdit: onEditTask,
               onDelete: onDeleteTask,
             })}
@@ -144,7 +151,19 @@
                         {task.title}
                       </h4>
                       {#if projectLabel?.(task)}
-                        <Badge variant="outline" class="max-w-[10rem] truncate text-xs">
+                        <Badge
+                          variant="outline"
+                          class={cn(
+                            'max-w-[10rem] truncate text-xs',
+                            onProjectClick && 'cursor-pointer hover:bg-accent'
+                          )}
+                          onclick={onProjectClick
+                            ? (e: MouseEvent) => {
+                                e.stopPropagation();
+                                onProjectClick?.(task);
+                              }
+                            : undefined}
+                        >
                           {projectLabel(task)}
                         </Badge>
                       {/if}

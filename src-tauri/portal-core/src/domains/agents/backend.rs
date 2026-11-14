@@ -28,6 +28,9 @@ pub struct StartParams {
     pub prompt: String,
     /// Resume a prior backend session (e.g. Claude's `--resume <id>`).
     pub resume_session_id: Option<String>,
+    /// The task that launched this run, if any — persisted onto the session
+    /// row, never read by a backend itself.
+    pub task_id: Option<String>,
     /// The CLI's own `--permission-mode` (e.g. `"manual"`, `"acceptEdits"`,
     /// `"bypassPermissions"`). Empty defaults to the backend's own default
     /// (claude-code: `"manual"`, ask everything via the hook relay).

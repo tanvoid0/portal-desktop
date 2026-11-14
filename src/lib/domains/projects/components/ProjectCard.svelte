@@ -20,7 +20,7 @@
   import ProjectQuickActions from './ProjectQuickActions.svelte';
   import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
   import { buildProjectMenu, copyProjectReference } from '$lib/domains/projects/utils/projectMenu';
-  import { launchInCoder } from '$lib/domains/projects/utils/launch';
+  import { launchInCoder, launchInAgents } from '$lib/domains/projects/utils/launch';
   import { createProjectMovesQuery } from '$lib/domains/projects/queries/projectMoveQueries';
   import { findActiveMove } from '$lib/domains/projects/api/projectMoveApi';
 
@@ -87,6 +87,7 @@
     onSetArchived,
     onCopyReference: (p) => copyProjectReference(p, branch),
     onLaunchCoder: launchInCoder,
+    onLaunchAgents: launchInAgents,
     onDelete,
   })}
 >

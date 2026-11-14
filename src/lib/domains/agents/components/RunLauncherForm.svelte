@@ -12,15 +12,21 @@
   interface Props {
     backends: BackendInfo[];
     busy?: boolean;
+    /** Pre-fills the working directory, e.g. a "New run" link from a project's
+     *  session group. Seeded before `ProjectCombobox` mounts, so its own
+     *  default-value effect (which only runs when `cwd` is still empty) no-ops. */
+    initialCwd?: string;
+    /** Pre-fills the first message, e.g. a task handed off from another page. */
+    initialPrompt?: string;
     onStart: (backendId: string, cwd: string, prompt: string, model: string | null) => void;
   }
 
-  let { backends, busy = false, onStart }: Props = $props();
+  let { backends, busy = false, initialCwd, initialPrompt, onStart }: Props = $props();
 
   let backendId = $state('');
-  let cwd = $state('');
+  let cwd = $state(initialCwd ?? '');
   let model = $state('');
-  let prompt = $state('');
+  let prompt = $state(initialPrompt ?? '');
 
   $effect(() => {
     if (!backendId && backends.length > 0) backendId = backends[0].id;
@@ -36,7 +42,7 @@
   }
 </script>
 
-<div class="flex flex-col gap-3 p-4">
+<div class="mx-auto flex w-full max-w-xl flex-col gap-3 p-4">
   <div class="grid gap-1.5">
     <Label for="agent-backend">Agent</Label>
     <Select

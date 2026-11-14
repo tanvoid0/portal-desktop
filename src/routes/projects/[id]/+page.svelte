@@ -65,6 +65,12 @@
   import { Badge } from '$lib/components/ui/badge';
   import { createProjectMovesQuery } from '$lib/domains/projects/queries/projectMoveQueries';
   import { findActiveMove } from '$lib/domains/projects/api/projectMoveApi';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { agentSessionsQuery } from '$lib/domains/agents/queries/agentsQueries';
+  import { groupSessionsByProject } from '$lib/domains/agents/utils/groupSessions';
+  import { openAgentsSessionById } from '$lib/domains/agents/utils/launch';
+  import { launchInAgents } from '$lib/domains/projects/utils/launch';
+  import Bolt from '~icons/fa6-solid/bolt';
 
   const log = logger.createScoped('ProjectDetailsPage');
 
@@ -151,6 +157,15 @@
   );
   const modules = $derived(modulesQuery.data ?? []);
   const hasModules = $derived(modules.length > 0);
+
+  // Agent sessions for this project's workspace — reuses the same cwd→project
+  // matching the Agents sidebar groups by, scoped to just this one project.
+  const agentSessions = createQuery(agentSessionsQuery);
+  const agentSessionsForProject = $derived.by(() => {
+    if (!project) return [];
+    const [group] = groupSessionsByProject(agentSessions.data ?? [], [project]);
+    return group?.projectId === project.id ? group.sessions.slice(0, 5) : [];
+  });
   // An 'apps' deep link shows Overview until (and unless) the project has modules.
   const displayTab = $derived(activeTab === 'apps' && !hasModules ? 'overview' : activeTab);
 
@@ -586,6 +601,39 @@
             {refreshing}
             onRedetect={handleRedetect}
           />
+          <Card>
+            <CardHeader>
+              <CardTitle class="flex items-center gap-2">
+                <Bolt class="h-5 w-5" />
+                Agent sessions
+              </CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-1.5">
+              {#if agentSessionsForProject.length === 0}
+                <p class="text-sm text-muted-foreground">No runs yet.</p>
+              {:else}
+                {#each agentSessionsForProject as session (session.id)}
+                  <Button
+                    variant="link"
+                    size="sm"
+                    class="h-auto w-full justify-start truncate p-0 text-left font-normal"
+                    onclick={() => openAgentsSessionById(session.id)}
+                  >
+                    {session.title || session.backend_id}
+                  </Button>
+                {/each}
+              {/if}
+              <Button
+                variant="outline"
+                size="sm"
+                class="mt-2 gap-2"
+                onclick={() => launchInAgents(currentProject)}
+              >
+                <Bolt class="h-3.5 w-3.5" />
+                New run
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </ResponsivePanel>
     </div>

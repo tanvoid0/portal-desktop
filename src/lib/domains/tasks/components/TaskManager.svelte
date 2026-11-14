@@ -42,6 +42,7 @@
   import { taskStatusLabel, type Task, type TaskStatus, type TaskPriority } from '../types';
   import { copyText } from '$lib/domains/shared/utils/clipboard';
   import { openCoderSession } from '$lib/domains/coder/utils/launch';
+  import { openAgentsSession } from '$lib/domains/agents/utils/launch';
   import { buildTaskReference, buildCoderPrompt } from '../utils/taskReference';
   import TaskDetail from './TaskDetail.svelte';
   import TaskFilterModal from './TaskFilterModal.svelte';
@@ -256,6 +257,17 @@
       projectId: id ?? null,
       prompt: buildCoderPrompt(task, name),
     });
+  }
+
+  function handleLaunchAgents(task: Task) {
+    const { name, path } = taskProject(task);
+    if (!path) return;
+    openAgentsSession({ cwd: path, prompt: buildCoderPrompt(task, name), taskId: task.id });
+  }
+
+  function handleProjectClick(task: Task) {
+    const { id } = taskProject(task);
+    if (id) goto(`/projects/${id}`);
   }
 
   function handleEditTask(task: Task) {
@@ -710,6 +722,7 @@
                 tasks={taskUi.archivedTasks}
                 onSelect={handleTaskSelect}
                 {projectLabel}
+                onProjectClick={handleProjectClick}
               />
             {/if}
           {:else if !hasAnyVisible}
@@ -728,9 +741,11 @@
               onSetStatus={handleSetStatus}
               onCopyReference={handleCopyReference}
               onLaunchCoder={handleLaunchCoder}
+              onLaunchAgents={handleLaunchAgents}
               onEditTask={handleEditTask}
               onDeleteTask={handleDeleteTask}
               {projectLabel}
+              onProjectClick={handleProjectClick}
               onShowArchive={() => navigate(selectedProject, 'archive')}
             />
           {:else}
@@ -742,9 +757,11 @@
               onSetStatus={handleSetStatus}
               onCopyReference={handleCopyReference}
               onLaunchCoder={handleLaunchCoder}
+              onLaunchAgents={handleLaunchAgents}
               onEditTask={handleEditTask}
               onDeleteTask={handleDeleteTask}
               {projectLabel}
+              onProjectClick={handleProjectClick}
             />
           {/if}
         </div>

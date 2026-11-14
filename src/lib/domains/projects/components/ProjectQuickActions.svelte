@@ -31,7 +31,12 @@
   import Trash2 from '~icons/fa6-solid/trash';
   import Unlink from '~icons/fa6-solid/link-slash';
   import WandSparkles from '~icons/fa6-solid/wand-magic-sparkles';
-  import { openInExplorer, launchInCoder } from '$lib/domains/projects/utils/launch';
+  import FaBolt from '~icons/fa6-solid/bolt';
+  import {
+    openInExplorer,
+    launchInCoder,
+    launchInAgents,
+  } from '$lib/domains/projects/utils/launch';
   import { goto } from '$app/navigation';
   import GitCommitDialog from '$lib/domains/coder/components/GitCommitDialog.svelte';
   import MoveProjectDialog from './MoveProjectDialog.svelte';
@@ -108,6 +113,16 @@
     onclick={() => launchInCoder(project)}
   >
     <WandSparkles class="h-4 w-4" />
+  </Button>
+  <Button
+    variant="ghost"
+    size="icon"
+    class="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+    title="Run agent here"
+    aria-label="Run agent on {project.name}"
+    onclick={() => launchInAgents(project)}
+  >
+    <FaBolt class="h-4 w-4" />
   </Button>
 
   <DropdownMenu>

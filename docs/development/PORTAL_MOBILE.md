@@ -1,7 +1,8 @@
-# Portal Mobile — the phone as a client of Portal Desktop
+# Portal Mobile — the phone (and any other device) as a client of Portal Desktop
 
-**Status:** plan only. Phase 0 has an unverified draft on `feat/portal-mobile`
-(2026-11-12) — see "State of the tree".
+**Status:** Phase 0 shipped and verified on `main` (`7aeed3da`, `b575e599`,
+2026-11-12/13) — real-phone pairing confirmed end to end. See "State of the
+tree" for what's built and the open follow-ups.
 Supersedes "Phase 5 — Android client" in
 [REMOTE_ARCHITECTURE.md](REMOTE_ARCHITECTURE.md), which planned to extend Portal
 Remote's Kotlin app.
@@ -9,10 +10,11 @@ Remote's Kotlin app.
 ## Product
 
 Portal is a tool for software developers: it automates and simplifies day-to-day
-development, on the PC and from the phone. The phone is the same product at a
-distance — check a pipeline, answer an agent's permission prompt, steer a coder
-thread, triage the board — not a media remote. Same Wi-Fi today; an
-intermediate relay for any-internet access later.
+development, on the PC and from any secondary device — phone, laptop, another
+desktop. The secondary device is the same product at a distance — check a
+pipeline, answer an agent's permission prompt, steer a coder thread, triage the
+board — not a media remote. Same Wi-Fi today; an intermediate relay for
+any-internet access later.
 
 That ordering decides priorities: developer workflows first, PC control
 (trackpad, mirror) after.
@@ -34,6 +36,18 @@ Portal itself means tasks, projects, coder, agents, terminal, pipelines — abou
 30 frontend domains that already exist here in Svelte. Rebuilding them in
 Compose doubles every future feature. With the thin client the phone UI _is_ the
 desktop UI, so it cannot drift.
+
+## Other clients: laptop, a second desktop
+
+The transport (`/rpc` + `/events` over a Bearer token) and the UI (this repo's
+`src/`) are already device-agnostic — nothing below is phone-specific. A
+laptop or another desktop reaching your main PC needs no Android/Tauri shell
+at all: it already has a browser. Point it at the daemon with a thin web
+build of `src/` (same `VITE_PORTAL_MOBILE` flag family, same `/connect`
+pairing flow) and it's the identical client, just served as a page instead of
+an APK. One client implementation (phase 0-3 below), two delivery shapes:
+installed app (phone) and browser page (laptop/desktop). Falls out of the
+existing plan; not a separate phase to design.
 
 ## How it works
 
@@ -161,19 +175,36 @@ Each ships on its own.
   ceilings until that is resolved).
 - Reviewer pass on the catch-all handler and `/whoami` (trust boundary).
 
-**State of the tree (2026-11-12)** — a first attempt was started and stopped
-mid-flight; it is **unverified and never compiled to completion** (one build
-died on the full disk). Treat as a draft to read or discard, not as done:
+**State of the tree (2026-11-13)** — Phase 0 is done, on `main`, debug APK
+built and installed on a real phone, pairing handshake confirmed over the LAN.
+Full account: [.claude/handoff-portal-mobile-apk.md](../../.claude/handoff-portal-mobile-apk.md).
 
-- `mobile/` (Cargo.toml, tauri.conf.json, capabilities, `src/lib.rs`,
-  `frontend.mjs`; no `gen/android` yet)
-- `src/lib/domains/mobile/*`, `src/routes/connect/+page.svelte`
-- edits to `package.json`, `pnpm-lock.yaml`, `src/app.css`, `src/app.html`,
-  `src/lib/components/layout/app-shell.svelte`, `src/lib/utils/notify.ts`,
-  `src/routes/+layout.svelte`, `src-tauri/src/daemon/mod.rs`
+- `mobile/` — Rust shell (`src/lib.rs`: catch-all invoke handler, `mobile_*`
+  commands, events bridge), `tauri.conf.json`, capabilities. `gen/android/` is
+  gitignored (generated Gradle project; a machine-specific build-runner path
+  fix lives only there, see follow-ups below).
+- `src/lib/domains/mobile/*` (`connection.svelte.ts`, `navCaps.ts`,
+  `pairUrl.ts`, `shell.ts`), `src/routes/connect/+page.svelte`.
+- `src-tauri/src/daemon/mod.rs` — `/whoami`, `/events` frames, `/rpc/{cmd}`,
+  `/pair/request`, UDP discovery `:8765`.
+- Frontend glue: `+layout.svelte` (connect gate), `app-shell.svelte` (nav
+  cap-filter + disconnect), `notify.ts` (guarded), `app.html`/`app.css`
+  (viewport-fit, 16px mobile inputs).
 
-Other modified files on the branch (`actions/**`, `CLAUDE.md`, `scripts/*`,
-`portal-core/*`, `src-tauri/src/lib.rs`, handoffs) belong to other sessions.
+**Open follow-ups** (none block using the app; tracked loosely under board
+task #542, pick up as wanted):
+
+1. **Real bug:** the pairing notification's "Review" button doesn't navigate
+   to `/devices` — `notify()`'s action wiring
+   (`src/lib/components/layout/app-shell.svelte` / `src/lib/utils/notify.ts`).
+   Pairing still completes if you reach `/devices` another way.
+2. **Durable build fix:** `tauri android init` regenerates
+   `gen/android/buildSrc/.../BuildTask.kt` with a bare `tauri` arg that fails
+   (`MODULE_NOT_FOUND`); it needs hand-patching to the absolute CLI path every
+   time. Not started.
+3. UDP discovery (`mobile_discover`) not independently confirmed — the test
+   phone's busybox `nc` lacks `-b`. Manual host/port pairing works regardless.
+4. Phases 1-6 below — not started; each ships on its own.
 
 ## What happens to Portal Remote
 

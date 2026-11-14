@@ -51,6 +51,9 @@
   import SidebarTooltip from '$lib/components/shell/sidebar-tooltip.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
   import { buildMainNavSections } from '$lib/config/main-nav';
+  import { AGENTS_BASE } from '$lib/config/agents-tabs';
+  import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte.js';
+  import AgentApprovalStack from '$lib/domains/agents/components/AgentApprovalStack.svelte';
   import { isMobileShell } from '$lib/domains/mobile/shell';
   import { mobileConnection } from '$lib/domains/mobile/connection.svelte';
   import { filterNavForCaps } from '$lib/domains/mobile/navCaps';
@@ -203,10 +206,10 @@
         initNotify().then((fn) => {
           unlistenNotify = fn;
         });
+      void agentRuns.ensureInit();
       agentsApi
         .onEvent(({ run_id, event }) => {
-          const route =
-            page.url.pathname === '/agents/run' ? '/agents/run' : `/agents/sessions/${run_id}`;
+          const route = `${AGENTS_BASE}?session=${run_id}`;
           if (event.type === 'turn_done' && !event.is_error) {
             // Errored turns are reported by the `exited` branch below instead —
             // skip here so the user doesn't see "finished" then "failed".
@@ -514,6 +517,9 @@
 
   <!-- Global confirmation dialog -->
   <ConfirmDialog />
+
+  <!-- Floating approval stack for agent runs not currently in view -->
+  <AgentApprovalStack />
 
   <!-- Launch-time update prompt -->
   {#if !isMobileShell}

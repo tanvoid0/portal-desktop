@@ -291,61 +291,61 @@
           {:else}
             <!-- Subtask Display -->
             <div class="rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex min-w-0 flex-1 items-center gap-2">
-                  <Icon
-                    icon={getTaskIcon(subtask)}
-                    class="h-4 w-4 shrink-0 {getTaskStatusColor(subtask.status)}"
-                  />
+              <div class="flex min-w-0 items-center gap-2">
+                <Icon
+                  icon={getTaskIcon(subtask)}
+                  class="h-4 w-4 shrink-0 {getTaskStatusColor(subtask.status)}"
+                />
+                {#if onOpenSubtask}
+                  <Button
+                    variant="link"
+                    class="h-auto min-w-0 p-0 text-left font-medium"
+                    onclick={() => onOpenSubtask?.(subtask.id)}
+                    title="View subtask details"
+                  >
+                    <span class="truncate">{subtask.title}</span>
+                  </Button>
+                {:else}
+                  <span class="truncate font-medium">{subtask.title}</span>
+                {/if}
+                {#if subtask.type}
+                  <Badge variant="outline" class="shrink-0 text-xs">{subtask.type}</Badge>
+                {/if}
+              </div>
+              <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <Badge class={getStatusBadgeColor(subtask.status)}>
+                  {taskStatusLabel(subtask.status)}
+                </Badge>
+                <div class="flex gap-1">
                   {#if onOpenSubtask}
                     <Button
-                      variant="link"
-                      class="h-auto min-w-0 p-0 text-left font-medium"
+                      variant="ghost"
+                      size="icon"
+                      class="h-7 w-7"
                       onclick={() => onOpenSubtask?.(subtask.id)}
                       title="View subtask details"
                     >
-                      <span class="truncate">{subtask.title}</span>
+                      <FaEye class="h-3.5 w-3.5" />
                     </Button>
-                  {:else}
-                    <span class="truncate font-medium">{subtask.title}</span>
                   {/if}
-                  {#if subtask.type}
-                    <Badge variant="outline" class="shrink-0 text-xs">{subtask.type}</Badge>
-                  {/if}
-                </div>
-                <div class="flex shrink-0 items-center gap-2">
-                  <Badge class={getStatusBadgeColor(subtask.status)}>
-                    {taskStatusLabel(subtask.status)}
-                  </Badge>
-                  <div class="flex gap-1">
-                    {#if onOpenSubtask}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => onOpenSubtask?.(subtask.id)}
-                        title="View subtask details"
-                      >
-                        <FaEye class="h-4 w-4" />
-                      </Button>
-                    {/if}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => startEditSubtask(subtask)}
-                      title="Edit subtask"
-                    >
-                      <FaPencil class="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={() => handleDeleteSubtask(subtask.id)}
-                      title="Delete subtask"
-                      class="text-destructive hover:text-destructive"
-                    >
-                      <FaTrash class="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-7 w-7"
+                    onclick={() => startEditSubtask(subtask)}
+                    title="Edit subtask"
+                  >
+                    <FaPencil class="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-7 w-7 text-destructive hover:text-destructive"
+                    onclick={() => handleDeleteSubtask(subtask.id)}
+                    title="Delete subtask"
+                  >
+                    <FaTrash class="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
               {#if subtask.description}
