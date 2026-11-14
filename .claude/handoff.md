@@ -30,7 +30,7 @@ can on your own, shut down if you hit something that needs a click"):
      running desktop app — needs the native window. Computer-use access
      needs a one-time permission dialog the user has to click; user was AFK,
      so per their instruction this was left rather than waited on.
-   Docs + board task #542 updated with this.
+     Docs + board task #542 updated with this.
 3. **Could not live-verify the Agents redesign** in the native dev window for
    the same reason — same computer-use permission-dialog blocker. Skipped,
    per the same instruction.
