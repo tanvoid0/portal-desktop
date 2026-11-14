@@ -25,6 +25,7 @@
     isDueToday,
     isDueThisWeek,
     formatMinutes,
+    activeSession,
   } from '../utils/taskDisplay';
   import type { Task } from '../types';
 
@@ -134,6 +135,16 @@
             >
               <FaLockOpen class="mr-1 h-3 w-3" />
               Blocking
+            </Badge>
+          {/if}
+
+          <!-- Active session -->
+          {#if activeSession(task)}
+            <Badge variant="outline" class="gap-1.5 text-xs">
+              <span
+                class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_6px_theme(colors.emerald.500)]"
+              ></span>
+              <span class="max-w-[8ch] truncate text-muted-foreground">{activeSession(task)}</span>
             </Badge>
           {/if}
         </div>

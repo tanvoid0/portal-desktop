@@ -9,7 +9,9 @@ use crate::domains::tasks::services::task_service::TaskService;
 use crate::domains::tasks::types::{
     ChildTaskInfo, ConversationMessage, ParentTaskInfo, SiblingTaskInfo, TaskContext,
 };
+use crate::events::{EventSinkExt, Events};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 use tauri::State;
 
@@ -133,6 +135,7 @@ pub struct TaskFiltersCommand {
 #[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn create_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
+    events: State<'_, Events>,
     command: CreateTaskCommand,
 ) -> Result<TaskResponse, String> {
     // Validation
@@ -207,19 +210,19 @@ pub async fn create_task(
         blocks: command.blocks,
     };
 
-    task_service
-        .create_task(request)
-        .await
-        .map(TaskResponse::from)
-        .map_err(|e| {
-            eprintln!("Failed to create task: {}", e);
-            e.to_string()
-        })
+    let result = task_service.create_task(request).await.map_err(|e| {
+        eprintln!("Failed to create task: {}", e);
+        e.to_string()
+    })?;
+
+    events.emit("tasks://changed", json!({ "taskId": result.id }));
+    Ok(TaskResponse::from(result))
 }
 
 #[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn update_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
+    events: State<'_, Events>,
     id: i32,
     command: UpdateTaskCommand,
 ) -> Result<TaskResponse, String> {
@@ -304,19 +307,19 @@ pub async fn update_task(
         blocks: command.blocks,
     };
 
-    task_service
-        .update_task(id, request)
-        .await
-        .map(TaskResponse::from)
-        .map_err(|e| {
-            eprintln!("Failed to update task: {}", e);
-            e.to_string()
-        })
+    let result = task_service.update_task(id, request).await.map_err(|e| {
+        eprintln!("Failed to update task: {}", e);
+        e.to_string()
+    })?;
+
+    events.emit("tasks://changed", json!({ "taskId": id }));
+    Ok(TaskResponse::from(result))
 }
 
 #[portal_rpc_macro::rpc(cap = "tasks")]
 pub async fn delete_task(
     db_manager: State<'_, Arc<DatabaseManager>>,
+    events: State<'_, Events>,
     id: i32,
 ) -> Result<(), String> {
     if id <= 0 {
@@ -327,10 +330,14 @@ pub async fn delete_task(
 
     // Check if task exists before deleting
     match task_service.get_task(id).await {
-        Ok(Some(_)) => task_service.delete_task(id).await.map_err(|e| {
-            eprintln!("Failed to delete task: {}", e);
-            e.to_string()
-        }),
+        Ok(Some(_)) => {
+            task_service.delete_task(id).await.map_err(|e| {
+                eprintln!("Failed to delete task: {}", e);
+                e.to_string()
+            })?;
+            events.emit("tasks://changed", json!({ "taskId": id }));
+            Ok(())
+        }
         Ok(None) => Err("Task not found".to_string()),
         Err(e) => {
             eprintln!("Failed to check if task exists: {}", e);

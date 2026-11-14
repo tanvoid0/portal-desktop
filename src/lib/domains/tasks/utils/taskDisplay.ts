@@ -52,6 +52,17 @@ export function getTaskIcon(task: Task): string {
   }
 }
 
+const SESSION_STALE_MS = 15 * 60 * 1000; // ponytail: heuristic — a crashed agent leaves this stuck "active" for up to 15min; tighten with a real heartbeat if that proves common
+
+/** Session id (from a `session:<id>` tag) claiming this task, or null if not in-progress, untagged, or stale. */
+export function activeSession(task: Task): string | null {
+  if (task.status !== 'in-progress') return null;
+  const tag = task.tags?.find((t) => t.startsWith('session:'));
+  if (!tag) return null;
+  if (Date.now() - task.updatedAt.getTime() > SESSION_STALE_MS) return null;
+  return tag.slice('session:'.length);
+}
+
 const isOpen = (t: Task) => t.status !== 'completed' && t.status !== 'cancelled';
 
 export function isOverdue(t: Task): boolean {

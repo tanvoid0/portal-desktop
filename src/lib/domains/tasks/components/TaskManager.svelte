@@ -22,9 +22,12 @@
   import { Input } from '$lib/components/ui/input';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { listen } from '@tauri-apps/api/event';
   import { taskActions, isLoading, error } from '../stores/taskStore';
   import { taskUi, getSubtaskCount, hasProject } from '../state/taskUi.svelte';
   import { createTasksQuery } from '../queries/taskQueries';
+  import { invalidateTaskCaches } from '../queries/invalidateTasks';
+  import { queryClient } from '$lib/domains/shared/query';
   import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
@@ -64,6 +67,16 @@
     } else if (tasksQuery.isSuccess) {
       error.set(null);
     }
+  });
+
+  // Tasks can change from outside the app (daemon RPC) too, not just our own
+  // mutations — refetch on the backend's fan-out event rather than polling.
+  $effect(() => {
+    let unlisten: (() => void) | undefined;
+    listen('tasks://changed', () => invalidateTaskCaches(queryClient)).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
   });
 
   // Selection lives in the URL: ?project=<id|all|none>&view=board|list|archive&task=<id>
