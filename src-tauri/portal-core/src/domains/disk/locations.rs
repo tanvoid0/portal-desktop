@@ -53,13 +53,9 @@ pub fn suggested_locations() -> Vec<Location> {
     if let Some(home) = home {
         // The home root itself, e.g. C:\Users\{username}.
         if Path::new(&home).exists() {
-            let label = Path::new(&home)
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| "Home".into());
             out.push(Location {
                 path: home.clone(),
-                label,
+                label: "Home".into(),
                 kind: "folder".into(),
             });
         }

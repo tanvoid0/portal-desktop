@@ -79,7 +79,11 @@ impl DevCleaner for ContainerRuntimeCleaner {
         })
     }
 
-    fn clean(&self, items: &[DevCleanerItem]) -> (Vec<CleanedItem>, Vec<FailedCleanItem>) {
+    fn clean(
+        &self,
+        items: &[DevCleanerItem],
+        _permanent: bool,
+    ) -> (Vec<CleanedItem>, Vec<FailedCleanItem>) {
         let mut cleaned = Vec::new();
         let mut failed = Vec::new();
 

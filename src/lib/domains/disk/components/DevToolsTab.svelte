@@ -26,6 +26,7 @@
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Checkbox } from '$lib/components/ui/checkbox';
+  import { Label } from '$lib/components/ui/label';
   import { Table, TableBody, TableCell, TableRow } from '$lib/components/ui/table';
   import Boxes from '~icons/fa6-solid/boxes-stacked';
   import Container from '~icons/fa6-solid/cube';
@@ -50,6 +51,7 @@
   let status = $state('');
   let locations = $state<Location[]>([]);
   let scanRoots = $state<Set<string>>(new Set());
+  let permanentDelete = $state(false);
 
   onMount(() => {
     invoke<Location[]>('list_locations')
@@ -193,11 +195,21 @@
 
   async function clean() {
     if (!scanResult || selected.size === 0) return;
-    const items = allItems
-      .filter((i) => selected.has(i.id))
-      .map((i) => ({ cleanerId: i.cleanerId, id: i.id, path: i.path, kind: i.kind }));
+    const chosen = allItems.filter((i) => selected.has(i.id));
+    const items = chosen.map((i) => ({
+      cleanerId: i.cleanerId,
+      id: i.id,
+      path: i.path,
+      kind: i.kind,
+      permanent: permanentDelete && i.cleanerId === 'projects' && i.risk === 'Safe',
+    }));
+    const permCount = items.filter((i) => i.permanent).length;
     const ok = await confirmAction(
-      `Remove ${items.length} selected item(s) (${fmtBytes(selectedBytes)})?\n\nProject folders go to the Recycle Bin and can be restored. Container resources are removed by Docker/Podman and cannot.`,
+      `Remove ${items.length} selected item(s) (${fmtBytes(selectedBytes)})?\n\n${
+        permCount > 0
+          ? `${permCount} Safe project item${permCount === 1 ? '' : 's'} will be permanently deleted — not recoverable. `
+          : ''
+      }Other project folders go to the Recycle Bin and can be restored. Container resources are removed by Docker/Podman and cannot.`,
       'Remove selected',
       { confirmLabel: 'Remove' }
     );
@@ -327,13 +339,19 @@
       count={selected.size}
       bytes={selectedBytes}
       disabled={busy}
-      actionLabel={containerSelected ? 'Remove selected' : 'Move to Recycle Bin'}
+      actionLabel={containerSelected || permanentDelete ? 'Remove selected' : 'Move to Recycle Bin'}
       onaction={clean}
     >
       {#snippet tools()}
         <Button variant="outline" size="sm" onclick={selectSafe}>Select all Safe</Button>
         <Button variant="outline" size="sm" onclick={selectAll}>Select all</Button>
         <Button variant="outline" size="sm" onclick={() => (selected = new Set())}>Clear</Button>
+        <div class="flex items-center gap-1.5">
+          <Checkbox bind:checked={permanentDelete} id="devtools-permanent" />
+          <Label for="devtools-permanent" class="text-xs font-normal text-muted-foreground">
+            Delete Safe project folders permanently
+          </Label>
+        </div>
       {/snippet}
     </SelectionBar>
   {/if}

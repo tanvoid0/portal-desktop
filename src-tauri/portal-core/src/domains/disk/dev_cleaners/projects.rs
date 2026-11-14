@@ -161,12 +161,17 @@ impl DevCleaner for ProjectDevCleaner {
         })
     }
 
-    fn clean(&self, items: &[DevCleanerItem]) -> (Vec<CleanedItem>, Vec<FailedCleanItem>) {
+    fn clean(
+        &self,
+        items: &[DevCleanerItem],
+        permanent: bool,
+    ) -> (Vec<CleanedItem>, Vec<FailedCleanItem>) {
         let batch: Vec<QuarantineItem> = items
             .iter()
             .map(|i| QuarantineItem {
                 path: i.path.clone(),
                 kind: i.kind.clone(),
+                permanent,
             })
             .collect();
         let result = quarantine::quarantine(batch, |_| {});

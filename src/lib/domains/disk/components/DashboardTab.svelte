@@ -14,6 +14,8 @@
   import Boxes from '~icons/fa6-solid/boxes-stacked';
   import Trash2 from '~icons/fa6-solid/trash';
   import Container from '~icons/fa6-solid/cube';
+  import Broom from '~icons/fa6-solid/broom';
+  import SweepDialog from './SweepDialog.svelte';
 
   let {
     active,
@@ -104,9 +106,14 @@
     const used = Math.max(0, d.totalBytes - d.availableBytes);
     return d.totalBytes > 0 ? Math.min(100, (used / d.totalBytes) * 100) : 0;
   }
+
+  let sweepOpen = $state(false);
 </script>
 
 <div class="mb-4 flex items-center gap-3">
+  <Button onclick={() => (sweepOpen = true)}>
+    <Broom class="size-3.5" /> Review & Clean Everything
+  </Button>
   <Button
     variant="outline"
     size="sm"
@@ -118,6 +125,8 @@
     {loading ? 'Refreshing…' : 'Refresh'}
   </Button>
 </div>
+
+<SweepDialog bind:open={sweepOpen} />
 
 <div class="mb-2 text-xs tracking-wide text-muted-foreground uppercase">Disk storage</div>
 <div class="{DISK_DRIVE_GRID} mb-6">

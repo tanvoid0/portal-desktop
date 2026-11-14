@@ -9,6 +9,10 @@ use ts_rs::TS;
 pub struct QuarantineItem {
     pub path: String,
     pub kind: String,
+    /// Hard-delete instead of moving to the Recycle Bin. Only ever set by the
+    /// UI for items it already restricted to Safe risk — not re-checked here.
+    #[serde(default)]
+    pub permanent: bool,
 }
 
 #[derive(Serialize, TS)]
@@ -67,9 +71,17 @@ fn path_size(p: &std::path::Path) -> u64 {
         .sum()
 }
 
-/// Moves each path to the OS Recycle Bin / Trash. Never a hard delete — every
-/// action is reversible by the user from their trash. This is the only place
-/// the app touches user files destructively.
+fn hard_delete(path: &std::path::Path) -> Result<(), String> {
+    if path.is_dir() {
+        std::fs::remove_dir_all(path).map_err(|e| e.to_string())
+    } else {
+        std::fs::remove_file(path).map_err(|e| e.to_string())
+    }
+}
+
+/// Moves each path to the OS Recycle Bin / Trash, unless the item is marked
+/// `permanent` — then it is hard-deleted instead. This is the only place the
+/// app touches user files destructively.
 /// `on_progress` is invoked once after each item is processed, plus once up
 /// front so the UI can render a full bar before the first (possibly slow) move.
 pub fn quarantine<F: FnMut(QuarantineProgress)>(
@@ -102,7 +114,12 @@ pub fn quarantine<F: FnMut(QuarantineProgress)>(
             continue;
         }
         let size = path_size(path);
-        match trash::delete(path) {
+        let outcome = if item.permanent {
+            hard_delete(path)
+        } else {
+            trash::delete(path).map_err(|e| e.to_string())
+        };
+        match outcome {
             Ok(_) => {
                 reclaimed_bytes += size;
                 moved.push(MovedItem {
@@ -114,7 +131,7 @@ pub fn quarantine<F: FnMut(QuarantineProgress)>(
             Err(e) => failed.push(FailedItem {
                 path: item.path,
                 kind: item.kind,
-                error: e.to_string(),
+                error: e,
             }),
         }
         on_progress(QuarantineProgress {

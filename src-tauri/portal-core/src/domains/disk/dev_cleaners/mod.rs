@@ -79,6 +79,10 @@ pub struct DevCleanerCleanItem {
     pub id: String,
     pub path: String,
     pub kind: String,
+    /// Hard-delete instead of moving to the Recycle Bin. Ignored by cleaners
+    /// (containers) that are already permanent by nature.
+    #[serde(default)]
+    pub permanent: bool,
 }
 
 #[derive(Serialize, TS)]
@@ -133,7 +137,11 @@ pub trait DevCleaner: Send + Sync {
         ctx: &DevCleanerScanContext,
         hooks: Option<&DevCleanerWalkHooks<'_>>,
     ) -> Result<DevCleanerGroup, String>;
-    fn clean(&self, items: &[DevCleanerItem]) -> (Vec<CleanedItem>, Vec<FailedCleanItem>);
+    fn clean(
+        &self,
+        items: &[DevCleanerItem],
+        permanent: bool,
+    ) -> (Vec<CleanedItem>, Vec<FailedCleanItem>);
 }
 
 fn registry() -> Vec<Box<dyn DevCleaner>> {
@@ -216,7 +224,7 @@ pub fn clean_items<F: FnMut(DevCleanerCleanProgress)>(
             group_label: None,
         };
 
-        let (mut ok, mut err) = cleaner.clean(&[dev_item]);
+        let (mut ok, mut err) = cleaner.clean(&[dev_item], item.permanent);
         for c in &ok {
             reclaimed_bytes += c.size_bytes;
         }

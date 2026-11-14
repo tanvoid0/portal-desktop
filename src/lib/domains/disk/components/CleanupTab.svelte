@@ -37,6 +37,7 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import { Checkbox } from '$lib/components/ui/checkbox';
+  import { Label } from '$lib/components/ui/label';
   import { Progress } from '$lib/components/ui/progress';
   import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import {
@@ -59,6 +60,7 @@
   let expanded = $state<Set<string>>(new Set());
   let status = $state('');
   let cached = $state<CachedScan | null>(null);
+  let permanentDelete = $state(false);
   let locations = $state<Location[]>([]);
   let verifying = $state(false);
   let verifyProgress = $state<VerifyProgress | null>(null);
@@ -264,18 +266,25 @@
 
   async function quarantine() {
     if (!summary || selected.size === 0) return;
-    const items = summary.proposals
-      .filter((p) => selected.has(p.id))
-      .map((p) => ({ path: p.path, kind: p.kind }));
+    const proposals = summary.proposals.filter((p) => selected.has(p.id));
+    const items = proposals.map((p) => ({
+      path: p.path,
+      kind: p.kind,
+      permanent: permanentDelete && p.risk === 'Safe',
+    }));
+    const permCount = items.filter((i) => i.permanent).length;
+    const binCount = items.length - permCount;
     const ok = await confirmAction(
-      `Move ${items.length} item(s) (${fmtBytes(selectedBytes)}) to the Recycle Bin?\n\nNothing is permanently deleted — you can restore from the Recycle Bin.`,
-      'Move to Recycle Bin',
-      { confirmLabel: 'Move' }
+      permCount > 0
+        ? `Remove ${items.length} item(s) (${fmtBytes(selectedBytes)})?\n\n${permCount} Safe item${permCount === 1 ? '' : 's'} will be permanently deleted — not recoverable.${binCount ? ` ${binCount} other item${binCount === 1 ? '' : 's'} go to the Recycle Bin.` : ''}`
+        : `Move ${items.length} item(s) (${fmtBytes(selectedBytes)}) to the Recycle Bin?\n\nNothing is permanently deleted — you can restore from the Recycle Bin.`,
+      permCount > 0 ? 'Remove selected' : 'Move to Recycle Bin',
+      { confirmLabel: permCount > 0 ? 'Delete' : 'Move' }
     );
     if (!ok) return;
     busy = true;
     qProgress = { done: 0, total: items.length, currentPath: '' };
-    status = 'Moving to Recycle Bin…';
+    status = permCount > 0 ? 'Removing…' : 'Moving to Recycle Bin…';
     try {
       const res = await invoke<QuarantineResult>('quarantine_paths', { items });
       status = `Reclaimed ${fmtBytes(res.reclaimedBytes)} · ${res.moved.length} moved · ${res.failed.length} failed`;
@@ -429,10 +438,22 @@
     </div>
   {/if}
 
-  <SelectionBar count={selected.size} bytes={selectedBytes} disabled={busy} onaction={quarantine}>
+  <SelectionBar
+    count={selected.size}
+    bytes={selectedBytes}
+    disabled={busy}
+    onaction={quarantine}
+    actionLabel={permanentDelete ? 'Remove selected' : 'Move to Recycle Bin'}
+  >
     {#snippet tools()}
       <Button variant="outline" size="sm" onclick={selectSafe}>Select all Safe</Button>
       <Button variant="outline" size="sm" onclick={() => (selected = new Set())}>Clear</Button>
+      <div class="flex items-center gap-1.5">
+        <Checkbox bind:checked={permanentDelete} id="cleanup-permanent" />
+        <Label for="cleanup-permanent" class="text-xs font-normal text-muted-foreground">
+          Delete Safe items permanently
+        </Label>
+      </div>
       <Button variant="outline" size="sm" onclick={() => (expanded = new Set(folderPaths(tree)))}>
         Expand all
       </Button>
