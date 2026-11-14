@@ -8,14 +8,18 @@
   import { mobileConnection, type DiscoveredDesktop } from '$lib/domains/mobile/connection.svelte';
   import { parsePairUrl } from '$lib/domains/mobile/pairUrl';
   import { getErrorMessage } from '$lib/utils/errorMessage';
+  import { isBrowserClient } from '$lib/domains/mobile/browserShim';
 
   const DEFAULT_PORT = 18420;
 
   let desktops = $state<DiscoveredDesktop[]>([]);
   let searching = $state(true);
-  let deviceName = $state('Android phone');
-  let host = $state('');
-  let port = $state(String(DEFAULT_PORT));
+  let deviceName = $state(isBrowserClient ? 'This browser' : 'Android phone');
+  // The daemon has no CORS layer, so a browser client's fetch can only ever reach the
+  // origin the page itself was served from — prefill it rather than let someone type a
+  // host that will just fail with an opaque "cannot reach" once the preflight is blocked.
+  let host = $state(isBrowserClient ? window.location.hostname : '');
+  let port = $state(isBrowserClient ? window.location.port || String(DEFAULT_PORT) : String(DEFAULT_PORT));
   let error = $state<string | null>(null);
   /** Label of the desktop awaiting approval; null when idle. */
   let waitingFor = $state<string | null>(null);
