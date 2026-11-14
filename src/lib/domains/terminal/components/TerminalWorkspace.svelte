@@ -23,6 +23,7 @@
   import CommandPalette from './CommandPalette.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
+  import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
   import Blocks from '~icons/fa6-solid/cubes';
   import Bot from '~icons/fa6-solid/robot';
   import StickyNote from '~icons/fa6-solid/note-sticky';
@@ -55,6 +56,9 @@
 
   let widgetRail = $state<WidgetRailState>(loadWidgetRailState());
   let deepLinkHandled = $state(false);
+  // Side-by-side at 70/30 is too cramped on a phone-width window; stack the
+  // widget rail below the terminal there instead.
+  const isMobile = new IsMobile();
 
   const tabs = $derived($terminalStore.tabs.filter(tabFilter));
   const activeTabId = $derived($terminalStore.activeTabId);
@@ -205,7 +209,10 @@
 
             <div class="min-h-0 flex-1">
               {#if widgetRail.open && widgetRail.activeWidgets.length > 0}
-                <ResizablePaneGroup direction="horizontal" class="h-full">
+                <ResizablePaneGroup
+                  direction={isMobile.current ? 'vertical' : 'horizontal'}
+                  class="h-full"
+                >
                   <ResizablePane defaultSize={70} minSize={40} class="min-h-0">
                     <div class="h-full min-h-0">
                       {#key `${tab.id}:${sessionSettings.defaultShell}:${sessionSettings.workingDirectory}`}

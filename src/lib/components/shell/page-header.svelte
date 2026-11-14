@@ -23,9 +23,9 @@
   }: Props = $props();
 </script>
 
-<div class="flex items-center justify-between gap-4">
+<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
   <div class="flex min-w-0 items-center gap-2">
-    <h1 class="shrink-0 text-xl font-semibold">{title}</h1>
+    <h1 class="min-w-0 truncate text-xl font-semibold">{title}</h1>
     {#if badge}
       <Badge variant={badgeVariant}>{badge}</Badge>
     {/if}
@@ -39,7 +39,7 @@
     {/if}
   </div>
   {#if actions}
-    <div class="flex shrink-0 items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       {@render actions()}
     </div>
   {/if}

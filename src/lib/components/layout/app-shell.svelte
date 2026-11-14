@@ -9,6 +9,7 @@
   import { goto, afterNavigate } from '$app/navigation';
   import type { Snippet } from 'svelte';
   import { notify, initNotify } from '$lib/utils/notify';
+  import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
   import { agentsApi } from '$lib/domains/agents/api/agentsApi';
   import { Button } from '$lib/components/ui/button';
   import ThemeToggle from '$lib/components/ui/theme-toggle.svelte';
@@ -79,7 +80,12 @@
   let hideMainSidebar = $derived(shouldHideMainSidebar(page.url.pathname));
   let isFillViewport = $derived(isViewportFillRoute(page.url.pathname));
   let isDomainLayout = $derived(isShellSidebarRoute(page.url.pathname));
-  let sidebarOpen = $state(true);
+  const isMobileViewport = new IsMobile();
+  // Starts collapsed on a phone-width viewport: the sidebar context mirrors
+  // this `open` value into the mobile Sheet's open state at construction, so
+  // defaulting to `true` meant the nav sidebar auto-opened as a full-page
+  // overlay on first mobile visit, before anyone touched it.
+  let sidebarOpen = $state(!isMobileViewport.current);
 
   // Main application navigation sections — derived from dashboard query cache.
   const navigationSections = $derived<NavSection[]>(
@@ -160,12 +166,15 @@
     try {
       log.info('Initializing application');
 
-      // Initialize sidebar open/closed state from cookie.
+      // Initialize sidebar open/closed state from cookie. Skipped on mobile:
+      // the cookie is a desktop preference, and applying it there would
+      // reopen the full-page overlay on revisit whenever it was last left
+      // open on desktop.
       const cookieOpen = readSidebarCookieOpen();
       // Always show sidebar on the app root (`/`) regardless of persisted state.
       // This prevents the sidebar from appearing "missing" when users previously
       // closed it and then return to `/` (especially on mobile/offcanvas mode).
-      if (page.url.pathname !== '/' && cookieOpen !== null) {
+      if (!isMobileViewport.current && page.url.pathname !== '/' && cookieOpen !== null) {
         sidebarOpen = cookieOpen;
       }
       // Initialize backend log listener to receive logs from Rust backend

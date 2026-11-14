@@ -2,6 +2,8 @@
  * Workspace sidebar + main panel state for the coder session view.
  */
 
+import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
+
 export type WorkspacePanel =
   'chat' | 'terminal' | 'files' | 'file' | 'browser' | 'changes' | 'git-changes';
 
@@ -16,7 +18,10 @@ export interface WorkspaceTab {
 }
 
 class CoderWorkspaceStore {
-  sidebarOpen = $state(true);
+  // ResponsivePanel renders this as a full-screen Sheet on mobile, so it must
+  // not default open there the way it does on desktop.
+  #isMobile = new IsMobile();
+  sidebarOpen = $state(!this.#isMobile.current);
   expanded = $state<Record<string, boolean>>({
     terminal: true,
     files: false,

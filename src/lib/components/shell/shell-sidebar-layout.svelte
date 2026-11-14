@@ -21,6 +21,7 @@
   } from '$lib/components/ui/sidebar';
 
   import { SIDEBAR_DOMAIN_COOKIE_NAME } from '$lib/components/ui/sidebar/constants.js';
+  import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 
   interface Props {
     sidebar: Snippet<[]>;
@@ -54,7 +55,13 @@
     mobileTriggerLabel = 'Section menu',
   }: Props = $props();
 
-  let domainSidebarOpen = $state(true);
+  const isMobile = new IsMobile();
+
+  // Starts collapsed on a phone-width viewport: the sidebar context mirrors
+  // this `open` value into the mobile Sheet's open state at construction, so
+  // defaulting to `true` meant the domain sidebar auto-opened as a full-page
+  // overlay on first mobile visit, before anyone touched it.
+  let domainSidebarOpen = $state(!isMobile.current);
 
   function readDomainSidebarCookie(): boolean | null {
     if (typeof document === 'undefined') return null;
@@ -73,6 +80,10 @@
   }
 
   onMount(() => {
+    // The cookie is a desktop preference; applying it on mobile would reopen
+    // the overlay on repeat visits whenever it was last left open on desktop.
+    if (isMobile.current) return;
+
     const cookieOpen = readDomainSidebarCookie();
 
     if (cookieOpen !== null) {

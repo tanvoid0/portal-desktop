@@ -199,10 +199,11 @@ Full account: [.claude/handoff-portal-mobile-apk.md](../../.claude/handoff-porta
 **Open follow-ups** (none block using the app; tracked loosely under board
 task #542, pick up as wanted):
 
-1. **Real bug:** the pairing notification's "Review" button doesn't navigate
-   to `/devices` — `notify()`'s action wiring
-   (`src/lib/components/layout/app-shell.svelte` / `src/lib/utils/notify.ts`).
-   Pairing still completes if you reach `/devices` another way.
+1. ~~**Real bug:** the pairing notification's "Review" button doesn't navigate
+   to `/devices`.~~ **Fixed** in `00e3b771` (2026-11-12): already-on-route
+   `goto()` is a no-op, and the persistent toast never dismissed itself, so a
+   working click looked dead. `toast.svelte`'s `handleAction` now dismisses
+   after running the action, for every caller.
 2. **Durable build fix:** `tauri android init` regenerates
    `gen/android/buildSrc/.../BuildTask.kt` with a bare `tauri` arg that fails
    (`MODULE_NOT_FOUND`); it needs hand-patching to the absolute CLI path every
