@@ -2,12 +2,21 @@
 
 **Status:** Phase 0 shipped and verified on `main` (`7aeed3da`, `b575e599`,
 2026-11-12/13) — real-phone pairing confirmed end to end. The browser/
-other-desktop client ("Other clients", below) is merged to `main` too —
-Rust/daemon side compiles and the existing daemon tests pass; the frontend
-shim has not yet been exercised in a real browser (board bug #552, the
-broken node/pnpm toolchain, is now fixed, but the live browser check itself
-still hasn't been run). See "State of the tree" for what's built and the
-open follow-ups.
+other-desktop client ("Other clients", below) is merged to `main` too, and
+the live browser check has now been run (2026-11-14, dev daemon :18421,
+browser-pane tab): `pnpm build:client` → daemon's fallback_service served
+`/connect` correctly, `browserShim.ts` installed `__TAURI_INTERNALS__` and
+the page rendered the real connect UI (not a crash). `mobile_pair` against
+`127.0.0.1:18421` failed outright (`TypeError: Failed to fetch`) — browser
+treats `localhost` and `127.0.0.1` as different origins even on the same
+port/machine, so the preflight/fetch never reaches the daemon; pairing
+against the literal `localhost` host the page was served from worked,
+reaching the real "Approve on your PC…" long-poll state. Did not click
+Approve — that's a device-approval decision inside the running desktop app,
+which needs either the native window (computer-use, gated behind a
+one-time permission dialog) or someone at the keyboard; out of reach for an
+unattended run. See "State of the tree" for what's built and the open
+follow-ups.
 Supersedes "Phase 5 — Android client" in
 [REMOTE_ARCHITECTURE.md](REMOTE_ARCHITECTURE.md), which planned to extend Portal
 Remote's Kotlin app.
