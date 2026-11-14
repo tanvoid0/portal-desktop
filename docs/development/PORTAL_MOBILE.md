@@ -90,6 +90,19 @@ Each ships on its own.
    (discover / QR / manual), nav filtered by caps, startup hardening.
 1. **Phone polish of the capped domains** — dashboard, tasks, projects, coder,
    agents, terminal at phone width. Fix per page; no redesign.
+   **Done** (`9df9372f`, 2026-11-14): the main nav sidebar, the per-domain
+   sidebar (`ShellSidebarLayout` — tasks' project/archive panel, also used
+   by sdk/settings/cloud/utilities), and the coder workspace rail all
+   defaulted their `open` state to `true`; the shadcn Sidebar/Sheet context
+   mirrors that into the mobile Sheet's open state at construction, so each
+   auto-opened as a full-page overlay on first mobile visit. Now default
+   closed under 768px (via the existing `IsMobile` hook), and skip the
+   desktop open/close cookie there. Also fixed: `PageHeader`'s title/actions
+   row never wrapped (title text overlapped the buttons at 375px, affecting
+   every page that uses it), and the terminal's 70/30 resizable split stayed
+   side-by-side instead of stacking, leaving the main pane unusably narrow.
+   Agents and dashboard/projects needed no changes beyond the shared fixes
+   above. Verified live via `pnpm dev` + browser pane at 375×812.
 2. **Widen the remote surface to the dev workflows** — give caps to
    pipelines/actions (run, watch, Diagnose & fix), n8n, github, and
    notifications (`event_cap` currently withholds them). One attribute per
