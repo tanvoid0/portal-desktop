@@ -85,6 +85,16 @@ Rules:
 
 ---
 
+## Responsive: design for the narrow window and the ultrawide monitor, not just your laptop
+
+This is a desktop window the user resizes and puts on any monitor — not a fixed-size canvas. Before calling a page or component done, check both ends:
+
+- **No fixed-width columns/panels without a breakpoint.** A `grid-cols-[16rem_1fr]` or a bare `w-96`/`w-[220px]` rail that never stacks or collapses breaks on a narrow window. Use a responsive prefix (`md:grid-cols-[...]`, `grid-cols-1 md:grid-cols-[16rem_1fr]`) or route it through `ResponsivePanel` (`$lib/components/shell/responsive-panel.svelte`), which already collapses to a Sheet below 768px.
+- **Content needs a max-width cap, or it stretches edge-to-edge on an ultrawide monitor.** Use `PageContainer` (`$lib/components/shell/page-container.svelte`) — its `full` variant is capped via `--content-max-width-full`; reach for `readable` on text-heavy pages. Don't skip `PageContainer` or use the bare Tailwind `container` class (Tailwind 4 has no breakpoint config for it here — it just resolves to 100%).
+- **No raw `w-screen` / unclamped `100vw`.** If you need viewport-relative sizing, clamp it (`min(100vw-2rem, 46rem)`), matching the pattern already used in `CatalogModelSelect.svelte` / `ProjectCombobox.svelte`.
+
+---
+
 ## Data flow (frontend ↔ Rust)
 
 1. **Call:** a domain `api/*.ts` wraps the Tauri command:

@@ -72,7 +72,7 @@
   <title>Database - Portal Desktop</title>
 </svelte:head>
 
-<div class="container mx-auto space-y-6 p-6">
+<div class="space-y-6 p-6">
   <PageHeader
     title="Database Explorer"
     description="Browse SQLite, Postgres & MySQL (read-only) — vault, SDK and Docker sources auto-discovered"
@@ -100,7 +100,7 @@
       onAction={pickFile}
     />
   {:else}
-    <div class="grid grid-cols-[16rem_1fr] gap-4">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
       <aside class="space-y-3 rounded-md border p-2">
         {#each sources.data as source (source.id)}
           <SourceNode

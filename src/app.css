@@ -92,6 +92,7 @@
     --sidebar-width-icon: 3rem;
     --content-max-width-readable: 48rem;
     --content-max-width-chat: 72rem;
+    --content-max-width-full: 112rem;
     --content-gutter: 1rem;
 
     /* Gradient variables */
