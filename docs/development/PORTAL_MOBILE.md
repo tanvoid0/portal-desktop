@@ -219,7 +219,7 @@ exactly what the desktop app already calls.
 the desktop app's `frontendDist` already points there, and Android's mobile
 build also lands in the repo-root `build/`; a third build sharing that folder
 would silently stomp whichever one built last). The daemon serves it via a
-`fallback_service` (`tower-http`'s `ServeDir`) added to the router *after*
+`fallback_service` (`tower-http`'s `ServeDir`) added to the router _after_
 `.with_state()`, which — because axum's `Router::layer` only wraps routes
 registered before it's called — puts it outside the `guard` middleware
 entirely: anyone who can reach the port gets the app shell unauthenticated,

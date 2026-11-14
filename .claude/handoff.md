@@ -15,17 +15,17 @@ this session, has the final design).
 
 1. `c8f868ec` — daemon static route (`src-tauri/src/daemon/mod.rs`): serves
    `build-client/` via `tower-http::ServeDir` as a `fallback_service` added
-   *after* `.with_state()` so it sits outside the `guard` middleware (public,
+   _after_ `.with_state()` so it sits outside the `guard` middleware (public,
    like any static site — no secrets in it). Also closed a real gap the
    reviewer found: `classify()`'s loopback free-pass only checked `Origin`,
    but a same-origin `fetch()` from this new page can omit `Origin` entirely
    — added a `Sec-Fetch-Site` check alongside it (see module doc comment at
    top of the file, and the two tests `loopback_with_sec_fetch_site_does_not_
-   get_the_free_local_pass` / the pre-existing Origin one right above it).
+get_the_free_local_pass` / the pre-existing Origin one right above it).
    Also: `src-tauri/Cargo.toml` (+`tower-http`), `src-tauri/tauri.conf.json`
    (`bundle.resources` + `beforeBundleCommand: "pnpm build:client"`),
    `build-client/.gitkeep` (tracked — `tauri-build` validates
-   `bundle.resources` paths on *every* `cargo check`, not just packaging, so
+   `bundle.resources` paths on _every_ `cargo check`, not just packaging, so
    this must exist even before anyone's run the real build).
 2. `41d8b2f9` — build tooling: `vite.config.ts`'s adapter now reads
    `VITE_BUILD_OUT_DIR`; `scripts/build-client.mjs` (new) builds with
@@ -34,17 +34,17 @@ this session, has the final design).
    gained `build:client`.
 3. `421796b7` — `src/lib/domains/mobile/browserShim.ts` (NEW, ~290 lines):
    installs `window.__TAURI_INTERNALS__` (and `__TAURI_EVENT_PLUGIN_
-   INTERNALS__`) only when `isMobileShell` and nothing's there already, so
+INTERNALS__`) only when `isMobileShell` and nothing's there already, so
    the real Android Tauri runtime is never touched. Mirrors `mobile/src-
-   tauri/src/lib.rs` exactly: `mobile_status/_pair/_connect/_disconnect/
-   _discover` run locally against `localStorage` (not a file); everything
+tauri/src/lib.rs` exactly: `mobile_status/_pair/_connect/_disconnect/
+_discover` run locally against `localStorage` (not a file); everything
    else → `POST /rpc/{cmd}` with bearer token after the same command-name
    check (`src/lib/domains/mobile/commandName.ts`'s `isForwardableCommand`,
    ascii alnum/underscore only — rejects `plugin:barcode-scanner|scan` etc.
    with a clear error); `/events` → plain `WebSocket` with `?token=`, capped
    backoff reconnect, restores a saved connection on load. Wired into
    `src/routes/+layout.svelte` as the very first import. `src/routes/connect/
-   +page.svelte` prefills host/port from `location.*` when running as this
++page.svelte` prefills host/port from `location.*` when running as this
    shim (daemon has no CORS layer, so any other origin's `fetch` just fails).
 4. `65bb5acd` — docs.
 
@@ -69,9 +69,9 @@ verified in a real browser — see blockers below.
 
 1. **In flight right now, likely done by the time you read this**:
    `src-tauri/.cargo/config.toml` sets `target-dir = "I:/build/cargo/
-   portal-desktop"` (final path — went through two earlier revisions this
+portal-desktop"` (final path — went through two earlier revisions this
    session: first `C:/cargo-target/portal-desktop`, then `I:/cargo-target/
-   portal-desktop`, then grouped under the new global convention below). A
+portal-desktop`, then grouped under the new global convention below). A
    `cargo check` + `git commit` for it was launched in the background right
    before this handoff was last edited; **confirm the commit actually
    landed** (`git log --oneline -1` should show "build(cargo): share one
@@ -92,7 +92,7 @@ verified in a real browser — see blockers below.
    only `I:/build/cargo/portal-desktop` is current.
 3. **node/pnpm is broken machine-wide** on this box — filed as board bug
    #552. `pnpm install`, `npx`, and `corepack` all fail with `MODULE_NOT_
-   FOUND` under `D:\sdk\nvm4w\nodejs` and the pnpm global store (looks like
+FOUND` under `D:\sdk\nvm4w\nodejs` and the pnpm global store (looks like
    an interrupted version switch, possibly by another concurrent session —
    do not try to repair it unilaterally; it's shared infrastructure). This
    blocks `pnpm check`, `pnpm lint`, `vitest`, and `pnpm tauri:dev` — i.e.
@@ -105,7 +105,7 @@ verified in a real browser — see blockers below.
    original task's verification bullet.
 4. D: was also separately logged full (643MB free of 450GB) as board bug
    #555 — unrelated to pnpm, just disk space. The I:-drive Cargo fix above
-   addresses *this worktree's* contribution to that; it does not fix pnpm,
+   addresses _this worktree's_ contribution to that; it does not fix pnpm,
    and other worktrees/sessions' own disk usage was deliberately left alone
    (not mine to clean up unilaterally on a shared machine).
 5. Branch is **not pushed**, no PR, not merged. Tried: `git push` fails —
@@ -115,8 +115,8 @@ verified in a real browser — see blockers below.
    fixed. **They chose: wait.** Do not `--no-verify` this push without
    asking again. Once node/pnpm (#552) is actually fixed: `pnpm install`,
    `pnpm check && pnpm lint`, `pnpm build:client`, exercise it in a browser
-   per item 3 below, *then* `git push -u origin claude/eager-mcclintock-
-   79e007` (should go through the hook cleanly then), open a PR, merge to
+   per item 3 below, _then_ `git push -u origin claude/eager-mcclintock-
+79e007` (should go through the hook cleanly then), open a PR, merge to
    `main` (confirmed a clean fast-forward as of this writing — `origin/main`
    is at `015e2663`, this branch is that +6 commits, no divergence to
    rebase). That whole sequence is what "merged to main" still needs.
@@ -134,7 +134,7 @@ verified in a real browser — see blockers below.
   build.
 - Shared Cargo target dir is a per-machine, uncommitted-concern path (it IS
   committed, since `.cargo/config.toml` needs to be in every worktree's
-  checkout — but the *path itself* is this-machine-specific, documented in
+  checkout — but the _path itself_ is this-machine-specific, documented in
   the file's own comment; override via `CARGO_TARGET_DIR` env var if this
   ever needs to run somewhere else).
 

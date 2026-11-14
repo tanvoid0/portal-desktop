@@ -19,7 +19,9 @@
   // origin the page itself was served from — prefill it rather than let someone type a
   // host that will just fail with an opaque "cannot reach" once the preflight is blocked.
   let host = $state(isBrowserClient ? window.location.hostname : '');
-  let port = $state(isBrowserClient ? window.location.port || String(DEFAULT_PORT) : String(DEFAULT_PORT));
+  let port = $state(
+    isBrowserClient ? window.location.port || String(DEFAULT_PORT) : String(DEFAULT_PORT)
+  );
   let error = $state<string | null>(null);
   /** Label of the desktop awaiting approval; null when idle. */
   let waitingFor = $state<string | null>(null);
