@@ -44,7 +44,14 @@ export default defineConfig({
     Icons({ compiler: 'svelte' }),
     sveltekit({
       preprocess: vitePreprocess(),
-      adapter: adapter({ fallback: 'index.html' }),
+      // `build:client` points this at its own output dir so it never
+      // collides with the desktop build's `build/` (both tauri.conf.json's
+      // `frontendDist` would otherwise resolve to the same folder).
+      adapter: adapter({
+        fallback: 'index.html',
+        pages: process.env.VITE_BUILD_OUT_DIR,
+        assets: process.env.VITE_BUILD_OUT_DIR,
+      }),
       // Kit writes these into its generated tsconfig, which is what gives
       // svelte-check the same `@` / `$lib` resolution Vite has below.
       alias: { '@': 'src', $lib: 'src/lib' },

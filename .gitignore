@@ -8,6 +8,10 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+# Tracked: .gitkeep only (tauri-build's `bundle.resources` fails every
+# `cargo check`/`build`, not just bundling, if this directory is absent).
+/build-client/*
+!/build-client/.gitkeep
 /dist
 
 # OS

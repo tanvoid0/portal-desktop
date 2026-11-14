@@ -3,6 +3,9 @@
 -->
 
 <script lang="ts">
+  // Must run before any invoke()/listen() call can fire — installs the browser
+  // shim's window.__TAURI_INTERNALS__ when this is the thin-client build.
+  import '$lib/domains/mobile/browserShim';
   import '../app.css';
   // Imported here rather than via app.css so Vite treats it as its own module —
   // the `devicon-woff-only` plugin in vite.config.ts needs to see it to strip

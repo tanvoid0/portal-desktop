@@ -8,6 +8,7 @@
     "predev": "node scripts/dev-instance.mjs --kill-port",
     "dev": "vite dev",
     "build": "vite build",
+    "build:client": "node scripts/build-client.mjs",
     "preview": "vite preview",
     "prepare": "husky",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

@@ -17,16 +17,28 @@
 //! Every HTTP/WS request passes through [`classify`], which decides what the
 //! peer is:
 //!
-//! - **Any `Origin` header → 403, on every route and both listeners.** A browser
-//!   cannot suppress it and WebSockets ignore CORS, so this is the only thing
-//!   keeping a visited web page off a port that exposes terminal execution and a
-//!   credential vault. Unconditional by design.
-//! - **Loopback peer → `Local`**: the machine itself, unrestricted.
-//! - **Remote peer with a live bearer token → `Remote { caps }`**: a paired
+//! - **Loopback peer, no `Origin` and no `Sec-Fetch-Site` header → `Local`**:
+//!   the machine itself, unrestricted.
+//! - **Either header is present → the free loopback pass above does not
+//!   apply.** A browser cannot suppress `Origin` and WebSockets ignore CORS, so
+//!   without this a visited web page could `fetch('http://127.0.0.1:18420/...')`
+//!   and inherit full local trust with no token at all. `Sec-Fetch-Site` closes
+//!   the same hole for a same-origin, same-method request (e.g. a page served
+//!   by this daemon's own thin-client static route calling `fetch('/whoami')`
+//!   on itself) — browsers omit `Origin` there but still send `Sec-Fetch-Site`,
+//!   and no native Tauri/reqwest client ever sends it. A page-originated
+//!   request (loopback or remote) instead falls through to the same bearer-token
+//!   check below — a page cannot forge a token it was never handed, so this is
+//!   what actually keeps it off a port that exposes terminal execution and a
+//!   credential vault, not either header's value.
+//! - **A live bearer token (header, or `?token=` on `/events` — a browser
+//!   `WebSocket` cannot set a custom header) → `Remote { caps }`**: a paired
 //!   device, allowed only the commands/events its granted capabilities cover.
-//! - **Remote peer without a token → `Anon`**: may reach `/health` and
-//!   `/pair/request` to pair, nothing else — `/control` is deliberately NOT
-//!   public, so an unauthenticated remote gets the same 401 `/rpc` gives it.
+//!   This applies to a page-originated loopback request too, now scoped like
+//!   any other remote rather than exempted.
+//! - **No token → `Anon`**: may reach `/health` and `/pair/request` to pair,
+//!   nothing else — `/control` is deliberately NOT public, so an unauthenticated
+//!   peer gets the same 401 `/rpc` gives it.
 //!
 //! `/rpc/{command}` refuses a remote peer whose caps do not cover the command's
 //! `cap`; `/events` and `/control` drop frames whose [`event_cap`] the peer does
@@ -42,6 +54,7 @@ pub mod pairing;
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -54,6 +67,7 @@ use axum::routing::{get, post};
 use axum::Router;
 use serde_json::{json, Value};
 use tokio::sync::broadcast;
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::database::DatabaseManager;
 use crate::domains::network::services::pairing_service;
@@ -158,15 +172,20 @@ struct AppState {
     /// pruned.
     // ponytail: fixed-window counter; swap for a token bucket only if abuse shows.
     pair_hits: Arc<Mutex<HashMap<IpAddr, (Instant, u32)>>>,
+    /// Where the browser/other-desktop web client's static build lives, if it
+    /// was found at startup. See [`client_web_dir`].
+    static_dir: Option<PathBuf>,
 }
 
 impl AppState {
     fn new(tx: broadcast::Sender<Shared>, app: Option<tauri::AppHandle>, port: u16) -> Self {
+        let static_dir = app.as_ref().and_then(client_web_dir);
         Self {
             tx,
             app,
             port,
             pair_hits: Arc::new(Mutex::new(HashMap::new())),
+            static_dir,
         }
     }
 
@@ -203,6 +222,27 @@ pub fn host_name() -> String {
     std::env::var("COMPUTERNAME")
         .or_else(|_| std::env::var("HOSTNAME"))
         .unwrap_or_else(|_| "Portal Desktop".to_string())
+}
+
+/// Where the thin-client build (browser, other-desktop — `pnpm build:client`)
+/// is found, if anywhere.
+///
+/// Dev: next to the repo, resolved at compile time from this crate's own
+/// manifest dir (`src-tauri/../build-client`) — mirrors how `tauri.conf.json`'s
+/// `frontendDist` is a relative path in dev. Release: Tauri's resource dir,
+/// where `bundle.resources` in `tauri.conf.json` ships it next to the installed
+/// exe (built by the `beforeBundleCommand` hook there, so packaging fails loud
+/// if someone forgets to build it rather than shipping an app with no web client).
+/// `None` either way the directory was never built — the fallback route is then
+/// simply not added, so a missing build degrades to "no web client", not a panic.
+fn client_web_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    let dir = if crate::app_paths::DEV {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("build-client")
+    } else {
+        app.path().resource_dir().ok()?.join("build-client")
+    };
+    dir.join("index.html").is_file().then_some(dir)
 }
 
 /// Whether the LAN listener and UDP discovery responder should bind: the
@@ -256,7 +296,8 @@ fn serve_on(state: AppState, host: Ipv4Addr, port: u16, label: &'static str) {
 }
 
 fn router(state: AppState) -> Router {
-    Router::new()
+    let static_dir = state.static_dir.clone();
+    let router = Router::new()
         .route("/health", get(health))
         .route("/whoami", get(whoami))
         .route("/events", get(events))
@@ -264,11 +305,21 @@ fn router(state: AppState) -> Router {
         .route("/pair/request", post(pairing::pair_request))
         .route("/control", get(control::control))
         .layer(middleware::from_fn_with_state(state.clone(), guard))
-        .with_state(state)
-}
+        .with_state(state);
 
-fn forbidden(msg: &str) -> Response {
-    (StatusCode::FORBIDDEN, msg.to_string()).into_response()
+    // The web client's own files: unauthenticated on purpose, same as any
+    // other static site — it is just the app shell, no data. Added after
+    // `.with_state` so it falls outside the `guard` layer above (middleware
+    // only covers routes present before `.layer` is called); the pairing and
+    // `/rpc` calls that shell makes still go through `guard` like any other
+    // page-originated request.
+    match static_dir {
+        Some(dir) => {
+            let index = dir.join("index.html");
+            router.fallback_service(ServeDir::new(dir).not_found_service(ServeFile::new(index)))
+        }
+        None => router,
+    }
 }
 
 /// The `Bearer` token on a request, if any.
@@ -279,6 +330,15 @@ fn bearer(headers: &HeaderMap) -> Option<String> {
         .ok()?
         .strip_prefix("Bearer ")
         .map(|t| t.trim().to_string())
+}
+
+/// A `key=value` pair out of a request's raw query string, undecoded — fine
+/// for a pairing token, which is base64url (no characters that need escaping).
+fn query_param(query: Option<&str>, key: &str) -> Option<String> {
+    query?.split('&').find_map(|kv| {
+        let (k, v) = kv.split_once('=')?;
+        (k == key).then(|| v.to_string())
+    })
 }
 
 /// Paths an unauthenticated remote peer may reach: health and the pairing
@@ -295,26 +355,34 @@ fn classify(
     peer: IpAddr,
     headers: &HeaderMap,
     path: &str,
+    query_token: Option<&str>,
     resolve: impl Fn(&str) -> Option<(String, Vec<String>)>,
 ) -> Result<Trust, Response> {
-    // No browser may speak to this port, on any route or either listener.
-    if headers.contains_key(header::ORIGIN) {
-        return Err(forbidden("browser origins are not permitted on this port"));
-    }
-
-    // Loopback is the machine itself.
-    if peer.is_loopback() {
+    // Loopback with no Origin AND no Sec-Fetch-Site is the machine itself
+    // calling its own daemon (every native command does this). A page's own
+    // `fetch`/WebSocket carries `Sec-Fetch-Site` even on a same-origin, same-
+    // method GET where browsers omit `Origin` entirely — so once the daemon
+    // started serving its own page (the thin-client static route), a script
+    // on that page could otherwise `fetch('/whoami')` from loopback and get
+    // unscoped `Local` trust with no token at all. No native Tauri/reqwest
+    // client ever sends this header, so its mere presence is page-originated,
+    // same as `Origin` — see the module doc for why that doesn't get the pass.
+    if peer.is_loopback()
+        && !headers.contains_key(header::ORIGIN)
+        && !headers.contains_key("sec-fetch-site")
+    {
         return Ok(Trust::Local);
     }
 
-    // A remote peer with a live token is a known, scoped device.
-    if let Some(token) = bearer(headers) {
+    // A live token is a known, scoped device - page-originated or not.
+    let token = bearer(headers).or_else(|| query_token.map(str::to_string));
+    if let Some(token) = token {
         if let Some((device_id, caps)) = resolve(&token) {
             return Ok(Trust::Remote { device_id, caps });
         }
     }
 
-    // Remote and unauthenticated: pairing and health only.
+    // Unauthenticated: pairing and health only.
     if is_public_path(path) {
         Ok(Trust::Anon)
     } else {
@@ -354,19 +422,31 @@ async fn guard(
     let path = req.uri().path().to_string();
     let peer_ip = peer.ip();
 
-    let token = bearer(&headers);
-    let identity = match (&token, peer_ip.is_loopback(), state.db()) {
-        (Some(t), false, Some(db)) => pairing_service::verify_token(db.get_connection(), t)
+    // `/events` is the one path a browser `WebSocket` needs this for: the
+    // handshake request can't carry a custom header.
+    let query_token = (path == "/events")
+        .then(|| query_param(req.uri().query(), "token"))
+        .flatten();
+    let token = bearer(&headers).or_else(|| query_token.clone());
+
+    let identity = match (&token, state.db()) {
+        (Some(t), Some(db)) => pairing_service::verify_token(db.get_connection(), t)
             .await
             .ok()
             .flatten(),
         _ => None,
     };
 
-    let trust = match classify(peer_ip, &headers, &path, |t| match (&token, &identity) {
-        (Some(tok), Some(id)) if tok == t => Some(id.clone()),
-        _ => None,
-    }) {
+    let trust = match classify(
+        peer_ip,
+        &headers,
+        &path,
+        query_token.as_deref(),
+        |t| match (&token, &identity) {
+            (Some(tok), Some(id)) if tok == t => Some(id.clone()),
+            _ => None,
+        },
+    ) {
         Ok(trust) => trust,
         Err(resp) => return resp,
     };
@@ -413,8 +493,9 @@ async fn events(
     Extension(trust): Extension<Trust>,
     State(state): State<AppState>,
 ) -> Response {
-    // The guard has already refused browser origins and unauthenticated remotes,
-    // so trust here is Local (full stream) or Remote (filtered by caps).
+    // The guard has already refused anyone without a token or a loopback-no-
+    // Origin pass, so trust here is Local (full stream) or Remote (filtered by
+    // caps) - a page-originated connection only ever arrives as the latter.
     let caps = match trust {
         Trust::Remote { caps, .. } => Some(caps),
         _ => None,
@@ -582,30 +663,95 @@ mod tests {
     }
 
     #[test]
-    fn loopback_is_local_and_unrestricted() {
+    fn loopback_without_origin_is_local_and_unrestricted() {
         let t = classify(
             "127.0.0.1".parse().unwrap(),
             &HeaderMap::new(),
             "/rpc/decrypt_credential",
+            None,
             |_| None,
         )
         .unwrap();
         assert!(matches!(t, Trust::Local));
     }
 
+    /// An `Origin` header means a page made the request — the free loopback
+    /// pass does not apply to it even though the peer IP is 127.0.0.1, same as
+    /// any other unauthenticated peer: health/pair are public, nothing else is.
     #[test]
-    fn any_origin_is_refused_on_every_route() {
+    fn loopback_with_origin_does_not_get_the_free_local_pass() {
         let h = with_header(header::ORIGIN, "https://evil.example");
-        // Even loopback, even a public path.
-        assert!(classify("127.0.0.1".parse().unwrap(), &h, "/health", |_| None).is_err());
-        assert!(classify(remote(), &h, "/pair/request", |_| None).is_err());
-        assert!(classify(remote(), &h, "/events", |_| None).is_err());
+        let local = "127.0.0.1".parse().unwrap();
+        assert!(matches!(
+            classify(local, &h, "/health", None, |_| None).unwrap(),
+            Trust::Anon
+        ));
+        assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
+        assert!(classify(local, &h, "/events", None, |_| None).is_err());
+    }
+
+    /// `Sec-Fetch-Site` closes the same hole for a same-origin request a
+    /// browser sends with no `Origin` header at all (e.g. the thin-client
+    /// static page's own `fetch('/whoami')` back at loopback) — this is the
+    /// case `loopback_with_origin_does_not_get_the_free_local_pass` above
+    /// doesn't cover, since there `Origin` is present.
+    #[test]
+    fn loopback_with_sec_fetch_site_does_not_get_the_free_local_pass() {
+        let h = with_header(
+            axum::http::HeaderName::from_static("sec-fetch-site"),
+            "same-origin",
+        );
+        let local = "127.0.0.1".parse().unwrap();
+        assert!(matches!(
+            classify(local, &h, "/health", None, |_| None).unwrap(),
+            Trust::Anon
+        ));
+        assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
+        assert!(classify(local, &h, "/whoami", None, |_| None).is_err());
+    }
+
+    /// The actual fix: a page-originated request, loopback or remote, with a
+    /// live token is scoped exactly like any other paired device.
+    #[test]
+    fn origin_with_a_live_token_is_scoped_to_its_caps_not_exempted() {
+        let h = {
+            let mut h = with_header(header::ORIGIN, "http://localhost:18420");
+            h.insert(header::AUTHORIZATION, "Bearer good".parse().unwrap());
+            h
+        };
+        let resolve = |tok: &str| (tok == "good").then(|| ("dev-1".to_string(), vec!["coder".to_string()]));
+        for peer in ["127.0.0.1".parse().unwrap(), remote()] {
+            let t = classify(peer, &h, "/rpc/coder_list_threads", None, resolve).unwrap();
+            match t {
+                Trust::Remote { device_id, caps } => {
+                    assert_eq!(device_id, "dev-1");
+                    assert_eq!(caps, vec!["coder".to_string()]);
+                }
+                other => panic!("expected Remote, got {other:?}"),
+            }
+        }
+    }
+
+    /// `/events` is the one path a query-string token is honoured on — a
+    /// browser `WebSocket` handshake cannot carry a custom header.
+    #[test]
+    fn events_accepts_a_query_token_a_header_token_is_refused_elsewhere() {
+        let resolve = |tok: &str| (tok == "good").then(|| ("dev-1".to_string(), vec![]));
+        assert!(matches!(
+            classify(remote(), &HeaderMap::new(), "/events", Some("good"), resolve).unwrap(),
+            Trust::Remote { .. }
+        ));
+        // Same query string on a different path is just ignored by `guard`
+        // (it only reads it for `/events`) - `classify` itself would honour
+        // whatever it's handed, so this documents the call site's job, not
+        // `classify`'s.
+        assert!(classify(remote(), &HeaderMap::new(), "/rpc/coder_list_threads", None, resolve).is_err());
     }
 
     #[test]
     fn remote_with_a_live_token_is_scoped_to_its_caps() {
         let h = with_header(header::AUTHORIZATION, "Bearer good");
-        let t = classify(remote(), &h, "/rpc/coder_list_threads", |tok| {
+        let t = classify(remote(), &h, "/rpc/coder_list_threads", None, |tok| {
             (tok == "good").then(|| ("dev-1".to_string(), vec!["coder".to_string()]))
         })
         .unwrap();
@@ -621,23 +767,24 @@ mod tests {
     #[test]
     fn remote_without_a_token_may_pair_but_not_call() {
         assert!(matches!(
-            classify(remote(), &HeaderMap::new(), "/pair/request", |_| None).unwrap(),
+            classify(remote(), &HeaderMap::new(), "/pair/request", None, |_| None).unwrap(),
             Trust::Anon
         ));
         assert!(classify(
             remote(),
             &HeaderMap::new(),
             "/rpc/coder_list_threads",
+            None,
             |_| None
         )
         .is_err());
-        assert!(classify(remote(), &HeaderMap::new(), "/events", |_| None).is_err());
+        assert!(classify(remote(), &HeaderMap::new(), "/events", None, |_| None).is_err());
     }
 
     #[test]
     fn remote_with_a_bad_token_is_refused_on_protected_paths() {
         let h = with_header(header::AUTHORIZATION, "Bearer nope");
-        assert!(classify(remote(), &h, "/rpc/coder_list_threads", |_| None).is_err());
+        assert!(classify(remote(), &h, "/rpc/coder_list_threads", None, |_| None).is_err());
     }
 
     /// `/control` carries a bearer, not a public path — same 401 an
@@ -647,7 +794,7 @@ mod tests {
     /// either.
     #[test]
     fn control_is_not_public_and_refuses_an_unauthenticated_remote() {
-        assert!(classify(remote(), &HeaderMap::new(), "/control", |_| None).is_err());
+        assert!(classify(remote(), &HeaderMap::new(), "/control", None, |_| None).is_err());
     }
 
     #[test]
@@ -698,10 +845,11 @@ mod tests {
         assert!(!sink.emit("coder://change", json!({})));
     }
 
-    /// The origin guard is the only thing between a visited page and this port,
-    /// so it keeps an end-to-end test over a real listener.
+    /// The token check is the only thing between a visited page and this port
+    /// (the loopback free pass does not apply once `Origin` is set), so it
+    /// keeps an end-to-end test over a real listener.
     #[tokio::test]
-    async fn browser_origins_are_refused_end_to_end() {
+    async fn unauthenticated_browser_origins_are_refused_end_to_end() {
         let (tx, _rx) = broadcast::channel(8);
         let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
             .await
@@ -736,17 +884,19 @@ mod tests {
             .unwrap();
         assert_eq!(allowed.status().as_u16(), 101);
 
-        // The same request from a page is refused before the upgrade.
+        // The same request from a page, with no token, is refused before the
+        // upgrade — same 401 any other unauthenticated caller gets on a
+        // protected path, not a blanket Origin-based 403.
         let refused = upgrade(client.get(format!("http://{addr}/events")))
             .header("Origin", "https://evil.example")
             .send()
             .await
             .unwrap();
-        assert_eq!(refused.status().as_u16(), 403);
+        assert_eq!(refused.status().as_u16(), 401);
     }
 
     #[tokio::test]
-    async fn rpc_refuses_browsers_and_separates_unknown_names_from_failures() {
+    async fn rpc_refuses_unauthenticated_browsers_and_separates_unknown_names_from_failures() {
         let (tx, _rx) = broadcast::channel(8);
         let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
             .await
@@ -767,7 +917,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(from_a_page.status().as_u16(), 403);
+        assert_eq!(from_a_page.status().as_u16(), 401);
 
         let typo = client
             .post(format!("http://{addr}/rpc/no_such_command"))
@@ -812,7 +962,7 @@ mod tests {
         assert_eq!(v["caps"], json!(["coder"]));
 
         // `/whoami` is not public: an unauthenticated remote gets the 401.
-        assert!(classify(remote(), &HeaderMap::new(), "/whoami", |_| None).is_err());
+        assert!(classify(remote(), &HeaderMap::new(), "/whoami", None, |_| None).is_err());
     }
 
     #[test]
