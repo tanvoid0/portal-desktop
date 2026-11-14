@@ -17,16 +17,20 @@
 //! Every HTTP/WS request passes through [`classify`], which decides what the
 //! peer is:
 //!
-//! - **Loopback peer, no `Origin` header → `Local`**: the machine itself,
-//!   unrestricted.
-//! - **An `Origin` header is present → the free loopback pass above does not
+//! - **Loopback peer, no `Origin` and no `Sec-Fetch-Site` header → `Local`**:
+//!   the machine itself, unrestricted.
+//! - **Either header is present → the free loopback pass above does not
 //!   apply.** A browser cannot suppress `Origin` and WebSockets ignore CORS, so
 //!   without this a visited web page could `fetch('http://127.0.0.1:18420/...')`
-//!   and inherit full local trust with no token at all. A page-originated
+//!   and inherit full local trust with no token at all. `Sec-Fetch-Site` closes
+//!   the same hole for a same-origin, same-method request (e.g. a page served
+//!   by this daemon's own thin-client static route calling `fetch('/whoami')`
+//!   on itself) — browsers omit `Origin` there but still send `Sec-Fetch-Site`,
+//!   and no native Tauri/reqwest client ever sends it. A page-originated
 //!   request (loopback or remote) instead falls through to the same bearer-token
 //!   check below — a page cannot forge a token it was never handed, so this is
 //!   what actually keeps it off a port that exposes terminal execution and a
-//!   credential vault, not the `Origin` value itself.
+//!   credential vault, not either header's value.
 //! - **A live bearer token (header, or `?token=` on `/events` — a browser
 //!   `WebSocket` cannot set a custom header) → `Remote { caps }`**: a paired
 //!   device, allowed only the commands/events its granted capabilities cover.
@@ -50,6 +54,7 @@ pub mod pairing;
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -62,6 +67,7 @@ use axum::routing::{get, post};
 use axum::Router;
 use serde_json::{json, Value};
 use tokio::sync::broadcast;
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::database::DatabaseManager;
 use crate::domains::network::services::pairing_service;
@@ -166,15 +172,20 @@ struct AppState {
     /// pruned.
     // ponytail: fixed-window counter; swap for a token bucket only if abuse shows.
     pair_hits: Arc<Mutex<HashMap<IpAddr, (Instant, u32)>>>,
+    /// Where the browser/other-desktop web client's static build lives, if it
+    /// was found at startup. See [`client_web_dir`].
+    static_dir: Option<PathBuf>,
 }
 
 impl AppState {
     fn new(tx: broadcast::Sender<Shared>, app: Option<tauri::AppHandle>, port: u16) -> Self {
+        let static_dir = app.as_ref().and_then(client_web_dir);
         Self {
             tx,
             app,
             port,
             pair_hits: Arc::new(Mutex::new(HashMap::new())),
+            static_dir,
         }
     }
 
@@ -211,6 +222,27 @@ pub fn host_name() -> String {
     std::env::var("COMPUTERNAME")
         .or_else(|_| std::env::var("HOSTNAME"))
         .unwrap_or_else(|_| "Portal Desktop".to_string())
+}
+
+/// Where the thin-client build (browser, other-desktop — `pnpm build:client`)
+/// is found, if anywhere.
+///
+/// Dev: next to the repo, resolved at compile time from this crate's own
+/// manifest dir (`src-tauri/../build-client`) — mirrors how `tauri.conf.json`'s
+/// `frontendDist` is a relative path in dev. Release: Tauri's resource dir,
+/// where `bundle.resources` in `tauri.conf.json` ships it next to the installed
+/// exe (built by the `beforeBundleCommand` hook there, so packaging fails loud
+/// if someone forgets to build it rather than shipping an app with no web client).
+/// `None` either way the directory was never built — the fallback route is then
+/// simply not added, so a missing build degrades to "no web client", not a panic.
+fn client_web_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    let dir = if crate::app_paths::DEV {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("build-client")
+    } else {
+        app.path().resource_dir().ok()?.join("build-client")
+    };
+    dir.join("index.html").is_file().then_some(dir)
 }
 
 /// Whether the LAN listener and UDP discovery responder should bind: the
@@ -264,7 +296,8 @@ fn serve_on(state: AppState, host: Ipv4Addr, port: u16, label: &'static str) {
 }
 
 fn router(state: AppState) -> Router {
-    Router::new()
+    let static_dir = state.static_dir.clone();
+    let router = Router::new()
         .route("/health", get(health))
         .route("/whoami", get(whoami))
         .route("/events", get(events))
@@ -272,7 +305,21 @@ fn router(state: AppState) -> Router {
         .route("/pair/request", post(pairing::pair_request))
         .route("/control", get(control::control))
         .layer(middleware::from_fn_with_state(state.clone(), guard))
-        .with_state(state)
+        .with_state(state);
+
+    // The web client's own files: unauthenticated on purpose, same as any
+    // other static site — it is just the app shell, no data. Added after
+    // `.with_state` so it falls outside the `guard` layer above (middleware
+    // only covers routes present before `.layer` is called); the pairing and
+    // `/rpc` calls that shell makes still go through `guard` like any other
+    // page-originated request.
+    match static_dir {
+        Some(dir) => {
+            let index = dir.join("index.html");
+            router.fallback_service(ServeDir::new(dir).not_found_service(ServeFile::new(index)))
+        }
+        None => router,
+    }
 }
 
 /// The `Bearer` token on a request, if any.
@@ -311,11 +358,19 @@ fn classify(
     query_token: Option<&str>,
     resolve: impl Fn(&str) -> Option<(String, Vec<String>)>,
 ) -> Result<Trust, Response> {
-    // Loopback with no Origin is the machine itself calling its own daemon
-    // (every native command does this). An Origin header means a page made
-    // the request, so it does not get this free pass even from loopback — see
-    // the module doc for why.
-    if peer.is_loopback() && !headers.contains_key(header::ORIGIN) {
+    // Loopback with no Origin AND no Sec-Fetch-Site is the machine itself
+    // calling its own daemon (every native command does this). A page's own
+    // `fetch`/WebSocket carries `Sec-Fetch-Site` even on a same-origin, same-
+    // method GET where browsers omit `Origin` entirely — so once the daemon
+    // started serving its own page (the thin-client static route), a script
+    // on that page could otherwise `fetch('/whoami')` from loopback and get
+    // unscoped `Local` trust with no token at all. No native Tauri/reqwest
+    // client ever sends this header, so its mere presence is page-originated,
+    // same as `Origin` — see the module doc for why that doesn't get the pass.
+    if peer.is_loopback()
+        && !headers.contains_key(header::ORIGIN)
+        && !headers.contains_key("sec-fetch-site")
+    {
         return Ok(Trust::Local);
     }
 
@@ -633,6 +688,26 @@ mod tests {
         ));
         assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
         assert!(classify(local, &h, "/events", None, |_| None).is_err());
+    }
+
+    /// `Sec-Fetch-Site` closes the same hole for a same-origin request a
+    /// browser sends with no `Origin` header at all (e.g. the thin-client
+    /// static page's own `fetch('/whoami')` back at loopback) — this is the
+    /// case `loopback_with_origin_does_not_get_the_free_local_pass` above
+    /// doesn't cover, since there `Origin` is present.
+    #[test]
+    fn loopback_with_sec_fetch_site_does_not_get_the_free_local_pass() {
+        let h = with_header(
+            axum::http::HeaderName::from_static("sec-fetch-site"),
+            "same-origin",
+        );
+        let local = "127.0.0.1".parse().unwrap();
+        assert!(matches!(
+            classify(local, &h, "/health", None, |_| None).unwrap(),
+            Trust::Anon
+        ));
+        assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
+        assert!(classify(local, &h, "/whoami", None, |_| None).is_err());
     }
 
     /// The actual fix: a page-originated request, loopback or remote, with a

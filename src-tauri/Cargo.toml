@@ -61,6 +61,8 @@ futures = "0.3"
 # Local HTTP/WS surface (daemon.rs). hyper 1.x + tower 0.5 are already in the
 # tree via reqwest, so this is a thin addition rather than a second stack.
 axum = { version = "0.8", features = ["ws"] }
+# Serves the browser/other-desktop web client's static build off the daemon.
+tower-http = { version = "0.6", features = ["fs"] }
 # Command registry: `#[rpc]` submits entries at the definition site, inventory
 # collects them at link time, so there is no central list to drift.
 inventory = "0.3"
