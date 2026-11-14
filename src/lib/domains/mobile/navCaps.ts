@@ -6,6 +6,8 @@ const NAV_CAP: Record<string, string> = {
   '/projects': 'projects',
   '/tasks': 'tasks',
   '/terminal': 'terminal',
+  '/pipeline-runs': 'pipelines',
+  '/github': 'github',
 };
 
 /** `/ai` hosts both the Code tab (cap `coder`) and the Agents tab (cap `agents`) —

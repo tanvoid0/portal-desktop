@@ -107,6 +107,21 @@ Each ships on its own.
    pipelines/actions (run, watch, Diagnose & fix), n8n, github, and
    notifications (`event_cap` currently withholds them). One attribute per
    command, plus a row in the approval UI.
+   **Done** (pending commit, 2026-11-14): six new caps — `pipelines`,
+   `actions`, `github`, `github.write`, `n8n`, `n8n.run` — attributed across
+   `rpc.rs` (the command → cap map and `SENSITIVE_CAPS`),
+   `automation/commands.rs`, `github/commands.rs`, `pipelines/commands.rs`,
+   and `scripts/commands.rs`. Run/cancel ops reuse the existing
+   `terminal.exec` cap rather than a new one; `github.write` and `n8n.run`
+   are sensitive and
+   opt-in, not default, since both can run arbitrary commands (editing/
+   dispatching on GitHub, or an n8n workflow node) the same way
+   `terminal.exec` can. `event_cap` in `daemon/mod.rs` is generalized: a
+   `<domain>://...` event now auto-maps to any registered cap of the same
+   name, with `terminal`/`shell-integration` → `terminal.exec` and
+   `pipeline-*` → `pipelines` kept as prefix exceptions since neither fits
+   the `domain://` shape. `navCaps.ts` gained the two matching nav entries:
+   `/pipeline-runs` → `pipelines`, `/github` → `github`.
 3. **Push when it matters** — agent needs a permission decision, pipeline
    failed, run finished: Android notification with the action on it. This is
    the feature that makes the phone worth carrying for development.

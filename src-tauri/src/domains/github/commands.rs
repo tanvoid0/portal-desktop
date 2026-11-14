@@ -15,7 +15,7 @@ use super::types::{
     GitHubWorkflow, GitHubWorkflowRun, GitHubWorkflowRunDetail,
 };
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_get_connection_status(
     db: State<'_, Arc<DatabaseManager>>,
     session: State<'_, Arc<VaultSession>>,
@@ -57,7 +57,7 @@ pub async fn github_disconnect(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_list_repositories(
     search: Option<String>,
     page: Option<u32>,
@@ -70,7 +70,7 @@ pub async fn github_list_repositories(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_list_linked_repos(
     db: State<'_, Arc<DatabaseManager>>,
     session: State<'_, Arc<VaultSession>>,
@@ -80,7 +80,7 @@ pub async fn github_list_linked_repos(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_get_repository(
     owner: String,
     repo: String,
@@ -92,7 +92,7 @@ pub async fn github_get_repository(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_list_issues(
     request: GitHubListIssuesRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -103,7 +103,7 @@ pub async fn github_list_issues(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_get_issue(
     owner: String,
     repo: String,
@@ -116,7 +116,7 @@ pub async fn github_get_issue(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github.write")]
 pub async fn github_create_issue(
     request: GitHubCreateIssueRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -127,7 +127,7 @@ pub async fn github_create_issue(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github.write")]
 pub async fn github_update_issue(
     request: GitHubUpdateIssueRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -160,7 +160,7 @@ pub async fn github_link_existing_repository(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_get_project_link(
     project_id: i32,
     db: State<'_, Arc<DatabaseManager>>,
@@ -182,7 +182,7 @@ pub async fn github_detect_local_repository(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_list_workflow_runs(
     request: GitHubListWorkflowRunsRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -193,7 +193,7 @@ pub async fn github_list_workflow_runs(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_list_workflows(
     request: GitHubListWorkflowsRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -204,7 +204,7 @@ pub async fn github_list_workflows(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github.write")]
 pub async fn github_dispatch_workflow(
     request: GitHubDispatchWorkflowRequest,
     db: State<'_, Arc<DatabaseManager>>,
@@ -215,7 +215,7 @@ pub async fn github_dispatch_workflow(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_get_workflow_run(
     owner: String,
     repo: String,
@@ -228,7 +228,7 @@ pub async fn github_get_workflow_run(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "github")]
 pub async fn github_get_workflow_job_logs(
     owner: String,
     repo: String,

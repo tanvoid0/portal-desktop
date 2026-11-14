@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tauri::State;
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn get_pipeline_executions(
     pipeline_id: String,
     limit: Option<u64>,
@@ -20,7 +20,7 @@ pub async fn get_pipeline_executions(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn get_project_pipeline_executions(
     project_id: i32,
     limit: Option<u64>,
@@ -29,7 +29,7 @@ pub async fn get_project_pipeline_executions(
     service.get_executions_by_project(project_id, limit).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn get_all_pipeline_executions(
     limit: Option<u64>,
     service: State<'_, Arc<ExecutionService>>,
@@ -103,7 +103,7 @@ pub async fn remove_pipeline_secret(
     Ok(())
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn get_blocks(service: State<'_, Arc<PipelineService>>) -> Result<Vec<Value>, String> {
     service.get_blocks().await
 }
@@ -133,7 +133,7 @@ pub async fn delete_block(
     service.delete_block(&block_id).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn get_step_execution_logs(
     execution_id: String,
     step_id: String,
@@ -169,7 +169,7 @@ pub async fn create_pipeline(
         .ok_or_else(|| "Pipeline not found after create".to_string())
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn get_pipeline(
     pipeline_id: String,
     service: State<'_, Arc<PipelineService>>,
@@ -180,7 +180,7 @@ pub async fn get_pipeline(
     service.get_pipeline(pipeline_id_int).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn get_pipelines(
     project_id: i32,
     service: State<'_, Arc<PipelineService>>,
@@ -221,7 +221,7 @@ pub async fn delete_pipeline(
     service.delete_pipeline(pipeline_id_int).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "terminal.exec")]
 pub async fn execute_pipeline(
     request: Value,
     events: State<'_, Events>,
@@ -237,7 +237,7 @@ pub async fn execute_pipeline(
         .ok_or_else(|| "Execution not found after start".to_string())
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn get_pipeline_execution(
     execution_id: String,
     service: State<'_, Arc<ExecutionService>>,
@@ -245,7 +245,7 @@ pub async fn get_pipeline_execution(
     service.get_execution(&execution_id).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "terminal.exec")]
 pub async fn cancel_pipeline_execution(
     execution_id: String,
     events: State<'_, Events>,
@@ -258,10 +258,11 @@ pub async fn cancel_pipeline_execution(
 
 // ── Releases ─────────────────────────────────────────────────────────────
 // A release is a workflow from the project's `.portal/pipeline.yml` named by its
-// `release:` block. Rehearsing is reachable by any client of the daemon; shipping
-// is `local_only`, so it can only be started from this app's own window.
+// `release:` block. Rehearsing runs a workflow, so it's gated behind
+// `terminal.exec` like `execute_pipeline`/`cancel_pipeline_execution` above;
+// shipping is `local_only`, so it can only be started from this app's own window.
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn release_describe(
     project_id: i32,
     service: State<'_, Arc<ExecutionService>>,
@@ -269,7 +270,7 @@ pub async fn release_describe(
     service.describe_release(project_id).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn release_list(
     project_id: i32,
     limit: Option<u64>,
@@ -313,7 +314,7 @@ async fn start_release(
 }
 
 /// Dry run: the project's `rehearse` workflow, with `RELEASE_DRY_RUN=1`.
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "terminal.exec")]
 pub async fn release_rehearse(
     project_id: i32,
     variables: Option<std::collections::HashMap<String, String>>,
@@ -385,7 +386,7 @@ async fn root_and_modules(
 }
 
 /// A `.portal/pipeline.yml` built from what the project contains. Read-only.
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn release_propose(
     project_id: i32,
     db_manager: State<'_, Arc<crate::database::DatabaseManager>>,
@@ -395,7 +396,7 @@ pub async fn release_propose(
 }
 
 /// Whether `yaml` is a usable pipeline file (parses; references resolve).
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn release_validate(yaml: String) -> Result<(), String> {
     use crate::domains::projects::pipelines::services::pipeline_file as pf;
     let file = pf::parse(&yaml)?;
@@ -406,7 +407,7 @@ pub async fn release_validate(yaml: String) -> Result<(), String> {
 }
 
 /// What would make this project's release fail or quietly skip something.
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "pipelines")]
 pub async fn release_health(
     project_id: i32,
     db_manager: State<'_, Arc<crate::database::DatabaseManager>>,

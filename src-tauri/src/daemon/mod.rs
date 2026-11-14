@@ -55,7 +55,7 @@ pub mod pairing;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -397,16 +397,29 @@ fn classify(
 /// The capability a remote peer must hold to receive an event. Fail-closed: an
 /// event mapped to nothing here is withheld from every remote peer (local peers
 /// are never filtered).
+///
+/// General rule: an event named `<domain>://...` maps to the cap `<domain>`,
+/// provided that's a real registered cap (`crate::rpc::capabilities()`) — this
+/// is what `coder://*`/`agents://*` already relied on. Two exceptions come
+/// first since they don't fit that shape:
+/// - `terminal`/`shell-integration` events map to `terminal.exec`, not the
+///   plain `terminal` cap, so a future `terminal://x` event doesn't leak to
+///   holders of the weaker `terminal` cap.
+/// - `pipeline-execution-update`/`pipeline-step-log` are emitted without the
+///   `domain://` form, so they're matched by prefix.
 fn event_cap(event: &str) -> Option<&'static str> {
-    if event.starts_with("coder") {
-        Some("coder")
-    } else if event.starts_with("agents") {
-        Some("agents")
-    } else if event.starts_with("terminal") || event.starts_with("shell-integration") {
-        Some("terminal.exec")
-    } else {
-        None
+    if event.starts_with("terminal") || event.starts_with("shell-integration") {
+        return Some("terminal.exec");
     }
+    if event.starts_with("pipeline-") {
+        return Some("pipelines");
+    }
+    static CAPS: OnceLock<Vec<&'static str>> = OnceLock::new();
+    let domain = event.split_once("://")?.0;
+    CAPS.get_or_init(crate::rpc::capabilities)
+        .iter()
+        .copied()
+        .find(|c| *c == domain)
 }
 
 /// The trust middleware. Resolves a bearer token against the database up front
@@ -804,6 +817,19 @@ mod tests {
         assert_eq!(event_cap("shell-integration-event"), Some("terminal.exec"));
         assert_eq!(event_cap("k8s://pods"), None);
 
+        // General `<domain>://...` rule, for a domain that isn't terminal's
+        // special case.
+        assert_eq!(event_cap("tasks://changed"), Some("tasks"));
+        assert_eq!(event_cap("agents://event"), Some("agents"));
+        // terminal:// must still resolve to terminal.exec, not the plain
+        // `terminal` cap the generic rule would otherwise find.
+        assert_eq!(event_cap("terminal://x"), Some("terminal.exec"));
+        // No `domain://` shape at all, and not a known bare-prefix case.
+        assert_eq!(event_cap("backend-log"), None);
+        // `domain://` shape, but `device` is not a registered cap.
+        assert_eq!(event_cap("device://pending"), None);
+        assert_eq!(event_cap("scan://progress"), None);
+
         let coder = vec!["coder".to_string()];
         assert!(frame_allowed(
             r#"{"event":"coder://x","payload":{}}"#,
@@ -821,6 +847,18 @@ mod tests {
         ));
         // Garbage frame is withheld.
         assert!(!frame_allowed("not json", &coder));
+
+        // A tasks:// frame is allowed through for a device holding "tasks",
+        // and blocked for one holding only "coder".
+        let tasks = vec!["tasks".to_string()];
+        assert!(frame_allowed(
+            r#"{"event":"tasks://changed","payload":{}}"#,
+            &tasks
+        ));
+        assert!(!frame_allowed(
+            r#"{"event":"tasks://changed","payload":{}}"#,
+            &coder
+        ));
     }
 
     #[tokio::test]

@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 use tauri::State;
 use tokio::sync::Mutex;
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "n8n.run")]
 pub async fn trigger_n8n_workflow(
     workflow_id: String,
     project_data: Value,
@@ -22,7 +22,7 @@ pub async fn trigger_n8n_workflow(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "n8n")]
 pub async fn get_workflow_status(
     execution_id: String,
     automation_service: State<'_, Arc<AutomationService>>,
@@ -30,14 +30,14 @@ pub async fn get_workflow_status(
     automation_service.get_workflow_status(&execution_id).await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "n8n")]
 pub async fn list_available_workflows(
     automation_service: State<'_, Arc<AutomationService>>,
 ) -> Result<Vec<AvailableWorkflow>, String> {
     automation_service.list_available_workflows().await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "n8n")]
 pub async fn get_suggested_workflows(
     framework: Option<String>,
     package_manager: Option<String>,
@@ -48,7 +48,7 @@ pub async fn get_suggested_workflows(
         .await
 }
 
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "n8n")]
 pub async fn check_n8n_health(
     automation_service: State<'_, Arc<AutomationService>>,
 ) -> Result<bool, String> {

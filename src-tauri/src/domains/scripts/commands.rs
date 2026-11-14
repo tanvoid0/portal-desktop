@@ -40,7 +40,7 @@ pub struct ExecuteScriptParams {
 }
 
 /// Execute a script
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "terminal.exec")]
 pub async fn execute_script(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -77,7 +77,7 @@ pub async fn record_interactive_execution(
 }
 
 /// Get execution details
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "actions")]
 pub async fn get_script_execution(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -88,7 +88,7 @@ pub async fn get_script_execution(
 }
 
 /// Get live output for a running execution
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "actions")]
 pub async fn get_script_execution_live_output(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -99,7 +99,7 @@ pub async fn get_script_execution_live_output(
 }
 
 /// Cancel a running execution
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "terminal.exec")]
 pub async fn cancel_script_execution(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -110,7 +110,7 @@ pub async fn cancel_script_execution(
 }
 
 /// Get executions for a specific block/script
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "actions")]
 pub async fn get_script_executions_by_block(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -122,7 +122,7 @@ pub async fn get_script_executions_by_block(
 }
 
 /// Get all currently running executions
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "actions")]
 pub async fn get_running_script_executions(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -132,7 +132,7 @@ pub async fn get_running_script_executions(
 }
 
 /// Get recent executions
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "actions")]
 pub async fn get_recent_script_executions(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,

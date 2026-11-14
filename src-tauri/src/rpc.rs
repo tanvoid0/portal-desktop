@@ -141,10 +141,20 @@ pub const DEFAULT_CAPS: &[&str] = &[
 /// produced in an agent run, so it opts in rather than riding the default
 /// grant the way the live `agents` cap (which run/model info, not history)
 /// does.
+///
+/// `github.write` acts on GitHub as the user — creating and editing issues,
+/// and dispatching a workflow run, which can deploy depending on what that
+/// workflow does. Read-only GitHub access (`github`) is not sensitive; this is.
+///
+/// `n8n.run` triggers an external n8n workflow. n8n workflows are arbitrary —
+/// a node in one can run shell commands or hit any URL — so running one is as
+/// sensitive as `terminal.exec`, even though it happens on another box.
 pub const SENSITIVE_CAPS: &[&str] = &[
     "terminal.exec",
     "agents.exec",
     "agents.history",
+    "github.write",
+    "n8n.run",
     REMOTE_INPUT_CAP,
 ];
 
@@ -329,6 +339,35 @@ mod tests {
         );
     }
 
+    /// Dispatching a workflow (or editing an issue) acts on GitHub as the
+    /// user and can deploy, so it opts in rather than riding the default
+    /// `github` (read-only) grant.
+    #[test]
+    fn github_write_is_sensitive_not_default() {
+        assert!(
+            !DEFAULT_CAPS.contains(&"github.write"),
+            "github.write must not be granted by default"
+        );
+        assert!(
+            SENSITIVE_CAPS.contains(&"github.write"),
+            "github.write must be listed as sensitive so the dialog unchecks it"
+        );
+    }
+
+    /// Running an n8n workflow can execute arbitrary commands via its nodes,
+    /// so it gets the same opt-in treatment as `terminal.exec`.
+    #[test]
+    fn n8n_run_is_sensitive_not_default() {
+        assert!(
+            !DEFAULT_CAPS.contains(&"n8n.run"),
+            "n8n.run must not be granted by default"
+        );
+        assert!(
+            SENSITIVE_CAPS.contains(&"n8n.run"),
+            "n8n.run must be listed as sensitive so the dialog unchecks it"
+        );
+    }
+
     /// A paired phone gets to move the mouse and type on this PC, so
     /// `remote.input` gets the same opt-in treatment as `terminal.exec` — and
     /// since it has no `/rpc` command behind it, this is also the only thing
@@ -379,11 +418,17 @@ mod tests {
         assert_eq!(
             capabilities(),
             vec![
+                "actions",
                 "agents",
                 "agents.exec",
                 "agents.history",
                 "coder",
                 "dashboard",
+                "github",
+                "github.write",
+                "n8n",
+                "n8n.run",
+                "pipelines",
                 "projects",
                 "remote.input",
                 "tasks",
@@ -403,7 +448,20 @@ mod tests {
         assert_eq!(capability("agents_list_backends"), Some("agents"));
         assert_eq!(capability("agents_start_run"), Some("agents.exec"));
         assert_eq!(capability("agents_list_sessions"), Some("agents.history"));
+        assert_eq!(capability("get_pipelines"), Some("pipelines"));
+        assert_eq!(capability("execute_pipeline"), Some("terminal.exec"));
+        assert_eq!(capability("github_list_repositories"), Some("github"));
+        assert_eq!(capability("github_create_issue"), Some("github.write"));
+        assert_eq!(capability("check_n8n_health"), Some("n8n"));
+        assert_eq!(capability("trigger_n8n_workflow"), Some("n8n.run"));
+        assert_eq!(capability("get_script_execution"), Some("actions"));
+        assert_eq!(capability("execute_script"), Some("terminal.exec"));
         assert!(capability("execute_command_in_directory").is_none());
+        assert!(capability("create_pipeline").is_none());
+        assert!(capability("github_start_device_flow").is_none());
+        assert!(capability("github_clone_repository").is_none());
+        assert!(capability("register_embedded_workflow").is_none());
+        assert!(capability("release_ship").is_none());
     }
 
     #[test]
