@@ -3,4 +3,11 @@
 /**
  * A persisted user/assistant turn, for the Conversation tab.
  */
-export type AgentMessageRow = { id: string, seq: number, role: string, text: string, parent_tool_use_id: string | null, created_at: string, };
+export type AgentMessageRow = {
+  id: string;
+  seq: number;
+  role: string;
+  text: string;
+  parent_tool_use_id: string | null;
+  created_at: string;
+};

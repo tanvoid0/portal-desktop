@@ -3,23 +3,31 @@
 /**
  * Row shape for `agents_list_sessions` — most recent first.
  */
-export type AgentSessionSummary = { id: string, backend_id: string, model: string | null, cwd: string, 
-/**
- * `"running" | "exited" | "interrupted"` (the last when the event
- * channel closed without a normal `Exited`, e.g. an app quit or crash
- * mid-run — see the pump loop's channel-closed branch in `start_run`).
- */
-status: string, started_at: string, ended_at: string | null, exit_code: number | null, 
-/**
- * First line of the launching prompt, truncated — the sidebar's label.
- */
-title: string | null, 
-/**
- * The task that launched this run, if any.
- */
-task_id: string | null, 
-/**
- * The backend CLI's own session id, once known — `resume_session` needs
- * this to be `Some` to resume-in-place.
- */
-backend_session_id: string | null, };
+export type AgentSessionSummary = {
+  id: string;
+  backend_id: string;
+  model: string | null;
+  cwd: string;
+  /**
+   * `"running" | "exited" | "interrupted"` (the last when the event
+   * channel closed without a normal `Exited`, e.g. an app quit or crash
+   * mid-run — see the pump loop's channel-closed branch in `start_run`).
+   */
+  status: string;
+  started_at: string;
+  ended_at: string | null;
+  exit_code: number | null;
+  /**
+   * First line of the launching prompt, truncated — the sidebar's label.
+   */
+  title: string | null;
+  /**
+   * The task that launched this run, if any.
+   */
+  task_id: string | null;
+  /**
+   * The backend CLI's own session id, once known — `resume_session` needs
+   * this to be `Some` to resume-in-place.
+   */
+  backend_session_id: string | null;
+};

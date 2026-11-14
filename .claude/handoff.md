@@ -14,6 +14,7 @@ to the database explorer — it was just the active branch when this session sta
 ## Status: done, gated clean, committed. Not pushed. Not live-verified against a real backend.
 
 Commits on `feat/database-explorer` (newest first, not pushed):
+
 - `b9cb8bf2` — tiny: adds the `.gitignore` entries the previous commit's message promised but
   forgot to actually stage.
 - `2576a838` — untracks 45 QA screenshots + `.qa424-src/` that `git add -A` swept into the main
@@ -113,7 +114,7 @@ need the "why" behind a specific choice — the summary:
      `./node_modules/.bin/<tool>.CMD` directly. Not fixed, not investigated beyond confirming
      it's broken — outside this task's scope, but it'll bite the next session too.
    - **#577** — the Portal MCP `update` tool's `note` field throws `"Task title must be less
-     than 200 characters"` for any note over ~190 chars (validating note length against the
+than 200 characters"` for any note over ~190 chars (validating note length against the
      title limit, looks like a copy-paste bug in the tool itself). Worked around by splitting
      notes into short ones. Not fixed.
 4. **Minor, not done, probably fine to skip**: no per-project-group "New run" button in the
@@ -125,7 +126,7 @@ need the "why" behind a specific choice — the summary:
 - **Agent Platform (the separate `agent-platformd` product at
   `D:\projects\production\ai\agentic-ai\agent-platform`) does NOT get a new `AgentBackend`
   adapter.** Originally planned, then dropped after research showed Portal's own Coder tab
-  already drives the exact same agent-platform coder-chat loop, with *stronger* permissions
+  already drives the exact same agent-platform coder-chat loop, with _stronger_ permissions
   (gates file writes, not just shell commands). Building a second, weaker front-end to the same
   thing was pointless. The user's own framing: agent-platform is meant to stay a pure
   AI-provider layer (OpenAI-compatible API multiplexer, eventually a standalone production
@@ -155,10 +156,10 @@ need the "why" behind a specific choice — the summary:
 - **`git add -A` is dangerous in this repo right now.** This session did it once (user's
   explicit instruction: "commit the working tree changes") and it swept in 45 new QA screenshots
   plus a scratch fixture dir (`.qa424-src/`) that the repo's convention says to leave untracked.
-  Caught it by actually reading a stale `.claude/handoff.md` from an *earlier* session that had
+  Caught it by actually reading a stale `.claude/handoff.md` from an _earlier_ session that had
   documented this exact convention — don't skip reading this file's "watch out" sections in
   whatever state you find them. First fix attempt (`git rm -r --cached .claude/qa/shots
-  .qa424-src`) was **way too broad** — it untracked 1368 pre-existing, legitimately-tracked
+.qa424-src`) was **way too broad** — it untracked 1368 pre-existing, legitimately-tracked
   screenshots going back through the whole project's QA history, not just the new ones. Caught
   via `git commit` output listing far more `delete mode` lines than expected — **always eyeball
   a commit's file count/list against what you think you're committing before trusting it, even
@@ -171,7 +172,7 @@ need the "why" behind a specific choice — the summary:
   session**, pointed at a vite server that had since been stopped. It held a file lock that made
   `cargo test agents` (the bin target) fail with `Access is denied` removing the old exe — worked
   around by testing the `portal-core` lib directly (`cd src-tauri/portal-core && cargo test
-  agents`) instead of going through the bin. Killing the stale process via `taskkill` was denied
+agents`) instead of going through the bin. Killing the stale process via `taskkill` was denied
   by the Bash tool's permission classifier ("Destructive or Unwanted Actions") every time it was
   tried. If you hit the same lock, either ask the user to close the window themselves, or just
   test against `portal-core` directly like this session ended up doing — don't fight the

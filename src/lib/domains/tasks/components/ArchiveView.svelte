@@ -65,15 +65,15 @@
               {#if project}
                 <Badge
                   variant="outline"
-                  class={onProjectClick ? 'max-w-[10rem] cursor-pointer truncate hover:bg-accent' : 'max-w-[10rem] truncate'}
-                  onclick={
-                    onProjectClick
-                      ? (e: MouseEvent) => {
-                          e.stopPropagation();
-                          onProjectClick?.(task);
-                        }
-                      : undefined
-                  }
+                  class={onProjectClick
+                    ? 'max-w-[10rem] cursor-pointer truncate hover:bg-accent'
+                    : 'max-w-[10rem] truncate'}
+                  onclick={onProjectClick
+                    ? (e: MouseEvent) => {
+                        e.stopPropagation();
+                        onProjectClick?.(task);
+                      }
+                    : undefined}
                 >
                   {project}
                 </Badge>
