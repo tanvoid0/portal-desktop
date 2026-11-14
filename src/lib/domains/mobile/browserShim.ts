@@ -89,7 +89,7 @@ async function whoami(conn: StoredConn): Promise<{ name: string; caps: string[] 
       headers: { Authorization: `Bearer ${conn.token}` },
     });
   } catch (e) {
-    throw new Error(`cannot reach ${conn.host}:${conn.port}: ${String(e)}`);
+    throw new Error(`cannot reach ${conn.host}:${conn.port}: ${String(e)}`, { cause: e });
   }
   const body = await res.text();
   if (!res.ok) {
@@ -100,7 +100,7 @@ async function whoami(conn: StoredConn): Promise<{ name: string; caps: string[] 
   try {
     v = JSON.parse(body);
   } catch (e) {
-    throw new Error(`bad /whoami reply: ${String(e)}`);
+    throw new Error(`bad /whoami reply: ${String(e)}`, { cause: e });
   }
   return { name: v.name ?? 'Portal Desktop', caps: Array.isArray(v.caps) ? v.caps : [] };
 }
@@ -287,14 +287,14 @@ class Bridge {
         body: JSON.stringify({ device }),
       });
     } catch (e) {
-      throw new Error(`cannot reach ${host}:${port}: ${String(e)}`);
+      throw new Error(`cannot reach ${host}:${port}: ${String(e)}`, { cause: e });
     }
     if (!res.ok) throw new Error(pairError(res.status));
     let v: { token?: string; name?: string; port?: number };
     try {
       v = JSON.parse(await res.text());
     } catch (e) {
-      throw new Error(`bad pairing reply: ${String(e)}`);
+      throw new Error(`bad pairing reply: ${String(e)}`, { cause: e });
     }
     if (!v.token) throw new Error('pairing reply had no token');
     this.set({ host, port: v.port ?? port, token: v.token, name: v.name ?? 'Portal Desktop' });
