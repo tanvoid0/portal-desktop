@@ -56,3 +56,30 @@ pub struct QueryResult {
     /// True when the row cap was hit and more rows exist.
     pub truncated: bool,
 }
+
+impl QueryResult {
+    /// A result carrying only an affected-row count (UPDATE/INSERT/DELETE) —
+    /// no columns/rows to display.
+    pub fn affected(n: usize) -> Self {
+        Self {
+            columns: Vec::new(),
+            rows: Vec::new(),
+            row_count: n,
+            truncated: false,
+        }
+    }
+}
+
+/// The parameterized SQL + bound values for one edit (P2). Pure to build — the
+/// same text is shown to the user as the confirm-dialog preview and used
+/// (with real bound params) to execute; a value is never string-interpolated
+/// into SQL that actually runs. Postgres execution appends a per-param
+/// `::<type>` cast that this preview text omits (see `sql_server.rs`) — it
+/// only affects type coercion, never the bound value.
+#[derive(Serialize, Clone, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/database/generated/")]
+pub struct EditPreview {
+    pub sql: String,
+    pub params: Vec<serde_json::Value>,
+}

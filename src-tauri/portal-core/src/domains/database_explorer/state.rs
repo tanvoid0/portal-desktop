@@ -4,12 +4,14 @@
 //! `discovered` (recomputed fresh on every `db_list_sources` from the vault / SDK
 //! services / Docker). A source carries everything needed to connect except the
 //! password, which for vault entries is resolved lazily at connect time so that
-//! listing never requires the vault to be unlocked.
+//! listing never requires the vault to be unlocked. A third set (`editable`,
+//! P2) tracks which source ids the user has opted into editing for — read-only
+//! is the default, and it resets every launch like everything else here.
 //!
 //! ponytail: no connection pool cache yet — a fresh pool is opened per call. Add
 //! one when latency measurably hurts.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -49,21 +51,21 @@ pub enum Source {
 }
 
 impl Source {
-    fn descriptor(&self, id: &str) -> DbSource {
+    fn descriptor(&self, id: &str, editable: bool) -> DbSource {
         match self {
             Source::Sqlite { path, label } => DbSource {
                 id: id.to_string(),
                 label: label.clone(),
                 engine: "sqlite".to_string(),
                 detail: path.display().to_string(),
-                editable: false,
+                editable,
             },
             Source::Server(s) => DbSource {
                 id: id.to_string(),
                 label: s.label.clone(),
                 engine: s.engine.clone(),
                 detail: s.detail.clone(),
-                editable: false,
+                editable,
             },
         }
     }
@@ -72,6 +74,7 @@ impl Source {
 pub struct DbExplorerState {
     manual: Mutex<HashMap<String, Source>>,
     discovered: Mutex<HashMap<String, Source>>,
+    editable: Mutex<HashSet<String>>,
 }
 
 impl DbExplorerState {
@@ -88,6 +91,7 @@ impl DbExplorerState {
         Self {
             manual: Mutex::new(manual),
             discovered: Mutex::new(HashMap::new()),
+            editable: Mutex::new(HashSet::new()),
         }
     }
 
@@ -95,7 +99,7 @@ impl DbExplorerState {
     pub fn register_sqlite(&self, path: PathBuf, label: String) -> DbSource {
         let id = uuid::Uuid::new_v4().to_string();
         let src = Source::Sqlite { path, label };
-        let descriptor = src.descriptor(&id);
+        let descriptor = src.descriptor(&id, false);
         self.manual.lock().unwrap().insert(id, src);
         descriptor
     }
@@ -111,12 +115,13 @@ impl DbExplorerState {
 
     /// All sources (manual + discovered), sorted by label.
     pub fn sources(&self) -> Vec<DbSource> {
+        let editable = self.editable.lock().unwrap();
         let mut out: Vec<DbSource> = Vec::new();
         for (id, s) in self.manual.lock().unwrap().iter() {
-            out.push(s.descriptor(id));
+            out.push(s.descriptor(id, editable.contains(id)));
         }
         for (id, s) in self.discovered.lock().unwrap().iter() {
-            out.push(s.descriptor(id));
+            out.push(s.descriptor(id, editable.contains(id)));
         }
         out.sort_by(|a, b| a.label.cmp(&b.label));
         out
@@ -128,5 +133,20 @@ impl DbExplorerState {
             return Some(s.clone());
         }
         self.discovered.lock().unwrap().get(id).cloned()
+    }
+
+    /// Enables/disables editing for a source id (P2). Read-only is the default
+    /// and this resets every launch, same as the rest of this registry.
+    pub fn set_editable(&self, id: &str, editable: bool) {
+        let mut guard = self.editable.lock().unwrap();
+        if editable {
+            guard.insert(id.to_string());
+        } else {
+            guard.remove(id);
+        }
+    }
+
+    pub fn is_editable(&self, id: &str) -> bool {
+        self.editable.lock().unwrap().contains(id)
     }
 }

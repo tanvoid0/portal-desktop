@@ -573,6 +573,13 @@ pub fn run() {
             domains::database_explorer::commands::db_describe_table,
             domains::database_explorer::commands::db_fetch_rows,
             domains::database_explorer::commands::db_run_query,
+            domains::database_explorer::commands::db_set_editable,
+            domains::database_explorer::commands::db_preview_update,
+            domains::database_explorer::commands::db_apply_update,
+            domains::database_explorer::commands::db_preview_insert,
+            domains::database_explorer::commands::db_apply_insert,
+            domains::database_explorer::commands::db_preview_delete,
+            domains::database_explorer::commands::db_apply_delete,
             // Automation commands
             domains::automation::trigger_n8n_workflow,
             domains::automation::get_workflow_status,

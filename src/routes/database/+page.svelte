@@ -42,6 +42,7 @@
 
   // Query tab runs against the selected source, else the first one.
   const querySourceId = $derived(sel?.sourceId ?? sources.data?.[0]?.id ?? '');
+  const selectedSource = $derived(sources.data?.find((s) => s.id === sel?.sourceId));
   const run = createMutation(() => ({
     mutationFn: () => runQuery(querySourceId, sql),
     onError: (e: unknown) => toast.error('Query failed', String(e)),
@@ -125,7 +126,14 @@
             {:else if rows.isError}
               <PageError message={String(rows.error)} onRetry={() => rows.refetch()} />
             {:else}
-              <ResultGrid result={rows.data} columnInfo={columns.data} />
+              <ResultGrid
+                result={rows.data}
+                columnInfo={columns.data}
+                editable={selectedSource?.editable}
+                sourceId={sel!.sourceId}
+                table={sel!.table}
+                onChanged={() => rows.refetch()}
+              />
               <div class="flex items-center gap-2">
                 <Button
                   variant="outline"
