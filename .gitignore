@@ -88,3 +88,7 @@ scripts/vpn.sh
 
 # Generated per-instance tauri dev overrides (scripts/dev-instance.mjs)
 src-tauri/.tauri-instance-*.conf.json
+
+# QA run artifacts — screenshots and scratch fixtures, never tracked
+.claude/qa/shots/
+.qa424-src/
