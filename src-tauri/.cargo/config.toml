@@ -1,0 +1,14 @@
+# One target dir shared by every worktree of this repo, on a drive with room
+# (D: has repeatedly run to 0 free - see docs/development/PORTAL_MOBILE.md's
+# "Preconditions"). Each worktree used to get its own full `target/` (~10GB+),
+# multiplied by however many worktrees/sessions exist at once; cargo's own
+# file lock in the target dir already serializes concurrent builds safely, so
+# sharing it costs parallelism between worktrees, not correctness.
+#
+# Per-machine path, not portable - if this ever needs to work on another
+# machine or in CI, override with the CARGO_TARGET_DIR env var instead (it
+# takes precedence over this file) rather than editing the path below.
+# I: has the most headroom on this machine (D: and C: both run tight);
+# grouped under I:/build/cargo/ alongside other projects' target dirs.
+[build]
+target-dir = "I:/build/cargo/portal-desktop"

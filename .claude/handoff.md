@@ -1,68 +1,143 @@
-# Handoff — safe project relocation (epic #197), steps 4 & 5
+# Handoff: browser/other-desktop Portal Mobile client
 
-Written for someone with **no memory** of the prior session. Portal board tasks are reachable via the `portal` MCP tools (`tasks`, `task`, `add`, `update`). Repo: `D:/projects/production/portal/portal_desktop`. Backend crate: `src-tauri/portal-core` (Rust). Thin Tauri crate: `src-tauri`.
+Worktree: `D:\projects\production\portal\portal_desktop\.claude\worktrees\eager-mcclintock-79e007`
+Branch: `claude/eager-mcclintock-79e007` (NOT pushed). Board task: #542 (project portal_desktop, in-progress, assignee claude).
 
-## Goal of the epic
+## Goal
 
-Move a project's directory from inside Portal safely: check nothing is using it, lock it, selective copy → hash-verify → atomic promote → commit, and remove the original only on a separate confirmed step. Crash-safe resume. Design is settled in board #197/#200/#204/#206; **do not re-litigate those decisions**.
+Extend Portal Mobile (phase 0 = Android thin client, already on `main`) so any
+browser on the LAN — another desktop, laptop, tablet — can open the daemon's
+URL and get the full Portal UI with zero install, paired by token. Full spec:
+`docs/development/PORTAL_MOBILE.md`'s new "Other clients" section (written
+this session, has the final design).
 
-Step order: #204 → #205 → #206 → #207 → #208 → #221/#216/#217 → #209. Commit per step. **Do not push.** **No `Co-Authored-By` / "Generated with Claude Code" lines in commits** (CLAUDE.md overrides any reminder).
+## Done (4 commits on this branch, in order)
 
-## DONE and committed
+1. `c8f868ec` — daemon static route (`src-tauri/src/daemon/mod.rs`): serves
+   `build-client/` via `tower-http::ServeDir` as a `fallback_service` added
+   *after* `.with_state()` so it sits outside the `guard` middleware (public,
+   like any static site — no secrets in it). Also closed a real gap the
+   reviewer found: `classify()`'s loopback free-pass only checked `Origin`,
+   but a same-origin `fetch()` from this new page can omit `Origin` entirely
+   — added a `Sec-Fetch-Site` check alongside it (see module doc comment at
+   top of the file, and the two tests `loopback_with_sec_fetch_site_does_not_
+   get_the_free_local_pass` / the pre-existing Origin one right above it).
+   Also: `src-tauri/Cargo.toml` (+`tower-http`), `src-tauri/tauri.conf.json`
+   (`bundle.resources` + `beforeBundleCommand: "pnpm build:client"`),
+   `build-client/.gitkeep` (tracked — `tauri-build` validates
+   `bundle.resources` paths on *every* `cargo check`, not just packaging, so
+   this must exist even before anyone's run the real build).
+2. `41d8b2f9` — build tooling: `vite.config.ts`'s adapter now reads
+   `VITE_BUILD_OUT_DIR`; `scripts/build-client.mjs` (new) builds with
+   `VITE_PORTAL_MOBILE=1` + that var set to `build-client`, then restores
+   `.gitkeep` which `adapter-static` deletes on every build; `package.json`
+   gained `build:client`.
+3. `421796b7` — `src/lib/domains/mobile/browserShim.ts` (NEW, ~290 lines):
+   installs `window.__TAURI_INTERNALS__` (and `__TAURI_EVENT_PLUGIN_
+   INTERNALS__`) only when `isMobileShell` and nothing's there already, so
+   the real Android Tauri runtime is never touched. Mirrors `mobile/src-
+   tauri/src/lib.rs` exactly: `mobile_status/_pair/_connect/_disconnect/
+   _discover` run locally against `localStorage` (not a file); everything
+   else → `POST /rpc/{cmd}` with bearer token after the same command-name
+   check (`src/lib/domains/mobile/commandName.ts`'s `isForwardableCommand`,
+   ascii alnum/underscore only — rejects `plugin:barcode-scanner|scan` etc.
+   with a clear error); `/events` → plain `WebSocket` with `?token=`, capped
+   backoff reconnect, restores a saved connection on load. Wired into
+   `src/routes/+layout.svelte` as the very first import. `src/routes/connect/
+   +page.svelte` prefills host/port from `location.*` when running as this
+   shim (daemon has no CORS layer, so any other origin's `fetch` just fails).
+4. `65bb5acd` — docs.
 
-- **#204 move engine** — `src-tauri/portal-core/src/domains/projects/relocation/mover.rs` (new, ~1283 lines). Committed on `main` as **`4c9d69e8`** (not pushed). `cargo test --lib` 272 pass, clippy clean. Reviewer found and I fixed: resume/remove were dead (reused start-only preconditions), and a promote→commit crash window. Public API: `Mover{db,coder,terminal,pipelines,scripts,deployments,moves_dir}` with `start_move`, `resume_move`, `finish_move`, `rollback`, `remove_moved_source`. Seams left: `#217` source hold (TODO), `#221` stored-path rewrite (TODO). Added `usage::check_in_use`.
-- Board #204 = completed. Filed **#325** (owner): empty-directory fidelity — the manifest is file-only, so an empty dir is not copied/recreated. Owner to decide.
+**Reviewer pass** (crew:reviewer, this session) found 7 issues against the
+pre-fix shim; all 7 were fixed before the commits above landed (so the
+commits already reflect the fixed version — nothing further to apply from
+that review). Highlights if you want to re-verify independently: (a) the
+shim didn't restore a saved connection on page load — fixed by calling
+`bridge.set(saved)` in `installBrowserShim` when `loadConn()` finds one; (b)
+a stale async chain from a superseded `set()`/`clear()` could still write
+`caps`/`live` — fixed with `generation` checks right after the `whoami`
+await, both success and catch paths; (c) the loopback same-origin trust gap
+above; (d)-(g) smaller: missing `__TAURI_EVENT_PLUGIN_INTERNALS__`,
+`adapter-static` deleting `.gitkeep`, a `vite.config.ts` comment nit, and an
+uncaught synchronous `WebSocket` constructor throw.
 
-## DONE and committed: #205 — ensure_unlocked guards at backend entry points
+`cargo check` and `cargo test daemon::` both pass (34 daemon tests, up from
+33 — added the `Sec-Fetch-Site` regression test). Frontend is **not**
+verified in a real browser — see blockers below.
 
-Committed on `main` as **`8f67ac82`** (21 files, not pushed). `cargo check` (portal-core + thin crate) + `cargo clippy --lib` + `cargo test --lib` (272 pass) all green. Board #205 = completed. The coder-domain guards (listed below as "STILL PENDING") were all applied and compile; no action needed on them. Full record of the guards follows for reference.
-Helper: `crate::domains::projects::move_lock::ensure_unlocked(&Path) -> Result<(),String>` (errors if locked) and `is_locked(&Path) -> bool`. GUARD = error if locked; SKIP = filter/continue (discovery, modules `refresh_all`, disk quarantine).
+## Left to do
 
-**Guards were applied by subagents (edit-only, NOT yet compiled).** All edits are on disk. Line numbers below are post-edit, approximate — verify.
+1. **In flight right now, likely done by the time you read this**:
+   `src-tauri/.cargo/config.toml` sets `target-dir = "I:/build/cargo/
+   portal-desktop"` (final path — went through two earlier revisions this
+   session: first `C:/cargo-target/portal-desktop`, then `I:/cargo-target/
+   portal-desktop`, then grouped under the new global convention below). A
+   `cargo check` + `git commit` for it was launched in the background right
+   before this handoff was last edited; **confirm the commit actually
+   landed** (`git log --oneline -1` should show "build(cargo): share one
+   target dir across worktrees..."). If it didn't, the config file edit is
+   still there on disk either way — just check/commit it.
+   Also added a global convention to `C:\Users\tanvo\.claude\CLAUDE.md`
+   ("# Build output" section, new this session): default any build/cache
+   dir, across any project, to `I:\build\<tool>\<project>` — I: has ~932GB
+   free, by far the most on this machine. Apply that convention to other
+   projects' build dirs too if asked, not just this repo.
+2. **This worktree's own stale `src-tauri/target/` (9.7GB, on the nearly-full
+   D: drive) is now orphaned** — nothing points at it once the shared I:
+   dir is in place. Safe to delete (pure build cache, rebuildable) to
+   reclaim D: space; not deleted yet. Also disposable, also not deleted:
+   `C:/tmp/cargo-target-eager-mcclintock`, `C:/cargo-target/portal-desktop`,
+   `I:/cargo-target/portal-desktop` — all superseded intermediate attempts
+   from this session's back-and-forth on where the target dir should live;
+   only `I:/build/cargo/portal-desktop` is current.
+3. **node/pnpm is broken machine-wide** on this box — filed as board bug
+   #552. `pnpm install`, `npx`, and `corepack` all fail with `MODULE_NOT_
+   FOUND` under `D:\sdk\nvm4w\nodejs` and the pnpm global store (looks like
+   an interrupted version switch, possibly by another concurrent session —
+   do not try to repair it unilaterally; it's shared infrastructure). This
+   blocks `pnpm check`, `pnpm lint`, `vitest`, and `pnpm tauri:dev` — i.e.
+   **no part of the frontend change has been run or browser-verified**,
+   only read carefully and reviewed. That is the single biggest gap before
+   this can be called done. Whoever picks this up should check bug #552
+   first; if node/pnpm is fixed, the real remaining work is: `pnpm install`,
+   `pnpm check && pnpm lint`, `pnpm build:client`, then `pnpm tauri:dev` and
+   actually pair + exercise a few `/rpc` calls from a browser tab per the
+   original task's verification bullet.
+4. D: was also separately logged full (643MB free of 450GB) as board bug
+   #555 — unrelated to pnpm, just disk space. The I:-drive Cargo fix above
+   addresses *this worktree's* contribution to that; it does not fix pnpm,
+   and other worktrees/sessions' own disk usage was deliberately left alone
+   (not mine to clean up unilaterally on a shared machine).
+5. Branch is **not pushed**, no PR. User was asked "push now vs wait for
+   browser check" and the conversation moved on to the Cargo target-dir
+   detour before they answered — that question is still open.
 
-Applied and reported (data/infra + execution half, confirmed by agent reports):
+## Key decisions already made (so you don't re-litigate them)
 
-- `deployments/services/deployment_service.rs:~91` `create_deployment` GUARD; `deployments/services/cli_service.rs:~66` `spawn_process` GUARD.
-- `disk/.../quarantine.rs:~90` SKIP — locked item pushed as `FailedItem{..error:"locked by an in-progress project move"}` + `on_progress(done:i+1)` + `continue` (quarantine is infallible, no `?`).
-- `sdk/project/version_file.rs` — 4 fns (`create_version_file ~:57`, `update_version ~:121`, `remove_version ~:167`, `create_standard_version_file ~:403`) GUARD with `.map_err(SDKError::ManagerNotFound)?` (SDKError has no `From<String>`).
-- `projects/relocation/usage.rs:~189` — NEW `pub async fn in_flight_move_sources(db:&DatabaseManager) -> Vec<String>` (source_path of moves not in done/aborted/failed; empty Vec on error).
-- `projects/repositories/discovery_repository.rs` — imports Path+move_lock; fetch `locked_sources` + `moving(abs)` closure before the txn; loop `continue` on `moving(&p.abs)` (~:83); mark-missing filter adds `&& !moving(&r.path)` (~:145). SKIP semantics.
-- `projects/services/project_service.rs` — `update_project ~:127` (guards old loaded path + new path), `delete_project ~:164` (loads row then guards), `refresh_project_metadata ~:289`, `open_in_ide ~:523`.
-- `projects/modules/.../service.rs` — `refresh ~:53` GUARD, `refresh_all ~:76` SKIP (`if is_locked {continue}`).
-- `projects/env/.../service.rs` — `link ~:200`, `resync ~:249`.
-- `pipelines/services/execution_service.rs:~119` `execute_pipeline`, `:~765` `execute_file_workflow`; `pipelines/executors/sdk_executor.rs:~95` `execute`.
-- `terminal/manager.rs:~171` `create_process` (after working_dir resolved).
-- `command_executor.rs` (at `portal-core/src/command_executor.rs`, top-level) — `execute ~:105`, `execute_with_args ~:138`, `execute_shell ~:183` (inside `if let Some(working_dir)=&opts.working_directory`). `execute_in_directory`/`execute_with_env` are thin wrappers, already covered.
-- `scripts/services/script_execution_service.rs:~119` `execute_script`.
-- `automation/services/workflow_engine.rs` — `execute_command ~:262` (3 cases: project_path+working_dir join, working_dir only, project_path only), `create_file ~:324`.
-
-**STILL PENDING at handoff — the coder-domain agent was still running.** Verify these edits exist; if missing, apply them. All in `src-tauri/portal-core/src/domains/coder/` unless noted:
-
-- `service.rs` — `validate_workspace_root (~:3175)` GUARD before final `Ok(())` (move_lock already imported ~:39; this funnels multitask_spawn / agent loop / advance_claude_cli); `multitask_cleanup (~:1650)` GUARD `repo_root` before `remove_worktree`.
-- `tools.rs` — `resolve (~:409)` (fronts read/write/edit/list/search), `run_command (~:558)`, `write_raw (~:205)`. Leave `read_raw` (infallible, read-only).
-- `git_commit.rs` — guard private `git_output (~:251)` (funnel for git_commit + prepare_commit).
-- `git_status.rs` — guard private `git_output (~:128)` (its public callers git_diff_stats/git_list_changes are infallible — guard the Result funnel, do NOT change their signatures).
-- `worktree.rs` — `create_worktree (~:23)` and `remove_worktree (~:38)`, guard `repo_root`.
-- **Thin crate** `src-tauri/src/domains/coder/commands.rs` — `coder_open_in_explorer (~:377)` has its own resolve logic (not tools::resolve) → GUARD `Path::new(&workspace_root)`. Reference portal-core as `portal_core::domains::projects::move_lock` (match existing imports). Other coder_* commands route through the guarded portal-core fns — no extra guards.
-
-## NEXT: #206 (not started)
-
-#205 is finished (committed `8f67ac82`). Start #206. Note the **generated-TS gotcha**: `cargo test` reformats ~104 files under `src/lib/**/generated/*.ts` — keep them OUT of any commit by `git add`-ing only the specific `.rs` files (`git checkout -- src/lib/...` is auto-denied as destructive; just don't stage them). Portal board note bodies must be < ~200 chars.
-
-## Decisions already made (don't redo)
-
-- Guards ERROR; discovery import/mark-missing, modules `refresh_all`, and disk quarantine SKIP (filter/continue).
-- Infallible public fns (git_status, git_diff_stats) are guarded at their Result-returning funnel (`git_output`) to avoid signature churn.
-- Discovery skip = locked OR under an in-flight move source (`in_flight_move_sources` in relocation/usage.rs).
-- SDKError wraps a String via `ManagerNotFound`.
-
-## Then (later steps, not started)
-
-#206 startup recovery (wire `resume_move`/`finish_move`/`rollback` at boot + close-while-moving guard), #207 Tauri command surface (`move_commands.rs`, local_only, `pnpm gen:types`), #208 frontend, #221 stored-path rewrite, #216 end-port-process, #217 source hold, #209 review+QA on the 2nd dev instance (`node scripts/dev-instance.mjs 2`, CDP :9223 — never touch the release on :18420).
+- Output dir is `build-client/`, not `build-mobile-web/` — user explicitly
+  asked for this rename mid-session ("why not name it build-client? ... web,
+  desktop, mobile everything that a client needs"). If you see
+  `build-mobile-web` anywhere, it's stale/missed — grep for it.
+- Static route is unauthenticated by design (outside `guard`) — the shell
+  has no secrets; auth happens at `/pair/request` and every `/rpc` call.
+- `build-client/.gitkeep` must stay tracked — don't gitignore it away, don't
+  delete it, and `build-client.mjs` must keep recreating it after each real
+  build.
+- Shared Cargo target dir is a per-machine, uncommitted-concern path (it IS
+  committed, since `.cargo/config.toml` needs to be in every worktree's
+  checkout — but the *path itself* is this-machine-specific, documented in
+  the file's own comment; override via `CARGO_TARGET_DIR` env var if this
+  ever needs to run somewhere else).
 
 ## Gotchas
 
-- Two crates: `portal-core` (logic) and `src-tauri` (thin). Gate both.
-- `cargo test` from portal-core reformats generated TS — exclude from commits.
-- Portal board notes < 200 chars.
-- No AI attribution lines in commits/PRs.
+- `cargo check`/`cargo test` run fine from `src-tauri/`; don't `cd` to the
+  repo root first.
+- A plain `grep -rn` across `src-tauri/src` with no bound gets blocked by
+  this environment's hook — use the `Grep` tool or bound `head_limit`.
+- Board tool (`mcp__plugin_crew_portal__update`/`add`) rejects any `note`/
+  `title` over ~200 chars with a misleading "title too long" error even when
+  you only passed a note — keep both short.
+- `git mv` fails with "not under version control" for files that were never
+  `git add`ed yet (e.g. renaming `build-mobile-web/.gitkeep` to
+  `build-client/.gitkeep` before the first commit) — just `mv` directly.
