@@ -1,13 +1,19 @@
 //! Database explorer domain.
 //!
-//! P0: SQLite, read-only — browse schema, page table rows, run SELECTs. Server
-//! engines (postgres/mysql), editing, and the Mongo/Redis panes arrive in later
-//! phases; see docs plan `iterative-plotting-flame`. There is deliberately no
-//! `DbDriver` trait yet: one engine does not justify an abstraction.
+//! Read-only (editing is P2). Engines: SQLite (`sqlite`, via rusqlite) and
+//! Postgres/MySQL (`sql_server`, via sqlx), behind the `DbDriver` trait. Sources
+//! come from the registry (`state`) and from `discovery` (vault / SDK / Docker).
+//! Mongo + Redis panes arrive in later phases; see plan `iterative-plotting-flame`.
 
+pub mod discovery;
+pub mod driver;
+pub mod sql_server;
 pub mod sqlite;
 mod state;
 mod types;
 
-pub use state::DbExplorerState;
+pub use driver::DbDriver;
+pub use sql_server::SqlServerDriver;
+pub use sqlite::SqliteDriver;
+pub use state::{DbExplorerState, PasswordRef, ServerConn, Source};
 pub use types::{ColumnInfo, DbSource, QueryResult, TableInfo};

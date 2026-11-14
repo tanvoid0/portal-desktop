@@ -5,11 +5,13 @@
 //! unit-tested against an in-memory DB; the async wrappers just move the work off
 //! the async runtime (rusqlite is blocking).
 
+use async_trait::async_trait;
 use rusqlite::{Connection, OpenFlags};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use tokio::task::spawn_blocking;
 
+use crate::domains::database_explorer::driver::DbDriver;
 use crate::domains::database_explorer::types::{ColumnInfo, QueryResult, TableInfo};
 
 /// Default cap on rows returned in one call, so a huge table never floods the UI.
@@ -160,6 +162,33 @@ pub async fn query(path: PathBuf, sql: String) -> Result<QueryResult, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Read-only SQLite driver: opens a fresh read-only connection per call (opens
+/// are cheap) on a blocking thread.
+pub struct SqliteDriver {
+    pub path: PathBuf,
+}
+
+#[async_trait]
+impl DbDriver for SqliteDriver {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, String> {
+        tables(self.path.clone()).await
+    }
+    async fn describe_table(&self, table: &str) -> Result<Vec<ColumnInfo>, String> {
+        columns(self.path.clone(), table.to_string()).await
+    }
+    async fn fetch_rows(
+        &self,
+        table: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<QueryResult, String> {
+        rows(self.path.clone(), table.to_string(), limit, offset).await
+    }
+    async fn run_query(&self, sql: &str) -> Result<QueryResult, String> {
+        query(self.path.clone(), sql.to_string()).await
+    }
 }
 
 #[cfg(test)]

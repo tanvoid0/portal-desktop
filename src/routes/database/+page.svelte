@@ -72,7 +72,10 @@
 </svelte:head>
 
 <div class="container mx-auto space-y-6 p-6">
-  <PageHeader title="Database Explorer" description="Browse SQLite databases (read-only)">
+  <PageHeader
+    title="Database Explorer"
+    description="Browse SQLite, Postgres & MySQL (read-only) — vault, SDK and Docker sources auto-discovered"
+  >
     {#snippet actions()}
       <Button variant="outline" size="sm" onclick={pickFile} disabled={openDb.isPending}>
         Open .db file…

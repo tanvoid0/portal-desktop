@@ -31,7 +31,10 @@ rand = "0.8"
 # Persistence
 sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
 sea-orm-migration = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls"] }
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite"] }
+# Version MUST stay in lockstep with sea-orm's sqlx (0.8) and with src-tauri/Cargo.toml:
+# two sqlx versions in the tree = duplicate type errors across the credential DB and here.
+# Feature set covers display of common pg/mysql column types (dates/uuid/decimal/json).
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "postgres", "mysql", "chrono", "uuid", "bigdecimal", "json"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 # Network
