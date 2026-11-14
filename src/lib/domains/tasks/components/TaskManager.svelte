@@ -6,7 +6,6 @@
   import FaXmark from '~icons/fa6-solid/xmark';
   import FaTrash from '~icons/fa6-solid/trash';
   import FaKeyboard from '~icons/fa6-solid/keyboard';
-  import FaWandMagicSparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import FaPlus from '~icons/fa6-solid/plus';
   import FaMagnifyingGlass from '~icons/fa6-solid/magnifying-glass';
   import FaFilter from '~icons/fa6-solid/filter';
@@ -410,10 +409,6 @@
         >
           <FaKeyboard class="mr-1.5 h-4 w-4" />
           Shortcuts
-        </Button>
-        <Button onclick={() => goto('/tasks/generate')} variant="outline" size="sm">
-          <FaWandMagicSparkles class="mr-1.5 h-4 w-4" />
-          Generate with AI
         </Button>
         <Button onclick={handleTaskCreate} size="sm">
           <FaPlus class="mr-1.5 h-4 w-4" />
