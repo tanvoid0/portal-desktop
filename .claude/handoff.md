@@ -108,9 +108,18 @@ verified in a real browser — see blockers below.
    addresses *this worktree's* contribution to that; it does not fix pnpm,
    and other worktrees/sessions' own disk usage was deliberately left alone
    (not mine to clean up unilaterally on a shared machine).
-5. Branch is **not pushed**, no PR. User was asked "push now vs wait for
-   browser check" and the conversation moved on to the Cargo target-dir
-   detour before they answered — that question is still open.
+5. Branch is **not pushed**, no PR, not merged. Tried: `git push` fails —
+   this repo's husky `pre-push` hook runs `pnpm check && pnpm lint`, which
+   fails immediately on the broken pnpm (same root cause as bug #552). Asked
+   the user: skip the hook once (`--no-verify`) vs wait for pnpm to be
+   fixed. **They chose: wait.** Do not `--no-verify` this push without
+   asking again. Once node/pnpm (#552) is actually fixed: `pnpm install`,
+   `pnpm check && pnpm lint`, `pnpm build:client`, exercise it in a browser
+   per item 3 below, *then* `git push -u origin claude/eager-mcclintock-
+   79e007` (should go through the hook cleanly then), open a PR, merge to
+   `main` (confirmed a clean fast-forward as of this writing — `origin/main`
+   is at `015e2663`, this branch is that +6 commits, no divergence to
+   rebase). That whole sequence is what "merged to main" still needs.
 
 ## Key decisions already made (so you don't re-litigate them)
 
