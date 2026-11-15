@@ -1,3 +1,124 @@
+# Handoff: 2026-11-15 (continued again) — #635 fixed and verified, nothing committed yet
+
+## This continuation
+
+User asked to fix #635 right after it was filed. Done:
+
+- `AgentsWorkspace.svelte`: `focusedId` changed from
+  `$derived(page.url.searchParams.get('session'))` to local `$state`, set
+  directly by `selectSession`/`newRun`/the `onStarted` callback. `syncUrl()`
+  now only mirrors the id into `?session=` for deep-linking/refresh, mirroring
+  how `CoderPanel.svelte` actually works (drives off its own state, URL is
+  just a mirror) rather than the inverted pattern that was there before.
+- Verified live over CDP on the dev build: clicking a sidebar row opens the
+  thread immediately (no reload), switching between two different sessions
+  works, and a freshly-started run opens its own thread right away.
+- `pnpm check` (0 errors) and `pnpm lint` (0 errors, no new warnings in the
+  touched file) both pass.
+- Closed board #635 with the fix note. **Not committed** — one file changed
+  (`src/lib/domains/agents/components/AgentsWorkspace.svelte`), nothing
+  staged, waiting on the user to say whether to commit/push.
+- Along the way the dev instance died mid-session (terminal tab + release
+  daemon both dropped — looked like an environment/sandbox restart, not
+  anything this session did) and had to be restarted twice
+  (`node scripts/dev-instance.mjs 1`, then `pnpm portal:ensure` to bring the
+  shared :18420 daemon back). Both came back clean; no data lost, the two
+  test sessions from earlier are still in the dev DB.
+
+## Still left (unchanged from before)
+
+1. Commit/push the #635 fix (holding for the user).
+2. Click through the pairing approval in a real window (dev or release).
+3. Install the new release build and smoke-test it — installer still
+   untested in `src-tauri/target/release/bundle/{nsis,msi}/`.
+4. #636 (predev npx) and #550 (global pnpm) — likely the same nvm/npm
+   corruption, worth fixing together.
+5. #577 (Portal `update`'s `note` field length bug) still open.
+
+---
+
+# Handoff: 2026-11-14 (continued) — Agents redesign live-verified over CDP, found a real regression
+
+## This continuation found and did
+
+Picked up the "left to do" list below. User was present and steered toward
+using the documented CDP harness instead of computer-use pixels (right call —
+see `[[driving-portal-desktop-over-cdp]]` memory).
+
+1. **Fixed the launch path, not just the symptom**: `.claude/launch.json`'s
+   `tauri` config runs `pnpm run tauri dev`, which never sets
+   `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` — only
+   `node scripts/dev-instance.mjs 1` does (see its own comment, which says
+   plain `pnpm tauri:dev` "is left exactly as it was — same CDP port", which
+   is **not true** for how the browser-pane launcher invokes it). Started the
+   dev build via `node scripts/dev-instance.mjs 1` in a Terminal tab instead;
+   CDP came up on :9222 as expected. **If you reach for `preview_start({name:
+"tauri"})` for CDP work, it won't give you a debug port — use the terminal
+   - `dev-instance.mjs 1` instead.**
+2. **Live-verified the Agents redesign (#546, dd27f0f0)** — the one thing
+   last session couldn't test. Ran a real Claude Code agent session
+   (`List the files in the current directory, then stop.`, cwd = Devstrail)
+   through the real backend over CDP via `.claude/qa/scripts/app.mjs` +
+   `window.__TAURI_INTERNALS__.invoke`:
+   - Backend is solid: `agents_start_run` → real process → real transcript
+     (`agents_get_session` returned the actual `ls` output).
+   - **Found a real regression, filed as board #635**: clicking a session row
+     in the sidebar (or finishing starting a new run) updates the URL
+     (`?session=<id>`, confirmed via `page.url()`) but the main panel stays
+     on the blank "Start run" launcher. A **hard reload of that same URL**
+     renders the thread correctly — transcript, expandable tool-call ("Ran
+     1s"), status badges, follow-up composer, all fine. So the bug is
+     specifically that `AgentsWorkspace.svelte`'s
+     `focusedId = $derived(page.url.searchParams.get('session'))` doesn't
+     react to its own `replaceState` call; its comment claims this mirrors
+     `CoderPanel.svelte`'s `?id=` sync, but `CoderPanel` actually drives
+     rendering off its own `coderSession.activeThreadId` state and only uses
+     `replaceState` to keep the URL in sync for deep-linking — not as the
+     trigger. `AgentsWorkspace` inverted that. Did **not** attempt the fix
+     this pass — it's a real one worth a focused coder session, and I'd
+     already spent the budget diagnosing it precisely (see #635 for the full
+     repro + root-cause writeup).
+   - Could not test the approval-banner / `decide()` path, since the trivial
+     `ls` prompt never needed a permission grant and the sidebar bug blocked
+     reopening a thread anyway to try a prompt that would.
+3. **Filed #636** (low): `predev` (`node scripts/dev-instance.mjs
+--kill-port`) crashes on every dev launch — nvm's `npx` is broken for node
+   v24.14.1 (`Cannot find module '@npmcli/config/lib/definitions'`). Harmless
+   when the port's already free, but means `kill-port` never actually runs.
+   Related to #550.
+4. **Did not click through the device-pairing approval** (left-to-do #1
+   below) — ran out of session budget after the Agents dig; the dev instance
+   from this session is still up (CDP :9222, vite :1420, daemon :18421) if
+   you want to pick that up directly.
+5. Cleaned up all scratch `.claude/qa/scripts/continue-*.mjs` test scripts —
+   none kept, the findings are in #635/#636 instead.
+
+## Still left (updated)
+
+1. **Fix #635** (Agents sidebar navigation) — the highest-value next step;
+   it blocks actually using the redesign day-to-day.
+2. Click through the pairing approval in a real window (dev or release) —
+   still nobody has watched a paired browser get a working session.
+3. Install the new release build and smoke-test it — installer still sitting
+   untested in `src-tauri/target/release/bundle/{nsis,msi}/`.
+4. #636 (predev npx) and #550 (global pnpm) are likely the same underlying
+   nvm/npm corruption — worth fixing together.
+5. #577 (Portal `update`'s `note` field length bug) still open, still just
+   worked around by keeping notes short.
+
+## Watch out for
+
+- The dev instance this session started (`node scripts/dev-instance.mjs 1`,
+  terminal tab "tauri dev cdp") may still be running — CDP :9222, vite :1420,
+  dev daemon :18421. Check before assuming a clean slate, same as last time.
+- Use `node scripts/dev-instance.mjs 1` for CDP work, **not**
+  `preview_start({name: "tauri"})` / plain `pnpm tauri:dev` — only the
+  former sets `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`.
+- The release daemon on :18420 is still the shared singleton — untouched
+  this session, same caution as before applies.
+
+---
+
 # Handoff: 2026-11-14 session close — pushed, release built, PC about to shut down
 
 ## What this session found and did

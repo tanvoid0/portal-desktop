@@ -1,8 +1,12 @@
 <!-- The Agents tab's one real page (#546): a project-grouped session sidebar
      beside a panel that is the launcher when nothing is focused and a live
-     transcript when a session is. `?session=` is the URL's source of truth
-     for which session is focused — same `replaceState` sync CoderPanel uses
-     for `?id=`. -->
+     transcript when a session is. `focusedId` is local state (what actually
+     drives the panel); the URL's `?session=` is kept in sync via
+     `replaceState` purely for deep-linking/refresh — like CoderPanel's `?id=`,
+     which likewise drives off its own `coderSession.activeThreadId` and only
+     mirrors into the URL, never the other way around (a plain
+     `$derived(page.url...)` here doesn't reliably re-fire on our own
+     `replaceState`, see #635). -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
@@ -18,10 +22,10 @@
   let prefillCwd = $state<string | undefined>(page.url.searchParams.get('cwd') ?? undefined);
   let prefillPrompt = $state<string | undefined>(undefined);
   let prefillTaskId = $state<string | null>(null);
-
-  const focusedId = $derived(page.url.searchParams.get('session'));
+  let focusedId = $state<string | null>(page.url.searchParams.get('session'));
 
   function syncUrl(sessionId: string | null) {
+    focusedId = sessionId;
     const url = new URL(page.url.href);
     if (sessionId) url.searchParams.set('session', sessionId);
     else url.searchParams.delete('session');
