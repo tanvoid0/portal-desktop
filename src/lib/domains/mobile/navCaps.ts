@@ -6,7 +6,7 @@ const NAV_CAP: Record<string, string> = {
   '/projects': 'projects',
   '/tasks': 'tasks',
   '/terminal': 'terminal',
-  '/pipeline-runs': 'pipelines',
+  '/pipeline-runs': 'actions',
   '/github': 'github',
 };
 

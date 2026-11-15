@@ -464,17 +464,23 @@ class ActionsService {
         options.onStepStart?.({ actionId: action.id, executionId });
         const finished = await this.waitForExecution(executionId, action.longRunning);
         const stepSuccess = finished.status === 'success';
+        const stopped = finished.status === 'cancelled';
         results.push({
           name: action.name,
           actionId: action.id,
           command: action.command,
-          status: stepSuccess ? 'success' : 'failed',
+          status: stepSuccess ? 'success' : stopped ? 'cancelled' : 'failed',
           executionId,
           exitCode: finished.exitCode,
           output: finished.output,
-          error: stepSuccess ? undefined : summarizeExecutionFailure(finished),
+          error: stepSuccess || stopped ? undefined : summarizeExecutionFailure(finished),
           runner: 'local',
         });
+        // A Stop ends the whole run, whatever stopOnError says.
+        if (stopped) {
+          success = false;
+          break;
+        }
         if (!stepSuccess) {
           success = false;
           if (stopOnError) break;

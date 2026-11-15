@@ -61,7 +61,7 @@ export interface ActionStepResult {
   name: string;
   actionId: string;
   command?: string;
-  status: 'success' | 'failed' | 'skipped';
+  status: 'success' | 'failed' | 'skipped' | 'cancelled';
   executionId?: string;
   exitCode?: number | null;
   output?: string;

@@ -65,7 +65,8 @@ export function classifyFailure(text: string, exitCode?: number | null): Classif
 
 /** Build a failure event from a run result, or null when the run succeeded. */
 export function toFailure(result: ActionRunResult): ActionFailure | null {
-  if (result.success) return null;
+  // A run the user stopped is not a failure to diagnose.
+  if (result.success || result.steps.some((s) => s.status === 'cancelled')) return null;
   const step = failingStep(result);
   if (!step) return null;
 
