@@ -8,11 +8,18 @@ const node = (id: string, path: string, discovery_path?: string, starred = false
 });
 
 describe('groupByArea', () => {
-  it('derives the area from discovery_path, falling back to the parent folder', () => {
+  it('derives the area from discovery_path, falling back to the last two folders of path', () => {
     expect(areaOf({ path: 'C:\\x\\y', discovery_path: 'production/flutter/aipairs' })).toBe(
       'production/flutter'
     );
-    expect(areaOf({ path: 'C:\\code\\tools\\app' })).toBe('tools');
+    expect(areaOf({ path: 'C:\\code\\tools\\app' })).toBe('code/tools');
+  });
+
+  it('keys a manually-added project the same as a discovery-found sibling in the same folder', () => {
+    const discovered = areaOf({ path: 'C:\\x', discovery_path: 'production/devstrail/sibling' });
+    const manual = areaOf({ path: 'C:\\Users\\me\\production\\devstrail\\my-manual-project' });
+    expect(discovered).toBe('production/devstrail');
+    expect(manual).toBe(discovered);
   });
 
   it('puts starred first, then areas alphabetically, keeping starred in their area', () => {
