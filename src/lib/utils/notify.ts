@@ -18,6 +18,13 @@ import { isMobileShell } from '$lib/domains/mobile/shell';
 
 const log = createLogger('notify');
 
+// Mobile's native notification (`Mobile::notify` in mobile/src-tauri/src/lib.rs) is posted
+// from Rust, which has no way to know the id of the toast this same call creates below — so
+// it can only carry a route (#642). Track the latest toast per route so a tap can still find
+// and dismiss it. ponytail: grows one entry per distinct route notified for the session; same
+// tradeoff as `notified` in lib.rs — revisit with an LRU cap if that ever matters.
+const toastByRoute = new Map<string, string>();
+
 export interface NotifyPayload {
   title: string;
   body?: string;
@@ -38,6 +45,7 @@ export function notify(p: NotifyPayload): void {
     duration: p.duration,
     action: p.route ? { label: p.actionLabel ?? 'Open', onClick: () => goto(p.route!) } : undefined,
   });
+  if (p.route) toastByRoute.set(p.route, toastId);
 
   // Settings not loaded yet (cold start): default to on rather than silently
   // dropping native notifications for the whole session.
@@ -74,13 +82,24 @@ export async function initNotify(): Promise<() => void> {
   try {
     const listener = await onAction((e) => {
       const extra = e.notification?.extra as { route?: string; toastId?: string } | undefined;
-      const win = getCurrentWindow();
-      void win
-        .unminimize()
-        .then(() => win.show())
-        .then(() => win.setFocus());
-      if (extra?.toastId) toastActions.dismiss(extra.toastId);
-      if (extra?.route) goto(extra.route);
+      // Desktop only: tapping a native notification there doesn't refocus the
+      // window on its own. On mobile the tap already foregrounds the app
+      // (that's how Android delivers it), and these window commands aren't
+      // granted in mobile/src-tauri/capabilities (#641).
+      if (!isMobileShell) {
+        const win = getCurrentWindow();
+        void win
+          .unminimize()
+          .then(() => win.show())
+          .then(() => win.setFocus());
+      }
+      const dismissId =
+        extra?.toastId ?? (extra?.route ? toastByRoute.get(extra.route) : undefined);
+      if (dismissId) toastActions.dismiss(dismissId);
+      if (extra?.route) {
+        toastByRoute.delete(extra.route);
+        goto(extra.route);
+      }
     });
     return () => void listener.unregister();
   } catch (err) {

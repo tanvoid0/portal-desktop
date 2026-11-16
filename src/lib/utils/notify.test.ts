@@ -8,6 +8,7 @@ vi.mock('@tauri-apps/plugin-notification', () => ({
 }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: vi.fn() }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$lib/domains/mobile/shell', () => ({ isMobileShell: false }));
 vi.mock('$lib/domains/settings/stores/settingsStore', async () => {
   const { writable } = await import('svelte/store');
   return { appSettings: writable<{ notifications: Record<string, boolean> } | null>(null) };
@@ -21,6 +22,7 @@ import {
 } from '@tauri-apps/plugin-notification';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { goto } from '$app/navigation';
+import * as mobileShell from '$lib/domains/mobile/shell';
 import { appSettings } from '$lib/domains/settings/stores/settingsStore';
 import { toastActions } from '$lib/domains/shared/stores/toastStore';
 import { notify, initNotify } from './notify';
@@ -55,6 +57,7 @@ describe('notify', () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     settingsStore.set(null);
+    (mobileShell as { isMobileShell: boolean }).isMobileShell = false;
   });
 
   it('does nothing when focused and already on the target route', () => {
@@ -135,6 +138,47 @@ describe('notify', () => {
     expect(win.setFocus).toHaveBeenCalled();
     expect(dismissSpy).toHaveBeenCalledWith('t1');
     expect(goto).toHaveBeenCalledWith('/devices');
+  });
+
+  it('skips raising the window on mobile but still dismisses the toast and navigates on action (#641)', async () => {
+    (isPermissionGranted as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    let capturedCb: (e: unknown) => void = () => {};
+    (onAction as ReturnType<typeof vi.fn>).mockImplementation((cb) => {
+      capturedCb = cb;
+      return Promise.resolve({ unregister: vi.fn().mockResolvedValue(undefined) });
+    });
+    (mobileShell as { isMobileShell: boolean }).isMobileShell = true;
+
+    await initNotify();
+    capturedCb({ notification: { extra: { route: '/devices', toastId: 't1' } } });
+    await flush();
+
+    expect(getCurrentWindow).not.toHaveBeenCalled();
+    expect(dismissSpy).toHaveBeenCalledWith('t1');
+    expect(goto).toHaveBeenCalledWith('/devices');
+  });
+
+  it('dismisses the toast by route when the action carries no toastId (mobile, #642)', async () => {
+    (isPermissionGranted as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    let capturedCb: (e: unknown) => void = () => {};
+    (onAction as ReturnType<typeof vi.fn>).mockImplementation((cb) => {
+      capturedCb = cb;
+      return Promise.resolve({ unregister: vi.fn().mockResolvedValue(undefined) });
+    });
+    (mobileShell as { isMobileShell: boolean }).isMobileShell = true;
+
+    // Mobile's native notification is posted by Rust, which never learns the
+    // JS-generated toastId — only the route both surfaces agree on.
+    vi.stubGlobal('document', { hasFocus: () => false });
+    notify({ title: 'Agent needs your approval', route: '/ai/agents?session=r1', duration: 0 });
+    const toastId = showSpy.mock.results[0]!.value;
+
+    await initNotify();
+    capturedCb({ notification: { extra: { route: '/ai/agents?session=r1' } } });
+    await flush();
+
+    expect(dismissSpy).toHaveBeenCalledWith(toastId);
+    expect(goto).toHaveBeenCalledWith('/ai/agents?session=r1');
   });
 
   it('requests permission when not already granted', async () => {
