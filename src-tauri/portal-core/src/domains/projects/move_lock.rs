@@ -65,6 +65,16 @@ pub fn is_under(a: &str, b: &str) -> bool {
     a[..n] == b[..n]
 }
 
+/// True if `child` is `root` or nested inside it — one direction only, unlike
+/// [`is_under`]. For "is this process running from the project": a process
+/// whose cwd is a shallow ancestor (the user's home, `C:\`) is not in the
+/// project (board #431).
+pub fn is_within(child: &str, root: &str) -> bool {
+    let c = components(child);
+    let r = components(root);
+    !r.is_empty() && c.len() >= r.len() && c[..r.len()] == r[..]
+}
+
 /// Lock `paths` for the duration of a move. Idempotent-ish: callers are
 /// expected to `unlock` the same paths when done, in pairs.
 pub fn lock(paths: &[PathBuf]) {
@@ -135,6 +145,16 @@ mod tests {
         lock(&[PathBuf::from(r"D:\mvlock3\foo")]);
         assert!(!is_locked(Path::new(r"D:\mvlock3\foobar")));
         unlock(&[PathBuf::from(r"D:\mvlock3\foo")]);
+    }
+
+    #[test]
+    fn is_within_is_one_directional() {
+        assert!(is_within(r"C:\Users\me\proj\src", r"C:\Users\me\proj"));
+        assert!(is_within(r"C:\Users\me\proj", r"c:/users/me/proj/"));
+        assert!(!is_within(r"C:\Users\me", r"C:\Users\me\proj"));
+        assert!(!is_within(r"C:\Users\me\projX", r"C:\Users\me\proj"));
+        assert!(!is_within(r"C:\x", ""));
+        assert!(!is_within("", r"C:\x"));
     }
 
     #[test]

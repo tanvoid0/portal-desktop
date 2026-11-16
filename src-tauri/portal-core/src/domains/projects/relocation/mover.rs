@@ -266,14 +266,14 @@ impl Mover<'_> {
             return Err(MoveError::Blocked(report));
         }
 
-        let (entries, skipped) =
-            build_manifest(&source, include_regenerable).map_err(MoveError::Failed)?;
+        let (entries, skipped) = blocking(|| build_manifest(&source, include_regenerable))
+            .map_err(MoveError::Failed)?;
 
         // #217: deny-write hold on the move set, held through the copy below.
         // Needs the file list, so it can't come before the walk above — but it
         // still comes before anything else touches the source or starts
         // copying. A sharing violation here is itself a usage blocker.
-        let hold = source_hold::acquire(&source, &rel_paths(&entries))?;
+        let hold = blocking(|| source_hold::acquire(&source, &rel_paths(&entries)))?;
 
         let id = Uuid::new_v4().to_string();
         let staging = staging_path(&dest, &id).map_err(MoveError::Failed)?;
@@ -388,15 +388,16 @@ impl Mover<'_> {
         let manifest = read_validated_manifest(&row).map_err(MoveError::Failed)?;
         let logged = read_progress(&progress_path_of(&row).map_err(MoveError::Failed)?)
             .map_err(MoveError::Failed)?;
-        resume_structural_ok(&row.id, &source, &staging, &manifest).map_err(MoveError::Failed)?;
+        blocking(|| resume_structural_ok(&row.id, &source, &staging, &manifest))
+            .map_err(MoveError::Failed)?;
 
         // #217: a resume re-acquires its own hold — nothing survives a crash
         // or restart to resume from, so this is not optional on the resumed
         // path either. Acquired before the hash loop below so those hashes
         // come from content already denied to other writers, not content
         // that could still be rewritten in the gap between hash and hold.
-        let hold = source_hold::acquire(&source, &rel_paths(&manifest.entries))?;
-        resume_source_hashes_ok(&source, &logged).map_err(MoveError::Failed)?;
+        let hold = blocking(|| source_hold::acquire(&source, &rel_paths(&manifest.entries)))?;
+        blocking(|| resume_source_hashes_ok(&source, &logged)).map_err(MoveError::Failed)?;
 
         let _ = bump_resume_count(self.db, &row.id).await;
         match self.run_move(&row, &manifest, hold, on_progress).await {
@@ -434,28 +435,31 @@ impl Mover<'_> {
         // ── Copy ──
         let logged = read_progress(&progress_path)?;
         let (to_copy, mut files_done, mut bytes_done) =
-            plan_copies(&manifest.entries, &staging, &logged)?;
+            blocking(|| plan_copies(&manifest.entries, &staging, &logged))?;
 
-        for &i in &to_copy {
-            let e = &manifest.entries[i];
-            let sha = copy_entry(&source, &staging, e)?;
-            if !logged.contains_key(&e.rel) {
-                append_progress(&progress_path, &e.rel, &sha)?;
-            }
-            files_done += 1;
-            bytes_done += e.len;
-            on_progress(Progress {
-                id: row.id.clone(),
-                project_id: row.project_id,
-                phase: "copying".into(),
-                files_done,
-                file_count,
-                bytes_done,
-                total_bytes,
-            });
-            if files_done % COUNTER_EVERY == 0 {
-                let _ = update_counts(self.db, &row.id, files_done, bytes_done).await;
-            }
+        for chunk in to_copy.chunks(COUNTER_EVERY as usize) {
+            blocking(|| -> Result<(), String> {
+                for &i in chunk {
+                    let e = &manifest.entries[i];
+                    let sha = copy_entry(&source, &staging, e)?;
+                    if !logged.contains_key(&e.rel) {
+                        append_progress(&progress_path, &e.rel, &sha)?;
+                    }
+                    files_done += 1;
+                    bytes_done += e.len;
+                    on_progress(Progress {
+                        id: row.id.clone(),
+                        project_id: row.project_id,
+                        phase: "copying".into(),
+                        files_done,
+                        file_count,
+                        bytes_done,
+                        total_bytes,
+                    });
+                }
+                Ok(())
+            })?;
+            let _ = update_counts(self.db, &row.id, files_done, bytes_done).await;
         }
         let _ = update_counts(self.db, &row.id, files_done, bytes_done).await;
 
@@ -470,7 +474,7 @@ impl Mover<'_> {
             bytes_done,
             total_bytes,
         });
-        final_verify(&source, &staging, manifest)?;
+        blocking(|| final_verify(&source, &staging, manifest))?;
         update_state(self.db, &row.id, "verified").await?;
 
         // ── Promote ── (atomic: staging is a sibling of dest, same volume)
@@ -552,7 +556,7 @@ impl Mover<'_> {
         };
         let project_ids = projects
             .into_iter()
-            .filter(|p| is_under(&p.path, &dest_s))
+            .filter(|p| move_lock::is_within(&p.path, &dest_s))
             .map(|p| p.id);
 
         let mut flagged = Vec::new();
@@ -597,26 +601,27 @@ impl Mover<'_> {
             }));
         }
 
-        let manifest = read_validated_manifest(&row).map_err(MoveError::Failed)?;
-        let current = rewalk(&source, &manifest.skipped_dirs).map_err(MoveError::Failed)?;
-        if !same_set(&current, &manifest.entries) {
-            return Err(MoveError::Failed(
-                "source changed since the move — refusing to delete it".into(),
-            ));
-        }
-        for e in &manifest.entries {
-            let src_h = hash_file(&os_join(&source, &e.rel)).map_err(MoveError::Failed)?;
-            let dst_h = hash_file(&os_join(&dest, &e.rel)).map_err(MoveError::Failed)?;
-            if src_h != dst_h {
-                return Err(MoveError::Failed(format!(
-                    "destination differs from source at {} — refusing to delete the source",
-                    e.rel
-                )));
+        blocking(|| {
+            let manifest = read_validated_manifest(&row).map_err(MoveError::Failed)?;
+            let current = rewalk(&source, &manifest.skipped_dirs).map_err(MoveError::Failed)?;
+            if !same_set(&current, &manifest.entries) {
+                return Err(MoveError::Failed(
+                    "source changed since the move — refusing to delete it".into(),
+                ));
             }
-        }
+            for e in &manifest.entries {
+                let src_h = hash_file(&os_join(&source, &e.rel)).map_err(MoveError::Failed)?;
+                let dst_h = hash_file(&os_join(&dest, &e.rel)).map_err(MoveError::Failed)?;
+                if src_h != dst_h {
+                    return Err(MoveError::Failed(format!(
+                        "destination differs from source at {} — refusing to delete the source",
+                        e.rel
+                    )));
+                }
+            }
 
-        trash::delete(&source).map_err(|e| MoveError::Failed(format!("recycle source: {e}")))?;
-        Ok(())
+            trash::delete(&source).map_err(|e| MoveError::Failed(format!("recycle source: {e}")))
+        })
     }
 
     /// Finish a `verified`/`committed` move whose copy crashed after the verify
@@ -1413,7 +1418,8 @@ fn read_sidecar(staging: &Path) -> Option<String> {
 }
 
 fn remove_staging(staging: &Path) -> Result<(), String> {
-    fs::remove_dir_all(staging).map_err(|e| format!("delete staging {}: {e}", staging.display()))
+    blocking(|| fs::remove_dir_all(staging))
+        .map_err(|e| format!("delete staging {}: {e}", staging.display()))
 }
 
 /// List every file under `root`, path relative with forward slashes. Unlike
@@ -1435,6 +1441,25 @@ fn list_rel_files(root: &Path) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
     rec(root, root, &mut out)?;
     Ok(out)
+}
+
+/// Run tree-wide sync filesystem work (walk, copy, hash, share-deny open)
+/// without stalling the async worker it's called from. Board #423: the SQLite
+/// pool is ONE connection (SeaORM's default), and sqlx hands a dropped
+/// connection back via a task spawned onto this same worker — so a long sync
+/// stretch here kept the app's only DB connection checked out and every other
+/// command timed out acquiring it. `block_in_place` moves the worker's queued
+/// tasks to another thread first. Current-thread runtimes (tests) can't, and
+/// just run `f` inline. `pub`: preflight (Tauri command layer) and
+/// `usage`'s tree walks need it too.
+pub fn blocking<T>(f: impl FnOnce() -> T) -> T {
+    use tokio::runtime::{Handle, RuntimeFlavor};
+    match Handle::try_current() {
+        Ok(h) if h.runtime_flavor() == RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(f)
+        }
+        _ => f(),
+    }
 }
 
 // ── Journal helpers ──────────────────────────────────────────────────────────
@@ -1743,6 +1768,38 @@ mod tests {
             fs::create_dir_all(p).unwrap();
         }
         fs::write(path, body).unwrap();
+    }
+
+    /// Board #423: a query's dropped connection goes back to the (1-connection)
+    /// pool via a task queued on the worker that ran it. If that worker then
+    /// sits in sync I/O, the pool stays empty and a query on another worker
+    /// times out. `blocking` must let it through. Fails with `blocking`
+    /// replaced by a plain `f()`.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn blocking_frees_the_only_db_connection() {
+        use sea_orm::{ConnectOptions, ConnectionTrait, Database};
+        use std::time::Duration;
+
+        let mut opt = ConnectOptions::new("sqlite::memory:");
+        opt.max_connections(1).acquire_timeout(Duration::from_secs(1));
+        let db = Database::connect(opt).await.unwrap();
+
+        let other = tokio::spawn(async move {
+            let db2 = db.clone();
+            // Woken by the timer, so it queries from the other worker.
+            let other = tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                db2.execute_unprepared("SELECT 1").await
+            });
+            // Leaves the connection's return task queued on this worker.
+            db.execute_unprepared("SELECT 1").await.unwrap();
+            blocking(|| std::thread::sleep(Duration::from_secs(2)));
+            other.await.unwrap()
+        });
+        other
+            .await
+            .unwrap()
+            .expect("query on the other worker timed out waiting for the pool");
     }
 
     #[test]

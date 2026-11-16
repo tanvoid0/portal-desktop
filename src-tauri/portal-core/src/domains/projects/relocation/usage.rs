@@ -10,7 +10,8 @@ use crate::database::DatabaseManager;
 use crate::domains::coder::CoderService;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
 use crate::domains::deployments::services::docker_service::DeploymentStatus;
-use crate::domains::projects::move_lock::is_under;
+use crate::domains::projects::move_lock::{is_under, is_within};
+use crate::domains::projects::relocation::mover::blocking;
 use crate::domains::projects::pipelines::services::ExecutionService;
 use crate::domains::scripts::ScriptExecutionService;
 use crate::domains::terminal::manager::TerminalManager;
@@ -86,9 +87,9 @@ pub async fn check(
     let mut blockers = check_preconditions(db, source, dest).await;
     blockers
         .extend(check_portal_usage(&path, coder, terminal, pipelines, scripts, deployments).await);
-    blockers.extend(check_os_processes(&path));
+    blockers.extend(blocking(|| check_os_processes(&path)));
 
-    let warnings = check_port_warnings(&path, dev_port, prod_port);
+    let warnings = blocking(|| check_port_warnings(&path, dev_port, prod_port));
 
     UsageReport { blockers, warnings }
 }
@@ -111,7 +112,7 @@ pub async fn check_in_use(
     let p = path.to_string_lossy().into_owned();
     let mut blockers =
         check_portal_usage(&p, coder, terminal, pipelines, scripts, deployments).await;
-    blockers.extend(check_os_processes(&p));
+    blockers.extend(blocking(|| check_os_processes(&p)));
     blockers
 }
 
@@ -143,7 +144,7 @@ pub async fn check_preconditions(db: &DatabaseManager, source: &Path, dest: &Pat
         ));
     }
 
-    let links = find_symlinks(source);
+    let links = blocking(|| find_symlinks(source));
     if !links.is_empty() {
         blockers.push(signal(
             "symlinks",
@@ -158,7 +159,7 @@ pub async fn check_preconditions(db: &DatabaseManager, source: &Path, dest: &Pat
         ));
     }
 
-    if let Some(s) = check_free_space(source, dest) {
+    if let Some(s) = blocking(|| check_free_space(source, dest)) {
         blockers.push(s);
     }
 
@@ -275,7 +276,7 @@ async fn check_portal_usage(
     if let Ok(processes) = terminal.get_all_processes().await {
         let hit = processes.iter().any(|p| {
             matches!(p.status.as_str(), "starting" | "running")
-                && is_under(&p.working_directory, path)
+                && is_within(&p.working_directory, path)
         });
         if hit {
             blockers.push(signal(
@@ -299,7 +300,7 @@ async fn check_portal_usage(
                 && d.process_id.is_some()
                 && d.working_directory
                     .as_deref()
-                    .is_some_and(|wd| is_under(wd, path))
+                    .is_some_and(|wd| is_within(wd, path))
         });
         if hit {
             blockers.push(signal("deployment", "A deployment is live in this project"));
@@ -334,19 +335,22 @@ fn worktree_count(path: &Path) -> Option<usize> {
     )
 }
 
-/// Any OS process — tracked by Portal or not — with a cwd or exe under
-/// `path`.
+/// Any OS process — tracked by Portal or not — with a cwd or exe inside
+/// `path` (one-directional: a process sitting in the user's home is not in
+/// every project under it, board #431).
+///
+/// Known blind spot (board #430): PowerShell's `cd`/`Set-Location` moves its
+/// own location but never the OS process cwd (verified on 5.1 and 7), so a
+/// PowerShell that cd'd in after launch is invisible here. Harmless for the
+/// move itself — a location holds no handle on the directory — and any
+/// program it starts from there does get that cwd, so it is caught. cmd's
+/// `cd` does change the process cwd and is detected.
 fn check_os_processes(path: &str) -> Vec<Signal> {
     let mut sys = System::new_all();
     sys.refresh_processes();
     sys.processes()
         .values()
-        .filter(|p| {
-            p.cwd()
-                .is_some_and(|c| is_under(&c.to_string_lossy(), path))
-                || p.exe()
-                    .is_some_and(|e| is_under(&e.to_string_lossy(), path))
-        })
+        .filter(|p| process_in(p, path))
         .map(|p| {
             signal(
                 "process",
@@ -358,6 +362,13 @@ fn check_os_processes(path: &str) -> Vec<Signal> {
             )
         })
         .collect()
+}
+
+fn process_in(p: &sysinfo::Process, path: &str) -> bool {
+    p.cwd()
+        .is_some_and(|c| is_within(&c.to_string_lossy(), path))
+        || p.exe()
+            .is_some_and(|e| is_within(&e.to_string_lossy(), path))
 }
 
 /// Point-in-time "is anything already holding a file open for write" check —
@@ -391,9 +402,7 @@ fn check_port_warnings(
         .filter_map(|port| owning_pid(port).map(|pid| (port, pid)))
         .filter_map(|(port, pid)| {
             let proc = sys.process(sysinfo::Pid::from(pid as usize))?;
-            let under = proc.cwd().is_some_and(|c| is_under(&c.to_string_lossy(), path))
-                || proc.exe().is_some_and(|e| is_under(&e.to_string_lossy(), path));
-            if under {
+            if process_in(proc, path) {
                 return None;
             }
             let process_name = proc.name().to_string();
@@ -512,7 +521,7 @@ fn refuse_kill(
         );
     };
     if let Some(windir) = windir {
-        if is_under(exe, windir) {
+        if is_within(exe, windir) {
             return Some("this is a core Windows system binary and shouldn't be ended".into());
         }
     }

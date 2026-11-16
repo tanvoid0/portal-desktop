@@ -113,7 +113,7 @@ pub async fn preflight_project_move(
     )
     .await;
 
-    let walk = mover::preflight_walk(&source, include_regenerable)?;
+    let walk = mover::blocking(|| mover::preflight_walk(&source, include_regenerable))?;
     let skipped_dirs = walk
         .skipped
         .into_iter()
@@ -423,7 +423,7 @@ async fn nested_under(
         .map_err(|e| format!("load projects: {e}"))?;
     Ok(rows
         .into_iter()
-        .filter(|p| p.id != project_id && move_lock::is_under(&p.path, &source_s))
+        .filter(|p| p.id != project_id && move_lock::is_within(&p.path, &source_s))
         .map(|p| NestedProject { id: p.id, name: p.name, path: p.path })
         .collect())
 }
