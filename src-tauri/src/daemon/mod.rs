@@ -17,20 +17,28 @@
 //! Every HTTP/WS request passes through [`classify`], which decides what the
 //! peer is:
 //!
-//! - **Loopback peer, no `Origin` and no `Sec-Fetch-Site` header → `Local`**:
-//!   the machine itself, unrestricted.
-//! - **Either header is present → the free loopback pass above does not
+//! - **Loopback peer, no `Origin`/`Sec-Fetch-Site` header, and a `Host` that
+//!   names the peer → `Local`**: the machine itself, unrestricted.
+//! - **Any of those three fails → the free loopback pass above does not
 //!   apply.** A browser cannot suppress `Origin` and WebSockets ignore CORS, so
-//!   without this a visited web page could `fetch('http://127.0.0.1:18420/...')`
-//!   and inherit full local trust with no token at all. `Sec-Fetch-Site` closes
-//!   the same hole for a same-origin, same-method request (e.g. a page served
-//!   by this daemon's own thin-client static route calling `fetch('/whoami')`
-//!   on itself) — browsers omit `Origin` there but still send `Sec-Fetch-Site`,
-//!   and no native Tauri/reqwest client ever sends it. A page-originated
-//!   request (loopback or remote) instead falls through to the same bearer-token
-//!   check below — a page cannot forge a token it was never handed, so this is
-//!   what actually keeps it off a port that exposes terminal execution and a
-//!   credential vault, not either header's value.
+//!   without the first two a visited web page could
+//!   `fetch('http://127.0.0.1:18420/...')` and inherit full local trust with no
+//!   token at all; `Sec-Fetch-Site` closes the same hole for a same-origin,
+//!   same-method request (e.g. a page served by this daemon's own thin-client
+//!   static route calling `fetch('/whoami')` on itself) — browsers omit
+//!   `Origin` there but still send `Sec-Fetch-Site`, and no native Tauri/
+//!   reqwest client ever sends either. Both are still opt-in, though: a page
+//!   whose own hostname has been DNS-rebound to 127.0.0.1 dials loopback with
+//!   neither set (same-origin by its own name, and a browser that never
+//!   implemented Fetch Metadata sends no `Sec-Fetch-Site` at all), but `Host`
+//!   still carries that attacker-controlled name rather than `127.0.0.1`/
+//!   `localhost` — requiring it to actually name the peer closes that gap
+//!   regardless of which optional header a given client sends. A page-
+//!   originated request (loopback or remote) instead falls through to the same
+//!   bearer-token check below — a page cannot forge a token it was never
+//!   handed, so this is what actually keeps it off a port that exposes
+//!   terminal execution and a credential vault, not any of these headers'
+//!   values.
 //! - **A live bearer token (header, or `?token=` on `/events` — a browser
 //!   `WebSocket` cannot set a custom header) → `Remote { caps }`**: a paired
 //!   device, allowed only the commands/events its granted capabilities cover.
@@ -341,6 +349,26 @@ fn query_param(query: Option<&str>, key: &str) -> Option<String> {
     })
 }
 
+/// True if the request's `Host` header actually names `peer` — the address
+/// the TCP connection came in on — rather than some other name a DNS rebind
+/// could have pointed at this socket while keeping its own name in the
+/// header. `localhost` is accepted by name since native callers here dial
+/// either that or the literal loopback IP; anything else has to parse as an
+/// IP equal to `peer`, so a missing or foreign `Host` fails closed.
+fn host_matches_peer(headers: &HeaderMap, peer: IpAddr) -> bool {
+    let Some(host) = headers.get(header::HOST).and_then(|h| h.to_str().ok()) else {
+        return false;
+    };
+    let host = match host.strip_prefix('[') {
+        // IPv6 literal: "[::1]" or "[::1]:18420" — the port colon sits after
+        // the closing bracket, not inside the address itself.
+        Some(rest) => rest.split_once(']').map_or(rest, |(ip, _)| ip),
+        None => host.rsplit_once(':').map_or(host, |(h, _)| h),
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host.parse::<IpAddr>().map(|ip| ip == peer).unwrap_or(false)
+}
+
 /// Paths an unauthenticated remote peer may reach: health and the pairing
 /// handshake. Everything else — including `/control` — requires loopback or a
 /// token.
@@ -367,9 +395,17 @@ fn classify(
     // unscoped `Local` trust with no token at all. No native Tauri/reqwest
     // client ever sends this header, so its mere presence is page-originated,
     // same as `Origin` — see the module doc for why that doesn't get the pass.
+    //
+    // Both headers are still opt-in, though: a page whose own hostname has
+    // been DNS-rebound to 127.0.0.1 dials loopback with neither one set (it's
+    // same-origin by its own name, and a browser that never implemented Fetch
+    // Metadata sends no Sec-Fetch-Site at all), but `Host` still carries that
+    // attacker-controlled name rather than `127.0.0.1`/`localhost` — so the
+    // free pass also requires `Host` to actually say so.
     if peer.is_loopback()
         && !headers.contains_key(header::ORIGIN)
         && !headers.contains_key("sec-fetch-site")
+        && host_matches_peer(headers, peer)
     {
         return Ok(Trust::Local);
     }
@@ -677,9 +713,12 @@ mod tests {
 
     #[test]
     fn loopback_without_origin_is_local_and_unrestricted() {
+        // A real native call always carries a `Host` naming what it dialed;
+        // `host_matches_peer` requires that too, so give it one here.
+        let h = with_header(header::HOST, "127.0.0.1");
         let t = classify(
             "127.0.0.1".parse().unwrap(),
-            &HeaderMap::new(),
+            &h,
             "/rpc/decrypt_credential",
             None,
             |_| None,
@@ -721,6 +760,49 @@ mod tests {
         ));
         assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
         assert!(classify(local, &h, "/whoami", None, |_| None).is_err());
+    }
+
+    /// The fix for #556: a page whose own hostname has been DNS-rebound to
+    /// 127.0.0.1 dials loopback with neither `Origin` nor `Sec-Fetch-Site`
+    /// set (same-origin by its own name; a browser with no Fetch Metadata
+    /// support sends no `Sec-Fetch-Site` at all) — the one case the two
+    /// tests above don't cover, since both of them set one of those headers.
+    /// `Host` still names the attacker's domain, not `127.0.0.1`/`localhost`,
+    /// so it has to be checked too or this `GET /whoami` would hand back the
+    /// hostname and full capability list with no token at all.
+    #[test]
+    fn loopback_with_a_foreign_host_does_not_get_the_free_local_pass() {
+        let local = "127.0.0.1".parse().unwrap();
+        for host in ["evil.example", "evil.example:18420"] {
+            let h = with_header(header::HOST, host);
+            assert!(matches!(
+                classify(local, &h, "/health", None, |_| None).unwrap(),
+                Trust::Anon
+            ));
+            assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
+            assert!(classify(local, &h, "/whoami", None, |_| None).is_err());
+        }
+    }
+
+    /// The other half of #556: a legitimate loopback call still gets `Local`
+    /// as long as `Host` actually names the peer it dialed — the literal IP
+    /// (with or without the port) or `localhost`, case-insensitively.
+    #[test]
+    fn loopback_with_a_host_naming_the_peer_still_gets_the_free_local_pass() {
+        let local = "127.0.0.1".parse().unwrap();
+        for host in [
+            "127.0.0.1",
+            "127.0.0.1:18420",
+            "localhost",
+            "localhost:18420",
+            "LOCALHOST",
+        ] {
+            let h = with_header(header::HOST, host);
+            assert!(matches!(
+                classify(local, &h, "/rpc/decrypt_credential", None, |_| None).unwrap(),
+                Trust::Local
+            ));
+        }
     }
 
     /// The actual fix: a page-originated request, loopback or remote, with a
