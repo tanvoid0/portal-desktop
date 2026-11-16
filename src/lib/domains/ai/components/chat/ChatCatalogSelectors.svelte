@@ -36,8 +36,6 @@
     showPlatformLabel?: boolean;
     /** Hide the inline error label when the caller renders its own banner. */
     showInlineError?: boolean;
-    /** Hide the model picker (e.g. for an engine that ignores the model). */
-    showModel?: boolean;
   }
 
   let {
@@ -52,7 +50,6 @@
     modelSelectClass = 'w-[280px]',
     showPlatformLabel = true,
     showInlineError = true,
-    showModel = true,
   }: Props = $props();
 
   let catalog = $state<PlatformCatalog | null>(null);
@@ -164,12 +161,12 @@
     persistSelection();
   }
 
-  const backendOptions = $derived.by(() => [
-    ...catalogProviders.map((provider) => ({
+  const backendOptions = $derived(
+    catalogProviders.map((provider) => ({
       value: provider.id,
       label: provider.label,
-    })),
-  ]);
+    }))
+  );
 
   const catalogModels = $derived.by((): CatalogModel[] => {
     if (!selectedBackendProvider) return [];
@@ -224,18 +221,16 @@
     class={backendSelectClass}
   />
 
-  {#if showModel}
-    <CatalogModelSelect
-      models={catalogModels}
-      bind:value={selectedModel}
-      onSelect={handleModelChange}
-      placeholder={isLoading ? 'Loading...' : 'Select model'}
-      disabled={disabled || isLoading || !selectedBackendProvider}
-      class={modelSelectClass}
-    />
-  {/if}
+  <CatalogModelSelect
+    models={catalogModels}
+    bind:value={selectedModel}
+    onSelect={handleModelChange}
+    placeholder={isLoading ? 'Loading...' : 'Select model'}
+    disabled={disabled || isLoading || !selectedBackendProvider}
+    class={modelSelectClass}
+  />
 
-  {#if showModel && isDefaultModel}
+  {#if isDefaultModel}
     <Badge variant="secondary" class="text-xs">Default</Badge>
   {/if}
 

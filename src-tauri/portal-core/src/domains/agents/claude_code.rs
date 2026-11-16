@@ -84,9 +84,8 @@ impl AgentBackend for ClaudeCodeBackend {
         let settings_guard = TempSettingsFile(settings_path.clone());
 
         // npm's `claude` shim is a `.cmd`, which `CreateProcess` can't run
-        // directly — go through `cmd.exe` on Windows, same as coder's
-        // `advance_claude_cli` (the `which` call above confirmed `claude` is
-        // on PATH either way, so this resolves the same binary).
+        // directly — go through `cmd.exe` on Windows (the `which` call above
+        // confirmed `claude` is on PATH either way).
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = tokio::process::Command::new("cmd");
             c.arg("/C").arg("claude");

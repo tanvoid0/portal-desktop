@@ -203,20 +203,17 @@ export async function runCoderTask(
     // Anything that goes wrong before the run starts is "could not start", not a
     // failed fix: no agent ran, no attempt is spent, no empty thread is left.
     try {
-      // Every backend except the claude CLI goes through the Agent Platform.
-      if (provider !== 'claude-cli') {
-        await aiPlatform.refresh();
-        // refresh() returns early when a check is already in flight: wait for it.
-        while (aiPlatform.checking) await new Promise((r) => setTimeout(r, 50));
-        if (aiPlatform.blocked) {
-          throw new Error(
-            aiPlatform.status === 'unreachable'
-              ? 'Agent Platform is not running.'
-              : aiPlatform.status === 'not_installed'
-                ? 'Agent Platform is not installed.'
-                : 'Agent Platform rejected this app’s token.'
-          );
-        }
+      await aiPlatform.refresh();
+      // refresh() returns early when a check is already in flight: wait for it.
+      while (aiPlatform.checking) await new Promise((r) => setTimeout(r, 50));
+      if (aiPlatform.blocked) {
+        throw new Error(
+          aiPlatform.status === 'unreachable'
+            ? 'Agent Platform is not running.'
+            : aiPlatform.status === 'not_installed'
+              ? 'Agent Platform is not installed.'
+              : 'Agent Platform rejected this app’s token.'
+        );
       }
       if (created) {
         const thread = await coderService.createThread(

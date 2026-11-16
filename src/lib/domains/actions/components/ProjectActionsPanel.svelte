@@ -353,14 +353,6 @@
         {aiPlatform.starting ? 'Launching…' : 'Launch Agent Platform'}
       </Button>
     {/if}
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      onclick={() => void coderSession.handleBackendProviderChange('claude-cli')}
-    >
-      Use Claude Code (CLI)
-    </Button>
   {/snippet}
 
   <div class="flex flex-col gap-6 xl:flex-row xl:items-start">

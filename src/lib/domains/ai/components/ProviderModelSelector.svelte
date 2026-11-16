@@ -14,7 +14,6 @@
     modelSelectClass?: string;
     showPlatformLabel?: boolean;
     showInlineError?: boolean;
-    showModel?: boolean;
   }
 
   let {
@@ -29,7 +28,6 @@
     modelSelectClass = 'w-[280px]',
     showPlatformLabel = true,
     showInlineError = true,
-    showModel = true,
   }: Props = $props();
 
   let selectors = $state<ChatCatalogSelectors | null>(null);
@@ -53,5 +51,4 @@
   {modelSelectClass}
   {showPlatformLabel}
   {showInlineError}
-  {showModel}
 />

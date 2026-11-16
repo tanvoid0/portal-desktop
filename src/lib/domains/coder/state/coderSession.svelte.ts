@@ -224,7 +224,9 @@ const PROVIDER_KEY = 'portal.coder.backendProvider';
 
 function loadStoredProvider(): string | null {
   try {
-    return localStorage.getItem(PROVIDER_KEY);
+    // The removed Claude Code (CLI) engine may still be stored from an old build.
+    const p = localStorage.getItem(PROVIDER_KEY);
+    return p === 'claude-cli' ? null : p;
   } catch {
     return null;
   }
@@ -921,7 +923,9 @@ class CoderSessionState {
     this.upsertThread(t);
     this.workspaceRoot = t.workspace_root;
     this.selectedModel = t.model ?? this.selectedModel;
-    this.selectedBackendProvider = t.llm_provider ?? this.selectedBackendProvider;
+    if (t.llm_provider && t.llm_provider !== 'claude-cli') {
+      this.selectedBackendProvider = t.llm_provider;
+    }
     this.multitaskMode = t.thread_kind === 'coordinator';
 
     if (t.thread_kind === 'sub-agent') {

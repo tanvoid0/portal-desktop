@@ -13,7 +13,7 @@ use crate::process_ext::NoWindowExt;
 /// settle the real exit code; `Child::wait` is safe to call again there even
 /// if nothing here has resolved yet.
 ///
-/// On Windows both this domain and coder's `claude-cli` path spawn through
+/// On Windows this domain spawns through
 /// `cmd /C claude` (the npm shim is a `.cmd`, which `CreateProcess` can't run
 /// directly), so `child` here is the `cmd.exe` wrapper, not the real
 /// `claude.exe` — `Child::start_kill` alone only terminates that wrapper,

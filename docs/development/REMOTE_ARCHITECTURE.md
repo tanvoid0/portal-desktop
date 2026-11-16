@@ -247,10 +247,7 @@ spelling the frontend already sends as well as snake_case. A command taking
 not an oversight.
 
 `Caller` carries the capabilities a command can additionally check per-call
-(beyond the static `cap = "..."` already gating the whole command) — the
-coder domain's seven commands that can drive the claude-cli engine use it to
-require `agents.exec` on top of `coder` when the thread they're acting on
-runs that engine. Recorded decision: local (loopback HTTP or Tauri IPC) is
+(beyond the static `cap = "..."` already gating the whole command). Recorded decision: local (loopback HTTP or Tauri IPC) is
 always unrestricted — `Caller` has a hand-written `CommandArg` impl rather
 than `Deserialize` so an IPC call can never hand the daemon its own caller,
 and always resolves to `Caller::local()`.
