@@ -72,6 +72,9 @@ jobs:
   rust:
     name: Rust checks
     runs-on: ubuntu-latest
+    # src-tauri/.cargo/config.toml pins target-dir to a local I: drive.
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
     steps:
       - uses: actions/checkout@v5
 
