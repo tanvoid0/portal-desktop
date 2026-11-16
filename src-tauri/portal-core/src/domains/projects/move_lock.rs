@@ -111,6 +111,9 @@ mod tests {
 
     // Each test uses its own root name — `LOCKED_ROOTS` is a process-wide
     // static and `cargo test` runs tests in parallel within one binary.
+    // Windows path literals: `D:\…` is not absolute on Unix, so is_locked
+    // short-circuits there.
+    #[cfg(windows)]
     #[test]
     fn prefix_matches_descendant() {
         lock(&[PathBuf::from(r"D:\mvlock1\foo")]);
@@ -119,6 +122,7 @@ mod tests {
         assert!(!is_locked(Path::new(r"D:\mvlock1\foo\bar.txt")));
     }
 
+    #[cfg(windows)]
     #[test]
     fn case_and_slash_insensitive() {
         lock(&[PathBuf::from(r"D:\mvlock2\AAA\Foo")]);

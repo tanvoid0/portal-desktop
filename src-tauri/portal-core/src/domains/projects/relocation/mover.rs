@@ -999,13 +999,11 @@ fn copy_entry(source: &Path, staging: &Path, e: &ManifestEntry) -> Result<String
     fs::copy(&src, &dst)
         .map_err(|err| format!("copy {} -> {}: {err}", src.display(), dst.display()))?;
 
-    // fs::copy (CopyFileExW) carries the source's ReadOnly attribute onto dst
-    // on Windows, so reopening it below for fsync fails with "Access is
-    // denied" for any read-only source (e.g. git's pack/idx files). Clear it
-    // first, then restore it so the staged copy ends up matching the source's
-    // real mode. Unix permission bits don't carry the same way through
-    // fs::copy, so this is a no-op there.
-    #[cfg(windows)]
+    // fs::copy carries the source's permissions onto dst (the ReadOnly
+    // attribute on Windows, the mode bits on Unix), so reopening it below for
+    // write fails for any read-only source (e.g. git's pack/idx files). Clear
+    // it first, then restore it so the staged copy ends up matching the
+    // source's real mode.
     let dst_perms = {
         let perms = fs::metadata(&dst)
             .map_err(|err| format!("stat {}: {err}", dst.display()))?
@@ -1027,7 +1025,6 @@ fn copy_entry(source: &Path, staging: &Path, e: &ManifestEntry) -> Result<String
         .and_then(|f| f.sync_all())
         .map_err(|err| format!("fsync {}: {err}", dst.display()))?;
 
-    #[cfg(windows)]
     fs::set_permissions(&dst, dst_perms)
         .map_err(|err| format!("restore permissions {}: {err}", dst.display()))?;
 
