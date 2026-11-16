@@ -7,14 +7,14 @@
   import { confirmAction } from '$lib/utils/confirm';
   import { toast } from '$lib/utils/toast';
   import { formatRelativeTime } from '$lib/domains/shared/utils';
-  import type { DeviceSummary } from '../types';
+  import type { CapabilityInfo, DeviceSummary } from '../types';
   import Pencil from '~icons/fa6-solid/pen';
   import Loader2 from '~icons/fa6-solid/spinner';
   import TriangleExclamation from '~icons/fa6-solid/triangle-exclamation';
 
   interface Props {
     device: DeviceSummary;
-    capabilities: string[];
+    capabilities: CapabilityInfo[];
     duplicates?: DeviceSummary[];
     onChanged?: () => void;
   }

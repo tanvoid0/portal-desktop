@@ -7,9 +7,10 @@
   import { toast } from '$lib/utils/toast';
   import Loader2 from '~icons/fa6-solid/spinner';
   import QrCodeIcon from '~icons/fa6-solid/qrcode';
+  import type { CapabilityInfo } from '../types';
 
   interface Props {
-    capabilities: string[];
+    capabilities: CapabilityInfo[];
     /** device_ids currently in "Paired devices" — used to auto-clear the QR
      * once its grant has actually been scanned (see the effect below). */
     pairedDeviceIds?: Set<string>;

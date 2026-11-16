@@ -2,17 +2,24 @@
   import { Switch } from '$lib/components/ui/switch';
   import { Label } from '$lib/components/ui/label';
   import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { bulkToggleable } from '../utils/capabilityChecklist';
+  import type { CapabilityInfo } from '../types';
 
   interface Props {
-    capabilities: string[];
+    capabilities: CapabilityInfo[];
     selected: string[];
     disabled?: boolean;
   }
 
   let { capabilities, selected = $bindable([]), disabled = false }: Props = $props();
 
+  // "Select all" only ever bulk-toggles the non-sensitive caps — terminal.exec,
+  // agents.exec, remote.input and the rest of SENSITIVE_CAPS stay opt-in per
+  // row even when every other box gets checked at once.
+  const bulkCaps = $derived(bulkToggleable(capabilities));
   const allSelected = $derived(
-    capabilities.length > 0 && capabilities.every((c) => selected.includes(c))
+    bulkCaps.length > 0 && bulkCaps.every((name) => selected.includes(name))
   );
 
   function toggle(cap: string, checked: boolean) {
@@ -20,7 +27,9 @@
   }
 
   function toggleAll() {
-    selected = allSelected ? [] : [...capabilities];
+    selected = allSelected
+      ? selected.filter((c) => !bulkCaps.includes(c))
+      : [...new Set([...selected, ...bulkCaps])];
   }
 </script>
 
@@ -32,14 +41,19 @@
       {allSelected ? 'Deselect all' : 'Select all'}
     </Button>
     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {#each capabilities as cap}
+      {#each capabilities as cap (cap.name)}
         <Label class="flex items-center gap-2 text-sm font-normal">
           <Switch
-            checked={selected.includes(cap)}
-            onCheckedChange={(v) => toggle(cap, v === true)}
+            checked={selected.includes(cap.name)}
+            onCheckedChange={(v) => toggle(cap.name, v === true)}
             {disabled}
           />
-          {cap}
+          {cap.name}
+          {#if cap.is_sensitive}
+            <Badge variant="destructive" class="px-1.5 py-0 text-[10px] font-normal"
+              >Sensitive</Badge
+            >
+          {/if}
         </Label>
       {/each}
     </div>

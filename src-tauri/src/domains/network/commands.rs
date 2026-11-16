@@ -206,15 +206,56 @@ pub async fn generate_pairing_qr(
     })
 }
 
-/// Every capability name a device can be granted, for the pairing/capability
+/// Every capability a device can be granted, for the pairing/capability
 /// checkbox UI. Backed by the same registry `/rpc/{command}` gates against,
 /// so this list can never drift from what capabilities actually do something.
+/// Each entry carries `is_sensitive` (from `rpc::SENSITIVE_CAPS`) so the
+/// checklist's "Select all" can leave RCE-equivalent caps opt-in rather than
+/// granting them the moment every other box gets checked at once.
 #[portal_rpc_macro::rpc]
-pub fn remote_list_capabilities() -> Result<Vec<String>, String> {
+pub fn remote_list_capabilities() -> Result<Vec<pairing_service::CapabilityInfo>, String> {
     Ok(crate::rpc::capabilities()
         .into_iter()
-        .map(String::from)
+        .map(|name| pairing_service::CapabilityInfo {
+            name: name.to_string(),
+            is_sensitive: crate::rpc::SENSITIVE_CAPS.contains(&name),
+        })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// This is the approval checklist's only source for which caps exist —
+    /// if `is_sensitive` here ever drifted from `rpc::SENSITIVE_CAPS`,
+    /// "Select all" would silently grant RCE-equivalent access again with
+    /// no way for the frontend to tell.
+    #[test]
+    fn sensitive_caps_come_back_flagged() {
+        let caps = remote_list_capabilities().expect("capabilities() never fails");
+
+        let terminal_exec = caps
+            .iter()
+            .find(|c| c.name == "terminal.exec")
+            .expect("terminal.exec is a registered capability");
+        assert!(terminal_exec.is_sensitive);
+
+        let projects = caps
+            .iter()
+            .find(|c| c.name == "projects")
+            .expect("projects is a registered capability");
+        assert!(!projects.is_sensitive);
+
+        for cap in &caps {
+            assert_eq!(
+                cap.is_sensitive,
+                crate::rpc::SENSITIVE_CAPS.contains(&cap.name.as_str()),
+                "{} sensitivity mismatch between remote_list_capabilities and rpc::SENSITIVE_CAPS",
+                cap.name
+            );
+        }
+    }
 }
 
 /// Whether the LAN listener and UDP discovery responder are enabled. See

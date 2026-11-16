@@ -49,6 +49,12 @@ const LONG_TERM_DAYS: i64 = 30;
 /// Pickup window for a QR-minted grant before any device has used it — see
 /// `mint_qr_pairing`/`verify_token`.
 const QR_PICKUP_TTL_MINUTES: i64 = 5;
+/// How long a `/pair/request` row may sit as "pending" before `list_devices`
+/// gives up on it. `daemon::pairing`'s own 170s timeout normally rejects an
+/// unanswered request, but that timer is an in-memory `oneshot` scoped to the
+/// daemon process that received it — a restart mid-poll (common in dev)
+/// leaves the row "pending" forever with nothing left to resolve it.
+const PENDING_REQUEST_TTL_MINUTES: i64 = 5;
 
 /// Hex SHA-256 of a value. Used for the token hash.
 pub fn hash(value: &str) -> String {
@@ -97,6 +103,17 @@ pub struct DeviceSummary {
     pub expires_at: Option<String>,
     pub last_used_at: Option<String>,
     pub created_at: String,
+}
+
+/// One row of `remote_list_capabilities` — a capability name plus whether
+/// granting it reaches outside the app's own data (`rpc::SENSITIVE_CAPS`).
+/// The approval checklist uses `is_sensitive` to keep its "Select all" from
+/// sweeping in `terminal.exec`/`agents.exec`/`remote.input` and the like.
+#[derive(Debug, Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../src/lib/domains/devices/generated/")]
+pub struct CapabilityInfo {
+    pub name: String,
+    pub is_sensitive: bool,
 }
 
 /// The most-recently created row for `device_id`, if any.
@@ -361,11 +378,18 @@ pub async fn list_devices(conn: &DatabaseConnection) -> Result<Vec<DeviceSummary
     // use (see `verify_token`), so a `until_revoked` row that still carries
     // one and is past it was never picked up and never will be — drop it
     // instead of letting it pile up in every list forever (QA-113).
+    //
+    // Stale pending rows: see `PENDING_REQUEST_TTL_MINUTES` — same treatment,
+    // so an orphaned request can't sit in the Pending list indefinitely where
+    // approving the wrong card (by position, among a pile of dead rows) is a
+    // real risk.
     let now: DateTime<FixedOffset> = Utc::now().into();
     let mut devices: Vec<_> = by_device
         .into_values()
         .filter(|row| {
-            !(row.approval_type == "until_revoked" && row.expires_at.is_some_and(|e| e <= now))
+            !(row.approval_type == "until_revoked" && row.expires_at.is_some_and(|e| e <= now)
+                || row.approval_type == "pending"
+                    && row.created_at + Duration::minutes(PENDING_REQUEST_TTL_MINUTES) <= now)
         })
         .collect();
     devices.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -481,7 +505,9 @@ mod tests {
     async fn approve_after_reject_does_not_ghost_pair() {
         let conn = fresh_db().await;
 
-        request_pairing(&conn, "dev-timeout", "Phone").await.unwrap();
+        request_pairing(&conn, "dev-timeout", "Phone")
+            .await
+            .unwrap();
         reject(&conn, "dev-timeout").await.unwrap();
 
         let err = approve(&conn, "dev-timeout", "temporary", &["coder".to_string()])
@@ -596,9 +622,39 @@ mod tests {
         let row = most_recent_row(&conn, &device_id).await.unwrap().unwrap();
         let mut m: device_approval::ActiveModel = row.into();
         m.expires_at = Set(Some((Utc::now() - Duration::minutes(1)).into()));
-        device_approval::Entity::update(m).exec(&conn).await.unwrap();
+        device_approval::Entity::update(m)
+            .exec(&conn)
+            .await
+            .unwrap();
 
         assert!(list_devices(&conn).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn stale_pending_row_is_pruned_but_a_fresh_one_survives() {
+        let conn = fresh_db().await;
+        request_pairing(&conn, "dev-stale", "Old phone")
+            .await
+            .unwrap();
+        request_pairing(&conn, "dev-fresh", "New phone")
+            .await
+            .unwrap();
+
+        // Back-date "dev-stale" past the TTL, as if its daemon process had
+        // died before `/pair/request`'s own 170s timeout could reject it.
+        let row = most_recent_row(&conn, "dev-stale").await.unwrap().unwrap();
+        let mut m: device_approval::ActiveModel = row.into();
+        m.created_at =
+            Set((Utc::now() - Duration::minutes(PENDING_REQUEST_TTL_MINUTES + 1)).into());
+        device_approval::Entity::update(m)
+            .exec(&conn)
+            .await
+            .unwrap();
+
+        let devices = list_devices(&conn).await.unwrap();
+        assert_eq!(devices.len(), 1, "the stale pending row should be pruned");
+        assert_eq!(devices[0].device_id, "dev-fresh");
+        assert_eq!(devices[0].approval_type, "pending");
     }
 
     #[tokio::test]
@@ -607,7 +663,9 @@ mod tests {
         request_pairing(&conn, "dev-3", "First").await.unwrap();
         approve(&conn, "dev-3", "temporary", &[]).await.unwrap();
         revoke(&conn, "dev-3").await.unwrap();
-        request_pairing(&conn, "dev-3", "Reconnected").await.unwrap();
+        request_pairing(&conn, "dev-3", "Reconnected")
+            .await
+            .unwrap();
 
         let devices = list_devices(&conn).await.unwrap();
         assert_eq!(devices.len(), 1, "one device_id, however many rows it has");
