@@ -266,8 +266,8 @@ impl Mover<'_> {
             return Err(MoveError::Blocked(report));
         }
 
-        let (entries, skipped) = blocking(|| build_manifest(&source, include_regenerable))
-            .map_err(MoveError::Failed)?;
+        let (entries, skipped) =
+            blocking(|| build_manifest(&source, include_regenerable)).map_err(MoveError::Failed)?;
 
         // #217: deny-write hold on the move set, held through the copy below.
         // Needs the file list, so it can't come before the walk above — but it
@@ -603,23 +603,12 @@ impl Mover<'_> {
 
         blocking(|| {
             let manifest = read_validated_manifest(&row).map_err(MoveError::Failed)?;
-            let current = rewalk(&source, &manifest.skipped_dirs).map_err(MoveError::Failed)?;
-            if !same_set(&current, &manifest.entries) {
-                return Err(MoveError::Failed(
-                    "source changed since the move — refusing to delete it".into(),
-                ));
-            }
-            for e in &manifest.entries {
-                let src_h = hash_file(&os_join(&source, &e.rel)).map_err(MoveError::Failed)?;
-                let dst_h = hash_file(&os_join(&dest, &e.rel)).map_err(MoveError::Failed)?;
-                if src_h != dst_h {
-                    return Err(MoveError::Failed(format!(
-                        "destination differs from source at {} — refusing to delete the source",
-                        e.rel
-                    )));
-                }
-            }
-
+            let hold = verify_source_removable(&source, &dest, &manifest)?;
+            // ponytail: the hold carries no FILE_SHARE_DELETE, so it would make
+            // the Recycle Bin move itself fail — it must close just before
+            // `trash::delete`, leaving a microsecond gap instead of the whole
+            // hash pass. Close it for good with a delete-sharing hold if needed.
+            drop(hold);
             trash::delete(&source).map_err(|e| MoveError::Failed(format!("recycle source: {e}")))
         })
     }
@@ -871,6 +860,10 @@ fn walk(
             .file_type()
             .map_err(|e| format!("file type of {}: {e}", path.display()))?;
 
+        // #414: a stray root marker from an earlier move is not project data.
+        if dir == root && entry.file_name() == SIDECAR {
+            continue;
+        }
         // Symlinks/junctions are refused up front by usage::check; never follow
         // or copy a reparse point here.
         if ft.is_symlink() {
@@ -939,6 +932,9 @@ fn rewalk_dir(
         let ft = entry
             .file_type()
             .map_err(|e| format!("file type of {}: {e}", path.display()))?;
+        if dir == root && entry.file_name() == SIDECAR {
+            continue;
+        }
         if ft.is_symlink() {
             continue;
         }
@@ -965,8 +961,9 @@ fn rewalk_dir(
 
 /// Decide which manifest entries still need copying. A file counts as done
 /// only if it is in the progress log *and* its staging copy is present with the
-/// right length; anything else — unlogged (possibly mid-write at the crash),
-/// missing, or wrong-length — is deleted from staging and queued for re-copy.
+/// right length and still hashes to the logged value (`#414`: same-length bit
+/// rot would otherwise fail every resume at verify); anything else — unlogged
+/// (possibly mid-write at the crash), missing, wrong-length or rotted — is deleted from staging and queued for re-copy.
 /// Returns the indices to copy plus the done file/byte counts.
 fn plan_copies(
     entries: &[ManifestEntry],
@@ -978,7 +975,12 @@ fn plan_copies(
     let mut bytes_done = 0u64;
     for (i, e) in entries.iter().enumerate() {
         let st = os_join(staging, &e.rel);
-        let done = logged.contains_key(&e.rel) && file_len(&st) == Some(e.len);
+        // The logged hash is the source's at copy time, and resume has already
+        // re-proven the source still matches it, so a recopy is safe.
+        let done = file_len(&st) == Some(e.len)
+            && logged
+                .get(&e.rel)
+                .is_some_and(|h| hash_file(&st).as_ref() == Ok(h));
         if done {
             files_done += 1;
             bytes_done += e.len;
@@ -991,6 +993,34 @@ fn plan_copies(
         }
     }
     Ok((to_copy, files_done, bytes_done))
+}
+
+/// `#414`: the pre-delete proof for [`Mover::remove_moved_source`], run under a
+/// fresh `#217` hold so a source write can't slip in between a file's hash and
+/// the caller's delete. Returns the hold; the caller drops it when done.
+fn verify_source_removable(
+    source: &Path,
+    dest: &Path,
+    manifest: &Manifest,
+) -> Result<SourceHold, MoveError> {
+    let hold = source_hold::acquire(source, &rel_paths(&manifest.entries))?;
+    let current = rewalk(source, &manifest.skipped_dirs).map_err(MoveError::Failed)?;
+    if !same_set(&current, &manifest.entries) {
+        return Err(MoveError::Failed(
+            "source changed since the move — refusing to delete it".into(),
+        ));
+    }
+    for e in &manifest.entries {
+        let src_h = hash_file(&os_join(source, &e.rel)).map_err(MoveError::Failed)?;
+        let dst_h = hash_file(&os_join(dest, &e.rel)).map_err(MoveError::Failed)?;
+        if src_h != dst_h {
+            return Err(MoveError::Failed(format!(
+                "destination differs from source at {} — refusing to delete the source",
+                e.rel
+            )));
+        }
+    }
+    Ok(hold)
 }
 
 /// Copy one file into staging, fsync it, then prove it by hashing the source
@@ -1455,9 +1485,7 @@ fn list_rel_files(root: &Path) -> Result<Vec<String>, String> {
 pub fn blocking<T>(f: impl FnOnce() -> T) -> T {
     use tokio::runtime::{Handle, RuntimeFlavor};
     match Handle::try_current() {
-        Ok(h) if h.runtime_flavor() == RuntimeFlavor::MultiThread => {
-            tokio::task::block_in_place(f)
-        }
+        Ok(h) if h.runtime_flavor() == RuntimeFlavor::MultiThread => tokio::task::block_in_place(f),
         _ => f(),
     }
 }
@@ -1781,7 +1809,8 @@ mod tests {
         use std::time::Duration;
 
         let mut opt = ConnectOptions::new("sqlite::memory:");
-        opt.max_connections(1).acquire_timeout(Duration::from_secs(1));
+        opt.max_connections(1)
+            .acquire_timeout(Duration::from_secs(1));
         let db = Database::connect(opt).await.unwrap();
 
         let other = tokio::spawn(async move {
@@ -1930,7 +1959,10 @@ mod tests {
         fs::write(stg.path().join("partial.txt"), "short").unwrap(); // wrong length
 
         let mut logged = HashMap::new();
-        logged.insert("done.txt".to_string(), "h".to_string());
+        logged.insert(
+            "done.txt".to_string(),
+            hash_file(&src.path().join("done.txt")).unwrap(),
+        );
         logged.insert("partial.txt".to_string(), "h".to_string());
 
         let (to_copy, files_done, _) = plan_copies(&entries, stg.path(), &logged).unwrap();
@@ -1941,6 +1973,62 @@ mod tests {
         assert!(!rels.contains(&"done.txt".to_string()));
         // The wrong-length staging file was dropped so it will be re-copied clean.
         assert!(!stg.path().join("partial.txt").exists());
+    }
+
+    /// #414: same-length rot in a logged staging file is recopied, not left to
+    /// fail `final_verify` on every resume.
+    #[test]
+    fn plan_copies_recopies_a_same_length_rotted_staging_file() {
+        let src = tempdir().unwrap();
+        let stg = tempdir().unwrap();
+        write(&src.path().join("a.txt"), "aaaa");
+        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let sha = copy_entry(src.path(), stg.path(), &entries[0]).unwrap();
+        fs::write(stg.path().join("a.txt"), "aaab").unwrap(); // same length
+        let logged = HashMap::from([("a.txt".to_string(), sha)]);
+
+        let (to_copy, files_done, _) = plan_copies(&entries, stg.path(), &logged).unwrap();
+        assert_eq!((to_copy, files_done), (vec![0], 0));
+    }
+
+    /// #414: a `.portal-move` at the walk root is skipped; a nested one is data.
+    #[test]
+    fn walks_skip_the_sidecar_at_the_root_only() {
+        let src = tempdir().unwrap();
+        write(&src.path().join(SIDECAR), "old-move");
+        write(&src.path().join("a.txt"), "a");
+        write(&src.path().join("sub").join(SIDECAR), "mine");
+        let want = vec!["a.txt".to_string(), format!("sub/{SIDECAR}")];
+        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        assert_eq!(rel_paths(&entries), want);
+        let re = rewalk(src.path(), &[]).unwrap();
+        assert_eq!(rel_paths(&re), want);
+    }
+
+    /// #414: the pre-delete verify returns a live hold, so a source write after
+    /// the hash check is refused until the caller drops it.
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn verify_source_removable_returns_a_live_hold() {
+        let src = tempdir().unwrap();
+        let dst = tempdir().unwrap();
+        write(&src.path().join("a.txt"), "a");
+        write(&dst.path().join("a.txt"), "a");
+        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            skipped_dirs: vec![],
+            entries,
+        };
+        let hold = verify_source_removable(src.path(), dst.path(), &manifest).unwrap();
+        let open_w = || {
+            fs::OpenOptions::new()
+                .write(true)
+                .open(src.path().join("a.txt"))
+        };
+        assert!(open_w().is_err());
+        drop(hold);
+        assert!(open_w().is_ok());
     }
 
     #[test]
