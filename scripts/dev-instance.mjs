@@ -148,6 +148,9 @@ if (process.argv[2] === '--kill-port') {
     // Instance 1's daemon holds 18421 (daemon::DEV_PORT).
     env.PORTAL_DAEMON_PORT = String(18421 + (n - 1));
     env.CARGO_TARGET_DIR = resolve('src-tauri/target', `instance-${n}`);
+    // The config's build-dir is per workspace path, so without this instance 2 would
+    // relink into instance 1's deps/, where its running .exe is hard-linked from.
+    env.CARGO_BUILD_BUILD_DIR = env.CARGO_TARGET_DIR;
     // Every process sharing a WebView2 user-data folder must pass identical browser
     // arguments. Ours differ by --remote-debugging-port, so instance 2 dies on startup
     // with HRESULT 0x8007139F ("group or resource is not in the correct state") until

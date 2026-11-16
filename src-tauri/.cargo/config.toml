@@ -1,14 +1,18 @@
-# One target dir shared by every worktree of this repo, on a drive with room
-# (D: has repeatedly run to 0 free - see docs/development/PORTAL_MOBILE.md's
-# "Preconditions"). Each worktree used to get its own full `target/` (~10GB+),
-# multiplied by however many worktrees/sessions exist at once; cargo's own
-# file lock in the target dir already serializes concurrent builds safely, so
-# sharing it costs parallelism between worktrees, not correctness.
+# Final artifacts (the app exe, bundles) go to one target dir on a drive with
+# room (D: has repeatedly run to 0 free - see docs/development/PORTAL_MOBILE.md's
+# "Preconditions"), grouped under I:/build/cargo/ alongside other projects.
 #
-# Per-machine path, not portable - if this ever needs to work on another
-# machine or in CI, override with the CARGO_TARGET_DIR env var instead (it
-# takes precedence over this file) rather than editing the path below.
-# I: has the most headroom on this machine (D: and C: both run tight);
-# grouped under I:/build/cargo/ alongside other projects' target dirs.
+# Intermediates (deps/, incremental/, build scripts, test binaries) go to a
+# build dir per workspace path, so every worktree compiles its own. Sharing
+# them was not safe: cargo names a path crate's artifacts by its
+# workspace-relative path and judges freshness by mtime, so `cargo test` in
+# one worktree could run another worktree's portal-core test binary and still
+# report "Fresh". Cost: one full build and its own few GB per worktree; delete
+# stale ones under I:/build/cargo/portal-desktop/build/.
+#
+# Per-machine paths, not portable - elsewhere or in CI, override with the
+# CARGO_TARGET_DIR and CARGO_BUILD_BUILD_DIR env vars (they take precedence
+# over this file) rather than editing the paths below.
 [build]
 target-dir = "I:/build/cargo/portal-desktop"
+build-dir = "I:/build/cargo/portal-desktop/build/{workspace-path-hash}"
