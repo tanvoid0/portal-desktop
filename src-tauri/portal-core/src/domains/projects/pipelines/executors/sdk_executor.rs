@@ -92,7 +92,7 @@ impl Executor for SDKExecutor {
             }
         };
 
-        move_lock::ensure_unlocked(Path::new(&request.working_directory))?;
+        move_lock::ensure_unlocked_within(Path::new(&request.working_directory))?;
         let mut cmd = Command::new(&program);
         cmd.no_window();
         cmd.args(&args);

@@ -207,7 +207,7 @@ impl ScriptExecutionService {
     /// Execute a script and track it persistently
     pub async fn execute_script(&self, request: ExecuteScriptRequest) -> Result<String, String> {
         if let Some(wd) = &request.working_directory {
-            move_lock::ensure_unlocked(Path::new(wd))?;
+            move_lock::ensure_unlocked_within(Path::new(wd))?;
         }
         let execution_id = Uuid::new_v4().to_string();
         let parameters_json = serde_json::to_string(&request.parameters)

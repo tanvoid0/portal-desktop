@@ -102,7 +102,7 @@ impl CommandExecutor {
 
         // Set working directory
         if let Some(working_dir) = &opts.working_directory {
-            move_lock::ensure_unlocked(Path::new(working_dir))?;
+            move_lock::ensure_unlocked_within(Path::new(working_dir))?;
             cmd.current_dir(Path::new(working_dir));
         }
 
@@ -135,7 +135,7 @@ impl CommandExecutor {
 
         // Set working directory
         if let Some(working_dir) = &opts.working_directory {
-            move_lock::ensure_unlocked(Path::new(working_dir))?;
+            move_lock::ensure_unlocked_within(Path::new(working_dir))?;
             cmd.current_dir(Path::new(working_dir));
         }
 
@@ -180,7 +180,7 @@ impl CommandExecutor {
 
         // Set working directory
         if let Some(working_dir) = &opts.working_directory {
-            move_lock::ensure_unlocked(Path::new(working_dir))?;
+            move_lock::ensure_unlocked_within(Path::new(working_dir))?;
             cmd.current_dir(Path::new(working_dir));
         }
 

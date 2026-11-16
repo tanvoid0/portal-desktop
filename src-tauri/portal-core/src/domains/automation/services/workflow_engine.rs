@@ -262,10 +262,10 @@ impl WorkflowEngine {
             let wd_path = self.substitute_variables(wd, context);
             if let Some(project_path) = &context.project_path {
                 let dir = project_path.join(wd_path);
-                move_lock::ensure_unlocked(&dir)?;
+                move_lock::ensure_unlocked_within(&dir)?;
                 cmd_builder.current_dir(dir);
             } else {
-                move_lock::ensure_unlocked(Path::new(&wd_path))?;
+                move_lock::ensure_unlocked_within(Path::new(&wd_path))?;
                 cmd_builder.current_dir(wd_path);
             }
         } else if let Some(project_path) = &context.project_path {

@@ -90,9 +90,7 @@ pub fn unlock(paths: &[PathBuf]) {
         .retain(|r| !targets.contains(&norm(&r.to_string_lossy())));
 }
 
-/// Empty or relative paths are never locked — there is nothing meaningful to
-/// compare them against.
-pub fn is_locked(path: &Path) -> bool {
+fn locked_by(path: &Path, matches: fn(&str, &str) -> bool) -> bool {
     let s = path.to_string_lossy();
     if s.is_empty() || !path.is_absolute() {
         return false;
@@ -101,11 +99,36 @@ pub fn is_locked(path: &Path) -> bool {
         .read()
         .unwrap()
         .iter()
-        .any(|root| is_under(&root.to_string_lossy(), &s))
+        .any(|root| matches(&root.to_string_lossy(), &s))
+}
+
+/// Two-way: locked when `path` is inside a locked root *or* a locked root is
+/// inside `path`. Use when the caller reads, writes, walks or runs git on the
+/// tree rooted at `path` — an ancestor can reach the locked subtree.
+///
+/// Empty or relative paths are never locked — there is nothing meaningful to
+/// compare them against.
+pub fn is_locked(path: &Path) -> bool {
+    locked_by(path, is_under)
+}
+
+/// One-way: locked only when `path` IS a locked root or inside one. Use when
+/// `path` is merely a spawned process's cwd — a shell at an ancestor (the
+/// user's home) holds no handle on the locked tree (board #781, cf. #431).
+pub fn is_locked_within(path: &Path) -> bool {
+    locked_by(path, |root, p| is_within(p, root))
+}
+
+pub fn ensure_unlocked_within(path: &Path) -> Result<(), String> {
+    ensure(is_locked_within(path), path)
 }
 
 pub fn ensure_unlocked(path: &Path) -> Result<(), String> {
-    if is_locked(path) {
+    ensure(is_locked(path), path)
+}
+
+fn ensure(locked: bool, path: &Path) -> Result<(), String> {
+    if locked {
         Err(format!(
             "{} is locked by an in-progress project move",
             path.display()
@@ -155,6 +178,23 @@ mod tests {
         assert!(!is_within(r"C:\Users\me\projX", r"C:\Users\me\proj"));
         assert!(!is_within(r"C:\x", ""));
         assert!(!is_within("", r"C:\x"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn one_way_check_ignores_ancestor() {
+        let root = PathBuf::from(r"D:\mvlock5\home\proj");
+        lock(&[root.clone()]);
+        let ancestor = Path::new(r"D:\mvlock5\home");
+        assert!(is_locked(ancestor));
+        assert!(!is_locked_within(ancestor));
+        assert!(ensure_unlocked_within(ancestor).is_ok());
+        for p in [r"D:\mvlock5\home\proj", r"D:\mvlock5\home\proj\src"] {
+            assert!(is_locked(Path::new(p)));
+            assert!(is_locked_within(Path::new(p)));
+            assert!(ensure_unlocked_within(Path::new(p)).is_err());
+        }
+        unlock(&[root]);
     }
 
     #[test]

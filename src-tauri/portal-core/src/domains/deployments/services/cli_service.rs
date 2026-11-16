@@ -63,7 +63,7 @@ impl CliService {
 
         // Set working directory
         if let Some(wd) = working_directory {
-            move_lock::ensure_unlocked(Path::new(wd))?;
+            move_lock::ensure_unlocked_within(Path::new(wd))?;
             let path = PathBuf::from(wd);
             if !path.exists() {
                 return Err(format!("Working directory does not exist: {}", wd));
