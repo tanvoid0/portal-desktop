@@ -2,10 +2,10 @@
   import { CoderPanel } from '$lib/domains/coder';
   import { afterNavigate } from '$app/navigation';
   import { coderSession } from '$lib/domains/coder/state/coderSession.svelte.js';
-  import { isAiCoderRoute } from '$lib/config/ai-tabs';
+  import { AI_CODER_PATH } from '$lib/config/ai-tabs';
 
   afterNavigate(async ({ to }) => {
-    if (!to?.url.pathname || !isAiCoderRoute(to.url.pathname)) return;
+    if (to?.url.pathname !== AI_CODER_PATH) return;
     await coderSession.ensureInit();
     await coderSession.refreshThreads();
     await coderSession.syncRunningThreads();

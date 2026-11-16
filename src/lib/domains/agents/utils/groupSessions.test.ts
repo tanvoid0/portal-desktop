@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentSessionSummary } from '../generated';
 import type { Project } from '$lib/domains/projects/types';
-import { groupSessionsByProject } from './groupSessions';
+import { filterSessionsByBackend, groupSessionsByProject } from './groupSessions';
 
 const session = (id: string, cwd: string): AgentSessionSummary => ({
   id,
@@ -19,6 +19,13 @@ const session = (id: string, cwd: string): AgentSessionSummary => ({
 
 const project = (id: string, name: string, path: string): Project =>
   ({ id, name, path, status: 'active' }) as unknown as Project;
+
+describe('filterSessionsByBackend', () => {
+  it('keeps only sessions matching the given backend', () => {
+    const sessions = [session('a', '/x'), { ...session('b', '/y'), backend_id: 'codex' }];
+    expect(filterSessionsByBackend(sessions, 'claude-code').map((s) => s.id)).toEqual(['a']);
+  });
+});
 
 describe('groupSessionsByProject', () => {
   it('matches a project path case- and separator-insensitively', () => {

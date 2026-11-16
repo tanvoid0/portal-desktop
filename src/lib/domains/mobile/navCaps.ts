@@ -1,4 +1,5 @@
 import type { NavSection } from '$lib/components/shell/nav-types';
+import { agentTabPath } from '$lib/config/agents-tabs';
 
 /** Nav entry url -> daemon cap that serves it. Entries not listed have no remote backend. */
 const NAV_CAP: Record<string, string> = {
@@ -10,11 +11,12 @@ const NAV_CAP: Record<string, string> = {
   '/github': 'github',
 };
 
-/** `/ai` hosts both the Code tab (cap `coder`) and the Agents tab (cap `agents`) —
- *  keep the entry if either is served, and land on whichever tab the device has. */
+/** `/ai` hosts both the Portal workspace (cap `coder`) and agent backend tabs
+ *  (cap `agents`) under the merged Code tab — keep the entry if either is
+ *  served, landing on whichever side the device can reach. */
 function aiEntryUrl(caps: string[]): string | null {
   if (caps.includes('coder')) return '/ai/coder';
-  if (caps.includes('agents')) return '/ai/agents';
+  if (caps.includes('agents')) return agentTabPath();
   return null;
 }
 

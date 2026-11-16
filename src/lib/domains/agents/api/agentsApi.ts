@@ -67,7 +67,7 @@ export const agentsApi = {
   },
 
   /** Run ids with a live backend process right now, so a reloaded
-   *  `/ai/agents/run` can reattach instead of showing a blank launcher (QA-127). */
+   *  agent tab (`/ai/coder/<backend>`) can reattach instead of showing a blank launcher (QA-127). */
   listRunning(): Promise<string[]> {
     return invokeClient.post<string[]>('agents_list_running');
   },

@@ -4,20 +4,16 @@
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import AITabBar from '$lib/domains/ai/components/navigation/AITabBar.svelte';
+  import CoderEngineTabs from '$lib/domains/ai/components/navigation/CoderEngineTabs.svelte';
   import { setBreadcrumbs, clearBreadcrumbs } from '$lib/domains/shared/stores/breadcrumbStore';
   import { getAiTabBreadcrumb, isAiCoderRoute, isAiSectionRoute } from '$lib/config/ai-tabs';
-  import { AGENTS_BASE } from '$lib/config/agents-tabs';
   import { AI_CHAT_PATH } from '$lib/config/ai-nav';
   import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
 
   let { children }: { children: Snippet<[]> } = $props();
 
-  // Page identity for screen readers: this layout also serves /ai/coder and /ai/agents.
-  const srHeading = $derived.by(() => {
-    if (isAiCoderRoute(page.url.pathname)) return 'Code';
-    if (page.url.pathname.startsWith(AGENTS_BASE)) return 'Agents';
-    return 'AI';
-  });
+  // Page identity for screen readers: this layout also serves /ai/coder and its backend tabs.
+  const srHeading = $derived(isAiCoderRoute(page.url.pathname) ? 'Code' : 'AI');
 
   function syncAiBreadcrumbs(pathname: string) {
     if (!isAiSectionRoute(pathname)) return;
@@ -42,7 +38,10 @@
   <div
     class="divider-edge-b divider-edge-full flex shrink-0 items-center gap-3 bg-background px-3 py-2 md:px-4"
   >
-    <AITabBar class="w-[300px] shrink-0" />
+    <AITabBar class="w-[200px] shrink-0" />
+    {#if isAiCoderRoute(page.url.pathname)}
+      <CoderEngineTabs class="min-w-0 shrink" />
+    {/if}
     {#if aiTopbar.actions}
       <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5">
         {@render aiTopbar.actions()}

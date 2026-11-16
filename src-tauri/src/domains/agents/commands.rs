@@ -119,7 +119,7 @@ pub async fn agents_get_events(
     Ok(service.get_events(&run_id).await)
 }
 
-/// Run ids with a live backend process right now — lets `/agents/run`
+/// Run ids with a live backend process right now — lets the agent tab (`/ai/coder/<backend>`)
 /// reattach to a run still alive on the backend after a reload (QA-127).
 #[portal_rpc_macro::rpc(cap = "agents")]
 pub async fn agents_list_running(

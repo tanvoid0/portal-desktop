@@ -1,6 +1,6 @@
 /**
  * Group agent sessions by the project whose path contains their cwd, for the
- * sessions list (`src/routes/ai/agents/sessions/+page.svelte`).
+ * agent tab's session sidebar (`AgentSessionSidebar.svelte`).
  */
 
 import type { AgentSessionSummary } from '../generated';
@@ -29,6 +29,15 @@ function matchProject<T extends { norm: string }>(cwd: string, projects: T[]): T
     if (isMatch && (!best || p.norm.length > best.norm.length)) best = p;
   }
   return best;
+}
+
+/** Sessions belonging to one backend — the sidebar scopes its list to the
+ *  tab it's rendering under before grouping by project. */
+export function filterSessionsByBackend(
+  sessions: AgentSessionSummary[],
+  backendId: string
+): AgentSessionSummary[] {
+  return sessions.filter((s) => s.backend_id === backendId);
 }
 
 /**
