@@ -14,7 +14,6 @@
     modelSelectClass?: string;
     showPlatformLabel?: boolean;
     showInlineError?: boolean;
-    extraProviders?: { value: string; label: string }[];
     showModel?: boolean;
   }
 
@@ -30,7 +29,6 @@
     modelSelectClass = 'w-[280px]',
     showPlatformLabel = true,
     showInlineError = true,
-    extraProviders = [],
     showModel = true,
   }: Props = $props();
 
@@ -55,6 +53,5 @@
   {modelSelectClass}
   {showPlatformLabel}
   {showInlineError}
-  {extraProviders}
   {showModel}
 />

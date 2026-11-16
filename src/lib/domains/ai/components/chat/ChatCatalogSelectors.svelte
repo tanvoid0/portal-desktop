@@ -36,8 +36,6 @@
     showPlatformLabel?: boolean;
     /** Hide the inline error label when the caller renders its own banner. */
     showInlineError?: boolean;
-    /** Extra non-catalog providers to offer (e.g. a local CLI engine). */
-    extraProviders?: { value: string; label: string }[];
     /** Hide the model picker (e.g. for an engine that ignores the model). */
     showModel?: boolean;
   }
@@ -54,7 +52,6 @@
     modelSelectClass = 'w-[280px]',
     showPlatformLabel = true,
     showInlineError = true,
-    extraProviders = [],
     showModel = true,
   }: Props = $props();
 
@@ -142,14 +139,6 @@
   }
 
   function handleBackendProviderChange(providerId: string) {
-    // A non-catalog engine (e.g. the Claude CLI) has no catalog models; just
-    // select it and clear the model — the engine ignores it.
-    if (extraProviders.some((p) => p.value === providerId)) {
-      selectedBackendProvider = providerId;
-      selectedModel = null;
-      onBackendProviderChange?.(providerId);
-      return;
-    }
     if (!catalog) return;
     selectedBackendProvider = providerId;
     onBackendProviderChange?.(providerId);
@@ -180,7 +169,6 @@
       value: provider.id,
       label: provider.label,
     })),
-    ...extraProviders,
   ]);
 
   const catalogModels = $derived.by((): CatalogModel[] => {

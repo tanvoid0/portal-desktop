@@ -8,41 +8,23 @@ use tauri::State;
 
 use crate::domains::ai::platform_config::PlatformConfig;
 use crate::domains::ai::services::AISettingsService;
-use crate::rpc::Caller;
 
-use super::service::{AgentTurn, CoderService, CLAUDE_CLI_PROVIDER};
+use super::service::{AgentTurn, CoderService};
 use super::types::{
     CoderAgentMode, CoderSubAgent, CoderThread, CoderThreadKind, CoderThreadSummary, FileChange,
-    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PendingApproval,
-    PermissionMode, PermissionRule,
+    MultitaskCancelRequest, MultitaskCleanupRequest, MultitaskSpawnRequest, PermissionMode,
+    PermissionRule,
 };
-
-/// Gates a coder command behind `agents.exec` when the thread (or, for
-/// create/update, the requested provider) runs the claude-cli engine — that
-/// engine spawns a real agent-CLI subprocess and answers its tool-call
-/// prompts, the same RCE-equivalent shape as `agents_start_run`, so it rides
-/// `agents.exec` on top of the plain `coder` cap every other coder command
-/// carries. `provider` is `None` for every other engine, which is unrestricted
-/// here (same as today).
-fn require_engine(caller: &Caller, provider: Option<&str>) -> Result<(), String> {
-    if provider == Some(CLAUDE_CLI_PROVIDER) {
-        caller.require("agents.exec")
-    } else {
-        Ok(())
-    }
-}
 
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_create_thread(
     service: State<'_, Arc<CoderService>>,
-    caller: Caller,
     workspace_root: String,
     model: Option<String>,
     llm_provider: Option<String>,
     thread_kind: Option<CoderThreadKind>,
     project_id: Option<i32>,
 ) -> Result<CoderThread, String> {
-    require_engine(&caller, llm_provider.as_deref())?;
     Ok(service
         .create_thread(workspace_root, model, llm_provider, thread_kind, project_id)
         .await)
@@ -81,17 +63,10 @@ pub async fn coder_delete_thread(
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_update_thread_model(
     service: State<'_, Arc<CoderService>>,
-    caller: Caller,
     thread_id: String,
     model: Option<String>,
     llm_provider: Option<String>,
 ) -> Result<(), String> {
-    require_engine(&caller, llm_provider.as_deref())?;
-    let stored = service
-        .get_thread(&thread_id)
-        .await
-        .and_then(|t| t.llm_provider);
-    require_engine(&caller, stored.as_deref())?;
     service
         .update_thread_model(&thread_id, model, llm_provider)
         .await
@@ -109,15 +84,9 @@ pub async fn coder_set_thread_kind(
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_send(
     service: State<'_, Arc<CoderService>>,
-    caller: Caller,
     thread_id: String,
     message: String,
 ) -> Result<(), String> {
-    let provider = service
-        .get_thread(&thread_id)
-        .await
-        .and_then(|t| t.llm_provider);
-    require_engine(&caller, provider.as_deref())?;
     service.prepare_send(&thread_id, message).await?;
     CoderService::spawn_run(service.inner().clone(), thread_id, AgentTurn::Send);
     Ok(())
@@ -126,14 +95,8 @@ pub async fn coder_send(
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_retry(
     service: State<'_, Arc<CoderService>>,
-    caller: Caller,
     thread_id: String,
 ) -> Result<(), String> {
-    let provider = service
-        .get_thread(&thread_id)
-        .await
-        .and_then(|t| t.llm_provider);
-    require_engine(&caller, provider.as_deref())?;
     service.prepare_retry(&thread_id).await?;
     CoderService::spawn_run(service.inner().clone(), thread_id, AgentTurn::Retry);
     Ok(())
@@ -142,16 +105,10 @@ pub async fn coder_retry(
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_edit_message(
     service: State<'_, Arc<CoderService>>,
-    caller: Caller,
     thread_id: String,
     message_index: usize,
     content: String,
 ) -> Result<(), String> {
-    let provider = service
-        .get_thread(&thread_id)
-        .await
-        .and_then(|t| t.llm_provider);
-    require_engine(&caller, provider.as_deref())?;
     service
         .prepare_edit_message(&thread_id, message_index, content)
         .await?;
@@ -162,7 +119,6 @@ pub async fn coder_edit_message(
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_approve(
     service: State<'_, Arc<CoderService>>,
-    caller: Caller,
     thread_id: String,
     call_id: String,
     approve: bool,
@@ -171,21 +127,6 @@ pub async fn coder_approve(
     remember_tool: Option<String>,
     remember_args: Option<serde_json::Value>,
 ) -> Result<(), String> {
-    let provider = service
-        .get_thread(&thread_id)
-        .await
-        .and_then(|t| t.llm_provider);
-    require_engine(&caller, provider.as_deref())?;
-    let is_claude_cli = provider.as_deref() == Some(CLAUDE_CLI_PROVIDER);
-    if is_claude_cli {
-        // The live hook relay is holding claude's tool call open for exactly
-        // this decision — resolve it directly on the in-flight run instead of
-        // `spawn_run`, which would cancel that very run (see
-        // `CoderService::decide_claude_cli_approval`).
-        return service
-            .decide_claude_cli_approval(&thread_id, &call_id, approve)
-            .await;
-    }
     service
         .prepare_approve(
             &thread_id,
@@ -207,20 +148,6 @@ pub async fn coder_approve(
         },
     );
     Ok(())
-}
-
-/// The live permission request a claude-cli thread's turn is currently
-/// blocked on, if any. The frontend calls this on thread load to
-/// reconstruct the approval banner after a reload — claude-cli's turn
-/// stays open mid-wait rather than returning, so (unlike the platform
-/// engine) nothing lands in the persisted transcript to infer it from
-/// (QA-119).
-#[portal_rpc_macro::rpc(cap = "coder")]
-pub async fn coder_get_claude_cli_pending(
-    service: State<'_, Arc<CoderService>>,
-    thread_id: String,
-) -> Result<Option<PendingApproval>, String> {
-    Ok(service.claude_cli_pending_for(&thread_id).await)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
@@ -375,7 +302,9 @@ pub fn coder_write_file(
 
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub fn coder_open_in_explorer(workspace_root: String, path: String) -> Result<(), String> {
-    portal_core::domains::projects::move_lock::ensure_unlocked(std::path::Path::new(&workspace_root))?;
+    portal_core::domains::projects::move_lock::ensure_unlocked(std::path::Path::new(
+        &workspace_root,
+    ))?;
     let root = PathBuf::from(&workspace_root);
     let joined = root.join(path);
 
@@ -501,14 +430,8 @@ pub async fn coder_submit_terminal_list(
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_multitask_spawn(
     service: State<'_, Arc<CoderService>>,
-    caller: Caller,
     request: MultitaskSpawnRequest,
 ) -> Result<Vec<CoderSubAgent>, String> {
-    let provider = service
-        .get_thread(&request.coordinator_thread_id)
-        .await
-        .and_then(|t| t.llm_provider);
-    require_engine(&caller, provider.as_deref())?;
     service.inner().multitask_spawn(request).await
 }
 
@@ -534,32 +457,4 @@ pub async fn coder_multitask_cleanup(
     request: MultitaskCleanupRequest,
 ) -> Result<Vec<CoderSubAgent>, String> {
     service.multitask_cleanup(request).await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn remote_coder_only_is_refused_claude_cli() {
-        let caller = Caller::remote(vec!["coder".to_string()]);
-        assert!(require_engine(&caller, Some(CLAUDE_CLI_PROVIDER)).is_err());
-    }
-
-    #[test]
-    fn remote_coder_only_is_allowed_any_other_provider() {
-        let caller = Caller::remote(vec!["coder".to_string()]);
-        assert!(require_engine(&caller, Some("anthropic")).is_ok());
-    }
-
-    #[test]
-    fn remote_coder_only_is_allowed_no_provider() {
-        let caller = Caller::remote(vec!["coder".to_string()]);
-        assert!(require_engine(&caller, None).is_ok());
-    }
-
-    #[test]
-    fn local_caller_is_allowed_claude_cli() {
-        assert!(require_engine(&Caller::local(), Some(CLAUDE_CLI_PROVIDER)).is_ok());
-    }
 }

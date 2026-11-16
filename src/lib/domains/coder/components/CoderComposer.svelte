@@ -68,11 +68,6 @@
 
     rows?: number;
 
-    /** Claude CLI engine: Claude runs its own loop, so the agent mode is ignored
-     *  and hidden. Permission mode still applies — it maps onto the CLI's
-     *  `--permission-mode` — so it stays visible either way. */
-    hideModes?: boolean;
-
     queuedMessages?: string[];
 
     onRemoveQueued?: (index: number) => void;
@@ -124,8 +119,6 @@
     llmUsage = null,
 
     rows = 2,
-
-    hideModes = false,
 
     queuedMessages = [],
 
@@ -216,7 +209,7 @@
   {rows}
   submitOn="modifier-enter"
   queueSend={true}
-  onModeCycle={hideModes ? undefined : cycleAgentMode}
+  onModeCycle={cycleAgentMode}
   class={className}
 >
   {#snippet above()}
@@ -328,24 +321,19 @@
   {/snippet}
 
   {#snippet trailing()}
-    <!-- Permission mode applies to both engines: the platform path gates its own
-         tools with it, and the Claude CLI path maps it onto `--permission-mode`.
-         Only the agent mode is platform-only. -->
     <CoderPermissionModeSelector
       mode={permissionMode}
       onModeChange={onPermissionModeChange}
-      inert={!hideModes && agentMode === 'ask'}
+      inert={agentMode === 'ask'}
       {disabled}
     />
 
-    {#if !hideModes}
-      <CoderAgentModeSelector
-        mode={agentMode}
-        {effectiveMode}
-        onModeChange={onAgentModeChange}
-        {disabled}
-      />
-    {/if}
+    <CoderAgentModeSelector
+      mode={agentMode}
+      {effectiveMode}
+      onModeChange={onAgentModeChange}
+      {disabled}
+    />
   {/snippet}
 
   {#snippet footer()}
@@ -367,9 +355,7 @@
           <span class="truncate">{workspaceName || 'This PC'}</span>
         </span>
 
-        <span class="truncate">
-          Ctrl+Enter · send{hideModes ? '' : ' · Shift+Tab · cycle mode'}
-        </span>
+        <span class="truncate"> Ctrl+Enter · send · Shift+Tab · cycle mode </span>
       </div>
 
       <AIContextBar variant="ring" {contextUsage} {llmUsage} />

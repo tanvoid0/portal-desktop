@@ -51,12 +51,8 @@
   let gitStats = $state<GitDiffStats | null>(null);
   let showCommitDialog = $state(false);
   let catalogError = $state<string | null>(null);
-  // The Claude CLI engine ignores model and agent/permission modes.
-  const isCli = $derived(coderSession.selectedBackendProvider === 'claude-cli');
   const tokenRejected = $derived(isAuthError(catalogError));
-  // The CLI engine talks to `claude` directly and never touches agent-platform,
-  // so a dead platform must not block it.
-  const platformBlocked = $derived(!isCli && aiPlatform.blocked);
+  const platformBlocked = $derived(aiPlatform.blocked);
 
   // Hand the action row to the AI layout's tab bar row — it has the width.
   $effect(() => {
@@ -91,8 +87,7 @@
   const pendingChangeCount = $derived(
     coderSession.changes.filter((c) => c.status === 'pending').length
   );
-  const blockedPlaceholder =
-    'Agent Platform is unavailable — switch to Claude Code (CLI) or fix it above';
+  const blockedPlaceholder = 'Agent Platform is unavailable — fix it above';
   const composerDisabled = $derived(!!pending || platformBlocked);
   const isEmpty = $derived(
     messages.filter((m) => m.role === 'user' || m.role === 'assistant').length === 0 &&
@@ -498,13 +493,10 @@
     onModelChange={(m) => coderSession.handleModelChange(m)}
     onBackendProviderChange={(p) => coderSession.handleBackendProviderChange(p)}
     modelSelectClass="w-[180px]"
-    showPlatformLabel={!isCli}
-    showModel={!isCli}
     showInlineError={false}
     onStatusChange={(s) => (catalogError = s.error)}
-    extraProviders={[{ value: 'claude-cli', label: 'Claude Code (CLI)' }]}
   />
-  {#if catalogError && !isCli && !platformBlocked}
+  {#if catalogError && !platformBlocked}
     <span class="text-xs font-medium text-destructive dark:text-red-400" title={catalogError}>
       {tokenRejected ? 'Agent Platform token rejected.' : 'Agent Platform unreachable.'}
       <a href={AI_PROVIDER_SETTINGS_PATH} class="underline">Settings &gt; AI</a>
@@ -700,9 +692,7 @@
       </div>
     </div>
 
-    {#if !isCli}
-      <PlatformStatusBanner blocks="Sending, retry and approvals" />
-    {/if}
+    <PlatformStatusBanner blocks="Sending, retry and approvals" />
 
     {#if multitaskMode && thread?.thread_kind === 'coordinator'}
       <CoderMultitaskBar
@@ -741,7 +731,6 @@
                   bind:value={input}
                   onSend={send}
                   rows={3}
-                  hideModes={isCli}
                   placeholder={platformBlocked
                     ? blockedPlaceholder
                     : multitaskMode
@@ -796,7 +785,6 @@
                 workspaceRoot={thread?.workspace_root ?? coderSession.workspaceRoot}
                 threadId={activeThreadId ?? undefined}
                 canEdit={canEditMessages}
-                showRemember={!isCli}
                 onEditMessage={(idx, text) => void coderSession.editMessage(idx, text)}
                 onRetry={platformBlocked ? undefined : () => coderSession.retry()}
                 decisionsDisabled={platformBlocked}
@@ -835,7 +823,6 @@
               {changesRevision}
               {contextUsage}
               {llmUsage}
-              hideModes={isCli}
               class="pt-0"
             />
           </div>

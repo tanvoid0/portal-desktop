@@ -125,11 +125,7 @@ pub const DEFAULT_CAPS: &[&str] = &[
 /// permission prompts it raises (arbitrary shell/file-write included) — same
 /// shape of risk as `terminal.exec`, so it gets the same opt-in treatment: a
 /// paired device can still be granted it, just never by leaving the approval
-/// dialog untouched. Also covers the coder domain's `claude-cli` engine
-/// (`CLAUDE_CLI_PROVIDER`) for the same reason: a coder thread running it is
-/// an agent-CLI subprocess too, so `coder/commands.rs::require_engine` gates
-/// the seven commands that drive one behind this cap on top of the plain
-/// `coder` one.
+/// dialog untouched.
 ///
 /// `remote.input` moves the mouse and types on the keyboard — a paired phone
 /// that holds it can do anything a person sitting at this PC could, so it
