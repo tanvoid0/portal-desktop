@@ -1,4 +1,4 @@
-export type { DeviceSummary } from '../generated';
+export type { CapabilityInfo, DeviceSummary } from '../generated';
 
 /** `approve_device`'s three grant lifetimes. */
 export type ApprovalType = 'temporary' | 'long_term' | 'until_revoked';

@@ -2,6 +2,7 @@ import { invokeClient } from '$lib/utils/invokeClient';
 import type {
   ApprovalType,
   ApproveDeviceResponse,
+  CapabilityInfo,
   DeviceSummary,
   PairingQrResponse,
   RemoteConnectivityStatus,
@@ -11,8 +12,8 @@ export function fetchDevices(): Promise<DeviceSummary[]> {
   return invokeClient.post<DeviceSummary[]>('list_devices');
 }
 
-export function fetchRemoteCapabilities(): Promise<string[]> {
-  return invokeClient.post<string[]>('remote_list_capabilities');
+export function fetchRemoteCapabilities(): Promise<CapabilityInfo[]> {
+  return invokeClient.post<CapabilityInfo[]>('remote_list_capabilities');
 }
 
 export function fetchLanEnabled(): Promise<boolean> {

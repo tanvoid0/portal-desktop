@@ -52,9 +52,10 @@
   import SidebarTooltip from '$lib/components/shell/sidebar-tooltip.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
   import { buildMainNavSections } from '$lib/config/main-nav';
-  import { AGENTS_BASE } from '$lib/config/agents-tabs';
+  import { agentTabPath } from '$lib/config/agents-tabs';
   import { agentRuns } from '$lib/domains/agents/state/agentRuns.svelte.js';
   import AgentApprovalStack from '$lib/domains/agents/components/AgentApprovalStack.svelte';
+  import type { PipelineExecution } from '$lib/domains/projects/pipelines';
   import { isMobileShell } from '$lib/domains/mobile/shell';
   import { mobileConnection } from '$lib/domains/mobile/connection.svelte';
   import { filterNavForCaps } from '$lib/domains/mobile/navCaps';
@@ -102,6 +103,10 @@
   let unlistenPairing: UnlistenFn | undefined;
   let unlistenNotify: (() => void) | undefined;
   let unlistenAgentEvents: UnlistenFn | undefined;
+  let unlistenPipelineEvents: UnlistenFn | undefined;
+  // One notification per execution per terminal status — the backend emits
+  // this event on every step tick, not just on success/failed.
+  const notifiedExecutions = new Set<string>();
 
   // Browser navigation state
   let canGoBack = $state(false);
@@ -209,16 +214,18 @@
         });
 
       // Native banner when unfocused + always-on toast for turn/permission/exit
-      // events from any running agent — see domains/agents/service.rs.
-      // Mobile: no notification plugin / window APIs (toasts only).
-      if (!isMobileShell)
-        initNotify().then((fn) => {
-          unlistenNotify = fn;
-        });
+      // events from any running agent — see domains/agents/service.rs. On
+      // mobile the backend posts the native notification itself
+      // (Mobile::notify in mobile/src-tauri/src/lib.rs) — initNotify() here
+      // only wires tap-to-navigate, via the plugin's cross-platform onAction
+      // event (#641).
+      initNotify().then((fn) => {
+        unlistenNotify = fn;
+      });
       void agentRuns.ensureInit();
       agentsApi
         .onEvent(({ run_id, event }) => {
-          const route = `${AGENTS_BASE}?session=${run_id}`;
+          const route = `${agentTabPath()}?session=${run_id}`;
           if (event.type === 'turn_done' && !event.is_error) {
             // Errored turns are reported by the `exited` branch below instead —
             // skip here so the user doesn't see "finished" then "failed".
@@ -242,6 +249,23 @@
         .then((fn) => {
           unlistenAgentEvents = fn;
         });
+
+      // Toast when a pipeline run finishes — same event the execution monitor
+      // listens to, so this reaches desktop and a phone that's in the foreground.
+      listen<PipelineExecution>('pipeline-execution-update', (event) => {
+        const execution = event.payload;
+        if (execution.status !== 'success' && execution.status !== 'failed') return;
+        if (notifiedExecutions.has(execution.id)) return;
+        notifiedExecutions.add(execution.id);
+        notify({
+          title: execution.status === 'success' ? 'Pipeline run finished' : 'Pipeline run failed',
+          body: execution.error,
+          type: execution.status === 'failed' ? 'error' : undefined,
+          route: `/pipeline-runs?run=${execution.id}`,
+        });
+      }).then((fn) => {
+        unlistenPipelineEvents = fn;
+      });
 
       // Initialize theme first (now synchronous)
       themeStore.initialize();
@@ -296,6 +320,7 @@
     unlistenPairing?.();
     unlistenNotify?.();
     unlistenAgentEvents?.();
+    unlistenPipelineEvents?.();
   });
 </script>
 

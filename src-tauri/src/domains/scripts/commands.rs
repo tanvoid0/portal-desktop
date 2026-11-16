@@ -37,6 +37,8 @@ pub struct ExecuteScriptParams {
     pub parameters: Option<HashMap<String, String>>,
     pub working_directory: Option<String>,
     pub env: Option<HashMap<String, String>>,
+    /// "user" when omitted; an MCP client passes e.g. "mcp:claude".
+    pub triggered_by: Option<String>,
 }
 
 /// Execute a script
@@ -54,6 +56,7 @@ pub async fn execute_script(
         parameters: params.parameters.unwrap_or_default(),
         working_directory: params.working_directory,
         env: params.env,
+        triggered_by: params.triggered_by,
     };
 
     service.execute_script(request).await

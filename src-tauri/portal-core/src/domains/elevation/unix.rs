@@ -19,7 +19,8 @@ pub fn run_elevated(exe: &str, args: &[String]) -> Result<ElevatedRunResult, Str
 }
 
 pub fn restart_elevated() -> Result<(), String> {
-    let exe = std::env::current_exe().map_err(|e| format!("Failed to resolve current exe: {}", e))?;
+    let exe =
+        std::env::current_exe().map_err(|e| format!("Failed to resolve current exe: {}", e))?;
     let args: Vec<String> = std::env::args().skip(1).collect();
     run(&exe.to_string_lossy(), &args, true).map(|_| ())
 }

@@ -5,6 +5,7 @@
   import { Label } from '$lib/components/ui/label';
   import Select from '$lib/components/ui/select.svelte';
   import ProjectCombobox from '$lib/domains/projects/components/ProjectCombobox.svelte';
+  import { hasBackendChoice } from '../utils/backends.js';
   import type { BackendInfo } from '../generated';
 
   const CWD_STORAGE_KEY = 'portal-agents-last-cwd';
@@ -34,6 +35,7 @@
 
   const backendOptions = $derived(backends.map((b) => ({ value: b.id, label: b.display_name })));
   const selected = $derived(backends.find((b) => b.id === backendId));
+  const showPicker = $derived(hasBackendChoice(backends));
   const canStart = $derived(!busy && !!backendId && cwd.trim() !== '' && prompt.trim() !== '');
 
   function submit() {
@@ -43,21 +45,23 @@
 </script>
 
 <div class="mx-auto flex w-full max-w-xl flex-col gap-3 p-4">
-  <div class="grid gap-1.5">
-    <Label for="agent-backend">Agent</Label>
-    <Select
-      id="agent-backend"
-      options={backendOptions}
-      value={backendId}
-      onValueChange={(v) => (backendId = v)}
-      placeholder="Select an agent"
-    />
-    {#if selected && !selected.available}
-      <p class="text-xs text-destructive">
-        {selected.display_name} wasn't found on PATH — install it to run this.
-      </p>
-    {/if}
-  </div>
+  {#if showPicker}
+    <div class="grid gap-1.5">
+      <Label for="agent-backend">Agent</Label>
+      <Select
+        id="agent-backend"
+        options={backendOptions}
+        value={backendId}
+        onValueChange={(v) => (backendId = v)}
+        placeholder="Select an agent"
+      />
+    </div>
+  {/if}
+  {#if selected && !selected.available}
+    <p class="text-xs text-destructive">
+      {selected.display_name} wasn't found on PATH — install it to run this.
+    </p>
+  {/if}
 
   <div class="grid gap-1.5">
     <Label>Working directory</Label>

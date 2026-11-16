@@ -1,4 +1,5 @@
 import { goto } from '$app/navigation';
+import { agentTabPath } from '$lib/config/agents-tabs';
 import { agentRuns } from '../state/agentRuns.svelte.js';
 
 export interface OpenAgentsSessionOptions {
@@ -15,10 +16,10 @@ export interface OpenAgentsSessionOptions {
  */
 export function openAgentsSession(opts: OpenAgentsSessionOptions): void {
   agentRuns.pendingLaunch = opts;
-  void goto('/ai/agents');
+  void goto(agentTabPath());
 }
 
 /** Jumps straight to an existing session. */
 export function openAgentsSessionById(id: string): void {
-  void goto('/ai/agents?session=' + encodeURIComponent(id));
+  void goto(agentTabPath() + '?session=' + encodeURIComponent(id));
 }

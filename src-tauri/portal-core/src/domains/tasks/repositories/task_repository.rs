@@ -378,7 +378,10 @@ mod tests {
     async fn completed_at_tracks_the_transition_not_every_update() {
         let (repo, _dir) = repo().await;
         let task = repo.create(new_task("pending")).await.expect("create");
-        assert!(task.completed_at.is_none(), "pending task has no completed_at");
+        assert!(
+            task.completed_at.is_none(),
+            "pending task has no completed_at"
+        );
 
         // Into completed: stamped.
         let done = repo

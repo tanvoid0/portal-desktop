@@ -247,7 +247,10 @@ impl ProjectEnvService {
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
         move_lock::ensure_unlocked(Path::new(&project.path))?;
-        let credential = self.credentials.get_credential(&model.credential_id).await?;
+        let credential = self
+            .credentials
+            .get_credential(&model.credential_id)
+            .await?;
         let current_value = current_file_value(&project.path, &model.file_name, &model.env_key);
 
         let mut active: ActiveModel = model.into();
@@ -264,7 +267,10 @@ impl ProjectEnvService {
         model: &Model,
         current_value: Option<&str>,
     ) -> Result<EnvLinkView, String> {
-        let credential = self.credentials.get_credential(&model.credential_id).await?;
+        let credential = self
+            .credentials
+            .get_credential(&model.credential_id)
+            .await?;
         let current_hash = current_value.map(hash_value);
         // Any decrypt failure on this one link (locked vault, corrupt ciphertext, whatever)
         // is "can't compare" for this link, not a reason to fail the whole env tab.

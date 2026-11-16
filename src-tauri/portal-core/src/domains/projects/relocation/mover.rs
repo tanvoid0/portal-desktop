@@ -202,7 +202,13 @@ pub struct Mover<'a> {
 }
 
 impl Mover<'_> {
-    async fn usage(&self, source: &Path, dest: &Path, dev: Option<u16>, prod: Option<u16>) -> UsageReport {
+    async fn usage(
+        &self,
+        source: &Path,
+        dest: &Path,
+        dev: Option<u16>,
+        prod: Option<u16>,
+    ) -> UsageReport {
         usage::check(
             source,
             dest,
@@ -249,13 +255,19 @@ impl Mover<'_> {
         let _guard = LockGuard::new(vec![source.clone(), dest.clone()]);
 
         let report = self
-            .usage(&source, &dest, port(project.dev_port), port(project.prod_port))
+            .usage(
+                &source,
+                &dest,
+                port(project.dev_port),
+                port(project.prod_port),
+            )
             .await;
         if !report.blockers.is_empty() || (!acknowledge_warnings && !report.warnings.is_empty()) {
             return Err(MoveError::Blocked(report));
         }
 
-        let (entries, skipped) = build_manifest(&source, include_regenerable).map_err(MoveError::Failed)?;
+        let (entries, skipped) =
+            build_manifest(&source, include_regenerable).map_err(MoveError::Failed)?;
 
         // #217: deny-write hold on the move set, held through the copy below.
         // Needs the file list, so it can't come before the walk above — but it
@@ -268,7 +280,8 @@ impl Mover<'_> {
         let manifest_path = self.moves_dir.join(format!("{id}.manifest.json"));
         let progress_path = self.moves_dir.join(format!("{id}.progress.jsonl"));
 
-        fs::create_dir_all(&self.moves_dir).map_err(|e| MoveError::Failed(format!("create moves dir: {e}")))?;
+        fs::create_dir_all(&self.moves_dir)
+            .map_err(|e| MoveError::Failed(format!("create moves dir: {e}")))?;
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: skipped,
@@ -276,9 +289,11 @@ impl Mover<'_> {
         };
         let manifest_sha = write_manifest(&manifest_path, &manifest).map_err(MoveError::Failed)?;
 
-        fs::create_dir_all(&staging).map_err(|e| MoveError::Failed(format!("create staging: {e}")))?;
+        fs::create_dir_all(&staging)
+            .map_err(|e| MoveError::Failed(format!("create staging: {e}")))?;
         write_sidecar(&staging, &id).map_err(MoveError::Failed)?;
-        fs::File::create(&progress_path).map_err(|e| MoveError::Failed(format!("create progress log: {e}")))?;
+        fs::File::create(&progress_path)
+            .map_err(|e| MoveError::Failed(format!("create progress log: {e}")))?;
 
         let total_bytes: i64 = manifest.entries.iter().map(|e| e.len as i64).sum();
         let now = now();
@@ -290,7 +305,9 @@ impl Mover<'_> {
             staging_path: Set(staging.to_string_lossy().into_owned()),
             state: Set("copying".into()),
             include_regenerable: Set(include_regenerable),
-            skipped_dirs: Set(serde_json::to_string(&manifest.skipped_dirs).unwrap_or_else(|_| "[]".into())),
+            skipped_dirs: Set(
+                serde_json::to_string(&manifest.skipped_dirs).unwrap_or_else(|_| "[]".into())
+            ),
             manifest_path: Set(Some(manifest_path.to_string_lossy().into_owned())),
             manifest_sha256: Set(Some(manifest_sha)),
             manifest_version: Set(Some(MANIFEST_VERSION)),
@@ -317,7 +334,9 @@ impl Mover<'_> {
                         .one(self.db.get_connection())
                         .await
                         .map_err(|e| MoveError::Failed(format!("journal move: verify: {e}")))?
-                        .ok_or_else(|| MoveError::Failed(format!("journal move: inserted row {id} not found")))?
+                        .ok_or_else(|| {
+                            MoveError::Failed(format!("journal move: inserted row {id} not found"))
+                        })?
                 } else {
                     return Err(MoveError::Failed(format!("journal move: {e}")));
                 }
@@ -343,9 +362,14 @@ impl Mover<'_> {
         move_id: &str,
         on_progress: ProgressFn<'_>,
     ) -> Result<project_move::Model, MoveError> {
-        let row = load_row(self.db, move_id).await.map_err(MoveError::Failed)?;
+        let row = load_row(self.db, move_id)
+            .await
+            .map_err(MoveError::Failed)?;
         if !matches!(row.state.as_str(), "copying" | "verifying") {
-            return Err(MoveError::Failed(format!("move is {}, not resumable", row.state)));
+            return Err(MoveError::Failed(format!(
+                "move is {}, not resumable",
+                row.state
+            )));
         }
         let source = PathBuf::from(&row.source_path);
         let staging = PathBuf::from(&row.staging_path);
@@ -355,7 +379,10 @@ impl Mover<'_> {
         // would trip the start-only preconditions.
         let blockers = self.in_use(&source).await;
         if !blockers.is_empty() {
-            return Err(MoveError::Blocked(UsageReport { blockers, warnings: vec![] }));
+            return Err(MoveError::Blocked(UsageReport {
+                blockers,
+                warnings: vec![],
+            }));
         }
 
         let manifest = read_validated_manifest(&row).map_err(MoveError::Failed)?;
@@ -451,7 +478,8 @@ impl Mover<'_> {
             .map_err(|e| format!("promote {} -> {}: {e}", staging.display(), dest.display()))?;
 
         // ── Commit ── repoint the moved project (and any nested ones) to dest.
-        self.commit(&row.id, &row.source_path, &row.dest_path).await?;
+        self.commit(&row.id, &row.source_path, &row.dest_path)
+            .await?;
 
         // The marker has done its job; a committed/done move needs no recovery.
         let _ = fs::remove_file(dest.join(SIDECAR));
@@ -493,7 +521,9 @@ impl Mover<'_> {
             if let Some(new_path) = rebased_path(&p.path, source, dest) {
                 let mut am: project_entity::ActiveModel = p.into();
                 am.path = Set(new_path);
-                am.update(&txn).await.map_err(|e| format!("rebase project path: {e}"))?;
+                am.update(&txn)
+                    .await
+                    .map_err(|e| format!("rebase project path: {e}"))?;
             }
         }
 
@@ -513,16 +543,28 @@ impl Mover<'_> {
     /// Best-effort throughout: nothing here may fail an already-committed move.
     async fn rewrite_configs(&self, move_id: &str, source: &Path, dest: &Path) {
         let dest_s = dest.to_string_lossy();
-        let projects = match project_entity::Entity::find().all(self.db.get_connection()).await {
+        let projects = match project_entity::Entity::find()
+            .all(self.db.get_connection())
+            .await
+        {
             Ok(p) => p,
             Err(_) => return,
         };
-        let project_ids = projects.into_iter().filter(|p| is_under(&p.path, &dest_s)).map(|p| p.id);
+        let project_ids = projects
+            .into_iter()
+            .filter(|p| is_under(&p.path, &dest_s))
+            .map(|p| p.id);
 
         let mut flagged = Vec::new();
         for project_id in project_ids {
-            flagged.extend(self.deployment_service.rebase_paths(&project_id.to_string(), source, dest).await);
-            if let Ok(f) = rebase_pipeline_paths(self.pipelines_repo, project_id, source, dest).await {
+            flagged.extend(
+                self.deployment_service
+                    .rebase_paths(&project_id.to_string(), source, dest)
+                    .await,
+            );
+            if let Ok(f) =
+                rebase_pipeline_paths(self.pipelines_repo, project_id, source, dest).await
+            {
                 flagged.extend(f);
             }
         }
@@ -534,7 +576,9 @@ impl Mover<'_> {
     /// destination is a byte-for-byte copy, then sends the source to the
     /// Recycle Bin. Refuses on any mismatch.
     pub async fn remove_moved_source(&self, move_id: &str) -> Result<(), MoveError> {
-        let row = load_row(self.db, move_id).await.map_err(MoveError::Failed)?;
+        let row = load_row(self.db, move_id)
+            .await
+            .map_err(MoveError::Failed)?;
         if !matches!(row.state.as_str(), "committed" | "done") {
             return Err(MoveError::Failed(format!(
                 "move is {}, not committed — refusing to delete the source",
@@ -547,7 +591,10 @@ impl Mover<'_> {
 
         let blockers = self.in_use(&source).await;
         if !blockers.is_empty() {
-            return Err(MoveError::Blocked(UsageReport { blockers, warnings: vec![] }));
+            return Err(MoveError::Blocked(UsageReport {
+                blockers,
+                warnings: vec![],
+            }));
         }
 
         let manifest = read_validated_manifest(&row).map_err(MoveError::Failed)?;
@@ -581,7 +628,9 @@ impl Mover<'_> {
     /// `#206` routes recovery here. Refuses a `verified` move when neither the
     /// destination nor the staging copy is this move's — roll back instead.
     pub async fn finish_move(&self, move_id: &str) -> Result<project_move::Model, MoveError> {
-        let row = load_row(self.db, move_id).await.map_err(MoveError::Failed)?;
+        let row = load_row(self.db, move_id)
+            .await
+            .map_err(MoveError::Failed)?;
         let dest = PathBuf::from(&row.dest_path);
         let _guard = LockGuard::new(vec![PathBuf::from(&row.source_path), dest.clone()]);
 
@@ -621,8 +670,11 @@ impl Mover<'_> {
             .map_err(MoveError::Failed)?;
         let _ = fs::remove_file(dest.join(SIDECAR));
         // #221: same config rewrite seam as run_move.
-        self.rewrite_configs(&row.id, Path::new(&row.source_path), &dest).await;
-        update_done(self.db, &row.id).await.map_err(MoveError::Failed)?;
+        self.rewrite_configs(&row.id, Path::new(&row.source_path), &dest)
+            .await;
+        update_done(self.db, &row.id)
+            .await
+            .map_err(MoveError::Failed)?;
         load_row(self.db, &row.id).await.map_err(MoveError::Failed)
     }
 
@@ -653,7 +705,9 @@ impl Mover<'_> {
         // than abort the move and strand an orphaned staging tree on a drive
         // that will come back (board #206: destination drive absent → retry).
         if !volume_present(&dest) {
-            return Err("destination drive not available — reconnect it and retry the rollback".into());
+            return Err(
+                "destination drive not available — reconnect it and retry the rollback".into(),
+            );
         }
         let staging = PathBuf::from(&row.staging_path);
         if staging.exists() {
@@ -743,7 +797,11 @@ pub fn preflight_walk(source: &Path, include_regenerable: bool) -> Result<Prefli
             (rel, bytes)
         })
         .collect();
-    Ok(PreflightWalk { file_count, total_bytes, skipped })
+    Ok(PreflightWalk {
+        file_count,
+        total_bytes,
+        skipped,
+    })
 }
 
 /// Total size of every file under `dir` — used only to report a skipped dir's
@@ -769,10 +827,19 @@ fn dir_size(dir: &Path) -> u64 {
 /// ponytail: empty directories aren't recorded, so a move won't recreate one
 /// that held no files. Add dir entries to the manifest if a project depends on
 /// an empty dir existing; files are the norm and preserving them is the point.
-fn build_manifest(source: &Path, include_regenerable: bool) -> Result<(Vec<ManifestEntry>, Vec<String>), String> {
+fn build_manifest(
+    source: &Path,
+    include_regenerable: bool,
+) -> Result<(Vec<ManifestEntry>, Vec<String>), String> {
     let mut entries = Vec::new();
     let mut skipped = Vec::new();
-    walk(source, source, include_regenerable, &mut entries, &mut skipped)?;
+    walk(
+        source,
+        source,
+        include_regenerable,
+        &mut entries,
+        &mut skipped,
+    )?;
     entries.sort_by(|a, b| a.rel.cmp(&b.rel));
     skipped.sort();
     Ok((entries, skipped))
@@ -807,7 +874,10 @@ fn walk(
         if ft.is_dir() {
             let name = entry.file_name().to_string_lossy().into_owned();
             let rel = rel_path(root, &path);
-            if !include_regenerable && REGENERABLE.contains(&name.as_str()) && is_git_ignored(root, &rel) {
+            if !include_regenerable
+                && REGENERABLE.contains(&name.as_str())
+                && is_git_ignored(root, &rel)
+            {
                 skipped.push(rel);
                 continue;
             }
@@ -909,7 +979,8 @@ fn plan_copies(
             bytes_done += e.len;
         } else {
             if st.exists() {
-                fs::remove_file(&st).map_err(|err| format!("drop stale staging {}: {err}", st.display()))?;
+                fs::remove_file(&st)
+                    .map_err(|err| format!("drop stale staging {}: {err}", st.display()))?;
             }
             to_copy.push(i);
         }
@@ -925,21 +996,23 @@ fn copy_entry(source: &Path, staging: &Path, e: &ManifestEntry) -> Result<String
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent).map_err(|err| format!("create {}: {err}", parent.display()))?;
     }
-    fs::copy(&src, &dst).map_err(|err| format!("copy {} -> {}: {err}", src.display(), dst.display()))?;
+    fs::copy(&src, &dst)
+        .map_err(|err| format!("copy {} -> {}: {err}", src.display(), dst.display()))?;
 
-    // fs::copy (CopyFileExW) carries the source's ReadOnly attribute onto dst
-    // on Windows, so reopening it below for fsync fails with "Access is
-    // denied" for any read-only source (e.g. git's pack/idx files). Clear it
-    // first, then restore it so the staged copy ends up matching the source's
-    // real mode. Unix permission bits don't carry the same way through
-    // fs::copy, so this is a no-op there.
-    #[cfg(windows)]
+    // fs::copy carries the source's permissions onto dst (the ReadOnly
+    // attribute on Windows, the mode bits on Unix), so reopening it below for
+    // write fails for any read-only source (e.g. git's pack/idx files). Clear
+    // it first, then restore it so the staged copy ends up matching the
+    // source's real mode.
     let dst_perms = {
-        let perms = fs::metadata(&dst).map_err(|err| format!("stat {}: {err}", dst.display()))?.permissions();
+        let perms = fs::metadata(&dst)
+            .map_err(|err| format!("stat {}: {err}", dst.display()))?
+            .permissions();
         if perms.readonly() {
             let mut writable = perms.clone();
             writable.set_readonly(false);
-            fs::set_permissions(&dst, writable).map_err(|err| format!("clear readonly {}: {err}", dst.display()))?;
+            fs::set_permissions(&dst, writable)
+                .map_err(|err| format!("clear readonly {}: {err}", dst.display()))?;
         }
         perms
     };
@@ -952,8 +1025,8 @@ fn copy_entry(source: &Path, staging: &Path, e: &ManifestEntry) -> Result<String
         .and_then(|f| f.sync_all())
         .map_err(|err| format!("fsync {}: {err}", dst.display()))?;
 
-    #[cfg(windows)]
-    fs::set_permissions(&dst, dst_perms).map_err(|err| format!("restore permissions {}: {err}", dst.display()))?;
+    fs::set_permissions(&dst, dst_perms)
+        .map_err(|err| format!("restore permissions {}: {err}", dst.display()))?;
 
     let src_h = hash_file(&src)?;
     let dst_h = hash_file(&dst)?;
@@ -1011,7 +1084,9 @@ fn can_resume(
 fn resume_source_hashes_ok(source: &Path, logged: &HashMap<String, String>) -> Result<(), String> {
     for (rel, sha) in logged {
         if &hash_file(&os_join(source, rel))? != sha {
-            return Err(format!("source file {rel} changed since it was copied — roll back"));
+            return Err(format!(
+                "source file {rel} changed since it was copied — roll back"
+            ));
         }
     }
     Ok(())
@@ -1038,7 +1113,9 @@ fn resume_structural_ok(
     let known: HashSet<&str> = manifest.entries.iter().map(|e| e.rel.as_str()).collect();
     for rel in list_rel_files(staging)? {
         if rel != SIDECAR && !known.contains(rel.as_str()) {
-            return Err(format!("staging holds an unexpected file {rel} — roll back"));
+            return Err(format!(
+                "staging holds an unexpected file {rel} — roll back"
+            ));
         }
     }
     Ok(())
@@ -1129,7 +1206,10 @@ fn never_started(row: &project_move::Model) -> bool {
 /// Remove a never-started move's staging tree (only when its sidecar is this
 /// move's, or it was never marked) and mark the move aborted. Never touches the
 /// source. Boot-recovery only, for a [`never_started`] row.
-async fn abort_never_started(db: &DatabaseManager, row: &project_move::Model) -> Result<(), String> {
+async fn abort_never_started(
+    db: &DatabaseManager,
+    row: &project_move::Model,
+) -> Result<(), String> {
     let staging = PathBuf::from(&row.staging_path);
     if staging.exists() {
         match read_sidecar(&staging) {
@@ -1187,7 +1267,12 @@ pub fn recovery_options(row: &project_move::Model) -> RecoveryStatus {
         "committed" => (vec![], Some("already committed — nothing to recover".into())),
         other => (vec![], Some(format!("state {other} is not an interrupted move"))),
     };
-    RecoveryStatus { id: row.id.clone(), state: row.state.clone(), actions, note }
+    RecoveryStatus {
+        id: row.id.clone(),
+        state: row.state.clone(),
+        actions,
+        note,
+    }
 }
 
 /// `None` if resume looks safe on the cheap (structural) checks, else why it is
@@ -1228,7 +1313,9 @@ fn hash_file(path: &Path) -> Result<String, String> {
     let mut hasher = Sha256::new();
     let mut buf = [0u8; BUF];
     loop {
-        let n = file.read(&mut buf).map_err(|e| format!("read {}: {e}", path.display()))?;
+        let n = file
+            .read(&mut buf)
+            .map_err(|e| format!("read {}: {e}", path.display()))?;
         if n == 0 {
             break;
         }
@@ -1246,19 +1333,27 @@ fn sha256_bytes(bytes: &[u8]) -> String {
 fn write_manifest(path: &Path, manifest: &Manifest) -> Result<String, String> {
     let bytes = serde_json::to_vec(manifest).map_err(|e| format!("serialize manifest: {e}"))?;
     let mut f = fs::File::create(path).map_err(|e| format!("create manifest: {e}"))?;
-    f.write_all(&bytes).map_err(|e| format!("write manifest: {e}"))?;
+    f.write_all(&bytes)
+        .map_err(|e| format!("write manifest: {e}"))?;
     f.sync_all().map_err(|e| format!("fsync manifest: {e}"))?;
     Ok(sha256_bytes(&bytes))
 }
 
 fn read_validated_manifest(row: &project_move::Model) -> Result<Manifest, String> {
-    let path = row.manifest_path.as_deref().ok_or("move has no manifest path")?;
-    let expected = row.manifest_sha256.as_deref().ok_or("move has no manifest hash")?;
+    let path = row
+        .manifest_path
+        .as_deref()
+        .ok_or("move has no manifest path")?;
+    let expected = row
+        .manifest_sha256
+        .as_deref()
+        .ok_or("move has no manifest hash")?;
     let bytes = fs::read(path).map_err(|e| format!("read manifest {path}: {e}"))?;
     if sha256_bytes(&bytes) != expected {
         return Err("manifest hash mismatch — roll back".into());
     }
-    let manifest: Manifest = serde_json::from_slice(&bytes).map_err(|e| format!("parse manifest: {e}"))?;
+    let manifest: Manifest =
+        serde_json::from_slice(&bytes).map_err(|e| format!("parse manifest: {e}"))?;
     if manifest.version != MANIFEST_VERSION {
         return Err(format!(
             "manifest version {} is not {MANIFEST_VERSION} — roll back",
@@ -1279,9 +1374,11 @@ fn append_progress(path: &Path, rel: &str, sha: &str) -> Result<(), String> {
         .append(true)
         .open(path)
         .map_err(|e| format!("open progress log: {e}"))?;
-    f.write_all(line.as_bytes()).and_then(|_| f.write_all(b"\n"))
+    f.write_all(line.as_bytes())
+        .and_then(|_| f.write_all(b"\n"))
         .map_err(|e| format!("write progress log: {e}"))?;
-    f.sync_all().map_err(|e| format!("fsync progress log: {e}"))?;
+    f.sync_all()
+        .map_err(|e| format!("fsync progress log: {e}"))?;
     Ok(())
 }
 
@@ -1310,7 +1407,9 @@ fn write_sidecar(staging: &Path, id: &str) -> Result<(), String> {
 }
 
 fn read_sidecar(staging: &Path) -> Option<String> {
-    fs::read_to_string(staging.join(SIDECAR)).ok().map(|s| s.trim().to_string())
+    fs::read_to_string(staging.join(SIDECAR))
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 fn remove_staging(staging: &Path) -> Result<(), String> {
@@ -1361,7 +1460,12 @@ async fn update_state(db: &DatabaseManager, id: &str, state: &str) -> Result<(),
     .map_err(|e| format!("set move state {state}: {e}"))
 }
 
-async fn update_counts(db: &DatabaseManager, id: &str, files_done: u64, bytes_done: u64) -> Result<(), String> {
+async fn update_counts(
+    db: &DatabaseManager,
+    id: &str,
+    files_done: u64,
+    bytes_done: u64,
+) -> Result<(), String> {
     project_move::ActiveModel {
         id: Set(id.to_string()),
         files_done: Set(files_done as i32),
@@ -1533,11 +1637,14 @@ async fn rebase_pipeline_paths(
     let dest_s = dest.to_string_lossy();
     let mut flagged = Vec::new();
     for p in repo.get_all_by_project(project_id).await? {
-        if json_text_holds_path(&p.steps_json, &source_s) || json_text_holds_path(&p.variables_json, &source_s) {
+        if json_text_holds_path(&p.steps_json, &source_s)
+            || json_text_holds_path(&p.variables_json, &source_s)
+        {
             flagged.push(p.id.to_string());
         }
 
-        let Ok(mut ctx) = serde_json::from_str::<serde_json::Value>(&p.execution_context_json) else {
+        let Ok(mut ctx) = serde_json::from_str::<serde_json::Value>(&p.execution_context_json)
+        else {
             continue;
         };
         let Some(obj) = ctx.as_object_mut() else {
@@ -1561,7 +1668,18 @@ async fn rebase_pipeline_paths(
             // rewrite — the move is already committed by the time this runs.
             let ok = match serde_json::to_string(&ctx) {
                 Ok(json) => repo
-                    .update(p.id, None, None, None, None, None, Some(json), None, None, None)
+                    .update(
+                        p.id,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(json),
+                        None,
+                        None,
+                        None,
+                    )
                     .await
                     .is_ok(),
                 Err(_) => false,
@@ -1587,7 +1705,10 @@ fn json_text_holds_path(haystack: &str, needle: &str) -> bool {
 }
 
 fn same_set(a: &[ManifestEntry], b: &[ManifestEntry]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.rel == y.rel && x.len == y.len)
+    a.len() == b.len()
+        && a.iter()
+            .zip(b)
+            .all(|(x, y)| x.rel == y.rel && x.len == y.len)
 }
 
 fn file_len(p: &Path) -> Option<u64> {
@@ -1665,7 +1786,10 @@ mod tests {
         write(&dir.path().join("src/main.rs"), "y");
         // Pruned deterministically from the captured set — no git involved.
         let pruned = rewalk(dir.path(), &["node_modules".to_string()]).unwrap();
-        assert_eq!(pruned.iter().map(|e| e.rel.as_str()).collect::<Vec<_>>(), vec!["src/main.rs"]);
+        assert_eq!(
+            pruned.iter().map(|e| e.rel.as_str()).collect::<Vec<_>>(),
+            vec!["src/main.rs"]
+        );
         // Empty skip set walks everything.
         let full = rewalk(dir.path(), &[]).unwrap();
         assert_eq!(full.len(), 2);
@@ -1682,7 +1806,11 @@ mod tests {
         for e in &entries {
             copy_entry(src.path(), stg.path(), e).unwrap();
         }
-        let manifest = Manifest { version: MANIFEST_VERSION, skipped_dirs: skipped, entries };
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            skipped_dirs: skipped,
+            entries,
+        };
         final_verify(src.path(), stg.path(), &manifest).unwrap();
 
         // Tampered destination: verify must catch it (it re-hashes dest vs src).
@@ -1717,7 +1845,11 @@ mod tests {
         write(&src.path().join("a.txt"), "alpha");
         let (entries, skipped) = build_manifest(src.path(), false).unwrap();
         copy_entry(src.path(), stg.path(), &entries[0]).unwrap();
-        let manifest = Manifest { version: MANIFEST_VERSION, skipped_dirs: skipped, entries };
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            skipped_dirs: skipped,
+            entries,
+        };
         // A file appears in the source mid-move.
         write(&src.path().join("new.txt"), "surprise");
         assert!(final_verify(src.path(), stg.path(), &manifest).is_err());
@@ -1760,7 +1892,11 @@ mod tests {
         let stg = tempdir().unwrap();
         write(&src.path().join("a.txt"), "original");
         let (entries, _) = build_manifest(src.path(), false).unwrap();
-        let manifest = Manifest { version: MANIFEST_VERSION, skipped_dirs: vec![], entries };
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            skipped_dirs: vec![],
+            entries,
+        };
         write_sidecar(stg.path(), "move-1").unwrap();
 
         let sha = hash_file(&src.path().join("a.txt")).unwrap();
@@ -1782,10 +1918,14 @@ mod tests {
         let stg = tempdir().unwrap();
         write(&src.path().join("a.txt"), "x");
         let (entries, _) = build_manifest(src.path(), false).unwrap();
-        let manifest = Manifest { version: MANIFEST_VERSION, skipped_dirs: vec![], entries };
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            skipped_dirs: vec![],
+            entries,
+        };
         write_sidecar(stg.path(), "some-other-move").unwrap();
-        let err = can_resume("move-1", src.path(), stg.path(), &manifest, &HashMap::new())
-            .unwrap_err();
+        let err =
+            can_resume("move-1", src.path(), stg.path(), &manifest, &HashMap::new()).unwrap_err();
         assert!(err.contains("roll back"));
     }
 
@@ -1799,10 +1939,19 @@ mod tests {
         // Nested registered project keeps its tail (and tail case).
         assert_eq!(
             rebased_path(r"D:\old\proj\Pkg\api", r"D:\old\proj", r"E:\new\proj"),
-            Some(PathBuf::from(r"E:\new\proj").join("Pkg").join("api").to_string_lossy().into_owned())
+            Some(
+                PathBuf::from(r"E:\new\proj")
+                    .join("Pkg")
+                    .join("api")
+                    .to_string_lossy()
+                    .into_owned()
+            )
         );
         // A sibling sharing a prefix is not rebased.
-        assert_eq!(rebased_path(r"D:\old\project2", r"D:\old\proj", r"E:\new\proj"), None);
+        assert_eq!(
+            rebased_path(r"D:\old\project2", r"D:\old\proj", r"E:\new\proj"),
+            None
+        );
     }
 
     #[test]
@@ -1853,25 +2002,45 @@ mod tests {
         let staging = dir.path().join("staging");
 
         // copying, but no manifest on the row → resume refused, rollback only.
-        let r = recovery_options(&mv("m1", "copying", dir.path().to_str().unwrap(), dest.to_str().unwrap(), staging.to_str().unwrap()));
+        let r = recovery_options(&mv(
+            "m1",
+            "copying",
+            dir.path().to_str().unwrap(),
+            dest.to_str().unwrap(),
+            staging.to_str().unwrap(),
+        ));
         assert_eq!(r.actions, vec![Rollback]);
         assert!(r.note.is_some());
 
         // verified, promote already done (dest carries this move's marker) → finish only.
         fs::create_dir_all(&dest).unwrap();
         write_sidecar(&dest, "m2").unwrap();
-        let r = recovery_options(&mv("m2", "verified", dir.path().to_str().unwrap(), dest.to_str().unwrap(), staging.to_str().unwrap()));
+        let r = recovery_options(&mv(
+            "m2",
+            "verified",
+            dir.path().to_str().unwrap(),
+            dest.to_str().unwrap(),
+            staging.to_str().unwrap(),
+        ));
         assert_eq!(r.actions, vec![Finish]);
 
         // verified, promote not done, staging copy present → finish or rollback.
         fs::create_dir_all(&staging).unwrap();
         write_sidecar(&staging, "m3").unwrap();
         let destless = dir.path().join("destless");
-        let r = recovery_options(&mv("m3", "verified", dir.path().to_str().unwrap(), destless.to_str().unwrap(), staging.to_str().unwrap()));
+        let r = recovery_options(&mv(
+            "m3",
+            "verified",
+            dir.path().to_str().unwrap(),
+            destless.to_str().unwrap(),
+            staging.to_str().unwrap(),
+        ));
         assert_eq!(r.actions, vec![Finish, Rollback]);
 
         // committed / unknown → nothing to recover.
-        assert!(recovery_options(&mv("m4", "committed", "s", "d", "g")).actions.is_empty());
+        assert!(recovery_options(&mv("m4", "committed", "s", "d", "g"))
+            .actions
+            .is_empty());
     }
 
     #[test]

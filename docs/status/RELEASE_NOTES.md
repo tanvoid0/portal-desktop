@@ -1,5 +1,22 @@
 # Portal Desktop - Release Notes
 
+## Version 0.16.0
+
+### Highlights
+
+- Feature: live action run viewer with a real Stop and a dedicated run page
+- Feature: Agents merged into Coder as per-backend engine tabs
+- Feature: push commits straight from project quick actions
+- Feature: Portal Mobile native notifications for approvals and pipeline results
+- Security: the daemon validates the Host header, closing a DNS-rebind local trust gap
+- Fix: Coder reselects the thread when ?id= changes, and every running agent session attaches
+- Fix: device Select all skips sensitive capabilities; stale pairing requests expire
+- Fix: discovery, relocation and project grouping correctness fixes (#210, #239, #273, #393)
+
+---
+
+# Portal Desktop - Release Notes
+
 ## Version 0.15.0
 
 ### Highlights

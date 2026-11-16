@@ -1,7 +1,7 @@
 {
   "name": "portal_desktop",
   "private": true,
-  "version": "0.15.0",
+  "version": "0.16.0",
   "packageManager": "pnpm@9.15.9",
   "type": "module",
   "scripts": {
@@ -11,8 +11,8 @@
     "build:client": "node scripts/build-client.mjs",
     "preview": "vite preview",
     "prepare": "husky",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --config ./vite.config.ts",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --config ./vite.config.ts --watch",
     "format": "prettier --write .",
     "gen:icons": "node scripts/gen-offline-icons.mjs",
     "lint": "prettier --check . && eslint src && node scripts/check-shadcn-ui.mjs",
@@ -74,7 +74,6 @@
     "formsnap": "^2.1.0",
     "globals": "^17.13.0",
     "husky": "^9.1.7",
-    "kill-port": "^2.0.1",
     "layerchart": "^1.0.13",
     "mode-watcher": "^1.1.0",
     "paneforge": "^1.0.2",

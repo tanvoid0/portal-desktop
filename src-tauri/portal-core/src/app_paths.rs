@@ -40,7 +40,11 @@ const DEV_APP_IDENTIFIER: &str = "com.tanvoid0.portal-desktop.dev";
 pub fn app_identifier() -> &'static str {
     static ID: OnceLock<String> = OnceLock::new();
     ID.get_or_init(|| {
-        let base = if DEV { DEV_APP_IDENTIFIER } else { APP_IDENTIFIER };
+        let base = if DEV {
+            DEV_APP_IDENTIFIER
+        } else {
+            APP_IDENTIFIER
+        };
         match std::env::var("PORTAL_INSTANCE").ok().as_deref() {
             None | Some("") | Some("1") => base.to_string(),
             Some(n) => format!("{base}.instance-{n}"),

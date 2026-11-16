@@ -13,9 +13,10 @@
   import { cn } from '$lib/utils';
   import AISessionSidebar from '$lib/domains/ai/components/shared/AISessionSidebar.svelte';
   import AISessionCard from '$lib/domains/ai/components/shared/AISessionCard.svelte';
-  import { agentSessionsQuery } from '../queries/agentsQueries.js';
+  import { agentBackendsQuery, agentSessionsQuery } from '../queries/agentsQueries.js';
   import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
   import {
+    filterSessionsByBackend,
     groupSessionsByProject,
     sessionSubpath,
     type SessionGroup,
@@ -27,15 +28,20 @@
   import History from '~icons/fa6-solid/clock-rotate-left';
 
   interface Props {
+    backendId: string;
     focusedId?: string | null;
     onSelect: (id: string) => void;
     onNewRun: () => void;
   }
 
-  let { focusedId = null, onSelect, onNewRun }: Props = $props();
+  let { backendId, focusedId = null, onSelect, onNewRun }: Props = $props();
 
+  const backendsQuery = createQuery(agentBackendsQuery);
+  const backendName = $derived(
+    backendsQuery.data?.find((b) => b.id === backendId)?.display_name ?? 'Agents'
+  );
   const sessionsQuery = createQuery(agentSessionsQuery);
-  const sessions = $derived(sessionsQuery.data ?? []);
+  const sessions = $derived(filterSessionsByBackend(sessionsQuery.data ?? [], backendId));
   const projectsQuery = createProjectsQuery();
   const projects = $derived(projectsQuery.data ?? []);
   const groups = $derived(groupSessionsByProject(sessions, projects));
@@ -84,7 +90,7 @@
 </script>
 
 <AISessionSidebar
-  title="Agents"
+  title={backendName}
   searchPlaceholder="Search sessions…"
   bind:searchValue
   onCreateNew={onNewRun}

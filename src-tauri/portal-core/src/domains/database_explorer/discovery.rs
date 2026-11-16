@@ -96,13 +96,19 @@ async fn from_sdk() -> Vec<(String, Source)> {
             };
             let id = format!("sdk:{}", c.id);
             let label = format!("{} (SDK service)", c.name);
-            Some((id, local_server(engine, port, label, format!("127.0.0.1:{port}"))))
+            Some((
+                id,
+                local_server(engine, port, label, format!("127.0.0.1:{port}")),
+            ))
         })
         .collect()
 }
 
 async fn from_docker() -> Vec<(String, Source)> {
-    let containers = DockerService::new().list_containers().await.unwrap_or_default();
+    let containers = DockerService::new()
+        .list_containers()
+        .await
+        .unwrap_or_default();
     containers
         .into_iter()
         .filter(|c| c.status.starts_with("Up"))
@@ -120,7 +126,12 @@ async fn from_docker() -> Vec<(String, Source)> {
             let label = format!("{} (Docker)", c.name);
             Some((
                 id,
-                local_server(engine, host_port, label, format!("127.0.0.1:{host_port} · {}", c.image)),
+                local_server(
+                    engine,
+                    host_port,
+                    label,
+                    format!("127.0.0.1:{host_port} · {}", c.image),
+                ),
             ))
         })
         .collect()
@@ -225,7 +236,10 @@ mod tests {
         assert_eq!(mapped_host_port(&ports, 5432), Some(5432));
 
         // Remapped host port differs from the container port.
-        let ports = vec!["0.0.0.0:49153->3306/tcp".to_string(), ":::49153->3306/tcp".to_string()];
+        let ports = vec![
+            "0.0.0.0:49153->3306/tcp".to_string(),
+            ":::49153->3306/tcp".to_string(),
+        ];
         assert_eq!(mapped_host_port(&ports, 3306), Some(49153));
 
         // Container port not published → None.
@@ -237,7 +251,10 @@ mod tests {
     #[test]
     fn infers_engine_from_hint_then_scheme_then_port() {
         assert_eq!(infer_engine(&json!({ "engine": "MySQL" })), "mysql");
-        assert_eq!(infer_engine(&json!({ "provider": "postgresql" })), "postgres");
+        assert_eq!(
+            infer_engine(&json!({ "provider": "postgresql" })),
+            "postgres"
+        );
         assert_eq!(
             infer_engine(&json!({ "connectionString": "mysql://u:p@h/db" })),
             "mysql"

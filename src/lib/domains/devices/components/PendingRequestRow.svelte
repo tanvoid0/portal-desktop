@@ -9,13 +9,13 @@
   import { toast } from '$lib/utils/toast';
   import { formatRelativeTime } from '$lib/domains/shared/utils';
   import { sameCapabilities } from '../utils/duplicateDevices';
-  import type { ApprovalType, DeviceSummary } from '../types';
+  import type { ApprovalType, CapabilityInfo, DeviceSummary } from '../types';
   import Loader2 from '~icons/fa6-solid/spinner';
   import TriangleExclamation from '~icons/fa6-solid/triangle-exclamation';
 
   interface Props {
     device: DeviceSummary;
-    capabilities: string[];
+    capabilities: CapabilityInfo[];
     existing?: DeviceSummary;
     onResolved?: () => void;
   }

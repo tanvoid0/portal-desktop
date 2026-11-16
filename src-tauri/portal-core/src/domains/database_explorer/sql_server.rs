@@ -127,7 +127,8 @@ impl SqlServerDriver {
 /// and append a plain-language hint; anything else passes through unchanged.
 fn friendly_connect_error(raw: String) -> String {
     let lower = raw.to_lowercase();
-    if lower.contains("password authentication failed") || lower.contains("access denied for user") {
+    if lower.contains("password authentication failed") || lower.contains("access denied for user")
+    {
         format!(
             "{raw} — the default credentials didn't work, so this is a real password, not a down \
              service. Save the real username/password as a vault credential for this connection."
@@ -151,7 +152,8 @@ const MY_LIST_TABLES: &str = "SELECT table_name, table_type \
      FROM information_schema.tables WHERE table_schema = DATABASE() \
      ORDER BY table_type, table_name";
 
-const PG_DESCRIBE: &str = "SELECT column_name::text, data_type::text, is_nullable::text, column_default::text \
+const PG_DESCRIBE: &str =
+    "SELECT column_name::text, data_type::text, is_nullable::text, column_default::text \
      FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 \
      ORDER BY ordinal_position";
 
@@ -184,7 +186,12 @@ fn fetch_rows_sql(engine: Engine, table: &str, cap: usize, offset: usize) -> Str
         Engine::Postgres => quote_pg(table),
         Engine::Mysql => quote_my(table),
     };
-    format!("SELECT * FROM {} LIMIT {} OFFSET {}", quoted, cap + 1, offset)
+    format!(
+        "SELECT * FROM {} LIMIT {} OFFSET {}",
+        quoted,
+        cap + 1,
+        offset
+    )
 }
 
 /// Wrap an ad-hoc query in a capped subquery so a huge result never floods the
@@ -219,20 +226,38 @@ fn insert_sql(engine: Engine, table: &str, columns: &[String]) -> String {
         Engine::Postgres => {
             let cols: Vec<String> = columns.iter().map(|c| quote_pg(c)).collect();
             let ph: Vec<String> = (1..=columns.len()).map(|i| format!("${i}")).collect();
-            format!("INSERT INTO {} ({}) VALUES ({})", quote_pg(table), cols.join(", "), ph.join(", "))
+            format!(
+                "INSERT INTO {} ({}) VALUES ({})",
+                quote_pg(table),
+                cols.join(", "),
+                ph.join(", ")
+            )
         }
         Engine::Mysql => {
             let cols: Vec<String> = columns.iter().map(|c| quote_my(c)).collect();
             let ph: Vec<String> = columns.iter().map(|_| "?".to_string()).collect();
-            format!("INSERT INTO {} ({}) VALUES ({})", quote_my(table), cols.join(", "), ph.join(", "))
+            format!(
+                "INSERT INTO {} ({}) VALUES ({})",
+                quote_my(table),
+                cols.join(", "),
+                ph.join(", ")
+            )
         }
     }
 }
 
 fn delete_sql(engine: Engine, table: &str, pk_column: &str) -> String {
     match engine {
-        Engine::Postgres => format!("DELETE FROM {} WHERE {} = $1", quote_pg(table), quote_pg(pk_column)),
-        Engine::Mysql => format!("DELETE FROM {} WHERE {} = ?", quote_my(table), quote_my(pk_column)),
+        Engine::Postgres => format!(
+            "DELETE FROM {} WHERE {} = $1",
+            quote_pg(table),
+            quote_pg(pk_column)
+        ),
+        Engine::Mysql => format!(
+            "DELETE FROM {} WHERE {} = ?",
+            quote_my(table),
+            quote_my(pk_column)
+        ),
     }
 }
 
@@ -257,10 +282,18 @@ async fn pg_column_types(pool: &PgPool, table: &str) -> HashMap<String, String> 
 /// `::<type>` suffix for a bound param, or empty when the column's type is
 /// unknown/uncastable (see `pg_column_types`).
 fn pg_cast(types: &HashMap<String, String>, column: &str) -> String {
-    types.get(column).map(|t| format!("::{t}")).unwrap_or_default()
+    types
+        .get(column)
+        .map(|t| format!("::{t}"))
+        .unwrap_or_default()
 }
 
-fn update_sql_pg_cast(table: &str, pk_column: &str, column: &str, types: &HashMap<String, String>) -> String {
+fn update_sql_pg_cast(
+    table: &str,
+    pk_column: &str,
+    column: &str,
+    types: &HashMap<String, String>,
+) -> String {
     format!(
         "UPDATE {} SET {} = $1{} WHERE {} = $2{}",
         quote_pg(table),
@@ -278,7 +311,12 @@ fn insert_sql_pg_cast(table: &str, columns: &[String], types: &HashMap<String, S
         .enumerate()
         .map(|(i, c)| format!("${}{}", i + 1, pg_cast(types, c)))
         .collect();
-    format!("INSERT INTO {} ({}) VALUES ({})", quote_pg(table), cols.join(", "), ph.join(", "))
+    format!(
+        "INSERT INTO {} ({}) VALUES ({})",
+        quote_pg(table),
+        cols.join(", "),
+        ph.join(", ")
+    )
 }
 
 fn delete_sql_pg_cast(table: &str, pk_column: &str, types: &HashMap<String, String>) -> String {
@@ -312,7 +350,12 @@ pub fn preview_insert(engine: Engine, table: &str, values: &[(String, Value)]) -
     }
 }
 
-pub fn preview_delete(engine: Engine, table: &str, pk_column: &str, pk_value: &Value) -> EditPreview {
+pub fn preview_delete(
+    engine: Engine,
+    table: &str,
+    pk_column: &str,
+    pk_value: &Value,
+) -> EditPreview {
     EditPreview {
         sql: delete_sql(engine, table, pk_column),
         params: vec![pk_value.clone()],
@@ -422,7 +465,11 @@ fn pg_cell(row: &PgRow, i: usize) -> Value {
         "JSON" | "JSONB" => try_json!(row, i),
         "TIMESTAMP" => try_str!(row, i, sqlx::types::chrono::NaiveDateTime),
         "TIMESTAMPTZ" => {
-            try_str!(row, i, sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>)
+            try_str!(
+                row,
+                i,
+                sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>
+            )
         }
         "DATE" => try_str!(row, i, sqlx::types::chrono::NaiveDate),
         "TIME" => try_str!(row, i, sqlx::types::chrono::NaiveTime),
@@ -556,8 +603,10 @@ impl DbDriver for SqlServerDriver {
                     .fetch_all(&pool)
                     .await
                     .map_err(|e| e.to_string())?;
-                let pk_names: HashSet<String> =
-                    pk_rows.iter().filter_map(|r| r.try_get::<String, _>(0).ok()).collect();
+                let pk_names: HashSet<String> = pk_rows
+                    .iter()
+                    .filter_map(|r| r.try_get::<String, _>(0).ok())
+                    .collect();
                 Ok(rows.iter().map(|r| pg_column(r, &pk_names)).collect())
             }
             Engine::Mysql => {
@@ -572,8 +621,10 @@ impl DbDriver for SqlServerDriver {
                     .fetch_all(&pool)
                     .await
                     .map_err(|e| e.to_string())?;
-                let pk_names: HashSet<String> =
-                    pk_rows.iter().filter_map(|r| r.try_get::<String, _>(0).ok()).collect();
+                let pk_names: HashSet<String> = pk_rows
+                    .iter()
+                    .filter_map(|r| r.try_get::<String, _>(0).ok())
+                    .collect();
                 Ok(rows.iter().map(|r| my_column(r, &pk_names)).collect())
             }
         }
@@ -658,7 +709,11 @@ impl DbDriver for SqlServerDriver {
         }
     }
 
-    async fn insert_row(&self, table: &str, values: Vec<(String, Value)>) -> Result<QueryResult, String> {
+    async fn insert_row(
+        &self,
+        table: &str,
+        values: Vec<(String, Value)>,
+    ) -> Result<QueryResult, String> {
         let columns: Vec<String> = values.iter().map(|(c, _)| c.clone()).collect();
         let params: Vec<Value> = values.into_iter().map(|(_, v)| v).collect();
         match self.engine {
@@ -680,7 +735,12 @@ impl DbDriver for SqlServerDriver {
         }
     }
 
-    async fn delete_row(&self, table: &str, pk_column: &str, pk_value: Value) -> Result<QueryResult, String> {
+    async fn delete_row(
+        &self,
+        table: &str,
+        pk_column: &str,
+        pk_value: Value,
+    ) -> Result<QueryResult, String> {
         let params = [pk_value];
         match self.engine {
             Engine::Postgres => {
@@ -715,7 +775,10 @@ async fn finish_pg_tx(
         }
         Ok(r) => {
             let _ = tx.rollback().await;
-            Err(format!("expected to affect exactly 1 row, affected {} — rolled back", r.rows_affected()))
+            Err(format!(
+                "expected to affect exactly 1 row, affected {} — rolled back",
+                r.rows_affected()
+            ))
         }
         Err(e) => {
             let _ = tx.rollback().await;
@@ -737,7 +800,10 @@ async fn finish_my_tx(
         }
         Ok(r) => {
             let _ = tx.rollback().await;
-            Err(format!("expected to affect exactly 1 row, affected {} — rolled back", r.rows_affected()))
+            Err(format!(
+                "expected to affect exactly 1 row, affected {} — rolled back",
+                r.rows_affected()
+            ))
         }
         Err(e) => {
             let _ = tx.rollback().await;
@@ -863,26 +929,46 @@ mod tests {
 
     #[test]
     fn delete_sql_scopes_to_pk_per_engine() {
-        assert_eq!(delete_sql(Engine::Postgres, "orders", "id"), "DELETE FROM \"orders\" WHERE \"id\" = $1");
-        assert_eq!(delete_sql(Engine::Mysql, "orders", "id"), "DELETE FROM `orders` WHERE `id` = ?");
+        assert_eq!(
+            delete_sql(Engine::Postgres, "orders", "id"),
+            "DELETE FROM \"orders\" WHERE \"id\" = $1"
+        );
+        assert_eq!(
+            delete_sql(Engine::Mysql, "orders", "id"),
+            "DELETE FROM `orders` WHERE `id` = ?"
+        );
     }
 
     #[test]
     fn preview_update_carries_value_then_pk_as_params() {
-        let p = preview_update(Engine::Postgres, "orders", "id", &Value::from(7), "status", &Value::from("done"));
-        assert_eq!(p.sql, "UPDATE \"orders\" SET \"status\" = $1 WHERE \"id\" = $2");
+        let p = preview_update(
+            Engine::Postgres,
+            "orders",
+            "id",
+            &Value::from(7),
+            "status",
+            &Value::from("done"),
+        );
+        assert_eq!(
+            p.sql,
+            "UPDATE \"orders\" SET \"status\" = $1 WHERE \"id\" = $2"
+        );
         assert_eq!(p.params, vec![Value::from("done"), Value::from(7)]);
     }
 
     #[test]
     fn friendly_connect_error_hints_at_the_likely_cause() {
         let auth = friendly_connect_error(
-            "error returned from database: password authentication failed for user \"postgres\"".to_string(),
+            "error returned from database: password authentication failed for user \"postgres\""
+                .to_string(),
         );
         assert!(auth.contains("not a down service"), "{auth}");
 
         let refused = friendly_connect_error("Connection refused (os error 111)".to_string());
-        assert!(refused.contains("is the service actually running"), "{refused}");
+        assert!(
+            refused.contains("is the service actually running"),
+            "{refused}"
+        );
 
         let other = friendly_connect_error("relation \"orders\" does not exist".to_string());
         assert_eq!(other, "relation \"orders\" does not exist");

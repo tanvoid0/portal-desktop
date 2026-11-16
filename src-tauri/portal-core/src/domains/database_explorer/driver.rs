@@ -35,7 +35,16 @@ pub trait DbDriver: Send + Sync {
         new_value: Value,
     ) -> Result<QueryResult, String>;
     /// INSERT one row, in a transaction.
-    async fn insert_row(&self, table: &str, values: Vec<(String, Value)>) -> Result<QueryResult, String>;
+    async fn insert_row(
+        &self,
+        table: &str,
+        values: Vec<(String, Value)>,
+    ) -> Result<QueryResult, String>;
     /// DELETE one row by primary key, in a transaction.
-    async fn delete_row(&self, table: &str, pk_column: &str, pk_value: Value) -> Result<QueryResult, String>;
+    async fn delete_row(
+        &self,
+        table: &str,
+        pk_column: &str,
+        pk_value: Value,
+    ) -> Result<QueryResult, String>;
 }

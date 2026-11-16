@@ -53,6 +53,9 @@ class AgentRunsState {
    *  — consumed once by the run page on mount, same pattern as coder's
    *  `pendingPrompt`. */
   pendingLaunch = $state<{ cwd?: string; prompt?: string; taskId?: string } | null>(null);
+  /** Last focused session per backend tab. Engine-tab links (#722) carry no
+   *  `?session=`, so switching Portal ↔ a backend and back restores from here. */
+  lastFocused: Record<string, string | null> = {};
 
   /** Idempotent — guards double-init from multiple mounts/HMR. */
   async ensureInit(): Promise<void> {
@@ -76,12 +79,19 @@ class AgentRunsState {
       this.append(run_id, { seq, event });
       if (event.type === 'session_started') {
         this.markRunning(run_id, true);
+        void this.attach(run_id);
         this.invalidateSessions();
       } else if (event.type === 'exited') {
         this.markRunning(run_id, false);
         this.invalidateSessions();
       }
     });
+
+    // The global approval stack reads pending approvals off every running
+    // session, but `append` drops events for unattached ones — so after a
+    // reload off the agents page it showed nothing (#769). Attach them all;
+    // not awaited (attach awaits this init).
+    for (const id of this.runningIds) void this.attach(id);
   }
 
   private append(sessionId: string, item: AgentEventSeq) {

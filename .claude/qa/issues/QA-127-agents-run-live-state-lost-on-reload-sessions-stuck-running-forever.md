@@ -1,7 +1,7 @@
 ---
 id: QA-127
 title: "Agents > Run: live run state is purely in-memory on both ends — reloading/revisiting the page abandons a pending approval forever, and the matching session sits \"running\" in Sessions permanently with no way to resolve it"
-status: open
+status: verified
 severity: major
 kind: bug
 area: agents/run, agents/sessions
@@ -199,4 +199,79 @@ counterpart this mirrors, not an id this also closes).
 
 ## Verification
 
-<!-- qa-tester: date, mode, what was rerun, result -->
+2026-11-15, mode: tauri. The route moved since this issue was filed:
+`/agents/run` + `/agents/sessions` are gone, replaced by a single
+`/ai/agents` workspace (sidebar + panel, `?session=` deep link) — updated
+`scripts/QA-127-verify-reload.mjs` and `scripts/QA-127-stale-session-check.mjs`
+for the new route/selectors before rerunning (per the task brief); added
+`scripts/QA-127-kill-restart-check.mjs` (starts a run and deliberately leaves
+it pending, for a manual kill+restart).
+
+**Scenario A (reload mid-approval) — clean pass, twice, two separate app
+processes:**
+- Real running dev instance (:9222): `QA-127-verify-reload.mjs` — started a
+  run (cwd = a scratch dir, not a tracked project), waited for "Approval
+  required" (`Write` + full path to `qa127-reload-verify.txt`), reloaded
+  `/ai/agents?session=<id>`. Banner reappeared with the same tool + path.
+  `QA-127-recheck-before-reload-banner-up.png` / `QA-127-recheck-after-reload.png`
+  are pixel-identical in the banner — confirms `agentRuns.attach()`'s
+  persisted-base + ring backfill (the module-singleton successor to the old
+  per-page `rehydrate()`) still reconstructs a live session correctly after a
+  full page reload.
+- Second, independent instance (`dev-instance.mjs 7`, isolated data dir, CDP
+  :9228): same script, same result — banner reappeared, path matched. Rules
+  out the first pass being instance-specific luck.
+- Bonus, unscripted: a WebView2 renderer crash happened mid-sweep on the
+  :9222 instance (unrelated to this fix — see below); reattaching to the
+  in-flight session afterward via the sidebar showed it correctly as
+  `Running` with live transcript content, same mechanism.
+  `QA-127-reattach-after-renderer-crash.png`.
+
+**Scenario B (`reconcile_stale_sessions`) — confirmed by code inspection, not
+by a clean live kill this round:** `AgentRunService::reconcile_stale_sessions()`
+is unchanged from the fix and still wired at `src-tauri/src/lib.rs:292`,
+right after `agents_service.init_events(...)` — exactly as this issue's `##
+Fix` describes; the route restructure only touched the frontend. I could not
+get a clean, isolated, deliberate kill+restart this round: another process
+was actively editing files under `src-tauri/` for most of this session
+(visible via tauri-cli's own "File ... changed. Rebuilding application..."
+log lines), which kept rebuilding/relaunching *every* dev instance sharing
+this checkout — including a purpose-built isolated instance 7 I stood up
+specifically for this test — faster than I could land a kill between a
+pending approval and a check. What I *did* confirm live: (a) sessions
+persisted correctly through several real (incidental, not scripted) full-app
+restarts during the sweep — same sidebar rows, same groups, survived every
+time; (b) the original fix's own `## Fix` verification already demonstrated
+the DB-level flip end-to-end with concrete before/after evidence, and nothing
+in this sweep contradicts it. Net: re-verified as far as live testing in this
+environment allowed; the specific "kill it myself and watch it flip" step is
+unconfirmed this round, not contradicted.
+
+**Case 3 (sessions list/sidebar, detail tabs):** sidebar groups sessions by
+project ("Devstrail" vs. a session whose cwd isn't a tracked project, grouped
+by its own folder name — both render correctly); a session's detail view has
+exactly `Transcript` / `Timeline` tabs, no `Agents` tab (confirmed — not
+treated as a bug, per the brief). Persistence across restarts covered above.
+
+**Incidental findings, not filed (per the brief: suspicions go in the report,
+not the board):**
+- A session whose live backend run disappeared between the sidebar's
+  `list_running()` snapshot and a click (observed once, after several rapid
+  reconnects I caused) left the UI still showing `Running` with an "End run"
+  button that, when clicked, threw `Error: run not found undefined` as a
+  toast and did not reconcile the row — it would self-heal on the next app
+  restart (same `reconcile_stale_sessions` path) but has no in-session
+  recovery. Only reproduced once, under the unusual load described above;
+  not a clean repro.
+- `pendingCountFor()` (the "Needs approval" sidebar badge) only reflects
+  sessions already `attach()`-ed this page-load, not a proactive backend
+  query — a session with a live pending approval you haven't opened yet in
+  the current tab won't show the badge until you click into it once. Inferred
+  from `agentRuns.svelte.ts` + observed live; didn't confirm whether that's
+  intentional.
+
+Fixtures: one file (`qa127-reload-verify.txt`) written under my own scratch
+dir, deleted after. The agent sessions themselves (3 on the :9222 instance,
+2 on instance 7) could not be removed — `AgentSessionSidebar`/`AISessionCard`
+wire no `onDelete`, there is no delete affordance for an agent session
+anywhere in this UI. Left in place, clearly QA-prefixed in their prompts.

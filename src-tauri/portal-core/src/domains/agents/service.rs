@@ -9,7 +9,9 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
+};
 use serde::Serialize;
 use serde_json::json;
 use tokio::sync::{mpsc, Mutex, Semaphore};
@@ -341,7 +343,12 @@ impl AgentRunService {
             .ok()
             .flatten()
             .map(|r| r.seq);
-        [max_event, max_message].into_iter().flatten().max().unwrap_or(0) + 1
+        [max_event, max_message]
+            .into_iter()
+            .flatten()
+            .max()
+            .unwrap_or(0)
+            + 1
     }
 
     /// The event-pump task shared by `start_run` and `resume_session`: turns
@@ -488,7 +495,7 @@ impl AgentRunService {
     }
 
     /// Run ids with a live backend process right now, regardless of which
-    /// page/tab started them. `/agents/run` has no persisted run id of its
+    /// page/tab started them. The agent tab (`/ai/coder/<backend>`) has no persisted run id of its
     /// own (unlike coder's thread list) — a reload calls this on mount to
     /// find a run it should reattach to instead of showing a blank launcher
     /// while the backend sits alive (QA-127). Cheap and non-sensitive (just
@@ -592,8 +599,8 @@ impl AgentRunService {
             messages: messages.into_iter().map(AgentMessageRow::from).collect(),
             events: events
                 .into_iter()
-                .filter_map(|row| {
-                    match serde_json::from_str::<AgentEvent>(&row.event_json) {
+                .filter_map(
+                    |row| match serde_json::from_str::<AgentEvent>(&row.event_json) {
                         Ok(event) => Some(AgentEventRow {
                             id: row.id,
                             seq: row.seq,
@@ -604,8 +611,8 @@ impl AgentRunService {
                             eprintln!("agents: skipping unparsable event row: {e}");
                             None
                         }
-                    }
-                })
+                    },
+                )
                 .collect(),
         }))
     }

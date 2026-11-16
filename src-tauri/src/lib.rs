@@ -386,6 +386,7 @@ pub fn run() {
             domains::coder::coder_list_git_changes,
             domains::coder::coder_prepare_git_commit,
             domains::coder::coder_git_commit,
+            domains::coder::coder_git_push,
             domains::coder::coder_list_dir,
             domains::coder::coder_read_file,
             domains::coder::coder_write_file,

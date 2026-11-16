@@ -153,8 +153,15 @@ const CLI_EDIT_TOOLS: &[(&str, &str)] = &[
 /// `(tool_use_id, tool name, path)` if a `ToolCall` event is one of
 /// [`CLI_EDIT_TOOLS`] — the file to snapshot before the tool runs. Pure, so
 /// the extraction is unit-tested without spawning the CLI.
-fn edit_target_for_tool_call(id: &str, name: &str, input: &Value) -> Option<(String, String, String)> {
-    let key = CLI_EDIT_TOOLS.iter().find(|(t, _)| *t == name).map(|(_, k)| *k)?;
+fn edit_target_for_tool_call(
+    id: &str,
+    name: &str,
+    input: &Value,
+) -> Option<(String, String, String)> {
+    let key = CLI_EDIT_TOOLS
+        .iter()
+        .find(|(t, _)| *t == name)
+        .map(|(_, k)| *k)?;
     let path = input.get(key).and_then(Value::as_str)?;
     Some((id.to_string(), name.to_string(), path.to_string()))
 }
@@ -187,12 +194,14 @@ fn chat_message_for_event(event: &AgentEvent) -> Option<ChatMessage> {
             tool_call_id: None,
             timestamp: Some(now_iso()),
         }),
-        AgentEvent::ToolCall { id, name, input, .. } => {
-            Some(ChatMessage::assistant_tool_call(id, name, input, None))
-        }
-        AgentEvent::ToolResult { tool_use_id, content, .. } => {
-            Some(ChatMessage::tool_result(tool_use_id, content.clone()))
-        }
+        AgentEvent::ToolCall {
+            id, name, input, ..
+        } => Some(ChatMessage::assistant_tool_call(id, name, input, None)),
+        AgentEvent::ToolResult {
+            tool_use_id,
+            content,
+            ..
+        } => Some(ChatMessage::tool_result(tool_use_id, content.clone())),
         _ => None,
     }
 }
@@ -237,7 +246,10 @@ fn native_tool_summary(tool_name: &str, input: &Value) -> String {
 
 #[cfg(test)]
 mod claude_cli_tests {
-    use super::{chat_message_for_event, edit_target_for_tool_call, pending_from_permission_request, workspace_relative};
+    use super::{
+        chat_message_for_event, edit_target_for_tool_call, pending_from_permission_request,
+        workspace_relative,
+    };
     use crate::domains::agents::events::AgentEvent;
     use serde_json::json;
 
@@ -261,7 +273,11 @@ mod claude_cli_tests {
             ))
         );
         assert_eq!(
-            edit_target_for_tool_call("tu_nb", "NotebookEdit", &json!({"notebook_path": "/w/n.ipynb"})),
+            edit_target_for_tool_call(
+                "tu_nb",
+                "NotebookEdit",
+                &json!({"notebook_path": "/w/n.ipynb"})
+            ),
             Some((
                 "tu_nb".to_string(),
                 "NotebookEdit".to_string(),
@@ -1324,7 +1340,13 @@ impl CoderService {
                 .is_some_and(|t| move_lock::is_under(&t.workspace_root, path))
         };
 
-        if self.active_runs.lock().await.keys().any(|id| thread_under(id)) {
+        if self
+            .active_runs
+            .lock()
+            .await
+            .keys()
+            .any(|id| thread_under(id))
+        {
             return true;
         }
         if self
@@ -2783,7 +2805,9 @@ impl CoderService {
                 AgentEvent::SessionStarted { session_id: sid } => session_id = Some(sid.clone()),
                 // Snapshot before the tool runs: this event fires when Claude
                 // decides to call the tool, not after it has written.
-                AgentEvent::ToolCall { id, name, input, .. } => {
+                AgentEvent::ToolCall {
+                    id, name, input, ..
+                } => {
                     if let Some((edit_id, tool, path)) = edit_target_for_tool_call(id, name, input)
                     {
                         if let Some(rel) = workspace_relative(&workspace_root, &path) {
@@ -2809,7 +2833,8 @@ impl CoderService {
                     tool_input,
                     ..
                 } => {
-                    let pending = pending_from_permission_request(request_id, tool_name, tool_input);
+                    let pending =
+                        pending_from_permission_request(request_id, tool_name, tool_input);
                     self.claude_cli_pending
                         .lock()
                         .await

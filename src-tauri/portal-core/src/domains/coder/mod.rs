@@ -10,6 +10,7 @@ pub mod agent_mode;
 pub mod diff;
 pub mod entities;
 pub mod git_commit;
+pub mod git_push;
 pub mod git_status;
 pub mod multitask;
 pub mod permissions;

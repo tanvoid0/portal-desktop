@@ -17,6 +17,11 @@ concurrency:
 env:
   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+  # src-tauri/.cargo/config.toml and .npmrc pin target-dir / store-dir to a
+  # local I: drive; override both back to runner-local paths (store kept
+  # outside the checkout so prettier never scans it).
+  CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
+  npm_config_store_dir: ${{ github.workspace }}/../.pnpm-store
 
 jobs:
   # Fail fast on one cheap runner before starting four platform builds.

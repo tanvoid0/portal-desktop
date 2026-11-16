@@ -19,7 +19,7 @@
 // rather than always 1420 — otherwise starting instance 2 kills instance 1.
 //
 //   node scripts/dev-instance.mjs --kill-port
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -36,22 +36,77 @@ function instanceNumber(raw) {
   return n;
 }
 
-/** `tolerateFailure` is for kill-port, which exits non-zero when the port is free. */
-function run(command, args, env, { tolerateFailure = false } = {}) {
-  // Windows needs a shell to resolve the `pnpm`/`npx` .cmd shims — Node refuses to
-  // spawn them directly. Every argument below is therefore shell-safe by
+function run(command, args, env) {
+  // Windows needs a shell to resolve the `pnpm` .cmd shim — Node refuses to
+  // spawn it directly. Every argument below is therefore shell-safe by
   // construction: a port number, or a relative path with no spaces or quotes.
   const child = spawn(command, args, {
     env,
     stdio: 'inherit',
     shell: process.platform === 'win32',
   });
-  child.on('exit', (code) => process.exit(tolerateFailure ? 0 : (code ?? 0)));
+  child.on('exit', (code) => process.exit(code ?? 0));
   child.on('error', (err) => {
-    if (tolerateFailure) process.exit(0);
     console.error(`dev-instance: failed to run ${command}: ${err.message}`);
     process.exit(1);
   });
+}
+
+/** Pids `LISTENING` on `port` — Windows via `netstat -ano`, else `lsof -t`. Same
+ * approach as `usage::owning_pids` in src-tauri (the port-kill logic the app
+ * itself uses), so this script doesn't invent a second way to find a port's owner. */
+function owningPids(port) {
+  try {
+    if (process.platform === 'win32') {
+      // Not the State column — it's localized ("LISTENING", "ABHÖREN", ...;
+      // #393/#719). Same check as usage::parse_listening_pids: a listening TCP
+      // row has 5 fields and the unspecified Foreign Address, an IP literal.
+      return [
+        ...new Set(
+          execFileSync('netstat', ['-ano'], { encoding: 'utf8' })
+            .split('\n')
+            .map((l) => l.trim().split(/\s+/))
+            .filter(
+              (f) =>
+                f.length === 5 &&
+                (f[2] === '0.0.0.0:0' || f[2] === '[::]:0') &&
+                f[1].endsWith(`:${port}`)
+            )
+            .map((f) => f[4])
+        ),
+      ];
+    }
+    return execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], {
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+  } catch {
+    // lsof/netstat exits non-zero when nothing matches — same as "no owner".
+    return [];
+  }
+}
+
+/** Kills whatever's listening on `port`, via `taskkill /T /F` (Windows) or
+ * `kill -9` (unix) per pid — mirrors `move_commands::kill_command`. Best-effort:
+ * a pid that's already gone by the time we get to it is not an error. */
+function killPort(port) {
+  const pids = owningPids(port);
+  for (const pid of pids) {
+    try {
+      if (process.platform === 'win32') execFileSync('taskkill', ['/PID', pid, '/T', '/F']);
+      else execFileSync('kill', ['-9', pid]);
+    } catch {
+      // already exited, or we lack permission — `tauri dev` fails loudly on
+      // the port right after if it's genuinely still held.
+    }
+  }
+  console.log(
+    pids.length
+      ? `dev-instance: killed ${pids.length} process(es) on port ${port}`
+      : `dev-instance: port ${port} was already free`
+  );
 }
 
 if (process.argv[2] === '--kill-port') {
@@ -71,7 +126,7 @@ if (process.argv[2] === '--kill-port') {
     console.log('dev-instance: Portal is already running — skipping kill-port');
   } else {
     const port = process.env.PORTAL_DEV_PORT ?? String(PORT_BASE);
-    run('npx', ['kill-port', port], process.env, { tolerateFailure: true });
+    killPort(port);
   }
 } else {
   const n = instanceNumber(process.argv[2]);

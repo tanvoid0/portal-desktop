@@ -365,7 +365,11 @@ impl ProjectRepository {
     /// Ids for `names` in a lookup table (`frameworks`, `languages` or
     /// `package_managers`), matched case-insensitively. A name the table has never
     /// seen (a stack detected on disk, e.g. `Android`) gets a row of its own.
-    pub async fn lookup_ids(&self, table: &'static str, names: &[String]) -> Result<Vec<i32>, String> {
+    pub async fn lookup_ids(
+        &self,
+        table: &'static str,
+        names: &[String],
+    ) -> Result<Vec<i32>, String> {
         use sea_orm::{ConnectionTrait, Statement};
         let conn = self.db_manager.get_connection();
         let backend = conn.get_database_backend();
@@ -400,7 +404,9 @@ impl ProjectRepository {
             let row = conn
                 .query_one(Statement::from_sql_and_values(
                     backend,
-                    format!("SELECT id FROM {table} WHERE lower(name) = lower(?) ORDER BY id LIMIT 1"),
+                    format!(
+                        "SELECT id FROM {table} WHERE lower(name) = lower(?) ORDER BY id LIMIT 1"
+                    ),
                     [name.as_str().into()],
                 ))
                 .await

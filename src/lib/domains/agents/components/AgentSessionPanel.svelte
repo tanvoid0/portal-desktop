@@ -23,6 +23,7 @@
   import { toast } from '$lib/utils/toast';
 
   interface Props {
+    backendId: string;
     sessionId: string | null;
     initialCwd?: string;
     initialPrompt?: string;
@@ -30,9 +31,19 @@
     onStarted: (id: string) => void;
   }
 
-  let { sessionId, initialCwd, initialPrompt, taskId = null, onStarted }: Props = $props();
+  let {
+    backendId,
+    sessionId,
+    initialCwd,
+    initialPrompt,
+    taskId = null,
+    onStarted,
+  }: Props = $props();
 
   const backendsQuery = createQuery(agentBackendsQuery);
+  // Only this tab's own backend — RunLauncherForm hides its picker once it
+  // sees a single-element list.
+  const backends = $derived((backendsQuery.data ?? []).filter((b) => b.id === backendId));
   const sessionDetailQuery = createQuery(() => ({
     ...agentSessionQuery(sessionId ?? ''),
     enabled: !!sessionId,
@@ -155,7 +166,7 @@
         />
       {:else}
         <RunLauncherForm
-          backends={backendsQuery.data ?? []}
+          {backends}
           busy={starting}
           {initialCwd}
           {initialPrompt}

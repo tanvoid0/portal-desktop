@@ -321,7 +321,14 @@ fn aliases(key: &str) -> &'static [&'static str] {
             "target_file",
             "path_to_file",
         ],
-        "content" => &["contents", "text", "file_text", "new_content", "body", "data"],
+        "content" => &[
+            "contents",
+            "text",
+            "file_text",
+            "new_content",
+            "body",
+            "data",
+        ],
         "old_string" => &["old_str", "old_text", "old", "search", "find"],
         "new_string" => &["new_str", "new_text", "new", "replace", "replacement"],
         "command" => &["cmd", "shell_command", "command_line", "script"],
@@ -662,7 +669,10 @@ mod tests {
         assert!(err.contains("missing arg: path"), "{err}");
         assert!(err.contains("requires: path, content"), "{err}");
         assert!(err.contains("You sent: content"), "{err}");
-        assert!(err.contains(r#"{"path": "...", "content": "..."}"#), "{err}");
+        assert!(
+            err.contains(r#"{"path": "...", "content": "..."}"#),
+            "{err}"
+        );
     }
 
     #[test]

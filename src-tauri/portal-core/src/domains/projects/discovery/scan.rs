@@ -600,26 +600,13 @@ fn read_description(dir: &Path) -> Option<String> {
         let raw = fs::read_to_string(&f).ok()?;
         let head: String = raw.chars().take(800).collect();
         let mut cleaned = String::with_capacity(head.len());
-        let mut in_link_text = false;
         for ch in head.chars() {
             match ch {
-                '#' | '*' | '`' | '>' | '_' | '[' | ']' | '(' | ')' | '!' => {
-                    // Markdown punctuation and link syntax collapse to a space;
-                    // link *text* survives because only the delimiters are dropped.
-                    if ch == '[' {
-                        in_link_text = true;
-                    }
-                    if ch == ']' {
-                        in_link_text = false;
-                    }
-                    cleaned.push(' ');
-                }
+                // Markdown punctuation and link syntax collapse to a space;
+                // link *text* survives because only the delimiters are dropped.
+                '#' | '*' | '`' | '>' | '_' | '[' | ']' | '(' | ')' | '!' => cleaned.push(' '),
                 '\n' | '\r' | '\t' => cleaned.push(' '),
-                _ => {
-                    if !in_link_text {
-                        cleaned.push(ch);
-                    }
-                }
+                _ => cleaned.push(ch),
             }
         }
         let collapsed = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");

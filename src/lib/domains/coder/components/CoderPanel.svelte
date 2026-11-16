@@ -16,7 +16,7 @@
   import PanelLeftOpen from '~icons/fa6-solid/table-columns';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
   import { toast } from '$lib/utils/toast';
-  import { replaceState } from '$app/navigation';
+  import { afterNavigate, replaceState } from '$app/navigation';
   import { coderSession, type SubAgentNotificationEvent } from '../state/coderSession.svelte.js';
   import { coderUi } from '../state/coderUi.svelte.js';
   import { coderService } from '../services/coderService.js';
@@ -288,6 +288,22 @@
     return () => {
       coderSession.setSubAgentNotificationHandler(null);
     };
+  });
+
+  // External goto('/ai/coder?id=X') while this panel is already mounted reuses
+  // the component, so onMount never re-reads `?id=` (#690, same as #662).
+  // The first call is the navigation that mounted us — onMount owns that one.
+  // syncUrl's replaceState never fires this, so it can't loop.
+  let mountNavSeen = false;
+  afterNavigate(() => {
+    if (!mountNavSeen) {
+      mountNavSeen = true;
+      return;
+    }
+    const urlId = page.url.searchParams.get('id');
+    if (urlId && urlId !== coderSession.activeThreadId) {
+      selectThread(urlId).catch((e) => console.error('coder: select from URL failed', e));
+    }
   });
 
   function syncUrl(id: string | null) {

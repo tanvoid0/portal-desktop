@@ -6,13 +6,14 @@
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import ApprovalBanner from '$lib/domains/coder/components/ApprovalBanner.svelte';
+  import { isAgentTabRoute } from '$lib/config/agents-tabs';
   import { agentRuns } from '../state/agentRuns.svelte.js';
   import { agentSessionsQuery } from '../queries/agentsQueries.js';
 
   const sessionsQuery = createQuery(agentSessionsQuery);
   const sessions = $derived(sessionsQuery.data ?? []);
   const focusedId = $derived(
-    page.url.pathname === '/ai/agents' ? page.url.searchParams.get('session') : null
+    isAgentTabRoute(page.url.pathname) ? page.url.searchParams.get('session') : null
   );
 
   const stacks = $derived.by(() => {

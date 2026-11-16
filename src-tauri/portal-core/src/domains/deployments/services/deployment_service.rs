@@ -698,7 +698,13 @@ impl DeploymentService {
             // write gap remains between this re-read and `persist`'s own write
             // lock — move the mutation under the cache's write lock directly
             // if that ever matters in practice.
-            let current = self.cache.read().await.iter().find(|c| c.id == d.id).cloned();
+            let current = self
+                .cache
+                .read()
+                .await
+                .iter()
+                .find(|c| c.id == d.id)
+                .cloned();
             let Some(mut current) = current else { continue };
             if let Some(p) = new_dockerfile {
                 current.dockerfile_path = Some(p);

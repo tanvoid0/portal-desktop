@@ -4,6 +4,7 @@
   import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import NavIcon from '$lib/components/shell/nav-icon.svelte';
   import { AI_TABS, getActiveAiTab } from '$lib/config/ai-tabs';
+  import { agentTabPath } from '$lib/config/agents-tabs';
   import { isMobileShell } from '$lib/domains/mobile/shell';
   import { mobileConnection } from '$lib/domains/mobile/connection.svelte';
 
@@ -16,17 +17,22 @@
   const activeTab = $derived(getActiveAiTab(page.url.pathname));
 
   // On the mobile shell, only show tabs the paired device actually serves.
+  // Code covers both the Portal workspace (cap `coder`) and agent backends
+  // (cap `agents`) — a device with only one of those still needs the tab,
+  // routed straight to whichever side it can reach.
   const tabs = $derived.by(() => {
     if (!isMobileShell) return AI_TABS;
     const caps = mobileConnection.status?.caps ?? [];
-    return AI_TABS.filter((t) => t.id !== 'code' || caps.includes('coder')).filter(
-      (t) => t.id !== 'agents' || caps.includes('agents')
+    const hasCoder = caps.includes('coder');
+    const hasAgents = caps.includes('agents');
+    return AI_TABS.filter((t) => t.id !== 'code' || hasCoder || hasAgents).map((t) =>
+      t.id === 'code' && !hasCoder && hasAgents ? { ...t, url: agentTabPath() } : t
     );
   });
 
   function onTabChange(tabId: string | undefined) {
     if (!tabId) return;
-    const tab = AI_TABS.find((t) => t.id === tabId);
+    const tab = tabs.find((t) => t.id === tabId);
     if (!tab || tab.id === activeTab) return;
     void goto(tab.url);
   }

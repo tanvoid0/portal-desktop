@@ -4,12 +4,94 @@ use crate::domains::scripts::repositories::ScriptExecutionRepository;
 use crate::process_ext::NoWindowExt;
 use crate::utils::pnpm_workspace::prepare_shell_command;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::{Child, Command};
 use uuid::Uuid;
+
+type OutputBuffers = Mutex<HashMap<String, Vec<String>>>;
+
+/// Decode one chunk of process output, carrying an incomplete trailing UTF-8
+/// sequence over to the next chunk so a multi-byte char split across two reads
+/// is not mangled. Invalid bytes become U+FFFD rather than ending the stream.
+fn decode_utf8_chunk(carry: &mut Vec<u8>, chunk: &[u8]) -> String {
+    carry.extend_from_slice(chunk);
+    let mut out = String::new();
+    let mut i = 0;
+    loop {
+        match std::str::from_utf8(&carry[i..]) {
+            Ok(s) => {
+                out.push_str(s);
+                i = carry.len();
+                break;
+            }
+            Err(e) => {
+                let end = i + e.valid_up_to();
+                out.push_str(std::str::from_utf8(&carry[i..end]).unwrap_or_default());
+                match e.error_len() {
+                    // Invalid bytes: replace them and keep decoding the rest.
+                    Some(n) => {
+                        out.push('\u{FFFD}');
+                        i = end + n;
+                    }
+                    // An unfinished char at the very end — carry it over.
+                    None => {
+                        i = end;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    carry.drain(..i);
+    out
+}
+
+/// Copy a child pipe into the execution's live buffer as raw chunks — not
+/// lines — so partial lines (progress, prompts) show while the run is going.
+/// stdout and stderr both land in the one buffer, in arrival order.
+async fn pump<R: AsyncRead + Unpin>(stream: Option<R>, id: &str, bufs: &OutputBuffers) {
+    let Some(mut stream) = stream else { return };
+    let mut chunk = [0u8; 8192];
+    let mut carry = Vec::new();
+    loop {
+        let text = match stream.read(&mut chunk).await {
+            Ok(0) | Err(_) => break,
+            Ok(n) => decode_utf8_chunk(&mut carry, &chunk[..n]),
+        };
+        if !text.is_empty() {
+            if let Some(buf) = bufs.lock().unwrap().get_mut(id) {
+                buf.push(text);
+            }
+        }
+    }
+    if !carry.is_empty() {
+        if let Some(buf) = bufs.lock().unwrap().get_mut(id) {
+            buf.push(String::from_utf8_lossy(&carry).into_owned());
+        }
+    }
+}
+
+/// Kill the whole process tree rooted at `pid` — the `cmd /C` / `sh -c`
+/// wrapper. Killing only the wrapper orphans what it started (pnpm -> node
+/// ...), which keeps running and keeps the output pipes open. Async, so no
+/// lock is held and no runtime thread blocks while taskkill/kill runs.
+async fn kill_tree(pid: u32) {
+    #[cfg(windows)]
+    let _ = Command::new("taskkill")
+        .no_window()
+        .args(["/T", "/F", "/PID", &pid.to_string()])
+        .output()
+        .await;
+    // Spawned with process_group(0), so the group id is the wrapper's pid.
+    #[cfg(unix)]
+    let _ = Command::new("kill")
+        .args(["-KILL", "--", &format!("-{pid}")])
+        .output()
+        .await;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +104,10 @@ pub struct ExecuteScriptRequest {
     /// non-interactive Action runs). Merged onto the inherited env.
     #[serde(default)]
     pub env: Option<HashMap<String, String>>,
+    /// Who asked for the run: "user" (default) or e.g. "mcp:<client>". Stored
+    /// on the row so a stop can be told apart from a failure by whoever waits.
+    #[serde(default)]
+    pub triggered_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +139,9 @@ pub struct ScriptExecutionService {
     // (`relocation::usage::running_under`) — kept alongside `running_processes`
     // rather than folded into it so the `Child` map stays untouched.
     running_dirs: Arc<Mutex<HashMap<String, String>>>,
+    // Runs the user asked to stop. The output task reads this when the process
+    // exits and records `cancelled` itself — after saving the output.
+    cancel_requested: Arc<Mutex<HashSet<String>>>,
 }
 
 impl ScriptExecutionService {
@@ -63,6 +152,7 @@ impl ScriptExecutionService {
             running_processes: Arc::new(Mutex::new(HashMap::new())),
             output_buffers: Arc::new(Mutex::new(HashMap::new())),
             running_dirs: Arc::new(Mutex::new(HashMap::new())),
+            cancel_requested: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -140,7 +230,10 @@ impl ScriptExecutionService {
                 exec_command.clone(),
                 parameters_json,
                 request.working_directory.clone(),
-                "user".to_string(),
+                request
+                    .triggered_by
+                    .clone()
+                    .unwrap_or_else(|| "user".to_string()),
             )
             .await?;
 
@@ -193,6 +286,9 @@ impl ScriptExecutionService {
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
         cmd.kill_on_drop(true);
+        // Own process group, so Stop can kill everything the shell started.
+        #[cfg(unix)]
+        cmd.process_group(0);
 
         // Spawn process
         let mut child = match cmd.spawn() {
@@ -210,24 +306,34 @@ impl ScriptExecutionService {
             }
         };
 
-        // Get PID and update record
-        let pid = child.id().map(|p| p as i32);
-        if let Some(pid) = pid {
-            self.repository.update_pid(&execution_id, pid).await?;
-        }
-
         // Take stdout/stderr before moving child
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
+        let pid = child.id();
 
-        // Store child process for tracking
-        {
-            let mut processes = self.running_processes.lock().unwrap();
-            processes.insert(execution_id.clone(), child);
-        }
+        // Register the child before anything else can await, so a Stop from
+        // here on finds it (cancel_execution sets its flag, then looks here).
+        self.running_processes
+            .lock()
+            .unwrap()
+            .insert(execution_id.clone(), child);
         if let Some(ref wd) = request.working_directory {
             let mut dirs = self.running_dirs.lock().unwrap();
             dirs.insert(execution_id.clone(), wd.clone());
+        }
+        // A Stop that landed while the process was spawning saw no child.
+        let stop_early = self
+            .cancel_requested
+            .lock()
+            .unwrap()
+            .contains(&execution_id);
+        if let (true, Some(pid)) = (stop_early, pid) {
+            kill_tree(pid).await;
+        }
+        if let Some(pid) = pid {
+            self.repository
+                .update_pid(&execution_id, pid as i32)
+                .await?;
         }
 
         // Spawn background task to read output and wait for completion
@@ -236,57 +342,47 @@ impl ScriptExecutionService {
         let output_buffers = Arc::clone(&self.output_buffers);
         let running_processes = Arc::clone(&self.running_processes);
         let running_dirs = Arc::clone(&self.running_dirs);
+        let cancel_requested = Arc::clone(&self.cancel_requested);
 
         tokio::spawn(async move {
-            // Read stdout + stderr in parallel (sequential reads can deadlock on full pipes)
-            let exec_id_out = exec_id_clone.clone();
-            let buffers_out = Arc::clone(&output_buffers);
-            let stdout_task = async move {
-                let mut lines = Vec::new();
-                if let Some(stdout) = stdout {
-                    let mut reader = BufReader::new(stdout).lines();
-                    while let Ok(Some(line)) = reader.next_line().await {
-                        let formatted = format!("{}\n", line);
+            // Pump stdout + stderr concurrently (sequential reads can deadlock on
+            // full pipes) into the one arrival-ordered live buffer.
+            let mut pumps = Box::pin(async {
+                tokio::join!(
+                    pump(stdout, &exec_id_clone, &output_buffers),
+                    pump(stderr, &exec_id_clone, &output_buffers),
+                )
+            });
+            // After a Stop, give the pipes a moment to close, then stop reading
+            // anyway: a process that outlived its (killed) parent can still hold
+            // them open, and on Windows taskkill /T can't find it once the parent
+            // is gone. Dropping our read ends lets the run finish as cancelled.
+            // ponytail: orphans survive on Windows; a Job object per run would
+            // kill them too.
+            let mut stop_deadline: Option<std::time::Instant> = None;
+            loop {
+                tokio::select! {
+                    _ = &mut pumps => break,
+                    _ = tokio::time::sleep(std::time::Duration::from_millis(250)) => {
+                        if stop_deadline.is_none()
+                            && cancel_requested.lock().unwrap().contains(&exec_id_clone)
                         {
-                            let mut bufs = buffers_out.lock().unwrap();
-                            if let Some(buf) = bufs.get_mut(&exec_id_out) {
-                                buf.push(formatted.clone());
-                            }
+                            stop_deadline =
+                                Some(std::time::Instant::now() + std::time::Duration::from_secs(2));
                         }
-                        lines.push(formatted);
+                        if stop_deadline.is_some_and(|d| std::time::Instant::now() >= d) {
+                            break;
+                        }
                     }
                 }
-                lines
-            };
-
-            let exec_id_err = exec_id_clone.clone();
-            let buffers_err = Arc::clone(&output_buffers);
-            let stderr_task = async move {
-                let mut lines = Vec::new();
-                if let Some(stderr) = stderr {
-                    let mut reader = BufReader::new(stderr).lines();
-                    while let Ok(Some(line)) = reader.next_line().await {
-                        let formatted = format!("[stderr] {}\n", line);
-                        {
-                            let mut bufs = buffers_err.lock().unwrap();
-                            if let Some(buf) = bufs.get_mut(&exec_id_err) {
-                                buf.push(formatted.clone());
-                            }
-                        }
-                        lines.push(formatted);
-                    }
-                }
-                lines
-            };
-
-            let (stdout_lines, stderr_lines) = tokio::join!(stdout_task, stderr_task);
-            let mut combined_output = String::new();
-            for line in &stdout_lines {
-                combined_output.push_str(line);
             }
-            for line in &stderr_lines {
-                combined_output.push_str(line);
-            }
+            drop(pumps); // closes our read ends if we stopped early
+            let combined_output = output_buffers
+                .lock()
+                .unwrap()
+                .get(&exec_id_clone)
+                .map(|chunks| chunks.concat())
+                .unwrap_or_default();
 
             // Wait for process to complete - extract child from map first, then await
             let child_opt: Option<Child> = {
@@ -304,8 +400,19 @@ impl ScriptExecutionService {
                 ))
             };
 
+            // Stopped by the user: record `cancelled`, not `failed`, so whoever
+            // waits on this run (the UI, an MCP client) reads it was stopped. A
+            // clean exit means it finished before the kill landed.
+            let stopped = cancel_requested.lock().unwrap().remove(&exec_id_clone);
+            let killed = stopped && !matches!(&wait_result, Ok(st) if st.success());
+
             // Update final status in database
             let (status, exit_code, error) = match wait_result {
+                _ if killed => (
+                    "cancelled".to_string(),
+                    None,
+                    Some("Stopped by user".to_string()),
+                ),
                 Ok(status) if status.success() => ("success".to_string(), status.code(), None),
                 Ok(status) => {
                     let code = status.code();
@@ -326,7 +433,8 @@ impl ScriptExecutionService {
                 ),
             };
 
-            // Save output and final status
+            // Save output, then the final status — a poller that stops at a
+            // finished status must already see the output.
             let _ = repo.append_output(&exec_id_clone, &combined_output).await;
             let _ = repo
                 .update_status(&exec_id_clone, status, exit_code, error)
@@ -416,30 +524,57 @@ impl ScriptExecutionService {
         buffers.get(execution_id).cloned().unwrap_or_default()
     }
 
-    /// Cancel a running execution
+    /// Stop a running execution and its whole process tree.
+    ///
+    /// Only flags and kills: the output task saves what the run printed and
+    /// then records `cancelled` (see `execute_script`).
     pub async fn cancel_execution(&self, execution_id: &str) -> Result<(), String> {
-        // Try to kill the process - extract from map first
-        let child_opt: Option<Child> = {
-            let mut processes = self.running_processes.lock().unwrap();
-            processes.remove(execution_id)
-        };
-        self.running_dirs.lock().unwrap().remove(execution_id);
-
-        if let Some(mut child) = child_opt {
-            let _ = child.kill().await;
+        let row = self
+            .repository
+            .get_by_id(execution_id)
+            .await?
+            .ok_or_else(|| format!("Execution not found: {execution_id}"))?;
+        if row.status != "running" && row.status != "pending" {
+            return Err(format!("Run already finished ({})", row.status));
         }
 
-        // Update database status
-        self.repository
-            .update_status(execution_id, "cancelled".to_string(), None, None)
-            .await?;
-
-        // Clean up output buffer
-        {
-            let mut buffers = self.output_buffers.lock().unwrap();
-            buffers.remove(execution_id);
+        // Flag first, then look for the child: execute_script registers the
+        // child before checking the flag, so one of the two always sees the other.
+        self.cancel_requested
+            .lock()
+            .unwrap()
+            .insert(execution_id.to_string());
+        let pid = self
+            .running_processes
+            .lock()
+            .unwrap()
+            .get(execution_id)
+            .map(|child| child.id());
+        match pid {
+            Some(Some(pid)) => {
+                kill_tree(pid).await;
+                if let Some(child) = self.running_processes.lock().unwrap().get_mut(execution_id) {
+                    let _ = child.start_kill();
+                }
+            }
+            // Already exited; the output task is finishing it.
+            Some(None) => {}
+            // Still spawning: execute_script sees the flag once the child is registered.
+            None if row.status == "pending" => {}
+            // Left over from an earlier Portal session — its process isn't ours to
+            // kill (the pid may be reused), so close the row and say so.
+            None => {
+                self.cancel_requested.lock().unwrap().remove(execution_id);
+                self.repository
+                    .update_status(
+                        execution_id,
+                        "cancelled".to_string(),
+                        None,
+                        Some("Not tracked by this Portal session — marked stopped".to_string()),
+                    )
+                    .await?;
+            }
         }
-
         Ok(())
     }
 
@@ -527,6 +662,18 @@ impl ScriptExecutionService {
     /// Check running processes and sync with database
     /// Called on app startup to reconcile state
     pub async fn sync_running_executions(&self) -> Result<(), String> {
+        // A row still `pending` at startup never got a process.
+        for execution in self.repository.get_pending().await? {
+            self.repository
+                .update_status(
+                    &execution.id,
+                    "failed".to_string(),
+                    None,
+                    Some("Interrupted by app restart".to_string()),
+                )
+                .await?;
+        }
+
         let executions = self.repository.get_running().await?;
 
         for execution in executions {
@@ -607,6 +754,41 @@ impl Clone for ScriptExecutionService {
             running_processes: Arc::clone(&self.running_processes),
             output_buffers: Arc::clone(&self.output_buffers),
             running_dirs: Arc::clone(&self.running_dirs),
+            cancel_requested: Arc::clone(&self.cancel_requested),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_utf8_chunk;
+
+    #[test]
+    fn utf8_split_across_chunks_is_kept_whole() {
+        let bytes = "ok ✓ done\r50%\r100%\n".as_bytes();
+        let cut = 4; // inside the 3-byte ✓
+        let mut carry = Vec::new();
+        let a = decode_utf8_chunk(&mut carry, &bytes[..cut]);
+        let b = decode_utf8_chunk(&mut carry, &bytes[cut..]);
+        assert_eq!(a, "ok ");
+        assert_eq!(a + &b, "ok ✓ done\r50%\r100%\n");
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn invalid_byte_then_split_char_keeps_the_tail() {
+        let mut carry = Vec::new();
+        // bad byte, then the first 2 of the 3 bytes of a check mark
+        let a = decode_utf8_chunk(&mut carry, &[b'x', 0xff, 0xe2, 0x9c]);
+        let b = decode_utf8_chunk(&mut carry, &[0x93]);
+        assert_eq!(a + &b, "x\u{fffd}\u{2713}");
+    }
+
+    #[test]
+    fn invalid_bytes_do_not_end_the_stream() {
+        let mut carry = Vec::new();
+        let out = decode_utf8_chunk(&mut carry, b"a\xffb");
+        assert_eq!(out, "a\u{fffd}b");
+        assert!(carry.is_empty());
     }
 }

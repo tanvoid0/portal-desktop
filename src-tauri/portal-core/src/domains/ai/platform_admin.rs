@@ -124,7 +124,11 @@ async fn probe(base: &str, token: Option<&str>) -> PlatformHealth {
 
 pub async fn platform_health(settings: &AISettingsService) -> PlatformHealth {
     let c = config(settings);
-    let token = c.api_key.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let token = c
+        .api_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     probe(&base_of(&c), token).await
 }
 
@@ -217,7 +221,10 @@ pub async fn start_platform(settings: &AISettingsService) -> StartResult {
         started: false,
         already_running: false,
         pid: Some(pid),
-        detail: format!("Launched {} but /health did not answer within 60s", exe.display()),
+        detail: format!(
+            "Launched {} but /health did not answer within 60s",
+            exe.display()
+        ),
         install_url: None,
     }
 }

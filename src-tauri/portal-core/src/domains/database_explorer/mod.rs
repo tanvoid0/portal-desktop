@@ -33,7 +33,9 @@ pub fn preview_update(
     new_value: &Value,
 ) -> Result<EditPreview, String> {
     match src {
-        Source::Sqlite { .. } => Ok(sqlite::preview_update(table, pk_column, pk_value, column, new_value)),
+        Source::Sqlite { .. } => Ok(sqlite::preview_update(
+            table, pk_column, pk_value, column, new_value,
+        )),
         Source::Server(s) => Ok(sql_server::preview_update(
             sql_server::Engine::parse(&s.engine)?,
             table,
@@ -46,10 +48,18 @@ pub fn preview_update(
 }
 
 /// Build the preview for an INSERT, dispatching to the source's engine.
-pub fn preview_insert(src: &Source, table: &str, values: &[(String, Value)]) -> Result<EditPreview, String> {
+pub fn preview_insert(
+    src: &Source,
+    table: &str,
+    values: &[(String, Value)],
+) -> Result<EditPreview, String> {
     match src {
         Source::Sqlite { .. } => Ok(sqlite::preview_insert(table, values)),
-        Source::Server(s) => Ok(sql_server::preview_insert(sql_server::Engine::parse(&s.engine)?, table, values)),
+        Source::Server(s) => Ok(sql_server::preview_insert(
+            sql_server::Engine::parse(&s.engine)?,
+            table,
+            values,
+        )),
     }
 }
 
@@ -62,8 +72,11 @@ pub fn preview_delete(
 ) -> Result<EditPreview, String> {
     match src {
         Source::Sqlite { .. } => Ok(sqlite::preview_delete(table, pk_column, pk_value)),
-        Source::Server(s) => {
-            Ok(sql_server::preview_delete(sql_server::Engine::parse(&s.engine)?, table, pk_column, pk_value))
-        }
+        Source::Server(s) => Ok(sql_server::preview_delete(
+            sql_server::Engine::parse(&s.engine)?,
+            table,
+            pk_column,
+            pk_value,
+        )),
     }
 }

@@ -32,17 +32,12 @@
   } from '$lib/domains/actions';
   import { GitHubProjectActionsPanel } from '$lib/domains/github';
   import ReleaseCard from './ReleaseCard.svelte';
+  import ActionRunDetail from './ActionRunDetail.svelte';
+  import ActionRunList from './ActionRunList.svelte';
   import {
     scriptExecutionService,
     type ScriptExecutionInfo,
   } from '$lib/domains/scripts/services/scriptExecutionService';
-  import {
-    formatExecutionDuration,
-    getExecutionStatusBadgeVariant,
-    getExecutionStatusBadgeClass,
-    getExecutionStatusColor,
-    getExecutionStatusIcon,
-  } from '$lib/domains/projects/pipelines/utils/executionDisplay';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { coderSession } from '$lib/domains/coder/state/coderSession.svelte.js';
@@ -79,13 +74,9 @@
   let seenProjectId: string | number | undefined;
   let runHistory = $state<ScriptExecutionInfo[]>([]);
   let historyLoading = $state(false);
-  let selectedExecution = $state<ScriptExecutionInfo | null>(null);
-  // Live, not-yet-persisted stdout/stderr for the running execution (QA-130).
-  let liveOutput = $state('');
-
-  const runningExecId = $derived(
-    selectedExecution?.status === 'running' ? selectedExecution.id : null
-  );
+  // The run shown in the detail card; it loads and live-polls itself (QA-130).
+  let selectedRunId = $state<string | null>(null);
+  let runTerminal = $state(false);
 
   const doctorRun = $derived(getDoctorRun(project.id));
   const doctorBusy = $derived(
@@ -125,7 +116,7 @@
     if (verify) {
       lastResult = verify;
       const ls = verify.steps.find((s) => s.executionId);
-      if (ls?.executionId) void openExecution(ls.executionId);
+      if (ls?.executionId) openExecution(ls.executionId);
       if (verify.success) toast.success('Verified — review the changes in Coder');
     }
     await loadHistory();
@@ -210,11 +201,6 @@
     try {
       const recent = await scriptExecutionService.getRecentExecutions(50);
       runHistory = recent.filter(isProjectExecution);
-      // Keep selected detail in sync with fresh data
-      if (selectedExecution) {
-        const updated = runHistory.find((e) => e.id === selectedExecution!.id);
-        selectedExecution = updated ?? selectedExecution;
-      }
     } catch {
       // history is best-effort
     } finally {
@@ -222,18 +208,9 @@
     }
   }
 
-  async function openExecution(executionId: string) {
-    try {
-      const exec = await scriptExecutionService.getExecution(executionId);
-      if (exec) {
-        selectedExecution = exec;
-        return;
-      }
-    } catch {
-      // fall through
-    }
-    const fromList = runHistory.find((e) => e.id === executionId);
-    if (fromList) selectedExecution = fromList;
+  function openExecution(executionId: string, opts?: { terminal?: boolean }) {
+    selectedRunId = executionId;
+    runTerminal = !!opts?.terminal;
   }
 
   function toggleSelect(id: string) {
@@ -259,13 +236,12 @@
 
     running = true;
     lastResult = null;
-    liveOutput = '';
     resetDoctorRun(project.id);
     try {
       const result = await actions.forProject(project).run(target, {
         // Surface the run the moment its process spawns — not after it finishes.
         onStepStart: ({ executionId }) => {
-          void openExecution(executionId);
+          openExecution(executionId);
           void loadHistory();
         },
       });
@@ -273,11 +249,13 @@
       // Prefer showing the script execution record (has persisted output)
       const localStep = result.steps.find((s) => s.executionId);
       if (localStep?.executionId) {
-        await openExecution(localStep.executionId);
+        openExecution(localStep.executionId);
       } else {
-        selectedExecution = null;
+        selectedRunId = null;
       }
-      if (result.success) {
+      if (result.steps.some((s) => s.status === 'cancelled')) {
+        // Stopped by the user — stopRun already said so; not a failure.
+      } else if (result.success) {
         toast.success(
           typeof target === 'string' ? `Ran ${target}` : `Ran ${target.length} actions`,
           result.remoteRunId ? `Remote: ${result.remoteRunId}` : undefined
@@ -313,7 +291,7 @@
       // project's failure/selection so Diagnose never runs A's failure against B.
       if (seenProjectId !== undefined && seenProjectId !== projectId) {
         lastResult = null;
-        selectedExecution = null;
+        selectedRunId = null;
         selected = new Set();
         requirement = '';
       }
@@ -321,37 +299,6 @@
       void loadCatalog();
       void loadHistory();
     });
-  });
-
-  // While the selected run is in flight, poll its live output + status every 1s
-  // so the user sees progress and the terminal result without a manual refresh.
-  $effect(() => {
-    const id = runningExecId;
-    if (!id) {
-      liveOutput = '';
-      return;
-    }
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const [info, live] = await Promise.all([
-          scriptExecutionService.getExecution(id),
-          scriptExecutionService.getLiveOutput(id),
-        ]);
-        if (cancelled) return;
-        liveOutput = live.join('');
-        if (info && selectedExecution?.id === id) selectedExecution = info;
-      } catch {
-        // best-effort; the run still resolves via runTarget's await
-      }
-    };
-    void tick();
-    const interval = setInterval(() => void tick(), 1000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      void loadHistory();
-    };
   });
 </script>
 
@@ -419,7 +366,7 @@
   <div class="flex flex-col gap-6 xl:flex-row xl:items-start">
     <!-- Actions sidebar -->
     <aside
-      class="w-full shrink-0 space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:w-80 xl:overflow-y-auto"
+      class="w-full shrink-0 space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:w-80 xl:overflow-y-auto 2xl:w-96"
     >
       <div class="flex flex-wrap gap-2">
         {#each FILTERS as filter (filter.id)}
@@ -453,7 +400,7 @@
         {#if filteredWorkflows.length > 0}
           <div class="space-y-2">
             <h3 class="text-sm font-medium text-muted-foreground">Workflows</h3>
-            <div class="space-y-2">
+            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
               {#each filteredWorkflows as workflow (workflow.id)}
                 {@const Icon = sourceIcon(workflow.source)}
                 <Card>
@@ -497,7 +444,7 @@
 
         <div class="space-y-2">
           <h3 class="text-sm font-medium text-muted-foreground">Actions</h3>
-          <div class="space-y-2">
+          <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
             {#each filteredActions as action (action.id)}
               {@const Icon = sourceIcon(action.source)}
               <Card>
@@ -645,7 +592,7 @@
                   // "Run failed" card clears because verify.failure is undefined.
                   lastResult = verify;
                   const ls = verify.steps.find((s) => s.executionId);
-                  if (ls?.executionId) void openExecution(ls.executionId);
+                  if (ls?.executionId) openExecution(ls.executionId);
                   if (verify.success)
                     toast.success('Doctor fixed it — review the changes in Coder');
                 }
@@ -823,218 +770,123 @@
         </Card>
       {/if}
 
-      {#if selectedExecution}
-        {@const StatusIcon = getExecutionStatusIcon(selectedExecution.status)}
-        <Card>
-          <CardHeader>
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <CardTitle class="text-base">Run details</CardTitle>
-                <CardDescription>
-                  {selectedExecution.status}
-                  {#if selectedExecution.exitCode != null}
-                    · exit {selectedExecution.exitCode}
+      <div class="grid gap-4 min-[2200px]:grid-cols-2 min-[2200px]:items-start">
+        {#if selectedRunId}
+          <ActionRunDetail
+            executionId={selectedRunId}
+            bind:terminal={runTerminal}
+            onStarted={(id) => {
+              openExecution(id);
+              void loadHistory();
+            }}
+            onChanged={() => void loadHistory()}
+            onClose={() => (selectedRunId = null)}
+          />
+        {:else if lastResult}
+          <Card>
+            <CardHeader>
+              <CardTitle class="text-base">Last run</CardTitle>
+              <CardDescription>
+                {lastResult.success ? 'Succeeded' : 'Failed'} · {lastResult.cwd}
+              </CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-3">
+              {#each lastResult.steps as step (step.actionId + step.name)}
+                <div class="space-y-1 rounded border p-2">
+                  <div class="flex items-center justify-between gap-2 text-sm">
+                    <span class="font-medium">{step.name}</span>
+                    <Badge
+                      variant={step.status === 'success'
+                        ? 'default'
+                        : step.status === 'skipped' || step.status === 'cancelled'
+                          ? 'secondary'
+                          : 'destructive'}
+                    >
+                      {step.status}
+                    </Badge>
+                  </div>
+                  {#if step.command}
+                    <code class="block truncate text-xs text-muted-foreground">
+                      {step.command}
+                    </code>
                   {/if}
-                  · {selectedExecution.workingDirectory ?? project.path}
-                </CardDescription>
-              </div>
-              <Badge
-                variant={getExecutionStatusBadgeVariant(selectedExecution.status)}
-                class="gap-1 {getExecutionStatusBadgeClass(selectedExecution.status)}"
-              >
-                <StatusIcon
-                  class="h-3.5 w-3.5 {getExecutionStatusColor(selectedExecution.status)}"
-                />
-                {selectedExecution.status}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent class="space-y-3">
-            <div>
-              <p class="mb-1 text-xs font-medium text-muted-foreground">Command</p>
-              <code
-                class="block rounded bg-muted px-2 py-1.5 text-xs break-all whitespace-pre-wrap"
-              >
-                {selectedExecution.command}
-              </code>
-            </div>
-            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>
-                Started {new Date(selectedExecution.startedAt).toLocaleString()}
-              </span>
-              <span>
-                Duration: {formatExecutionDuration(
-                  selectedExecution.startedAt,
-                  selectedExecution.finishedAt
-                )}
-              </span>
-            </div>
-            {#if selectedExecution.error}
-              <div>
-                <p class="mb-1 text-xs font-medium text-destructive">Error</p>
-                <pre
-                  class="max-h-40 overflow-auto rounded border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs whitespace-pre-wrap text-destructive">{selectedExecution.error}</pre>
-              </div>
-            {/if}
-            {#if selectedExecution.status === 'running' && liveOutput.trim()}
-              <div>
-                <p class="mb-1 text-xs font-medium text-muted-foreground">Output (live)</p>
-                <pre
-                  class="max-h-72 overflow-auto rounded bg-muted px-2 py-1.5 text-xs whitespace-pre-wrap">{liveOutput}</pre>
-              </div>
-            {:else if selectedExecution.output?.trim()}
-              <div>
-                <p class="mb-1 text-xs font-medium text-muted-foreground">Output</p>
-                <pre
-                  class="max-h-72 overflow-auto rounded bg-muted px-2 py-1.5 text-xs whitespace-pre-wrap">{selectedExecution.output}</pre>
-              </div>
-            {:else if selectedExecution.status === 'running'}
-              <p class="text-xs text-muted-foreground">Running…</p>
-            {:else if !selectedExecution.error}
-              <p class="text-xs text-muted-foreground">No output captured.</p>
-            {/if}
-          </CardContent>
-        </Card>
-      {:else if lastResult}
+                  {#if step.exitCode != null}
+                    <p class="text-xs text-muted-foreground">
+                      Exit code {step.exitCode}
+                    </p>
+                  {/if}
+                  {#if step.error}
+                    <pre
+                      class="max-h-32 overflow-auto text-xs whitespace-pre-wrap text-destructive">{step.error}</pre>
+                  {/if}
+                  {#if step.output?.trim()}
+                    <pre
+                      class="max-h-40 overflow-auto rounded bg-muted px-2 py-1 text-xs whitespace-pre-wrap">{step.output}</pre>
+                  {/if}
+                  {#if step.executionId}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      class="mt-1"
+                      onclick={() => openExecution(step.executionId!)}
+                    >
+                      View full details
+                    </Button>
+                  {/if}
+                </div>
+              {/each}
+            </CardContent>
+          </Card>
+        {/if}
+
         <Card>
           <CardHeader>
-            <CardTitle class="text-base">Last run</CardTitle>
-            <CardDescription>
-              {lastResult.success ? 'Succeeded' : 'Failed'} · {lastResult.cwd}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-3">
-            {#each lastResult.steps as step (step.actionId + step.name)}
-              <div class="space-y-1 rounded border p-2">
-                <div class="flex items-center justify-between gap-2 text-sm">
-                  <span class="font-medium">{step.name}</span>
-                  <Badge
-                    variant={step.status === 'success'
-                      ? 'default'
-                      : step.status === 'skipped'
-                        ? 'secondary'
-                        : 'destructive'}
-                  >
-                    {step.status}
-                  </Badge>
-                </div>
-                {#if step.command}
-                  <code class="block truncate text-xs text-muted-foreground">
-                    {step.command}
-                  </code>
-                {/if}
-                {#if step.exitCode != null}
-                  <p class="text-xs text-muted-foreground">
-                    Exit code {step.exitCode}
-                  </p>
-                {/if}
-                {#if step.error}
-                  <pre
-                    class="max-h-32 overflow-auto text-xs whitespace-pre-wrap text-destructive">{step.error}</pre>
-                {/if}
-                {#if step.output?.trim()}
-                  <pre
-                    class="max-h-40 overflow-auto rounded bg-muted px-2 py-1 text-xs whitespace-pre-wrap">{step.output}</pre>
-                {/if}
-                {#if step.executionId}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    class="mt-1"
-                    onclick={() => void openExecution(step.executionId!)}
-                  >
-                    View full details
-                  </Button>
-                {/if}
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle class="flex items-center gap-2 text-base">
+                  <History class="h-5 w-5" />
+                  Local run history
+                </CardTitle>
+                <CardDescription>Script executions for this project (Actions runs)</CardDescription>
               </div>
-            {/each}
+              <Button
+                variant="ghost"
+                size="sm"
+                onclick={() => void loadHistory()}
+                disabled={historyLoading}
+              >
+                <RefreshCw class="h-4 w-4 {historyLoading ? 'animate-spin' : ''}" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {#if historyLoading && runHistory.length === 0}
+              <PageLoading message="Loading history…" />
+            {:else if runHistory.length === 0}
+              <PageEmpty
+                title="No action runs yet"
+                description="Run an action to see command output and exit details here."
+                icon={History}
+              />
+            {:else}
+              <ActionRunList
+                executions={runHistory}
+                selectedId={selectedRunId}
+                onSelect={(e, opts) => openExecution(e.id, opts)}
+                onStarted={(id) => {
+                  openExecution(id);
+                  void loadHistory();
+                }}
+                onChanged={(deletedId) => {
+                  if (deletedId && deletedId === selectedRunId) selectedRunId = null;
+                  void loadHistory();
+                }}
+              />
+            {/if}
           </CardContent>
         </Card>
-      {/if}
-
-      <Card>
-        <CardHeader>
-          <div class="flex items-center justify-between gap-2">
-            <div>
-              <CardTitle class="flex items-center gap-2 text-base">
-                <History class="h-5 w-5" />
-                Local run history
-              </CardTitle>
-              <CardDescription>Script executions for this project (Actions runs)</CardDescription>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onclick={() => void loadHistory()}
-              disabled={historyLoading}
-            >
-              <RefreshCw class="h-4 w-4 {historyLoading ? 'animate-spin' : ''}" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {#if historyLoading && runHistory.length === 0}
-            <PageLoading message="Loading history…" />
-          {:else if runHistory.length === 0}
-            <PageEmpty
-              title="No action runs yet"
-              description="Run an action to see command output and exit details here."
-              icon={History}
-            />
-          {:else}
-            <div class="space-y-2">
-              {#each runHistory as execution (execution.id)}
-                {@const StatusIcon = getExecutionStatusIcon(execution.status)}
-                <Button
-                  type="button"
-                  variant="outline"
-                  class="h-auto w-full justify-start rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 {selectedExecution?.id ===
-                  execution.id
-                    ? 'border-primary bg-primary/5'
-                    : ''}"
-                  onclick={() => void openExecution(execution.id)}
-                >
-                  <div class="flex w-full flex-wrap items-center justify-between gap-2">
-                    <div class="flex min-w-0 items-center gap-2">
-                      <StatusIcon
-                        class="h-4 w-4 shrink-0 {getExecutionStatusColor(
-                          execution.status
-                        )}{execution.status === 'running' ? ' animate-spin' : ''}"
-                      />
-                      <Badge
-                        variant={getExecutionStatusBadgeVariant(execution.status)}
-                        class={getExecutionStatusBadgeClass(execution.status)}
-                      >
-                        {execution.status}
-                      </Badge>
-                      <span class="truncate text-sm font-medium">
-                        {execution.command}
-                      </span>
-                    </div>
-                    <span class="text-xs text-muted-foreground">
-                      {new Date(execution.startedAt).toLocaleString()}
-                    </span>
-                  </div>
-                  <div
-                    class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
-                  >
-                    <span>
-                      Duration: {formatExecutionDuration(execution.startedAt, execution.finishedAt)}
-                    </span>
-                    {#if execution.exitCode != null}
-                      <span>exit {execution.exitCode}</span>
-                    {/if}
-                    {#if execution.error}
-                      <span class="truncate text-destructive">{execution.error}</span>
-                    {/if}
-                  </div>
-                </Button>
-              {/each}
-            </div>
-          {/if}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   </div>
 
