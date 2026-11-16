@@ -17,8 +17,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::database::DatabaseManager;
-use crate::domains::projects::move_lock;
 use crate::domains::projects::discovery::{DiscoveredProject, DiscoveryReport};
+use crate::domains::projects::move_lock;
 use crate::entities::project::{self, Entity as Project};
 
 /// What a single import changed, so the UI can report it honestly.
@@ -137,6 +137,12 @@ impl DiscoveryRepository {
         }
 
         if mark_missing {
+            // Re-read rather than reuse `existing`: the upsert loop above may have
+            // just adopted a row — repointing a relinked or moved project's
+            // `discovery_path` onto its new location. Checking that against the
+            // pre-upsert snapshot would still see the old key, which this scan
+            // can't have found there, and archive a row that is alive one step up.
+            let existing = Project::find().all(&txn).await.map_err(|e| e.to_string())?;
             let seen: std::collections::HashSet<&str> =
                 report.projects.iter().map(|p| p.path.as_str()).collect();
             // Only roots this run actually walked. A root whose drive was not
@@ -144,10 +150,9 @@ impl DiscoveryRepository {
             // under it would punish the user for unplugging a disk.
             let walked: std::collections::HashSet<&str> =
                 report.roots_scanned.iter().map(String::as_str).collect();
-            for row in existing
-                .iter()
-                .filter(|r| r.discovery_path.is_some() && r.status != "archived" && !moving(&r.path))
-            {
+            for row in existing.iter().filter(|r| {
+                r.discovery_path.is_some() && r.status != "archived" && !moving(&r.path)
+            }) {
                 let key = row.discovery_path.as_deref().unwrap_or_default();
                 if seen.contains(key) {
                     continue;
@@ -271,4 +276,141 @@ fn apply_machine_fields(am: &mut project::ActiveModel, p: &DiscoveredProject, no
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
         .map(|d| d.with_timezone(&Utc).into()));
     am.updated_at = Set(Some(now.into()));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domains::projects::discovery::{
+        ActivityStatus, DiscoveryStats, ProjectGitSummary, RiskLevel,
+    };
+    use crate::domains::projects::services::project_service::ProjectService;
+
+    async fn test_db() -> (Arc<DatabaseManager>, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = DatabaseManager::new(dir.path().to_path_buf())
+            .await
+            .expect("db init");
+        (Arc::new(db), dir)
+    }
+
+    /// A report with one project found under `roots_scanned`, for the
+    /// `mark_missing` path.
+    fn report(path: &str, abs: &str, roots_scanned: &[&str]) -> DiscoveryReport {
+        DiscoveryReport {
+            generated_at: "2026-01-01T00:00:00Z".to_string(),
+            cancelled: false,
+            projects: vec![DiscoveredProject {
+                path: path.to_string(),
+                abs: abs.to_string(),
+                name: "foo".to_string(),
+                area: "apps".to_string(),
+                bucket: "demo".to_string(),
+                module_count: 0,
+                modules: vec![],
+                activity: 0,
+                age_days: None,
+                status: ActivityStatus::Active,
+                git: ProjectGitSummary::default(),
+                langs: vec![],
+                regenerable: vec![],
+                regenerable_bytes: -1,
+                description: None,
+                risk: vec![],
+                risk_level: RiskLevel::None,
+                duplicate_of: vec![],
+            }],
+            clusters: vec![],
+            stats: DiscoveryStats {
+                projects: 1,
+                roots: 1,
+                git_repos: 0,
+                unpushed: 0,
+                no_remote: 0,
+                active: 1,
+                recent: 0,
+                dormant: 0,
+                stale: 0,
+                regenerable_bytes: -1,
+            },
+            roots_scanned: roots_scanned.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// board #210: relink (`UnavailableProjects.svelte`'s `update_project` call)
+    /// repoints `path` but leaves `discovery_path` stale — exactly what
+    /// `ProjectService::update_project` does below. `mark_missing` used to read
+    /// that staleness off the snapshot taken *before* this same `import()`
+    /// call's upsert loop had already adopted the row onto its new key, and
+    /// archived a project this very scan had just found alive.
+    #[tokio::test]
+    async fn relinked_project_found_again_is_not_archived() {
+        let (db, _dir) = test_db().await;
+        let conn = db.get_connection();
+
+        // Seed a row the way discovery itself would have, the first time it
+        // found this project.
+        let now = Utc::now();
+        let seed = project::ActiveModel {
+            name: Set("foo".to_string()),
+            path: Set("C:/old/foo".to_string()),
+            status: Set("active".to_string()),
+            starred: Set(false),
+            open_count: Set(0),
+            size: Set(0),
+            file_count: Set(0),
+            has_uncommitted_changes: Set(false),
+            discovery_path: Set(Some("roots/apps/foo".to_string())),
+            created_at: Set(Some(now.into())),
+            ..Default::default()
+        };
+        let row = seed.insert(conn).await.expect("seed row");
+
+        // Relink to where the folder went — the real command, not a stand-in.
+        let service = ProjectService::new(&db);
+        service
+            .update_project(
+                row.id,
+                None,                           // name
+                None,                           // description
+                Some("C:/new/foo".to_string()), // path
+                None,                           // status
+                None,                           // framework_ids
+                None,                           // package_manager_ids
+                None,                           // language_ids
+                None,                           // build_command
+                None,                           // start_command
+                None,                           // test_command
+                None,                           // output_directory
+                None,                           // dev_port
+                None,                           // prod_port
+            )
+            .await
+            .expect("relink");
+
+        // The next scan walks the same root and finds the project alive at its
+        // new path, under a fresh key (a rename, not just a drive letter change).
+        let rpt = report("roots/apps/foo-renamed", "C:/new/foo", &["roots"]);
+
+        let repo = DiscoveryRepository::new(db.clone());
+        let outcome = repo.import(&rpt, true).await.expect("import");
+
+        assert_eq!(outcome.adopted, vec!["roots/apps/foo-renamed".to_string()]);
+        assert!(
+            outcome.missing.is_empty(),
+            "wrongly archived: {:?}",
+            outcome.missing
+        );
+
+        let reloaded = Project::find_by_id(row.id)
+            .one(conn)
+            .await
+            .expect("reload")
+            .expect("row still exists");
+        assert_eq!(reloaded.status, "active");
+        assert_eq!(
+            reloaded.discovery_path,
+            Some("roots/apps/foo-renamed".to_string())
+        );
+    }
 }
