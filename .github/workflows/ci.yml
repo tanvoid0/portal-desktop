@@ -15,6 +15,10 @@ jobs:
   frontend:
     name: Frontend checks
     runs-on: ubuntu-latest
+    # .npmrc pins store-dir to a local I: drive; on Linux that lands inside the
+    # checkout and prettier --check . scans the whole store.
+    env:
+      npm_config_store_dir: ${{ github.workspace }}/../.pnpm-store
     steps:
       - uses: actions/checkout@v5
 
@@ -75,6 +79,7 @@ jobs:
     # src-tauri/.cargo/config.toml pins target-dir to a local I: drive.
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
+      npm_config_store_dir: ${{ github.workspace }}/../.pnpm-store
     steps:
       - uses: actions/checkout@v5
 
