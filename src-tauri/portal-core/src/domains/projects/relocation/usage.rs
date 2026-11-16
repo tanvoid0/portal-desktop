@@ -84,7 +84,8 @@ pub async fn check(
     let path = source.to_string_lossy().into_owned();
 
     let mut blockers = check_preconditions(db, source, dest).await;
-    blockers.extend(check_portal_usage(&path, coder, terminal, pipelines, scripts, deployments).await);
+    blockers
+        .extend(check_portal_usage(&path, coder, terminal, pipelines, scripts, deployments).await);
     blockers.extend(check_os_processes(&path));
 
     let warnings = check_port_warnings(&path, dev_port, prod_port);
@@ -108,7 +109,8 @@ pub async fn check_in_use(
     deployments: &DeploymentRepository,
 ) -> Vec<Signal> {
     let p = path.to_string_lossy().into_owned();
-    let mut blockers = check_portal_usage(&p, coder, terminal, pipelines, scripts, deployments).await;
+    let mut blockers =
+        check_portal_usage(&p, coder, terminal, pipelines, scripts, deployments).await;
     blockers.extend(check_os_processes(&p));
     blockers
 }
@@ -202,7 +204,9 @@ fn check_free_space(source: &Path, dest: &Path) -> Option<Signal> {
     if avail < needed {
         Some(signal(
             "low_space",
-            format!("Destination has {avail} bytes free, need ~{needed} (1.1x the {total}-byte source)"),
+            format!(
+                "Destination has {avail} bytes free, need ~{needed} (1.1x the {total}-byte source)"
+            ),
         ))
     } else {
         None
@@ -224,7 +228,11 @@ pub async fn in_flight_move_sources(db: &DatabaseManager) -> Vec<String> {
 
 /// Any other `project_moves` row, still in flight, whose source or dest
 /// overlaps either path in this move.
-async fn check_overlapping_moves(db: &DatabaseManager, source: &Path, dest: &Path) -> Option<Signal> {
+async fn check_overlapping_moves(
+    db: &DatabaseManager,
+    source: &Path,
+    dest: &Path,
+) -> Option<Signal> {
     let rows = project_move::Entity::find()
         .all(db.get_connection())
         .await
@@ -239,7 +247,10 @@ async fn check_overlapping_moves(db: &DatabaseManager, source: &Path, dest: &Pat
     })?;
     Some(signal(
         "move_in_progress",
-        format!("Move {} is already in progress for an overlapping path", hit.id),
+        format!(
+            "Move {} is already in progress for an overlapping path",
+            hit.id
+        ),
     ))
 }
 
@@ -263,10 +274,14 @@ async fn check_portal_usage(
 
     if let Ok(processes) = terminal.get_all_processes().await {
         let hit = processes.iter().any(|p| {
-            matches!(p.status.as_str(), "starting" | "running") && is_under(&p.working_directory, path)
+            matches!(p.status.as_str(), "starting" | "running")
+                && is_under(&p.working_directory, path)
         });
         if hit {
-            blockers.push(signal("terminal", "A terminal process is running in this project"));
+            blockers.push(signal(
+                "terminal",
+                "A terminal process is running in this project",
+            ));
         }
     }
 
@@ -282,8 +297,7 @@ async fn check_portal_usage(
         let hit = all.iter().any(|d| {
             matches!(d.status, DeploymentStatus::Running)
                 && d.process_id.is_some()
-                && d
-                    .working_directory
+                && d.working_directory
                     .as_deref()
                     .is_some_and(|wd| is_under(wd, path))
         });
@@ -328,13 +342,19 @@ fn check_os_processes(path: &str) -> Vec<Signal> {
     sys.processes()
         .values()
         .filter(|p| {
-            p.cwd().is_some_and(|c| is_under(&c.to_string_lossy(), path))
-                || p.exe().is_some_and(|e| is_under(&e.to_string_lossy(), path))
+            p.cwd()
+                .is_some_and(|c| is_under(&c.to_string_lossy(), path))
+                || p.exe()
+                    .is_some_and(|e| is_under(&e.to_string_lossy(), path))
         })
         .map(|p| {
             signal(
                 "process",
-                format!("{} (pid {}) is running from this project", p.name(), p.pid()),
+                format!(
+                    "{} (pid {}) is running from this project",
+                    p.name(),
+                    p.pid()
+                ),
             )
         })
         .collect()
@@ -356,7 +376,11 @@ fn check_open_for_write(_path: &Path) -> Option<Signal> {
 /// it; this surfaces the pid + name plus enough (`exe`/`cmdline`/`cwd`) for
 /// the UI to show what it'd actually be ending, and runs [`refuse_kill`] to
 /// decide `killable` up front.
-fn check_port_warnings(path: &str, dev_port: Option<u16>, prod_port: Option<u16>) -> Vec<PortWarning> {
+fn check_port_warnings(
+    path: &str,
+    dev_port: Option<u16>,
+    prod_port: Option<u16>,
+) -> Vec<PortWarning> {
     let mut sys = System::new_all();
     sys.refresh_processes();
 
@@ -423,7 +447,9 @@ pub fn kill_refusal(sys: &System, pid: u32) -> Option<String> {
         .and_then(|p| sys.process(p))
         .and_then(|p| p.user_id())
         .cloned();
-    let windir = std::env::var("WINDIR").or_else(|_| std::env::var("SystemRoot")).ok();
+    let windir = std::env::var("WINDIR")
+        .or_else(|_| std::env::var("SystemRoot"))
+        .ok();
     let process_name = proc.name().to_string();
     let exe = proc.exe().map(|e| e.to_string_lossy().into_owned());
     // Fail closed: either uid unreadable (common for SYSTEM/elevated/protected
@@ -433,7 +459,14 @@ pub fn kill_refusal(sys: &System, pid: u32) -> Option<String> {
         (proc.user_id(), self_uid.as_ref()),
         (Some(a), Some(b)) if a == b
     );
-    refuse_kill(pid, &process_name, exe.as_deref(), &self_chain, different_user, windir.as_deref())
+    refuse_kill(
+        pid,
+        &process_name,
+        exe.as_deref(),
+        &self_chain,
+        different_user,
+        windir.as_deref(),
+    )
 }
 
 /// Docker's own port-forwarder family — on Linux the full name can also show
@@ -473,7 +506,10 @@ fn refuse_kill(
     // can't fire either way, so an unknown executable is refused rather than
     // silently waved through.
     let Some(exe) = exe else {
-        return Some("this process's executable path couldn't be read — refusing to end it unverified".into());
+        return Some(
+            "this process's executable path couldn't be read — refusing to end it unverified"
+                .into(),
+        );
     };
     if let Some(windir) = windir {
         if is_under(exe, windir) {
@@ -483,8 +519,14 @@ fn refuse_kill(
     // Match the forwarder lists against the exe's basename, not the
     // (possibly OS-truncated) process name — over-matching here just refuses
     // a kill that might have been fine, which is the safe direction.
-    let basename = exe.rsplit(['/', '\\']).next().unwrap_or(exe).to_ascii_lowercase();
-    if basename.starts_with(DOCKER_FORWARDER_PREFIX) || OTHER_FORWARDERS.iter().any(|f| basename.contains(f)) {
+    let basename = exe
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(exe)
+        .to_ascii_lowercase();
+    if basename.starts_with(DOCKER_FORWARDER_PREFIX)
+        || OTHER_FORWARDERS.iter().any(|f| basename.contains(f))
+    {
         return Some(format!(
             "{name} only forwards this port — ending it won't free the real server behind it"
         ));
@@ -504,13 +546,40 @@ pub fn owning_pids(port: u16) -> Vec<u32> {
     if !out.status.success() {
         return Vec::new();
     }
-    let needle = format!(":{port} ");
+    parse_listening_pids(&String::from_utf8_lossy(&out.stdout), port)
+}
+
+/// The pids [`owning_pids`] reports, parsed out of `netstat -ano`-shaped
+/// text. Split out from it so this part — the actual parsing — is
+/// unit-testable without shelling out to `netstat`.
+///
+/// Doesn't match the `State` column's text: board #393, that text is
+/// localized (English says "LISTENING", a German install says "ABHÖREN",
+/// and so on), so the original `.contains("LISTENING")` silently found
+/// nothing on a non-English Windows install. The column layout is stable
+/// across locales instead, so this keys off that: a listening TCP row
+/// always has 5 whitespace-separated fields (Proto, Local Address, Foreign
+/// Address, State, PID) — UDP has no State column, so it's 4 — and a
+/// listening socket's Foreign Address is always the unspecified endpoint
+/// (`0.0.0.0:0` / `[::]:0`), an IP literal that's never translated.
+#[cfg(target_os = "windows")]
+fn parse_listening_pids(netstat_output: &str, port: u16) -> Vec<u32> {
+    let port_s = port.to_string();
     let mut seen = std::collections::HashSet::new();
-    String::from_utf8_lossy(&out.stdout)
+    netstat_output
         .lines()
-        .filter(|l| l.contains("LISTENING") && l.contains(&needle))
-        .filter_map(|l| l.split_whitespace().last())
-        .filter_map(|pid| pid.parse::<u32>().ok())
+        .filter_map(|l| {
+            let fields: Vec<&str> = l.split_whitespace().collect();
+            if fields.len() != 5 {
+                return None;
+            }
+            let (local, foreign, pid) = (fields[1], fields[2], fields[4]);
+            let listening = foreign == "0.0.0.0:0" || foreign == "[::]:0";
+            if !listening || local.rsplit(':').next() != Some(port_s.as_str()) {
+                return None;
+            }
+            pid.parse::<u32>().ok()
+        })
         .filter(|pid| seen.insert(*pid))
         .collect()
 }
@@ -592,18 +661,64 @@ mod tests {
 
     #[test]
     fn refuse_kill_blocks_windows_system_binaries() {
-        let reason = refuse_kill(42, "svchost.exe", Some("C:\\Windows\\System32\\svchost.exe"), &[], false, Some("C:\\Windows"));
+        let reason = refuse_kill(
+            42,
+            "svchost.exe",
+            Some("C:\\Windows\\System32\\svchost.exe"),
+            &[],
+            false,
+            Some("C:\\Windows"),
+        );
         assert!(reason.is_some());
-        let ok = refuse_kill(42, "node.exe", Some("D:\\projects\\foo\\node.exe"), &[], false, Some("C:\\Windows"));
+        let ok = refuse_kill(
+            42,
+            "node.exe",
+            Some("D:\\projects\\foo\\node.exe"),
+            &[],
+            false,
+            Some("C:\\Windows"),
+        );
         assert!(ok.is_none());
     }
 
     #[test]
     fn refuse_kill_blocks_known_forwarders() {
-        assert!(refuse_kill(42, "wslrelay.exe", Some("C:\\x\\wslrelay.exe"), &[], false, None).is_some());
-        assert!(refuse_kill(42, "com.docker.backend.exe", Some("/usr/bin/com.docker.backend"), &[], false, None).is_some());
-        assert!(refuse_kill(42, "vpnkit.exe", Some("C:\\x\\vpnkit.exe"), &[], false, None).is_some());
-        assert!(refuse_kill(42, "node.exe", Some("D:\\projects\\foo\\node.exe"), &[], false, None).is_none());
+        assert!(refuse_kill(
+            42,
+            "wslrelay.exe",
+            Some("C:\\x\\wslrelay.exe"),
+            &[],
+            false,
+            None
+        )
+        .is_some());
+        assert!(refuse_kill(
+            42,
+            "com.docker.backend.exe",
+            Some("/usr/bin/com.docker.backend"),
+            &[],
+            false,
+            None
+        )
+        .is_some());
+        assert!(refuse_kill(
+            42,
+            "vpnkit.exe",
+            Some("C:\\x\\vpnkit.exe"),
+            &[],
+            false,
+            None
+        )
+        .is_some());
+        assert!(refuse_kill(
+            42,
+            "node.exe",
+            Some("D:\\projects\\foo\\node.exe"),
+            &[],
+            false,
+            None
+        )
+        .is_none());
     }
 
     #[test]
@@ -611,7 +726,14 @@ mod tests {
         // Linux's `/proc/<pid>/comm` truncates to 15 chars, so the process
         // name alone can't carry "com.docker.backend" — the exe basename
         // (untruncated) must still catch it.
-        let reason = refuse_kill(42, "com.docker.back", Some("/usr/bin/com.docker.backend"), &[], false, None);
+        let reason = refuse_kill(
+            42,
+            "com.docker.back",
+            Some("/usr/bin/com.docker.backend"),
+            &[],
+            false,
+            None,
+        );
         assert!(reason.is_some());
     }
 
@@ -620,5 +742,26 @@ mod tests {
         let mut sys = System::new_all();
         sys.refresh_processes();
         assert!(kill_refusal(&sys, std::process::id()).is_some());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn parse_listening_pids_ignores_localized_state_text() {
+        // board #393: a German install prints "ABHÖREN" where English says
+        // "LISTENING" — the fix must key off column shape and the
+        // (never-translated) foreign-endpoint literal, not that word. Decoy
+        // rows check it doesn't over-match: an ESTABLISHED/"HERGESTELLT"
+        // connection on the same port under a different pid, a UDP row on
+        // the same port (no State column at all), and a listening row on a
+        // different port.
+        let netstat = "\
+  Proto  Lokale Adresse        Remoteadresse          Status          PID
+  TCP    0.0.0.0:3000          0.0.0.0:0              ABHÖREN         4321
+  TCP6   [::]:3000             [::]:0                 ABHÖREN         4321
+  TCP    127.0.0.1:3000        127.0.0.1:55000        HERGESTELLT     9999
+  UDP    0.0.0.0:3000          *:*                                   900
+  TCP    0.0.0.0:4000          0.0.0.0:0              ABHÖREN         222
+";
+        assert_eq!(parse_listening_pids(netstat, 3000), vec![4321]);
     }
 }
