@@ -19,6 +19,7 @@
   import VersionList from '$lib/domains/sdk/components/VersionList.svelte';
   import { goto } from '$app/navigation';
   import { confirmAction } from '$lib/utils/confirm';
+  import { toast } from '$lib/utils/toast';
   import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
 
   interface VersionInfo {
@@ -90,28 +91,30 @@
       const manager = sdkConfig.sdk_managers.find((m) => m.installed);
 
       if (!manager) {
-        // No manager installed, show empty list
+        // The template's "No SDK manager is installed" alert covers this.
         versions = [];
         return;
       }
 
-      // Load installed and available versions
-      const [installedVersionsResult, availableVersionsResult, currentVersionResult] =
-        await Promise.all([
-          invokeClient
-            .post<string[]>('get_manager_installed_versions', { managerName: manager.id })
-            .catch(() => [] as string[]),
-          invokeClient
-            .post<string[]>('get_manager_available_versions', { managerName: manager.id })
-            .catch(() => [] as string[]),
-          invokeClient
-            .post<string | null>('get_manager_current_version', { managerName: manager.id })
-            .catch(() => null as string | null),
-        ]);
+      const [installedRes, availableRes, currentRes] = await Promise.allSettled([
+        invokeClient.post<string[]>('get_manager_installed_versions', { managerName: manager.id }),
+        invokeClient.post<string[]>('get_manager_available_versions', { managerName: manager.id }),
+        invokeClient.post<string | null>('get_manager_current_version', {
+          managerName: manager.id,
+        }),
+      ]);
+      // Installed versions are the page: an unsupported manager must say so, not show "0".
+      // The available list needs the network, so its failure is a warning, not the page.
+      if (installedRes.status === 'rejected') throw installedRes.reason;
+      if (availableRes.status === 'rejected') {
+        toast.warning(`Couldn't list available versions: ${String(availableRes.reason)}`);
+      }
 
-      const installedVersions: string[] = installedVersionsResult || [];
-      const availableVersions: string[] = availableVersionsResult || [];
-      const currentVersion: string | null = currentVersionResult || null;
+      const installedVersions: string[] = installedRes.value || [];
+      const availableVersions: string[] =
+        availableRes.status === 'fulfilled' ? availableRes.value || [] : [];
+      const currentVersion: string | null =
+        currentRes.status === 'fulfilled' ? currentRes.value || null : null;
 
       // Combine installed and available versions
       const allVersions = new Set<string>();
@@ -153,7 +156,8 @@
         return b.version.localeCompare(a.version);
       });
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load versions';
+      // Tauri rejects with the Rust error string, not an Error.
+      error = err instanceof Error ? err.message : String(err);
       console.error('Failed to load versions:', err);
     } finally {
       loadingVersions = false;

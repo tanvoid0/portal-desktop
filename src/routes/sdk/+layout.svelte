@@ -5,26 +5,12 @@
 
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { setContext } from 'svelte';
-  import { createQuery } from '@tanstack/svelte-query';
   import SDKSidebar from '$lib/domains/sdk/components/SDKSidebar.svelte';
   import ShellSidebarLayout from '$lib/components/shell/shell-sidebar-layout.svelte';
   import PageContainer from '$lib/components/shell/page-container.svelte';
   import { page } from '$app/state';
-  import {
-    sdkConfigsQuery,
-    sdkManagersQuery,
-    SDK_QUERIES_CONTEXT,
-    type SdkQueries,
-  } from '$lib/domains/sdk/queries/sdkQueries';
 
   let { children }: { children: Snippet<[]> } = $props();
-
-  // Created once here, for the lifetime of the whole /sdk section — see SDK_QUERIES_CONTEXT's
-  // doc comment for why this must not be duplicated per-page.
-  const configsQuery = createQuery(sdkConfigsQuery);
-  const managersQuery = createQuery(sdkManagersQuery);
-  setContext<SdkQueries>(SDK_QUERIES_CONTEXT, { configsQuery, managersQuery });
 
   let currentPath = $derived(page.url.pathname);
   const navigationItemIds = ['/sdk', '/sdk/managers', '/sdk/services', '/sdk/versions'];

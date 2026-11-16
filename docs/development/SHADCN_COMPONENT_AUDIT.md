@@ -64,15 +64,12 @@ Status: `ok` | `pending` | `exception`
 
 ### SDK
 
-| File                          | shadcn        | Raw issues        | Phase | Status |
-| ----------------------------- | ------------- | ----------------- | ----- | ------ |
-| ServiceManagementTable.svelte | Table, Button | Raw input/select  | 3     | ok     |
-| VersionManagerTable.svelte    | Table, Button | Raw input         | 3     | ok     |
-| SDKSidebar.svelte             | Button        | Raw toggle button | 3     | ok     |
-| SDKCategorySection.svelte     | —             | Raw expand button | 3     | ok     |
-| SDKServiceToggle.svelte       | —             | Raw toggle        | 3     | ok     |
-| ServiceCard.svelte            | Card, Button  | Confirm overlay   | 2     | ok     |
-| CustomDirectoryManager.svelte | Dialog, Input | Raw select        | 3     | ok     |
+| File                      | shadcn       | Raw issues        | Phase | Status |
+| ------------------------- | ------------ | ----------------- | ----- | ------ |
+| SDKSidebar.svelte         | Button       | Raw toggle button | 3     | ok     |
+| SDKCategorySection.svelte | —            | Raw expand button | 3     | ok     |
+| SDKServiceToggle.svelte   | —            | Raw toggle        | 3     | ok     |
+| ServiceCard.svelte        | Card, Button | Confirm overlay   | 2     | ok     |
 
 ### Projects / pipelines
 

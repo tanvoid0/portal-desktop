@@ -22,6 +22,7 @@
   import { Input } from '$lib/components/ui/input';
   import { PageError, PageHeader, PageLoading } from '$lib/components/shell';
   import { confirmAction } from '$lib/utils/confirm';
+  import { toast } from '$lib/utils/toast';
   import { buildTabUrl, resolveUrlTab } from '$lib/utils/url-tabs';
 
   const MANAGER_TABS = ['installed', 'available'] as const;
@@ -59,6 +60,8 @@
   let availableVersions = $state<string[]>([]);
   let currentVersion = $state<string | null>(null);
   let loadingVersions = $state(false);
+  // Kept apart from `error`: a manager Portal can't drive yet must not hide its info card.
+  let versionsError = $state<string | null>(null);
   let installingVersion = $state<string | null>(null);
   let switchingVersion = $state<string | null>(null);
 
@@ -101,23 +104,26 @@
     if (!manager || !manager.installed) return;
 
     loadingVersions = true;
+    versionsError = null;
     try {
-      const [installed, available, current] = await Promise.all([
-        invoke<string[]>('get_manager_installed_versions', {
-          managerName: manager.id,
-        }).catch(() => []),
-        invoke<string[]>('get_manager_available_versions', {
-          managerName: manager.id,
-        }).catch(() => []),
-        invoke<string | null>('get_manager_current_version', {
-          managerName: manager.id,
-        }).catch(() => null),
+      const [installed, available, current] = await Promise.allSettled([
+        invoke<string[]>('get_manager_installed_versions', { managerName: manager.id }),
+        invoke<string[]>('get_manager_available_versions', { managerName: manager.id }),
+        invoke<string | null>('get_manager_current_version', { managerName: manager.id }),
       ]);
+      // Installed versions must load (an unsupported manager says so instead of showing "0");
+      // the available list needs the network, so its failure is only a warning.
+      if (installed.status === 'rejected') throw installed.reason;
+      if (available.status === 'rejected') {
+        toast.warning(`Couldn't list available versions: ${String(available.reason)}`);
+      }
 
-      installedVersions = installed;
-      availableVersions = available;
-      currentVersion = current;
+      installedVersions = installed.value;
+      availableVersions = available.status === 'fulfilled' ? available.value : [];
+      currentVersion = current.status === 'fulfilled' ? current.value : null;
     } catch (err) {
+      // Tauri rejects with the Rust error string, not an Error.
+      versionsError = err instanceof Error ? err.message : String(err);
       console.error('Failed to load versions:', err);
     } finally {
       loadingVersions = false;
@@ -317,6 +323,8 @@
                   <div class="flex items-center justify-center py-8">
                     <RefreshCw class="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
+                {:else if versionsError}
+                  <p class="py-8 text-center text-destructive">{versionsError}</p>
                 {:else if installedVersions.length === 0}
                   <p class="py-8 text-center text-muted-foreground">No versions installed</p>
                 {:else}

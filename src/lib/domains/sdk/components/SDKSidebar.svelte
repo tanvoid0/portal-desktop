@@ -18,12 +18,11 @@
   import Package from '~icons/fa6-solid/box-open';
   import Download from '~icons/fa6-solid/download';
   import ArrowLeft from '~icons/fa6-solid/arrow-left';
-  import { getContext } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { logger } from '$lib/domains/shared';
   import type { ProcessedSDKConfig } from '$lib/domains/sdk/services/sdkConfigService';
-  import { SDK_QUERIES_CONTEXT, type SdkQueries } from '$lib/domains/sdk/queries/sdkQueries';
-  import { useQueryClient } from '@tanstack/svelte-query';
+  import { sdkConfigsQuery, sdkManagersQuery } from '$lib/domains/sdk/queries/sdkQueries';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -68,7 +67,8 @@
   });
   let lastSelectedItemId = $state<string | null>(null);
 
-  const { configsQuery, managersQuery } = getContext<SdkQueries>(SDK_QUERIES_CONTEXT);
+  const configsQuery = createQuery(sdkConfigsQuery);
+  const managersQuery = createQuery(sdkManagersQuery);
   const queryClient = useQueryClient();
   const sdkConfigs = $derived<ProcessedSDKConfig[]>(configsQuery.data ?? []);
   const sdkManagers = $derived<SDKManager[]>(managersQuery.data ?? []);
@@ -278,16 +278,15 @@
     lastSelectedItemId = selectedItem;
   });
 
-  // If nothing is selected yet, show something by default.
+  // If nothing is selected yet, open languages + managers once data arrives. Once only: re-running
+  // looped forever when there were no languages (each write re-triggered it), and re-opened the
+  // section every time the user collapsed it. Empty categories are hidden, so opening them is moot.
+  let defaultSectionsOpened = false;
   $effect(() => {
-    if (sidebarLoading) return;
+    if (sidebarLoading || defaultSectionsOpened) return;
+    defaultSectionsOpened = true;
     if (selectedItem) return;
-    if (openSections.language) return;
-    openSections = {
-      ...openSections,
-      language: categories.some((c) => c.key === 'language' && c.items.length > 0),
-      manager: categories.some((c) => c.key === 'manager' && c.items.length > 0),
-    };
+    openSections = { ...openSections, language: true, manager: true };
   });
 
   // Map SDK types to their route paths - use dynamic route

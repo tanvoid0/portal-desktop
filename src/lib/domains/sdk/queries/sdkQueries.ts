@@ -1,9 +1,10 @@
-import type { CreateQueryResult } from '@tanstack/svelte-query';
 import { queryKeys } from '$lib/domains/shared/query/keys';
-import { sdkConfigService, type ProcessedSDKConfig } from '../services/sdkConfigService';
-import { listSDKManagers, type SDKManagerInfo } from '../services/sdkManagerService';
+import { sdkConfigService } from '../services/sdkConfigService';
+import { listSDKManagers } from '../services/sdkManagerService';
 
-// Shared by the sidebar and every /sdk page so one probe pass serves them all.
+// Each consumer calls `createQuery(sdkConfigsQuery)` itself; TanStack dedupes by key, so one
+// probe pass still serves the sidebar and every /sdk page. Sharing one result object through
+// context let a render stall in the page freeze the sidebar too, so don't go back to that.
 export const sdkConfigsQuery = () => ({
   queryKey: queryKeys.sdk.configs,
   queryFn: () => sdkConfigService.getAllSDKConfigs(),
@@ -15,17 +16,3 @@ export const sdkManagersQuery = () => ({
   queryFn: () => listSDKManagers(),
   refetchOnWindowFocus: false,
 });
-
-export interface SdkQueries {
-  configsQuery: CreateQueryResult<ProcessedSDKConfig[]>;
-  managersQuery: CreateQueryResult<SDKManagerInfo[]>;
-}
-
-/**
- * `/sdk/+layout.svelte` creates the two queries above exactly once and sets this context —
- * the sidebar and every `/sdk/*` page read them from here instead of each calling
- * `createQuery` again. On a cold mount, two independent `createQuery` calls for the identical
- * key could end up as two separate observers racing each other (one resolving, the other
- * stuck); sharing a single pair of observers makes that divergence structurally impossible.
- */
-export const SDK_QUERIES_CONTEXT = Symbol('sdk-queries');

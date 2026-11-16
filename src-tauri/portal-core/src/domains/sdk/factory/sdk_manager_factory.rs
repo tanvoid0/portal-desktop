@@ -1,5 +1,5 @@
 use crate::domains::sdk::managers::{
-    NvmManager, PhpenvManager, PyenvManager, RbenvManager, RustupManager, SdkmanManager,
+    NvmManager, RustupManager, SdkmanManager,
 };
 use crate::domains::sdk::traits::sdk_manager::SDKManager;
 use crate::domains::sdk::SDKError;
@@ -26,10 +26,7 @@ impl SDKManagerFactory {
         // Register all available managers
         factory.register_manager("nvm", Box::new(NvmManager::new()));
         factory.register_manager("rustup", Box::new(RustupManager::new()));
-        factory.register_manager("pyenv", Box::new(PyenvManager::new()));
         factory.register_manager("sdk", Box::new(SdkmanManager::new()));
-        factory.register_manager("rbenv", Box::new(RbenvManager::new()));
-        factory.register_manager("phpenv", Box::new(PhpenvManager::new()));
 
         factory
     }
