@@ -1,35 +1,35 @@
-// Checks whether the stuck "running" session (started 16:56, before this
-// instance's own 18:03 start) also shows "running" on its own detail page,
-// and whether opening it triggers any reconciliation.
-import { chromium } from '@playwright/test';
-import { existsSync, mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+// Re-verify QA-127 scenario B on the current route (/ai/agents, sidebar +
+// detail panel — the old separate /agents/sessions table route is gone).
+// Checks whether a session (identified by a snippet of its first-message
+// title, shown as the sidebar row's label) shows a terminal status with an
+// end time, instead of floating at "running" forever — which is what
+// `reconcile_stale_sessions()` (src-tauri/src/lib.rs:292) is supposed to fix
+// on the next app startup after a process that left it "running" is gone.
+//
+//   node .claude/qa/scripts/QA-127-stale-session-check.mjs "<row text snippet>"
+import { open } from './app.mjs';
 
-const SHOTS = fileURLToPath(new URL('../shots/', import.meta.url));
-async function shot(page, name) {
-  mkdirSync(SHOTS, { recursive: true });
-  let path = `${SHOTS}${name}.png`;
-  for (let i = 2; existsSync(path); i++) path = `${SHOTS}${name}-${i}.png`;
-  await page.screenshot({ path, fullPage: true });
-  return path;
+const needle = process.argv[2];
+if (!needle) {
+  console.error('usage: node QA-127-stale-session-check.mjs "<sidebar row text snippet>"');
+  process.exit(1);
 }
 
-const cdpPort = process.env.CDP_PORT ?? '9222';
-const browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`, { timeout: 2000 });
-const page = browser.contexts()[0].pages()[0];
+const app = await open('ai/agents');
+const { page } = app;
 
-await page.goto(page.url().replace(/\/agents\/.*/, '/agents/sessions'));
-await page.waitForLoadState('load');
-await page.waitForTimeout(1000);
-
-// Row with started "Today, 16:56" per earlier screenshot.
-const row = page.locator('table tbody tr', { hasText: '16:56' });
+const row = page.locator('[role="group"]', { hasText: needle }).first();
+await row.waitFor({ timeout: 10000 });
 await row.click();
 await page.waitForLoadState('load');
 await page.waitForTimeout(1000);
-console.log('screenshot:', await shot(page, 'QA-127-stale-running-session-detail'));
+console.log('screenshot:', await app.shot('QA-127-stale-running-session-detail'));
 
 const bodyText = await page.locator('body').innerText();
-console.log('contains "running":', bodyText.toLowerCase().includes('running'));
+console.log('status line contains "Running":', bodyText.includes('Running'));
+console.log('status line contains "Ended":', bodyText.includes('Ended'));
+console.log('has Transcript tab:', bodyText.includes('Transcript'));
+console.log('has Timeline tab:', bodyText.includes('Timeline'));
+console.log('has Agents tab (should be false — known pending decision):', bodyText.includes('Agents tab'));
 
-await browser.close();
+await app.done();
