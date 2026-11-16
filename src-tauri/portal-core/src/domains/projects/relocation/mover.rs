@@ -604,10 +604,10 @@ impl Mover<'_> {
         blocking(|| {
             let manifest = read_validated_manifest(&row).map_err(MoveError::Failed)?;
             let hold = verify_source_removable(&source, &dest, &manifest)?;
-            // ponytail: the hold carries no FILE_SHARE_DELETE, so it would make
-            // the Recycle Bin move itself fail — it must close just before
-            // `trash::delete`, leaving a microsecond gap instead of the whole
-            // hash pass. Close it for good with a delete-sharing hold if needed.
+            // No share-mode hold can stay open across the Recycle Bin move (any
+            // open handle under the source fails the rename), so it closes here.
+            // The gap is accepted: a write landing in it goes to the Recycle Bin
+            // with the source, and the destination already holds the verified copy.
             drop(hold);
             trash::delete(&source).map_err(|e| MoveError::Failed(format!("recycle source: {e}")))
         })
@@ -1003,7 +1003,14 @@ fn verify_source_removable(
     dest: &Path,
     manifest: &Manifest,
 ) -> Result<SourceHold, MoveError> {
-    let hold = source_hold::acquire(source, &rel_paths(&manifest.entries))?;
+    let hold =
+        source_hold::acquire(source, &rel_paths(&manifest.entries)).map_err(|e| match e {
+            // A file gone since the move (os error 2/3) is "source changed", not a hold failure.
+            MoveError::Failed(m) if m.contains("(os error 2)") || m.contains("(os error 3)") => {
+                MoveError::Failed("source changed since the move — refusing to delete it".into())
+            }
+            e => e,
+        })?;
     let current = rewalk(source, &manifest.skipped_dirs).map_err(MoveError::Failed)?;
     if !same_set(&current, &manifest.entries) {
         return Err(MoveError::Failed(
@@ -2029,6 +2036,48 @@ mod tests {
         assert!(open_w().is_err());
         drop(hold);
         assert!(open_w().is_ok());
+    }
+
+    /// #414: the hold must be gone before the Recycle Bin move — a live hold
+    /// fails the directory rename (os error 32). Rename stands in for the trash.
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn source_is_movable_only_after_the_hold_drops() {
+        let root = tempdir().unwrap();
+        let src = root.path().join("src");
+        let dst = root.path().join("dst");
+        write(&src.join("a.txt"), "a");
+        write(&dst.join("a.txt"), "a");
+        let (entries, _) = build_manifest(&src, false).unwrap();
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            skipped_dirs: vec![],
+            entries,
+        };
+        let hold = verify_source_removable(&src, &dst, &manifest).unwrap();
+        assert!(fs::rename(&src, root.path().join("gone")).is_err());
+        drop(hold);
+        fs::rename(&src, root.path().join("gone")).unwrap();
+    }
+
+    /// #414: a source file deleted since the move reads as "source changed".
+    #[test]
+    fn verify_source_removable_reports_a_vanished_file_as_changed() {
+        let src = tempdir().unwrap();
+        let dst = tempdir().unwrap();
+        write(&src.path().join("a.txt"), "a");
+        write(&dst.path().join("a.txt"), "a");
+        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            skipped_dirs: vec![],
+            entries,
+        };
+        fs::remove_file(src.path().join("a.txt")).unwrap();
+        match verify_source_removable(src.path(), dst.path(), &manifest) {
+            Err(MoveError::Failed(m)) => assert!(m.contains("source changed"), "{m}"),
+            other => panic!("unexpected: {other:?}"),
+        }
     }
 
     #[test]
