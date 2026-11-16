@@ -26,6 +26,10 @@ pub async fn get_project(
 /// workflow is handed `output_directory`. Writing one of these plants a command
 /// the user runs next time they click Run, so a remote caller needs
 /// `terminal.exec` for it, not just the default `projects`. Local IPC passes.
+///
+/// `name` reaches a shell too: pipeline steps and actions substitute
+/// `${PROJECT_NAME}` raw into `cmd /C` / `sh -c`. A default device may still
+/// rename, but only to a name with no shell meaning (see [`shell_inert`]).
 pub(crate) fn require_exec_for_run_fields(
     caller: &crate::rpc::Caller,
     path: &Option<String>,
@@ -33,6 +37,7 @@ pub(crate) fn require_exec_for_run_fields(
     start_command: &Option<String>,
     test_command: &Option<String>,
     output_directory: &Option<String>,
+    name: &Option<String>,
 ) -> Result<(), String> {
     let touched = [
         path,
@@ -43,10 +48,23 @@ pub(crate) fn require_exec_for_run_fields(
     ]
     .iter()
     .any(|f| f.is_some());
-    if touched {
+    if touched || name.as_deref().is_some_and(|n| !shell_inert(n)) {
         caller.require("terminal.exec")?;
     }
     Ok(())
+}
+
+/// ASCII letters, digits, space, `.`, `_`, `-`; no word that starts with `-`
+/// or is empty / all dots. So no `cmd` or `sh` metacharacter, no `--option`
+/// smuggled into whatever command a template splices `${PROJECT_NAME}` into
+/// unquoted, and no `..` path segment. ASCII only: Windows best-fit turns
+/// letters like U+02BA into `"` for programs that read an ANSI argv.
+fn shell_inert(name: &str) -> bool {
+    name.chars()
+        .all(|c| c.is_ascii_alphanumeric() || " ._-".contains(c))
+        && name
+            .split(' ')
+            .all(|w| !w.starts_with('-') && !w.chars().all(|c| c == '.'))
 }
 
 /// `terminal.exec`, not `projects`: a new project always sets `path`, the
@@ -113,6 +131,7 @@ pub async fn update_project(
         &start_command,
         &test_command,
         &output_directory,
+        &name,
     )?;
     let service = ProjectService::new(&db_manager);
     service

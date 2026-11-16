@@ -366,7 +366,7 @@ mod tests {
     /// Run/Build/Test, in its `path`, so writing one is running a command:
     /// `terminal.exec`, not the default `projects`. Creating always sets
     /// `path`; updating is gated per field, so a default device can still
-    /// rename, describe or re-status a project.
+    /// rename (to a shell-inert name), describe or re-status a project.
     #[test]
     fn project_run_fields_need_terminal_exec() {
         use crate::domains::projects::commands::require_exec_for_run_fields as guard;
@@ -382,15 +382,81 @@ mod tests {
             f[i] = Some("calc.exe".into());
             let caller = default_remote();
             assert!(
-                guard(&caller, &f[0], &f[1], &f[2], &f[3], &f[4]).is_err(),
+                guard(&caller, &f[0], &f[1], &f[2], &f[3], &f[4], &None).is_err(),
                 "field {i}"
             );
             assert_eq!(caller.denied(), Some("terminal.exec"), "field {i}");
-            assert!(guard(&Caller::local(), &f[0], &f[1], &f[2], &f[3], &f[4]).is_ok());
-            assert!(guard(&exec_remote, &f[0], &f[1], &f[2], &f[3], &f[4]).is_ok());
+            assert!(guard(&Caller::local(), &f[0], &f[1], &f[2], &f[3], &f[4], &None).is_ok());
+            assert!(guard(&exec_remote, &f[0], &f[1], &f[2], &f[3], &f[4], &None).is_ok());
         }
         let none = None;
-        assert!(guard(&default_remote(), &none, &none, &none, &none, &none).is_ok());
+        assert!(guard(&default_remote(), &none, &none, &none, &none, &none, &none).is_ok());
+
+        // `${PROJECT_NAME}` is spliced raw into `cmd /C` / `sh -c`.
+        let rename = |n: &str| Some(n.to_string());
+        for ok in ["My App", "portal_desktop-2.0", "v1.2 beta"] {
+            assert!(
+                guard(
+                    &default_remote(),
+                    &none,
+                    &none,
+                    &none,
+                    &none,
+                    &none,
+                    &rename(ok)
+                )
+                .is_ok(),
+                "{ok:?}"
+            );
+        }
+        for bad in [
+            "x & calc.exe & rem",
+            "x | y",
+            "a;b",
+            "$(id)",
+            "`id`",
+            "%PATH%",
+            "a
+b",
+            "a	b",
+            "\"q",
+            "x > out",
+            "-rf",
+            "x --upload-pack calc",
+            "Café",
+            "\u{2BA}-x\u{2BA}",
+            "",
+            ".",
+            "out ..",
+            "a  b",
+        ] {
+            let caller = default_remote();
+            assert!(
+                guard(&caller, &none, &none, &none, &none, &none, &rename(bad)).is_err(),
+                "{bad:?}"
+            );
+            assert_eq!(caller.denied(), Some("terminal.exec"), "{bad:?}");
+            assert!(guard(
+                &Caller::local(),
+                &none,
+                &none,
+                &none,
+                &none,
+                &none,
+                &rename(bad)
+            )
+            .is_ok());
+            assert!(guard(
+                &exec_remote,
+                &none,
+                &none,
+                &none,
+                &none,
+                &none,
+                &rename(bad)
+            )
+            .is_ok());
+        }
     }
 
     /// Reading back a past run's full transcript is a wholesale data grant
