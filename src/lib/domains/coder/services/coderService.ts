@@ -274,6 +274,11 @@ export class CoderService {
     });
   }
 
+  /** Push the current branch to origin (sets upstream if missing). Never force-pushes. */
+  gitPush(workspaceRoot: string): Promise<string> {
+    return invoke<string>('coder_git_push', { workspaceRoot });
+  }
+
   /** The run finished. */
   onDone(cb: (p: CoderDoneEvent) => void): Promise<UnlistenFn> {
     return listen<CoderDoneEvent>('coder://done', (e) => cb(e.payload));

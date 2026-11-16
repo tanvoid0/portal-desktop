@@ -21,6 +21,7 @@
   import { cn } from '$lib/utils';
   import Archive from '~icons/fa6-solid/box-archive';
   import TruckMoving from '~icons/fa6-solid/truck-moving';
+  import CloudArrowUp from '~icons/fa6-solid/cloud-arrow-up';
   import Ellipsis from '~icons/fa6-solid/ellipsis';
   import ExternalLink from '~icons/fa6-solid/arrow-up-right-from-square';
   import Flag from '~icons/fa6-solid/flag';
@@ -39,10 +40,13 @@
   } from '$lib/domains/projects/utils/launch';
   import { goto } from '$app/navigation';
   import GitCommitDialog from '$lib/domains/coder/components/GitCommitDialog.svelte';
+  import { coderService } from '$lib/domains/coder/services/coderService';
   import MoveProjectDialog from './MoveProjectDialog.svelte';
   import { queryClient, invalidateProjectsList } from '$lib/domains/shared/query';
   import { createProjectMovesQuery } from '$lib/domains/projects/queries/projectMoveQueries';
   import { findActiveMove } from '$lib/domains/projects/api/projectMoveApi';
+  import { confirmAction } from '$lib/utils/confirm';
+  import { toast } from '$lib/utils/toast';
 
   interface Props {
     project: Project;
@@ -69,13 +73,31 @@
   let groupOpen = $state(false);
   let commitOpen = $state(false);
   let moveOpen = $state(false);
+  let pushing = $state(false);
 
   const movesQuery = createProjectMovesQuery();
   const activeMove = $derived(findActiveMove(movesQuery.data, Number(project.id)));
 
-  const needsAttention = $derived(
-    project.has_uncommitted_changes || (project.unpushed_commits ?? 0) > 0
-  );
+  const unpushedCount = $derived(project.unpushed_commits ?? 0);
+  const needsAttention = $derived(project.has_uncommitted_changes || unpushedCount > 0);
+
+  async function push() {
+    const ok = await confirmAction(
+      `Push ${unpushedCount} commit${unpushedCount === 1 ? '' : 's'} on this branch to origin?`,
+      'Push commits?'
+    );
+    if (!ok) return;
+    pushing = true;
+    try {
+      const branch = await coderService.gitPush(project.path);
+      toast.success(`Pushed ${branch}`);
+      invalidateProjectsList(queryClient);
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      pushing = false;
+    }
+  }
 
   // Read-only evidence shown next to the stage picker — never sets anything itself.
   const stageHint = $derived.by(() => {
@@ -152,6 +174,12 @@
         <DropdownMenuItem onclick={() => (commitOpen = true)}>
           <GitCommitHorizontal class="mr-2 h-4 w-4" />
           Review & commit…
+        </DropdownMenuItem>
+      {/if}
+      {#if unpushedCount > 0}
+        <DropdownMenuItem disabled={pushing} onclick={() => void push()}>
+          <CloudArrowUp class="mr-2 h-4 w-4" />
+          Push commits…
         </DropdownMenuItem>
       {/if}
       <DropdownMenuSub>

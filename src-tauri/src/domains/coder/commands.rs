@@ -467,6 +467,13 @@ pub fn coder_git_commit(
     super::git_commit::git_commit(&workspace_root, &title, summary.as_deref())
 }
 
+/// Pushes the current branch to `origin`. Never force-pushes — see
+/// `git_push::push_args`.
+#[portal_rpc_macro::rpc(cap = "coder")]
+pub fn coder_git_push(workspace_root: String) -> Result<String, String> {
+    super::git_push::git_push(&workspace_root)
+}
+
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_submit_command_result(
     service: State<'_, Arc<CoderService>>,
