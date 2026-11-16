@@ -21,7 +21,38 @@ pub async fn get_project(
     service.get_project(id).await.map_err(|e| e.to_string())
 }
 
-#[portal_rpc_macro::rpc(cap = "projects")]
+/// Run/Build/Test (and pipelines) execute a project's commands as typed, with
+/// `path` as the working directory and `${PROJECT_PATH}`; the n8n deploy
+/// workflow is handed `output_directory`. Writing one of these plants a command
+/// the user runs next time they click Run, so a remote caller needs
+/// `terminal.exec` for it, not just the default `projects`. Local IPC passes.
+pub(crate) fn require_exec_for_run_fields(
+    caller: &crate::rpc::Caller,
+    path: &Option<String>,
+    build_command: &Option<String>,
+    start_command: &Option<String>,
+    test_command: &Option<String>,
+    output_directory: &Option<String>,
+) -> Result<(), String> {
+    let touched = [
+        path,
+        build_command,
+        start_command,
+        test_command,
+        output_directory,
+    ]
+    .iter()
+    .any(|f| f.is_some());
+    if touched {
+        caller.require("terminal.exec")?;
+    }
+    Ok(())
+}
+
+/// `terminal.exec`, not `projects`: a new project always sets `path`, the
+/// working directory its Run/Build/Test commands execute in (see
+/// [`require_exec_for_run_fields`]).
+#[portal_rpc_macro::rpc(cap = "terminal.exec")]
 pub async fn create_project(
     name: String,
     description: Option<String>,
@@ -72,8 +103,17 @@ pub async fn update_project(
     output_directory: Option<String>,
     dev_port: Option<i32>,
     prod_port: Option<i32>,
+    caller: crate::rpc::Caller,
     db_manager: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<Option<crate::domains::projects::entities::ProjectResponse>, String> {
+    require_exec_for_run_fields(
+        &caller,
+        &path,
+        &build_command,
+        &start_command,
+        &test_command,
+        &output_directory,
+    )?;
     let service = ProjectService::new(&db_manager);
     service
         .update_project(

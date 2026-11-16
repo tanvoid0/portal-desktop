@@ -362,6 +362,37 @@ mod tests {
         }
     }
 
+    /// A project's start/build/test commands run as typed when the user clicks
+    /// Run/Build/Test, in its `path`, so writing one is running a command:
+    /// `terminal.exec`, not the default `projects`. Creating always sets
+    /// `path`; updating is gated per field, so a default device can still
+    /// rename, describe or re-status a project.
+    #[test]
+    fn project_run_fields_need_terminal_exec() {
+        use crate::domains::projects::commands::require_exec_for_run_fields as guard;
+        assert_eq!(capability("create_project"), Some("terminal.exec"));
+        assert_eq!(capability("update_project"), Some("projects"));
+
+        let default_remote =
+            || Caller::remote(DEFAULT_CAPS.iter().map(|c| c.to_string()).collect());
+        let exec_remote = Caller::remote(vec!["projects".into(), "terminal.exec".into()]);
+        // path, build_command, start_command, test_command, output_directory
+        for i in 0..5 {
+            let mut f: [Option<String>; 5] = Default::default();
+            f[i] = Some("calc.exe".into());
+            let caller = default_remote();
+            assert!(
+                guard(&caller, &f[0], &f[1], &f[2], &f[3], &f[4]).is_err(),
+                "field {i}"
+            );
+            assert_eq!(caller.denied(), Some("terminal.exec"), "field {i}");
+            assert!(guard(&Caller::local(), &f[0], &f[1], &f[2], &f[3], &f[4]).is_ok());
+            assert!(guard(&exec_remote, &f[0], &f[1], &f[2], &f[3], &f[4]).is_ok());
+        }
+        let none = None;
+        assert!(guard(&default_remote(), &none, &none, &none, &none, &none).is_ok());
+    }
+
     /// Reading back a past run's full transcript is a wholesale data grant
     /// (every tool input/output, file content, command output that run ever
     /// touched), so it opts in rather than riding the default `agents` grant.
@@ -482,6 +513,7 @@ mod tests {
         assert_eq!(capability("coder_write_file"), Some("coder.exec"));
         assert_eq!(capability("get_dashboard_overview"), Some("dashboard"));
         assert_eq!(capability("get_all_projects"), Some("projects"));
+        assert_eq!(capability("create_project"), Some("terminal.exec"));
         assert_eq!(capability("create_task"), Some("tasks"));
         assert_eq!(capability("load_command_history"), Some("terminal"));
         assert_eq!(capability("create_terminal_process"), Some("terminal.exec"));

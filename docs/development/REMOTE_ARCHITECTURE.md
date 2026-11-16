@@ -395,10 +395,11 @@ write any file on the PC (a `.bat` in the Startup folder), then run it with
 Anything that keeps the agent's turn loop going is `coder.exec`, even a
 denial. In auto-accept mode, or under an allow rule, the next tool call runs
 without a prompt. The gate is the static `#[rpc(cap = "coder.exec")]` check, so
-local IPC and loopback are never held to it. `Caller::require` is still there
-for a command that has to be gated on its arguments. None needs that yet.
-Devices paired before this change keep their stored caps, so they lose the
-`coder.exec` commands until they are granted it in the devices list.
+local IPC and loopback are never held to it. `Caller::require` is there for a
+command that has to be gated on its arguments; `update_project` (below) is the
+first to need it. Devices paired before this change keep their stored caps, so
+they lose the `coder.exec` commands until they are granted it in the devices
+list.
 
 Separately, `coder::tools::resolve` is the one path guard that every coder file
 access goes through: agent tools, `coder_write_file`, change accept/reject and
@@ -409,6 +410,25 @@ would follow it. The agent's `search_files` walks the tree itself, so it skips
 links instead (a junction looping back to the root used to recurse until the
 stack overflowed). This guard keeps the agent inside the workspace it was given.
 It does not decide whether a remote device may write at all; the cap does that.
+
+Projects had the same hole one step removed (fixed 2026-11-16). A project's
+`start_command`, `build_command` and `test_command` run as typed when the user
+clicks Run/Build/Test (and in pipelines), in the project's `path`, which also
+fills `${PROJECT_PATH}` in action and workflow commands; the n8n deploy
+workflow is handed `output_directory`. `create_project` and `update_project`
+carried the default `projects` cap, so a default device could
+`update_project({ id, startCommand: "calc.exe" })` and the user would run it
+on their next click. Writing any of those five fields now needs `terminal.exec`:
+
+| command          | gate                                                                                                                                                                                                             |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_project` | static `#[rpc(cap = "terminal.exec")]`. A new project always sets `path`.                                                                                                                                        |
+| `update_project` | stays `projects`; `require_exec_for_run_fields` calls `caller.require("terminal.exec")` when the call sets `path`, a command or `output_directory`. Name, description, status, stack ids and ports stay default. |
+
+Every other `projects` command writes only app data (star, stage, archive,
+parent, open count) or rescans the stored `path`. Discovery, relocation and
+`.env` access were already loopback-only. A command written by hand on this
+machine is still trusted as before: Run does not ask again.
 
 ### Phase 5 — Android client
 
