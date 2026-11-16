@@ -1977,7 +1977,10 @@ impl KubernetesManager {
             )
             .await
         {
-            Ok(_) => Ok(format!("Deployment '{}' restarted successfully", deployment_name)),
+            Ok(_) => Ok(format!(
+                "Deployment '{}' restarted successfully",
+                deployment_name
+            )),
             Err(e) => Err(format!("Failed to restart deployment: {}", e)),
         }
     }

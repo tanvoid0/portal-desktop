@@ -362,16 +362,16 @@ async fn spawn_permission_hook(
         token: token.clone(),
     };
     let app = axum::Router::new()
-        .route("/hook/{token}", axum::routing::post(permission_hook_handler))
+        .route(
+            "/hook/{token}",
+            axum::routing::post(permission_hook_handler),
+        )
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .map_err(|e| format!("failed to bind permission-hook listener: {e}"))?;
-    let port = listener
-        .local_addr()
-        .map_err(|e| e.to_string())?
-        .port();
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     tokio::spawn(async move {
@@ -431,7 +431,8 @@ async fn permission_hook_handler(
 
 fn write_hook_settings(run_id: &str, port: u16, token: &str) -> Result<PathBuf, String> {
     let dir = std::env::temp_dir().join("portal-agents");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("failed to create hook settings dir: {e}"))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("failed to create hook settings dir: {e}"))?;
     let path = dir.join(format!("hook-{run_id}.json"));
     let settings = json!({
         "hooks": {
@@ -514,7 +515,9 @@ fn parse_stream_json_line(event: &Value, subagent_ids: &mut HashSet<String>) -> 
                     }
                 }
                 Some("thinking_delta") => {
-                    if let Some(text) = delta.and_then(|d| d.get("thinking")).and_then(Value::as_str)
+                    if let Some(text) = delta
+                        .and_then(|d| d.get("thinking"))
+                        .and_then(Value::as_str)
                     {
                         if !text.is_empty() {
                             out.push(AgentEvent::ThinkingDelta {
@@ -551,7 +554,11 @@ fn parse_stream_json_line(event: &Value, subagent_ids: &mut HashSet<String>) -> 
                         }
                     }
                     Some("tool_use") => {
-                        let id = block.get("id").and_then(Value::as_str).unwrap_or("").to_string();
+                        let id = block
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string();
                         let name = block
                             .get("name")
                             .and_then(Value::as_str)
@@ -602,7 +609,10 @@ fn parse_stream_json_line(event: &Value, subagent_ids: &mut HashSet<String>) -> 
                         .and_then(Value::as_str)
                         .unwrap_or("")
                         .to_string();
-                    let is_error = block.get("is_error").and_then(Value::as_bool).unwrap_or(false);
+                    let is_error = block
+                        .get("is_error")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
                     out.push(AgentEvent::ToolResult {
                         tool_use_id: tool_use_id.clone(),
                         content: tool_result_text(block.get("content")),
@@ -619,8 +629,14 @@ fn parse_stream_json_line(event: &Value, subagent_ids: &mut HashSet<String>) -> 
                 .get("result")
                 .and_then(Value::as_str)
                 .map(str::to_string);
-            let is_error = event.get("is_error").and_then(Value::as_bool).unwrap_or(false);
-            out.push(AgentEvent::TurnDone { final_text, is_error });
+            let is_error = event
+                .get("is_error")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            out.push(AgentEvent::TurnDone {
+                final_text,
+                is_error,
+            });
             let total_cost_usd = event.get("total_cost_usd").and_then(Value::as_f64);
             let model_usage = event.get("modelUsage").cloned();
             if total_cost_usd.is_some() || model_usage.is_some() {
@@ -650,8 +666,10 @@ mod tests {
             {"type":"tool_use","id":"tu_1","name":"Agent","input":{"description":"Explore the repo"}}
         ]}});
         let events = parse_stream_json_line(&dispatch, &mut ids);
-        assert!(matches!(&events[0], AgentEvent::SubagentStarted { tool_use_id, name }
-            if tool_use_id == "tu_1" && name.as_deref() == Some("Explore the repo")));
+        assert!(
+            matches!(&events[0], AgentEvent::SubagentStarted { tool_use_id, name }
+            if tool_use_id == "tu_1" && name.as_deref() == Some("Explore the repo"))
+        );
         assert!(matches!(&events[1], AgentEvent::ToolCall { id, name, .. }
             if id == "tu_1" && name == "Agent"));
         assert!(ids.contains("tu_1"));
@@ -660,8 +678,12 @@ mod tests {
             {"type":"tool_result","tool_use_id":"tu_1","content":"done"}
         ]}});
         let events = parse_stream_json_line(&result, &mut ids);
-        assert!(matches!(&events[0], AgentEvent::ToolResult { tool_use_id, .. } if tool_use_id == "tu_1"));
-        assert!(matches!(&events[1], AgentEvent::SubagentFinished { tool_use_id } if tool_use_id == "tu_1"));
+        assert!(
+            matches!(&events[0], AgentEvent::ToolResult { tool_use_id, .. } if tool_use_id == "tu_1")
+        );
+        assert!(
+            matches!(&events[1], AgentEvent::SubagentFinished { tool_use_id } if tool_use_id == "tu_1")
+        );
         assert!(!ids.contains("tu_1"));
     }
 
@@ -670,8 +692,12 @@ mod tests {
         let mut ids = HashSet::new();
         let line = json!({"type":"result","result":"all done","total_cost_usd":0.5,"modelUsage":{"sonnet":{"tokens":10}}});
         let events = parse_stream_json_line(&line, &mut ids);
-        assert!(matches!(&events[0], AgentEvent::TurnDone { final_text, .. } if final_text.as_deref() == Some("all done")));
-        assert!(matches!(&events[1], AgentEvent::Usage { total_cost_usd: Some(c), .. } if (*c - 0.5).abs() < f64::EPSILON));
+        assert!(
+            matches!(&events[0], AgentEvent::TurnDone { final_text, .. } if final_text.as_deref() == Some("all done"))
+        );
+        assert!(
+            matches!(&events[1], AgentEvent::Usage { total_cost_usd: Some(c), .. } if (*c - 0.5).abs() < f64::EPSILON)
+        );
     }
 
     #[test]
@@ -682,7 +708,9 @@ mod tests {
             "event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}
         });
         let events = parse_stream_json_line(&line, &mut ids);
-        assert!(matches!(&events[0], AgentEvent::TextDelta { text, parent_tool_use_id }
-            if text == "hi" && parent_tool_use_id.as_deref() == Some("tu_1")));
+        assert!(
+            matches!(&events[0], AgentEvent::TextDelta { text, parent_tool_use_id }
+            if text == "hi" && parent_tool_use_id.as_deref() == Some("tu_1"))
+        );
     }
 }

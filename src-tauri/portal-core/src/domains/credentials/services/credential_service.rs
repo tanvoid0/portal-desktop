@@ -230,8 +230,9 @@ impl CredentialService {
     /// (project-env), not a credential access.
     pub async fn peek_value(&self, id: &str) -> Result<Option<String>, CredentialError> {
         let credential = self.get_credential(id).await?;
-        let encryption_data: EncryptionResult = serde_json::from_str(&credential.encrypted_value)
-            .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
+        let encryption_data: EncryptionResult =
+            serde_json::from_str(&credential.encrypted_value)
+                .map_err(|e| CredentialError::DeserializationError(e.to_string()))?;
 
         let master_key = match self.session.peek_key() {
             Ok(key) => key,

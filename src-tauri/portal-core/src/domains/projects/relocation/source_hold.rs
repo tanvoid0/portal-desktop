@@ -114,7 +114,9 @@ pub fn acquire(source: &Path, rel_files: &[String]) -> Result<SourceHold, MoveEr
 /// `usage::check_in_use`, run by the caller before this.
 #[cfg(not(target_os = "windows"))]
 pub fn acquire(_source: &Path, _rel_files: &[String]) -> Result<SourceHold, MoveError> {
-    Ok(SourceHold { handles: Vec::new() })
+    Ok(SourceHold {
+        handles: Vec::new(),
+    })
 }
 
 #[cfg(all(test, target_os = "windows"))]
@@ -150,12 +152,23 @@ mod tests {
         // write open.
         let sub = dir.path().join("sub");
         let sub2 = dir.path().join("sub2");
-        assert_eq!(fs::rename(&sub, &sub2).unwrap_err().raw_os_error(), Some(32));
-        assert_eq!(fs::remove_file(dir.path().join("a.txt")).unwrap_err().raw_os_error(), Some(32));
+        assert_eq!(
+            fs::rename(&sub, &sub2).unwrap_err().raw_os_error(),
+            Some(32)
+        );
+        assert_eq!(
+            fs::remove_file(dir.path().join("a.txt"))
+                .unwrap_err()
+                .raw_os_error(),
+            Some(32)
+        );
 
         drop(hold);
         // Released: the same write open now succeeds.
-        fs::OpenOptions::new().write(true).open(dir.path().join("a.txt")).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(dir.path().join("a.txt"))
+            .unwrap();
     }
 
     #[test]
@@ -167,7 +180,9 @@ mod tests {
         let _busy = fs::OpenOptions::new().write(true).open(&path).unwrap();
 
         let err = acquire(dir.path(), &["locked.txt".to_string()]).unwrap_err();
-        let MoveError::Blocked(report) = err else { panic!("expected Blocked, got {err:?}") };
+        let MoveError::Blocked(report) = err else {
+            panic!("expected Blocked, got {err:?}")
+        };
         assert_eq!(report.blockers[0].kind, "source_in_use");
         assert!(report.blockers[0].detail.contains("locked.txt"));
     }
@@ -178,6 +193,9 @@ mod tests {
         // Named in rel_files but never created — NotFound, not a sharing
         // violation, so this must not read as "close the other program".
         let err = acquire(dir.path(), &["missing.txt".to_string()]).unwrap_err();
-        assert!(matches!(err, MoveError::Failed(_)), "expected Failed, got {err:?}");
+        assert!(
+            matches!(err, MoveError::Failed(_)),
+            "expected Failed, got {err:?}"
+        );
     }
 }

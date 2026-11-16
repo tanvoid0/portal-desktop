@@ -30,11 +30,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(ProjectMoves::ProjectId)
-                            .integer()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(ProjectMoves::ProjectId).integer().not_null())
                     .col(ColumnDef::new(ProjectMoves::SourcePath).text().not_null())
                     .col(ColumnDef::new(ProjectMoves::DestPath).text().not_null())
                     .col(ColumnDef::new(ProjectMoves::StagingPath).text().not_null())
@@ -56,7 +52,11 @@ impl MigrationTrait for Migration {
                     // Manifest + progress file aren't written until the copy runs.
                     .col(ColumnDef::new(ProjectMoves::ManifestPath).text().null())
                     .col(ColumnDef::new(ProjectMoves::ManifestSha256).text().null())
-                    .col(ColumnDef::new(ProjectMoves::ManifestVersion).integer().null())
+                    .col(
+                        ColumnDef::new(ProjectMoves::ManifestVersion)
+                            .integer()
+                            .null(),
+                    )
                     .col(ColumnDef::new(ProjectMoves::ProgressPath).text().null())
                     .col(
                         ColumnDef::new(ProjectMoves::FileCount)

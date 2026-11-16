@@ -37,7 +37,10 @@ fn editor_command(executable: &str) -> Command {
                 .map(|p| std::env::split_paths(&p).collect())
                 .unwrap_or_default()
         };
-        let name = exe.file_name().and_then(|n| n.to_str()).unwrap_or(executable);
+        let name = exe
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(executable);
         for dir in dirs {
             for ext in ["exe", "cmd", "bat"] {
                 let candidate = dir.join(format!("{name}.{ext}"));
@@ -612,7 +615,6 @@ impl ProjectService {
             .replace_all(&formatted, " ")
             .to_string()
     }
-
 
     async fn detect_output_directory(
         &self,

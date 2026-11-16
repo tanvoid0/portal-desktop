@@ -8,15 +8,15 @@
 
 pub mod types;
 
-#[cfg(target_os = "windows")]
-mod windows;
 #[cfg(not(target_os = "windows"))]
 mod unix;
-
 #[cfg(target_os = "windows")]
-use windows as platform;
+mod windows;
+
 #[cfg(not(target_os = "windows"))]
 use unix as platform;
+#[cfg(target_os = "windows")]
+use windows as platform;
 
 pub use types::{ElevatedRunResult, ElevationStatus};
 

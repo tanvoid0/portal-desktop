@@ -123,11 +123,7 @@ pub fn fetch_rows(
     let cap = limit.clamp(1, ROW_CAP);
     let sql = format!("SELECT * FROM {} LIMIT ?1 OFFSET ?2", quote_ident(table));
     let mut stmt = conn.prepare(&sql)?;
-    collect(
-        &mut stmt,
-        rusqlite::params![cap as i64, offset as i64],
-        cap,
-    )
+    collect(&mut stmt, rusqlite::params![cap as i64, offset as i64], cap)
 }
 
 pub fn run_query(conn: &Connection, sql: &str, cap: usize) -> rusqlite::Result<QueryResult> {
@@ -159,7 +155,11 @@ fn insert_sql(table: &str, columns: &[String]) -> String {
 }
 
 fn delete_sql(table: &str, pk_column: &str) -> String {
-    format!("DELETE FROM {} WHERE {} = ?1", quote_ident(table), quote_ident(pk_column))
+    format!(
+        "DELETE FROM {} WHERE {} = ?1",
+        quote_ident(table),
+        quote_ident(pk_column)
+    )
 }
 
 pub fn preview_update(
@@ -209,7 +209,11 @@ fn json_to_sql_param(v: &Value) -> rusqlite::types::Value {
 /// Run one parameterized statement in an explicit transaction, rolling back
 /// unless it affects exactly one row — the safety net for a PK that turns out
 /// not to be unique (e.g. a composite key reduced to one column upstream).
-fn exec_in_tx(conn: &Connection, sql: &str, params: &[rusqlite::types::Value]) -> rusqlite::Result<usize> {
+fn exec_in_tx(
+    conn: &Connection,
+    sql: &str,
+    params: &[rusqlite::types::Value],
+) -> rusqlite::Result<usize> {
     conn.execute("BEGIN", [])?;
     match conn.execute(sql, rusqlite::params_from_iter(params)) {
         Ok(n) if n == 1 => {
@@ -236,17 +240,31 @@ pub fn update_cell(
     new_value: &Value,
 ) -> rusqlite::Result<usize> {
     let sql = update_sql(table, pk_column, column);
-    exec_in_tx(conn, &sql, &[json_to_sql_param(new_value), json_to_sql_param(pk_value)])
+    exec_in_tx(
+        conn,
+        &sql,
+        &[json_to_sql_param(new_value), json_to_sql_param(pk_value)],
+    )
 }
 
-pub fn insert_row(conn: &Connection, table: &str, values: &[(String, Value)]) -> rusqlite::Result<usize> {
+pub fn insert_row(
+    conn: &Connection,
+    table: &str,
+    values: &[(String, Value)],
+) -> rusqlite::Result<usize> {
     let columns: Vec<String> = values.iter().map(|(c, _)| c.clone()).collect();
     let sql = insert_sql(table, &columns);
-    let params: Vec<rusqlite::types::Value> = values.iter().map(|(_, v)| json_to_sql_param(v)).collect();
+    let params: Vec<rusqlite::types::Value> =
+        values.iter().map(|(_, v)| json_to_sql_param(v)).collect();
     exec_in_tx(conn, &sql, &params)
 }
 
-pub fn delete_row(conn: &Connection, table: &str, pk_column: &str, pk_value: &Value) -> rusqlite::Result<usize> {
+pub fn delete_row(
+    conn: &Connection,
+    table: &str,
+    pk_column: &str,
+    pk_value: &Value,
+) -> rusqlite::Result<usize> {
     let sql = delete_sql(table, pk_column);
     exec_in_tx(conn, &sql, &[json_to_sql_param(pk_value)])
 }
@@ -386,11 +404,26 @@ impl DbDriver for SqliteDriver {
         )
         .await
     }
-    async fn insert_row(&self, table: &str, values: Vec<(String, Value)>) -> Result<QueryResult, String> {
+    async fn insert_row(
+        &self,
+        table: &str,
+        values: Vec<(String, Value)>,
+    ) -> Result<QueryResult, String> {
         apply_insert(self.path.clone(), table.to_string(), values).await
     }
-    async fn delete_row(&self, table: &str, pk_column: &str, pk_value: Value) -> Result<QueryResult, String> {
-        apply_delete(self.path.clone(), table.to_string(), pk_column.to_string(), pk_value).await
+    async fn delete_row(
+        &self,
+        table: &str,
+        pk_column: &str,
+        pk_value: Value,
+    ) -> Result<QueryResult, String> {
+        apply_delete(
+            self.path.clone(),
+            table.to_string(),
+            pk_column.to_string(),
+            pk_value,
+        )
+        .await
     }
 }
 
@@ -414,7 +447,10 @@ mod tests {
         let c = seed();
         let t = list_tables(&c).unwrap();
         // ordered by type then name: table 't' before view 'v'
-        assert_eq!(t.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["t", "v"]);
+        assert_eq!(
+            t.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(),
+            ["t", "v"]
+        );
         assert_eq!(t[0].kind, "table");
         assert_eq!(t[1].kind, "view");
     }
@@ -472,9 +508,15 @@ mod tests {
 
     #[test]
     fn preview_insert_builds_column_and_placeholder_lists() {
-        let values = vec![("name".to_string(), Value::from("c")), ("amt".to_string(), Value::from(3.0))];
+        let values = vec![
+            ("name".to_string(), Value::from("c")),
+            ("amt".to_string(), Value::from(3.0)),
+        ];
         let p = preview_insert("t", &values);
-        assert_eq!(p.sql, "INSERT INTO \"t\" (\"name\", \"amt\") VALUES (?1, ?2)");
+        assert_eq!(
+            p.sql,
+            "INSERT INTO \"t\" (\"name\", \"amt\") VALUES (?1, ?2)"
+        );
         assert_eq!(p.params, vec![Value::from("c"), Value::from(3.0)]);
     }
 
@@ -498,7 +540,10 @@ mod tests {
     #[test]
     fn insert_row_adds_a_new_row() {
         let c = seed();
-        let values = vec![("name".to_string(), Value::from("c")), ("amt".to_string(), Value::from(9.0))];
+        let values = vec![
+            ("name".to_string(), Value::from("c")),
+            ("amt".to_string(), Value::from(9.0)),
+        ];
         let n = insert_row(&c, "t", &values).unwrap();
         assert_eq!(n, 1);
         assert_eq!(fetch_rows(&c, "t", 10, 0).unwrap().row_count, 3);
@@ -517,12 +562,19 @@ mod tests {
     #[test]
     fn exec_in_tx_rolls_back_on_error_leaving_data_untouched() {
         let c = seed();
-        let err = exec_in_tx(&c, "UPDATE \"t\" SET \"nope\" = ?1 WHERE \"id\" = ?2", &[
-            rusqlite::types::Value::Text("x".into()),
-            rusqlite::types::Value::Integer(1),
-        ]);
+        let err = exec_in_tx(
+            &c,
+            "UPDATE \"t\" SET \"nope\" = ?1 WHERE \"id\" = ?2",
+            &[
+                rusqlite::types::Value::Text("x".into()),
+                rusqlite::types::Value::Integer(1),
+            ],
+        );
         assert!(err.is_err());
         // a failed tx must not leave a dangling BEGIN — a following write should still work.
-        assert_eq!(update_cell(&c, "t", "id", &Value::from(1), "name", &Value::from("ok")).unwrap(), 1);
+        assert_eq!(
+            update_cell(&c, "t", "id", &Value::from(1), "name", &Value::from("ok")).unwrap(),
+            1
+        );
     }
 }

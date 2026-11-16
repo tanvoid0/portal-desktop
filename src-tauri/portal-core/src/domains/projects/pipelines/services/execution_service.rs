@@ -1,8 +1,8 @@
 use crate::database::DatabaseManager;
 use crate::domains::projects::entities::ProjectResponse;
+use crate::domains::projects::move_lock;
 use crate::domains::projects::pipelines::repositories::{ExecutionRepository, PipelineRepository};
 use crate::domains::projects::pipelines::services::pipeline_file;
-use crate::domains::projects::move_lock;
 use crate::domains::projects::pipelines::utils::dependency_resolver::resolve_execution_order;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use crate::events::{EventSink, EventSinkExt};
@@ -549,8 +549,7 @@ impl ExecutionService {
             return Ok(StepRunOutcome::LongRunning);
         }
 
-        let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
 
         let exit_status = loop {
             if *cancel_rx.borrow() {
@@ -1304,6 +1303,9 @@ mod tests {
         // Absent or non-positive falls back to the default, so a hung step is
         // still killed rather than running forever.
         assert_eq!(resolve_step_timeout(&json!({})), DEFAULT_STEP_TIMEOUT_SECS);
-        assert_eq!(resolve_step_timeout(&json!({ "timeout": 0 })), DEFAULT_STEP_TIMEOUT_SECS);
+        assert_eq!(
+            resolve_step_timeout(&json!({ "timeout": 0 })),
+            DEFAULT_STEP_TIMEOUT_SECS
+        );
     }
 }

@@ -4,4 +4,6 @@
 pub mod entity;
 pub mod service;
 
-pub use service::{DriftState, EnvFileView, EnvLinkView, EnvVarView, ProjectEnv, ProjectEnvService};
+pub use service::{
+    DriftState, EnvFileView, EnvLinkView, EnvVarView, ProjectEnv, ProjectEnvService,
+};

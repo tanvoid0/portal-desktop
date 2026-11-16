@@ -49,11 +49,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(AgentMessages::SessionId)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(AgentMessages::SessionId).string().not_null())
                     .col(ColumnDef::new(AgentMessages::Seq).big_integer().not_null())
                     .col(ColumnDef::new(AgentMessages::Role).string().not_null())
                     .col(ColumnDef::new(AgentMessages::Text).text().not_null())

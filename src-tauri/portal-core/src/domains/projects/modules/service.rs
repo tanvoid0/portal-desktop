@@ -3,11 +3,11 @@
 use super::detect::{self, DetectedModule};
 use super::stack;
 use crate::database::DatabaseManager;
+use crate::domains::projects::move_lock;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use crate::domains::projects::services::project_service::ProjectService;
 use crate::entities::project_module::{ActiveModel, Column, Entity, Model};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
-use crate::domains::projects::move_lock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 

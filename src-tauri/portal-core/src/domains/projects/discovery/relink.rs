@@ -228,7 +228,12 @@ mod tests {
         }
         let mut got: Vec<String> = index_dirs(&[tmp.clone()], 5)
             .iter()
-            .map(|p| p.strip_prefix(&tmp).unwrap().to_string_lossy().replace('\\', "/"))
+            .map(|p| {
+                p.strip_prefix(&tmp)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
             .collect();
         got.sort();
         fs::remove_dir_all(&tmp).ok();
@@ -244,8 +249,16 @@ mod tests {
         std::fs::create_dir_all(&asset).unwrap();
         std::fs::write(real.join("package.json"), "{}").unwrap();
 
-        let got = suggest_with(r"D:\old\JOB", &[asset.clone(), real.clone()], looks_like_project);
+        let got = suggest_with(
+            r"D:\old\JOB",
+            &[asset.clone(), real.clone()],
+            looks_like_project,
+        );
         std::fs::remove_dir_all(&base).ok();
-        assert_eq!(got, vec![real.display().to_string()], "asset dir must be dropped");
+        assert_eq!(
+            got,
+            vec![real.display().to_string()],
+            "asset dir must be dropped"
+        );
     }
 }

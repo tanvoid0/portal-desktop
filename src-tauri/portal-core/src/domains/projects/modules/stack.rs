@@ -42,11 +42,31 @@ const NODE_PMS: &[&str] = &["pnpm", "yarn", "bun", "npm"];
 /// framework (Electron, Express, ...) are listed here too, so a React + Electron
 /// app shows both.
 const DEP_FRAMEWORKS: &[(&[&str], &str, &str)] = &[
-    (&["requirements.txt", "pyproject.toml", "Pipfile"], "django", "Django"),
-    (&["requirements.txt", "pyproject.toml", "Pipfile"], "fastapi", "FastAPI"),
-    (&["requirements.txt", "pyproject.toml", "Pipfile"], "flask", "Flask"),
-    (&["pom.xml", "build.gradle", "build.gradle.kts"], "spring-boot", "Spring"),
-    (&["pom.xml", "build.gradle", "build.gradle.kts"], "quarkus", "Quarkus"),
+    (
+        &["requirements.txt", "pyproject.toml", "Pipfile"],
+        "django",
+        "Django",
+    ),
+    (
+        &["requirements.txt", "pyproject.toml", "Pipfile"],
+        "fastapi",
+        "FastAPI",
+    ),
+    (
+        &["requirements.txt", "pyproject.toml", "Pipfile"],
+        "flask",
+        "Flask",
+    ),
+    (
+        &["pom.xml", "build.gradle", "build.gradle.kts"],
+        "spring-boot",
+        "Spring",
+    ),
+    (
+        &["pom.xml", "build.gradle", "build.gradle.kts"],
+        "quarkus",
+        "Quarkus",
+    ),
     (&["composer.json"], "laravel/framework", "Laravel"),
     (&["composer.json"], "symfony/framework-bundle", "Symfony"),
     (&["Gemfile"], "'rails'", "Rails"),
@@ -116,7 +136,12 @@ pub fn detect_with(root: &Path, modules: &[DetectedModule]) -> Stack {
     // Workspace packages have no lockfile of their own; npm is the default only
     // when no Node package manager was found anywhere.
     let has_node = dirs.iter().any(|(_, k)| NODE_STACKS.contains(&k.as_str()));
-    if has_node && !stack.package_managers.iter().any(|p| NODE_PMS.contains(&p.as_str())) {
+    if has_node
+        && !stack
+            .package_managers
+            .iter()
+            .any(|p| NODE_PMS.contains(&p.as_str()))
+    {
         push(&mut stack.package_managers, "npm");
     }
     if root.join("src-tauri").is_dir() {
@@ -227,7 +252,11 @@ fn commands(
     stack: &Stack,
 ) -> (Option<String>, Option<String>, Option<String>) {
     let s = |v: &str| Some(v.to_string());
-    let gradlew = if cfg!(windows) { "gradlew" } else { "./gradlew" };
+    let gradlew = if cfg!(windows) {
+        "gradlew"
+    } else {
+        "./gradlew"
+    };
     let spring = stack.frameworks.iter().any(|f| f == "Spring");
     match kind {
         k if NODE_STACKS.contains(&k) => {
@@ -248,7 +277,11 @@ fn commands(
                 })
             };
             // `dev` first: `next start` and friends need a production build first.
-            (script(&["build"]), script(&["dev", "start"]), script(&["test"]))
+            (
+                script(&["build"]),
+                script(&["dev", "start"]),
+                script(&["test"]),
+            )
         }
         "flutter" => (None, s("flutter run"), s("flutter test")),
         "dart" => (None, s("dart run"), s("dart test")),
@@ -368,7 +401,11 @@ mod tests {
         touch(&dir, "pnpm-lock.yaml", "");
         touch(&dir, "src-tauri/Cargo.toml", "[package]");
         // A vendored app inside the project must not become one of its frameworks.
-        touch(&dir, "inspirations/other/package.json", r#"{"dependencies":{"vue":"3"}}"#);
+        touch(
+            &dir,
+            "inspirations/other/package.json",
+            r#"{"dependencies":{"vue":"3"}}"#,
+        );
         let got = detect(&dir);
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(got.frameworks, ["Svelte", "Tauri"]);
@@ -382,7 +419,11 @@ mod tests {
     #[test]
     fn spring_maven_and_django() {
         let dir = tmp("spring");
-        touch(&dir, "pom.xml", "<artifactId>spring-boot-starter-web</artifactId>");
+        touch(
+            &dir,
+            "pom.xml",
+            "<artifactId>spring-boot-starter-web</artifactId>",
+        );
         let got = detect(&dir);
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(got.frameworks, ["Spring"]);
