@@ -180,19 +180,20 @@ mod tests {
         assert!(!is_within("", r"C:\x"));
     }
 
-    #[cfg(windows)]
     #[test]
     fn one_way_check_ignores_ancestor() {
-        let root = PathBuf::from(r"D:\mvlock5\home\proj");
-        lock(&[root.clone()]);
-        let ancestor = Path::new(r"D:\mvlock5\home");
-        assert!(is_locked(ancestor));
-        assert!(!is_locked_within(ancestor));
-        assert!(ensure_unlocked_within(ancestor).is_ok());
-        for p in [r"D:\mvlock5\home\proj", r"D:\mvlock5\home\proj\src"] {
-            assert!(is_locked(Path::new(p)));
-            assert!(is_locked_within(Path::new(p)));
-            assert!(ensure_unlocked_within(Path::new(p)).is_err());
+        // Absolute on both platforms (`D:\…` is not absolute on Unix).
+        let base = if cfg!(windows) { r"D:\mvlock5" } else { "/mvlock5" };
+        let base = PathBuf::from(base).join("home");
+        let root = base.join("proj");
+        lock(std::slice::from_ref(&root));
+        assert!(is_locked(&base));
+        assert!(!is_locked_within(&base));
+        assert!(ensure_unlocked_within(&base).is_ok());
+        for p in [root.clone(), root.join("src")] {
+            assert!(is_locked(&p));
+            assert!(is_locked_within(&p));
+            assert!(ensure_unlocked_within(&p).is_err());
         }
         unlock(&[root]);
     }

@@ -269,7 +269,7 @@ impl WorkflowEngine {
                 cmd_builder.current_dir(wd_path);
             }
         } else if let Some(project_path) = &context.project_path {
-            move_lock::ensure_unlocked(project_path)?;
+            move_lock::ensure_unlocked_within(project_path)?;
             cmd_builder.current_dir(project_path);
         }
 
@@ -321,11 +321,12 @@ impl WorkflowEngine {
         let file_content = self.substitute_variables(content, context);
 
         let final_path = if let Some(project_path) = &context.project_path {
-            move_lock::ensure_unlocked(project_path)?;
             project_path.join(&file_path)
         } else {
             PathBuf::from(&file_path)
         };
+        // Guard the real write target: absolute / `..` paths escape project_path.
+        move_lock::ensure_unlocked_within(&final_path)?;
 
         // Create parent directories if needed
         if let Some(parent) = final_path.parent() {

@@ -163,7 +163,7 @@ impl ScriptExecutionService {
             .lock()
             .unwrap()
             .values()
-            .any(|dir| crate::domains::projects::move_lock::is_under(dir, path))
+            .any(|dir| crate::domains::projects::move_lock::is_within(dir, path))
     }
 
     /// Resolve parameter placeholders in command
