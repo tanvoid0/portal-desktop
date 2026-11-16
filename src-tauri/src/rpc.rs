@@ -145,8 +145,16 @@ pub const DEFAULT_CAPS: &[&str] = &[
 /// `n8n.run` triggers an external n8n workflow. n8n workflows are arbitrary —
 /// a node in one can run shell commands or hit any URL — so running one is as
 /// sensitive as `terminal.exec`, even though it happens on another box.
+///
+/// `coder.exec` writes files and runs processes through the coder: a direct
+/// file write under any caller-named workspace root (a `.bat` in the Startup
+/// folder), shell-open of a path, git commit/push (hooks run), and driving
+/// the agent loop — which in auto-accept mode or under an allow rule runs
+/// tools without a prompt. Same risk as `terminal.exec`; the plain `coder` cap
+/// keeps the read side. See `domains/coder/commands.rs`.
 pub const SENSITIVE_CAPS: &[&str] = &[
     "terminal.exec",
+    "coder.exec",
     "agents.exec",
     "agents.history",
     "github.write",
@@ -320,6 +328,40 @@ mod tests {
         );
     }
 
+    /// The coder's write/run/approve side reaches outside the app's own data
+    /// (any file on disk, git hooks, an auto-accepting agent loop), so it is
+    /// opt-in. Every command that can do that carries `coder.exec`, not the
+    /// default `coder` — listed here so moving one back is a test failure.
+    #[test]
+    fn coder_exec_is_sensitive_not_default() {
+        assert!(!DEFAULT_CAPS.contains(&"coder.exec"));
+        assert!(SENSITIVE_CAPS.contains(&"coder.exec"));
+        for name in [
+            "coder_send",
+            "coder_retry",
+            "coder_edit_message",
+            "coder_approve",
+            "coder_set_mode",
+            "coder_set_permission_mode",
+            "coder_add_rule",
+            "coder_remove_rule",
+            "coder_accept_change",
+            "coder_reject_change",
+            "coder_set_hunk",
+            "coder_modify_change",
+            "coder_write_file",
+            "coder_open_in_explorer",
+            "coder_git_commit",
+            "coder_git_push",
+            "coder_submit_command_result",
+            "coder_submit_terminal_list",
+            "coder_multitask_spawn",
+            "coder_multitask_cleanup",
+        ] {
+            assert_eq!(capability(name), Some("coder.exec"), "{name}");
+        }
+    }
+
     /// Reading back a past run's full transcript is a wholesale data grant
     /// (every tool input/output, file content, command output that run ever
     /// touched), so it opts in rather than riding the default `agents` grant.
@@ -419,6 +461,7 @@ mod tests {
                 "agents.exec",
                 "agents.history",
                 "coder",
+                "coder.exec",
                 "dashboard",
                 "github",
                 "github.write",
@@ -436,6 +479,7 @@ mod tests {
 
         // One command per cap, plus proof the fenced-off ones stay fenced.
         assert_eq!(capability("coder_list_threads"), Some("coder"));
+        assert_eq!(capability("coder_write_file"), Some("coder.exec"));
         assert_eq!(capability("get_dashboard_overview"), Some("dashboard"));
         assert_eq!(capability("get_all_projects"), Some("projects"));
         assert_eq!(capability("create_task"), Some("tasks"));

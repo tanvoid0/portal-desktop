@@ -414,8 +414,11 @@ fn arg_str<'a>(args: &'a Value, tool: &str, key: &str) -> Result<&'a str, String
         .ok_or_else(|| arg_error(tool, key, args))
 }
 
-/// Resolve `rel` under `root`, rejecting escapes outside the workspace.
-fn resolve(root: &str, rel: &str) -> Result<PathBuf, String> {
+/// Resolve `rel` under `root`, rejecting escapes outside the workspace: an
+/// absolute `rel`, a `..` that climbs out, or a symlink/junction inside the
+/// workspace that points out of it (including a dangling one, which a write
+/// would follow and create its target).
+pub fn resolve(root: &str, rel: &str) -> Result<PathBuf, String> {
     move_lock::ensure_unlocked(Path::new(root))?;
     let root = PathBuf::from(root);
     let joined = root.join(rel);
@@ -435,6 +438,29 @@ fn resolve(root: &str, rel: &str) -> Result<PathBuf, String> {
     }
     if !normalized.starts_with(&root) {
         return Err("path escapes workspace root".into());
+    }
+
+    // The lexical check above cannot see links. Canonicalize the deepest part
+    // of the path that exists (`symlink_metadata`, so a dangling link counts as
+    // existing and then fails to canonicalize) and require it under the
+    // canonical root. What is left below it does not exist yet, so it is
+    // plain names that will be created inside.
+    // ponytail: fails closed where canonicalize can't (a root that does not
+    // exist yet, some RAM/virtual drives — rust-lang/rust#48249); relax only
+    // for a real user on such a drive.
+    let canon_root = root
+        .canonicalize()
+        .map_err(|e| format!("workspace root {}: {e}", root.display()))?;
+    let mut existing = normalized.as_path();
+    while std::fs::symlink_metadata(existing).is_err() {
+        existing = existing
+            .parent()
+            .ok_or_else(|| "path escapes workspace root".to_string())?;
+    }
+    let link_error = || format!("{rel} goes through a link that points outside the workspace");
+    let canon = existing.canonicalize().map_err(|_| link_error())?;
+    if !canon.starts_with(&canon_root) {
+        return Err(link_error());
     }
     Ok(normalized)
 }
@@ -543,12 +569,16 @@ fn search_files(root: &str, query: &str, rel: &str) -> Result<String, String> {
 }
 
 /// Depth-first file walk; `f` returns false to stop early. Skips common heavy
-/// dirs to keep searches responsive.
+/// dirs to keep searches responsive, and links (junctions included), which
+/// could lead outside the workspace or loop back into it forever.
 fn walk(dir: &Path, f: &mut dyn FnMut(&Path) -> bool) -> bool {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return true;
     };
     for entry in entries.flatten() {
+        if entry.file_type().map_or(true, |t| t.is_symlink()) {
+            continue;
+        }
         let path = entry.path();
         if path.is_dir() {
             let skip = matches!(
@@ -680,6 +710,102 @@ mod tests {
         let root = tmp_root();
         let err = read_file(root.to_str().unwrap(), "../secret");
         assert!(err.is_err());
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn write_rejects_absolute_and_parent_escapes() {
+        let root = tmp_root();
+        let outside = tmp_root();
+        let root_s = root.to_str().unwrap();
+        let abs = outside.join("abs.txt");
+        assert!(write_file(root_s, abs.to_str().unwrap(), "x").is_err());
+        assert!(write_file(root_s, "a/../../escaped.txt", "x").is_err());
+        assert!(!abs.exists());
+        assert!(!root.parent().unwrap().join("escaped.txt").exists());
+        // The ordinary case still works, nested dirs included.
+        write_file(root_s, "src/new/a.txt", "ok").unwrap();
+        assert_eq!(read_file(root_s, "src/new/a.txt").unwrap(), "ok");
+        std::fs::remove_dir_all(&root).ok();
+        std::fs::remove_dir_all(&outside).ok();
+    }
+
+    /// A directory link inside the workspace that points outside it. Unix: a
+    /// symlink. Windows: a junction (`mklink /J`), which needs no privilege,
+    /// unlike a symlink — and canonicalizes the same way.
+    fn link_dir(link: &Path, target: &Path) {
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(target, link).unwrap();
+        #[cfg(windows)]
+        {
+            let ok = Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(link)
+                .arg(target)
+                .output()
+                .unwrap()
+                .status
+                .success();
+            assert!(ok, "mklink /J failed");
+        }
+    }
+
+    #[test]
+    fn write_rejects_a_link_that_points_outside() {
+        let root = tmp_root();
+        let outside = tmp_root();
+        let root_s = root.to_str().unwrap();
+        link_dir(&root.join("link"), &outside);
+
+        assert!(write_file(root_s, "link/evil.bat", "x").is_err());
+        assert!(write_file(root_s, "link/sub/evil.bat", "x").is_err());
+        assert!(read_file(root_s, "link/evil.bat").is_err());
+        assert!(!outside.join("evil.bat").exists());
+        assert!(!outside.join("sub").exists());
+
+        std::fs::remove_dir_all(&root).ok();
+        std::fs::remove_dir_all(&outside).ok();
+    }
+
+    /// A dangling file symlink: `exists()` says false, but `fs::write` would
+    /// follow it and create the target outside the workspace.
+    #[cfg(unix)]
+    #[test]
+    fn write_rejects_a_dangling_link() {
+        let root = tmp_root();
+        let outside = tmp_root();
+        let target = outside.join("created.txt");
+        std::os::unix::fs::symlink(&target, root.join("dangling")).unwrap();
+        assert!(write_file(root.to_str().unwrap(), "dangling", "x").is_err());
+        assert!(!target.exists());
+        std::fs::remove_dir_all(&root).ok();
+        std::fs::remove_dir_all(&outside).ok();
+    }
+
+    /// `search_files` walks the tree itself rather than through `resolve`, so
+    /// it skips links: one leading outside is not searched, and one looping
+    /// back to the root does not recurse until the stack overflows.
+    #[test]
+    fn search_skips_links() {
+        let root = tmp_root();
+        let outside = tmp_root();
+        std::fs::write(outside.join("secret.txt"), "needle").unwrap();
+        link_dir(&root.join("out"), &outside);
+        link_dir(&root.join("loop"), &root);
+        let hits = search_files(root.to_str().unwrap(), "needle", ".").unwrap();
+        assert_eq!(hits, "no matches");
+        std::fs::remove_dir_all(&root).ok();
+        std::fs::remove_dir_all(&outside).ok();
+    }
+
+    #[test]
+    fn a_link_that_stays_inside_is_fine() {
+        let root = tmp_root();
+        let root_s = root.to_str().unwrap();
+        std::fs::create_dir_all(root.join("real")).unwrap();
+        link_dir(&root.join("alias"), &root.join("real"));
+        write_file(root_s, "alias/a.txt", "ok").unwrap();
+        assert_eq!(read_file(root_s, "real/a.txt").unwrap(), "ok");
         std::fs::remove_dir_all(&root).ok();
     }
 }

@@ -1,6 +1,15 @@
 //! Tauri command surface for the coder agent.
+//!
+//! Two caps, the same split as `terminal`/`terminal.exec`. `coder` (granted to
+//! a paired device by default) reads: threads, history, changes, modes, git
+//! status. `coder.exec` (opt-in, `rpc::SENSITIVE_CAPS`) is everything that can
+//! change a file or run a process on this machine: writing a file, accepting or
+//! editing a change, opening a path with the shell, git commit/push, worktree
+//! fan-out — and anything that drives or loosens the agent's turn loop (send,
+//! retry, approve, feeding it tool output, permission mode and rules), since an
+//! agent in auto-accept mode or with an allow rule runs tools unprompted.
+//! Local IPC is never held to either cap.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use reqwest::Client;
@@ -81,7 +90,7 @@ pub async fn coder_set_thread_kind(
     service.set_thread_kind(&thread_id, thread_kind).await
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_send(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -92,7 +101,7 @@ pub async fn coder_send(
     Ok(())
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_retry(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -102,7 +111,7 @@ pub async fn coder_retry(
     Ok(())
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_edit_message(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -116,7 +125,7 @@ pub async fn coder_edit_message(
     Ok(())
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_approve(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -180,7 +189,7 @@ pub async fn coder_get_mode(
     Ok(service.get_mode().await)
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_set_mode(
     service: State<'_, Arc<CoderService>>,
     mode: CoderAgentMode,
@@ -196,7 +205,7 @@ pub async fn coder_get_permission_mode(
     Ok(service.get_permission_mode().await)
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_set_permission_mode(
     service: State<'_, Arc<CoderService>>,
     mode: PermissionMode,
@@ -212,7 +221,7 @@ pub async fn coder_list_rules(
     Ok(service.list_rules().await)
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_add_rule(
     service: State<'_, Arc<CoderService>>,
     rule: PermissionRule,
@@ -221,7 +230,7 @@ pub async fn coder_add_rule(
     Ok(())
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_remove_rule(
     service: State<'_, Arc<CoderService>>,
     tool: String,
@@ -241,7 +250,7 @@ pub async fn coder_list_changes(
     Ok(service.list_changes(thread_id.as_deref()).await)
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_accept_change(
     service: State<'_, Arc<CoderService>>,
     change_id: String,
@@ -249,7 +258,7 @@ pub async fn coder_accept_change(
     service.accept_change(&change_id).await
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_reject_change(
     service: State<'_, Arc<CoderService>>,
     change_id: String,
@@ -257,7 +266,7 @@ pub async fn coder_reject_change(
     service.reject_change(&change_id).await
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_set_hunk(
     service: State<'_, Arc<CoderService>>,
     change_id: String,
@@ -267,7 +276,7 @@ pub async fn coder_set_hunk(
     service.set_hunk(&change_id, hunk_index, accepted).await
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_modify_change(
     service: State<'_, Arc<CoderService>>,
     change_id: String,
@@ -290,7 +299,7 @@ pub fn coder_read_file(workspace_root: String, path: String) -> Result<String, S
     super::tools::read_file(&workspace_root, &path)
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub fn coder_write_file(
     workspace_root: String,
     path: String,
@@ -300,31 +309,9 @@ pub fn coder_write_file(
     Ok(())
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub fn coder_open_in_explorer(workspace_root: String, path: String) -> Result<(), String> {
-    portal_core::domains::projects::move_lock::ensure_unlocked(std::path::Path::new(
-        &workspace_root,
-    ))?;
-    let root = PathBuf::from(&workspace_root);
-    let joined = root.join(path);
-
-    // Normalize without requiring the path to already exist.
-    let mut normalized = PathBuf::new();
-    for comp in joined.components() {
-        use std::path::Component::*;
-        match comp {
-            ParentDir => {
-                if !normalized.pop() {
-                    return Err("path escapes workspace root".into());
-                }
-            }
-            CurDir => {}
-            other => normalized.push(other.as_os_str()),
-        }
-    }
-    if !normalized.starts_with(&root) {
-        return Err("path escapes workspace root".into());
-    }
+    let normalized = super::tools::resolve(&workspace_root, &path)?;
     if !normalized.exists() {
         return Err("path does not exist".into());
     }
@@ -387,7 +374,7 @@ pub async fn coder_prepare_git_commit(
     Ok(draft)
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub fn coder_git_commit(
     workspace_root: String,
     title: String,
@@ -398,12 +385,12 @@ pub fn coder_git_commit(
 
 /// Pushes the current branch to `origin`. Never force-pushes — see
 /// `git_push::push_args`.
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub fn coder_git_push(workspace_root: String) -> Result<String, String> {
     super::git_push::git_push(&workspace_root)
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_submit_command_result(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -415,7 +402,7 @@ pub async fn coder_submit_command_result(
         .await
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_submit_terminal_list(
     service: State<'_, Arc<CoderService>>,
     thread_id: String,
@@ -427,7 +414,7 @@ pub async fn coder_submit_terminal_list(
         .await
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_multitask_spawn(
     service: State<'_, Arc<CoderService>>,
     request: MultitaskSpawnRequest,
@@ -451,7 +438,7 @@ pub async fn coder_multitask_cancel(
     service.multitask_cancel(request).await
 }
 
-#[portal_rpc_macro::rpc(cap = "coder")]
+#[portal_rpc_macro::rpc(cap = "coder.exec")]
 pub async fn coder_multitask_cleanup(
     service: State<'_, Arc<CoderService>>,
     request: MultitaskCleanupRequest,

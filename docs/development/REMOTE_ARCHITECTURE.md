@@ -372,6 +372,44 @@ Required before any `0.0.0.0` bind:
 - credentials and terminal-exec domains non-remotable by default, opt-in per device
 - a phone token grants a route subset, never the whole `/rpc/*`
 
+**Rule: a default cap never reaches outside the app's own data.** If a command
+can write a file or start a process on this machine, directly or by driving an
+agent that will, it carries an opt-in `*.exec`-style cap from
+`rpc::SENSITIVE_CAPS`, not the domain's default cap. The default cap keeps the
+read side. A path check alone does not count as the gate. If the caller names
+the root, it can name any root, and writes inside a real project are code
+execution anyway (`.git/hooks`, `package.json` scripts).
+
+The coder is where this was missed (fixed 2026-11-16). `coder_write_file` takes
+its own `workspace_root`, so any device holding the default `coder` cap could
+write any file on the PC (a `.bat` in the Startup folder), then run it with
+`coder_open_in_explorer`. The agent loop was open the same way: `coder_set_permission_mode`
+(auto-accept) or `coder_approve`, then `coder_send`. The split now matches
+`terminal`/`terminal.exec`:
+
+| cap                   | coder commands                                                                                                                                                                                                                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `coder` (default)     | threads (create, list, get, delete, model, kind), `stop`, context usage, running list, get mode/permission mode/rules, list changes, `list_dir`, `read_file`, git status/diff stats, commit draft, multitask list/cancel                                                                        |
+| `coder.exec` (opt-in) | `send`, `retry`, `edit_message`, `approve`, `submit_command_result`, `submit_terminal_list`, `set_mode`, `set_permission_mode`, `add_rule`, `remove_rule`, accept/reject/hunk/modify change, `write_file`, `open_in_explorer`, `git_commit`, `git_push`, `multitask_spawn`, `multitask_cleanup` |
+
+Anything that keeps the agent's turn loop going is `coder.exec`, even a
+denial. In auto-accept mode, or under an allow rule, the next tool call runs
+without a prompt. The gate is the static `#[rpc(cap = "coder.exec")]` check, so
+local IPC and loopback are never held to it. `Caller::require` is still there
+for a command that has to be gated on its arguments. None needs that yet.
+Devices paired before this change keep their stored caps, so they lose the
+`coder.exec` commands until they are granted it in the devices list.
+
+Separately, `coder::tools::resolve` is the one path guard that every coder file
+access goes through: agent tools, `coder_write_file`, change accept/reject and
+`coder_open_in_explorer`. It now also canonicalizes the deepest existing part of
+the path against the canonical root, so a symlink or junction inside a workspace
+that points outside it is refused. A dangling link is refused too, since a write
+would follow it. The agent's `search_files` walks the tree itself, so it skips
+links instead (a junction looping back to the root used to recurse until the
+stack overflowed). This guard keeps the agent inside the workspace it was given.
+It does not decide whether a remote device may write at all; the cap does that.
+
 ### Phase 5 — Android client
 
 Point Portal Remote's existing Android app at the daemon. Its `net/WsClient.kt`

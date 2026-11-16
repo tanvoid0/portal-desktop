@@ -1104,4 +1104,50 @@ mod tests {
     fn caller_for_anon_fails_closed() {
         assert!(caller_for(&Trust::Anon).require("coder").is_err());
     }
+
+    /// The hole this closes: `coder_write_file` names its own workspace root,
+    /// so a default-paired device could write any file on the machine. The
+    /// gate is the command's cap, checked before the arguments are read, so the
+    /// path does not matter (its own guard is tested in `coder::tools`).
+    /// Through the real `/rpc` handler: a remote holding `DEFAULT_CAPS` gets
+    /// 403 naming `coder.exec`; local, and a device granted `coder.exec`, get
+    /// past the gate (to the 503 a listener without an app handle gives); the
+    /// read side stays on the default grant.
+    #[tokio::test]
+    async fn remote_default_caps_cannot_write_files_through_the_coder() {
+        let call = |command: &'static str, trust: Trust| async move {
+            let (tx, _rx) = broadcast::channel(8);
+            let args = json!({ "workspaceRoot": "C:\\", "path": "evil.bat", "content": "x" });
+            rpc(
+                AxumPath(command.to_string()),
+                Extension(trust),
+                State(AppState::new(tx, None, 0)),
+                Some(axum::Json(args)),
+            )
+            .await
+        };
+        let remote = |extra: &[&str]| Trust::Remote {
+            device_id: "phone".into(),
+            caps: crate::rpc::DEFAULT_CAPS
+                .iter()
+                .chain(extra)
+                .map(|c| c.to_string())
+                .collect(),
+        };
+
+        let refused = call("coder_write_file", remote(&[])).await;
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(refused.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["capability"], "coder.exec");
+
+        let granted = call("coder_write_file", remote(&["coder.exec"])).await;
+        assert_eq!(granted.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let local = call("coder_write_file", Trust::Local).await;
+        assert_eq!(local.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let read = call("coder_list_threads", remote(&[])).await;
+        assert_eq!(read.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
 }
