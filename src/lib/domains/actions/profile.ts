@@ -72,10 +72,3 @@ export function profileVariables(profile: ProjectAutomationProfile): Record<stri
   if (profile.framework) vars.FRAMEWORK = profile.framework;
   return vars;
 }
-
-export function substituteVars(template: string, variables: Record<string, string>): string {
-  return template.replace(/\$\{([A-Z0-9_]+)\}/gi, (match, key: string) => {
-    const upper = key.toUpperCase();
-    return variables[upper] ?? variables[key] ?? match;
-  });
-}

@@ -156,6 +156,18 @@ workflows:
     expect(catalog.workflows.find((w) => w.id === 'ci')).toBeTruthy();
   });
 
+  it('leaves ${VAR} placeholders for the backend to quote, never splicing values in', () => {
+    // A folder scanned as `a & calc` must not become shell syntax (the backend
+    // fills placeholders quoted, from the parameters actionsService sends).
+    const catalog = resolveCatalogFromFileContent(
+      nodeProfile({ name: 'a & calc', path: 'D:/x/$(id)' }),
+      'version: 1\nactions:\n  tag:\n    run: echo ${PROJECT_NAME} ${PROJECT_PATH}\n'
+    );
+    expect(catalog.actions.find((a) => a.id === 'tag')?.command).toBe(
+      'echo ${PROJECT_NAME} ${PROJECT_PATH}'
+    );
+  });
+
   it('warns on unknown workflow action refs', () => {
     const catalog = mergeCatalog(profileFromDirectory('/tmp/x'), {
       file: {

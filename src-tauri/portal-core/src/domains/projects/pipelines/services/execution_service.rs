@@ -8,6 +8,7 @@ use crate::domains::projects::repositories::project_repository::ProjectRepositor
 use crate::events::{EventSink, EventSinkExt};
 use crate::process_ext::NoWindowExt;
 use crate::utils::pnpm_workspace::{prepare_shell_command, warn_if_broken_pnpm_workspace};
+use crate::utils::shell_template;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -277,7 +278,9 @@ impl ExecutionService {
                     .unwrap_or(false);
                 let timeout_secs = resolve_step_timeout(step);
 
-                let mut command = substitute_variables(&command_template, &variables);
+                // Values are quoted for the shell (a folder named `a & calc`
+                // stays one argument), in one pass.
+                let mut command = shell_template::render(&command_template, &variables);
 
                 // Honor the resolved command from the Actions catalog / FE.
                 // Only normalize the package-manager binary name — do not replace
@@ -300,7 +303,7 @@ impl ExecutionService {
                         o.iter()
                             .filter_map(|(k, v)| {
                                 v.as_str()
-                                    .map(|s| (k.clone(), substitute_variables(s, &variables)))
+                                    .map(|s| (k.clone(), shell_template::expand_raw(s, &variables)))
                             })
                             .collect()
                     })
@@ -485,17 +488,7 @@ impl ExecutionService {
             }
         }
 
-        let mut cmd = if cfg!(target_os = "windows") {
-            let mut c = Command::new("cmd");
-            c.no_window();
-            c.args(["/C", &exec_command]);
-            c
-        } else {
-            let mut c = Command::new("sh");
-            c.args(["-c", &exec_command]);
-            c
-        };
-
+        let mut cmd = shell_template::shell_command(&exec_command);
         cmd.current_dir(working_directory);
         cmd.envs(env);
         cmd.stdout(std::process::Stdio::piped());
@@ -1106,14 +1099,6 @@ fn resolve_step_timeout(step: &Value) -> u64 {
         .and_then(|v| v.as_u64())
         .filter(|s| *s > 0)
         .unwrap_or(DEFAULT_STEP_TIMEOUT_SECS)
-}
-
-fn substitute_variables(template: &str, variables: &HashMap<String, String>) -> String {
-    let mut result = template.to_string();
-    for (key, value) in variables {
-        result = result.replace(&format!("${{{}}}", key), value);
-    }
-    result
 }
 
 fn detect_package_manager_from_path(project_path: &str) -> String {

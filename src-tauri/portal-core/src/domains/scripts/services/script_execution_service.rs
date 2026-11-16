@@ -3,6 +3,7 @@ use crate::domains::projects::move_lock;
 use crate::domains::scripts::repositories::ScriptExecutionRepository;
 use crate::process_ext::NoWindowExt;
 use crate::utils::pnpm_workspace::prepare_shell_command;
+use crate::utils::shell_template;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -166,18 +167,6 @@ impl ScriptExecutionService {
             .any(|dir| crate::domains::projects::move_lock::is_within(dir, path))
     }
 
-    /// Resolve parameter placeholders in command
-    fn resolve_command(command: &str, parameters: &HashMap<String, String>) -> String {
-        let mut resolved = command.to_string();
-        for (key, value) in parameters {
-            // Replace ${key} style placeholders
-            resolved = resolved.replace(&format!("${{{}}}", key), value);
-            // Also support $key style without braces
-            resolved = resolved.replace(&format!("${}", key), value);
-        }
-        resolved
-    }
-
     /// Build a short error message from exit code + captured output.
     fn failure_message(exit_code: Option<i32>, output: &str) -> String {
         let meaningful: Vec<&str> = output
@@ -213,8 +202,9 @@ impl ScriptExecutionService {
         let parameters_json = serde_json::to_string(&request.parameters)
             .map_err(|e| format!("Failed to serialize parameters: {}", e))?;
 
-        // Resolve command with parameters, then apply shell rewrites (e.g. broken pnpm workspace)
-        let resolved_command = Self::resolve_command(&request.command, &request.parameters);
+        // Fill `${name}` / `$name` with the parameters, quoted for the shell,
+        // then apply shell rewrites (e.g. broken pnpm workspace)
+        let resolved_command = shell_template::render(&request.command, &request.parameters);
         let exec_command = if let Some(ref wd) = request.working_directory {
             prepare_shell_command(&resolved_command, wd)
         } else {
@@ -258,16 +248,7 @@ impl ScriptExecutionService {
         }
 
         // Build command - use shell to handle complex commands with pipes, redirects, etc.
-        let mut cmd = if cfg!(target_os = "windows") {
-            let mut c = Command::new("cmd");
-            c.no_window();
-            c.args(["/C", &exec_command]);
-            c
-        } else {
-            let mut c = Command::new("sh");
-            c.args(["-c", &exec_command]);
-            c
-        };
+        let mut cmd = shell_template::shell_command(&exec_command);
 
         // Set working directory
         if let Some(ref wd) = request.working_directory {

@@ -7,12 +7,7 @@ import { invokeClient } from '$lib/utils/invokeClient';
 import type { Project } from '$lib/domains/projects/types';
 import { buildDefaultActions, buildDefaultWorkflows } from './defaults';
 import { loadPortalPipelineFile, parsePortalPipelineFile } from './pipelineFile';
-import {
-  profileFromDirectory,
-  profileFromProject,
-  profileVariables,
-  substituteVars,
-} from './profile';
+import { profileFromDirectory, profileFromProject } from './profile';
 import type {
   PortalPipelineFile,
   ProjectAutomationProfile,
@@ -50,12 +45,10 @@ function mergeById<T extends { id: string }>(layers: T[][]): T[] {
   return [...map.values()];
 }
 
-function fileActionsToUnified(
-  file: PortalPipelineFile,
-  profile: ProjectAutomationProfile
-): UnifiedAction[] {
+/** `run:` keeps its `${VAR}` placeholders: the backend fills them at run time,
+ *  quoted for the shell, so a value can never become shell syntax. */
+function fileActionsToUnified(file: PortalPipelineFile): UnifiedAction[] {
   if (!file.actions) return [];
-  const vars = profileVariables(profile);
   return Object.entries(file.actions).map(([id, def]) => ({
     id,
     name: def.name ?? id,
@@ -63,7 +56,7 @@ function fileActionsToUnified(
     source: 'file' as const,
     runner: 'local' as const,
     category: def.category,
-    command: substituteVars(def.run, vars),
+    command: def.run,
     longRunning: def.longRunning,
   }));
 }
@@ -98,7 +91,7 @@ export function mergeCatalog(
   const customWorkflows = options.customWorkflows ?? [];
 
   const file = options.file ?? null;
-  const fromFileActions = file ? fileActionsToUnified(file, profile) : [];
+  const fromFileActions = file ? fileActionsToUnified(file) : [];
   const fromFileWorkflows = file ? fileWorkflowsToUnified(file) : [];
 
   // Priority (last wins): defaults → custom → file

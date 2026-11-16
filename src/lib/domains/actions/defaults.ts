@@ -5,7 +5,6 @@
 
 import { normalizePackageScriptCommand } from '$lib/domains/projects/pipelines/services/frameworkStarterService';
 import type { ProjectAutomationProfile, UnifiedAction, UnifiedWorkflow } from './types';
-import { substituteVars, profileVariables } from './profile';
 
 function formatPmScript(pm: string, script: 'build' | 'dev' | 'test' | 'install' | 'lint'): string {
   if (script === 'install') return `${pm} install`;
@@ -90,7 +89,6 @@ function isRustLike(profile: ProjectAutomationProfile): boolean {
  * Prefer build/start/test commands from metadata over generics.
  */
 export function buildDefaultActions(profile: ProjectAutomationProfile): UnifiedAction[] {
-  const vars = profileVariables(profile);
   const actions: UnifiedAction[] = [];
 
   if (isRustLike(profile) && !isNodeLike(profile)) {
@@ -220,10 +218,8 @@ export function buildDefaultActions(profile: ProjectAutomationProfile): UnifiedA
     }
   }
 
-  return actions.map((a) => ({
-    ...a,
-    command: a.command ? substituteVars(a.command, vars) : a.command,
-  }));
+  // `${PROJECT_PATH}` etc. stay in: the backend fills them, quoted for the shell.
+  return actions;
 }
 
 /** Default local workflows composed from default actions */

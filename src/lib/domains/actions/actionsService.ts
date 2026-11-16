@@ -14,7 +14,7 @@ import {
   type ActionCatalog,
   type ResolveCatalogOptions,
 } from './resolver';
-import { profileFromProject, profileVariables } from './profile';
+import { profileFromDirectory, profileFromProject, profileVariables } from './profile';
 import { toFailure } from './failure';
 import { createAutomationContext } from '$lib/domains/automation/utils/automationContext';
 import { listGitHubActions } from './adapters/githubAdapter';
@@ -371,12 +371,18 @@ class ActionsService {
     const results: ActionStepResult[] = [];
     let success = true;
 
+    // Values for the `${PROJECT_PATH}`-style placeholders in action commands.
+    // Sent as parameters, never spliced here: the backend quotes them for the shell.
+    const profile = options.project
+      ? profileFromProject(options.project as Project)
+      : profileFromDirectory(options.cwd);
+    const parameters = profileVariables(profile);
+
     // Sync automation context builtins for any downstream that still needs them
     if (options.project) {
-      const profile = profileFromProject(options.project as Project);
       createAutomationContext({
         cwd: options.cwd,
-        variables: { ...profileVariables(profile), ...options.variables },
+        variables: { ...parameters, ...options.variables },
         secrets: options.secrets,
         profile,
       });
@@ -454,6 +460,7 @@ class ActionsService {
         // so script_executions FK is satisfied (null is allowed for freestyle runs).
         const executionId = await scriptExecutionService.executeScript({
           command: action.command,
+          parameters,
           workingDirectory: options.cwd,
           // Action runs are non-interactive: CI=true keeps package managers and
           // test runners from prompting / dropping into watch mode (QA-129).

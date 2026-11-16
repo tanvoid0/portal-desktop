@@ -22,7 +22,6 @@ export {
   profileVariables,
   resolveFrameworkNames,
   resolvePackageManagerName,
-  substituteVars,
 } from './profile';
 
 export { buildDefaultActions, buildDefaultWorkflows } from './defaults';
