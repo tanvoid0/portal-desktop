@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
   AgentEvent,
   AgentEventSeq,
+  AgentFeedEvent,
   AgentSessionDetail,
   AgentSessionSummary,
   BackendInfo,
@@ -85,6 +86,20 @@ export const agentsApi = {
   /** Persisted sessions, most recent first. */
   listSessions(): Promise<AgentSessionSummary[]> {
     return invokeClient.post<AgentSessionSummary[]>('agents_list_sessions');
+  },
+
+  /** Cross-session activity feed, newest first. `afterSeq`/`beforeSeq` are `cursor`s
+   *  (global insertion order — per-session `seq` restarts at 1). */
+  listEvents(opts: {
+    afterSeq?: number;
+    beforeSeq?: number;
+    limit?: number;
+  }): Promise<AgentFeedEvent[]> {
+    return invokeClient.post<AgentFeedEvent[]>('agents_list_events', {
+      afterSeq: opts.afterSeq ?? null,
+      beforeSeq: opts.beforeSeq ?? null,
+      limit: opts.limit ?? null,
+    });
   },
 
   /** One session's full persisted transcript + event log, in order. */

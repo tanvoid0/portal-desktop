@@ -9,8 +9,10 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
+use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter,
+    QueryOrder, QuerySelect,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -135,6 +137,31 @@ pub struct AgentEventSeq {
     pub seq: i64,
     pub event: AgentEvent,
 }
+
+/// One row of the cross-session activity feed. `agent_events.seq` restarts at
+/// 1 per session, so the feed pages on `cursor` (the table's insertion-order
+/// rowid) instead.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/agents/generated/")]
+pub struct AgentFeedEvent {
+    #[ts(type = "number")]
+    pub cursor: i64,
+    pub session_id: String,
+    pub created_at: String,
+    pub event: AgentEvent,
+}
+
+#[derive(FromQueryResult)]
+struct FeedRow {
+    cursor: i64,
+    session_id: String,
+    created_at: String,
+    event_json: String,
+}
+
+/// Streaming/diagnostic events that would drown the feed (stored as
+/// `{"type":"<tag>",...}` — serde's internal tag is serialized first).
+const FEED_NOISE: [&str; 4] = ["text_delta", "thinking_delta", "raw", "usage"];
 
 /// Full detail for one session — `get_session_detail`'s return shape.
 #[derive(Debug, Clone, Serialize, TS)]
@@ -538,6 +565,60 @@ impl AgentRunService {
         Ok(rows.into_iter().map(AgentSessionSummary::from).collect())
     }
 
+    /// Cross-session activity feed, newest first, without streaming noise.
+    /// `after_seq` = only newer than that cursor, `before_seq` = only older
+    /// (the next page back); `limit` is clamped to 1..=200.
+    pub async fn list_events(
+        &self,
+        after_seq: Option<i64>,
+        before_seq: Option<i64>,
+        limit: Option<u64>,
+    ) -> Result<Vec<AgentFeedEvent>, String> {
+        let mut q = agent_event::Entity::find()
+            .select_only()
+            .column_as(Expr::cust("rowid"), "cursor")
+            .columns([
+                agent_event::Column::SessionId,
+                agent_event::Column::CreatedAt,
+                agent_event::Column::EventJson,
+            ])
+            .order_by_desc(Expr::cust("rowid"))
+            .limit(limit.unwrap_or(50).clamp(1, 200));
+        for tag in FEED_NOISE {
+            q = q.filter(Expr::cust(format!(
+                "event_json NOT LIKE '{{\"type\":\"{tag}\"%'"
+            )));
+        }
+        if let Some(n) = after_seq {
+            q = q.filter(Expr::cust_with_values("rowid > ?", [n]));
+        }
+        if let Some(n) = before_seq {
+            q = q.filter(Expr::cust_with_values("rowid < ?", [n]));
+        }
+        let rows = q
+            .into_model::<FeedRow>()
+            .all(self.db.get_connection())
+            .await
+            .map_err(|e| format!("agents: list events failed: {e}"))?;
+        Ok(rows
+            .into_iter()
+            .filter_map(
+                |r| match serde_json::from_str::<AgentEvent>(&r.event_json) {
+                    Ok(event) => Some(AgentFeedEvent {
+                        cursor: r.cursor,
+                        session_id: r.session_id,
+                        created_at: r.created_at,
+                        event,
+                    }),
+                    Err(e) => {
+                        eprintln!("agents: skipping unparsable event row: {e}");
+                        None
+                    }
+                },
+            )
+            .collect())
+    }
+
     /// Deletes a persisted session and its transcript/event rows (FK cascade
     /// on `agent_sessions.id`, same shape as `coder_file_changes`). Refuses a
     /// session that's live or persisted as `"running"` — same "the only
@@ -885,5 +966,58 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.contains("never reached the backend"), "got: {err}");
+    }
+
+    /// Cross-session feed: newest first, noise dropped, `after_seq`/`before_seq`
+    /// page on insertion order even though per-session `seq` collides.
+    #[tokio::test]
+    async fn list_events_pages_across_sessions_and_skips_noise() {
+        let (svc, _dir) = test_service().await;
+        for id in ["a", "b"] {
+            let am = agent_session::ActiveModel {
+                id: Set(id.to_string()),
+                backend_id: Set("claude-code".to_string()),
+                model: Set(None),
+                cwd: Set(".".to_string()),
+                status: Set("exited".to_string()),
+                started_at: Set(now_iso()),
+                ended_at: Set(None),
+                exit_code: Set(None),
+                title: Set(None),
+                task_id: Set(None),
+                backend_session_id: Set(None),
+            };
+            agent_session::Entity::insert(am)
+                .exec(svc.db.get_connection())
+                .await
+                .expect("insert session");
+        }
+        let exit = AgentEvent::Exited { code: Some(0) };
+        let noise = AgentEvent::TextDelta {
+            text: "x".into(),
+            parent_tool_use_id: None,
+        };
+        // Both sessions reuse seq 1/2; the delta must not show up.
+        svc.persist_event("a", 1, &exit).await;
+        svc.persist_event("a", 2, &noise).await;
+        svc.persist_event("b", 1, &exit).await;
+        svc.persist_event("b", 2, &exit).await;
+
+        let all = svc.list_events(None, None, None).await.unwrap();
+        assert_eq!(all.len(), 3);
+        assert!(all[0].cursor > all[1].cursor && all[1].cursor > all[2].cursor);
+        assert_eq!(all[2].session_id, "a");
+
+        let newer = svc
+            .list_events(Some(all[2].cursor), None, None)
+            .await
+            .unwrap();
+        assert_eq!(newer.len(), 2);
+        let older = svc
+            .list_events(None, Some(all[0].cursor), Some(1))
+            .await
+            .unwrap();
+        assert_eq!(older.len(), 1);
+        assert_eq!(older[0].cursor, all[1].cursor);
     }
 }

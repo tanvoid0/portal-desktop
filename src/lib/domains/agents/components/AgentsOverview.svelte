@@ -17,6 +17,8 @@
   import Select from '$lib/components/ui/select.svelte';
   import { formatSessionDateTime } from '$lib/domains/shared/utils';
   import { agentBackendsQuery, agentSessionsQuery } from '../queries/agentsQueries.js';
+  import AgentsBoard from './AgentsBoard.svelte';
+  import AgentActivityFeed from './AgentActivityFeed.svelte';
   import { overviewSessions } from '../utils/overviewStats.js';
   import { basename } from '../utils/groupSessions.js';
   import type { AgentSessionSummary } from '../generated';
@@ -32,6 +34,9 @@
     { value: ALL, label: 'All backends' },
     ...(backendsQuery.data ?? []).map((b) => ({ value: b.id, label: b.display_name })),
   ]);
+  const scoped = $derived(
+    (sessionsQuery.data ?? []).filter((s) => !backend || s.backend_id === backend)
+  );
   const view = $derived(overviewSessions(sessionsQuery.data ?? [], backend));
   const stats = $derived([
     { label: 'Total', value: view.stats.total },
@@ -106,5 +111,7 @@
     <PageStats {stats} />
     {@render list('Running', view.running)}
     {@render list('Recent', view.recent)}
+    <AgentsBoard sessions={[...view.running, ...view.recent]} {backendName} onOpen={open} />
+    <AgentActivityFeed sessions={scoped} onOpen={open} />
   {/if}
 </PageContainer>

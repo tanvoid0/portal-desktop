@@ -6,7 +6,8 @@ use tauri::State;
 
 use super::backend::StartParams;
 use super::service::{
-    AgentEventSeq, AgentRunService, AgentSessionDetail, AgentSessionSummary, BackendInfo,
+    AgentEventSeq, AgentFeedEvent, AgentRunService, AgentSessionDetail, AgentSessionSummary,
+    BackendInfo,
 };
 
 // `agents` (read-only: which backends/models exist, replaying a *live* run's
@@ -129,6 +130,19 @@ pub async fn agents_list_sessions(
     service: State<'_, Arc<AgentRunService>>,
 ) -> Result<Vec<AgentSessionSummary>, String> {
     service.list_sessions().await
+}
+
+/// Cross-session activity feed (newest first) — pages on a global cursor, see
+/// `AgentFeedEvent`. Reads every run's persisted events, so same cap as the
+/// session list.
+#[portal_rpc_macro::rpc(cap = "agents.history")]
+pub async fn agents_list_events(
+    service: State<'_, Arc<AgentRunService>>,
+    after_seq: Option<i64>,
+    before_seq: Option<i64>,
+    limit: Option<u64>,
+) -> Result<Vec<AgentFeedEvent>, String> {
+    service.list_events(after_seq, before_seq, limit).await
 }
 
 /// One session's full persisted transcript + event log, in order — the

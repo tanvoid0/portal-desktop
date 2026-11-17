@@ -139,7 +139,47 @@ export function getSubtaskCount(taskId: string, allTasks: Task[]): number {
   return allTasks.filter((task) => task.parentId === taskId).length;
 }
 
+export interface KanbanColumnDef {
+  /** Doubles as the status a card dropped here is moved to. */
+  id: string;
+  title: string;
+  color: string;
+  /** Shown in a tooltip on the column header. */
+  hint?: string;
+  match: (task: Task) => boolean;
+  /** Sort by completion/update time, newest first. */
+  newestFirst?: boolean;
+}
+
+export const DEFAULT_COLUMNS: KanbanColumnDef[] = [
+  {
+    id: 'pending',
+    title: 'Backlog',
+    color: 'bg-gray-100 dark:bg-gray-800',
+    match: (t) => t.status === 'pending',
+  },
+  {
+    id: 'in-progress',
+    title: 'In Progress',
+    color: 'bg-blue-100 dark:bg-blue-900/20',
+    match: (t) => t.status === 'in-progress',
+  },
+  {
+    id: 'completed',
+    title: 'Done',
+    color: 'bg-green-100 dark:bg-green-900/20',
+    match: (t) => t.status === 'completed',
+    newestFirst: true,
+  },
+];
+
 export class TaskUiState {
+  readonly columns: KanbanColumnDef[] = DEFAULT_COLUMNS;
+
+  constructor(columns?: KanbanColumnDef[]) {
+    if (columns) this.columns = columns;
+  }
+
   tasks = $state<Task[]>([]);
   selectedTask = $state<Task | null>(null);
   selectedTaskIds = $state<Set<string>>(new Set());
@@ -190,35 +230,17 @@ export class TaskUiState {
     return { open, archived, openTotal, known };
   });
 
-  kanbanColumns = $derived.by(() => {
-    const done = this.filteredTasks
-      .filter((t) => t.status === 'completed' && !this.archived(t))
-      .sort((a, b) => archiveTime(b) - archiveTime(a));
-    return [
-      {
-        id: 'pending',
-        title: 'Backlog',
-        color: 'bg-gray-100 dark:bg-gray-800',
-        tasks: this.filteredTasks.filter((t) => t.status === 'pending'),
-        olderCount: 0,
-      },
-      {
-        id: 'in-progress',
-        title: 'In Progress',
-        color: 'bg-blue-100 dark:bg-blue-900/20',
-        tasks: this.filteredTasks.filter((t) => t.status === 'in-progress'),
-        olderCount: 0,
-      },
-      {
-        id: 'completed',
-        title: 'Done',
-        color: 'bg-green-100 dark:bg-green-900/20',
-        tasks: done,
-        olderCount: this.filteredTasks.filter((t) => t.status === 'completed' && this.archived(t))
-          .length,
-      },
-    ];
-  });
+  kanbanColumns = $derived(
+    this.columns.map((c) => {
+      const matched = this.filteredTasks.filter(c.match);
+      const shown = matched.filter((t) => !this.archived(t));
+      return {
+        ...c,
+        tasks: c.newestFirst ? shown.sort((a, b) => archiveTime(b) - archiveTime(a)) : shown,
+        olderCount: matched.length - shown.length,
+      };
+    })
+  );
 
   overdueTasks = $derived(
     this.tasks.filter(
@@ -436,6 +458,8 @@ export class TaskUiState {
 
 export const taskUi = new TaskUiState();
 
-export function createTaskUiState(): TaskUiState {
-  return new TaskUiState();
+export function createTaskUiState({
+  columns = DEFAULT_COLUMNS,
+}: { columns?: KanbanColumnDef[] } = {}): TaskUiState {
+  return new TaskUiState(columns);
 }

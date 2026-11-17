@@ -47,6 +47,7 @@ export const queryKeys = {
     backends: ['agents', 'backends'] as const,
     sessions: ['agents', 'sessions'] as const,
     session: (id: string) => ['agents', 'sessions', id] as const,
+    events: ['agents', 'events'] as const,
   },
   database: {
     sources: ['database', 'sources'] as const,

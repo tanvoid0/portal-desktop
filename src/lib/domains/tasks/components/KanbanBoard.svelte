@@ -12,6 +12,7 @@
   import { Card, CardContent } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
+  import * as Tooltip from '$lib/components/ui/tooltip';
   import Icon from '@iconify/svelte';
   import { taskActions } from '../stores/taskStore';
   import { toastActions } from '$lib/utils/toast';
@@ -65,6 +66,8 @@
     /** Override status/priority colours and icons (GitHub issues use their own). */
     display?: TaskDisplay;
     showSubtaskActions?: boolean;
+    /** No drag-and-drop (boards that mirror state owned elsewhere). */
+    readonly?: boolean;
   }
 
   let {
@@ -85,6 +88,7 @@
     onDeleteTask,
     display = defaultDisplay,
     showSubtaskActions = true,
+    readonly = false,
   }: Props = $props();
   let taskUi = $derived(ui);
 
@@ -133,12 +137,23 @@
       )}"
       role="region"
       aria-label="Drop zone for {column.title} tasks"
-      ondragover={(e) => handleDragOver(e, column.id, dragDropState)}
-      ondragleave={(e) => handleDragLeave(e, dragDropState)}
-      ondrop={(e) => handleDrop(e, column.id, dragDropState, handleTaskMove)}
+      ondragover={readonly ? undefined : (e) => handleDragOver(e, column.id, dragDropState)}
+      ondragleave={readonly ? undefined : (e) => handleDragLeave(e, dragDropState)}
+      ondrop={readonly ? undefined : (e) => handleDrop(e, column.id, dragDropState, handleTaskMove)}
     >
       <div class="flex shrink-0 items-center justify-between">
-        <h3 class="text-sm font-semibold text-foreground">{column.title}</h3>
+        {#if column.hint}
+          <Tooltip.Root>
+            <Tooltip.Trigger>
+              {#snippet child({ props })}
+                <h3 {...props} class="text-sm font-semibold text-foreground">{column.title}</h3>
+              {/snippet}
+            </Tooltip.Trigger>
+            <Tooltip.Content>{column.hint}</Tooltip.Content>
+          </Tooltip.Root>
+        {:else}
+          <h3 class="text-sm font-semibold text-foreground">{column.title}</h3>
+        {/if}
         <span class="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
           {column.tasks.length}
         </span>
@@ -167,9 +182,13 @@
               {#snippet trigger(menuProps)}
                 <Card
                   {...menuProps}
-                  draggable="true"
-                  ondragstart={(e: DragEvent) => handleDragStart(e, task, dragDropState)}
-                  ondragend={(e: DragEvent) => handleDragEnd(e, dragDropState)}
+                  draggable={readonly ? undefined : 'true'}
+                  ondragstart={readonly
+                    ? undefined
+                    : (e: DragEvent) => handleDragStart(e, task, dragDropState)}
+                  ondragend={readonly
+                    ? undefined
+                    : (e: DragEvent) => handleDragEnd(e, dragDropState)}
                   onclick={() => activate(task)}
                   onkeydown={(e: KeyboardEvent) => {
                     if (e.target !== e.currentTarget) return;
@@ -313,22 +332,24 @@
                             <FaPlus class="h-4 w-4 text-muted-foreground" />
                           </Button>
                         {/if}
-                        <Button
-                          onclick={(e) => {
-                            e.stopPropagation();
-                            handleTaskStatusToggle(task.id);
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          class="h-8 w-8 p-0"
-                          aria-label="Toggle task status"
-                          title="Toggle task status"
-                        >
-                          <Icon
-                            icon={display.icon(task)}
-                            class="h-4 w-4 {display.statusColor(task.status)}"
-                          />
-                        </Button>
+                        {#if !readonly}
+                          <Button
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              handleTaskStatusToggle(task.id);
+                            }}
+                            variant="ghost"
+                            size="sm"
+                            class="h-8 w-8 p-0"
+                            aria-label="Toggle task status"
+                            title="Toggle task status"
+                          >
+                            <Icon
+                              icon={display.icon(task)}
+                              class="h-4 w-4 {display.statusColor(task.status)}"
+                            />
+                          </Button>
+                        {/if}
                       </div>
                     </div>
                   </CardContent>
@@ -393,22 +414,24 @@
                         <Badge class={display.statusBadge(subtask.status)}>
                           {taskStatusLabel(subtask.status)}
                         </Badge>
-                        <Button
-                          onclick={(e) => {
-                            e.stopPropagation();
-                            handleTaskStatusToggle(subtask.id);
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          class="h-8 w-8 shrink-0 p-0"
-                          aria-label="Toggle subtask status"
-                          title="Toggle subtask status"
-                        >
-                          <Icon
-                            icon={display.icon(subtask)}
-                            class="h-4 w-4 {display.statusColor(subtask.status)}"
-                          />
-                        </Button>
+                        {#if !readonly}
+                          <Button
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              handleTaskStatusToggle(subtask.id);
+                            }}
+                            variant="ghost"
+                            size="sm"
+                            class="h-8 w-8 shrink-0 p-0"
+                            aria-label="Toggle subtask status"
+                            title="Toggle subtask status"
+                          >
+                            <Icon
+                              icon={display.icon(subtask)}
+                              class="h-4 w-4 {display.statusColor(subtask.status)}"
+                            />
+                          </Button>
+                        {/if}
                       </div>
                     </CardContent>
                   </Card>

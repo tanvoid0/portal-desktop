@@ -109,6 +109,7 @@ class AgentRunsState {
 
   private invalidateSessions() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.agents.sessions });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.agents.events });
   }
 
   /** Attaches to a session's log: persisted base (`getSession`) + whatever's
@@ -146,6 +147,11 @@ class AgentRunsState {
   viewFor(sessionId: string): AgentRunView {
     const log = this.logs[sessionId];
     return eventsToMessages(log ? log.map((item) => item.event) : []);
+  }
+
+  /** Raw event log of an attached session ([] if untracked). */
+  eventsFor(sessionId: string): AgentEvent[] {
+    return (this.logs[sessionId] ?? []).map((item) => item.event);
   }
 
   pendingCountFor(sessionId: string): number {
