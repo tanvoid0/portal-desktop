@@ -1,5 +1,19 @@
 # Portal Desktop - Release Notes
 
+## Version 0.17.0
+
+### Highlights
+
+- Feature: database explorer browses and edits MongoDB and Redis, with bounded Redis reads and TLS via the ssl flag (#502)
+- Security: remote callers need terminal.exec to run project commands, change paths or make shell-unsafe renames; coder file writes and agent driving need the opt-in coder.exec
+- Security: ${VAR} values are quoted for the shell instead of spliced in raw
+- Change: the Claude Code (CLI) coder provider is gone; Claude lives in its own tab (#726)
+- Fix: project relocation uses one-way move locks, recopies rotted staging and holds the source across delete verification (#781, #414, #423, #430, #431)
+- Fix: file-workflow pipeline runs no longer stall or lose step statuses; release steps are not long-running (#832)
+- Fix: SDK manager loads and surfaces errors; nvm-windows, rustup and nvm-sh report real state (#850)
+
+---
+
 ## Version 0.16.0
 
 ### Highlights
@@ -14,8 +28,6 @@
 - Fix: discovery, relocation and project grouping correctness fixes (#210, #239, #273, #393)
 
 ---
-
-# Portal Desktop - Release Notes
 
 ## Version 0.15.0
 
