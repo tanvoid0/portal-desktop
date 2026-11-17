@@ -18,6 +18,8 @@
     workspaceName: string;
     gitStats?: GitDiffStats | null;
     pendingChangeCount?: number;
+    /** Hide the "Agent changes" entry for hosts with no coder change feed. */
+    agentChanges?: boolean;
   }
 
   let {
@@ -26,6 +28,7 @@
     workspaceName,
     gitStats = null,
     pendingChangeCount = 0,
+    agentChanges = true,
   }: Props = $props();
 
   const openTabs = $derived.by(() => {
@@ -126,29 +129,31 @@
       </div>
 
       <!-- Agent changes -->
-      <div class="rounded-md">
-        <Button
-          type="button"
-          variant="ghost"
-          class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
-          onclick={() => {
-            coderWorkspaceStore.expandSection('changes');
-            coderWorkspaceStore.openChanges();
-            if (threadId) coderSession.refreshChanges(threadId);
-          }}
-        >
-          <ChevronRight
-            class="h-3.5 w-3.5 shrink-0 transition-transform {changesExpanded ? 'rotate-90' : ''}"
-          />
-          <Bot class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span class="flex-1">Agent changes</span>
-          {#if agentDiffLabel}
-            <span class="font-mono text-[10px] text-amber-600 dark:text-amber-400">
-              {agentDiffLabel}
-            </span>
-          {/if}
-        </Button>
-      </div>
+      {#if agentChanges}
+        <div class="rounded-md">
+          <Button
+            type="button"
+            variant="ghost"
+            class="h-auto w-full justify-start gap-1.5 rounded px-2 py-1.5 text-xs hover:bg-muted/60"
+            onclick={() => {
+              coderWorkspaceStore.expandSection('changes');
+              coderWorkspaceStore.openChanges();
+              if (threadId) coderSession.refreshChanges(threadId);
+            }}
+          >
+            <ChevronRight
+              class="h-3.5 w-3.5 shrink-0 transition-transform {changesExpanded ? 'rotate-90' : ''}"
+            />
+            <Bot class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span class="flex-1">Agent changes</span>
+            {#if agentDiffLabel}
+              <span class="font-mono text-[10px] text-amber-600 dark:text-amber-400">
+                {agentDiffLabel}
+              </span>
+            {/if}
+          </Button>
+        </div>
+      {/if}
 
       <!-- Git changes -->
       <div class="rounded-md">

@@ -10,7 +10,9 @@
      `goto('/ai/coder/claude-code?session=…')` while this page is already open, #662)
      goes the other way, picked up via `afterNavigate` — `replaceState` is
      exempt from the navigation lifecycle, so it never trips that handler and
-     can't fight the local writes above. -->
+     can't fight the local writes above. A focused session also gets the Coder
+     workspace (git changes, terminal, files, browser) beside its transcript,
+     rooted at the session's cwd. -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { createQuery } from '@tanstack/svelte-query';
@@ -20,7 +22,13 @@
   import ResponsivePanel from '$lib/components/shell/responsive-panel.svelte';
   import PanelLeftOpen from '~icons/fa6-solid/table-columns';
   import AgentSessionSidebar from './AgentSessionSidebar.svelte';
+  import PanelRightOpen from '~icons/fa6-solid/table-columns';
   import AgentSessionPanel from './AgentSessionPanel.svelte';
+  import CoderWorkspacePanel from '$lib/domains/coder/components/CoderWorkspacePanel.svelte';
+  import CoderWorkspaceSidebar from '$lib/domains/coder/components/CoderWorkspaceSidebar.svelte';
+  import GitCommitDialog from '$lib/domains/coder/components/GitCommitDialog.svelte';
+  import { coderWorkspaceStore } from '$lib/domains/coder/state/coderWorkspaceStore.svelte.js';
+  import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
   import { agentRuns } from '../state/agentRuns.svelte.js';
   import { agentSessionsQuery } from '../queries/agentsQueries.js';
 
@@ -77,9 +85,33 @@
   // There's no other tab to send it to yet — #725 adds one route per
   // backend; until then the safe fallback is just dropping focus.
   const sessionsQuery = createQuery(agentSessionsQuery);
+  const focused = $derived(sessionsQuery.data?.find((s) => s.id === focusedId));
+  const cwd = $derived(focused?.cwd ?? '');
   $effect(() => {
-    const session = sessionsQuery.data?.find((s) => s.id === focusedId);
-    if (session && session.backend_id !== backendId) syncUrl(null);
+    if (focused && focused.backend_id !== backendId) syncUrl(null);
+  });
+
+  let commitOpen = $state(false);
+
+  // ponytail: coderWorkspaceStore is one shared singleton (also CoderPanel's),
+  // so tabs reset per focused session and on teardown instead of being keyed
+  // per session; key the store by thread id if tabs should persist per session.
+  function resetWorkspace() {
+    coderWorkspaceStore.openTabs = [];
+    coderWorkspaceStore.openChat();
+  }
+  $effect(() => {
+    focusedId;
+    resetWorkspace();
+    return resetWorkspace;
+  });
+
+  $effect(() => {
+    if (!cwd) return;
+    aiTopbar.actions = topbarActions;
+    return () => {
+      aiTopbar.actions = null;
+    };
   });
 
   onMount(() => {
@@ -108,6 +140,21 @@
   }
 </script>
 
+{#snippet topbarActions()}
+  <Button
+    size="sm"
+    variant={coderWorkspaceStore.sidebarOpen ? 'secondary' : 'ghost'}
+    class="h-8 gap-1"
+    title="Workspace sidebar"
+    aria-label="Workspace sidebar"
+    onclick={() => {
+      coderWorkspaceStore.sidebarOpen = !coderWorkspaceStore.sidebarOpen;
+    }}
+  >
+    <PanelRightOpen class="h-3.5 w-3.5" />
+  </Button>
+{/snippet}
+
 <div class="flex h-full w-full overflow-hidden">
   <ResponsivePanel bind:open={sidebarOpen} side="left" desktopClass="w-80 bg-muted/20">
     <AgentSessionSidebar {backendId} {focusedId} onSelect={selectSession} onNewRun={newRun} />
@@ -134,4 +181,33 @@
       onStarted={(id) => syncUrl(id)}
     />
   </div>
+
+  {#if cwd}
+    {#if coderWorkspaceStore.activePanel !== 'chat'}
+      <CoderWorkspacePanel
+        threadId={focusedId}
+        workspaceRoot={cwd}
+        changes={[]}
+        onRefreshChanges={() => {}}
+        onCommit={() => (commitOpen = true)}
+      />
+    {/if}
+    {#if coderWorkspaceStore.sidebarOpen}
+      <ResponsivePanel
+        bind:open={coderWorkspaceStore.sidebarOpen}
+        side="right"
+        desktopClass="divider-edge-l w-56 bg-muted/20"
+        borderClass=""
+      >
+        <CoderWorkspaceSidebar
+          threadId={focusedId}
+          workspaceRoot={cwd}
+          workspaceName={cwd.split(/[\\/]/).filter(Boolean).pop() ?? ''}
+          agentChanges={false}
+        />
+      </ResponsivePanel>
+    {/if}
+  {/if}
 </div>
+
+<GitCommitDialog bind:open={commitOpen} workspaceRoot={cwd} />
