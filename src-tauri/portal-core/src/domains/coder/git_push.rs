@@ -46,9 +46,11 @@ fn push_args(branch: &str, has_upstream: bool) -> Vec<String> {
 }
 
 fn git_output(workspace: &str, args: &[&str]) -> Result<String, String> {
+    super::tools::reject_unc(workspace)?;
     move_lock::ensure_unlocked(Path::new(workspace))?;
     let output = Command::new("git")
         .no_window()
+        .args(["-c", "core.fsmonitor="])
         // ponytail: forces a stalled auth prompt into a fast, real git error
         // instead of hanging the UI forever; SSH keys and credential helpers
         // still authenticate normally, this only disables the interactive

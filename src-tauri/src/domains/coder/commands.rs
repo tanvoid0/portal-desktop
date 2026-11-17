@@ -34,6 +34,7 @@ pub async fn coder_create_thread(
     thread_kind: Option<CoderThreadKind>,
     project_id: Option<i32>,
 ) -> Result<CoderThread, String> {
+    service.ensure_known_root(&workspace_root).await?;
     Ok(service
         .create_thread(workspace_root, model, llm_provider, thread_kind, project_id)
         .await)
@@ -286,25 +287,34 @@ pub async fn coder_modify_change(
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
-pub fn coder_list_dir(
+pub async fn coder_list_dir(
+    service: State<'_, Arc<CoderService>>,
     workspace_root: String,
     path: Option<String>,
 ) -> Result<Vec<super::types::WorkspaceDirEntry>, String> {
+    service.ensure_known_root(&workspace_root).await?;
     let rel = path.unwrap_or_else(|| ".".to_string());
     super::tools::list_dir_entries(&workspace_root, &rel)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
-pub fn coder_read_file(workspace_root: String, path: String) -> Result<String, String> {
+pub async fn coder_read_file(
+    service: State<'_, Arc<CoderService>>,
+    workspace_root: String,
+    path: String,
+) -> Result<String, String> {
+    service.ensure_known_root(&workspace_root).await?;
     super::tools::read_file(&workspace_root, &path)
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
-pub fn coder_write_file(
+pub async fn coder_write_file(
+    service: State<'_, Arc<CoderService>>,
     workspace_root: String,
     path: String,
     content: String,
 ) -> Result<(), String> {
+    service.ensure_known_root(&workspace_root).await?;
     super::tools::write_file(&workspace_root, &path, &content)?;
     Ok(())
 }
@@ -344,21 +354,31 @@ pub fn coder_open_in_explorer(workspace_root: String, path: String) -> Result<()
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
-pub fn coder_get_git_diff_stats(workspace_root: String) -> super::git_status::GitDiffStats {
-    super::git_status::git_diff_stats(&workspace_root)
+pub async fn coder_get_git_diff_stats(
+    service: State<'_, Arc<CoderService>>,
+    workspace_root: String,
+) -> Result<super::git_status::GitDiffStats, String> {
+    service.ensure_known_root(&workspace_root).await?;
+    Ok(super::git_status::git_diff_stats(&workspace_root))
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
-pub fn coder_list_git_changes(workspace_root: String) -> Vec<super::git_status::GitFileChange> {
-    super::git_status::git_list_changes(&workspace_root)
+pub async fn coder_list_git_changes(
+    service: State<'_, Arc<CoderService>>,
+    workspace_root: String,
+) -> Result<Vec<super::git_status::GitFileChange>, String> {
+    service.ensure_known_root(&workspace_root).await?;
+    Ok(super::git_status::git_list_changes(&workspace_root))
 }
 
 #[portal_rpc_macro::rpc(cap = "coder")]
 pub async fn coder_prepare_git_commit(
+    service: State<'_, Arc<CoderService>>,
     workspace_root: String,
     use_ai: Option<bool>,
     settings_service: State<'_, Arc<AISettingsService>>,
 ) -> Result<super::git_commit::GitCommitDraft, String> {
+    service.ensure_known_root(&workspace_root).await?;
     let mut draft = super::git_commit::prepare_commit(&workspace_root)?;
     if use_ai.unwrap_or(true) {
         let cfg = PlatformConfig::resolve(&settings_service);
@@ -375,18 +395,24 @@ pub async fn coder_prepare_git_commit(
 }
 
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
-pub fn coder_git_commit(
+pub async fn coder_git_commit(
+    service: State<'_, Arc<CoderService>>,
     workspace_root: String,
     title: String,
     summary: Option<String>,
 ) -> Result<String, String> {
+    service.ensure_known_root(&workspace_root).await?;
     super::git_commit::git_commit(&workspace_root, &title, summary.as_deref())
 }
 
 /// Pushes the current branch to `origin`. Never force-pushes — see
 /// `git_push::push_args`.
 #[portal_rpc_macro::rpc(cap = "coder.exec")]
-pub fn coder_git_push(workspace_root: String) -> Result<String, String> {
+pub async fn coder_git_push(
+    service: State<'_, Arc<CoderService>>,
+    workspace_root: String,
+) -> Result<String, String> {
+    service.ensure_known_root(&workspace_root).await?;
     super::git_push::git_push(&workspace_root)
 }
 

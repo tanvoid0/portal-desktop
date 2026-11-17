@@ -1044,6 +1044,28 @@ impl CoderService {
         summaries
     }
 
+    /// Gate for caller-chosen workspace roots: the root must sit at or under a
+    /// registered project, an existing thread's root or a sub-agent worktree,
+    /// and never be a UNC path (board #864). Stops a paired device reading or
+    /// running git anywhere on disk by naming an arbitrary `workspace_root`.
+    pub async fn ensure_known_root(&self, root: &str) -> Result<(), String> {
+        super::tools::reject_unc(root)?;
+        let mut known: Vec<String> = crate::entities::project::Entity::find()
+            .all(self.db.get_connection())
+            .await
+            .map_err(|e| format!("load projects: {e}"))?
+            .into_iter()
+            .map(|p| p.path)
+            .collect();
+        known.extend(self.threads.lock().await.values().map(|t| t.workspace_root.clone()));
+        known.extend(self.sub_agents.lock().await.values().map(|s| s.workspace_root.clone()));
+        if known.iter().any(|k| move_lock::is_within(root, k)) {
+            Ok(())
+        } else {
+            Err(format!("Not a known project or workspace: {root}"))
+        }
+    }
+
     pub async fn get_thread(&self, id: &str) -> Option<CoderThread> {
         self.threads.lock().await.get(id).cloned()
     }

@@ -213,6 +213,7 @@ fn parse_commit_json(raw: &str) -> Result<(String, String), String> {
 }
 
 pub fn git_commit(workspace: &str, title: &str, summary: Option<&str>) -> Result<String, String> {
+    super::tools::reject_unc(workspace)?;
     move_lock::ensure_unlocked(std::path::Path::new(workspace))?;
     let title = title.trim();
     if title.is_empty() {
@@ -221,6 +222,7 @@ pub fn git_commit(workspace: &str, title: &str, summary: Option<&str>) -> Result
 
     let output = Command::new("git")
         .no_window()
+        .args(["-c", "core.fsmonitor="])
         .args(["add", "-A"])
         .current_dir(workspace)
         .output()
@@ -239,6 +241,7 @@ pub fn git_commit(workspace: &str, title: &str, summary: Option<&str>) -> Result
 
     let output = Command::new("git")
         .no_window()
+        .args(["-c", "core.fsmonitor="])
         .args(&args)
         .current_dir(workspace)
         .output()
@@ -251,9 +254,11 @@ pub fn git_commit(workspace: &str, title: &str, summary: Option<&str>) -> Result
 }
 
 fn git_output(workspace: &str, args: &[&str]) -> Result<String, String> {
+    super::tools::reject_unc(workspace)?;
     move_lock::ensure_unlocked(std::path::Path::new(workspace))?;
     let output = Command::new("git")
         .no_window()
+        .args(["-c", "core.fsmonitor="])
         .args(args)
         .current_dir(workspace)
         .output()
