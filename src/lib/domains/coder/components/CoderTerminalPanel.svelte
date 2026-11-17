@@ -4,7 +4,7 @@
   import X from '~icons/fa6-solid/xmark';
   import TerminalIcon from '~icons/fa6-solid/terminal';
   import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
-  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import { useCoderWorkspace } from '../state/coderWorkspaceStore.svelte.js';
   import CoderSessionTerminal from './CoderSessionTerminal.svelte';
 
   interface Props {
@@ -16,6 +16,7 @@
   }
 
   let { threadId, workspaceRoot, open = true, activeTerminalId = null }: Props = $props();
+  const coderWorkspaceStore = useCoderWorkspace();
 
   const tabs = $derived.by(() => {
     coderTerminalStore.revision;

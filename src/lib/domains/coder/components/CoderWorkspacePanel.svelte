@@ -3,7 +3,7 @@
   import Maximize2 from '~icons/fa6-solid/maximize';
   import MessageSquare from '~icons/fa6-solid/message';
   import { Button } from '$lib/components/ui/button';
-  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import { useCoderWorkspace } from '../state/coderWorkspaceStore.svelte.js';
   import CoderTerminalPanel from './CoderTerminalPanel.svelte';
   import CoderFileExplorer from './CoderFileExplorer.svelte';
   import CoderFilePreview from './CoderFilePreview.svelte';
@@ -21,6 +21,7 @@
   }
 
   let { threadId, workspaceRoot, changes, onRefreshChanges, onCommit }: Props = $props();
+  const coderWorkspaceStore = useCoderWorkspace();
 
   const panel = $derived(coderWorkspaceStore.activePanel);
   const activeTab = $derived(

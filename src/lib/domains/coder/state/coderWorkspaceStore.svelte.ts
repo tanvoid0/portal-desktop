@@ -2,6 +2,7 @@
  * Workspace sidebar + main panel state for the coder session view.
  */
 
+import { getContext, setContext } from 'svelte';
 import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 
 export type WorkspacePanel =
@@ -17,7 +18,7 @@ export interface WorkspaceTab {
   filePath?: string;
 }
 
-class CoderWorkspaceStore {
+export class CoderWorkspaceStore {
   // ResponsivePanel renders this as a full-screen Sheet on mobile, so it must
   // not default open there the way it does on desktop.
   #isMobile = new IsMobile();
@@ -145,3 +146,17 @@ class CoderWorkspaceStore {
 }
 
 export const coderWorkspaceStore = new CoderWorkspaceStore();
+
+const KEY = Symbol('coderWorkspace');
+
+/** Give this component subtree its own workspace (tabs, panel, sidebar) instead of the app-wide one. */
+export function provideCoderWorkspace(): CoderWorkspaceStore {
+  const store = new CoderWorkspaceStore();
+  setContext(KEY, store);
+  return store;
+}
+
+/** The nearest provided workspace, else the singleton (CoderPanel, coderSession). */
+export function useCoderWorkspace(): CoderWorkspaceStore {
+  return getContext<CoderWorkspaceStore | undefined>(KEY) ?? coderWorkspaceStore;
+}

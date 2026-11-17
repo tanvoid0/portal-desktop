@@ -7,7 +7,7 @@
   import Plus from '~icons/fa6-solid/plus';
   import Bot from '~icons/fa6-solid/robot';
   import { Button } from '$lib/components/ui/button';
-  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import { useCoderWorkspace } from '../state/coderWorkspaceStore.svelte.js';
   import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
   import { coderSession } from '../state/coderSession.svelte.js';
   import type { GitDiffStats } from '../types.js';
@@ -30,6 +30,7 @@
     pendingChangeCount = 0,
     agentChanges = true,
   }: Props = $props();
+  const coderWorkspaceStore = useCoderWorkspace();
 
   const openTabs = $derived.by(() => {
     coderWorkspaceStore.openTabs;

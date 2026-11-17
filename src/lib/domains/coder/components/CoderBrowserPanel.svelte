@@ -3,8 +3,9 @@
   import { Input } from '$lib/components/ui/input';
   import ArrowRight from '~icons/fa6-solid/arrow-right';
   import Globe from '~icons/fa6-solid/globe';
-  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import { useCoderWorkspace } from '../state/coderWorkspaceStore.svelte.js';
 
+  const coderWorkspaceStore = useCoderWorkspace();
   let url = $state(coderWorkspaceStore.browserUrl);
 
   function navigate() {

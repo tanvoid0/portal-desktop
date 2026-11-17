@@ -6,7 +6,7 @@
   import Folder from '~icons/fa6-solid/folder';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import { Button } from '$lib/components/ui/button';
-  import { coderWorkspaceStore } from '../state/coderWorkspaceStore.svelte.js';
+  import { useCoderWorkspace } from '../state/coderWorkspaceStore.svelte.js';
 
   interface Props {
     workspaceRoot: string;
@@ -27,6 +27,7 @@
   }
 
   let { workspaceRoot }: Props = $props();
+  const coderWorkspaceStore = useCoderWorkspace();
 
   let root = $state<Node[]>([]);
   let loading = $state(false);

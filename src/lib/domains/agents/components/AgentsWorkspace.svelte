@@ -27,7 +27,7 @@
   import CoderWorkspacePanel from '$lib/domains/coder/components/CoderWorkspacePanel.svelte';
   import CoderWorkspaceSidebar from '$lib/domains/coder/components/CoderWorkspaceSidebar.svelte';
   import GitCommitDialog from '$lib/domains/coder/components/GitCommitDialog.svelte';
-  import { coderWorkspaceStore } from '$lib/domains/coder/state/coderWorkspaceStore.svelte.js';
+  import { provideCoderWorkspace } from '$lib/domains/coder/state/coderWorkspaceStore.svelte.js';
   import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
   import { agentRuns } from '../state/agentRuns.svelte.js';
   import { agentSessionsQuery } from '../queries/agentsQueries.js';
@@ -47,8 +47,22 @@
   let prefillTaskId = $state<string | null>(null);
   let focusedId = $state<string | null>(page.url.searchParams.get('session'));
 
-  function syncUrl(sessionId: string | null) {
+  // This tab's own workspace, so Portal-tab coder runs can't touch it. Reset
+  // synchronously with the focus change, before the new session renders.
+  const coderWorkspaceStore = provideCoderWorkspace();
+  let commitOpen = $state(false);
+
+  function focus(sessionId: string | null) {
+    if (sessionId !== focusedId) {
+      coderWorkspaceStore.openTabs = [];
+      coderWorkspaceStore.openChat();
+      commitOpen = false;
+    }
     focusedId = sessionId;
+  }
+
+  function syncUrl(sessionId: string | null) {
+    focus(sessionId);
     agentRuns.lastFocused[backendId] = sessionId;
     const url = new URL(page.url.href);
     if (sessionId) url.searchParams.set('session', sessionId);
@@ -72,7 +86,7 @@
     }
     const fromUrl = page.url.searchParams.get('session');
     if (fromUrl || page.url.searchParams.has('cwd') || agentRuns.pendingLaunch) {
-      focusedId = fromUrl;
+      focus(fromUrl);
       agentRuns.lastFocused[backendId] = fromUrl;
     } else {
       syncUrl(agentRuns.lastFocused[backendId] ?? null);
@@ -89,21 +103,6 @@
   const cwd = $derived(focused?.cwd ?? '');
   $effect(() => {
     if (focused && focused.backend_id !== backendId) syncUrl(null);
-  });
-
-  let commitOpen = $state(false);
-
-  // ponytail: coderWorkspaceStore is one shared singleton (also CoderPanel's),
-  // so tabs reset per focused session and on teardown instead of being keyed
-  // per session; key the store by thread id if tabs should persist per session.
-  function resetWorkspace() {
-    coderWorkspaceStore.openTabs = [];
-    coderWorkspaceStore.openChat();
-  }
-  $effect(() => {
-    focusedId;
-    resetWorkspace();
-    return resetWorkspace;
   });
 
   $effect(() => {
