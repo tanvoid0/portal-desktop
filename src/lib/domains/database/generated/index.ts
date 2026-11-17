@@ -2,5 +2,7 @@
 export type { ColumnInfo } from './ColumnInfo';
 export type { DbSource } from './DbSource';
 export type { EditPreview } from './EditPreview';
+export type { MongoDoc } from './MongoDoc';
+export type { MongoPage } from './MongoPage';
 export type { QueryResult } from './QueryResult';
 export type { TableInfo } from './TableInfo';

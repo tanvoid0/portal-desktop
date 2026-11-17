@@ -83,3 +83,24 @@ pub struct EditPreview {
     pub sql: String,
     pub params: Vec<serde_json::Value>,
 }
+
+/// One MongoDB document as extended-JSON text (key order preserved; see
+/// `mongo.rs` for why it is text, not a JSON value). `id` is the `_id` in
+/// canonical extended JSON, sent back verbatim to replace/delete.
+#[derive(Serialize, Clone, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/database/generated/")]
+pub struct MongoDoc {
+    pub id: Option<String>,
+    pub json: String,
+}
+
+/// One page of documents plus the total matching the filter.
+#[derive(Serialize, Clone, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/database/generated/")]
+pub struct MongoPage {
+    pub docs: Vec<MongoDoc>,
+    #[ts(type = "number")]
+    pub total: u64,
+}

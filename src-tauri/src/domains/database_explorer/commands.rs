@@ -5,6 +5,8 @@
 //! The edit commands (P2) are gated by `require_editable` (per-source toggle,
 //! read-only by default) and, for update/delete, `require_pk` (the given
 //! column must really be the table's primary key) before anything executes.
+//! The `db_mongo_*` commands (P3) go to `open_mongo` instead; writes there are
+//! gated by the same `require_editable`.
 //! Preview commands never open a connection — they just build the SQL text.
 
 use std::sync::Arc;
@@ -24,14 +26,39 @@ async fn open_driver(
     match src {
         dbx::Source::Sqlite { path, .. } => Ok(Box::new(dbx::SqliteDriver { path })),
         dbx::Source::Server(s) => {
-            let password = match s.password {
-                dbx::PasswordRef::Plain(p) => p,
-                dbx::PasswordRef::Vault(cid) => resolve_vault_password(&cid, db, session).await?,
-            };
+            let password = password_of(s.password, db, session).await?;
             let driver =
                 dbx::SqlServerDriver::new(&s.engine, s.host, s.port, s.user, password, s.database)?;
             Ok(Box::new(driver))
         }
+    }
+}
+
+async fn password_of(
+    p: dbx::PasswordRef,
+    db: &Arc<DatabaseManager>,
+    session: &Arc<VaultSession>,
+) -> Result<String, String> {
+    match p {
+        dbx::PasswordRef::Plain(p) => Ok(p),
+        dbx::PasswordRef::Vault(cid) => resolve_vault_password(&cid, db, session).await,
+    }
+}
+
+/// Resolve a source to a live Mongo driver (the SQL `open_driver` rejects
+/// engine "mongodb" via `Engine::parse`; Mongo is not behind `DbDriver`).
+async fn open_mongo(
+    state: &dbx::DbExplorerState,
+    source_id: &str,
+    db: &Arc<DatabaseManager>,
+    session: &Arc<VaultSession>,
+) -> Result<dbx::MongoDriver, String> {
+    match source_or_err(state, source_id)? {
+        dbx::Source::Server(s) if s.engine == "mongodb" => {
+            let secret = password_of(s.password, db, session).await?;
+            dbx::MongoDriver::connect(&s.host, s.port, &s.user, &secret, &s.database).await
+        }
+        _ => Err("not a MongoDB source".to_string()),
     }
 }
 
@@ -286,4 +313,104 @@ pub async fn db_apply_delete(
     let driver = open_driver(src, db.inner(), session.inner()).await?;
     require_pk(driver.as_ref(), &table, &pk_column).await?;
     driver.delete_row(&table, &pk_column, pk_value).await
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn db_mongo_list_databases(
+    source_id: String,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<Vec<String>, String> {
+    open_mongo(&state, &source_id, db.inner(), session.inner())
+        .await?
+        .list_databases()
+        .await
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn db_mongo_list_collections(
+    source_id: String,
+    database: String,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<Vec<String>, String> {
+    open_mongo(&state, &source_id, db.inner(), session.inner())
+        .await?
+        .list_collections(&database)
+        .await
+}
+
+#[portal_rpc_macro::rpc]
+#[allow(clippy::too_many_arguments)]
+pub async fn db_mongo_find(
+    source_id: String,
+    database: String,
+    collection: String,
+    filter: String,
+    limit: usize,
+    skip: u64,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<dbx::MongoPage, String> {
+    open_mongo(&state, &source_id, db.inner(), session.inner())
+        .await?
+        .find(&database, &collection, &filter, limit, skip)
+        .await
+}
+
+/// Returns the new document's `_id` as text.
+#[portal_rpc_macro::rpc]
+pub async fn db_mongo_insert(
+    source_id: String,
+    database: String,
+    collection: String,
+    doc: String,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<String, String> {
+    require_editable(&state, &source_id)?;
+    open_mongo(&state, &source_id, db.inner(), session.inner())
+        .await?
+        .insert(&database, &collection, &doc)
+        .await
+}
+
+#[portal_rpc_macro::rpc]
+#[allow(clippy::too_many_arguments)]
+pub async fn db_mongo_replace(
+    source_id: String,
+    database: String,
+    collection: String,
+    id: String,
+    doc: String,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<(), String> {
+    require_editable(&state, &source_id)?;
+    open_mongo(&state, &source_id, db.inner(), session.inner())
+        .await?
+        .replace(&database, &collection, &id, &doc)
+        .await
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn db_mongo_delete(
+    source_id: String,
+    database: String,
+    collection: String,
+    id: String,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<(), String> {
+    require_editable(&state, &source_id)?;
+    open_mongo(&state, &source_id, db.inner(), session.inner())
+        .await?
+        .delete(&database, &collection, &id)
+        .await
 }

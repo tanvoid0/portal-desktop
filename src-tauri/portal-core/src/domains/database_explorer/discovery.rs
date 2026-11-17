@@ -3,15 +3,15 @@
 //! 1. Vault credentials of type DATABASE (host/port/db/user/engine from the
 //!    plaintext metadata; the password stays `Vault(id)` and is decrypted only at
 //!    connect time, so listing works even while the vault is locked).
-//! 2. Running SDK-managed DB services (Postgres/MySQL).
-//! 3. Running Docker containers whose image is Postgres/MySQL, at their actual
+//! 2. Running SDK-managed DB services (Postgres/MySQL/MongoDB).
+//! 3. Running Docker containers whose image is Postgres/MySQL/MongoDB, at their actual
 //!    mapped host port.
 //!
 //! Every source is best-effort: a failure in one path (vault DB error, Docker not
 //! installed, …) is skipped, never fatal — `db_list_sources` still returns the rest.
 //!
 //! ponytail: SDK/Docker sources assume default local credentials (pg: postgres,
-//! mysql: root, empty password); if that is wrong the connect error surfaces.
+//! mysql: root, mongodb: no auth, empty password); if that is wrong the connect error surfaces.
 
 use std::sync::Arc;
 
@@ -92,6 +92,7 @@ async fn from_sdk() -> Vec<(String, Source)> {
             let engine = match c.id.as_str() {
                 "postgresql" => "postgres",
                 "mysql" => "mysql",
+                "mongodb" => "mongodb",
                 _ => return None,
             };
             let id = format!("sdk:{}", c.id);
@@ -118,6 +119,8 @@ async fn from_docker() -> Vec<(String, Source)> {
                 ("postgres", 5432)
             } else if image.contains("mysql") || image.contains("maria") {
                 ("mysql", 3306)
+            } else if image.contains("mongo") {
+                ("mongodb", 27017)
             } else {
                 return None;
             };
@@ -141,6 +144,7 @@ async fn from_docker() -> Vec<(String, Source)> {
 fn local_server(engine: &str, port: u16, label: String, detail: String) -> Source {
     let (user, database) = match engine {
         "mysql" => ("root".to_string(), String::new()),
+        "mongodb" => (String::new(), String::new()),
         _ => ("postgres".to_string(), "postgres".to_string()),
     };
     Source::Server(ServerConn {
@@ -166,6 +170,9 @@ fn infer_engine(meta: &Value) -> String {
             if s.contains("postgres") || s == "pg" {
                 return "postgres".to_string();
             }
+            if s.contains("mongo") {
+                return "mongodb".to_string();
+            }
         }
     }
     // Then the connection string scheme.
@@ -177,27 +184,31 @@ fn infer_engine(meta: &Value) -> String {
         if cs.starts_with("postgres") {
             return "postgres".to_string();
         }
+        if cs.starts_with("mongodb") {
+            return "mongodb".to_string();
+        }
     }
     // Finally the port.
     match meta.get("port").and_then(as_u16) {
         Some(3306) | Some(33060) => "mysql".to_string(),
+        Some(27017) => "mongodb".to_string(),
         _ => "postgres".to_string(),
     }
 }
 
 fn default_port(engine: &str) -> u16 {
-    if engine == "mysql" {
-        3306
-    } else {
-        5432
+    match engine {
+        "mysql" => 3306,
+        "mongodb" => 27017,
+        _ => 5432,
     }
 }
 
 fn default_user(engine: &str) -> &'static str {
-    if engine == "mysql" {
-        "root"
-    } else {
-        "postgres"
+    match engine {
+        "mysql" => "root",
+        "mongodb" => "",
+        _ => "postgres",
     }
 }
 
@@ -261,6 +272,14 @@ mod tests {
         );
         assert_eq!(infer_engine(&json!({ "port": 3306 })), "mysql");
         assert_eq!(infer_engine(&json!({ "port": 5432 })), "postgres");
+        assert_eq!(infer_engine(&json!({ "engine": "MongoDB" })), "mongodb");
+        assert_eq!(
+            infer_engine(&json!({ "connectionString": "mongodb+srv://h/db" })),
+            "mongodb"
+        );
+        assert_eq!(infer_engine(&json!({ "port": 27017 })), "mongodb");
+        assert_eq!(default_port("mongodb"), 27017);
+        assert_eq!(default_user("mongodb"), "");
         // Nothing to go on → default postgres.
         assert_eq!(infer_engine(&json!({})), "postgres");
     }

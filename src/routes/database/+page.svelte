@@ -4,7 +4,13 @@
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
   import * as Tabs from '$lib/components/ui/tabs';
-  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
+  import {
+    PageContainer,
+    PageHeader,
+    PageLoading,
+    PageError,
+    PageEmpty,
+  } from '$lib/components/shell';
   import { toast } from '$lib/utils/toast';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import {
@@ -15,12 +21,14 @@
     runQuery,
   } from '$lib/domains/database/api/databaseApi';
   import ResultGrid from '$lib/domains/database/components/ResultGrid.svelte';
+  import MongoPane from '$lib/domains/database/components/MongoPane.svelte';
   import SourceNode from '$lib/domains/database/components/SourceNode.svelte';
 
   const PAGE_SIZE = 100;
   const client = useQueryClient();
 
-  let sel = $state<{ sourceId: string; table: string } | null>(null);
+  // `db` is set only for MongoDB selections (`table` is then the collection).
+  let sel = $state<{ sourceId: string; table: string; db?: string } | null>(null);
   let page = $state(0);
   let sql = $state('');
   let tab = $state('data');
@@ -32,17 +40,23 @@
   const columns = createQuery(() => ({
     queryKey: queryKeys.database.columns(sel?.sourceId ?? '', sel?.table ?? ''),
     queryFn: () => describeTable(sel!.sourceId, sel!.table),
-    enabled: !!sel,
+    enabled: !!sel && !sel.db,
   }));
   const rows = createQuery(() => ({
     queryKey: queryKeys.database.rows(sel?.sourceId ?? '', sel?.table ?? '', page),
     queryFn: () => fetchRows(sel!.sourceId, sel!.table, PAGE_SIZE, page * PAGE_SIZE),
-    enabled: !!sel,
+    enabled: !!sel && !sel.db,
   }));
 
   // Query tab runs against the selected source, else the first one.
-  const querySourceId = $derived(sel?.sourceId ?? sources.data?.[0]?.id ?? '');
+  // SQL only: Mongo sources never take it.
   const selectedSource = $derived(sources.data?.find((s) => s.id === sel?.sourceId));
+  const querySourceId = $derived(
+    (selectedSource && selectedSource.engine !== 'mongodb'
+      ? selectedSource
+      : sources.data?.find((s) => s.engine !== 'mongodb')
+    )?.id ?? ''
+  );
   const run = createMutation(() => ({
     mutationFn: () => runQuery(querySourceId, sql),
     onError: (e: unknown) => toast.error('Query failed', String(e)),
@@ -53,8 +67,13 @@
     onError: (e: unknown) => toast.error('Could not open database', String(e)),
   }));
 
-  function select(sourceId: string, table: string) {
-    sel = { sourceId, table };
+  // A selection whose source vanished on rediscovery would spin "Loading rows..." forever.
+  $effect(() => {
+    if (sel && sources.data && !sources.data.some((s) => s.id === sel!.sourceId)) sel = null;
+  });
+
+  function select(sourceId: string, table: string, db?: string) {
+    sel = { sourceId, table, db };
     page = 0;
     tab = 'data';
   }
@@ -72,10 +91,10 @@
   <title>Database - Portal Desktop</title>
 </svelte:head>
 
-<div class="space-y-6 p-6">
+<PageContainer variant="full" class="space-y-6 py-4 md:py-6">
   <PageHeader
     title="Database Explorer"
-    description="Browse & edit SQLite, Postgres and MySQL — vault, SDK and Docker sources auto-discovered"
+    description="Browse & edit SQLite, Postgres, MySQL and MongoDB — vault, SDK and Docker sources auto-discovered"
   >
     {#snippet actions()}
       <Button variant="outline" size="sm" onclick={pickFile} disabled={openDb.isPending}>
@@ -106,6 +125,7 @@
           <SourceNode
             {source}
             selected={sel?.sourceId === source.id ? sel.table : null}
+            selectedDb={sel?.sourceId === source.id ? (sel.db ?? null) : null}
             onSelect={select}
           />
         {/each}
@@ -121,6 +141,15 @@
           <Tabs.Content value="data" class="space-y-3">
             {#if !sel}
               <p class="text-sm text-muted-foreground">Select a table or view.</p>
+            {:else if sel.db}
+              {#key `${sel.sourceId}/${sel.db}/${sel.table}`}
+                <MongoPane
+                  sourceId={sel.sourceId}
+                  db={sel.db}
+                  collection={sel.table}
+                  editable={selectedSource?.editable}
+                />
+              {/key}
             {:else if rows.isPending}
               <PageLoading message="Loading rows..." />
             {:else if rows.isError}
@@ -174,4 +203,4 @@
       </section>
     </div>
   {/if}
-</div>
+</PageContainer>

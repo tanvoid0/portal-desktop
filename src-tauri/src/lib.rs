@@ -580,6 +580,12 @@ pub fn run() {
             domains::database_explorer::commands::db_apply_insert,
             domains::database_explorer::commands::db_preview_delete,
             domains::database_explorer::commands::db_apply_delete,
+            domains::database_explorer::commands::db_mongo_list_databases,
+            domains::database_explorer::commands::db_mongo_list_collections,
+            domains::database_explorer::commands::db_mongo_find,
+            domains::database_explorer::commands::db_mongo_insert,
+            domains::database_explorer::commands::db_mongo_replace,
+            domains::database_explorer::commands::db_mongo_delete,
             // Automation commands
             domains::automation::trigger_n8n_workflow,
             domains::automation::get_workflow_status,

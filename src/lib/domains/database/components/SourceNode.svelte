@@ -3,32 +3,56 @@
   import Database from '~icons/fa6-solid/database';
   import Table2 from '~icons/fa6-solid/table';
   import Eye from '~icons/fa6-solid/eye';
+  import ChevronRight from '~icons/fa6-solid/chevron-right';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Switch } from '$lib/components/ui/switch';
   import TechIcon from '$lib/components/ui/tech-icon.svelte';
   import { toast } from '$lib/utils/toast';
   import { queryKeys } from '$lib/domains/shared/query/keys';
-  import { listTables, setEditable } from '../api/databaseApi';
+  import {
+    listTables,
+    mongoListCollections,
+    mongoListDatabases,
+    setEditable,
+  } from '../api/databaseApi';
   import type { DbSource } from '../generated';
 
   interface Props {
     source: DbSource;
     selected?: string | null;
-    onSelect: (sourceId: string, table: string) => void;
+    /** MongoDB only: the database `selected` (a collection) lives in. */
+    selectedDb?: string | null;
+    onSelect: (sourceId: string, table: string, db?: string) => void;
   }
-  let { source, selected = null, onSelect }: Props = $props();
+  let { source, selected = null, selectedDb = null, onSelect }: Props = $props();
 
   const ENGINES: Record<string, { label: string; devicon: string }> = {
     sqlite: { label: 'SQLite', devicon: 'devicon-sqlite-plain' },
     postgres: { label: 'Postgres', devicon: 'devicon-postgresql-plain' },
     mysql: { label: 'MySQL', devicon: 'devicon-mysql-original' },
+    mongodb: { label: 'MongoDB', devicon: 'devicon-mongodb-plain' },
   };
   const engine = $derived(ENGINES[source.engine] ?? { label: source.engine, devicon: '' });
+
+  const isMongo = $derived(source.engine === 'mongodb');
+  // Mongo servers can have hundreds of collections: one database open at a time.
+  let openDb = $state<string | null>(null);
 
   const tables = createQuery(() => ({
     queryKey: queryKeys.database.tables(source.id),
     queryFn: () => listTables(source.id),
+    enabled: !isMongo,
+  }));
+  const dbs = createQuery(() => ({
+    queryKey: queryKeys.database.mongoDatabases(source.id),
+    queryFn: () => mongoListDatabases(source.id),
+    enabled: isMongo,
+  }));
+  const collections = createQuery(() => ({
+    queryKey: queryKeys.database.mongoCollections(source.id, openDb ?? ''),
+    queryFn: () => mongoListCollections(source.id, openDb!),
+    enabled: isMongo && !!openDb,
   }));
 
   const client = useQueryClient();
@@ -56,7 +80,47 @@
     />
     <Badge variant="outline" class="shrink-0 text-[10px] font-normal">{engine.label}</Badge>
   </div>
-  {#if tables.isPending}
+  {#if isMongo}
+    {#if dbs.isPending}
+      <p class="px-6 text-xs text-muted-foreground">Loading...</p>
+    {:else if dbs.isError}
+      <p class="px-6 text-xs text-destructive">{String(dbs.error)}</p>
+    {:else}
+      {#each dbs.data ?? [] as d (d)}
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-7 w-full justify-start gap-2 pl-4"
+          aria-expanded={openDb === d}
+          onclick={() => (openDb = openDb === d ? null : d)}
+        >
+          <ChevronRight
+            class="h-3 w-3 shrink-0 transition-transform {openDb === d ? 'rotate-90' : ''}"
+          />
+          <span class="truncate">{d}</span>
+        </Button>
+        {#if openDb === d}
+          {#if collections.isPending}
+            <p class="px-9 text-xs text-muted-foreground">Loading...</p>
+          {:else if collections.isError}
+            <p class="px-9 text-xs text-destructive">{String(collections.error)}</p>
+          {:else}
+            {#each collections.data ?? [] as c (c)}
+              <Button
+                variant={selectedDb === d && selected === c ? 'secondary' : 'ghost'}
+                size="sm"
+                class="h-7 w-full justify-start gap-2 pl-9"
+                onclick={() => onSelect(source.id, c, d)}
+              >
+                <Table2 class="h-3.5 w-3.5 shrink-0" />
+                <span class="truncate">{c}</span>
+              </Button>
+            {/each}
+          {/if}
+        {/if}
+      {/each}
+    {/if}
+  {:else if tables.isPending}
     <p class="px-6 text-xs text-muted-foreground">Loading...</p>
   {:else if tables.isError}
     <p class="px-6 text-xs text-destructive">{String(tables.error)}</p>

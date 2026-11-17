@@ -5,11 +5,13 @@
 //! (`state`) and from `discovery` (vault / SDK / Docker). P2 adds editing:
 //! PK detection, the write ops on `DbDriver`, and the `preview_*` dispatchers
 //! below, which pick the right engine's pure SQL builder without needing a
-//! live connection (so a preview never needs the vault unlocked). Mongo +
-//! Redis panes arrive in later phases; see plan `iterative-plotting-flame`.
+//! live connection (so a preview never needs the vault unlocked). P3 adds
+//! MongoDB (`mongo`): a concrete `MongoDriver` outside `DbDriver` (documents,
+//! not tables). The Redis pane arrives later; see plan `iterative-plotting-flame`.
 
 pub mod discovery;
 pub mod driver;
+pub mod mongo;
 pub mod sql_server;
 pub mod sqlite;
 mod state;
@@ -18,10 +20,13 @@ mod types;
 use serde_json::Value;
 
 pub use driver::DbDriver;
+pub use mongo::MongoDriver;
 pub use sql_server::SqlServerDriver;
 pub use sqlite::SqliteDriver;
 pub use state::{DbExplorerState, PasswordRef, ServerConn, Source};
-pub use types::{ColumnInfo, DbSource, EditPreview, QueryResult, TableInfo};
+pub use types::{
+    ColumnInfo, DbSource, EditPreview, MongoDoc, MongoPage, QueryResult, TableInfo,
+};
 
 /// Build the preview for an UPDATE, dispatching to the source's engine.
 pub fn preview_update(

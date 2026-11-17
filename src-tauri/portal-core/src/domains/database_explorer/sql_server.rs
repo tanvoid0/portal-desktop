@@ -34,7 +34,7 @@ use crate::domains::database_explorer::sqlite::ROW_CAP;
 use crate::domains::database_explorer::types::{ColumnInfo, EditPreview, QueryResult, TableInfo};
 
 /// Seconds to wait for a connection before giving up (connect + acquire).
-const CONNECT_TIMEOUT_SECS: u64 = 8;
+pub(crate) const CONNECT_TIMEOUT_SECS: u64 = 8;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Engine {

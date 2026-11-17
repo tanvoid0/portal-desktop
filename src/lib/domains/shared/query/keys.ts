@@ -54,6 +54,15 @@ export const queryKeys = {
     columns: (sourceId: string, table: string) => ['database', sourceId, table, 'columns'] as const,
     rows: (sourceId: string, table: string, page: number) =>
       ['database', sourceId, table, 'rows', page] as const,
+    mongoDatabases: (sourceId: string) => ['database', sourceId, 'mongo', 'dbs'] as const,
+    mongoCollections: (sourceId: string, db: string) =>
+      ['database', sourceId, 'mongo', db, 'collections'] as const,
+    // Prefix of every mongoDocs key for one collection (invalidate after a write).
+    mongoCollection: (sourceId: string, db: string, coll: string) =>
+      ['database', sourceId, 'mongo', db, coll] as const,
+    // `filter` is the applied filter text; `page` the 0-based page.
+    mongoDocs: (sourceId: string, db: string, coll: string, filter: string, page: number) =>
+      ['database', sourceId, 'mongo', db, coll, 'docs', filter, page] as const,
   },
   devices: {
     all: ['devices'] as const,

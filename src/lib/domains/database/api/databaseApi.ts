@@ -1,5 +1,12 @@
 import { invokeClient } from '$lib/utils/invokeClient';
-import type { ColumnInfo, DbSource, EditPreview, QueryResult, TableInfo } from '../generated';
+import type {
+  ColumnInfo,
+  DbSource,
+  EditPreview,
+  MongoPage,
+  QueryResult,
+  TableInfo,
+} from '../generated';
 
 // Rust types are already camelCase (ts-rs), so no normalize step.
 // Tauri maps camelCase arg keys to the snake_case Rust params.
@@ -64,3 +71,37 @@ export const previewDelete = (
 ) => invokeClient.post<EditPreview>('db_preview_delete', { sourceId, table, pkColumn, pkValue });
 export const applyDelete = (sourceId: string, table: string, pkColumn: string, pkValue: unknown) =>
   invokeClient.post<QueryResult>('db_apply_delete', { sourceId, table, pkColumn, pkValue });
+
+// MongoDB (P3) — documents travel as extended-JSON text (see mongo.rs); `id` is
+// the `_id` text a MongoDoc carries, sent back verbatim.
+export const mongoListDatabases = (sourceId: string) =>
+  invokeClient.post<string[]>('db_mongo_list_databases', { sourceId });
+export const mongoListCollections = (sourceId: string, database: string) =>
+  invokeClient.post<string[]>('db_mongo_list_collections', { sourceId, database });
+export const mongoFind = (
+  sourceId: string,
+  database: string,
+  collection: string,
+  filter: string,
+  limit: number,
+  skip: number
+) =>
+  invokeClient.post<MongoPage>('db_mongo_find', {
+    sourceId,
+    database,
+    collection,
+    filter,
+    limit,
+    skip,
+  });
+export const mongoInsert = (sourceId: string, database: string, collection: string, doc: string) =>
+  invokeClient.post<string>('db_mongo_insert', { sourceId, database, collection, doc });
+export const mongoReplace = (
+  sourceId: string,
+  database: string,
+  collection: string,
+  id: string,
+  doc: string
+) => invokeClient.post<void>('db_mongo_replace', { sourceId, database, collection, id, doc });
+export const mongoDelete = (sourceId: string, database: string, collection: string, id: string) =>
+  invokeClient.post<void>('db_mongo_delete', { sourceId, database, collection, id });

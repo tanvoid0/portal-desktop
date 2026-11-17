@@ -27,15 +27,15 @@ pub enum PasswordRef {
     Vault(String),
 }
 
-/// Connection details for a Postgres/MySQL source.
+/// Connection details for a Postgres/MySQL/MongoDB source.
 #[derive(Clone)]
 pub struct ServerConn {
-    /// "postgres" | "mysql".
+    /// "postgres" | "mysql" | "mongodb".
     pub engine: String,
     pub host: String,
     pub port: u16,
     pub user: String,
-    /// Default database to connect to (may be empty for MySQL).
+    /// Default database to connect to (may be empty for MySQL; unused for MongoDB).
     pub database: String,
     pub password: PasswordRef,
     pub label: String,
