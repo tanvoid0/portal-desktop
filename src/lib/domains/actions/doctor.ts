@@ -19,7 +19,7 @@ export const PIPELINE_FILE_SCHEMA = [
   '    run: <shell command>        # required, non-empty',
   '    cwd: <optional, relative to project root>',
   '    category: <optional>',
-  '    longRunning: <optional true|false>',
+  '    longRunning: <optional true|false>  # true only for a server that never exits',
   'workflows:',
   '  <workflow-id>:',
   '    steps:',

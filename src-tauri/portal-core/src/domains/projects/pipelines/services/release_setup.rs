@@ -30,13 +30,15 @@ pub struct Issue {
     pub message: String,
 }
 
-fn action(run: &str, cwd: Option<&str>, long: bool) -> FileAction {
+/// Never `long_running`: the runner parks on such a step until cancelled, so a
+/// release step marked that way would never record its exit code.
+fn action(run: &str, cwd: Option<&str>) -> FileAction {
     FileAction {
         name: None,
         run: run.to_string(),
         cwd: cwd.map(String::from),
         env: HashMap::new(),
-        long_running: long,
+        long_running: false,
     }
 }
 
@@ -140,12 +142,12 @@ pub fn propose(root: &Path, modules: &[DetectedModule]) -> Result<Proposal, Stri
         if let Some(check) = check {
             let id = format!("check-{name}");
             file.actions
-                .insert(id.clone(), action(check, cwd.as_deref(), false));
+                .insert(id.clone(), action(check, cwd.as_deref()));
             gates.push(id);
         }
         let id = format!("build-{name}");
         file.actions
-            .insert(id.clone(), action(build, cwd.as_deref(), false));
+            .insert(id.clone(), action(build, cwd.as_deref()));
         builds.push(id);
     }
 
@@ -153,10 +155,8 @@ pub fn propose(root: &Path, modules: &[DetectedModule]) -> Result<Proposal, Stri
     let (ship_steps, rehearse_steps);
     if let Some((name, _)) = ship_npm {
         source = "scripts";
-        file.actions.insert(
-            "release".into(),
-            action(&format!("npm run {name}"), None, true),
-        );
+        file.actions
+            .insert("release".into(), action(&format!("npm run {name}"), None));
         let dry = npm
             .iter()
             .find(|(n, _)| n.contains("dry"))
@@ -168,10 +168,8 @@ pub fn propose(root: &Path, modules: &[DetectedModule]) -> Result<Proposal, Stri
         });
         ship_steps = ship;
         rehearse_steps = dry.map(|d| {
-            file.actions.insert(
-                "release-dry".into(),
-                action(&format!("npm run {d}"), None, true),
-            );
+            file.actions
+                .insert("release-dry".into(), action(&format!("npm run {d}"), None));
             let mut s = steps(&gates, &[]);
             s.push(FileStep {
                 action: "release-dry".into(),
@@ -313,10 +311,14 @@ pub fn health(root: &Path, modules: &[DetectedModule]) -> Vec<Issue> {
     // Text a release can reach: the commands themselves, and the scripts they call.
     let mut corpus = String::new();
     let mut commands: Vec<&str> = Vec::new();
+    let mut parked: BTreeSet<&str> = BTreeSet::new();
     for id in std::iter::once(&release.ship).chain(release.rehearse.iter()) {
         if let Some(wf) = file.workflows.get(id) {
             for step in &wf.steps {
                 if let Some(a) = file.actions.get(&step.action) {
+                    if a.long_running {
+                        parked.insert(&step.action);
+                    }
                     commands.push(&a.run);
                     corpus.push_str(&a.run);
                     corpus.push(' ');
@@ -329,6 +331,18 @@ pub fn health(root: &Path, modules: &[DetectedModule]) -> Vec<Issue> {
         }
     }
     corpus.push_str(&reachable_text(root, &corpus.clone()));
+
+    // The runner parks on a longRunning step until cancelled, so its exit code is
+    // never recorded and the run shows "running" forever, even when it failed.
+    if !parked.is_empty() {
+        issues.push(Issue {
+            level: "error",
+            message: format!(
+                "longRunning is for servers that never exit; remove it from {} or the release never finishes",
+                parked.into_iter().collect::<Vec<_>>().join(", ")
+            ),
+        });
+    }
 
     let missing: Vec<&str> = modules
         .iter()
@@ -392,6 +406,7 @@ pub fn refine_prompt(
     let system = "You edit a Portal Desktop `.portal/pipeline.yml`. Reply with the complete YAML file only: no prose, no code fences.\n\
 Schema: `version: 1`; `release: {kind, ship, rehearse, bump, env}` where ship and rehearse name workflows; \
 `actions: {<id>: {name, run, cwd, env, longRunning}}` where `run` is one shell command, `cwd` is relative to the project root; \
+`longRunning: true` only for a server that never exits (the run waits on it until cancelled), never for a slow build or release step; \
 `workflows: {<id>: {name, steps: [{action, needs: [action ids]}]}}`. \
 `rehearse` must never publish or deploy anything. Keep existing action ids unless the request says otherwise. \
 Commands run through `cmd /C` on Windows and `sh -c` elsewhere, one command per action.".to_string();
@@ -465,10 +480,47 @@ mod tests {
         let p = propose(&dir, &mods).unwrap();
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(p.source, "scripts");
-        assert!(pipeline_file::parse(&p.yaml)
-            .unwrap()
-            .actions
-            .contains_key("release-dry"));
+        let file = pipeline_file::parse(&p.yaml).unwrap();
+        assert!(file.actions.contains_key("release-dry"));
+        // A longRunning release step parks the run forever.
+        assert!(file.actions.values().all(|a| !a.long_running));
+    }
+
+    #[test]
+    fn health_errors_on_a_long_running_release_step() {
+        let dir = std::env::temp_dir().join(format!("portal-parked-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(".portal")).unwrap();
+        fs::write(
+            dir.join(".portal/pipeline.yml"),
+            "version: 1
+release: {ship: s, rehearse: d}
+actions:
+  gate: {run: echo ok}
+  go: {run: echo go, longRunning: true}
+  dev: {run: echo serve, longRunning: true}
+workflows:
+  s: {steps: [{action: gate}, {action: go, needs: [gate]}]}
+  d: {steps: [{action: go}]}
+  serve: {steps: [{action: dev}]}
+",
+        )
+        .unwrap();
+
+        let issues = health(&dir, &[]);
+        let _ = fs::remove_dir_all(&dir);
+        let parked: Vec<&Issue> = issues
+            .iter()
+            .filter(|i| i.message.starts_with("longRunning"))
+            .collect();
+        assert_eq!(parked.len(), 1);
+        assert_eq!(parked[0].level, "error");
+        // `go` once despite two workflows; `dev` is not in a release workflow.
+        assert!(
+            parked[0].message.contains("from go or"),
+            "{}",
+            parked[0].message
+        );
     }
 
     #[test]
