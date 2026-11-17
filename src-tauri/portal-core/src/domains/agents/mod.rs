@@ -8,6 +8,7 @@
 pub mod backend;
 pub mod claude_code;
 pub mod codex;
+pub mod cursor;
 pub mod entities;
 pub mod events;
 pub mod process;
