@@ -622,7 +622,18 @@ impl Mover<'_> {
             // The gap is accepted: a write landing in it goes to the Recycle Bin
             // with the source, and the destination already holds the verified copy.
             drop(hold);
-            trash::delete(&source).map_err(|e| MoveError::Failed(format!("recycle source: {e}")))
+            trash::delete(&source).map_err(|e| MoveError::Failed(format!("recycle source: {e}")))?;
+            // #417: over the bin's quota Windows reports success but deletes
+            // permanently. Say so instead of leaving the user thinking it's
+            // recoverable.
+            if !source.exists() && in_recycle_bin(&source) == Some(false) {
+                return Err(MoveError::Failed(
+                    "the source was too large for the Recycle Bin and was deleted permanently — \
+                     it is NOT recoverable; the destination holds the verified copy"
+                        .into(),
+                ));
+            }
+            Ok(())
         })
     }
 
@@ -757,6 +768,24 @@ impl Mover<'_> {
             }
         }
     }
+}
+
+/// Whether `path` now sits in the Recycle Bin. `None` = can't tell (non-Windows,
+/// or the bin listing failed) — callers must not treat that as "permanently deleted".
+#[cfg(windows)]
+fn in_recycle_bin(path: &Path) -> Option<bool> {
+    let want = move_lock::norm(&path.to_string_lossy());
+    let items = trash::os_limited::list().ok()?;
+    Some(
+        items
+            .iter()
+            .any(|i| move_lock::norm(&i.original_path().to_string_lossy()) == want),
+    )
+}
+
+#[cfg(not(windows))]
+fn in_recycle_bin(_path: &Path) -> Option<bool> {
+    None
 }
 
 // ── Lock guard ───────────────────────────────────────────────────────────────
