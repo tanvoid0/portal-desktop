@@ -16,6 +16,21 @@ const FAMILIES = Object.keys(FAMILY_CONFIG) as Family[];
 export const familyOf = (model: string): Family =>
   FAMILIES.find((f) => model.toLowerCase().includes(f)) ?? 'other';
 
+export const compact = new Intl.NumberFormat(undefined, { notation: 'compact' });
+export const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
+
+/** layerchart 1.x styles itself with Tailwind-3 `*-surface-*` classes this app's theme lacks
+ *  (no colour emitted: black text, black hover column, unstyled tooltip). Re-skin those class hooks with
+ *  semantic tokens; drop this when layerchart is bumped to a themeable (v2) release. */
+export const CHART_CLASS = [
+  '[&_.fill-surface-content]:fill-muted-foreground [&_.text-surface-content]:text-foreground',
+  '[&_text]:stroke-transparent [&_.tickLabel]:fill-muted-foreground',
+  '[&_.labels-g_text]:fill-foreground',
+  "[&_[class*='stroke-surface-content/']]:stroke-border [&_[class*='fill-surface-content/']]:fill-foreground/5",
+  '[&_.absolute.z-50>div]:rounded-md [&_.absolute.z-50>div]:border [&_.absolute.z-50>div]:bg-popover [&_.absolute.z-50>div]:text-popover-foreground [&_.absolute.z-50>div]:shadow-md',
+  '[&_.absolute.z-50_.label]:text-muted-foreground',
+].join(' ');
+
 const DAY_MS = 86_400_000;
 
 /** Pivot day x model cells into one row per day (gaps filled with 0) and one value

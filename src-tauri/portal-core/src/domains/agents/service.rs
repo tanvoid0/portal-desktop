@@ -171,7 +171,8 @@ struct FeedRow {
 }
 
 /// Streaming/diagnostic events that would drown the feed (stored as
-/// `{"type":"<tag>",...}` — serde's internal tag is serialized first).
+/// `{"type":"<tag>",...}` — serde's internal tag is serialized first and
+/// `serde_json::to_string` is compact, so `LIKE '{"type":"<tag>"%'` is exact).
 const FEED_NOISE: [&str; 4] = ["text_delta", "thinking_delta", "raw", "usage"];
 
 /// One (UTC day, model) cell of token/cost usage. Tokens exclude cache
@@ -212,13 +213,15 @@ pub struct AgentAnalytics {
     pub usage: Vec<AgentUsageCell>,
     pub tools: Vec<AgentToolCount>,
     pub outcomes: Vec<AgentOutcomeCount>,
-    /// Mean of `ended_at - started_at` over finished sessions; `None` if none.
+    /// Mean per-process run time (`session_started` -> `exited`); `None` if none.
     pub avg_duration_secs: Option<f64>,
 }
 
 #[derive(FromQueryResult)]
 struct UsageRow {
     session_id: String,
+    kind: String,
+    created_at: String,
     day: String,
     cost: Option<f64>,
     model_usage: Option<String>,
@@ -702,7 +705,10 @@ impl AgentRunService {
     /// Usage per day/model, tool-call counts and session outcomes, read from
     /// `agent_events.event_json` via `json_extract`; `backend_id` filters in SQL.
     /// `Usage` events carry the run's *cumulative* totals, so each becomes a
-    /// per-session delta (a drop = resumed process, counts from zero).
+    /// per-session delta; a resumed process counts from zero again, so a
+    /// `session_started`/`exited` boundary resets the baseline (a counter
+    /// drop is the fallback). Run duration is per process too
+    /// (`session_started` -> `exited`), so a resume's idle gap isn't counted.
     pub async fn analytics(&self, backend_id: Option<String>) -> Result<AgentAnalytics, String> {
         let conn = self.db.get_connection();
         let err = |e: sea_orm::DbErr| format!("agents: analytics failed: {e}");
@@ -716,10 +722,13 @@ impl AgentRunService {
         const SS: &str = "(? IS NULL OR backend_id = ?)";
 
         let rows = UsageRow::find_by_statement(stmt(format!(
-            "SELECT session_id, substr(created_at, 1, 10) AS day, \
+            "SELECT session_id, json_extract(event_json, '$.type') AS kind, created_at, \
+             substr(created_at, 1, 10) AS day, \
              json_extract(event_json, '$.total_cost_usd') AS cost, \
              json_extract(event_json, '$.model_usage') AS model_usage \
-             FROM agent_events WHERE json_extract(event_json, '$.type') = 'usage' AND {EV} \
+             FROM agent_events WHERE (event_json LIKE '{{\"type\":\"usage\"%' \
+             OR event_json LIKE '{{\"type\":\"session_started\"%' \
+             OR event_json LIKE '{{\"type\":\"exited\"%') AND {EV} \
              ORDER BY rowid"
         )))
         .all(conn)
@@ -729,20 +738,50 @@ impl AgentRunService {
         let mut cells: std::collections::BTreeMap<(String, String), (i64, i64, f64)> =
             Default::default();
         let mut prev: HashMap<(String, String), (i64, i64, f64)> = HashMap::new();
-        for r in rows {
+        // Sessions where any usage event carries per-model `costUSD`; only the rest
+        // may fall back to the session total (deciding per event flips mid-session).
+        let has_model_cost: std::collections::HashSet<&str> = rows
+            .iter()
+            .filter(|r| {
+                r.kind == "usage"
+                    && r.model_usage
+                        .as_deref()
+                        .is_some_and(|j| j.contains("\"costUSD\""))
+            })
+            .map(|r| r.session_id.as_str())
+            .collect();
+        let mut started: HashMap<&str, chrono::DateTime<chrono::FixedOffset>> = HashMap::new();
+        let mut run_secs: Vec<f64> = Vec::new();
+        for r in &rows {
+            if r.kind != "usage" {
+                prev.retain(|(s, _), _| s != &r.session_id);
+                let at = chrono::DateTime::parse_from_rfc3339(&r.created_at).ok();
+                if r.kind == "exited" {
+                    // A second `exited` (EOF + stop) finds no start and is ignored.
+                    if let (Some(a), Some(t)) = (started.remove(r.session_id.as_str()), at) {
+                        run_secs.push((t - a).num_milliseconds() as f64 / 1000.0);
+                    }
+                } else if let Some(t) = at {
+                    started.entry(r.session_id.as_str()).or_insert(t);
+                }
+                continue;
+            }
             let usage = r
                 .model_usage
-                .and_then(|j| serde_json::from_str::<serde_json::Value>(&j).ok());
+                .as_deref()
+                .and_then(|j| serde_json::from_str::<serde_json::Value>(j).ok());
             let Some(models) = usage.as_ref().and_then(|u| u.as_object()) else {
                 continue;
             };
             let n = |m: &serde_json::Value, k: &str| m.get(k).and_then(|v| v.as_i64()).unwrap_or(0);
             for (model, m) in models {
-                // The session total is only a fallback for a lone model without `costUSD`.
-                let cost = m
-                    .get("costUSD")
-                    .and_then(|v| v.as_f64())
-                    .or(if models.len() == 1 { r.cost } else { None });
+                let cost = m.get("costUSD").and_then(|v| v.as_f64()).or(
+                    if models.len() == 1 && !has_model_cost.contains(r.session_id.as_str()) {
+                        r.cost
+                    } else {
+                        None
+                    },
+                );
                 let cur = (
                     n(m, "inputTokens") + n(m, "outputTokens"),
                     n(m, "cacheReadInputTokens") + n(m, "cacheCreationInputTokens"),
@@ -777,7 +816,7 @@ impl AgentRunService {
         }
         let tools = Tool::find_by_statement(stmt(format!(
             "SELECT json_extract(event_json, '$.name') AS name, COUNT(*) AS count \
-             FROM agent_events WHERE json_extract(event_json, '$.type') = 'tool_call' \
+             FROM agent_events WHERE event_json LIKE '{{\"type\":\"tool_call\"%' \
              AND json_extract(event_json, '$.name') IS NOT NULL AND {EV} \
              GROUP BY name ORDER BY count DESC, name LIMIT 15"
         )))
@@ -812,18 +851,8 @@ impl AgentRunService {
         })
         .collect();
 
-        #[derive(FromQueryResult)]
-        struct Avg {
-            avg: Option<f64>,
-        }
-        let avg_duration_secs = Avg::find_by_statement(stmt(format!(
-            "SELECT AVG((julianday(ended_at) - julianday(started_at)) * 86400.0) AS avg \
-             FROM agent_sessions WHERE ended_at IS NOT NULL AND {SS}"
-        )))
-        .one(conn)
-        .await
-        .map_err(err)?
-        .and_then(|a| a.avg);
+        let avg_duration_secs =
+            (!run_secs.is_empty()).then(|| run_secs.iter().sum::<f64>() / run_secs.len() as f64);
 
         Ok(AgentAnalytics {
             usage,
@@ -1312,11 +1341,96 @@ mod tests {
             .outcomes
             .iter()
             .any(|o| o.status == "failed" && o.count == 1));
-        assert!((all.avg_duration_secs.unwrap() - 60.0).abs() < 0.1); // julianday float error
 
         let only_b = svc.analytics(Some("other".into())).await.unwrap();
         assert_eq!(only_b.usage[0].tokens, 15);
         assert_eq!(only_b.tools.len(), 1);
         assert_eq!(only_b.outcomes.len(), 1);
+    }
+
+    async fn seed_session(svc: &AgentRunService, id: &str) {
+        let am = agent_session::ActiveModel {
+            id: Set(id.to_string()),
+            backend_id: Set("claude-code".to_string()),
+            model: Set(None),
+            cwd: Set(".".to_string()),
+            status: Set("exited".to_string()),
+            started_at: Set("2026-11-01T10:00:00+00:00".to_string()),
+            ended_at: Set(None),
+            exit_code: Set(Some(0)),
+            title: Set(None),
+            task_id: Set(None),
+            backend_session_id: Set(None),
+        };
+        agent_session::Entity::insert(am)
+            .exec(svc.db.get_connection())
+            .await
+            .expect("insert session");
+    }
+
+    /// A resume reuses the session row and restarts the counters at 0, so its first
+    /// total can exceed the old one; the boundary must stop that reading as a delta.
+    /// Duration is per process: the idle gap between the runs is not counted.
+    #[tokio::test]
+    async fn analytics_resumed_session_counts_each_process_from_zero() {
+        let (svc, _dir) = test_service().await;
+        seed_session(&svc, "r").await;
+        let usage = |out: i64, cost: f64| AgentEvent::Usage {
+            total_cost_usd: Some(cost),
+            model_usage: Some(json!({"opus": {"outputTokens": out, "costUSD": cost}})),
+        };
+        let started = AgentEvent::SessionStarted {
+            session_id: "x".into(),
+        };
+        let exited = AgentEvent::Exited { code: Some(0) };
+        // (event, created_at): run 1 lasts 60s, run 2 starts an hour later and lasts 120s.
+        let evs = [
+            (&started, "2026-11-01T10:00:00+00:00"),
+            (&usage(1000, 0.10), "2026-11-01T10:00:30+00:00"),
+            (&exited, "2026-11-01T10:01:00+00:00"),
+            (&started, "2026-11-01T11:01:00+00:00"),
+            (&usage(1200, 0.30), "2026-11-01T11:02:00+00:00"),
+            (&exited, "2026-11-01T11:03:00+00:00"),
+        ];
+        for (i, (e, at)) in evs.into_iter().enumerate() {
+            let am = agent_event::ActiveModel {
+                id: Set(format!("e{i}")),
+                session_id: Set("r".to_string()),
+                seq: Set(i as i64),
+                event_json: Set(serde_json::to_string(e).unwrap()),
+                created_at: Set(at.to_string()),
+            };
+            agent_event::Entity::insert(am)
+                .exec(svc.db.get_connection())
+                .await
+                .expect("insert event");
+        }
+        let a = svc.analytics(None).await.unwrap();
+        assert_eq!(a.usage[0].tokens, 2200);
+        assert!((a.usage[0].cost_usd - 0.40).abs() < 1e-9);
+        assert!((a.avg_duration_secs.unwrap() - 90.0).abs() < 1e-6);
+    }
+
+    /// A lone model without `costUSD` may use the session total, but only when no
+    /// usage event of the session has per-model cost (else it flips mid-session).
+    #[tokio::test]
+    async fn analytics_cost_fallback_is_per_session_not_per_event() {
+        let (svc, _dir) = test_service().await;
+        seed_session(&svc, "f").await;
+        let ev = |m: serde_json::Value, cost: f64| AgentEvent::Usage {
+            total_cost_usd: Some(cost),
+            model_usage: Some(json!({ "opus": m })),
+        };
+        svc.persist_event("f", 1, &ev(json!({"outputTokens": 10}), 0.5))
+            .await;
+        svc.persist_event(
+            "f",
+            2,
+            &ev(json!({"outputTokens": 20, "costUSD": 1.0}), 1.0),
+        )
+        .await;
+        let a = svc.analytics(None).await.unwrap();
+        // Event 1 has no per-model cost and the session does elsewhere: 0 then 1.0.
+        assert!((a.usage[0].cost_usd - 1.0).abs() < 1e-9);
     }
 }

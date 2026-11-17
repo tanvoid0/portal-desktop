@@ -6,8 +6,9 @@
   import { PageLoading, PageError } from '$lib/components/shell';
   import { Badge } from '$lib/components/ui/badge';
   import { ChartContainer } from '$lib/components/ui/chart';
+  import { cn } from '$lib/utils';
   import { agentAnalyticsQuery } from '../queries/agentsQueries.js';
-  import { FAMILY_CONFIG, familyOf } from '../utils/analytics.js';
+  import { CHART_CLASS, FAMILY_CONFIG, compact, familyOf, money } from '../utils/analytics.js';
   import AgentUsageChart from './AgentUsageChart.svelte';
   import AgentSubagentTree from './AgentSubagentTree.svelte';
   import type { AgentSessionSummary } from '../generated';
@@ -22,8 +23,6 @@
 
   const q = createQuery(() => agentAnalyticsQuery(backendId));
 
-  const compact = new Intl.NumberFormat(undefined, { notation: 'compact' });
-  const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
   const bad = (s: string) => s === 'failed' || s === 'interrupted';
   const duration = (secs: number) =>
     secs < 90
@@ -116,7 +115,7 @@
         {:else}
           <ChartContainer
             config={toolConfig}
-            class="aspect-auto w-full"
+            class={cn('aspect-auto w-full', CHART_CLASS)}
             style="height: {Math.max(8, d.tools.length * 1.75)}rem"
             role="img"
             aria-label="Tool call counts, most used first"
@@ -126,7 +125,7 @@
               orientation="horizontal"
               y="name"
               series={[{ key: 'count', label: 'Calls', color: 'var(--color-count)' }]}
-              props={{ yAxis: { format: (n: string) => n.slice(0, 18) } }}
+              props={{ yAxis: { format: (n: string) => n.slice(0, 18) }, bars: { stroke: 'none' } }}
               labels
             />
           </ChartContainer>

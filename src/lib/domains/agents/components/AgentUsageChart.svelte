@@ -2,7 +2,8 @@
 <script lang="ts">
   import { BarChart } from 'layerchart';
   import { ChartContainer } from '$lib/components/ui/chart';
-  import { FAMILY_CONFIG, pivotUsage } from '../utils/analytics.js';
+  import { cn } from '$lib/utils';
+  import { CHART_CLASS, FAMILY_CONFIG, compact, money, pivotUsage } from '../utils/analytics.js';
   import type { AgentUsageCell } from '../generated';
 
   interface Props {
@@ -12,11 +13,7 @@
   }
   let { title, cells, metric }: Props = $props();
 
-  const compact = new Intl.NumberFormat(undefined, { notation: 'compact' });
-  const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
-  const fmt = $derived((v: number) =>
-    metric === 'cost_usd' ? money.format(v) : compact.format(v)
-  );
+  const fmt = (v: number) => (metric === 'cost_usd' ? money.format(v) : compact.format(v));
 
   const pivot = $derived(pivotUsage(cells, metric));
   const series = $derived(
@@ -35,7 +32,7 @@
   {:else}
     <ChartContainer
       config={FAMILY_CONFIG}
-      class="aspect-auto h-56 w-full"
+      class={cn('aspect-auto h-56 w-full', CHART_CLASS)}
       role="img"
       aria-label="{title} per day, stacked by model family"
     >
@@ -48,6 +45,7 @@
         legend
         props={{
           xAxis: { format: (d: string) => d.slice(5) },
+          bars: { stroke: 'hsl(var(--card))' },
           yAxis: { format: fmt },
         }}
       />

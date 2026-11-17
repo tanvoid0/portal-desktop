@@ -5,6 +5,8 @@
 @import 'tailwindcss';
 @config '../tailwind.config.js';
 @plugin '@tailwindcss/typography';
+/* Tailwind skips node_modules; layerchart 1.x styles itself with utility classes (flex/grid/fill-transparent...). */
+@source '../node_modules/layerchart/dist';
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
