@@ -26,6 +26,15 @@ const MAX_STRING: usize = 1 << 20;
 const MAX_ROUNDS: usize = 20;
 /// Largest single list / set / hash / zset cell (bytes).
 const MAX_CELL: usize = 64 << 10;
+/// Stop reading a list / set / hash / zset once this many bytes are in hand.
+const BYTE_BUDGET: usize = 8 << 20;
+/// Elements per LRANGE / ZRANGE round (and HSCAN / SSCAN COUNT), so the budget is checked often.
+// ponytail: one chunk can still overshoot by CHUNK x 512MB; lower CHUNK if that ever matters.
+const CHUNK: usize = 10;
+
+fn over_budget(bytes: usize) -> bool {
+    bytes >= BYTE_BUDGET
+}
 
 pub struct RedisDriver {
     con: MultiplexedConnection,
@@ -62,7 +71,8 @@ impl RedisDriver {
         fn bad<E>(_: E) -> String {
             "invalid Redis connection string".to_string()
         }
-        let info = if secret.starts_with("redis://") || secret.starts_with("rediss://") {
+        let scheme = secret.get(..9).unwrap_or(secret).to_ascii_lowercase();
+        let info = if scheme.starts_with("redis://") || scheme.starts_with("rediss://") {
             secret.into_connection_info().map_err(bad)?
         } else {
             let mut r = ::redis::RedisConnectionInfo::default();
@@ -102,8 +112,13 @@ impl RedisDriver {
 
     pub async fn list_databases(&self) -> Result<Vec<RedisDb>, String> {
         let mut c = self.con.clone();
-        let info: String =
-            ::redis::cmd("INFO").arg("keyspace").query_async(&mut c).await.map_err(err)?;
+        // INFO is @dangerous: without it still list db0.
+        let info: String = ::redis::cmd("INFO")
+            .arg("keyspace")
+            .query_async(&mut c)
+            .await
+            .ok()
+            .unwrap_or_default();
         // Managed Redis often disables CONFIG.
         let count = ::redis::cmd("CONFIG")
             .arg("GET")
@@ -196,35 +211,51 @@ impl RedisDriver {
                 return Ok(v);
             }
             "list" => {
-                let (len, xs): (u64, Vec<Vec<u8>>) = ::redis::pipe()
-                    .cmd("LLEN")
-                    .arg(key)
-                    .cmd("LRANGE")
-                    .arg(key)
-                    .arg(0)
-                    .arg(last)
-                    .query_async(&mut c)
-                    .await
-                    .map_err(err)?;
-                v.len = len;
-                v.items = xs.iter().map(|x| vec![cell(x, &mut cut)]).collect();
+                v.len = ::redis::cmd("LLEN").arg(key).query_async(&mut c).await.map_err(err)?;
+                let mut bytes = 0;
+                let mut start = 0;
+                while start <= last && !over_budget(bytes) {
+                    let xs: Vec<Vec<u8>> = ::redis::cmd("LRANGE")
+                        .arg(key)
+                        .arg(start)
+                        .arg(start + CHUNK - 1)
+                        .query_async(&mut c)
+                        .await
+                        .map_err(err)?;
+                    bytes += xs.iter().map(Vec::len).sum::<usize>();
+                    v.items.extend(xs.iter().map(|x| vec![cell(x, &mut cut)]));
+                    if xs.len() < CHUNK {
+                        break;
+                    }
+                    start += CHUNK;
+                }
+                v.items.truncate(ROW_CAP);
             }
             "zset" => {
-                let (len, xs): (u64, Vec<Vec<u8>>) = ::redis::pipe()
-                    .cmd("ZCARD")
-                    .arg(key)
-                    .cmd("ZRANGE")
-                    .arg(key)
-                    .arg(0)
-                    .arg(last)
-                    .arg("WITHSCORES")
-                    .query_async(&mut c)
-                    .await
-                    .map_err(err)?;
-                v.len = len;
-                // Score stays the reply's text (f64 would lose precision).
-                v.items =
-                    xs.chunks(2).map(|p| p.iter().map(|x| cell(x, &mut cut)).collect()).collect();
+                v.len = ::redis::cmd("ZCARD").arg(key).query_async(&mut c).await.map_err(err)?;
+                let mut bytes = 0;
+                let mut start = 0;
+                while start <= last && !over_budget(bytes) {
+                    let xs: Vec<Vec<u8>> = ::redis::cmd("ZRANGE")
+                        .arg(key)
+                        .arg(start)
+                        .arg(start + CHUNK - 1)
+                        .arg("WITHSCORES")
+                        .query_async(&mut c)
+                        .await
+                        .map_err(err)?;
+                    bytes += xs.iter().map(Vec::len).sum::<usize>();
+                    // Score stays the reply's text (f64 would lose precision).
+                    v.items.extend(
+                        xs.chunks(2)
+                            .map(|p| p.iter().map(|x| cell(x, &mut cut)).collect::<Vec<_>>()),
+                    );
+                    if xs.len() < CHUNK * 2 {
+                        break;
+                    }
+                    start += CHUNK;
+                }
+                v.items.truncate(ROW_CAP);
             }
             "hash" | "set" => {
                 let (lencmd, scan, width) =
@@ -232,18 +263,20 @@ impl RedisDriver {
                 v.len = ::redis::cmd(lencmd).arg(key).query_async(&mut c).await.map_err(err)?;
                 let mut cur = 0u64;
                 let mut flat: Vec<Vec<u8>> = Vec::new();
-                for _ in 0..MAX_ROUNDS {
+                let mut bytes = 0;
+                for _ in 0..ROW_CAP {
                     let (next, batch): (u64, Vec<Vec<u8>>) = ::redis::cmd(scan)
                         .arg(key)
                         .arg(cur)
                         .arg("COUNT")
-                        .arg(200)
+                        .arg(CHUNK)
                         .query_async(&mut c)
                         .await
                         .map_err(err)?;
+                    bytes += batch.iter().map(Vec::len).sum::<usize>();
                     flat.extend(batch);
                     cur = next;
-                    if cur == 0 || flat.len() / width >= ROW_CAP {
+                    if cur == 0 || flat.len() / width >= ROW_CAP || over_budget(bytes) {
                         break;
                     }
                 }
@@ -346,8 +379,13 @@ pub fn command_text(args: &[String]) -> String {
                     '\n' => s.push_str("\\n"),
                     '\r' => s.push_str("\\r"),
                     '\t' => s.push_str("\\t"),
-                    c if (c as u32) < 0x20 || c as u32 == 0x7f => {
-                        s.push_str(&format!("\\x{:02x}", c as u32))
+                    c if c.is_control()
+                        || matches!(
+                            c as u32,
+                            0x200b..=0x200f | 0x202a..=0x202e | 0x2066..=0x2069 | 0xfeff
+                        ) =>
+                    {
+                        s.push_str(&format!("\\u{{{:x}}}", c as u32))
                     }
                     c => s.push(c),
                 }
@@ -404,6 +442,14 @@ mod tests {
     }
 
     #[test]
+    fn budget_and_invisible_escapes() {
+        assert!(!over_budget(BYTE_BUDGET - 1));
+        assert!(over_budget(BYTE_BUDGET));
+        let t = command_text(&["SET".into(), "a\u{200b}b\u{202e}c\u{85}d\x01".into()]);
+        assert_eq!(t, r#"SET "a\u{200b}b\u{202e}c\u{85}d\u{1}""#);
+    }
+
+    #[test]
     fn cell_cap() {
         let mut cut = false;
         assert_eq!(cell(b"abc", &mut cut), "abc");
@@ -430,7 +476,7 @@ mod tests {
         let t = |a: &[&str]| command_text(&a.iter().map(|s| s.to_string()).collect::<Vec<_>>());
         assert_eq!(t(&["SET", "user:1", "x"]), "SET user:1 x");
         assert_eq!(t(&["SET", "k", ""]), r#"SET k """#);
-        assert_eq!(t(&["SET", "a b", "q\"\\\n\r\t\u{1}"]), r#"SET "a b" "q\"\\\n\r\t\x01""#);
+        assert_eq!(t(&["SET", "a b", "q\"\\\n\r\t\u{1}"]), r#"SET "a b" "q\"\\\n\r\t\u{1}""#);
         assert_eq!(t(&["SET", "é"]), "SET \"é\"");
     }
 

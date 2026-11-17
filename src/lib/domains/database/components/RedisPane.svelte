@@ -53,6 +53,7 @@
     queryFn: () => redisGet(sourceId, db, selected!),
     enabled: selected !== null,
     retry: false,
+    staleTime: 0, // a stale value/TTL would let SET XX overwrite outside edits
     refetchOnWindowFocus: false, // would clobber an unsaved draft
   }));
 
@@ -104,10 +105,14 @@
     }
   }
 
+  let busy = $state(false);
+
   async function proceed() {
     const c = confirm;
+    if (busy) return;
     confirmOpen = false; // AlertDialogAction does not close the dialog by itself
     if (!c) return;
+    busy = true;
     try {
       await redisWrite(sourceId, db, c.write);
       toast.success(c.done);
@@ -119,6 +124,8 @@
       client.invalidateQueries({ queryKey: queryKeys.database.redisDatabases(sourceId) });
     } catch (e) {
       toast.error(`${c.title} failed`, String(e));
+    } finally {
+      busy = false;
     }
   }
 
@@ -330,6 +337,7 @@
       <AlertDialogCancel>Cancel</AlertDialogCancel>
       <AlertDialogAction
         class={confirm?.destructive ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
+        disabled={busy}
         onclick={proceed}>Confirm</AlertDialogAction
       >
     </AlertDialogFooter>

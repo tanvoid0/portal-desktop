@@ -89,10 +89,14 @@
     confirmOpen = true;
   }
 
+  let busy = $state(false);
+
   async function proceed() {
     const c = confirm;
+    if (busy) return;
     confirmOpen = false; // AlertDialogAction does not close the dialog by itself
     if (!c) return;
+    busy = true;
     try {
       await c.op();
       toast.success(c.done);
@@ -102,6 +106,8 @@
       });
     } catch (e) {
       toast.error(`${c.title} failed`, String(e));
+    } finally {
+      busy = false;
     }
   }
 
@@ -230,6 +236,7 @@
       <AlertDialogCancel>Cancel</AlertDialogCancel>
       <AlertDialogAction
         class={confirm?.destructive ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
+        disabled={busy}
         onclick={proceed}>Confirm</AlertDialogAction
       >
     </AlertDialogFooter>

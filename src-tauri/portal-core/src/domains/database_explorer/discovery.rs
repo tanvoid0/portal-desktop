@@ -167,9 +167,11 @@ fn local_server(engine: &str, port: u16, label: String, detail: String) -> Sourc
 /// A `rediss://` connection string means TLS even though host/port come from
 /// the metadata (a plain TCP connect would send AUTH in cleartext).
 fn wants_tls(meta: &Value) -> bool {
-    meta.get("connectionString")
-        .and_then(Value::as_str)
-        .is_some_and(|cs| cs.to_lowercase().starts_with("rediss://"))
+    meta.get("ssl").and_then(Value::as_bool) == Some(true)
+        || meta
+            .get("connectionString")
+            .and_then(Value::as_str)
+            .is_some_and(|cs| cs.to_lowercase().starts_with("rediss://"))
 }
 
 fn infer_engine(meta: &Value) -> String {
@@ -309,6 +311,8 @@ mod tests {
         assert!(wants_tls(&json!({ "connectionString": "rediss://h:1" })));
         assert!(!wants_tls(&json!({ "connectionString": "redis://h:1" })));
         assert!(!wants_tls(&json!({})));
+        assert!(wants_tls(&json!({ "ssl": true })));
+        assert!(!wants_tls(&json!({ "ssl": false })));
         // Nothing to go on → default postgres.
         assert_eq!(infer_engine(&json!({})), "postgres");
     }
