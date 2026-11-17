@@ -151,6 +151,17 @@ pub struct AgentFeedEvent {
     pub event: AgentEvent,
 }
 
+/// One page of the feed. `next_cursor` is the last *raw* row's cursor when the
+/// page came back full (rows that fail to parse are dropped from `events` but
+/// still count), so paging never stops early on a short parsed page.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/agents/generated/")]
+pub struct AgentFeedPage {
+    pub events: Vec<AgentFeedEvent>,
+    #[ts(type = "number | null")]
+    pub next_cursor: Option<i64>,
+}
+
 #[derive(FromQueryResult)]
 struct FeedRow {
     cursor: i64,
@@ -567,13 +578,18 @@ impl AgentRunService {
 
     /// Cross-session activity feed, newest first, without streaming noise.
     /// `after_seq` = only newer than that cursor, `before_seq` = only older
-    /// (the next page back); `limit` is clamped to 1..=200.
+    /// (the next page back); `limit` is clamped to 1..=200; `backend_id`
+    /// restricts to that backend's sessions in SQL, before the LIMIT.
+    // Cursor = rowid: VACUUM can renumber it, and deleting the newest session's
+    // events lets SQLite reuse numbers. Fine for a feed; not a durable key.
     pub async fn list_events(
         &self,
         after_seq: Option<i64>,
         before_seq: Option<i64>,
         limit: Option<u64>,
-    ) -> Result<Vec<AgentFeedEvent>, String> {
+        backend_id: Option<String>,
+    ) -> Result<AgentFeedPage, String> {
+        let limit = limit.unwrap_or(50).clamp(1, 200);
         let mut q = agent_event::Entity::find()
             .select_only()
             .column_as(Expr::cust("rowid"), "cursor")
@@ -583,7 +599,13 @@ impl AgentRunService {
                 agent_event::Column::EventJson,
             ])
             .order_by_desc(Expr::cust("rowid"))
-            .limit(limit.unwrap_or(50).clamp(1, 200));
+            .limit(limit);
+        if let Some(b) = backend_id {
+            q = q.filter(Expr::cust_with_values(
+                "session_id IN (SELECT id FROM agent_sessions WHERE backend_id = ?)",
+                [b],
+            ));
+        }
         for tag in FEED_NOISE {
             q = q.filter(Expr::cust(format!(
                 "event_json NOT LIKE '{{\"type\":\"{tag}\"%'"
@@ -600,7 +622,11 @@ impl AgentRunService {
             .all(self.db.get_connection())
             .await
             .map_err(|e| format!("agents: list events failed: {e}"))?;
-        Ok(rows
+        let next_cursor = rows
+            .last()
+            .filter(|_| rows.len() as u64 == limit)
+            .map(|r| r.cursor);
+        let events = rows
             .into_iter()
             .filter_map(
                 |r| match serde_json::from_str::<AgentEvent>(&r.event_json) {
@@ -616,7 +642,11 @@ impl AgentRunService {
                     }
                 },
             )
-            .collect())
+            .collect();
+        Ok(AgentFeedPage {
+            events,
+            next_cursor,
+        })
     }
 
     /// Deletes a persisted session and its transcript/event rows (FK cascade
@@ -976,7 +1006,7 @@ mod tests {
         for id in ["a", "b"] {
             let am = agent_session::ActiveModel {
                 id: Set(id.to_string()),
-                backend_id: Set("claude-code".to_string()),
+                backend_id: Set(if id == "a" { "claude-code" } else { "other" }.to_string()),
                 model: Set(None),
                 cwd: Set(".".to_string()),
                 status: Set("exited".to_string()),
@@ -1003,21 +1033,43 @@ mod tests {
         svc.persist_event("b", 1, &exit).await;
         svc.persist_event("b", 2, &exit).await;
 
-        let all = svc.list_events(None, None, None).await.unwrap();
+        let all = svc
+            .list_events(None, None, None, None)
+            .await
+            .unwrap()
+            .events;
         assert_eq!(all.len(), 3);
         assert!(all[0].cursor > all[1].cursor && all[1].cursor > all[2].cursor);
         assert_eq!(all[2].session_id, "a");
 
         let newer = svc
-            .list_events(Some(all[2].cursor), None, None)
+            .list_events(Some(all[2].cursor), None, None, None)
             .await
-            .unwrap();
+            .unwrap()
+            .events;
         assert_eq!(newer.len(), 2);
         let older = svc
-            .list_events(None, Some(all[0].cursor), Some(1))
+            .list_events(None, Some(all[0].cursor), Some(1), None)
             .await
             .unwrap();
-        assert_eq!(older.len(), 1);
-        assert_eq!(older[0].cursor, all[1].cursor);
+        assert_eq!(older.events.len(), 1);
+        assert_eq!(older.events[0].cursor, all[1].cursor);
+        // Full page -> raw cursor to continue from; short page -> none.
+        assert_eq!(older.next_cursor, Some(all[1].cursor));
+        assert_eq!(
+            svc.list_events(None, None, None, None)
+                .await
+                .unwrap()
+                .next_cursor,
+            None
+        );
+
+        // Backend filter applies before LIMIT: only "b" (backend "other") rows.
+        let only_b = svc
+            .list_events(None, None, Some(2), Some("other".into()))
+            .await
+            .unwrap();
+        assert_eq!(only_b.events.len(), 2);
+        assert!(only_b.events.iter().all(|e| e.session_id == "b"));
     }
 }

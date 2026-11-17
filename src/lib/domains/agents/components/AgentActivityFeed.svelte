@@ -4,20 +4,26 @@
   import { Button } from '$lib/components/ui/button';
   import { formatSessionDateTime } from '$lib/domains/shared/utils';
   import { agentEventsQuery } from '../queries/agentsQueries.js';
+  import { agentRuns } from '../state/agentRuns.svelte.js';
   import { foldTimelineEvents } from '../utils/eventTimeline.js';
   import type { AgentSessionSummary } from '../generated';
 
   interface Props {
     /** Sessions in scope (already backend-filtered); other sessions' events are hidden. */
     sessions: AgentSessionSummary[];
+    /** '' = all backends; filtered in SQL so pages aren't emptied client-side. */
+    backendId?: string;
     onOpen?: (s: AgentSessionSummary) => void;
   }
-  let { sessions, onOpen = () => {} }: Props = $props();
+  let { sessions, backendId = '', onOpen = () => {} }: Props = $props();
 
-  const feed = createInfiniteQuery(agentEventsQuery);
+  const feed = createInfiniteQuery(() =>
+    // Poll while any run is live; start/exit invalidation alone misses its mid-run events.
+    agentEventsQuery(backendId, agentRuns.runningIds.size > 0 ? 3000 : false)
+  );
   const byId = $derived(new Map(sessions.map((s) => [s.id, s])));
   const items = $derived(
-    (feed.data?.pages.flat() ?? []).flatMap((e) => {
+    (feed.data?.pages.flatMap((p) => p.events) ?? []).flatMap((e) => {
       const session = byId.get(e.session_id);
       const item = session
         ? foldTimelineEvents([

@@ -58,4 +58,10 @@ describe('sessionsToTasks', () => {
       ['a:t2', 'a', 'Subagent', 'in-progress'],
     ]);
   });
+
+  it('marks unfinished subagents completed once the parent is no longer running', () => {
+    const events: AgentEvent[] = [{ type: 'subagent_started', tool_use_id: 't2' }];
+    const tasks = sessionsToTasks([s('a', 'interrupted')], ctx([], { a: events }));
+    expect(tasks[1].status).toBe('completed');
+  });
 });

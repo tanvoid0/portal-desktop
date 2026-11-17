@@ -136,7 +136,7 @@
         'rounded-lg border-2 border-dashed border-transparent p-2'
       )}"
       role="region"
-      aria-label="Drop zone for {column.title} tasks"
+      aria-label={readonly ? `${column.title} column` : `Drop zone for ${column.title} tasks`}
       ondragover={readonly ? undefined : (e) => handleDragOver(e, column.id, dragDropState)}
       ondragleave={readonly ? undefined : (e) => handleDragLeave(e, dragDropState)}
       ondrop={readonly ? undefined : (e) => handleDrop(e, column.id, dragDropState, handleTaskMove)}

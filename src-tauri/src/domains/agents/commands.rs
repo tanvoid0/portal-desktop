@@ -6,7 +6,7 @@ use tauri::State;
 
 use super::backend::StartParams;
 use super::service::{
-    AgentEventSeq, AgentFeedEvent, AgentRunService, AgentSessionDetail, AgentSessionSummary,
+    AgentEventSeq, AgentFeedPage, AgentRunService, AgentSessionDetail, AgentSessionSummary,
     BackendInfo,
 };
 
@@ -141,8 +141,11 @@ pub async fn agents_list_events(
     after_seq: Option<i64>,
     before_seq: Option<i64>,
     limit: Option<u64>,
-) -> Result<Vec<AgentFeedEvent>, String> {
-    service.list_events(after_seq, before_seq, limit).await
+    backend_id: Option<String>,
+) -> Result<AgentFeedPage, String> {
+    service
+        .list_events(after_seq, before_seq, limit, backend_id)
+        .await
 }
 
 /// One session's full persisted transcript + event log, in order — the

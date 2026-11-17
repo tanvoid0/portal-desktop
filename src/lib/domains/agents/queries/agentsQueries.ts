@@ -1,6 +1,6 @@
 import { queryKeys } from '$lib/domains/shared/query/keys';
+import type { AgentFeedPage } from '../generated';
 import { agentsApi } from '../api/agentsApi.js';
-import type { AgentFeedEvent } from '../generated';
 
 /** Detected agent backends (Claude Code today) and their reported models. */
 export const agentBackendsQuery = () => ({
@@ -16,17 +16,19 @@ export const agentSessionsQuery = () => ({
 
 export const EVENTS_PAGE = 30;
 
-/** Cursor of the next (older) feed page: the last row's cursor, or none once a page comes up short. */
-export const nextEventsCursor = (page: AgentFeedEvent[]) =>
-  page.length < EVENTS_PAGE ? undefined : page[page.length - 1].cursor;
-
-/** Cross-session activity feed, newest first; each page is older than the last. */
-export const agentEventsQuery = () => ({
-  queryKey: queryKeys.agents.events,
+/** `''` = all backends. Filtered in SQL before paging, so pages are never empty by filtering. */
+export const agentEventsQuery = (backendId = '', refetchInterval: number | false = false) => ({
+  queryKey: queryKeys.agents.feed(backendId),
   queryFn: ({ pageParam }: { pageParam: number | undefined }) =>
-    agentsApi.listEvents({ beforeSeq: pageParam, limit: EVENTS_PAGE }),
+    agentsApi.listEvents({
+      beforeSeq: pageParam,
+      limit: EVENTS_PAGE,
+      backendId: backendId || undefined,
+    }),
   initialPageParam: undefined as number | undefined,
-  getNextPageParam: nextEventsCursor,
+  // Rust reports the raw-row cursor (unparseable rows still count toward a full page).
+  getNextPageParam: (page: AgentFeedPage) => page.next_cursor ?? undefined,
+  refetchInterval,
 });
 
 /** One session's full transcript + event log. */

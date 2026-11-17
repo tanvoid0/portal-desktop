@@ -85,7 +85,8 @@ export function sessionsToTasks(sessions: AgentSessionSummary[], ctx: SessionTas
       id: `${s.id}:${id}`,
       parentId: s.id,
       title: sub.name,
-      status: sub.done ? 'completed' : 'in-progress',
+      // A subagent can't outlive its parent: interrupted/crashed parent => no more finish events.
+      status: sub.done || s.status !== 'running' ? 'completed' : 'in-progress',
       priority: 'medium',
       type: 'Subtask',
       createdAt: started,

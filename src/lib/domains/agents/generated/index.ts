@@ -3,6 +3,7 @@ export type { AgentEvent } from './AgentEvent';
 export type { AgentEventRow } from './AgentEventRow';
 export type { AgentEventSeq } from './AgentEventSeq';
 export type { AgentFeedEvent } from './AgentFeedEvent';
+export type { AgentFeedPage } from './AgentFeedPage';
 export type { AgentMessageRow } from './AgentMessageRow';
 export type { AgentSessionDetail } from './AgentSessionDetail';
 export type { AgentSessionSummary } from './AgentSessionSummary';

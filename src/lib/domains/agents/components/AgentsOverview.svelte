@@ -112,6 +112,6 @@
     {@render list('Running', view.running)}
     {@render list('Recent', view.recent)}
     <AgentsBoard sessions={[...view.running, ...view.recent]} {backendName} onOpen={open} />
-    <AgentActivityFeed sessions={scoped} onOpen={open} />
+    <AgentActivityFeed sessions={scoped} backendId={backend} onOpen={open} />
   {/if}
 </PageContainer>

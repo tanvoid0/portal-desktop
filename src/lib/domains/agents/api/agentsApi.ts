@@ -3,7 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
   AgentEvent,
   AgentEventSeq,
-  AgentFeedEvent,
+  AgentFeedPage,
   AgentSessionDetail,
   AgentSessionSummary,
   BackendInfo,
@@ -94,8 +94,10 @@ export const agentsApi = {
     afterSeq?: number;
     beforeSeq?: number;
     limit?: number;
-  }): Promise<AgentFeedEvent[]> {
-    return invokeClient.post<AgentFeedEvent[]>('agents_list_events', {
+    backendId?: string;
+  }): Promise<AgentFeedPage> {
+    return invokeClient.post<AgentFeedPage>('agents_list_events', {
+      backendId: opts.backendId ?? null,
       afterSeq: opts.afterSeq ?? null,
       beforeSeq: opts.beforeSeq ?? null,
       limit: opts.limit ?? null,
