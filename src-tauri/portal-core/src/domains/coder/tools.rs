@@ -418,7 +418,18 @@ fn arg_str<'a>(args: &'a Value, tool: &str, key: &str) -> Result<&'a str, String
 /// absolute `rel`, a `..` that climbs out, or a symlink/junction inside the
 /// workspace that points out of it (including a dangling one, which a write
 /// would follow and create its target).
+/// Refuse network (UNC) roots: touching `\\host\share` makes Windows send the
+/// user's NTLM credentials to `host`. Local verbatim paths (`\\?\C:\`) pass.
+pub fn reject_unc(root: &str) -> Result<(), String> {
+    let r = root.replace('/', "\\");
+    if r.starts_with("\\\\") && !r.starts_with("\\\\?\\") && !r.starts_with("\\\\.\\") {
+        return Err("network (UNC) workspace roots are not allowed".into());
+    }
+    Ok(())
+}
+
 pub fn resolve(root: &str, rel: &str) -> Result<PathBuf, String> {
+    reject_unc(root)?;
     move_lock::ensure_unlocked(Path::new(root))?;
     let root = PathBuf::from(root);
     let joined = root.join(rel);
@@ -638,6 +649,16 @@ fn run_command(root: &str, command: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unc_roots_rejected_local_verbatim_allowed() {
+        assert!(reject_unc(r"\\evil\share").is_err());
+        assert!(reject_unc("//evil/share").is_err());
+        assert!(reject_unc(r"\\?\C:\work").is_ok());
+        assert!(reject_unc(r"C:\work").is_ok());
+        assert!(reject_unc("/home/u/work").is_ok());
+        assert!(resolve(r"\\evil\share", "a.txt").is_err());
+    }
 
     fn tmp_root() -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("coder_test_{}", uuid::Uuid::new_v4()));

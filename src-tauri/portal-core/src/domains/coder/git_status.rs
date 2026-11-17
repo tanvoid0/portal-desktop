@@ -127,9 +127,13 @@ fn default_branch(workspace: &str) -> Option<String> {
 }
 
 fn git_output(workspace: &str, args: &[&str]) -> Result<String, String> {
+    super::tools::reject_unc(workspace)?;
     move_lock::ensure_unlocked(Path::new(workspace))?;
+    // `core.fsmonitor=` stops a repo-local config from running its own hook
+    // when git status refreshes the index.
     let output = Command::new("git")
         .no_window()
+        .args(["-c", "core.fsmonitor="])
         .args(args)
         .current_dir(workspace)
         .output()
