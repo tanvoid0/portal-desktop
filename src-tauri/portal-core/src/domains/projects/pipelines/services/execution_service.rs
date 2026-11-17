@@ -1071,9 +1071,12 @@ impl LogReader {
 /// Wait for a finished step's readers to reach EOF, so its log is complete
 /// before the step is finalized. A grandchild that outlives the step can keep
 /// the pipe open indefinitely (a daemonized helper, or a tool like MSVC's
-/// vctip.exe that link.exe leaves behind), so the readers are abandoned once
-/// they go [`READER_IDLE_GRACE`] without reading a line, after
-/// [`READER_DRAIN_CAP`] in all (a grandchild that keeps writing), or on cancel.
+/// vctip.exe that link.exe leaves behind), so the step stops waiting once the
+/// readers go [`READER_IDLE_GRACE`] without reading a line, or after
+/// [`READER_DRAIN_CAP`] in all (a grandchild that keeps writing). Those readers
+/// are detached, not aborted: aborting would drop the pipe and give a
+/// backgrounded child (`cmd &`, `nohup`) EPIPE on its next write, and could cut
+/// a line still being saved. They end on their own at EOF. Only cancel aborts.
 async fn drain_log_readers(
     readers: Vec<JoinHandle<()>>,
     lines_read: &AtomicUsize,
@@ -1089,12 +1092,14 @@ async fn drain_log_readers(
     let cap = tokio::time::sleep(READER_DRAIN_CAP);
     tokio::pin!(cap);
     let mut seen = lines_read.load(Ordering::Relaxed);
+    let mut cancelled = false;
     loop {
         tokio::select! {
             _ = &mut all => return,
             _ = &mut cap => break,
             changed = cancel_rx.changed() => {
                 if changed.is_err() || *cancel_rx.borrow() {
+                    cancelled = true;
                     break;
                 }
             }
@@ -1109,11 +1114,14 @@ async fn drain_log_readers(
     }
     log_warn!(
         "ExecutionService",
-        "Step exited but its output pipe is still open; abandoning its log readers"
+        "Step exited but its output pipe is still open; no longer waiting on its log readers"
     );
-    for a in aborts {
-        a.abort();
+    if cancelled {
+        for a in aborts {
+            a.abort();
+        }
     }
+    // Otherwise dropping `all` (on return) detaches the readers.
 }
 
 /// Refuse a run in which any step comes after a `longRunning` one. A
@@ -1133,7 +1141,8 @@ fn reject_steps_after_long_running(steps: &[Value]) -> Result<(), String> {
             return Err(format!(
                 "Step '{next}' comes after '{server}', which is longRunning: it never \
                  finishes, so '{next}' could never start. longRunning is for servers; \
-                 drop it from '{server}' or make '{server}' the last step."
+                 drop it from '{server}', or make it the last step by giving it a \
+                 dependsOn on every other step."
             ));
         }
     }
@@ -1446,6 +1455,16 @@ mod tests {
         .await;
         assert!(drained.is_ok(), "drain waited on a pipe that never closes");
         assert_eq!(svc.get_step_logs("e", "a").await.unwrap(), ["one", "two"]);
+        // Detached, not aborted: the read end is still open, so a background
+        // child writing later gets no EPIPE, and its output is still logged.
+        tokio::io::AsyncWriteExt::write_all(&mut held_open, b"late\n")
+            .await
+            .expect("reader was aborted: write end got a broken pipe");
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(
+            svc.get_step_logs("e", "a").await.unwrap(),
+            ["one", "two", "late"]
+        );
     }
 
     /// A service over a scratch database holding execution "e" with pending
