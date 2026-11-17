@@ -34,12 +34,5 @@
 </script>
 
 <div class="coder-session-terminal h-full min-h-0 w-full">
-  <Terminal
-    bind:this={terminal}
-    tabId={tab.tabId}
-    {settings}
-    mode="interactive"
-    killOnDestroy={false}
-    class="h-full"
-  />
+  <Terminal bind:this={terminal} tabId={tab.tabId} {settings} mode="interactive" class="h-full" />
 </div>
