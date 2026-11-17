@@ -256,7 +256,7 @@ pub struct AgentRunService {
 impl AgentRunService {
     pub fn new(db: Arc<DatabaseManager>) -> Self {
         Self {
-            backends: vec![Arc::new(ClaudeCodeBackend)],
+            backends: vec![Arc::new(ClaudeCodeBackend), Arc::new(super::codex::CodexBackend)],
             runs: Mutex::new(HashMap::new()),
             semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_RUNS)),
             sink: Mutex::new(None),
