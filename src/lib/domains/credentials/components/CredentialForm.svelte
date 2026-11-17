@@ -58,6 +58,22 @@
   let expiresAt = $state<string>('');
   let metadata = $state<Partial<CredentialMetadata>>({});
 
+  // Empty inputs would otherwise persist as ''/null and shadow real values.
+  const cleanMetadata = $derived.by(() => {
+    const entries = Object.entries(metadata).filter(([, v]) => v !== '' && v != null);
+    return entries.length > 0
+      ? (Object.fromEntries(entries) as Partial<CredentialMetadata>)
+      : undefined;
+  });
+
+  // Database Explorer discovery reads these from plaintext metadata (host is required).
+  const dbEngines = [
+    { value: 'postgres', label: 'PostgreSQL' },
+    { value: 'mysql', label: 'MySQL / MariaDB' },
+    { value: 'mongodb', label: 'MongoDB' },
+    { value: 'redis', label: 'Redis' },
+  ];
+
   // Credential type options
   const credentialTypes: {
     value: CredentialType;
@@ -133,7 +149,7 @@
           // empty = keep the existing secret (backend only re-encrypts when a value is sent)
           value: value.trim() || undefined,
           expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+          metadata: cleanMetadata,
         };
 
         const updatedCredential = await credentialService.updateCredential(
@@ -160,7 +176,7 @@
           tags,
           value: value.trim(),
           expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+          metadata: cleanMetadata,
         };
 
         const newCredential = await credentialService.createCredential(createRequest);
@@ -252,6 +268,49 @@
           rows={2}
         />
       </div>
+
+      {#if type === CredentialType.DATABASE}
+        <!-- Connection (plaintext metadata; the secret stays the password) -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="space-y-2">
+            <Label>Engine</Label>
+            <Select
+              options={dbEngines}
+              defaultValue={metadata.provider ?? ''}
+              placeholder="Select engine"
+              onSelect={(v) => (metadata.provider = v)}
+              disabled={loading}
+            />
+          </div>
+          <div class="space-y-2">
+            <Label for="db-host">Host</Label>
+            <Input
+              id="db-host"
+              placeholder="localhost"
+              bind:value={metadata.host}
+              disabled={loading}
+            />
+          </div>
+          <div class="space-y-2">
+            <Label for="db-port">Port</Label>
+            <Input
+              id="db-port"
+              type="number"
+              placeholder="default"
+              bind:value={metadata.port}
+              disabled={loading}
+            />
+          </div>
+          <div class="space-y-2">
+            <Label for="db-name">Database</Label>
+            <Input id="db-name" bind:value={metadata.database} disabled={loading} />
+          </div>
+          <div class="space-y-2 sm:col-span-2">
+            <Label for="db-user">Username</Label>
+            <Input id="db-user" bind:value={metadata.username} disabled={loading} />
+          </div>
+        </div>
+      {/if}
 
       <!-- Value -->
       <div class="space-y-2">
