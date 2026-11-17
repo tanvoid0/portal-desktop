@@ -11,8 +11,8 @@ use std::time::Duration;
 
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter,
-    QueryOrder, QuerySelect,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DbBackend, EntityTrait,
+    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, Statement,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -173,6 +173,56 @@ struct FeedRow {
 /// Streaming/diagnostic events that would drown the feed (stored as
 /// `{"type":"<tag>",...}` — serde's internal tag is serialized first).
 const FEED_NOISE: [&str; 4] = ["text_delta", "thinking_delta", "raw", "usage"];
+
+/// One (UTC day, model) cell of token/cost usage. Tokens exclude cache
+/// traffic (`cache_tokens` = cache read + creation) so the chart isn't
+/// dominated by re-read context.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/agents/generated/")]
+pub struct AgentUsageCell {
+    pub day: String,
+    pub model: String,
+    #[ts(type = "number")]
+    pub tokens: i64,
+    #[ts(type = "number")]
+    pub cache_tokens: i64,
+    pub cost_usd: f64,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/agents/generated/")]
+pub struct AgentToolCount {
+    pub name: String,
+    #[ts(type = "number")]
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/agents/generated/")]
+pub struct AgentOutcomeCount {
+    pub status: String,
+    #[ts(type = "number")]
+    pub count: i64,
+}
+
+/// Everything the Analytics section charts, for one backend or all.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/domains/agents/generated/")]
+pub struct AgentAnalytics {
+    pub usage: Vec<AgentUsageCell>,
+    pub tools: Vec<AgentToolCount>,
+    pub outcomes: Vec<AgentOutcomeCount>,
+    /// Mean of `ended_at - started_at` over finished sessions; `None` if none.
+    pub avg_duration_secs: Option<f64>,
+}
+
+#[derive(FromQueryResult)]
+struct UsageRow {
+    session_id: String,
+    day: String,
+    cost: Option<f64>,
+    model_usage: Option<String>,
+}
 
 /// Full detail for one session — `get_session_detail`'s return shape.
 #[derive(Debug, Clone, Serialize, TS)]
@@ -649,6 +699,140 @@ impl AgentRunService {
         })
     }
 
+    /// Usage per day/model, tool-call counts and session outcomes, read from
+    /// `agent_events.event_json` via `json_extract`; `backend_id` filters in SQL.
+    /// `Usage` events carry the run's *cumulative* totals, so each becomes a
+    /// per-session delta (a drop = resumed process, counts from zero).
+    pub async fn analytics(&self, backend_id: Option<String>) -> Result<AgentAnalytics, String> {
+        let conn = self.db.get_connection();
+        let err = |e: sea_orm::DbErr| format!("agents: analytics failed: {e}");
+        // Every query takes the optional backend twice: `(? IS NULL OR … = ?)`.
+        let stmt = |sql: String| {
+            let b = || sea_orm::Value::String(backend_id.clone().map(Box::new));
+            Statement::from_sql_and_values(DbBackend::Sqlite, sql, [b(), b()])
+        };
+        const EV: &str =
+            "(? IS NULL OR session_id IN (SELECT id FROM agent_sessions WHERE backend_id = ?))";
+        const SS: &str = "(? IS NULL OR backend_id = ?)";
+
+        let rows = UsageRow::find_by_statement(stmt(format!(
+            "SELECT session_id, substr(created_at, 1, 10) AS day, \
+             json_extract(event_json, '$.total_cost_usd') AS cost, \
+             json_extract(event_json, '$.model_usage') AS model_usage \
+             FROM agent_events WHERE json_extract(event_json, '$.type') = 'usage' AND {EV} \
+             ORDER BY rowid"
+        )))
+        .all(conn)
+        .await
+        .map_err(err)?;
+        // (day, model) -> (tokens, cache, cost); `prev` is per (session, model).
+        let mut cells: std::collections::BTreeMap<(String, String), (i64, i64, f64)> =
+            Default::default();
+        let mut prev: HashMap<(String, String), (i64, i64, f64)> = HashMap::new();
+        for r in rows {
+            let usage = r
+                .model_usage
+                .and_then(|j| serde_json::from_str::<serde_json::Value>(&j).ok());
+            let Some(models) = usage.as_ref().and_then(|u| u.as_object()) else {
+                continue;
+            };
+            let n = |m: &serde_json::Value, k: &str| m.get(k).and_then(|v| v.as_i64()).unwrap_or(0);
+            for (model, m) in models {
+                // The session total is only a fallback for a lone model without `costUSD`.
+                let cost = m
+                    .get("costUSD")
+                    .and_then(|v| v.as_f64())
+                    .or(if models.len() == 1 { r.cost } else { None });
+                let cur = (
+                    n(m, "inputTokens") + n(m, "outputTokens"),
+                    n(m, "cacheReadInputTokens") + n(m, "cacheCreationInputTokens"),
+                    cost.unwrap_or(0.0),
+                );
+                let (pt, pc, pu) = prev
+                    .insert((r.session_id.clone(), model.clone()), cur)
+                    .unwrap_or_default();
+                let c = cells.entry((r.day.clone(), model.clone())).or_default();
+                c.0 += if cur.0 >= pt { cur.0 - pt } else { cur.0 };
+                c.1 += if cur.1 >= pc { cur.1 - pc } else { cur.1 };
+                c.2 += if cur.2 >= pu { cur.2 - pu } else { cur.2 };
+            }
+        }
+        let usage = cells
+            .into_iter()
+            .map(
+                |((day, model), (tokens, cache_tokens, cost_usd))| AgentUsageCell {
+                    day,
+                    model,
+                    tokens,
+                    cache_tokens,
+                    cost_usd,
+                },
+            )
+            .collect();
+
+        #[derive(FromQueryResult)]
+        struct Tool {
+            name: String,
+            count: i64,
+        }
+        let tools = Tool::find_by_statement(stmt(format!(
+            "SELECT json_extract(event_json, '$.name') AS name, COUNT(*) AS count \
+             FROM agent_events WHERE json_extract(event_json, '$.type') = 'tool_call' \
+             AND json_extract(event_json, '$.name') IS NOT NULL AND {EV} \
+             GROUP BY name ORDER BY count DESC, name LIMIT 15"
+        )))
+        .all(conn)
+        .await
+        .map_err(err)?
+        .into_iter()
+        .map(|t| AgentToolCount {
+            name: t.name,
+            count: t.count,
+        })
+        .collect();
+
+        #[derive(FromQueryResult)]
+        struct Outcome {
+            status: String,
+            count: i64,
+        }
+        // A non-zero exit on a finished session is a failure, whatever its status says.
+        let outcomes = Outcome::find_by_statement(stmt(format!(
+            "SELECT CASE WHEN status = 'exited' AND COALESCE(exit_code, 0) != 0 THEN 'failed' \
+             ELSE status END AS status, COUNT(*) AS count \
+             FROM agent_sessions WHERE {SS} GROUP BY 1 ORDER BY count DESC"
+        )))
+        .all(conn)
+        .await
+        .map_err(err)?
+        .into_iter()
+        .map(|o| AgentOutcomeCount {
+            status: o.status,
+            count: o.count,
+        })
+        .collect();
+
+        #[derive(FromQueryResult)]
+        struct Avg {
+            avg: Option<f64>,
+        }
+        let avg_duration_secs = Avg::find_by_statement(stmt(format!(
+            "SELECT AVG((julianday(ended_at) - julianday(started_at)) * 86400.0) AS avg \
+             FROM agent_sessions WHERE ended_at IS NOT NULL AND {SS}"
+        )))
+        .one(conn)
+        .await
+        .map_err(err)?
+        .and_then(|a| a.avg);
+
+        Ok(AgentAnalytics {
+            usage,
+            tools,
+            outcomes,
+            avg_duration_secs,
+        })
+    }
+
     /// Deletes a persisted session and its transcript/event rows (FK cascade
     /// on `agent_sessions.id`, same shape as `coder_file_changes`). Refuses a
     /// session that's live or persisted as `"running"` — same "the only
@@ -1071,5 +1255,68 @@ mod tests {
             .unwrap();
         assert_eq!(only_b.events.len(), 2);
         assert!(only_b.events.iter().all(|e| e.session_id == "b"));
+    }
+
+    /// Usage deltas, tool counts and outcomes, seeded across two backends.
+    #[tokio::test]
+    async fn analytics_aggregates_per_backend() {
+        let (svc, _dir) = test_service().await;
+        for (id, backend, code) in [("a", "claude-code", 0), ("b", "other", 1)] {
+            let am = agent_session::ActiveModel {
+                id: Set(id.to_string()),
+                backend_id: Set(backend.to_string()),
+                model: Set(None),
+                cwd: Set(".".to_string()),
+                status: Set("exited".to_string()),
+                started_at: Set("2026-11-01T10:00:00+00:00".to_string()),
+                ended_at: Set(Some("2026-11-01T10:01:00+00:00".to_string())),
+                exit_code: Set(Some(code)),
+                title: Set(None),
+                task_id: Set(None),
+                backend_session_id: Set(None),
+            };
+            agent_session::Entity::insert(am)
+                .exec(svc.db.get_connection())
+                .await
+                .expect("insert session");
+        }
+        let usage = |out: i64, cost: f64| AgentEvent::Usage {
+            total_cost_usd: Some(cost),
+            model_usage: Some(
+                json!({"opus": {"inputTokens": 10, "outputTokens": out, "costUSD": cost}}),
+            ),
+        };
+        let tool = |n: &str| AgentEvent::ToolCall {
+            id: "t".into(),
+            name: n.into(),
+            input: json!({}),
+            parent_tool_use_id: None,
+        };
+        // Session a reports cumulative totals: 30 then 60 tokens -> 60 summed, not 90.
+        svc.persist_event("a", 1, &usage(20, 1.0)).await;
+        svc.persist_event("a", 2, &usage(50, 2.5)).await;
+        svc.persist_event("a", 3, &tool("Bash")).await;
+        svc.persist_event("a", 4, &tool("Bash")).await;
+        svc.persist_event("b", 1, &usage(5, 0.5)).await;
+        svc.persist_event("b", 2, &tool("Read")).await;
+
+        let all = svc.analytics(None).await.unwrap();
+        assert_eq!(all.usage.len(), 1);
+        assert_eq!(all.usage[0].tokens, 75); // a: 60, b: 15
+        assert!((all.usage[0].cost_usd - 3.0).abs() < 1e-9);
+        assert_eq!(
+            (all.tools[0].name.as_str(), all.tools[0].count),
+            ("Bash", 2)
+        );
+        assert!(all
+            .outcomes
+            .iter()
+            .any(|o| o.status == "failed" && o.count == 1));
+        assert!((all.avg_duration_secs.unwrap() - 60.0).abs() < 0.1); // julianday float error
+
+        let only_b = svc.analytics(Some("other".into())).await.unwrap();
+        assert_eq!(only_b.usage[0].tokens, 15);
+        assert_eq!(only_b.tools.len(), 1);
+        assert_eq!(only_b.outcomes.len(), 1);
     }
 }

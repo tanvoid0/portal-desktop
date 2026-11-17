@@ -19,6 +19,7 @@
   import { agentBackendsQuery, agentSessionsQuery } from '../queries/agentsQueries.js';
   import AgentsBoard from './AgentsBoard.svelte';
   import AgentActivityFeed from './AgentActivityFeed.svelte';
+  import AgentAnalytics from './AgentAnalytics.svelte';
   import { overviewSessions } from '../utils/overviewStats.js';
   import { basename } from '../utils/groupSessions.js';
   import type { AgentSessionSummary } from '../generated';
@@ -113,5 +114,6 @@
     {@render list('Recent', view.recent)}
     <AgentsBoard sessions={[...view.running, ...view.recent]} {backendName} onOpen={open} />
     <AgentActivityFeed sessions={scoped} backendId={backend} onOpen={open} />
+    <AgentAnalytics backendId={backend} sessions={scoped} />
   {/if}
 </PageContainer>

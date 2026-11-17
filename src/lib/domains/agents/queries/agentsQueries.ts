@@ -31,6 +31,12 @@ export const agentEventsQuery = (backendId = '', refetchInterval: number | false
   refetchInterval,
 });
 
+/** `''` = all backends. Historical aggregates, so no polling. */
+export const agentAnalyticsQuery = (backendId = '') => ({
+  queryKey: queryKeys.agents.analytics(backendId),
+  queryFn: () => agentsApi.analytics(backendId || undefined),
+});
+
 /** One session's full transcript + event log. */
 export const agentSessionQuery = (sessionId: string) => ({
   queryKey: queryKeys.agents.session(sessionId),

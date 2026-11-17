@@ -6,7 +6,7 @@ use tauri::State;
 
 use super::backend::StartParams;
 use super::service::{
-    AgentEventSeq, AgentFeedPage, AgentRunService, AgentSessionDetail, AgentSessionSummary,
+    AgentAnalytics, AgentEventSeq, AgentFeedPage, AgentRunService, AgentSessionDetail, AgentSessionSummary,
     BackendInfo,
 };
 
@@ -146,6 +146,15 @@ pub async fn agents_list_events(
     service
         .list_events(after_seq, before_seq, limit, backend_id)
         .await
+}
+
+/// Usage/tool/outcome aggregates over every run's events — same cap as the feed.
+#[portal_rpc_macro::rpc(cap = "agents.history")]
+pub async fn agents_analytics(
+    service: State<'_, Arc<AgentRunService>>,
+    backend_id: Option<String>,
+) -> Result<AgentAnalytics, String> {
+    service.analytics(backend_id).await
 }
 
 /// One session's full persisted transcript + event log, in order — the

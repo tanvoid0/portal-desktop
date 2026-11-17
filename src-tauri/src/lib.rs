@@ -922,6 +922,7 @@ pub fn run() {
             domains::agents::agents_list_running,
             domains::agents::agents_list_sessions,
             domains::agents::agents_list_events,
+            domains::agents::agents_analytics,
             domains::agents::agents_get_session,
             domains::agents::agents_delete_session,
         ])

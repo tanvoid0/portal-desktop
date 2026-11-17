@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
   AgentEvent,
   AgentEventSeq,
+  AgentAnalytics,
   AgentFeedPage,
   AgentSessionDetail,
   AgentSessionSummary,
@@ -102,6 +103,11 @@ export const agentsApi = {
       beforeSeq: opts.beforeSeq ?? null,
       limit: opts.limit ?? null,
     });
+  },
+
+  /** Usage/tool/outcome aggregates; `backendId` filters in SQL. */
+  analytics(backendId?: string): Promise<AgentAnalytics> {
+    return invokeClient.post<AgentAnalytics>('agents_analytics', { backendId: backendId ?? null });
   },
 
   /** One session's full persisted transcript + event log, in order. */
