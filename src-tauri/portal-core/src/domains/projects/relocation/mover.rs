@@ -632,7 +632,7 @@ impl Mover<'_> {
             "verified" => {
                 // The crash could have landed either side of the promote
                 // (`update_state(verified)` runs just before the rename).
-                if read_sidecar(&dest).as_deref() != Some(row.id.as_str()) {
+                if !dest_promoted(&row) {
                     // Promote hadn't happened: the verified tree is still in
                     // staging. Carry it into place now — the exact tail of
                     // `run_move`, which promotes the already-verified staging
@@ -685,7 +685,7 @@ impl Mover<'_> {
         match row.state.as_str() {
             "copying" | "verifying" => {}
             "verified" => {
-                if read_sidecar(&dest).as_deref() == Some(row.id.as_str()) {
+                if dest_promoted(&row) {
                     return Err(
                         "destination is already in place — finish the move instead of rolling back"
                             .into(),
@@ -1298,7 +1298,7 @@ pub fn recovery_options(row: &project_move::Model) -> RecoveryStatus {
                 (vec![Resume, Rollback], None)
             }
         }
-        "verified" if mine(&dest) => (vec![Finish], None),
+        "verified" if dest_promoted(row) => (vec![Finish], None),
         // staging sits on the dest volume (staging_path = dest.parent()/…), so
         // its existence already implies the drive is present — no volume check.
         "verified" if staging.exists() && mine(&staging) => (vec![Finish, Rollback], None),
@@ -1469,6 +1469,20 @@ fn read_sidecar(staging: &Path) -> Option<String> {
 fn owns_staging_by_name(row: &project_move::Model) -> bool {
     staging_path(Path::new(&row.dest_path), &row.id)
         .is_ok_and(|p| p == Path::new(&row.staging_path))
+}
+
+/// Whether a `verified` move's promote (the staging → dest rename) has already
+/// happened: dest carries this move's marker, or (#908, a pre-#414 move whose
+/// marker was overwritten by a stale one) staging is gone, its name proves it
+/// was this move's, and dest exists holding some marker. A rename leaves only
+/// one of the two dirs, and a verified move's dest did not exist beforehand.
+fn dest_promoted(row: &project_move::Model) -> bool {
+    let dest = Path::new(&row.dest_path);
+    match read_sidecar(dest) {
+        Some(id) if id == row.id => true,
+        Some(_) => owns_staging_by_name(row) && !Path::new(&row.staging_path).exists(),
+        None => false,
+    }
 }
 
 fn remove_staging(staging: &Path) -> Result<(), String> {
@@ -2227,6 +2241,37 @@ mod tests {
         let row = mv("m5", "verified", src, dest.to_str().unwrap(), other.to_str().unwrap());
         assert!(!owns_staging_by_name(&row));
         assert!(recovery_options(&row).actions.is_empty());
+    }
+
+    /// #908: promoted with a stale marker at dest and staging gone → Finish,
+    /// never Rollback-by-accident; staging still present → not "promoted".
+    #[test]
+    fn dest_with_stale_marker_counts_as_promoted_only_when_staging_is_gone() {
+        use RecoveryAction::Finish;
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("dest");
+        let ours = staging_path(&dest, "m6").unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        write_sidecar(&dest, "stale-old-move").unwrap();
+        let src = dir.path().to_str().unwrap();
+        let row = mv("m6", "verified", src, dest.to_str().unwrap(), ours.to_str().unwrap());
+        assert!(dest_promoted(&row));
+        assert_eq!(recovery_options(&row).actions, vec![Finish]);
+
+        // Staging still on disk: the rename did not happen.
+        fs::create_dir_all(&ours).unwrap();
+        assert!(!dest_promoted(&row));
+
+        // Staging gone but the name is not this move's: not provably ours.
+        let other = dir.path().join("elsewhere");
+        let row = mv("m6", "verified", src, dest.to_str().unwrap(), other.to_str().unwrap());
+        assert!(!dest_promoted(&row));
+
+        // No marker at dest at all: unknown dir, never promoted.
+        fs::remove_file(dest.join(SIDECAR)).unwrap();
+        fs::remove_dir_all(&ours).unwrap();
+        let row = mv("m6", "verified", src, dest.to_str().unwrap(), ours.to_str().unwrap());
+        assert!(!dest_promoted(&row));
     }
 
     #[test]
