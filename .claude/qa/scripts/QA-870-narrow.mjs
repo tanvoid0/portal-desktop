@@ -1,0 +1,16 @@
+import { open } from './app.mjs';
+const app = await open('ai/coder/claude-code?session=955eb08e-aff7-431d-a646-ec6c3844e466');
+const { page } = app;
+await page.setViewportSize({ width: 375, height: 700 }); await page.reload(); await page.waitForLoadState('load');
+await page.waitForTimeout(1500);
+const tg = page.getByRole('button', { name: 'Workspace sidebar' });
+console.log('toggle count', await tg.count());
+console.log('sheet dialog before:', await page.getByRole('dialog').count(), 'aside git visible before:', await page.getByText('Git changes',{exact:true}).isVisible().catch(()=>false));
+await app.shot('sweep-agent-tab-375-closed');
+await tg.click(); await page.waitForTimeout(800);
+console.log('dialog after toggle:', await page.getByRole('dialog').count(), 'Git changes visible:', await page.getByText('Git changes',{exact:true}).isVisible().catch(()=>false));
+await app.shot('sweep-agent-tab-375-sheet');
+await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+console.log('dialog after esc:', await page.getByRole('dialog').count());
+await page.setViewportSize({ width: 1280, height: 800 });
+await app.done();
