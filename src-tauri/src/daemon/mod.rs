@@ -545,11 +545,12 @@ async fn events(
     // The guard has already refused anyone without a token or a loopback-no-
     // Origin pass, so trust here is Local (full stream) or Remote (filtered by
     // caps) - a page-originated connection only ever arrives as the latter.
+    let cutoff = pairing::Cutoff::new(&trust, &state);
     let caps = match trust {
         Trust::Remote { caps, .. } => Some(caps),
         _ => None,
     };
-    upgrade.on_upgrade(move |socket| pump(socket, state.tx.subscribe(), caps))
+    upgrade.on_upgrade(move |socket| pump(socket, state.tx.subscribe(), caps, cutoff))
 }
 
 /// Run one command by name. The registry is the command's own namespace, shared
@@ -682,16 +683,25 @@ async fn forward_one(
     }
 }
 
-/// Forward frames to one client until it goes away. `caps == None` is a local
-/// peer and gets the whole stream; `Some` is a remote peer and is filtered.
+/// Forward frames to one client until it goes away or its device is cut off
+/// (`pairing::drop_device`). `caps == None` is a local peer and gets the whole
+/// stream; `Some` is a remote peer and is filtered.
 async fn pump(
     mut socket: WebSocket,
     mut rx: broadcast::Receiver<Shared>,
     caps: Option<Vec<String>>,
+    cutoff: Option<pairing::Cutoff>,
 ) {
+    let cut_off = pairing::until_cut_off(cutoff);
+    tokio::pin!(cut_off);
     loop {
-        if !forward_one(&mut socket, rx.recv().await, &caps).await {
-            return;
+        tokio::select! {
+            _ = &mut cut_off => return,
+            frame = rx.recv() => {
+                if !forward_one(&mut socket, frame, &caps).await {
+                    return;
+                }
+            }
         }
     }
 }
@@ -700,6 +710,7 @@ async fn pump(
 mod tests {
     use super::*;
     use crate::events::EventSinkExt;
+    use tokio_tungstenite::tungstenite::{Error as WsError, Message as WsMessage};
 
     fn remote() -> IpAddr {
         "192.168.1.50".parse().unwrap()
@@ -1149,5 +1160,84 @@ mod tests {
         assert_eq!(local.status(), StatusCode::SERVICE_UNAVAILABLE);
         let read = call("coder_list_threads", remote(&[])).await;
         assert_eq!(read.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    /// Both socket routes behind a fixed `Trust` — no `guard`, no database,
+    /// the same workaround `control`'s tests use for a peer they cannot mint.
+    async fn spawn_sockets(trust: Trust) -> SocketAddr {
+        let (tx, _rx) = broadcast::channel(8);
+        let app = Router::new()
+            .route("/events", get(events))
+            .route("/control", get(control::control))
+            .layer(Extension(trust))
+            .with_state(AppState::new(tx, None, 0));
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app.into_make_service()).await;
+        });
+        addr
+    }
+
+    /// Whether the server ended this client socket (close frame, error or EOF)
+    /// within `within`; any other frame, like `/control`'s `hello`, is skipped.
+    async fn closed_within(
+        ws: &mut (impl futures_util::Stream<Item = Result<WsMessage, WsError>> + Unpin),
+        within: Duration,
+    ) -> bool {
+        use futures_util::StreamExt;
+        tokio::time::timeout(within, async {
+            loop {
+                match ws.next().await {
+                    None | Some(Err(_)) | Some(Ok(WsMessage::Close(_))) => return,
+                    Some(Ok(_)) => {}
+                }
+            }
+        })
+        .await
+        .is_ok()
+    }
+
+    /// The trust gap: a socket's caps are fixed when it opens, so without
+    /// `drop_device` a revoked device kept streaming and driving input until
+    /// it chose to leave. Its `/events` and `/control` sockets end within a
+    /// second; another device's, and a local peer's, do not.
+    #[tokio::test]
+    async fn drop_device_closes_that_devices_sockets_and_no_one_elses() {
+        let remote = |id: &str| Trust::Remote {
+            device_id: id.to_string(),
+            caps: vec!["coder".to_string()],
+        };
+        let mut sockets = Vec::new(); // (route, should be dropped, client end)
+        for route in ["events", "control"] {
+            for (trust, dropped) in [
+                (remote("drop-victim"), true),
+                (remote("drop-bystander"), false),
+                (Trust::Local, false),
+            ] {
+                let addr = spawn_sockets(trust).await;
+                let (ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}/{route}"))
+                    .await
+                    .unwrap();
+                sockets.push((route, dropped, ws));
+            }
+        }
+
+        pairing::drop_device("drop-victim");
+
+        for (route, dropped, ws) in &mut sockets {
+            let wait = if *dropped {
+                Duration::from_secs(1)
+            } else {
+                Duration::from_millis(300)
+            };
+            assert_eq!(
+                closed_within(ws, wait).await,
+                *dropped,
+                "/{route}: dropped = {dropped}"
+            );
+        }
     }
 }

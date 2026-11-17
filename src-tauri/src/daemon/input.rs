@@ -36,6 +36,9 @@ pub struct State {
     enigo: Enigo,
     /// Virtual keys sent down and not yet up. See the module doc.
     held: HashSet<u16>,
+    /// Mouse buttons sent down (`down: true`) and not yet up — a phone that
+    /// drops mid-drag must not leave one stuck either.
+    held_buttons: HashSet<Button>,
 }
 
 impl State {
@@ -45,7 +48,11 @@ impl State {
     /// just can't move the mouse, and says so if a phone asks it to.
     pub fn new() -> Option<Self> {
         match Enigo::new(&Settings::default()) {
-            Ok(enigo) => Some(Self { enigo, held: HashSet::new() }),
+            Ok(enigo) => Some(Self {
+                enigo,
+                held: HashSet::new(),
+                held_buttons: HashSet::new(),
+            }),
             Err(e) => {
                 eprintln!("[daemon] input injection unavailable: {e}");
                 None
@@ -53,11 +60,15 @@ impl State {
         }
     }
 
-    /// Key-up everything still held. The control socket's close path, same
-    /// reasoning as `InputActions.ReleaseHeld` on the C# server.
+    /// Key-up everything still held, keys and mouse buttons. The control
+    /// socket's close path, same reasoning as `InputActions.ReleaseHeld` on
+    /// the C# server.
     pub fn release_held(&mut self) {
         for vk in std::mem::take(&mut self.held) {
             let _ = self.enigo.key(Key::Other(u32::from(vk)), Direction::Release);
+        }
+        for btn in std::mem::take(&mut self.held_buttons) {
+            let _ = self.enigo.button(btn, Direction::Release);
         }
     }
 
@@ -135,7 +146,19 @@ impl State {
             Some(false) => Direction::Release,
             None => Direction::Click,
         };
-        self.enigo.button(btn, direction).map_err(|e| e.to_string())
+        self.enigo
+            .button(btn, direction)
+            .map_err(|e| e.to_string())?;
+        match direction {
+            Direction::Press => {
+                self.held_buttons.insert(btn);
+            }
+            Direction::Release => {
+                self.held_buttons.remove(&btn);
+            }
+            Direction::Click => {}
+        }
+        Ok(())
     }
 
     /// `dy`/`dx` are raw wheel deltas, 120 == one notch, positive scrolls

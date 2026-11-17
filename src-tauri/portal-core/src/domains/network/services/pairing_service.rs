@@ -116,6 +116,14 @@ pub struct CapabilityInfo {
     pub is_sensitive: bool,
 }
 
+/// Whether `row`'s `expires_at` or `token_expires_at` is at or before `now`.
+/// `None` means "until_revoked" (or a QR grant past its pickup window — see
+/// [`verify_token`]) — no expiry, live forever until `revoke` sets
+/// approved=false.
+fn lapsed(row: &device_approval::Model, now: DateTime<FixedOffset>) -> bool {
+    row.expires_at.is_some_and(|e| e <= now) || row.token_expires_at.is_some_and(|e| e <= now)
+}
+
 /// The most-recently created row for `device_id`, if any.
 async fn most_recent_row(
     conn: &DatabaseConnection,
@@ -429,12 +437,7 @@ pub async fn verify_token(
     };
 
     let now: DateTime<FixedOffset> = Utc::now().into();
-    // `None` means "until_revoked" (or a QR grant past its pickup window — see
-    // below) — live forever until `revoke` sets approved=false.
-    let live = row.approved
-        && row.expires_at.map(|e| e > now).unwrap_or(true)
-        && row.token_expires_at.map(|e| e > now).unwrap_or(true);
-    if !live {
+    if !row.approved || lapsed(&row, now) {
         return Ok(None);
     }
 
@@ -459,6 +462,23 @@ pub async fn verify_token(
         .map_err(|e| format!("Failed to update device approval: {e}"))?;
 
     Ok(Some((device_id, capabilities)))
+}
+
+/// `device_id`'s granted capabilities, if its most recent row is a live grant
+/// right now — `None` once it is revoked, rejected, still pending, past its
+/// expiry, or unknown. What a socket opened under a grant re-checks against
+/// when it can no longer be sure it heard about a change
+/// (`daemon::pairing::cut_off`). Unlike [`verify_token`] it takes no token
+/// and stamps nothing.
+pub async fn live_capabilities(
+    conn: &DatabaseConnection,
+    device_id: &str,
+) -> Result<Option<Vec<String>>, String> {
+    let now: DateTime<FixedOffset> = Utc::now().into();
+    Ok(most_recent_row(conn, device_id)
+        .await?
+        .filter(|row| row.approved && !lapsed(row, now))
+        .map(|row| serde_json::from_str(&row.capabilities).unwrap_or_default()))
 }
 
 #[cfg(test)]
@@ -655,6 +675,50 @@ mod tests {
         assert_eq!(devices.len(), 1, "the stale pending row should be pruned");
         assert_eq!(devices[0].device_id, "dev-fresh");
         assert_eq!(devices[0].approval_type, "pending");
+    }
+
+    /// Push `device_id`'s grant a minute into the past, as if its lifetime ran out.
+    async fn expire(conn: &DatabaseConnection, device_id: &str) {
+        let row = most_recent_row(conn, device_id).await.unwrap().unwrap();
+        let mut m: device_approval::ActiveModel = row.into();
+        m.expires_at = Set(Some((Utc::now() - Duration::minutes(1)).into()));
+        device_approval::Entity::update(m).exec(conn).await.unwrap();
+    }
+
+    /// `live_capabilities`, for a test that expects the read itself to work.
+    async fn live(conn: &DatabaseConnection, device_id: &str) -> Option<Vec<String>> {
+        live_capabilities(conn, device_id).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn live_capabilities_track_the_current_grant() {
+        let conn = fresh_db().await;
+        let caps = |c: &str| Some(vec![c.to_string()]);
+        assert_eq!(live(&conn, "nobody").await, None);
+
+        request_pairing(&conn, "dev-a", "Phone").await.unwrap();
+        assert_eq!(live(&conn, "dev-a").await, None, "pending");
+
+        approve(&conn, "dev-a", "temporary", &["coder".to_string()])
+            .await
+            .unwrap();
+        assert_eq!(live(&conn, "dev-a").await, caps("coder"));
+
+        update_capabilities(&conn, "dev-a", &["projects".to_string()])
+            .await
+            .unwrap();
+        assert_eq!(live(&conn, "dev-a").await, caps("projects"));
+
+        expire(&conn, "dev-a").await;
+        assert_eq!(live(&conn, "dev-a").await, None, "expired");
+
+        request_pairing(&conn, "dev-b", "Tablet").await.unwrap();
+        approve(&conn, "dev-b", "until_revoked", &["coder".to_string()])
+            .await
+            .unwrap();
+        assert_eq!(live(&conn, "dev-b").await, caps("coder"));
+        revoke(&conn, "dev-b").await.unwrap();
+        assert_eq!(live(&conn, "dev-b").await, None, "revoked");
     }
 
     #[tokio::test]

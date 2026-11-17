@@ -19,6 +19,7 @@ use tokio::sync::broadcast;
 use crate::domains::network::services::pairing_service;
 
 use super::input;
+use super::pairing::{until_cut_off, Cutoff};
 use super::{forward_one, AppState, Shared, Trust};
 
 /// The device name a client may send once over `X-Portal-Device`, e.g. to
@@ -37,6 +38,7 @@ pub async fn control(
 ) -> Response {
     // The guard has already refused browsers and anonymous remotes (`/control`
     // is not in `is_public_path`), so trust here is always Local or Remote.
+    let cutoff = Cutoff::new(&trust, &state);
     let caps = match &trust {
         Trust::Remote { caps, .. } => Some(caps.clone()),
         _ => None,
@@ -49,7 +51,7 @@ pub async fn control(
     }
 
     let host_name = super::host_name();
-    upgrade.on_upgrade(move |socket| run(socket, state.tx.subscribe(), caps, host_name))
+    upgrade.on_upgrade(move |socket| run(socket, state.tx.subscribe(), caps, cutoff, host_name))
 }
 
 /// `hello`'s fixed shape. `screen`/`id`/`mac` are placeholders — mirroring and
@@ -122,6 +124,7 @@ async fn run(
     mut socket: WebSocket,
     mut rx: broadcast::Receiver<Shared>,
     caps: Option<Vec<String>>,
+    cutoff: Option<Cutoff>,
     host_name: String,
 ) {
     if socket.send(hello(&host_name)).await.is_err() {
@@ -129,10 +132,11 @@ async fn run(
     }
 
     let mut input_state = input::State::new();
-    pump_control(&mut socket, &mut rx, &caps, &mut input_state).await;
-    // However the loop below exited — client gone, send failure, server
-    // shutting down — a modifier this phone pressed and never released must
-    // not stay down on the real keyboard.
+    pump_control(&mut socket, &mut rx, &caps, &mut input_state, cutoff).await;
+    // However the loop below exited — client gone, send failure, device cut
+    // off (`pairing::drop_device`), server shutting down — a key or mouse
+    // button this phone pressed and never released must not stay down on the
+    // real keyboard and mouse.
     if let Some(state) = &mut input_state {
         state.release_held();
     }
@@ -146,9 +150,13 @@ async fn pump_control(
     rx: &mut broadcast::Receiver<Shared>,
     caps: &Option<Vec<String>>,
     input_state: &mut Option<input::State>,
+    cutoff: Option<Cutoff>,
 ) {
+    let cut_off = until_cut_off(cutoff);
+    tokio::pin!(cut_off);
     loop {
         tokio::select! {
+            _ = &mut cut_off => return,
             frame = rx.recv() => {
                 if !forward_one(socket, frame, caps).await {
                     return;

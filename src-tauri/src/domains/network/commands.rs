@@ -12,7 +12,7 @@
 //! power to approve/revoke *other* devices or read the device list would
 //! defeat the point.
 
-use crate::daemon::pairing::{resolve_pending, PairResolution};
+use crate::daemon::pairing::{drop_device, resolve_pending, PairResolution};
 use crate::database::DatabaseManager;
 use crate::domains::network::services::pairing_service;
 use crate::domains::settings::services::settings_service::SettingsService;
@@ -153,23 +153,31 @@ pub async fn reject_device(
 }
 
 /// End a device's access — the only way to stop an `until_revoked` grant.
+/// Closes its open `/events` and `/control` sockets too (after the write, so a
+/// reconnect is already refused).
 #[portal_rpc_macro::rpc]
 pub async fn revoke_device(
     device_id: String,
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<(), String> {
     log_info!("device_auth", "Revoking device_id: {}", device_id);
-    pairing_service::revoke(db.get_connection(), &device_id).await
+    pairing_service::revoke(db.get_connection(), &device_id).await?;
+    drop_device(&device_id);
+    Ok(())
 }
 
-/// Change a device's granted capabilities without re-minting its token.
+/// Change a device's granted capabilities without re-minting its token. Its
+/// open sockets close so it reconnects under the new caps: they were fixed
+/// when each socket opened.
 #[portal_rpc_macro::rpc]
 pub async fn update_device_capabilities(
     device_id: String,
     capabilities: Vec<String>,
     db: tauri::State<'_, Arc<DatabaseManager>>,
 ) -> Result<(), String> {
-    pairing_service::update_capabilities(db.get_connection(), &device_id, &capabilities).await
+    pairing_service::update_capabilities(db.get_connection(), &device_id, &capabilities).await?;
+    drop_device(&device_id);
+    Ok(())
 }
 
 /// Every device the host has ever seen, most-recent row per device_id, for
