@@ -179,27 +179,22 @@ impl ExecutionRepository {
         Ok(result)
     }
 
+    /// One UPDATE, no reads: it runs per log line, under the executor's blob lock.
     pub async fn update_step_executions(
         &self,
         id: &str,
         step_executions_json: String,
-    ) -> Result<ExecutionModel, String> {
-        let connection = self.db_manager.get_connection();
-
-        let mut execution: ExecutionActiveModel = ExecutionEntity::find_by_id(id)
-            .one(connection)
-            .await
-            .map_err(|e| format!("Failed to find execution: {}", e))?
-            .ok_or_else(|| "Execution not found".to_string())?
-            .into();
-
-        execution.step_executions_json = Set(step_executions_json);
-
-        let result = execution
-            .update(connection)
+    ) -> Result<(), String> {
+        use crate::entities::pipeline_execution::Column;
+        ExecutionEntity::update_many()
+            .col_expr(
+                Column::StepExecutionsJson,
+                sea_orm::sea_query::Expr::value(step_executions_json),
+            )
+            .filter(Column::Id.eq(id))
+            .exec(self.db_manager.get_connection())
             .await
             .map_err(|e| format!("Failed to update step executions: {}", e))?;
-
-        Ok(result)
+        Ok(())
     }
 }

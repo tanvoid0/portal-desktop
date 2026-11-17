@@ -6,6 +6,7 @@ use crate::domains::projects::pipelines::services::pipeline_file;
 use crate::domains::projects::pipelines::utils::dependency_resolver::resolve_execution_order;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use crate::events::{EventSink, EventSinkExt};
+use crate::log_warn;
 use crate::process_ext::NoWindowExt;
 use crate::utils::pnpm_workspace::{prepare_shell_command, warn_if_broken_pnpm_workspace};
 use crate::utils::shell_template;
@@ -14,11 +15,20 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::watch;
+use tokio::task::JoinHandle;
 use uuid::Uuid;
+
+/// How long a finished step's log readers may go without reading a line before
+/// [`drain_log_readers`] stops waiting for them.
+const READER_IDLE_GRACE: Duration = Duration::from_secs(3);
+/// The most [`drain_log_readers`] waits in all, however busy the readers are.
+const READER_DRAIN_CAP: Duration = Duration::from_secs(30);
 
 /// A non-long-running step with no explicit `timeout` is killed after this many
 /// seconds, so a process that finishes its work but never exits (e.g.
@@ -120,6 +130,7 @@ impl ExecutionService {
         move_lock::ensure_unlocked(Path::new(&project.path))?;
 
         let steps: Vec<Value> = serde_json::from_str(&pipeline.steps_json).unwrap_or_default();
+        reject_steps_after_long_running(&steps)?;
 
         let mut variables: HashMap<String, String> = request.variables.unwrap_or_default();
         if let Ok(pipeline_vars) = serde_json::from_str::<Vec<Value>>(&pipeline.variables_json) {
@@ -507,35 +518,21 @@ impl ExecutionService {
             procs.push(child);
         }
 
-        let exec_id = execution_id.to_string();
-        let sid = step_id.to_string();
-        let repo = self.execution_repo.clone();
-        let events_clone = events.clone();
-
+        let lines_read = Arc::new(AtomicUsize::new(0));
+        let mut readers = Vec::new();
+        let reader = |stream| LogReader {
+            repo: self.execution_repo.clone(),
+            execution_id: execution_id.to_string(),
+            step_id: step_id.to_string(),
+            stream,
+            events: events.clone(),
+            lines_read: Arc::clone(&lines_read),
+        };
         if let Some(stdout) = stdout {
-            let exec_id = exec_id.clone();
-            let sid = sid.clone();
-            let repo = repo.clone();
-            let events_clone = events_clone.clone();
-            tokio::spawn(async move {
-                let mut reader = BufReader::new(stdout).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    append_step_log(&repo, &exec_id, &sid, &line, "stdout", &events_clone).await;
-                }
-            });
+            readers.push(reader("stdout").spawn(stdout));
         }
-
         if let Some(stderr) = stderr {
-            let exec_id = exec_id.clone();
-            let sid = sid.clone();
-            let repo = repo.clone();
-            let events_clone = events_clone.clone();
-            tokio::spawn(async move {
-                let mut reader = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    append_step_log(&repo, &exec_id, &sid, &line, "stderr", &events_clone).await;
-                }
-            });
+            readers.push(reader("stderr").spawn(stderr));
         }
 
         if long_running {
@@ -587,6 +584,13 @@ impl ExecutionService {
         {
             let mut procs = children.lock().unwrap();
             procs.pop();
+        }
+
+        drain_log_readers(readers, &lines_read, cancel_rx).await;
+        // A cancel that lands while the readers drain must not be overwritten
+        // by this step's "success".
+        if *cancel_rx.borrow() {
+            return Err("Execution cancelled".to_string());
         }
 
         let code = exit_status.code().unwrap_or(-1);
@@ -644,28 +648,13 @@ impl ExecutionService {
     where
         F: FnOnce(&mut StepExecutionState),
     {
-        let execution = self
-            .execution_repo
-            .get_by_id(execution_id)
-            .await?
-            .ok_or_else(|| "Execution not found".to_string())?;
-
-        let mut steps: Vec<StepExecutionState> =
-            serde_json::from_str(&execution.step_executions_json).unwrap_or_default();
-
-        for step in steps.iter_mut() {
-            if step.stepId == step_id {
+        modify_steps(&self.execution_repo, execution_id, |steps| {
+            if let Some(step) = steps.iter_mut().find(|s| s.stepId == step_id) {
                 update(step);
-                break;
             }
-        }
-
-        let json = serde_json::to_string(&steps)
-            .map_err(|e| format!("Failed to serialize step executions: {}", e))?;
-        self.execution_repo
-            .update_step_executions(execution_id, json)
-            .await?;
-        Ok(())
+            true
+        })
+        .await
     }
 
     async fn mark_cancelled(&self, execution_id: &str, events: &Arc<dyn EventSink>) {
@@ -949,44 +938,29 @@ impl ExecutionService {
     }
 
     async fn finalize_running_steps(&self, execution_id: &str, status: &str) -> Result<(), String> {
-        let execution = self
-            .execution_repo
-            .get_by_id(execution_id)
-            .await?
-            .ok_or_else(|| "Execution not found".to_string())?;
-
-        let mut steps: Vec<StepExecutionState> =
-            serde_json::from_str(&execution.step_executions_json).unwrap_or_default();
-
-        let mut changed = false;
-        for step in steps.iter_mut() {
-            if step.status == "running" {
-                step.status = status.to_string();
-                if step.startedAt.is_empty() {
-                    step.startedAt = Utc::now().to_rfc3339();
-                }
-                step.finishedAt = Some(Utc::now().to_rfc3339());
-                if let (Ok(started), Some(finished)) = (
-                    chrono::DateTime::parse_from_rfc3339(&step.startedAt),
-                    step.finishedAt.as_ref(),
-                ) {
-                    if let Ok(finished_dt) = chrono::DateTime::parse_from_rfc3339(finished) {
-                        step.duration = Some((finished_dt - started).num_milliseconds());
+        modify_steps(&self.execution_repo, execution_id, |steps| {
+            let mut changed = false;
+            for step in steps.iter_mut() {
+                if step.status == "running" {
+                    step.status = status.to_string();
+                    if step.startedAt.is_empty() {
+                        step.startedAt = Utc::now().to_rfc3339();
                     }
+                    step.finishedAt = Some(Utc::now().to_rfc3339());
+                    if let (Ok(started), Some(finished)) = (
+                        chrono::DateTime::parse_from_rfc3339(&step.startedAt),
+                        step.finishedAt.as_ref(),
+                    ) {
+                        if let Ok(finished_dt) = chrono::DateTime::parse_from_rfc3339(finished) {
+                            step.duration = Some((finished_dt - started).num_milliseconds());
+                        }
+                    }
+                    changed = true;
                 }
-                changed = true;
             }
-        }
-
-        if changed {
-            let json = serde_json::to_string(&steps)
-                .map_err(|e| format!("Failed to serialize step executions: {}", e))?;
-            self.execution_repo
-                .update_step_executions(execution_id, json)
-                .await?;
-        }
-
-        Ok(())
+            changed
+        })
+        .await
     }
 
     pub async fn get_executions_by_pipeline(
@@ -1041,29 +1015,159 @@ async fn append_step_log(
 ) {
     ExecutionService::emit_step_log(events, execution_id, step_id, line, stream);
 
-    if let Ok(Some(execution)) = repo.get_by_id(execution_id).await {
-        let mut steps: Vec<StepExecutionState> =
-            serde_json::from_str(&execution.step_executions_json).unwrap_or_default();
+    let formatted = if stream == "stderr" {
+        format!("[stderr] {}", line)
+    } else {
+        line.to_string()
+    };
+    let _ = modify_steps(repo, execution_id, |steps| {
+        if let Some(step) = steps.iter_mut().find(|s| s.stepId == step_id) {
+            step.logs.push(formatted.clone());
+            step.output.push_str(&formatted);
+            step.output.push('\n');
+        }
+        true
+    })
+    .await;
+}
 
-        let formatted = if stream == "stderr" {
-            format!("[stderr] {}", line)
-        } else {
-            line.to_string()
-        };
+/// Copies one of a step's output pipes into its log, line by line.
+struct LogReader {
+    repo: ExecutionRepository,
+    execution_id: String,
+    step_id: String,
+    stream: &'static str,
+    events: Arc<dyn EventSink>,
+    /// Shared by the step's readers; [`drain_log_readers`] watches it.
+    lines_read: Arc<AtomicUsize>,
+}
 
-        for step in steps.iter_mut() {
-            if step.stepId == step_id {
-                step.logs.push(formatted.clone());
-                step.output.push_str(&formatted);
-                step.output.push('\n');
-                break;
+impl LogReader {
+    fn spawn<R: AsyncRead + Unpin + Send + 'static>(self, pipe: R) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            // Bytes, not `lines()`: one non-UTF-8 byte (a tool writing in the
+            // console code page) would end `lines()`, and with nobody reading
+            // the pipe the child blocks on its next write once the pipe fills.
+            let mut pipe = BufReader::new(pipe);
+            let mut buf = Vec::new();
+            while pipe.read_until(b'\n', &mut buf).await.is_ok_and(|n| n > 0) {
+                self.lines_read.fetch_add(1, Ordering::Relaxed);
+                let line = String::from_utf8_lossy(&buf);
+                append_step_log(
+                    &self.repo,
+                    &self.execution_id,
+                    &self.step_id,
+                    line.trim_end_matches(['\n', '\r']),
+                    self.stream,
+                    &self.events,
+                )
+                .await;
+                buf.clear();
+            }
+        })
+    }
+}
+
+/// Wait for a finished step's readers to reach EOF, so its log is complete
+/// before the step is finalized. A grandchild that outlives the step can keep
+/// the pipe open indefinitely (a daemonized helper, or a tool like MSVC's
+/// vctip.exe that link.exe leaves behind), so the readers are abandoned once
+/// they go [`READER_IDLE_GRACE`] without reading a line, after
+/// [`READER_DRAIN_CAP`] in all (a grandchild that keeps writing), or on cancel.
+async fn drain_log_readers(
+    readers: Vec<JoinHandle<()>>,
+    lines_read: &AtomicUsize,
+    cancel_rx: &mut watch::Receiver<bool>,
+) {
+    let aborts: Vec<_> = readers.iter().map(|r| r.abort_handle()).collect();
+    let all = async {
+        for r in readers {
+            let _ = r.await;
+        }
+    };
+    tokio::pin!(all);
+    let cap = tokio::time::sleep(READER_DRAIN_CAP);
+    tokio::pin!(cap);
+    let mut seen = lines_read.load(Ordering::Relaxed);
+    loop {
+        tokio::select! {
+            _ = &mut all => return,
+            _ = &mut cap => break,
+            changed = cancel_rx.changed() => {
+                if changed.is_err() || *cancel_rx.borrow() {
+                    break;
+                }
+            }
+            _ = tokio::time::sleep(READER_IDLE_GRACE) => {
+                let now = lines_read.load(Ordering::Relaxed);
+                if now == seen {
+                    break;
+                }
+                seen = now;
             }
         }
+    }
+    log_warn!(
+        "ExecutionService",
+        "Step exited but its output pipe is still open; abandoning its log readers"
+    );
+    for a in aborts {
+        a.abort();
+    }
+}
 
-        if let Ok(json) = serde_json::to_string(&steps) {
-            let _ = repo.update_step_executions(execution_id, json).await;
+/// Refuse a run in which any step comes after a `longRunning` one. A
+/// long-running step (a dev server) never finishes: the run parks on it until
+/// cancelled, so nothing ordered after it would ever start.
+fn reject_steps_after_long_running(steps: &[Value]) -> Result<(), String> {
+    let order = resolve_execution_order(steps)?.concat();
+    let is_long_running = |id: &String| {
+        steps.iter().any(|s| {
+            s["id"].as_str() == Some(id.as_str())
+                && s["config"]["longRunning"].as_bool() == Some(true)
+        })
+    };
+    if let Some(at) = order.iter().position(is_long_running) {
+        if let Some(next) = order.get(at + 1) {
+            let server = &order[at];
+            return Err(format!(
+                "Step '{next}' comes after '{server}', which is longRunning: it never \
+                 finishes, so '{next}' could never start. longRunning is for servers; \
+                 drop it from '{server}' or make '{server}' the last step."
+            ));
         }
     }
+    Ok(())
+}
+
+/// Held across every read-modify-write of `pipeline_executions.step_executions_json`.
+/// The run loop and a step's stdout/stderr readers all rewrite the whole blob;
+/// unserialized, a reader's stale write undid `finalize_step` (a finished step
+/// stuck at "running") and `set_step_running` (the next one shown "pending").
+/// ponytail: one lock for every execution's blob; key it by execution id if
+/// concurrent runs ever contend on it.
+static STEPS_BLOB: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Load the execution's step states, let `f` change them, and write them back
+/// when `f` returns true — all under [`STEPS_BLOB`].
+async fn modify_steps(
+    repo: &ExecutionRepository,
+    execution_id: &str,
+    f: impl FnOnce(&mut Vec<StepExecutionState>) -> bool,
+) -> Result<(), String> {
+    let _guard = STEPS_BLOB.lock().await;
+    let execution = repo
+        .get_by_id(execution_id)
+        .await?
+        .ok_or_else(|| "Execution not found".to_string())?;
+    let mut steps: Vec<StepExecutionState> =
+        serde_json::from_str(&execution.step_executions_json).unwrap_or_default();
+    if f(&mut steps) {
+        let json = serde_json::to_string(&steps)
+            .map_err(|e| format!("Failed to serialize step executions: {}", e))?;
+        repo.update_step_executions(execution_id, json).await?;
+    }
+    Ok(())
 }
 
 fn build_initial_step_executions(steps: &[Value]) -> Vec<StepExecutionState> {
@@ -1292,5 +1396,153 @@ mod tests {
             resolve_step_timeout(&json!({ "timeout": 0 })),
             DEFAULT_STEP_TIMEOUT_SECS
         );
+    }
+
+    #[derive(Debug)]
+    struct Quiet;
+    impl EventSink for Quiet {
+        fn emit_json(&self, _: &str, _: Value) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn refuses_steps_after_a_long_running_one() {
+        let server = json!({ "id": "build", "dependsOn": [], "config": { "longRunning": true } });
+        let needs = json!({ "id": "publish", "dependsOn": ["build"] });
+        let err = reject_steps_after_long_running(&[server.clone(), needs]).unwrap_err();
+        assert!(err.contains("'publish' comes after 'build'"), "{err}");
+        // Ordered after it without needing it: still never starts.
+        let after = json!({ "id": "e2e", "dependsOn": [] });
+        assert!(reject_steps_after_long_running(&[server.clone(), after.clone()]).is_err());
+        // Last in the order is fine.
+        assert!(reject_steps_after_long_running(&[after, server]).is_ok());
+    }
+
+    /// A pipe whose write end outlives the step (a grandchild holding it) must
+    /// not hold the run: the drain gives up once the reader goes idle.
+    #[tokio::test]
+    async fn drain_abandons_a_pipe_that_never_closes() {
+        let (svc, _dir) = service_with_execution().await;
+        let (mut held_open, pipe) = tokio::io::duplex(64);
+        tokio::io::AsyncWriteExt::write_all(&mut held_open, b"one\ntwo\n")
+            .await
+            .unwrap();
+        let lines_read = Arc::new(AtomicUsize::new(0));
+        let reader = LogReader {
+            repo: svc.execution_repo.clone(),
+            execution_id: "e".into(),
+            step_id: "a".into(),
+            stream: "stdout",
+            events: Arc::new(Quiet),
+            lines_read: Arc::clone(&lines_read),
+        }
+        .spawn(pipe);
+        let (_cancel_tx, mut cancel_rx) = watch::channel(false);
+        let drained = tokio::time::timeout(
+            READER_IDLE_GRACE * 3,
+            drain_log_readers(vec![reader], &lines_read, &mut cancel_rx),
+        )
+        .await;
+        assert!(drained.is_ok(), "drain waited on a pipe that never closes");
+        assert_eq!(svc.get_step_logs("e", "a").await.unwrap(), ["one", "two"]);
+    }
+
+    /// A service over a scratch database holding execution "e" with pending
+    /// steps "a" and "b".
+    async fn service_with_execution() -> (ExecutionService, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(
+            DatabaseManager::new(dir.path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let svc = ExecutionService::new(db);
+        let project = svc
+            .project_repo
+            .create(
+                "p".into(),
+                None,
+                dir.path().display().to_string(),
+                vec![],
+                vec![],
+                vec![],
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        let pipeline = svc
+            .pipeline_repo
+            .create(
+                "p".into(),
+                None,
+                project.id,
+                "[]".into(),
+                "[]".into(),
+                "[]".into(),
+                "{}".into(),
+                true,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        let steps = build_initial_step_executions(&[json!({ "id": "a" }), json!({ "id": "b" })]);
+        svc.execution_repo
+            .create(
+                "e".into(),
+                pipeline.id,
+                project.id,
+                "running".into(),
+                "user".into(),
+                serde_json::to_string(&steps).unwrap(),
+                "{}".into(),
+            )
+            .await
+            .unwrap();
+        (svc, dir)
+    }
+
+    /// Two log readers append while the run loop finalizes step `a` and starts
+    /// `b` — the shape of a step whose output is still draining when it exits.
+    /// Every line and both status writes must survive.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_log_appends_and_finalize_lose_nothing() {
+        let (svc, _dir) = service_with_execution().await;
+        svc.set_step_running("e", "a").await.unwrap();
+
+        const LINES: usize = 60;
+        let events: Arc<dyn EventSink> = Arc::new(Quiet);
+        let readers: Vec<_> = ["stdout", "stderr"]
+            .into_iter()
+            .map(|stream| {
+                let (repo, events) = (svc.execution_repo.clone(), events.clone());
+                tokio::spawn(async move {
+                    for i in 0..LINES {
+                        append_step_log(&repo, "e", "a", &format!("{i}"), stream, &events).await;
+                    }
+                })
+            })
+            .collect();
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        svc.finalize_step("e", "a", "success", Some(0), None)
+            .await
+            .unwrap();
+        svc.set_step_running("e", "b").await.unwrap();
+        for r in readers {
+            r.await.unwrap();
+        }
+
+        let exec = svc.execution_repo.get_by_id("e").await.unwrap().unwrap();
+        let steps: Vec<StepExecutionState> =
+            serde_json::from_str(&exec.step_executions_json).unwrap();
+        assert_eq!(steps[0].status, "success");
+        assert_eq!(steps[1].status, "running");
+        assert_eq!(steps[0].logs.len(), 2 * LINES);
     }
 }
