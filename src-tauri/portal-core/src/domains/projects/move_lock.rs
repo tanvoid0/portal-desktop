@@ -82,6 +82,23 @@ pub fn lock(paths: &[PathBuf]) {
     roots.extend(paths.iter().cloned());
 }
 
+/// Like [`lock`], but refuses (returning the colliding root) when any of
+/// `paths` is nested in, contains, or equals an already-locked root. The check
+/// and the insert share one write lock, so two moves of overlapping trees can't
+/// both pass — unlike the journal-row check, which only sees a move seconds
+/// after it starts (board #413). Paths within `paths` may overlap each other.
+pub fn try_lock(paths: &[PathBuf]) -> Result<(), PathBuf> {
+    let mut roots = LOCKED_ROOTS.write().unwrap();
+    for p in paths {
+        let p_s = p.to_string_lossy();
+        if let Some(hit) = roots.iter().find(|r| is_under(&r.to_string_lossy(), &p_s)) {
+            return Err(hit.clone());
+        }
+    }
+    roots.extend(paths.iter().cloned());
+    Ok(())
+}
+
 pub fn unlock(paths: &[PathBuf]) {
     let targets: Vec<String> = paths.iter().map(|p| norm(&p.to_string_lossy())).collect();
     LOCKED_ROOTS
@@ -168,6 +185,22 @@ mod tests {
         lock(&[PathBuf::from(r"D:\mvlock3\foo")]);
         assert!(!is_locked(Path::new(r"D:\mvlock3\foobar")));
         unlock(&[PathBuf::from(r"D:\mvlock3\foo")]);
+    }
+
+    #[test]
+    fn try_lock_refuses_nested_and_ancestor_and_equal() {
+        let base = if cfg!(windows) { r"D:\mvlock6" } else { "/mvlock6" };
+        let app = PathBuf::from(base).join("app");
+        let pkg = app.join("pkg");
+        let other = PathBuf::from(base).join("other");
+        assert!(try_lock(std::slice::from_ref(&app)).is_ok());
+        assert!(try_lock(std::slice::from_ref(&pkg)).is_err()); // nested
+        assert!(try_lock(std::slice::from_ref(&app)).is_err()); // equal
+        assert!(try_lock(std::slice::from_ref(&other)).is_ok()); // disjoint
+        unlock(&[app.clone(), other]);
+        assert!(try_lock(std::slice::from_ref(&pkg)).is_ok());
+        assert!(try_lock(std::slice::from_ref(&app)).is_err()); // ancestor
+        unlock(&[pkg]);
     }
 
     #[test]

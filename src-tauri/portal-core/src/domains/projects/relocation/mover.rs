@@ -252,7 +252,20 @@ impl Mover<'_> {
     ) -> Result<project_move::Model, MoveError> {
         let source = PathBuf::from(&project.path);
         let dest = dest.to_path_buf();
-        let _guard = LockGuard::new(vec![source.clone(), dest.clone()]);
+        // #413: claim the tree atomically — refuses if any in-flight move (live
+        // or boot-rearmed) overlaps, before the journal row exists.
+        let _guard = LockGuard::try_new(vec![source.clone(), dest.clone()]).map_err(|hit| {
+            MoveError::Blocked(UsageReport {
+                blockers: vec![usage::Signal {
+                    kind: "move_in_progress".into(),
+                    detail: format!(
+                        "A move is already in progress for an overlapping path ({})",
+                        hit.display()
+                    ),
+                }],
+                warnings: vec![],
+            })
+        })?;
 
         let report = self
             .usage(
@@ -762,6 +775,13 @@ impl LockGuard {
         // without a guard, so a merely-interrupted move never counts as active.
         move_lock::begin_active();
         Self { paths }
+    }
+
+    /// [`LockGuard::new`] that refuses an overlapping lock (see `move_lock::try_lock`).
+    fn try_new(paths: Vec<PathBuf>) -> Result<Self, PathBuf> {
+        move_lock::try_lock(&paths)?;
+        move_lock::begin_active();
+        Ok(Self { paths })
     }
 }
 
