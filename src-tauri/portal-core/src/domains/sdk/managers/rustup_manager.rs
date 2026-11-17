@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 
 /// Rustup Manager implementation
+#[derive(Default)]
 pub struct RustupManager {
     // Add any Rustup-specific configuration here
 }
@@ -28,11 +29,38 @@ impl RustupManager {
         if result.success {
             Ok(result.stdout)
         } else {
-            Err(SDKError::ManagerNotFound(format!(
-                "Command failed: {}",
-                result.stderr
+            Err(SDKError::CommandFailed(format!(
+                "{} {} failed: {}",
+                command,
+                args.join(" "),
+                result.stderr.trim()
             )))
         }
+    }
+}
+
+/// Toolchain names from `rustup toolchain list` / `rustup show active-toolchain`:
+/// `stable-x86_64-pc-windows-msvc (active, default)` → `stable-x86_64-pc-windows-msvc`.
+/// "no installed toolchains" yields nothing.
+fn parse_toolchains(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter_map(|line| line.split_whitespace().next())
+        // "no installed toolchains", "info:"/"warning:" lines
+        .filter(|word| *word != "no" && !word.ends_with(':'))
+        .map(str::to_string)
+        .collect()
+}
+
+const CHANNELS: [&str; 3] = ["stable", "beta", "nightly"];
+
+/// Whether an installed toolchain is the plain `channel` (`stable` or
+/// `stable-<host>`), as opposed to a dated one like `nightly-2024-01-01-<host>`.
+fn is_channel(toolchain: &str, channel: &str) -> bool {
+    match toolchain.strip_prefix(channel) {
+        Some("") => true,
+        Some(rest) => rest.starts_with('-') && !rest[1..].starts_with(|c: char| c.is_ascii_digit()),
+        None => false,
     }
 }
 
@@ -68,24 +96,18 @@ impl SDKManager for RustupManager {
 
     // === Version Management ===
     async fn list_versions(&self) -> Result<Vec<String>, SDKError> {
-        let output = self.execute_command("rustup", &["show"]).await?;
-        let versions: Vec<String> = output
-            .lines()
-            .filter_map(|line| {
-                if line.contains("rust-") {
-                    Some(line.trim().to_string())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        Ok(versions)
+        let output = self
+            .execute_command("rustup", &["toolchain", "list"])
+            .await?;
+        Ok(parse_toolchains(&output))
     }
 
+    /// The active toolchain's name, so it matches an entry of `list_versions`.
     async fn get_current_version(&self) -> Result<Option<String>, SDKError> {
-        let output = self.execute_command("rustc", &["--version"]).await?;
-        let version = output.trim().replace("rustc ", "");
-        Ok(Some(version))
+        let output = self
+            .execute_command("rustup", &["show", "active-toolchain"])
+            .await?;
+        Ok(parse_toolchains(&output).into_iter().next())
     }
 
     async fn switch_version(&self, version: &str) -> Result<(), SDKError> {
@@ -108,8 +130,10 @@ impl SDKManager for RustupManager {
     }
 
     async fn is_version_installed(&self, version: &str) -> Result<bool, SDKError> {
-        let output = self.execute_command("rustup", &["show"]).await?;
-        Ok(output.contains(version))
+        let installed = self.list_versions().await?;
+        Ok(installed
+            .iter()
+            .any(|t| t == version || is_channel(t, version)))
     }
 
     // === Installation (Optional) ===
@@ -125,21 +149,15 @@ impl SDKManager for RustupManager {
         Ok(())
     }
 
+    /// rustup can install any channel, dated nightly or version, but has no "list
+    /// remote" command, so offer the three channels not already installed.
     async fn list_available_versions(&self) -> Result<Vec<String>, SDKError> {
-        let output = self
-            .execute_command("rustup", &["update", "--list"])
-            .await?;
-        let versions: Vec<String> = output
-            .lines()
-            .filter_map(|line| {
-                if line.contains("rust-") {
-                    Some(line.trim().to_string())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        Ok(versions)
+        let installed = self.list_versions().await?;
+        Ok(CHANNELS
+            .iter()
+            .filter(|ch| !installed.iter().any(|t| is_channel(t, ch)))
+            .map(|ch| ch.to_string())
+            .collect())
     }
 
     fn supports_installation(&self) -> bool {
@@ -239,3 +257,27 @@ impl SDKManagerDefaults for RustupManager {}
 
 #[async_trait]
 impl SDKManagerHelpers for RustupManager {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_toolchains_and_channels() {
+        let list = "stable-x86_64-pc-windows-msvc (active, default)\nnightly-2024-01-01-x86_64-pc-windows-msvc\n";
+        let toolchains = parse_toolchains(list);
+        assert_eq!(
+            toolchains,
+            [
+                "stable-x86_64-pc-windows-msvc",
+                "nightly-2024-01-01-x86_64-pc-windows-msvc"
+            ]
+        );
+        assert!(parse_toolchains("no installed toolchains\n").is_empty());
+
+        assert!(is_channel(&toolchains[0], "stable"));
+        assert!(is_channel("beta", "beta"));
+        assert!(!is_channel(&toolchains[1], "nightly"));
+        assert!(!is_channel("stable-x86_64-pc-windows-msvc", "beta"));
+    }
+}

@@ -6,7 +6,6 @@ use crate::command_executor::CommandExecutor;
  */
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 pub struct SdkmanManager;
 
@@ -39,134 +38,20 @@ impl SdkmanManager {
             )))
         }
     }
+}
 
-    fn sdkman_sdk_name(&self) -> &str {
-        // SDKMAN can manage multiple "candidates" (java, kotlin, ...),
-        // but in this app we model SDKMAN as the manager for Java only.
-        self.sdk_type()
-    }
-
-    fn parse_versions_from_sdk_list_output(
-        &self,
-        sdk_list_output: &str,
-        only_installed: bool,
-    ) -> Vec<String> {
-        fn strip_ansi(input: &str) -> String {
-            // Remove common ANSI escape sequences used for terminal coloring.
-            // Example: "\x1b[32m" ... "\x1b[0m"
-            let mut out = String::with_capacity(input.len());
-            let bytes = input.as_bytes();
-            let mut i = 0;
-            while i < bytes.len() {
-                if bytes[i] == 0x1B {
-                    // ESC sequence
-                    i += 1;
-                    while i < bytes.len() {
-                        // CSI sequences end with a letter
-                        if (bytes[i] as char).is_ascii_alphabetic() || bytes[i] == b'@' {
-                            i += 1;
-                            break;
-                        }
-                        i += 1;
-                    }
-                } else {
-                    out.push(bytes[i] as char);
-                    i += 1;
-                }
-            }
-            out
-        }
-
-        let sdk_list_output = strip_ansi(sdk_list_output).replace("\r\n", "\n");
-        let mut versions: HashSet<String> = HashSet::new();
-
-        for raw_line in sdk_list_output.lines() {
-            let line = raw_line.trim();
-
-            // SDKMAN uses `|`-separated tables for versions.
-            if !line.contains('|') {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split('|').collect();
-            // Expected columns:
-            // Vendor | Use | Version | Dist | Status | Identifier
-            if parts.len() < 6 {
-                continue;
-            }
-
-            let version = parts[2].trim();
-            if version.is_empty() {
-                continue;
-            }
-
-            // Skip header rows.
-            if version.eq_ignore_ascii_case("version") || version.eq_ignore_ascii_case("identifier")
-            {
-                continue;
-            }
-
-            let status = parts[4].trim().to_lowercase();
-            let is_installed = status.contains("installed") || status.contains("local only");
-
-            if only_installed && !is_installed {
-                continue;
-            }
-            versions.insert(version.to_string());
-        }
-
-        let mut out: Vec<String> = versions.into_iter().collect();
-        out.sort(); // stable-ish fallback ordering
-        out
-    }
-
-    fn parse_current_version(&self, sdk_current_output: &str) -> Option<String> {
-        // Common forms we might see:
-        // - "Using: java 21.0.3-tem"
-        // - "Using java version 21.0.3-tem"
-        // - "SDKMAN 5.x ..."
-        //
-        // We'll take the first "word token" after the word "version" or the first
-        // token that looks like a version (contains digits + a dot).
-        for raw_line in sdk_current_output.lines() {
-            let line = raw_line.trim();
-            if line.is_empty() {
-                continue;
-            }
-
-            let lower = line.to_lowercase();
-            if lower.contains("version") {
-                if let Some(idx) = lower.find("version") {
-                    let after = line[idx + "version".len()..].trim();
-                    if let Some(token) = after.split_whitespace().next() {
-                        let token = token.trim().trim_matches('"').trim_matches('\'');
-                        if token.contains('.') && token.chars().any(|c| c.is_ascii_digit()) {
-                            return Some(token.to_string());
-                        }
-                    }
-                }
-            }
-
-            // Fallback heuristic: first token that looks like a version.
-            if lower.contains(self.sdkman_sdk_name()) && lower.contains("using") {
-                for token in line.split_whitespace() {
-                    let token_lower = token.to_lowercase();
-                    if token_lower.contains('.') && token_lower.chars().any(|c| c.is_ascii_digit())
-                    {
-                        return Some(token.to_string());
-                    }
-                }
-            }
-        }
-
-        None
-    }
+/// Version management is not wired up for SDKMAN yet (its `sdk list` output is a
+/// paged, per-candidate table). Fail loudly instead of reporting a no-op as success.
+fn not_supported() -> SDKError {
+    SDKError::CommandFailed(
+        "SDKMAN version management is not supported yet; use `sdk` in a terminal".to_string(),
+    )
 }
 
 #[async_trait]
 impl SDKManager for SdkmanManager {
     fn name(&self) -> &'static str {
-        "sdk"
+        "sdkman"
     }
     fn display_name(&self) -> &'static str {
         "SDKMAN"
@@ -201,36 +86,26 @@ impl SDKManager for SdkmanManager {
         // TEMPORARY DISABLED (see list_versions).
         Ok(None)
     }
-    async fn switch_version(&self, version: &str) -> Result<(), SDKError> {
-        // TEMPORARY DISABLED (see list_versions).
-        let _ = version;
-        Ok(())
+    async fn switch_version(&self, _version: &str) -> Result<(), SDKError> {
+        Err(not_supported())
     }
     async fn switch_version_for_project(
         &self,
-        version: &str,
+        _version: &str,
         _project_path: &str,
     ) -> Result<(), SDKError> {
-        // TEMPORARY DISABLED (see list_versions).
-        let _ = version;
-        Ok(())
+        Err(not_supported())
     }
-    async fn is_version_installed(&self, version: &str) -> Result<bool, SDKError> {
-        // TEMPORARY DISABLED (see list_versions).
-        let _ = version;
+    async fn is_version_installed(&self, _version: &str) -> Result<bool, SDKError> {
         Ok(false)
     }
 
     // === Installation (Optional) ===
-    async fn install_version(&self, version: &str) -> Result<(), SDKError> {
-        // TEMPORARY DISABLED (see list_versions).
-        let _ = version;
-        Ok(())
+    async fn install_version(&self, _version: &str) -> Result<(), SDKError> {
+        Err(not_supported())
     }
-    async fn uninstall_version(&self, version: &str) -> Result<(), SDKError> {
-        // TEMPORARY DISABLED (see list_versions).
-        let _ = version;
-        Ok(())
+    async fn uninstall_version(&self, _version: &str) -> Result<(), SDKError> {
+        Err(not_supported())
     }
     async fn list_available_versions(&self) -> Result<Vec<String>, SDKError> {
         // TEMPORARY DISABLED (see list_versions).
@@ -302,7 +177,7 @@ mod tests {
     #[tokio::test]
     async fn test_sdkman_manager_creation() {
         let manager = SdkmanManager::new();
-        assert_eq!(manager.name(), "sdk");
+        assert_eq!(manager.name(), "sdkman");
         assert_eq!(manager.display_name(), "SDKMAN");
         assert_eq!(manager.sdk_type(), "java");
         assert_eq!(manager.category(), "language");

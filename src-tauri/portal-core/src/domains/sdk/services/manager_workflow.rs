@@ -12,7 +12,6 @@
  */
 use crate::command_executor::{CommandExecutor, CommandOptions, ShellType};
 use crate::domains::sdk::configs::{get_all_sdk_configs, SDKManagerConfig};
-use crate::domains::sdk::factory::SDKManagerFactory;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]

@@ -326,15 +326,12 @@ impl SDKConfigService {
         use std::process::Command;
 
         // Map of known manager binaries to their factory names
-        // Note: SDKMAN uses 'sdk' as the binary name, but the factory uses 'sdk' as the manager name
-        let manager_map: std::collections::HashMap<&str, &str> = [
-            ("nvm", "nvm"),
-            ("sdk", "sdk"),    // SDKMAN uses 'sdk' command, factory name is also 'sdk'
-            ("sdkman", "sdk"), // Also check for 'sdkman' as alias
-        ]
-        .iter()
-        .cloned()
-        .collect();
+        // SDKMAN's binary is `sdk`; its manager id (factory + language config) is `sdkman`
+        let manager_map: std::collections::HashMap<&str, &str> =
+            [("nvm", "nvm"), ("sdk", "sdkman"), ("sdkman", "sdkman")]
+                .iter()
+                .cloned()
+                .collect();
 
         // Check if this is a known manager that needs special handling
         if let Some(manager_name) = manager_map.get(binary) {

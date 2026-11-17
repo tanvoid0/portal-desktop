@@ -1,6 +1,4 @@
-use crate::domains::sdk::managers::{
-    NvmManager, RustupManager, SdkmanManager,
-};
+use crate::domains::sdk::managers::{NvmManager, RustupManager, SdkmanManager};
 use crate::domains::sdk::traits::sdk_manager::SDKManager;
 use crate::domains::sdk::SDKError;
 /**
@@ -26,7 +24,7 @@ impl SDKManagerFactory {
         // Register all available managers
         factory.register_manager("nvm", Box::new(NvmManager::new()));
         factory.register_manager("rustup", Box::new(RustupManager::new()));
-        factory.register_manager("sdk", Box::new(SdkmanManager::new()));
+        factory.register_manager("sdkman", Box::new(SdkmanManager::new()));
 
         factory
     }
@@ -228,7 +226,7 @@ mod tests {
 
                 // Check if SDKMAN is in the results
                 let sdkman_found = managers.iter().any(|m| {
-                    m.get("name") == Some(&"sdk".to_string())
+                    m.get("name") == Some(&"sdkman".to_string())
                         || m.get("display_name") == Some(&"SDKMAN".to_string())
                 });
 
@@ -250,7 +248,7 @@ mod tests {
         let factory = SDKManagerFactory::new();
 
         // Test SDKMAN manager specifically
-        if let Some(sdkman_manager) = factory.get_manager("sdk") {
+        if let Some(sdkman_manager) = factory.get_manager("sdkman") {
             println!("✅ SDKMAN manager found in factory");
 
             let is_installed = sdkman_manager.is_installed().await;
