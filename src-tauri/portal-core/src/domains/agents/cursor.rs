@@ -1,7 +1,7 @@
 //! `AgentBackend` for Cursor's `cursor-agent` CLI in print mode:
 //! `cursor-agent -p --output-format stream-json --stream-partial-output
-//! [--resume <chatId>] [--model m] [--force] -- <prompt>`, **one process per
-//! turn**. A follow-up prompt is a new process resumed by chat id; the run
+//! [--resume <chatId>] [--model m] [--force]` with the prompt piped on stdin,
+//! **one process per turn**. A follow-up prompt is a new process resumed by chat id; the run
 //! (and its `Exited`) lives until `kill`.
 //!
 //! Flags and event shapes are taken from Cursor's official docs, read
@@ -12,6 +12,11 @@
 //! **Never run against a live `cursor-agent`** — not installed here; the tests
 //! replay a transcript hand-built from those docs.
 //!
+//! Unverified: the prompt goes on stdin, not argv (a newline in an argv entry
+//! breaks `.cmd` shims on Windows, and `--` may not stop commander dispatching
+//! a prompt like `logout` as a subcommand). The headless/parameters docs do not
+//! mention stdin; that `-p` reads the prompt from piped stdin is the reviewer's
+//! report of the CLI's behaviour, not something these docs confirm.
 //! Unverified: the docs name the binary `agent`; `cursor-agent` is the
 //! historical installer name and is what we look for. The tool-result shape on
 //! failure, `function`-style tool calls and the `--list-models` output are not
@@ -31,7 +36,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Child;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -56,7 +61,7 @@ impl AgentBackend for CursorBackend {
     }
 
     async fn detect(&self) -> bool {
-        which::which(BIN).is_ok()
+        find_bin().is_ok()
     }
 
     async fn list_models(&self) -> Vec<BackendModel> {
@@ -70,9 +75,8 @@ impl AgentBackend for CursorBackend {
         params: StartParams,
         events_tx: UnboundedSender<AgentEvent>,
     ) -> Result<Box<dyn RunControl>, String> {
-        // Resolved path, not `cmd /C`: the prompt is an argv entry and Rust
-        // escapes it safely for .cmd shims, cmd.exe would not.
-        let bin = which::which(BIN).map_err(|_| {
+        // Resolved path, not `cmd /C`. The prompt is piped on stdin, never argv.
+        let bin = find_bin().map_err(|_| {
             "`cursor-agent` CLI not found on PATH. Install Cursor CLI (https://cursor.com/cli)."
                 .to_string()
         })?;
@@ -102,6 +106,12 @@ impl AgentBackend for CursorBackend {
     }
 }
 
+/// `cursor-agent` first; the docs' name `agent` is only a fallback (it is too
+/// generic to prefer).
+fn find_bin() -> which::Result<PathBuf> {
+    which::which(BIN).or_else(|_| which::which("agent"))
+}
+
 struct CursorRun {
     bin: PathBuf,
     cwd: String,
@@ -117,12 +127,7 @@ struct CursorRun {
     events_tx: UnboundedSender<AgentEvent>,
 }
 
-fn build_args(
-    force: bool,
-    model: Option<&str>,
-    chat_id: Option<&str>,
-    prompt: &str,
-) -> Vec<String> {
+fn build_args(force: bool, model: Option<&str>, chat_id: Option<&str>) -> Vec<String> {
     let mut a: Vec<String> = [
         "-p",
         "--output-format",
@@ -140,8 +145,6 @@ fn build_args(
     if let Some(id) = chat_id {
         a.extend(["--resume".into(), id.into()]);
     }
-    // `--` so a prompt starting with `-` is not read as a flag.
-    a.extend(["--".into(), prompt.into()]);
     a
 }
 
@@ -149,6 +152,9 @@ impl CursorRun {
     /// Starts one turn's process. Never blocks: spawn is immediate and a task
     /// owns the output (callers hold the service's `runs` lock).
     fn spawn_turn(self: &Arc<Self>, prompt: String) -> Result<(), String> {
+        if self.killed.load(Ordering::SeqCst) {
+            return Err("run ended".into());
+        }
         if self.busy.swap(true, Ordering::SeqCst) {
             return Err("a Cursor turn is still running; wait for it or interrupt".into());
         }
@@ -162,13 +168,12 @@ impl CursorRun {
             self.force,
             self.model.as_deref(),
             self.chat_id.lock().unwrap().as_deref(),
-            &prompt,
         );
         let mut cmd = tokio::process::Command::new(&self.bin);
         cmd.no_window()
             .args(args)
             .current_dir(&self.cwd)
-            .stdin(Stdio::null())
+            .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
@@ -183,17 +188,26 @@ impl CursorRun {
             .stderr
             .take()
             .ok_or("cursor-agent produced no stderr")?;
+        let mut stdin = child.stdin.take().ok_or("cursor-agent has no stdin")?;
         *self.child.lock().unwrap() = Some(child);
 
+        tokio::spawn(async move {
+            let _ = stdin.write_all(prompt.as_bytes()).await;
+            // dropped: EOF on stdin is what starts the turn
+        });
+        let mut stderr = stderr;
         let stderr_task = tokio::spawn(async move {
+            // Drain everything (a closed pipe can EPIPE-kill the CLI), cap after.
             let mut buf = String::new();
-            let _ = stderr.take(64 * 1024).read_to_string(&mut buf).await;
+            let _ = stderr.read_to_string(&mut buf).await;
+            buf.truncate(buf.floor_char_boundary(64 * 1024));
             buf
         });
         let this = Arc::clone(self);
         tokio::spawn(async move {
             let mut lines = BufReader::new(stdout).lines();
             let mut done = None;
+            let mut last_msg = None;
             while let Ok(Some(line)) = lines.next_line().await {
                 let events = match serde_json::from_str::<Value>(line.trim()) {
                     Ok(v) => parse_line(&v, &mut this.chat_id.lock().unwrap()),
@@ -203,22 +217,51 @@ impl CursorRun {
                 for e in events {
                     // Held back: TurnDone must follow `busy = false` so the
                     // follow-up send the UI fires on it is not refused.
-                    if matches!(e, AgentEvent::TurnDone { .. }) {
-                        done = Some(e);
-                    } else {
-                        let _ = this.events_tx.send(e);
+                    match e {
+                        AgentEvent::TurnDone {
+                            final_text,
+                            is_error,
+                        } => {
+                            // `result.result` glues every segment; the last
+                            // Message is the final answer.
+                            let final_text = if is_error {
+                                final_text
+                            } else {
+                                last_msg.take().or(final_text)
+                            };
+                            done = Some(AgentEvent::TurnDone {
+                                final_text,
+                                is_error,
+                            });
+                        }
+                        e => {
+                            if let AgentEvent::Message { text, .. } = &e {
+                                last_msg = Some(text.clone());
+                            }
+                            let _ = this.events_tx.send(e);
+                        }
                     }
+                }
+                // `result` ends the turn: a grandchild (dev server, MCP) can
+                // hold the stdout pipe open, so EOF may never come.
+                if done.is_some() {
+                    break;
                 }
             }
             let child = this.child.lock().unwrap().take();
             if let Some(mut c) = child {
-                let _ = c.wait().await;
+                let grace = Duration::from_secs(2);
+                if tokio::time::timeout(grace, c.wait()).await.is_err() {
+                    process::start_kill(&mut c);
+                    let _ = tokio::time::timeout(grace, c.wait()).await;
+                }
             }
             let err = tokio::time::timeout(Duration::from_secs(2), stderr_task)
                 .await
                 .ok()
                 .and_then(Result::ok)
                 .unwrap_or_default();
+            let interrupted = this.interrupted.load(Ordering::SeqCst);
             this.busy.store(false, Ordering::SeqCst);
             if this.killed.load(Ordering::SeqCst) {
                 return; // `kill` already sent Exited
@@ -227,7 +270,6 @@ impl CursorRun {
             let ev = done.unwrap_or_else(|| {
                 // No terminal `result` line: interrupted, or the CLI failed
                 // (auth, headless disabled, untrusted workspace...) — stderr says.
-                let interrupted = this.interrupted.load(Ordering::SeqCst);
                 AgentEvent::TurnDone {
                     final_text: (!interrupted && !err.is_empty()).then(|| err.clone()),
                     is_error: !interrupted,
@@ -456,12 +498,30 @@ mod tests {
 
     #[test]
     fn args_default_safe_and_force_only_on_request() {
-        let a = build_args(false, None, None, "-x do it");
+        let a = build_args(false, None, None);
         assert!(!a.contains(&"--force".to_string()));
-        assert_eq!(&a[a.len() - 2..], ["--", "-x do it"]);
-        let b = build_args(true, Some("m"), Some("c1"), "p");
+        assert!(!a.contains(&"--".to_string())); // the prompt is on stdin, never argv
+        let b = build_args(true, Some("m"), Some("c1"));
         assert!(b.windows(2).any(|w| w == ["--resume", "c1"]));
         assert!(b.windows(2).any(|w| w == ["--model", "m"]));
         assert!(b.contains(&"--force".to_string()));
+    }
+
+    #[test]
+    fn spawn_turn_after_kill_is_refused() {
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let run = Arc::new(CursorRun {
+            bin: PathBuf::from("cursor-agent"),
+            cwd: ".".into(),
+            model: None,
+            force: false,
+            chat_id: Mutex::new(None),
+            child: Mutex::new(None),
+            busy: AtomicBool::new(false),
+            interrupted: AtomicBool::new(false),
+            killed: AtomicBool::new(true),
+            events_tx: tx,
+        });
+        assert_eq!(run.spawn_turn("hi".into()).unwrap_err(), "run ended");
     }
 }
