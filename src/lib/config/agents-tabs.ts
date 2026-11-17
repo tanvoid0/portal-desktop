@@ -15,9 +15,17 @@ export interface EngineTab {
 
 export const PORTAL_ENGINE_TAB: EngineTab = { id: 'portal', label: 'Portal', url: AGENT_TAB_BASE };
 
+/** Cross-backend monitoring page; always the last tab. */
+export const OVERVIEW_ENGINE_TAB: EngineTab = {
+  id: 'overview',
+  label: 'Overview',
+  url: `${AGENT_TAB_BASE}/overview`,
+};
+
 /**
  * Engine tabs for the Code workspace. `caps` null = desktop (everything);
- * otherwise the mobile shell: Portal needs cap `coder`, backend tabs need `agents`.
+ * otherwise the mobile shell: Portal needs cap `coder`, backend tabs need `agents`,
+ * Overview needs a backend plus `agents.history` (its session list is gated on it).
  */
 export function engineTabsFor(
   backends: ReadonlyArray<{ id: string; display_name: string }>,
@@ -28,6 +36,8 @@ export function engineTabsFor(
   if (!caps || caps.includes('agents')) {
     for (const b of backends)
       tabs.push({ id: b.id, label: b.display_name, url: agentTabPath(b.id) });
+    if (backends.length && (!caps || caps.includes('agents.history')))
+      tabs.push(OVERVIEW_ENGINE_TAB);
   }
   return tabs;
 }

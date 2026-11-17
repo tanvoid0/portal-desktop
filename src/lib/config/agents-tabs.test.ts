@@ -38,6 +38,17 @@ describe('engineTabsFor', () => {
       ['Portal', '/ai/coder'],
       ['Claude Code', '/ai/coder/claude-code'],
       ['Codex', '/ai/coder/codex'],
+      ['Overview', '/ai/coder/overview'],
+    ]);
+  });
+
+  it('Overview needs a backend and agents.history', () => {
+    expect(engineTabsFor([], null).map((t) => t.id)).toEqual(['portal']);
+    expect(engineTabsFor(backends, ['agents']).map((t) => t.id)).not.toContain('overview');
+    expect(engineTabsFor(backends, ['agents', 'agents.history']).map((t) => t.id)).toEqual([
+      'claude-code',
+      'codex',
+      'overview',
     ]);
   });
 
