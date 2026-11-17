@@ -75,6 +75,16 @@ pub fn is_within(child: &str, root: &str) -> bool {
     !r.is_empty() && c.len() >= r.len() && c[..r.len()] == r[..]
 }
 
+/// True if `dest` lives on the disk mounted at `mount`. Unlike [`is_within`],
+/// the Unix root `/` (zero components once normalised) mounts every absolute
+/// path (board #782).
+pub fn is_mount_of(mount: &str, dest: &str) -> bool {
+    if norm(mount).is_empty() && mount.starts_with(['/', '\\']) {
+        return dest.starts_with(['/', '\\']);
+    }
+    is_within(dest, mount)
+}
+
 /// Lock `paths` for the duration of a move. Idempotent-ish: callers are
 /// expected to `unlock` the same paths when done, in pairs.
 pub fn lock(paths: &[PathBuf]) {
@@ -189,7 +199,11 @@ mod tests {
 
     #[test]
     fn try_lock_refuses_nested_and_ancestor_and_equal() {
-        let base = if cfg!(windows) { r"D:\mvlock6" } else { "/mvlock6" };
+        let base = if cfg!(windows) {
+            r"D:\mvlock6"
+        } else {
+            "/mvlock6"
+        };
         let app = PathBuf::from(base).join("app");
         let pkg = app.join("pkg");
         let other = PathBuf::from(base).join("other");
@@ -214,9 +228,23 @@ mod tests {
     }
 
     #[test]
+    fn root_mount_matches_every_absolute_path() {
+        assert!(is_mount_of("/", "/home/me/new"));
+        assert!(is_mount_of("/home", "/home/me"));
+        assert!(!is_mount_of("/home", "/homework"));
+        assert!(!is_mount_of("/", ""));
+        assert!(is_mount_of(r"C:\", r"C:\a\b"));
+        assert!(!is_mount_of(r"C:\", r"D:\a"));
+    }
+
+    #[test]
     fn one_way_check_ignores_ancestor() {
         // Absolute on both platforms (`D:\…` is not absolute on Unix).
-        let base = if cfg!(windows) { r"D:\mvlock5" } else { "/mvlock5" };
+        let base = if cfg!(windows) {
+            r"D:\mvlock5"
+        } else {
+            "/mvlock5"
+        };
         let base = PathBuf::from(base).join("home");
         let root = base.join("proj");
         lock(std::slice::from_ref(&root));

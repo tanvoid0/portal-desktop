@@ -436,7 +436,7 @@ fn available_space(dest: &Path) -> Option<u64> {
     let disks = sysinfo::Disks::new_with_refreshed_list();
     disks
         .iter()
-        .filter(|d| move_lock::is_under(&d.mount_point().to_string_lossy(), &dest_s))
+        .filter(|d| move_lock::is_mount_of(&d.mount_point().to_string_lossy(), &dest_s))
         .max_by_key(|d| d.mount_point().to_string_lossy().len())
         .map(|d| d.available_space())
 }

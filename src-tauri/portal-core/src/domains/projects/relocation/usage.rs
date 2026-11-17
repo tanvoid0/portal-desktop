@@ -10,9 +10,9 @@ use crate::database::DatabaseManager;
 use crate::domains::coder::CoderService;
 use crate::domains::deployments::repositories::deployment_repository::DeploymentRepository;
 use crate::domains::deployments::services::docker_service::DeploymentStatus;
-use crate::domains::projects::move_lock::{is_under, is_within};
-use crate::domains::projects::relocation::mover::blocking;
+use crate::domains::projects::move_lock::{is_mount_of, is_under, is_within};
 use crate::domains::projects::pipelines::services::ExecutionService;
+use crate::domains::projects::relocation::mover::blocking;
 use crate::domains::scripts::ScriptExecutionService;
 use crate::domains::terminal::manager::TerminalManager;
 use crate::entities::project_move;
@@ -198,7 +198,7 @@ fn check_free_space(source: &Path, dest: &Path) -> Option<Signal> {
     // Most specific (longest) matching mount point wins.
     let avail = disks
         .iter()
-        .filter(|d| is_under(&d.mount_point().to_string_lossy(), &dest_s))
+        .filter(|d| is_mount_of(&d.mount_point().to_string_lossy(), &dest_s))
         .max_by_key(|d| d.mount_point().to_string_lossy().len())
         .map(|d| d.available_space())?;
 
