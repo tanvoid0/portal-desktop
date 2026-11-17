@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use axum::extract::{ConnectInfo, State};
@@ -18,6 +18,7 @@ use serde_json::json;
 use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
+use crate::database::DatabaseManager;
 use crate::domains::network::services::pairing_service;
 use crate::events::{EventSinkExt, Events};
 
@@ -150,6 +151,10 @@ pub(super) async fn pair_request(
 /// a lag is rare — and costs one database read when it happens.
 const DROP_CHANNEL_CAPACITY: usize = 64;
 
+/// How often [`spawn_expiry_sweep`] looks for grants that have run out — and so
+/// the longest a socket outlives its grant's expiry.
+const EXPIRY_SWEEP_EVERY: Duration = Duration::from_secs(60);
+
 /// Every open `/events` and `/control` socket of a remote device listens here.
 /// Process-wide rather than on `AppState`: the commands that end a grant (the
 /// Tauri adapters) never see the daemon's state — same reason `PENDING` is.
@@ -235,10 +240,37 @@ pub(super) async fn until_cut_off(cutoff: Option<Cutoff>) {
     }
 }
 
+/// One pass of the expiry sweep: [`drop_device`] every device whose temporary
+/// or long-term grant has run out. Expiry changes nothing in the database, so
+/// unlike a revoke nothing else would ever signal it.
+// ponytail: re-signals every expired approved row on each pass (a no-op once its
+// sockets are gone) — fine for a handful of devices; remember the ids already
+// signalled if that set ever grows.
+async fn sweep_expired(conn: &DatabaseConnection) {
+    match pairing_service::expired_devices(conn).await {
+        Ok(ids) => ids.iter().for_each(|id| drop_device(id)),
+        Err(e) => eprintln!("[daemon] expiry sweep failed: {e}"),
+    }
+}
+
+/// Run [`sweep_expired`] every [`EXPIRY_SWEEP_EVERY`], starting now. Call it
+/// once the database is managed.
+pub fn spawn_expiry_sweep(db: Arc<DatabaseManager>) {
+    tauri::async_runtime::spawn(async move {
+        let mut tick = tokio::time::interval(EXPIRY_SWEEP_EVERY);
+        loop {
+            tick.tick().await;
+            sweep_expired(db.get_connection()).await;
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::device_approval;
     use portal_core::migrations::runner::run_migrations;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
     use std::future::Future;
     use std::pin::Pin;
     use tokio::time::timeout;
@@ -278,6 +310,15 @@ mod tests {
         }
     }
 
+    /// A migrated database; the directory goes when the first half is dropped.
+    async fn fresh_db() -> (tempfile::TempDir, DatabaseConnection) {
+        let dir = tempfile::tempdir().unwrap();
+        let url = format!("sqlite://{}?mode=rwc", dir.path().join("t.db").display());
+        let conn = sea_orm::Database::connect(&url).await.unwrap();
+        run_migrations(&conn).await.unwrap();
+        (dir, conn)
+    }
+
     #[tokio::test]
     async fn only_its_own_device_cuts_a_socket_off() {
         let (tx, mut waiting) = open("dev", &["coder"], None);
@@ -302,10 +343,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_lag_is_settled_by_the_database() {
-        let dir = tempfile::tempdir().unwrap();
-        let url = format!("sqlite://{}?mode=rwc", dir.path().join("t.db").display());
-        let conn = sea_orm::Database::connect(&url).await.unwrap();
-        run_migrations(&conn).await.unwrap();
+        let (_dir, conn) = fresh_db().await;
         pairing_service::request_pairing(&conn, "dev", "Phone")
             .await
             .unwrap();
@@ -343,5 +381,56 @@ mod tests {
             closed(&mut waiting).await,
             "revoked before the socket subscribed"
         );
+    }
+
+    /// Expiry is the one way a grant ends with no command and no signal: the
+    /// stored expiry just falls behind the clock. Only the sweep notices.
+    #[tokio::test]
+    async fn the_sweep_closes_a_socket_whose_grant_lapsed_and_no_other() {
+        let (_dir, conn) = fresh_db().await;
+        for (id, kind) in [
+            ("sweep-lapsing", "temporary"),
+            ("sweep-forever", "until_revoked"),
+        ] {
+            pairing_service::request_pairing(&conn, id, "Phone")
+                .await
+                .unwrap();
+            pairing_service::approve(&conn, id, kind, &["coder".to_string()])
+                .await
+                .unwrap();
+        }
+        // Both sockets open under live grants, on the channel the sweep signals.
+        let open_on_shared = |id: &str| -> Waiting {
+            Box::pin(until_cut_off(Some(Cutoff {
+                rx: drops().subscribe(),
+                device_id: id.to_string(),
+                caps: vec!["coder".to_string()],
+                db: Some(conn.clone()),
+            })))
+        };
+        let mut lapsing = open_on_shared("sweep-lapsing");
+        let mut forever = open_on_shared("sweep-forever");
+        let (a, b) = tokio::join!(closed(&mut lapsing), closed(&mut forever));
+        assert!(!a && !b, "both grants are live");
+
+        let row = device_approval::Entity::find()
+            .filter(device_approval::Column::DeviceId.eq("sweep-lapsing"))
+            .one(&conn)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut lapsed: device_approval::ActiveModel = row.into();
+        lapsed.expires_at = Set(Some(
+            (chrono::Utc::now() - chrono::Duration::minutes(1)).into(),
+        ));
+        device_approval::Entity::update(lapsed)
+            .exec(&conn)
+            .await
+            .unwrap();
+
+        sweep_expired(&conn).await;
+        let (a, b) = tokio::join!(closed(&mut lapsing), closed(&mut forever));
+        assert!(a, "its grant lapsed");
+        assert!(!b, "until_revoked is never swept");
     }
 }

@@ -164,6 +164,10 @@ pub fn run() {
             // Manage the database manager wrapped in Arc
             app.manage(db_manager_arc.clone());
 
+            // Sockets of devices whose temporary/long-term grant has expired
+            // close here; a revoke or caps change closes them from its command.
+            daemon::pairing::spawn_expiry_sweep(db_manager_arc.clone());
+
             // Re-arm the move lock for any project relocation the previous run
             // left mid-flight (copying/verifying/verified). No filesystem action
             // here — this only re-locks the source/dest so nothing touches those

@@ -481,6 +481,31 @@ pub async fn live_capabilities(
         .map(|row| serde_json::from_str(&row.capabilities).unwrap_or_default()))
 }
 
+/// Ids of the devices whose approved temporary or long-term grant has run out
+/// as of `now` — the pure decision behind the daemon's expiry sweep. Only a
+/// row that carries an expiry and is past it counts. `until_revoked` is never
+/// touched (a QR grant that was never picked up lapses too, but nobody holds
+/// it), and a pending, rejected or revoked row has no live grant left to end.
+pub fn expired_device_ids(
+    rows: &[device_approval::Model],
+    now: DateTime<FixedOffset>,
+) -> Vec<String> {
+    rows.iter()
+        .filter(|row| row.approved && row.approval_type != "until_revoked" && lapsed(row, now))
+        .map(|row| row.device_id.clone())
+        .collect()
+}
+
+/// [`expired_device_ids`] over every approved row, as of now.
+pub async fn expired_devices(conn: &DatabaseConnection) -> Result<Vec<String>, String> {
+    let rows = device_approval::Entity::find()
+        .filter(device_approval::Column::Approved.eq(true))
+        .all(conn)
+        .await
+        .map_err(|e| format!("Database error: {e}"))?;
+    Ok(expired_device_ids(&rows, Utc::now().into()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -735,5 +760,77 @@ mod tests {
         assert_eq!(devices.len(), 1, "one device_id, however many rows it has");
         assert_eq!(devices[0].device_name, "Reconnected");
         assert_eq!(devices[0].approval_type, "pending");
+    }
+
+    /// A row with only what [`expired_device_ids`] looks at; the rest is filler.
+    fn row(
+        device_id: &str,
+        approval_type: &str,
+        approved: bool,
+        expires_at: Option<DateTime<FixedOffset>>,
+        token_expires_at: Option<DateTime<FixedOffset>>,
+    ) -> device_approval::Model {
+        let now: DateTime<FixedOffset> = Utc::now().into();
+        device_approval::Model {
+            id: device_id.to_string(),
+            device_id: device_id.to_string(),
+            device_name: String::new(),
+            device_info: "{}".to_string(),
+            passcode: String::new(),
+            passcode_expires_at: now,
+            approved,
+            approval_type: approval_type.to_string(),
+            approved_at: None,
+            expires_at,
+            access_token: None,
+            token_expires_at,
+            capabilities: "[]".to_string(),
+            pairing_secret: None,
+            created_at: now,
+            updated_at: now,
+            last_used_at: None,
+        }
+    }
+
+    #[test]
+    fn only_approved_temporary_and_long_term_grants_past_their_expiry_are_expired() {
+        let t: DateTime<FixedOffset> = Utc::now().into();
+        let past = Some(t - Duration::minutes(1));
+        let future = Some(t + Duration::hours(1));
+        let rows = [
+            row("temporary-lapsed", "temporary", true, past, past),
+            row("token-lapsed", "long_term", true, future, past),
+            row("expires-right-now", "long_term", true, Some(t), Some(t)),
+            row("still-running", "long_term", true, future, future),
+            row("until-revoked", "until_revoked", true, None, None),
+            row("qr-never-picked-up", "until_revoked", true, past, None),
+            row("pending", "pending", false, None, None),
+            row("revoked-after-expiry", "revoked", false, past, past),
+        ];
+
+        assert_eq!(
+            expired_device_ids(&rows, t),
+            ["temporary-lapsed", "token-lapsed", "expires-right-now"]
+        );
+        // Before any of those expiries, nothing has lapsed yet.
+        assert!(expired_device_ids(&rows, t - Duration::hours(1)).is_empty());
+    }
+
+    #[tokio::test]
+    async fn expired_devices_reads_only_approved_rows_that_lapsed() {
+        let conn = fresh_db().await;
+        for (id, kind) in [
+            ("lapsed", "temporary"),
+            ("running", "long_term"),
+            ("forever", "until_revoked"),
+        ] {
+            request_pairing(&conn, id, "Phone").await.unwrap();
+            approve(&conn, id, kind, &[]).await.unwrap();
+        }
+        request_pairing(&conn, "pending", "Phone").await.unwrap();
+        assert!(expired_devices(&conn).await.unwrap().is_empty());
+
+        expire(&conn, "lapsed").await;
+        assert_eq!(expired_devices(&conn).await.unwrap(), ["lapsed"]);
     }
 }
