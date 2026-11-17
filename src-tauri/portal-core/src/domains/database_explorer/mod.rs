@@ -7,11 +7,13 @@
 //! below, which pick the right engine's pure SQL builder without needing a
 //! live connection (so a preview never needs the vault unlocked). P3 adds
 //! MongoDB (`mongo`): a concrete `MongoDriver` outside `DbDriver` (documents,
-//! not tables). The Redis pane arrives later; see plan `iterative-plotting-flame`.
+//! not tables). P4 adds Redis (`redis`): a concrete `RedisDriver` too (keys, typed
+//! values, TTLs).
 
 pub mod discovery;
 pub mod driver;
 pub mod mongo;
+pub mod redis;
 pub mod sql_server;
 pub mod sqlite;
 mod state;
@@ -21,11 +23,13 @@ use serde_json::Value;
 
 pub use driver::DbDriver;
 pub use mongo::MongoDriver;
+pub use redis::RedisDriver;
 pub use sql_server::SqlServerDriver;
 pub use sqlite::SqliteDriver;
 pub use state::{DbExplorerState, PasswordRef, ServerConn, Source};
 pub use types::{
-    ColumnInfo, DbSource, EditPreview, MongoDoc, MongoPage, QueryResult, TableInfo,
+    ColumnInfo, DbSource, EditPreview, MongoDoc, MongoPage, QueryResult, RedisDb, RedisScan, RedisValue,
+    RedisWrite, TableInfo,
 };
 
 /// Build the preview for an UPDATE, dispatching to the source's engine.

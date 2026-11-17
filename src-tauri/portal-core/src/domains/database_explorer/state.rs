@@ -38,6 +38,8 @@ pub struct ServerConn {
     /// Default database to connect to (may be empty for MySQL; unused for MongoDB).
     pub database: String,
     pub password: PasswordRef,
+    /// Redis only: connect over TLS (vault connection string is `rediss://`).
+    pub tls: bool,
     pub label: String,
     /// Human detail shown in the UI — never includes the password.
     pub detail: String,

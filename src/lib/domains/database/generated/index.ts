@@ -5,4 +5,8 @@ export type { EditPreview } from './EditPreview';
 export type { MongoDoc } from './MongoDoc';
 export type { MongoPage } from './MongoPage';
 export type { QueryResult } from './QueryResult';
+export type { RedisDb } from './RedisDb';
+export type { RedisScan } from './RedisScan';
+export type { RedisValue } from './RedisValue';
+export type { RedisWrite } from './RedisWrite';
 export type { TableInfo } from './TableInfo';

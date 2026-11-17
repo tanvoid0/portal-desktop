@@ -188,7 +188,7 @@ export function buildMainNavSections(
           title: 'Database',
           url: '/database',
           icon: 'database',
-          description: 'Browse SQLite, Postgres, MySQL, and MongoDB databases',
+          description: 'Browse SQLite, Postgres, MySQL, MongoDB, and Redis databases',
           badge: null,
         },
         {

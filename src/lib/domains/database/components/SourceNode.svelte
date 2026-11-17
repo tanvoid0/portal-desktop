@@ -14,6 +14,7 @@
     listTables,
     mongoListCollections,
     mongoListDatabases,
+    redisListDatabases,
     setEditable,
   } from '../api/databaseApi';
   import type { DbSource } from '../generated';
@@ -32,17 +33,24 @@
     postgres: { label: 'Postgres', devicon: 'devicon-postgresql-plain' },
     mysql: { label: 'MySQL', devicon: 'devicon-mysql-original' },
     mongodb: { label: 'MongoDB', devicon: 'devicon-mongodb-plain' },
+    redis: { label: 'Redis', devicon: 'devicon-redis-plain' },
   };
   const engine = $derived(ENGINES[source.engine] ?? { label: source.engine, devicon: '' });
 
   const isMongo = $derived(source.engine === 'mongodb');
+  const isRedis = $derived(source.engine === 'redis');
   // Mongo servers can have hundreds of collections: one database open at a time.
   let openDb = $state<string | null>(null);
 
   const tables = createQuery(() => ({
     queryKey: queryKeys.database.tables(source.id),
     queryFn: () => listTables(source.id),
-    enabled: !isMongo,
+    enabled: !isMongo && !isRedis,
+  }));
+  const redisDbs = createQuery(() => ({
+    queryKey: queryKeys.database.redisDatabases(source.id),
+    queryFn: () => redisListDatabases(source.id),
+    enabled: isRedis,
   }));
   const dbs = createQuery(() => ({
     queryKey: queryKeys.database.mongoDatabases(source.id),
@@ -80,7 +88,25 @@
     />
     <Badge variant="outline" class="shrink-0 text-[10px] font-normal">{engine.label}</Badge>
   </div>
-  {#if isMongo}
+  {#if isRedis}
+    {#if redisDbs.isPending}
+      <p class="px-6 text-xs text-muted-foreground">Loading...</p>
+    {:else if redisDbs.isError}
+      <p class="px-6 text-xs text-destructive">{String(redisDbs.error)}</p>
+    {:else}
+      {#each redisDbs.data ?? [] as d (d.index)}
+        <Button
+          variant={selected === `db${d.index}` ? 'secondary' : 'ghost'}
+          size="sm"
+          class="h-7 w-full justify-start gap-2 pl-6"
+          onclick={() => onSelect(source.id, `db${d.index}`, String(d.index))}
+        >
+          <span class="truncate">db{d.index}</span>
+          <span class="ml-auto text-xs text-muted-foreground tabular-nums">{d.keys}</span>
+        </Button>
+      {/each}
+    {/if}
+  {:else if isMongo}
     {#if dbs.isPending}
       <p class="px-6 text-xs text-muted-foreground">Loading...</p>
     {:else if dbs.isError}

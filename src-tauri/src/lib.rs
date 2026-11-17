@@ -586,6 +586,11 @@ pub fn run() {
             domains::database_explorer::commands::db_mongo_insert,
             domains::database_explorer::commands::db_mongo_replace,
             domains::database_explorer::commands::db_mongo_delete,
+            domains::database_explorer::commands::db_redis_list_databases,
+            domains::database_explorer::commands::db_redis_scan,
+            domains::database_explorer::commands::db_redis_get,
+            domains::database_explorer::commands::db_redis_preview,
+            domains::database_explorer::commands::db_redis_write,
             // Automation commands
             domains::automation::trigger_n8n_workflow,
             domains::automation::get_workflow_status,

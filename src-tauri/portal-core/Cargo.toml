@@ -38,6 +38,8 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "postgre
 rusqlite = { version = "0.32", features = ["bundled"] }
 # MongoDB explorer (P3). rustls only (no openssl/aws-lc); no dns-resolver, so mongodb+srv:// is unsupported.
 mongodb = { version = "3.10", default-features = false, features = ["compat-3-0-0", "rustls-tls"] }
+# Redis explorer (P4). tokio + rustls only.
+redis = { version = "1.8", default-features = false, features = ["tokio-rustls-comp"] }
 
 # Network
 reqwest = { version = "0.12.23", features = ["json", "stream", "blocking"] }

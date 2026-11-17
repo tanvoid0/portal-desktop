@@ -3,15 +3,15 @@
 //! 1. Vault credentials of type DATABASE (host/port/db/user/engine from the
 //!    plaintext metadata; the password stays `Vault(id)` and is decrypted only at
 //!    connect time, so listing works even while the vault is locked).
-//! 2. Running SDK-managed DB services (Postgres/MySQL/MongoDB).
-//! 3. Running Docker containers whose image is Postgres/MySQL/MongoDB, at their actual
+//! 2. Running SDK-managed DB services (Postgres/MySQL/MongoDB/Redis).
+//! 3. Running Docker containers whose image is Postgres/MySQL/MongoDB/Redis, at their actual
 //!    mapped host port.
 //!
 //! Every source is best-effort: a failure in one path (vault DB error, Docker not
 //! installed, …) is skipped, never fatal — `db_list_sources` still returns the rest.
 //!
 //! ponytail: SDK/Docker sources assume default local credentials (pg: postgres,
-//! mysql: root, mongodb: no auth, empty password); if that is wrong the connect error surfaces.
+//! mysql: root, mongodb/redis: no auth, empty password); if that is wrong the connect error surfaces.
 
 use std::sync::Arc;
 
@@ -72,6 +72,7 @@ async fn from_vault(db: DatabaseConnection, session: Arc<VaultSession>) -> Vec<(
                     user,
                     database,
                     password: PasswordRef::Vault(c.id),
+                    tls: wants_tls(&meta),
                     label: format!("{} ({engine})", c.name),
                     detail: format!("{host}:{port}"),
                 }),
@@ -93,6 +94,7 @@ async fn from_sdk() -> Vec<(String, Source)> {
                 "postgresql" => "postgres",
                 "mysql" => "mysql",
                 "mongodb" => "mongodb",
+                "redis" => "redis",
                 _ => return None,
             };
             let id = format!("sdk:{}", c.id);
@@ -121,6 +123,8 @@ async fn from_docker() -> Vec<(String, Source)> {
                 ("mysql", 3306)
             } else if image.contains("mongo") {
                 ("mongodb", 27017)
+            } else if image.contains("redis") || image.contains("valkey") {
+                ("redis", 6379)
             } else {
                 return None;
             };
@@ -144,7 +148,7 @@ async fn from_docker() -> Vec<(String, Source)> {
 fn local_server(engine: &str, port: u16, label: String, detail: String) -> Source {
     let (user, database) = match engine {
         "mysql" => ("root".to_string(), String::new()),
-        "mongodb" => (String::new(), String::new()),
+        "mongodb" | "redis" => (String::new(), String::new()),
         _ => ("postgres".to_string(), "postgres".to_string()),
     };
     Source::Server(ServerConn {
@@ -154,9 +158,18 @@ fn local_server(engine: &str, port: u16, label: String, detail: String) -> Sourc
         user,
         database,
         password: PasswordRef::Plain(String::new()),
+        tls: false,
         label,
         detail,
     })
+}
+
+/// A `rediss://` connection string means TLS even though host/port come from
+/// the metadata (a plain TCP connect would send AUTH in cleartext).
+fn wants_tls(meta: &Value) -> bool {
+    meta.get("connectionString")
+        .and_then(Value::as_str)
+        .is_some_and(|cs| cs.to_lowercase().starts_with("rediss://"))
 }
 
 fn infer_engine(meta: &Value) -> String {
@@ -173,6 +186,9 @@ fn infer_engine(meta: &Value) -> String {
             if s.contains("mongo") {
                 return "mongodb".to_string();
             }
+            if s.contains("redis") || s.contains("valkey") {
+                return "redis".to_string();
+            }
         }
     }
     // Then the connection string scheme.
@@ -187,11 +203,15 @@ fn infer_engine(meta: &Value) -> String {
         if cs.starts_with("mongodb") {
             return "mongodb".to_string();
         }
+        if cs.starts_with("redis") {
+            return "redis".to_string();
+        }
     }
     // Finally the port.
     match meta.get("port").and_then(as_u16) {
         Some(3306) | Some(33060) => "mysql".to_string(),
         Some(27017) => "mongodb".to_string(),
+        Some(6379) => "redis".to_string(),
         _ => "postgres".to_string(),
     }
 }
@@ -200,6 +220,7 @@ fn default_port(engine: &str) -> u16 {
     match engine {
         "mysql" => 3306,
         "mongodb" => 27017,
+        "redis" => 6379,
         _ => 5432,
     }
 }
@@ -207,7 +228,7 @@ fn default_port(engine: &str) -> u16 {
 fn default_user(engine: &str) -> &'static str {
     match engine {
         "mysql" => "root",
-        "mongodb" => "",
+        "mongodb" | "redis" => "",
         _ => "postgres",
     }
 }
@@ -280,6 +301,14 @@ mod tests {
         assert_eq!(infer_engine(&json!({ "port": 27017 })), "mongodb");
         assert_eq!(default_port("mongodb"), 27017);
         assert_eq!(default_user("mongodb"), "");
+        assert_eq!(infer_engine(&json!({ "engine": "Valkey" })), "redis");
+        assert_eq!(infer_engine(&json!({ "connectionString": "rediss://h:1" })), "redis");
+        assert_eq!(infer_engine(&json!({ "port": 6379 })), "redis");
+        assert_eq!(default_port("redis"), 6379);
+        assert_eq!(default_user("redis"), "");
+        assert!(wants_tls(&json!({ "connectionString": "rediss://h:1" })));
+        assert!(!wants_tls(&json!({ "connectionString": "redis://h:1" })));
+        assert!(!wants_tls(&json!({})));
         // Nothing to go on → default postgres.
         assert_eq!(infer_engine(&json!({})), "postgres");
     }

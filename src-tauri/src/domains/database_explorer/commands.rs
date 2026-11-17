@@ -6,7 +6,8 @@
 //! read-only by default) and, for update/delete, `require_pk` (the given
 //! column must really be the table's primary key) before anything executes.
 //! The `db_mongo_*` commands (P3) go to `open_mongo` instead; writes there are
-//! gated by the same `require_editable`.
+//! gated by the same `require_editable`. So are the `db_redis_*` commands (P4),
+//! which go to `open_redis`.
 //! Preview commands never open a connection — they just build the SQL text.
 
 use std::sync::Arc;
@@ -59,6 +60,23 @@ async fn open_mongo(
             dbx::MongoDriver::connect(&s.host, s.port, &s.user, &secret, &s.database).await
         }
         _ => Err("not a MongoDB source".to_string()),
+    }
+}
+
+/// Resolve a source to a live Redis driver on logical database `db_index`.
+async fn open_redis(
+    state: &dbx::DbExplorerState,
+    source_id: &str,
+    db_index: u32,
+    db: &Arc<DatabaseManager>,
+    session: &Arc<VaultSession>,
+) -> Result<dbx::RedisDriver, String> {
+    match source_or_err(state, source_id)? {
+        dbx::Source::Server(s) if s.engine == "redis" => {
+            let secret = password_of(s.password, db, session).await?;
+            dbx::RedisDriver::connect(&s.host, s.port, &s.user, &secret, db_index, s.tls).await
+        }
+        _ => Err("not a Redis source".to_string()),
     }
 }
 
@@ -412,5 +430,77 @@ pub async fn db_mongo_delete(
     open_mongo(&state, &source_id, db.inner(), session.inner())
         .await?
         .delete(&database, &collection, &id)
+        .await
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn db_redis_list_databases(
+    source_id: String,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<Vec<dbx::RedisDb>, String> {
+    open_redis(&state, &source_id, 0, db.inner(), session.inner())
+        .await?
+        .list_databases()
+        .await
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn db_redis_scan(
+    source_id: String,
+    db_index: u32,
+    pattern: String,
+    cursor: String,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<dbx::RedisScan, String> {
+    open_redis(&state, &source_id, db_index, db.inner(), session.inner())
+        .await?
+        .scan(&pattern, &cursor)
+        .await
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn db_redis_get(
+    source_id: String,
+    db_index: u32,
+    key: String,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<dbx::RedisValue, String> {
+    open_redis(&state, &source_id, db_index, db.inner(), session.inner())
+        .await?
+        .get(&key)
+        .await
+}
+
+/// The exact command a write would run. No connection, so it works with the
+/// vault locked.
+#[portal_rpc_macro::rpc]
+pub async fn db_redis_preview(
+    source_id: String,
+    write: dbx::RedisWrite,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+) -> Result<String, String> {
+    require_editable(&state, &source_id)?;
+    Ok(dbx::redis::command_text(&write.args()?))
+}
+
+#[portal_rpc_macro::rpc]
+pub async fn db_redis_write(
+    source_id: String,
+    db_index: u32,
+    write: dbx::RedisWrite,
+    state: State<'_, Arc<dbx::DbExplorerState>>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<(), String> {
+    require_editable(&state, &source_id)?;
+    open_redis(&state, &source_id, db_index, db.inner(), session.inner())
+        .await?
+        .write(&write)
         .await
 }

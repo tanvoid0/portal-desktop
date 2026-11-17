@@ -5,6 +5,10 @@ import type {
   EditPreview,
   MongoPage,
   QueryResult,
+  RedisDb,
+  RedisScan,
+  RedisValue,
+  RedisWrite,
   TableInfo,
 } from '../generated';
 
@@ -105,3 +109,16 @@ export const mongoReplace = (
 ) => invokeClient.post<void>('db_mongo_replace', { sourceId, database, collection, id, doc });
 export const mongoDelete = (sourceId: string, database: string, collection: string, id: string) =>
   invokeClient.post<void>('db_mongo_delete', { sourceId, database, collection, id });
+
+// Redis (P4): `dbIndex` is the logical database; `cursor` is SCAN's u64 as text.
+export const redisListDatabases = (sourceId: string) =>
+  invokeClient.post<RedisDb[]>('db_redis_list_databases', { sourceId });
+export const redisScan = (sourceId: string, dbIndex: number, pattern: string, cursor: string) =>
+  invokeClient.post<RedisScan>('db_redis_scan', { sourceId, dbIndex, pattern, cursor });
+export const redisGet = (sourceId: string, dbIndex: number, key: string) =>
+  invokeClient.post<RedisValue>('db_redis_get', { sourceId, dbIndex, key });
+/** The exact command a write would run (no connection). */
+export const redisPreview = (sourceId: string, write: RedisWrite) =>
+  invokeClient.post<string>('db_redis_preview', { sourceId, write });
+export const redisWrite = (sourceId: string, dbIndex: number, write: RedisWrite) =>
+  invokeClient.post<void>('db_redis_write', { sourceId, dbIndex, write });

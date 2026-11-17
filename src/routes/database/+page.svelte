@@ -22,12 +22,14 @@
   } from '$lib/domains/database/api/databaseApi';
   import ResultGrid from '$lib/domains/database/components/ResultGrid.svelte';
   import MongoPane from '$lib/domains/database/components/MongoPane.svelte';
+  import RedisPane from '$lib/domains/database/components/RedisPane.svelte';
   import SourceNode from '$lib/domains/database/components/SourceNode.svelte';
 
   const PAGE_SIZE = 100;
   const client = useQueryClient();
 
-  // `db` is set only for MongoDB selections (`table` is then the collection).
+  // `db` is set only for MongoDB / Redis selections (`table` is then the collection, or `dbN`
+  // with `db` = the logical db index for Redis).
   let sel = $state<{ sourceId: string; table: string; db?: string } | null>(null);
   let page = $state(0);
   let sql = $state('');
@@ -49,12 +51,13 @@
   }));
 
   // Query tab runs against the selected source, else the first one.
-  // SQL only: Mongo sources never take it.
+  // SQL only: Mongo / Redis sources never take it.
   const selectedSource = $derived(sources.data?.find((s) => s.id === sel?.sourceId));
+  const isSql = (engine: string) => ['sqlite', 'postgres', 'mysql'].includes(engine);
   const querySourceId = $derived(
-    (selectedSource && selectedSource.engine !== 'mongodb'
+    (selectedSource && isSql(selectedSource.engine)
       ? selectedSource
-      : sources.data?.find((s) => s.engine !== 'mongodb')
+      : sources.data?.find((s) => isSql(s.engine))
     )?.id ?? ''
   );
   const run = createMutation(() => ({
@@ -94,7 +97,7 @@
 <PageContainer variant="full" class="space-y-6 py-4 md:py-6">
   <PageHeader
     title="Database Explorer"
-    description="Browse & edit SQLite, Postgres, MySQL and MongoDB — vault, SDK and Docker sources auto-discovered"
+    description="Browse & edit SQLite, Postgres, MySQL, MongoDB and Redis — vault, SDK and Docker sources auto-discovered"
   >
     {#snippet actions()}
       <Button variant="outline" size="sm" onclick={pickFile} disabled={openDb.isPending}>
@@ -141,6 +144,14 @@
           <Tabs.Content value="data" class="space-y-3">
             {#if !sel}
               <p class="text-sm text-muted-foreground">Select a table or view.</p>
+            {:else if selectedSource?.engine === 'redis'}
+              {#key `${sel.sourceId}/${sel.db}`}
+                <RedisPane
+                  sourceId={sel.sourceId}
+                  db={Number(sel.db)}
+                  editable={selectedSource.editable}
+                />
+              {/key}
             {:else if sel.db}
               {#key `${sel.sourceId}/${sel.db}/${sel.table}`}
                 <MongoPane

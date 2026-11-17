@@ -63,6 +63,13 @@ export const queryKeys = {
     // `filter` is the applied filter text; `page` the 0-based page.
     mongoDocs: (sourceId: string, db: string, coll: string, filter: string, page: number) =>
       ['database', sourceId, 'mongo', db, coll, 'docs', filter, page] as const,
+    redisDatabases: (sourceId: string) => ['database', sourceId, 'redis', 'dbs'] as const,
+    // Prefix of redisKeys / redisValue for one logical db (invalidate after a write).
+    redisDb: (sourceId: string, db: number) => ['database', sourceId, 'redis', 'db', db] as const,
+    redisKeys: (sourceId: string, db: number, pattern: string) =>
+      ['database', sourceId, 'redis', 'db', db, 'keys', pattern] as const,
+    redisValue: (sourceId: string, db: number, key: string) =>
+      ['database', sourceId, 'redis', 'db', db, 'value', key] as const,
   },
   devices: {
     all: ['devices'] as const,

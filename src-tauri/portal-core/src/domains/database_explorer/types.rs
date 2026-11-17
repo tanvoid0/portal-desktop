@@ -3,7 +3,7 @@
 //! P0 is SQLite, read-only. `engine` is a string ("sqlite") rather than an enum
 //! so adding postgres/mysql/mongo/redis later needs no migration of this type.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 /// A connectable database the explorer knows about. P0: SQLite files only
@@ -103,4 +103,62 @@ pub struct MongoPage {
     pub docs: Vec<MongoDoc>,
     #[ts(type = "number")]
     pub total: u64,
+}
+
+/// One logical Redis database (`db0`…) and its key count.
+#[derive(Serialize, Clone, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/database/generated/")]
+pub struct RedisDb {
+    pub index: u32,
+    #[ts(type = "number")]
+    pub keys: u64,
+}
+
+/// One SCAN page. `cursor` is a u64 as text (JS precision); "0" = done.
+#[derive(Serialize, Clone, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/database/generated/")]
+pub struct RedisScan {
+    pub keys: Vec<String>,
+    pub cursor: String,
+}
+
+/// A key's value. `items`: hash [f,v] · list [v] · set [m] · zset [m, score].
+#[derive(Serialize, Clone, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../src/lib/domains/database/generated/")]
+pub struct RedisValue {
+    /// "string" | "hash" | "list" | "set" | "zset" | other.
+    pub kind: String,
+    /// Seconds; -1 = no expiry.
+    #[ts(type = "number")]
+    pub ttl: i64,
+    /// STRLEN / HLEN / LLEN / SCARD / ZCARD.
+    #[ts(type = "number")]
+    pub len: u64,
+    /// String kind only.
+    pub text: Option<String>,
+    /// String was not UTF-8: shown lossy, not editable.
+    pub binary: bool,
+    pub items: Vec<Vec<String>>,
+    pub truncated: bool,
+}
+
+/// A Redis write. Built into one command by `RedisWrite::args` (redis.rs),
+/// which both the confirm preview and the execution use.
+#[derive(Deserialize, Clone, TS)]
+#[serde(tag = "op")]
+#[ts(export, export_to = "../../../src/lib/domains/database/generated/")]
+pub enum RedisWrite {
+    #[serde(rename = "set")]
+    Set {
+        key: String,
+        value: String,
+        #[ts(type = "number | null")]
+        ttl: Option<u64>,
+        create: bool,
+    },
+    #[serde(rename = "del")]
+    Del { key: String },
 }
