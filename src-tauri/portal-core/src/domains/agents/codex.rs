@@ -16,15 +16,14 @@
 //! `item/fileChange/requestApproval`) and are answered with
 //! `{decision:"accept"|"decline"}` once the user decides.
 //!
-//! Launcher options: `BackendCaps` does not exist in this codebase; the only
-//! launcher knob is `StartParams::permission_mode`, mapped in
+//! The only launcher knob is `StartParams::permission_mode`, mapped in
 //! [`policy_for_mode`] to codex's approval policy + sandbox.
 
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -39,6 +38,10 @@ use super::events::AgentEvent;
 use super::process;
 
 const REQUEST_TIMEOUT: u64 = 30;
+const MODEL_TTL: Duration = Duration::from_secs(600);
+
+type ModelCache = StdMutex<Option<(Instant, Vec<BackendModel>)>>;
+static MODEL_CACHE: ModelCache = StdMutex::new(None);
 
 pub struct CodexBackend;
 
@@ -57,8 +60,11 @@ impl AgentBackend for CodexBackend {
     }
 
     async fn list_models(&self) -> Vec<BackendModel> {
-        // ponytail: spawns a throwaway app-server per call (no cache); cache
-        // on the backend if the launcher starts polling this.
+        if let Some((at, models)) = &*MODEL_CACHE.lock().unwrap() {
+            if at.elapsed() < MODEL_TTL {
+                return models.clone();
+            }
+        }
         if !self.detect().await {
             return Vec::new();
         }
@@ -66,13 +72,22 @@ impl AgentBackend for CodexBackend {
         let Ok(rpc) = Rpc::spawn(None, tx) else {
             return Vec::new();
         };
-        let res = async {
+        // One budget for spawn handshake + list; a timeout yields an empty list.
+        let res = tokio::time::timeout(Duration::from_secs(5), async {
             rpc.init().await?;
-            rpc.request("model/list", json!({}), 10).await
-        }
+            rpc.request("model/list", json!({}), 5).await
+        })
         .await;
         rpc.kill().await;
-        res.map(|v| parse_models(&v)).unwrap_or_default()
+        let models = res
+            .ok()
+            .and_then(Result::ok)
+            .map(|v| parse_models(&v))
+            .unwrap_or_default();
+        // ponytail: failures are cached too (10 min) so a broken codex isn't
+        // respawned per call; add an invalidate if the launcher needs a retry.
+        *MODEL_CACHE.lock().unwrap() = Some((Instant::now(), models.clone()));
+        models
     }
 
     async fn start(
@@ -134,8 +149,10 @@ impl CodexBackend {
 /// -> codex `(approvalPolicy, sandbox)`.
 fn policy_for_mode(mode: &str) -> (&'static str, &'static str) {
     match mode {
+        // Must be gated like coder's bypass before any caller passes it:
+        // no approvals and no sandbox.
         "bypassPermissions" => ("never", "danger-full-access"),
-        "acceptEdits" => ("on-request", "workspace-write"),
+        "acceptEdits" => ("untrusted", "workspace-write"),
         // "manual" / empty: ask for anything codex doesn't consider trusted.
         _ => ("untrusted", "workspace-write"),
     }
@@ -149,18 +166,15 @@ struct CodexRun {
 #[async_trait]
 impl RunControl for CodexRun {
     async fn send_user(&self, text: String) -> Result<(), String> {
-        let res = self
-            .rpc
-            .request(
+        // Detached: callers hold the service's `runs` lock. turn_id comes from
+        // `turn/started` only — writing it from the response could resurrect a
+        // turn the reader already completed.
+        self.rpc
+            .request_detached(
                 "turn/start",
                 json!({ "threadId": self.thread_id, "input": [{ "type": "text", "text": text }] }),
-                REQUEST_TIMEOUT,
             )
-            .await?;
-        if let Some(id) = res.pointer("/turn/id").and_then(Value::as_str) {
-            self.rpc.state.lock().unwrap().turn_id = Some(id.to_string());
-        }
-        Ok(())
+            .await
     }
 
     async fn decide_permission(&self, request_id: String, allow: bool) -> Result<(), String> {
@@ -187,14 +201,13 @@ impl RunControl for CodexRun {
         let Some(turn_id) = turn_id else {
             return Ok(()); // no turn in flight
         };
+        // Detached: the reply only comes after the abort completes.
         self.rpc
-            .request(
+            .request_detached(
                 "turn/interrupt",
                 json!({ "threadId": self.thread_id, "turnId": turn_id }),
-                REQUEST_TIMEOUT,
             )
             .await
-            .map(|_| ())
     }
 
     async fn kill(&self) -> Result<(), String> {
@@ -224,6 +237,8 @@ struct Rpc {
     approvals: StdMutex<HashMap<String, Value>>,
     state: StdMutex<TurnState>,
     killed: AtomicBool,
+    /// Reader hit EOF; set under the `pending` lock so no request slips in after.
+    closed: AtomicBool,
     events_tx: UnboundedSender<AgentEvent>,
 }
 
@@ -264,6 +279,7 @@ impl Rpc {
             approvals: StdMutex::new(HashMap::new()),
             state: StdMutex::new(TurnState::default()),
             killed: AtomicBool::new(false),
+            closed: AtomicBool::new(false),
             events_tx,
         });
 
@@ -283,7 +299,11 @@ impl Rpc {
                 }
             }
             // Fail in-flight requests instead of letting them time out.
-            pump.pending.lock().unwrap().clear();
+            {
+                let mut pending = pump.pending.lock().unwrap();
+                pump.closed.store(true, Ordering::SeqCst);
+                pending.clear();
+            }
             if !pump.killed.load(Ordering::SeqCst) {
                 let detail = tokio::time::timeout(Duration::from_secs(2), stderr_rx)
                     .await
@@ -320,17 +340,67 @@ impl Rpc {
             .map_err(|e| format!("codex stdin write failed: {e}"))
     }
 
-    async fn request(&self, method: &str, params: Value, secs: u64) -> Result<Value, String> {
+    /// Registers + writes a request; returns its id and the response channel.
+    /// Cleans `pending` on write failure; fails fast once the reader hit EOF.
+    async fn send(
+        &self,
+        method: &str,
+        params: Value,
+    ) -> Result<(i64, oneshot::Receiver<Result<Value, String>>), String> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
-        self.pending.lock().unwrap().insert(id, tx);
-        self.write(&json!({ "id": id, "method": method, "params": params }))
-            .await?;
+        {
+            let mut pending = self.pending.lock().unwrap();
+            if self.closed.load(Ordering::SeqCst) {
+                return Err("codex exited".to_string());
+            }
+            pending.insert(id, tx);
+        }
+        if let Err(e) = self
+            .write(&json!({ "id": id, "method": method, "params": params }))
+            .await
+        {
+            self.pending.lock().unwrap().remove(&id);
+            return Err(e);
+        }
+        Ok((id, rx))
+    }
+
+    async fn request(&self, method: &str, params: Value, secs: u64) -> Result<Value, String> {
+        let (id, rx) = self.send(method, params).await?;
         match tokio::time::timeout(Duration::from_secs(secs), rx).await {
             Ok(Ok(res)) => res,
             Ok(Err(_)) => Err("codex exited".to_string()),
-            Err(_) => Err(format!("codex {method} timed out")),
+            Err(_) => {
+                self.pending.lock().unwrap().remove(&id);
+                Err(format!("codex {method} timed out"))
+            }
         }
+    }
+
+    /// Writes the request and returns; a spawned task awaits the reply and
+    /// reports failures as a `Raw` event. Only write failures are returned.
+    async fn request_detached(
+        self: &Arc<Self>,
+        method: &'static str,
+        params: Value,
+    ) -> Result<(), String> {
+        let (id, rx) = self.send(method, params).await?;
+        let rpc = Arc::clone(self);
+        tokio::spawn(async move {
+            let err = match tokio::time::timeout(Duration::from_secs(REQUEST_TIMEOUT), rx).await {
+                Ok(Ok(Ok(_))) | Ok(Err(_)) => return, // ok, or exited (Exited event covers it)
+                Ok(Ok(Err(e))) => e,
+                Err(_) => {
+                    rpc.pending.lock().unwrap().remove(&id);
+                    format!("codex {method} timed out")
+                }
+            };
+            let _ = rpc.events_tx.send(AgentEvent::Raw {
+                line: format!("codex {method} failed: {err}"),
+            });
+        });
+        Ok(())
     }
 
     async fn init(&self) -> Result<(), String> {
@@ -680,6 +750,32 @@ mod tests {
         assert!(
             matches!(&events[1], AgentEvent::TurnDone { final_text, is_error: true }
             if final_text.as_deref() == Some("boom"))
+        );
+    }
+
+    #[test]
+    fn fast_turn_leaves_no_turn_id() {
+        // turn/start's response is no longer a turn_id source, so a turn that
+        // starts and completes before the response is read cannot leave a stale id.
+        let mut st = TurnState::default();
+        parse_notification("turn/started", &json!({"turn":{"id":"tu_1"}}), &mut st);
+        parse_notification(
+            "turn/completed",
+            &json!({"turn":{"status":"completed"}}),
+            &mut st,
+        );
+        assert!(st.turn_id.is_none());
+    }
+
+    #[test]
+    fn acceptedits_is_untrusted_and_bypass_unsandboxed() {
+        assert_eq!(
+            policy_for_mode("acceptEdits"),
+            ("untrusted", "workspace-write")
+        );
+        assert_eq!(
+            policy_for_mode("bypassPermissions"),
+            ("never", "danger-full-access")
         );
     }
 
