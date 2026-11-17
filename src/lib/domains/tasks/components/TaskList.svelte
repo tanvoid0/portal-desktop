@@ -14,6 +14,7 @@
     type TaskUiState,
   } from '../state/taskUi.svelte';
   import { defaultDisplay, type TaskDisplay } from '../utils/taskDisplay';
+  import { stripMarkdown } from '../utils/stripMarkdown';
   import { taskStatusLabel, type Task, type TaskStatus } from '../types';
   import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
   import { buildTaskMenu } from '../utils/taskMenu';
@@ -175,8 +176,8 @@
                       {/if}
                     </div>
                     {#if task.description}
-                      <p class="mt-1 text-sm text-muted-foreground">
-                        {task.description}
+                      <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                        {stripMarkdown(task.description)}
                       </p>
                     {/if}
                     {#if task.tags?.length}
@@ -255,8 +256,8 @@
                           </h4>
                         </div>
                         {#if subtask.description}
-                          <p class="mt-1 text-sm text-muted-foreground">
-                            {subtask.description}
+                          <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                            {stripMarkdown(subtask.description)}
                           </p>
                         {/if}
                       </div>

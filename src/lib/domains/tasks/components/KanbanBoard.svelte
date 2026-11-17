@@ -41,6 +41,7 @@
   import { taskStatusLabel, type Task, type TaskStatus } from '../types';
   import ContextMenuList from '$lib/components/menu/ContextMenuList.svelte';
   import { buildTaskMenu } from '../utils/taskMenu';
+  import { stripMarkdown } from '../utils/stripMarkdown';
 
   interface Props {
     ui?: TaskUiState;
@@ -213,7 +214,9 @@
                     </div>
 
                     {#if task.description}
-                      <p class="line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
+                      <p class="line-clamp-2 text-xs text-muted-foreground">
+                        {stripMarkdown(task.description)}
+                      </p>
                     {/if}
 
                     {#if task.type || isOverdue(task) || isDueToday(task) || isDueThisWeek(task) || blocked || tags.length > 0}
@@ -382,7 +385,7 @@
 
                       {#if subtask.description}
                         <p class="line-clamp-2 text-xs text-muted-foreground">
-                          {subtask.description}
+                          {stripMarkdown(subtask.description)}
                         </p>
                       {/if}
 

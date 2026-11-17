@@ -26,6 +26,7 @@
   import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
   import type { ChatMessage } from '$lib/domains/ai/types';
   import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
+  import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
   import { goto } from '$app/navigation';
 
   interface Props {
@@ -231,9 +232,7 @@
             <CardContent class="space-y-4">
               <div>
                 <h3 class="mb-2 font-semibold">{generatedData.title}</h3>
-                <div class="prose max-w-none dark:prose-invert">
-                  <pre class="text-sm whitespace-pre-wrap">{generatedData.content}</pre>
-                </div>
+                <ChatMarkdown content={generatedData.content} />
               </div>
               {#if generatedData.suggestedTags && generatedData.suggestedTags.length > 0}
                 <div class="flex flex-wrap gap-2">

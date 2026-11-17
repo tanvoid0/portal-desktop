@@ -17,6 +17,7 @@
   import { Progress } from '$lib/components/ui/progress';
   import { Label } from '$lib/components/ui/label';
   import { Switch } from '$lib/components/ui/switch';
+  import ChatMarkdown from '$lib/components/ui/chat-markdown/ChatMarkdown.svelte';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Download from '~icons/fa6-solid/download';
   import CheckCircle2 from '~icons/fa6-solid/circle-check';
@@ -255,8 +256,8 @@
                   </p>
                 {/if}
                 {#if updateInfo.body}
-                  <div class="text-sm whitespace-pre-wrap">
-                    {updateInfo.body}
+                  <div class="max-h-72 overflow-y-auto">
+                    <ChatMarkdown content={updateInfo.body} density="compact" />
                   </div>
                 {/if}
               </div>

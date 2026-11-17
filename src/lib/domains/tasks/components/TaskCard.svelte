@@ -17,6 +17,7 @@
   import { Badge } from '$lib/components/ui/badge';
   import Icon from '@iconify/svelte';
   import { taskUi, getSubtaskCount } from '../state/taskUi.svelte';
+  import { stripMarkdown } from '../utils/stripMarkdown';
   import {
     getTaskStatusColor,
     getPriorityColor,
@@ -176,7 +177,7 @@
 
     {#if task.description}
       <p class="mb-3 line-clamp-2 text-xs text-muted-foreground">
-        {task.description}
+        {stripMarkdown(task.description)}
       </p>
     {/if}
 

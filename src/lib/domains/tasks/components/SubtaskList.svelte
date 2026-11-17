@@ -13,6 +13,7 @@
   import { Textarea } from '$lib/components/ui/textarea';
   import Select from '$lib/components/ui/select.svelte';
   import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
+  import MarkdownView from '$lib/components/ui/markdown-view.svelte';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
   import { taskActions } from '../stores/taskStore';
@@ -349,9 +350,9 @@
                 </div>
               </div>
               {#if subtask.description}
-                <p class="mt-2 ml-6 text-sm text-muted-foreground">
-                  {subtask.description}
-                </p>
+                <div class="mt-2 ml-6">
+                  <MarkdownView content={subtask.description} truncateAt={300} />
+                </div>
               {/if}
             </div>
           {/if}
