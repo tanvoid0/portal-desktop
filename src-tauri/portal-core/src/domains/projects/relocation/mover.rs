@@ -709,6 +709,10 @@ impl Mover<'_> {
                 // Our staging dir, or one we created but hadn't marked yet.
                 Some(id) if id == row.id => remove_staging(&staging)?,
                 None => remove_staging(&staging)?,
+                // #866: a pre-#414 walk copied the source's stale root marker
+                // over ours. The dir is still provably this move's: it is the
+                // journaled path AND its name is `.portal-staging-<this id>`.
+                Some(_) if owns_staging_by_name(&row) => remove_staging(&staging)?,
                 Some(_) => {
                     return Err("staging sidecar id does not match — refusing to delete".into())
                 }
@@ -1298,6 +1302,11 @@ pub fn recovery_options(row: &project_move::Model) -> RecoveryStatus {
         // staging sits on the dest volume (staging_path = dest.parent()/…), so
         // its existence already implies the drive is present — no volume check.
         "verified" if staging.exists() && mine(&staging) => (vec![Finish, Rollback], None),
+        // #866: marker overwritten by a stale one, but the dir is ours by name.
+        "verified" if staging.exists() && owns_staging_by_name(row) => (
+            vec![Rollback],
+            Some("staging marker was overwritten by a stale one — only rollback is safe".into()),
+        ),
         "verified" if !volume_present(&dest) => (
             vec![],
             Some("destination drive not available — retry when it is connected".into()),
@@ -1452,6 +1461,14 @@ fn read_sidecar(staging: &Path) -> Option<String> {
     fs::read_to_string(staging.join(SIDECAR))
         .ok()
         .map(|s| s.trim().to_string())
+}
+
+/// True when the journaled staging path is exactly the one this move would have
+/// created (`dest.parent()/.portal-staging-<id>`). Move ids are unique, so a
+/// directory with that name is ours even if its marker file is not.
+fn owns_staging_by_name(row: &project_move::Model) -> bool {
+    staging_path(Path::new(&row.dest_path), &row.id)
+        .is_ok_and(|p| p == Path::new(&row.staging_path))
 }
 
 fn remove_staging(staging: &Path) -> Result<(), String> {
@@ -2186,6 +2203,30 @@ mod tests {
             updated_at: "t".into(),
             finished_at: None,
         }
+    }
+
+    /// #866: staging whose marker was overwritten by a stale one is still ours
+    /// when it is the journaled path named for this move; offer rollback only.
+    #[test]
+    fn stale_marker_staging_is_rollback_only_when_named_for_the_move() {
+        use RecoveryAction::Rollback;
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("dest");
+        let ours = staging_path(&dest, "m5").unwrap();
+        fs::create_dir_all(&ours).unwrap();
+        write_sidecar(&ours, "stale-old-move").unwrap();
+        let src = dir.path().to_str().unwrap();
+        let row = mv("m5", "verified", src, dest.to_str().unwrap(), ours.to_str().unwrap());
+        assert!(owns_staging_by_name(&row));
+        assert_eq!(recovery_options(&row).actions, vec![Rollback]);
+
+        // Same stale marker, but the journaled path is not this move's name.
+        let other = dir.path().join("elsewhere");
+        fs::create_dir_all(&other).unwrap();
+        write_sidecar(&other, "stale-old-move").unwrap();
+        let row = mv("m5", "verified", src, dest.to_str().unwrap(), other.to_str().unwrap());
+        assert!(!owns_staging_by_name(&row));
+        assert!(recovery_options(&row).actions.is_empty());
     }
 
     #[test]
