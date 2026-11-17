@@ -435,19 +435,14 @@ impl WorkflowEngine {
 
     /// Substitute variables in a string
     fn substitute_variables(&self, text: &str, context: &WorkflowContext) -> String {
-        let mut result = text.to_string();
-
-        for (key, value) in &context.variables {
-            result = result.replace(&format!("${{{}}}", key), value);
-            result = result.replace(&format!("${}", key), value);
-        }
-
-        // Common variables
+        // Single pass (longest name wins, values never rescanned). Raw mode:
+        // steps spawn argv, no shell parses the result.
+        let mut vars = context.variables.clone();
         if let Some(project_path) = &context.project_path {
-            result = result.replace("${PROJECT_PATH}", &project_path.to_string_lossy());
+            vars.entry("PROJECT_PATH".to_string())
+                .or_insert_with(|| project_path.to_string_lossy().into_owned());
         }
-
-        result
+        crate::utils::shell_template::expand_raw(text, &vars)
     }
 
     /// Evaluate a condition (simple boolean logic)
@@ -547,5 +542,24 @@ mod tests {
 
         let result = engine.execute_workflow("test", context).await.unwrap();
         assert!(result.success);
+    }
+
+    #[test]
+    fn substitute_is_single_pass_and_longest_name_wins() {
+        let engine = WorkflowEngine::new();
+        let mut variables = HashMap::new();
+        variables.insert("PROJECT".to_string(), "short".to_string());
+        variables.insert("PROJECT_NAME".to_string(), "long".to_string());
+        variables.insert("A".to_string(), "${B}".to_string());
+        variables.insert("B".to_string(), "second".to_string());
+        let context = WorkflowContext {
+            project_path: Some(PathBuf::from("/p")),
+            variables,
+            trigger_data: None,
+        };
+        assert_eq!(
+            engine.substitute_variables("$PROJECT $PROJECT_NAME ${A} ${PROJECT_PATH}", &context),
+            "short long ${B} /p"
+        );
     }
 }
