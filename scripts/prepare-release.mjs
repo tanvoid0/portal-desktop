@@ -144,7 +144,8 @@ ${bullets}
 `;
 
   const header = '# Portal Desktop - Release Notes\n\n';
-  const body = current.startsWith(header) ? current.slice(header.length) : current;
+  // \r?: a Windows autocrlf checkout has CRLF; a plain startsWith missed it and duplicated the header.
+  const body = current.replace(/^# Portal Desktop - Release Notes\r?\n\r?\n/, '');
 
   writeFileSync(FILES.releaseNotes, `${header}${section}${body}`);
   return true;
