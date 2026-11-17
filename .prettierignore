@@ -18,5 +18,8 @@ node_modules/
 # QA board: agent-written issues and repro scripts
 .claude/qa/
 
+# Nested git worktrees: each is a full checkout, gated in its own tree
+.claude/worktrees/
+
 # Generated hook cache (impeccable plugin)
 .impeccable/
