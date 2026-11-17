@@ -75,6 +75,10 @@ impl AgentBackend for ClaudeCodeBackend {
         which::which("claude")
             .map_err(|_| "`claude` CLI not found on PATH. Install Claude Code.".to_string())?;
 
+        // An agent edits the tree it runs in; refuse mid-move (two-way, like
+        // the coder tools) before any hook listener or settings file exists.
+        crate::domains::projects::move_lock::ensure_unlocked(std::path::Path::new(&params.cwd))?;
+
         let run_id = uuid::Uuid::new_v4().to_string();
         let (hook_port, hook_token, pending, shutdown_tx) =
             spawn_permission_hook(events_tx.clone()).await?;
