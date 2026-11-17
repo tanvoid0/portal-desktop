@@ -2,6 +2,17 @@
 # first jobs would — type errors, lint/format (incl. prettier on docs/scripts,
 # which caught v0.13.0's first release failure), and a Rust compile check.
 # Full tests/build/release-smoke stay for `pnpm release:verify` (act) before tagging.
+# The gates below check THIS working tree. Only run them when what is being
+# pushed is HEAD; otherwise they would grade the wrong code (pass a broken ref,
+# block a good one), so skip and leave it to CI. stdin: "<ref> <sha> <ref> <sha>".
+head=$(git rev-parse HEAD)
+while read -r _ local_sha _ _; do
+  case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  if [ "$local_sha" != "$head" ]; then
+    echo "pre-push: pushing $local_sha, not checked-out HEAD - local gate skipped (CI will run it)"
+    exit 0
+  fi
+done
 pnpm check
 pnpm lint
 cargo check --manifest-path src-tauri/Cargo.toml
