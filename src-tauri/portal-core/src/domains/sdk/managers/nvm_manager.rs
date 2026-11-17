@@ -1,6 +1,6 @@
 use super::super::traits::sdk_manager::{SDKManager, SDKManagerDefaults, SDKManagerHelpers};
 use super::super::SDKError;
-use crate::command_executor::{CommandExecutor, CommandResult};
+use crate::command_executor::{CommandExecutor, CommandOptions, CommandResult};
 /**
  * NVM (Node Version Manager) Implementation
  *
@@ -25,27 +25,37 @@ impl NvmManager {
 
     /// Run `nvm <args>` with whichever nvm this platform has; stdout on success.
     async fn nvm(&self, args: &[&str]) -> Result<String, SDKError> {
-        if cfg!(windows) {
-            let result = Self::nvm_windows(args).await?;
-            if result.success {
-                Ok(result.stdout)
-            } else {
-                Err(Self::failed(args, &result))
-            }
+        let result = if cfg!(windows) {
+            Self::nvm_windows(args).await?
         } else {
-            self.execute_shell_command(&format!(
-                r#"
+            Self::nvm_sh(args, CommandOptions::default()).await?
+        };
+        if result.success {
+            Ok(result.stdout)
+        } else {
+            Err(Self::failed(args, &result))
+        }
+    }
+
+    /// nvm-sh is a shell function, so it needs bash, but the args go in as bash's
+    /// positional parameters (`nvm "$@"`), never spliced into the script: a version
+    /// or path is always one word, whatever characters it holds.
+    async fn nvm_sh(args: &[&str], options: CommandOptions) -> Result<CommandResult, SDKError> {
+        const SCRIPT: &str = r#"
             if [ -s "$HOME/.nvm/nvm.sh" ]; then
                 source "$HOME/.nvm/nvm.sh"
             elif [ -s "/usr/local/opt/nvm/nvm.sh" ]; then
                 source "/usr/local/opt/nvm/nvm.sh"
             fi
-            nvm {}
-        "#,
-                args.join(" ")
-            ))
+            nvm "$@"
+        "#;
+        let argv: Vec<&str> = ["-c", SCRIPT, "nvm"]
+            .into_iter()
+            .chain(args.iter().copied())
+            .collect();
+        CommandExecutor::execute_with_args("bash", &argv, Some(options))
             .await
-        }
+            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to run nvm: {}", e)))
     }
 
     /// Invoke nvm-windows directly (no shell). `%NVM_HOME%\nvm.exe` first, since the
@@ -65,21 +75,6 @@ impl NvmManager {
     fn failed(args: &[&str], result: &CommandResult) -> SDKError {
         let output = format!("{}\n{}", result.stdout.trim(), result.stderr.trim());
         SDKError::CommandFailed(format!("nvm {} failed: {}", args.join(" "), output.trim()))
-    }
-
-    async fn execute_shell_command(&self, command: &str) -> Result<String, SDKError> {
-        let result = CommandExecutor::execute_shell(command, None)
-            .await
-            .map_err(|e| SDKError::ManagerNotFound(format!("Failed to execute command: {}", e)))?;
-
-        if result.success {
-            Ok(result.stdout)
-        } else {
-            Err(SDKError::ManagerNotFound(format!(
-                "Command failed: {}",
-                result.stderr
-            )))
-        }
     }
 
     fn version_arg() -> &'static str {
@@ -236,23 +231,17 @@ impl SDKManager for NvmManager {
             ));
         }
 
-        let nvm_use_project_command = format!(
-            r#"
-            cd {} && if [ -s "$HOME/.nvm/nvm.sh" ]; then
-                source "$HOME/.nvm/nvm.sh"
-                nvm use {}
-            elif [ -s "/usr/local/opt/nvm/nvm.sh" ]; then
-                source "/usr/local/opt/nvm/nvm.sh"
-                nvm use {}
-            else
-                nvm use {}
-            fi
-        "#,
-            project_path, version, version, version
-        );
-
-        self.execute_shell_command(&nvm_use_project_command).await?;
-        Ok(())
+        let args = ["use", version];
+        let options = CommandOptions {
+            working_directory: Some(project_path.to_string()),
+            ..Default::default()
+        };
+        let result = Self::nvm_sh(&args, options).await?;
+        if result.success {
+            Ok(())
+        } else {
+            Err(Self::failed(&args, &result))
+        }
     }
 
     async fn is_version_installed(&self, version: &str) -> Result<bool, SDKError> {
@@ -457,5 +446,38 @@ This is a partial list. For a complete list, visit https://nodejs.org/en/downloa
             parse_windows_available(available),
             ["27.0.0-alpha.0.1.0", "26.13.1", "26.12.1", "24.22.3"]
         );
+    }
+
+    /// A stub nvm.sh echoes its cwd and argv: hostile args arrive as single words
+    /// and run nothing, and a project path with a space is the working directory.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn nvm_sh_passes_args_as_words() {
+        let home = tempfile::tempdir().unwrap();
+        std::fs::create_dir(home.path().join(".nvm")).unwrap();
+        std::fs::write(
+            home.path().join(".nvm/nvm.sh"),
+            "nvm() { pwd; printf '%s\\n' \"$@\"; }\n",
+        )
+        .unwrap();
+        let project = home.path().join("my proj");
+        std::fs::create_dir(&project).unwrap();
+
+        let hostile = ["use", "1; touch pwned", "$(touch pwned2)", "a b"];
+        let options = CommandOptions {
+            working_directory: Some(project.to_string_lossy().into_owned()),
+            environment: Some(HashMap::from([(
+                "HOME".to_string(),
+                home.path().to_string_lossy().into_owned(),
+            )])),
+            ..Default::default()
+        };
+        let result = NvmManager::nvm_sh(&hostile, options).await.unwrap();
+
+        assert!(result.success, "{}", result.stderr);
+        let lines: Vec<&str> = result.stdout.lines().collect();
+        assert!(lines[0].ends_with("/my proj"), "cwd: {}", lines[0]);
+        assert_eq!(lines[1..], hostile);
+        assert!(!project.join("pwned").exists() && !project.join("pwned2").exists());
     }
 }
