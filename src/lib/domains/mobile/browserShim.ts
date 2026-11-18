@@ -9,6 +9,10 @@
  *   `localStorage` instead of a file (a browser has no filesystem).
  *   `mobile_discover` always returns `[]` — no UDP from a browser; manual
  *   host/port entry on `/connect` already covers it.
+ * - `mobile_control_send({frame})` queues one frame on a lazily-opened
+ *   `/control` WebSocket (`?token=`, since a handshake can't carry a header)
+ *   and returns at once; the daemon's `{t:"error"}` replies come back as
+ *   `mobile://control-error`.
  * - Everything else forwards to `POST /rpc/{command}` with a bearer token,
  *   except the two `plugin:event|*` commands `@tauri-apps/api/event`'s
  *   `listen`/`_unlisten` issue, which are served locally against the
@@ -21,6 +25,9 @@ import { isMobileShell } from './shell';
 import { isForwardableCommand } from './commandName';
 
 const STORAGE_KEY = 'portal-client-connection';
+
+/** Frames the `/control` socket may hold while it is still opening — mirrors the Rust shell's `CONTROL_QUEUE`. */
+const CONTROL_QUEUE = 64;
 
 interface StoredConn {
   host: string;
@@ -76,6 +83,18 @@ function pairError(status: number): string {
       return 'too many pairing attempts; wait a minute and retry';
     default:
       return `pairing failed: desktop answered HTTP ${status}`;
+  }
+}
+
+/** What `mobile://control-error` carries for one `/control` frame: the daemon's `{t:"error"}`
+ * refusals only. `hello` and the fanout it forwards are already delivered by `/events`.
+ * Mirrors `control_error()` in `mobile/src-tauri/src/lib.rs`. */
+function controlError(data: string): { t: 'error'; message?: string } | null {
+  try {
+    const frame = JSON.parse(data) as { t?: unknown } | null;
+    return frame?.t === 'error' ? (frame as { t: 'error'; message?: string }) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -139,6 +158,10 @@ class Bridge {
   private live = false;
   private generation = 0;
   private socket: WebSocket | null = null;
+  /** The one `/control` socket: opened by the first `mobile_control_send`, reused until it closes. */
+  private control: WebSocket | null = null;
+  /** Frames sent while it is still opening — a socket cannot `send()` before `open`. */
+  private controlQueue: string[] = [];
 
   /** `transformCallback(response)` → `{event, id, payload}`, same shape the real Tauri
    * webview delivers to a `listen()` handler (see `connection.svelte.ts`'s `e.payload`). */
@@ -170,6 +193,7 @@ class Bridge {
     this.generation++;
     this.socket?.close();
     this.socket = null;
+    this.closeControl();
     this.caps = [];
     this.live = false;
     saveConn(null);
@@ -181,6 +205,7 @@ class Bridge {
     this.generation++;
     this.socket?.close();
     this.socket = null;
+    this.closeControl(); // its socket carries the old token
     this.live = false;
     saveConn(conn);
     this.emit('mobile://connection', this.status());
@@ -254,6 +279,60 @@ class Bridge {
         /* onclose always follows; nothing to do here. */
       };
     });
+  }
+
+  /** Drop the `/control` socket and anything still queued for it. */
+  private closeControl(): void {
+    this.control?.close();
+    this.control = null;
+    this.controlQueue = [];
+  }
+
+  /** `mobile_control_send`, mirroring the Rust shell's `queue_control`/`open_control`:
+   * fire-and-forget — queue the frame and return, never wait on the network. Opens the
+   * socket if none is live; one that closed (the daemon drops it on revoke, caps change and
+   * expiry) is replaced by the next call. A revoked token can't be told from any other
+   * failed handshake here (see `run`), so it just retries until `run`'s `whoami()` clears. */
+  controlSend(frame: unknown): void {
+    const conn = loadConn();
+    if (!conn) throw 'not connected to a Portal Desktop';
+    const text = JSON.stringify(frame);
+    const socket = this.control ?? this.openControl(conn);
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(text);
+    } else if (this.controlQueue.length < CONTROL_QUEUE) {
+      this.controlQueue.push(text);
+    } else {
+      throw 'the control socket is backed up';
+    }
+  }
+
+  private openControl(conn: StoredConn): WebSocket {
+    // A handshake can't carry an `Authorization` header, so the token rides the query, as on /events.
+    const url = `ws://${hostport(conn.host, conn.port)}/control?token=${encodeURIComponent(conn.token)}`;
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(url);
+    } catch (e) {
+      throw `cannot reach ${conn.host}:${conn.port}: ${String(e)}`; // bad URL / SecurityError
+    }
+    this.control = socket;
+    socket.onopen = () => {
+      for (const text of this.controlQueue.splice(0)) socket.send(text);
+    };
+    socket.onmessage = (ev) => {
+      const err = controlError(ev.data as string);
+      if (err) this.emit('mobile://control-error', err);
+    };
+    socket.onclose = () => {
+      if (this.control !== socket) return; // already replaced or cleared
+      this.control = null;
+      this.controlQueue = [];
+    };
+    socket.onerror = () => {
+      /* onclose always follows; nothing to do here. */
+    };
+    return socket;
   }
 
   listen(event: string, handlerId: number): number {
@@ -347,6 +426,10 @@ async function local(bridge: Bridge, cmd: string, args: Record<string, unknown>)
       return bridge.status();
     case 'mobile_discover':
       return [];
+    case 'mobile_control_send':
+      if (args.frame == null) throw 'missing `frame`';
+      bridge.controlSend(args.frame);
+      return null;
     case 'mobile_connect': {
       const host = need(args.host, 'host');
       if (typeof args.port !== 'number') throw 'missing `port`';

@@ -142,7 +142,8 @@ Each ships on its own.
    connection becomes a URL instead of `host:port`; `/rpc` and `/events` keep
    their shape. Not built until LAN use is solid.
 5. **PC control in Svelte** — trackpad + keyboard page over `/control`
-   (`remote.input` is already served by the daemon), resource monitor (the
+   (`remote.input` is already served by the daemon; the transport for both
+   clients is `mobile_control_send`, see "Other clients"), resource monitor (the
    existing `host_stats` + `disk_usage` commands, served under the default
    read-only `sysinfo` cap, plus a page the desktop gets for free too).
 6. **Media-remote features** — screen mirror, files, now-playing/volume. Port
@@ -165,7 +166,8 @@ Each ships on its own.
 `com.tanvoid0.portal.mobile`; must not depend on `src-tauri` or `portal-core`)
 
 - `frontendDist` = root SvelteKit build, built with `VITE_PORTAL_MOBILE=1`.
-- Stored connection `{host, port, token, name}`: JSON in the app data dir.
+- Stored connection `{host, port, token, name}` (plus the device's own `device`
+  name, once paired): JSON in the app data dir.
 - Local commands — the contract the frontend codes against:
 
 | Command                               | Behaviour                                                                                                       |
@@ -175,6 +177,7 @@ Each ships on its own.
 | `mobile_connect({host, port, token})` | Verify with `GET /whoami`, store, start events bridge. QR payload: `portalremote://{ip}:{port}/{token}`.        |
 | `mobile_disconnect()`                 | Stop bridge, delete stored connection.                                                                          |
 | `mobile_discover()`                   | UDP broadcast `PORTALREMOTE?` to 8765, collect replies ~1.5 s → `[{host, port, name, version}]`.                |
+| `mobile_control_send({frame})`        | Queue one `/control` frame, fire-and-forget. Daemon `{t:"error"}` replies → `mobile://control-error`.           |
 
 - Event `mobile://connection` (payload = status) on every change, including a
   401 from the daemon (token revoked → disconnected).
@@ -269,9 +272,10 @@ Narrowed to: loopback only gets the free `Local` pass when there is **no**
 `Origin`-bearing request — browser-originated, loopback or remote — instead
 falls through to the same bearer-token check a remote peer needs. A visited
 page can't forge a token it was never handed, so this is what actually keeps
-it off the port, not the `Origin` value itself. `/events`'s browser
-`WebSocket` handshake can't set a custom header, so it additionally accepts
-the token as `?token=` on that one path.
+it off the port, not the `Origin` value itself. A browser `WebSocket`
+handshake can't set a custom header, so `/events` and `/control` additionally
+accept the token as `?token=` — those two paths only, and it only ever
+resolves to a paired device (`Remote`), never to the loopback pass.
 
 **The browser shim** (`src/lib/domains/mobile/browserShim.ts`) is the
 web-client counterpart to `mobile/src-tauri/src/lib.rs`: it installs
@@ -288,6 +292,20 @@ rejects cleanly instead of forwarding garbage; `/events` is bridged with a
 plain `WebSocket` and the same capped-backoff reconnect as the Rust client. No
 transport code in the rest of the frontend changes — `invoke`/`listen` stay
 exactly what the desktop app already calls.
+
+**`/control` from both clients (phase 5 transport):**
+`invoke('mobile_control_send', { frame })` queues one `/control` frame (wire
+shapes in `daemon/input.rs`, e.g. `{ t: 'mouse_move', dx: 50, dy: 0 }`) and
+returns at once. Each client opens one `/control` socket lazily, reuses it, and
+opens a fresh one on the next call after it closes. The Android shell
+authenticates with `Authorization: Bearer` (plus `X-Portal-Device` when it knows
+the device's name) and keeps the token in Rust — the page only hands over the
+frame; the browser has no header to set, so it uses `?token=` as it does for
+`/events`. The `hello` and the event fanout the daemon also sends on `/control`
+are dropped (already on `/events`); its `{t:"error"}` replies — this device
+lacks `remote.input`, injection is unavailable on the PC — arrive as the
+`mobile://control-error` event. `remote.input` stays the opt-in cap per device,
+browsers included.
 
 **Serving it:** `pnpm build:client` builds the SvelteKit frontend with
 `VITE_PORTAL_MOBILE=1` to its own `build-client/` output dir (NOT `build/` —

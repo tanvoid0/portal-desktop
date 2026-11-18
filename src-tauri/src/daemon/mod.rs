@@ -39,9 +39,11 @@
 //!   handed, so this is what actually keeps it off a port that exposes
 //!   terminal execution and a credential vault, not any of these headers'
 //!   values.
-//! - **A live bearer token (header, or `?token=` on `/events` — a browser
-//!   `WebSocket` cannot set a custom header) → `Remote { caps }`**: a paired
-//!   device, allowed only the commands/events its granted capabilities cover.
+//! - **A live bearer token (header, or `?token=` on `/events` and `/control` —
+//!   a browser `WebSocket` cannot set a custom header) → `Remote { caps }`**: a
+//!   paired device, allowed only the commands/events its granted capabilities
+//!   cover. The query form is the only way a token reaches `Remote` other than
+//!   the header, and it is read on those two paths alone ([`socket_query_token`]).
 //!   This applies to a page-originated loopback request too, now scoped like
 //!   any other remote rather than exempted.
 //! - **No token → `Anon`**: may reach `/health` and `/pair/request` to pair,
@@ -350,6 +352,19 @@ fn query_param(query: Option<&str>, key: &str) -> Option<String> {
     })
 }
 
+/// The `?token=` on a WebSocket handshake. Honoured on `/events` and `/control`
+/// only — the two routes a browser `WebSocket`, which cannot set an
+/// `Authorization` header, has to reach. Every other path ignores the query, so
+/// a token in a URL can never unlock `/rpc` or anything else. It is also the one
+/// place a token could leak into a log: the router carries no trace/log layer and
+/// no handler or error body echoes the URI, so keep it that way — a layer that
+/// logs request URIs must redact `token` first.
+fn socket_query_token(path: &str, query: Option<&str>) -> Option<String> {
+    matches!(path, "/events" | "/control")
+        .then(|| query_param(query, "token"))
+        .flatten()
+}
+
 /// True if the request's `Host` header actually names `peer` — the address
 /// the TCP connection came in on — rather than some other name a DNS rebind
 /// could have pointed at this socket while keeping its own name in the
@@ -472,11 +487,7 @@ async fn guard(
     let path = req.uri().path().to_string();
     let peer_ip = peer.ip();
 
-    // `/events` is the one path a browser `WebSocket` needs this for: the
-    // handshake request can't carry a custom header.
-    let query_token = (path == "/events")
-        .then(|| query_param(req.uri().query(), "token"))
-        .flatten();
+    let query_token = socket_query_token(&path, req.uri().query());
     let token = bearer(&headers).or_else(|| query_token.clone());
 
     let identity = match (&token, state.db()) {
@@ -760,6 +771,7 @@ mod tests {
         ));
         assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
         assert!(classify(local, &h, "/events", None, |_| None).is_err());
+        assert!(classify(local, &h, "/control", None, |_| None).is_err());
     }
 
     /// `Sec-Fetch-Site` closes the same hole for a same-origin request a
@@ -780,6 +792,7 @@ mod tests {
         ));
         assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
         assert!(classify(local, &h, "/whoami", None, |_| None).is_err());
+        assert!(classify(local, &h, "/control", None, |_| None).is_err());
     }
 
     /// The fix for #556: a page whose own hostname has been DNS-rebound to
@@ -801,6 +814,7 @@ mod tests {
             ));
             assert!(classify(local, &h, "/rpc/decrypt_credential", None, |_| None).is_err());
             assert!(classify(local, &h, "/whoami", None, |_| None).is_err());
+            assert!(classify(local, &h, "/control", None, |_| None).is_err());
         }
     }
 
@@ -847,20 +861,68 @@ mod tests {
         }
     }
 
-    /// `/events` is the one path a query-string token is honoured on — a
-    /// browser `WebSocket` handshake cannot carry a custom header.
+    /// `/events` and `/control` are the only paths a query-string token is
+    /// honoured on — a browser `WebSocket` handshake cannot carry a custom
+    /// header, and nothing else needs the escape hatch. `classify` honours
+    /// whatever it is handed, so the "nowhere else" half is the call site's job:
+    /// `socket_query_token` is what `guard` hands it.
     #[test]
-    fn events_accepts_a_query_token_a_header_token_is_refused_elsewhere() {
+    fn a_query_token_is_read_on_the_two_socket_routes_and_nowhere_else() {
+        let query = Some("x=1&token=good");
+        for path in ["/events", "/control"] {
+            assert_eq!(socket_query_token(path, query).as_deref(), Some("good"));
+        }
+        for path in [
+            "/rpc/coder_list_threads",
+            "/whoami",
+            "/health",
+            "/pair/request",
+            "/",
+            "/events/",
+            "/control/x",
+            "/Control",
+        ] {
+            assert_eq!(socket_query_token(path, query), None, "{path}");
+        }
+        assert_eq!(socket_query_token("/control", None), None);
+        assert_eq!(socket_query_token("/control", Some("tok=good")), None);
+
+        // End to end through `classify`: the same query string unlocks the
+        // two socket routes and is refused on `/rpc`.
         let resolve = |tok: &str| (tok == "good").then(|| ("dev-1".to_string(), vec![]));
-        assert!(matches!(
-            classify(remote(), &HeaderMap::new(), "/events", Some("good"), resolve).unwrap(),
-            Trust::Remote { .. }
-        ));
-        // Same query string on a different path is just ignored by `guard`
-        // (it only reads it for `/events`) - `classify` itself would honour
-        // whatever it's handed, so this documents the call site's job, not
-        // `classify`'s.
-        assert!(classify(remote(), &HeaderMap::new(), "/rpc/coder_list_threads", None, resolve).is_err());
+        for path in ["/events", "/control", "/rpc/coder_list_threads"] {
+            let token = socket_query_token(path, query);
+            let trust = classify(remote(), &HeaderMap::new(), path, token.as_deref(), resolve);
+            assert_eq!(trust.is_ok(), path != "/rpc/coder_list_threads", "{path}");
+        }
+    }
+
+    /// A browser's `WebSocket` handshake always carries `Origin` (and
+    /// `Sec-Fetch-Site` where the browser has Fetch Metadata), so it never gets
+    /// the loopback pass: `?token=` on `/control` resolves to `Remote` with
+    /// exactly the device's caps — never `Local`, loopback peer or not — and a
+    /// token the database does not vouch for (revoked, expired, never issued),
+    /// or none at all, is a 401 before any upgrade.
+    #[test]
+    fn a_browser_websocket_on_control_is_remote_with_its_caps_or_refused() {
+        let resolve =
+            |tok: &str| (tok == "good").then(|| ("dev-1".to_string(), vec!["coder".to_string()]));
+        let mut page = with_header(header::ORIGIN, "http://192.168.1.10:18420");
+        page.insert(
+            axum::http::HeaderName::from_static("sec-fetch-site"),
+            "same-origin".parse().unwrap(),
+        );
+        for peer in ["127.0.0.1".parse().unwrap(), remote()] {
+            match classify(peer, &page, "/control", Some("good"), resolve).unwrap() {
+                Trust::Remote { device_id, caps } => {
+                    assert_eq!(device_id, "dev-1");
+                    assert_eq!(caps, vec!["coder".to_string()]);
+                }
+                other => panic!("expected Remote, got {other:?}"),
+            }
+            assert!(classify(peer, &page, "/control", Some("stale"), resolve).is_err());
+            assert!(classify(peer, &page, "/control", None, resolve).is_err());
+        }
     }
 
     #[test]
@@ -1033,6 +1095,23 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(refused.status().as_u16(), 401);
+
+        // `/control` sits behind the same guard, wired through the real router:
+        // the native loopback client upgrades; a page with no token, or with
+        // one the database does not know, is refused before any upgrade.
+        let allowed = upgrade(client.get(format!("http://{addr}/control")))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(allowed.status().as_u16(), 101);
+        for path in ["control", "control?token=nope"] {
+            let refused = upgrade(client.get(format!("http://{addr}/{path}")))
+                .header("Origin", "https://evil.example")
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(refused.status().as_u16(), 401, "/{path}");
+        }
     }
 
     #[tokio::test]

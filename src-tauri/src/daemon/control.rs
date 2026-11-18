@@ -1,9 +1,9 @@
-//! `GET /control` — Android's live socket: a `hello` frame on connect, then
-//! ping/pong, mouse/keyboard input (gated on the `remote.input` capability —
-//! see [`input`]), and this app's existing event fanout, filtered by
-//! capability exactly like `/events`. Mirror/audio/casting are later phases;
-//! any other client frame gets an explicit "not implemented yet" rather than
-//! silently hanging.
+//! `GET /control` — the thin clients' live socket (Android's, and a browser's
+//! over `?token=`): a `hello` frame on connect, then ping/pong, mouse/keyboard
+//! input (gated on the `remote.input` capability — see [`input`]), and this
+//! app's existing event fanout, filtered by capability exactly like `/events`.
+//! Mirror/audio/casting are later phases; any other client frame gets an
+//! explicit "not implemented yet" rather than silently hanging.
 //!
 //! A remote socket closes when its device is revoked, its capabilities change,
 //! or its grant expires ([`pairing::drop_device`], plus the 60 s expiry
@@ -36,8 +36,11 @@ pub async fn control(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Response {
-    // The guard has already refused browsers and anonymous remotes (`/control`
-    // is not in `is_public_path`), so trust here is always Local or Remote.
+    // The guard has already refused anyone with neither a loopback pass nor a
+    // live token (`/control` is not in `is_public_path`), so trust here is Local
+    // or Remote. A browser's `WebSocket` (`?token=`, see `socket_query_token`)
+    // gets in as a Remote like any paired device: `input_allowed` below holds it
+    // to `remote.input` exactly as it holds Android.
     let cutoff = Cutoff::new(&trust, &state);
     let caps = super::stream_caps(&trust);
 
@@ -278,6 +281,50 @@ mod tests {
         let reply = next_json(&mut ws).await;
         assert_eq!(reply["t"], "error");
         assert!(reply["message"].as_str().unwrap().contains("not permitted"));
+    }
+
+    /// A browser reaches `/control` as a `Remote` holding exactly the caps its
+    /// device was granted (`?token=`, resolved by `classify`), and every input
+    /// frame type is refused unless one of them is `remote.input`. Driven with no
+    /// `input::State`, so a refused frame never reaches the OS and a permitted one
+    /// finds "unavailable" — nothing here can move the real mouse or press a key.
+    #[test]
+    fn a_browser_device_needs_remote_input_for_every_input_frame() {
+        let mut page = HeaderMap::new();
+        page.insert(
+            axum::http::header::ORIGIN,
+            "http://192.168.1.10:18420".parse().unwrap(),
+        );
+        let input = crate::rpc::REMOTE_INPUT_CAP;
+        for (granted, permitted) in [(vec!["coder"], false), (vec!["coder", input], true)] {
+            let granted: Vec<String> = granted.into_iter().map(String::from).collect();
+            let grant = granted.clone();
+            let trust = super::super::classify(
+                "192.168.1.50".parse().unwrap(),
+                &page,
+                "/control",
+                Some("good"),
+                |_| Some(("dev-1".to_string(), grant.clone())),
+            );
+            let Ok(Trust::Remote { caps, .. }) = trust else {
+                panic!("a live token is a Remote");
+            };
+            assert_eq!(caps, granted);
+
+            for t in input::FRAME_TYPES {
+                let frame = json!({ "t": t }).to_string();
+                let reply = handle_client_frame(&frame, &mut None, &Some(caps.clone()))
+                    .expect("an input frame is always answered here");
+                let reply: Value = serde_json::from_str(&reply).unwrap();
+                let message = reply["message"].as_str().unwrap();
+                let expected = if permitted {
+                    "unavailable"
+                } else {
+                    "not permitted"
+                };
+                assert!(message.contains(expected), "{t}: {message}");
+            }
+        }
     }
 
     #[test]
