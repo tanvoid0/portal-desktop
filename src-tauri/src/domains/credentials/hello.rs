@@ -64,25 +64,28 @@ pub async fn available() -> bool {
 #[cfg(windows)]
 pub async fn verify(hwnd: isize, message: &str) -> Result<bool, String> {
     let message = message.to_string();
-    tauri::async_runtime::spawn_blocking(move || {
+    // Start the prompt on a blocking thread (WinRT init + interop call), but
+    // await completion as a future instead of parking a thread on `join()` —
+    // a parked wait never woke after the user confirmed.
+    let op = tauri::async_runtime::spawn_blocking(move || {
         ensure_winrt_initialized();
         let hwnd = HWND(hwnd as *mut _);
         let interop: IUserConsentVerifierInterop =
             factory::<UserConsentVerifier, IUserConsentVerifierInterop>()
                 .map_err(|e| e.to_string())?;
-        let op = unsafe {
+        unsafe {
             interop
                 .RequestVerificationForWindowAsync::<windows_future::IAsyncOperation<UserConsentVerificationResult>>(
                     hwnd,
                     &HSTRING::from(message),
                 )
-                .map_err(|e| e.to_string())?
-        };
-        let result = op.join().map_err(|e| e.to_string())?;
-        Ok(result == UserConsentVerificationResult::Verified)
+                .map_err(|e| e.to_string())
+        }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    let result = op.await.map_err(|e| e.to_string())?;
+    Ok(result == UserConsentVerificationResult::Verified)
 }
 
 #[cfg(not(windows))]

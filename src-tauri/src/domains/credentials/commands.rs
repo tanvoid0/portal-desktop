@@ -232,7 +232,10 @@ pub async fn vault_unlock_with_hello(
     }
 
     let service = VaultService::new(db.get_connection_clone(), session.inner().clone());
-    service.unlock_with_keychain().map_err(|e| e.to_string())
+    service
+        .unlock_with_keychain()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Lock the vault immediately. It otherwise stays unlocked until the app exits.

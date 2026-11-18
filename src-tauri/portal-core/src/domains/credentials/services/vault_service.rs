@@ -163,17 +163,17 @@ impl VaultService {
     }
 
     /// Caller must already have Windows Hello consent before calling this —
-    /// it only reads the keychain and unlocks the session. Sync on purpose:
-    /// portal-core never depends on an async runtime from the host (tauri),
-    /// so the one DB read here blocks on `futures::executor::block_on`.
-    pub fn unlock_with_keychain(&self) -> Result<(), CredentialError> {
-        let exists =
-            futures::executor::block_on(VaultEntity::find_by_id(VAULT_ID).one(&self.db))?.is_some();
+    /// it only reads the keychain and unlocks the session. Async: blocking a
+    /// tokio worker on the DB reads (`futures::executor::block_on`) could hang.
+    pub async fn unlock_with_keychain(&self) -> Result<(), CredentialError> {
+        let exists = VaultEntity::find_by_id(VAULT_ID)
+            .one(&self.db)
+            .await?
+            .is_some();
         if !exists {
             return Err(CredentialError::VaultNotSetUp);
         }
-        let credential_count =
-            futures::executor::block_on(CredentialEntity::find().all(&self.db))?.len();
+        let credential_count = CredentialEntity::find().all(&self.db).await?.len();
         self.session
             .unlock(Self::read_keychain_master_key(credential_count)?);
         Ok(())
