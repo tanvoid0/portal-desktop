@@ -184,7 +184,14 @@ pub async fn start_project_move(
     let row = mv
         .start_move(&project, Path::new(&dest), include_regenerable, acknowledged_warnings, &mut emit)
         .await
-        .map_err(describe_move_error)?;
+        .map_err(|e| {
+            // #1111: pairs the "beginning" line, so a handled failure reads
+            // differently from a silent kill. Project id, not move id: the row is
+            // journaled inside `start_move` and an Err doesn't carry its id.
+            let msg = describe_move_error(e);
+            crate::log_warn!("Moves", "start_project_move: failed project {}: {}", project.id, msg);
+            msg
+        })?;
     crate::log_info!(
         "Moves",
         "start_project_move: finished project {} (move {} state={})",
