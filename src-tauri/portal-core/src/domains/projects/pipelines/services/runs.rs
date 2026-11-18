@@ -129,4 +129,29 @@ mod tests {
         let running: Vec<_> = running_runs(&db).await.unwrap().into_iter().map(|r| r["id"].clone()).collect();
         assert!(running.contains(&json!("e")) && !running.contains(&json!("s")));
     }
+
+    /// A Stop leaves a `cancelled` row with no error: an action reads "Stopped by
+    /// user" (the Action UI expects it), a pipeline run has no such text.
+    #[tokio::test]
+    async fn a_stopped_action_reads_stopped_by_user_but_a_stopped_pipeline_does_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(DatabaseManager::new(dir.path().to_path_buf()).await.unwrap());
+        let repo = ExecutionRepository::new(db.clone());
+        let stopped = |id: &str, action: Option<ActionMeta>| NewRun {
+            id: id.into(),
+            status: "cancelled".into(),
+            triggered_by: "user".into(),
+            step_executions_json: "[]".into(),
+            variables_json: "{}".into(),
+            action,
+            ..Default::default()
+        };
+        repo.insert(stopped("a", Some(ActionMeta { command: "sleep 9".into(), ..Default::default() }))).await.unwrap();
+        repo.insert(stopped("p", None)).await.unwrap();
+
+        let runs = recent_runs(&db, 10).await.unwrap();
+        let error = |id: &str| runs.iter().find(|r| r["id"] == id).unwrap().get("error").cloned();
+        assert_eq!(error("a"), Some(json!("Stopped by user")));
+        assert_eq!(error("p"), None);
+    }
 }

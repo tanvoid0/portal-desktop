@@ -4,7 +4,8 @@ use crate::entities::pipeline_execution::{
 };
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    Set,
 };
 use std::sync::Arc;
 
@@ -152,6 +153,48 @@ impl ExecutionRepository {
             .all(self.db_manager.get_connection())
             .await
             .map_err(|e| format!("Failed to fetch executions: {}", e))
+    }
+
+    /// What an action's ETA is learned from: its successful runs, newest first.
+    /// Without a block, the runs of the same command in the same folder (no folder
+    /// matches no folder). With one, the block's own runs, plus those same-command
+    /// runs that have no block: the old script table NULLed every `block_id` it did
+    /// not know (all built-in blocks, e.g. `test-npm`) and migration 000051 copied
+    /// them that way, so that history is only findable by command and folder.
+    /// Filtered to `success` here so failed, cancelled and running runs do not take
+    /// up `limit` slots.
+    /// ponytail: no index on `block_id` / `command`, so a key with few runs scans
+    /// the table; add one if the table grows.
+    pub async fn get_action_history(
+        &self,
+        block_id: Option<&str>,
+        command: &str,
+        working_directory: Option<&str>,
+        limit: u64,
+    ) -> Result<Vec<ExecutionModel>, String> {
+        let in_folder = match working_directory {
+            Some(dir) => Column::WorkingDirectory.eq(dir),
+            None => Column::WorkingDirectory.is_null(),
+        };
+        let same_command = Condition::all()
+            .add(Column::Command.eq(command))
+            .add(in_folder);
+        let same_run = match block_id {
+            Some(block_id) => Condition::any()
+                .add(Column::BlockId.eq(block_id))
+                .add(same_command.add(Column::BlockId.is_null())),
+            None => same_command,
+        };
+
+        ExecutionEntity::find()
+            .filter(Column::Kind.eq("action"))
+            .filter(Column::Status.eq("success"))
+            .filter(same_run)
+            .order_by_desc(Column::StartedAt)
+            .limit(limit)
+            .all(self.db_manager.get_connection())
+            .await
+            .map_err(|e| format!("Failed to fetch action history: {}", e))
     }
 
     /// Every step row of one workflow run, oldest first.

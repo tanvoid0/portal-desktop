@@ -256,6 +256,42 @@ impl ExecutionService {
         .await
     }
 
+    /// The ETA for an action's step: the median of its own recent successful runs
+    /// (see [`ExecutionRepository::get_action_history`]), for `RunSpec::expected`.
+    /// An action is one step whatever a workflow names it, so every one-step run in
+    /// the history answers for `step_id`; a run of any other length is not an action's.
+    /// Best effort: a history that cannot be read is no history, never a failed run.
+    pub async fn action_expected(&self, meta: &ActionMeta, step_id: &str) -> HashMap<String, i64> {
+        let rows = self
+            .execution_repo
+            .get_action_history(
+                meta.block_id.as_deref(),
+                &meta.command,
+                meta.working_directory.as_deref(),
+                20,
+            )
+            .await
+            .unwrap_or_default();
+        let history: Vec<HistoryRun> = rows
+            .iter()
+            .filter_map(|e| {
+                let steps =
+                    serde_json::from_str::<Vec<StepExecutionState>>(&e.step_executions_json)
+                        .ok()?;
+                let [s] = steps.as_slice() else { return None };
+                // A one-step run lasts as long as its step: a row copied from
+                // `script_executions` may carry no step `duration`, only its own span.
+                let span = e.finished_at.map(|f| (f - e.started_at).num_milliseconds());
+                Some(vec![(
+                    step_id.to_string(),
+                    s.status.clone(),
+                    s.duration.or(span),
+                )])
+            })
+            .collect();
+        expected_durations(&history, &[step_id.to_string()])
+    }
+
     /// Store `spec` as a run, register it so Stop can find it, and drive it on a
     /// background task. Returns the execution id as soon as the run is queued.
     /// Pipelines and Actions both come through here.
@@ -2092,5 +2128,139 @@ mod tests {
         assert_eq!(run.status, "failed");
         assert_eq!(run.error.as_deref(), Some("Exit code 3\noops"));
         assert_eq!(svc.get_step_logs(&id, "s").await.unwrap(), ["oops"]);
+    }
+
+    /// An action's ETA history is its block's successful runs (plus the block-less
+    /// ones of the same command and folder, which is how a built-in block's old
+    /// history was copied), else those of the same command in the same folder (no
+    /// folder matches no folder). It is one step whatever its id; failed runs do
+    /// not use up the window, and a row copied from `script_executions` with no
+    /// step `duration` counts for its own span.
+    #[tokio::test]
+    async fn action_expected_is_the_median_of_the_blocks_or_the_commands_own_runs() {
+        let (svc, _dir) = service_with_execution().await;
+        let meta = |block: Option<&str>, command: &str, cwd: Option<&str>| ActionMeta {
+            command: command.into(),
+            working_directory: cwd.map(Into::into),
+            block_id: block.map(Into::into),
+            ..Default::default()
+        };
+        // An action's step, named `m.step_id` (default "run") as `record_finished_action`
+        // does, that lasted `ms` (`None`: no `duration` written).
+        let step = |m: &ActionMeta, status: &str, ms: Option<i64>| {
+            json!({
+                "id": "i", "stepId": m.step_id.as_deref().unwrap_or("run"), "stepName": m.command,
+                "status": status, "startedAt": "", "output": "", "retryCount": 0, "logs": [],
+                "duration": ms
+            })
+        };
+        // A one-step action row.
+        let row = |m: ActionMeta, status: &str, ms: Option<i64>| NewRun {
+            id: Uuid::new_v4().to_string(),
+            status: status.into(),
+            triggered_by: "user".into(),
+            step_executions_json: json!([step(&m, status, ms)]).to_string(),
+            variables_json: "{}".into(),
+            action: Some(m),
+            ..Default::default()
+        };
+        // The ETA for `m`'s step (`m.step_id`, default "run"), as `execute_script` asks for it.
+        async fn eta(svc: &ExecutionService, m: ActionMeta) -> Option<i64> {
+            let step_id = m.step_id.clone().unwrap_or_else(|| "run".to_string());
+            svc.action_expected(&m, &step_id)
+                .await
+                .get(&step_id)
+                .copied()
+        }
+        let repo = &svc.execution_repo;
+
+        // Block "b": runs of 1 s, 3 s and 5 s, then twenty newer failures that must
+        // not push them out of the window. The command asked for does not matter.
+        for ms in [1000, 3000, 5000] {
+            repo.insert(row(meta(Some("b"), "x", None), "success", Some(ms)))
+                .await
+                .unwrap();
+        }
+        for _ in 0..20 {
+            repo.insert(row(meta(Some("b"), "x", None), "failed", Some(9999)))
+                .await
+                .unwrap();
+        }
+        assert_eq!(eta(&svc, meta(Some("b"), "other", None)).await, Some(3000));
+        assert_eq!(eta(&svc, meta(Some("none"), "x", None)).await, None);
+
+        // No block: the same command in the same folder, and NULL matches NULL.
+        for (cwd, ms) in [(Some("/w"), 7000), (Some("/w"), 9000), (None, 1000)] {
+            repo.insert(row(meta(None, "c", cwd), "success", Some(ms)))
+                .await
+                .unwrap();
+        }
+        assert_eq!(eta(&svc, meta(None, "c", Some("/w"))).await, Some(8000));
+        assert_eq!(eta(&svc, meta(None, "c", None)).await, Some(1000));
+        assert_eq!(eta(&svc, meta(None, "c", Some("/elsewhere"))).await, None);
+
+        // A copied row without a step `duration` counts for the run's own 10 s; a
+        // row whose steps are unreadable counts for nothing and fails nothing.
+        let t0 = Utc::now() - chrono::Duration::seconds(60);
+        repo.insert(NewRun {
+            started_at: Some(t0),
+            finished_at: Some(t0 + chrono::Duration::seconds(10)),
+            ..row(meta(None, "old", None), "success", None)
+        })
+        .await
+        .unwrap();
+        repo.insert(NewRun {
+            step_executions_json: "garbage".into(),
+            ..row(meta(None, "old", None), "success", None)
+        })
+        .await
+        .unwrap();
+        assert_eq!(eta(&svc, meta(None, "old", None)).await, Some(10_000));
+
+        // An action is one step whatever a workflow names it: block "b"'s runs above
+        // were recorded as "run" and answer for "build"; runs recorded as "build"
+        // answer for "run".
+        let build = |m: ActionMeta| ActionMeta {
+            step_id: Some("build".into()),
+            ..m
+        };
+        assert_eq!(
+            eta(&svc, build(meta(Some("b"), "x", None))).await,
+            Some(3000)
+        );
+        for ms in [2000, 4000] {
+            repo.insert(row(build(meta(Some("w"), "x", None)), "success", Some(ms)))
+                .await
+                .unwrap();
+        }
+        assert_eq!(eta(&svc, meta(Some("w"), "x", None)).await, Some(3000));
+        // A run of several steps is not an action's: it answers for nothing.
+        let m = meta(None, "multi", None);
+        let s = step(&m, "success", Some(500));
+        repo.insert(NewRun {
+            step_executions_json: json!([s.clone(), s]).to_string(),
+            ..row(m, "success", Some(500))
+        })
+        .await
+        .unwrap();
+        assert_eq!(eta(&svc, meta(None, "multi", None)).await, None);
+
+        // A built-in block's old history was copied with a NULL block: for a run that
+        // has a block, the same command in the same folder counts; another folder,
+        // another command and another block's run do not.
+        for (block, command, cwd, ms) in [
+            (None, "npm test", Some("/w"), 6000),
+            (None, "npm test", Some("/other"), 90_000),
+            (None, "npm run test", Some("/w"), 90_000),
+            (Some("not-t"), "npm test", Some("/w"), 90_000),
+        ] {
+            repo.insert(row(meta(block, command, cwd), "success", Some(ms)))
+                .await
+                .unwrap();
+        }
+        assert_eq!(
+            eta(&svc, meta(Some("t"), "npm test", Some("/w"))).await,
+            Some(6000)
+        );
     }
 }

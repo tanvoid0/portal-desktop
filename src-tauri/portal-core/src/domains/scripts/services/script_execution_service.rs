@@ -165,28 +165,32 @@ impl ScriptExecutionService {
         // from `variables` — rendering the resolved text again would re-expand.
         let command = shell_template::render(&request.command, &request.parameters);
         let step_id = request.step_id.clone().unwrap_or_else(|| "run".to_string());
+        let action = ActionMeta {
+            command,
+            working_directory: request.working_directory,
+            block_id: request.block_id,
+            workflow_run_id: request.workflow_run_id,
+            workflow_id: request.workflow_id,
+            step_id: request.step_id,
+            workflow_plan_json: request.workflow_plan.map(|p| p.to_string()),
+        };
+        // The progress bar's ETA: the median of this action's own past runs.
+        let expected = self.exec.action_expected(&action, &step_id).await;
         self.exec
             .execute_steps(
                 RunSpec {
                     cwd,
                     steps: vec![json!({
                         "id": step_id,
-                        "name": command,
+                        "name": action.command,
                         "dependsOn": [],
                         "config": { "command": request.command },
                     })],
                     variables: request.parameters,
                     env: request.env.unwrap_or_default(),
                     triggered_by: request.triggered_by.unwrap_or_else(|| "user".to_string()),
-                    action: Some(ActionMeta {
-                        command,
-                        working_directory: request.working_directory,
-                        block_id: request.block_id,
-                        workflow_run_id: request.workflow_run_id,
-                        workflow_id: request.workflow_id,
-                        step_id: request.step_id,
-                        workflow_plan_json: request.workflow_plan.map(|p| p.to_string()),
-                    }),
+                    expected,
+                    action: Some(action),
                     ..Default::default()
                 },
                 events,
@@ -463,6 +467,68 @@ mod tests {
         // And the one place a run can be Stopped has no run left to stop.
         let err = svc.cancel_execution(&id).await.unwrap_err();
         assert_eq!(err, "Run already finished (success)");
+    }
+
+    /// The ETA comes from the action's own past runs: its block's, else those of
+    /// the same command in the same folder. A run with none has no `expectedMs`.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn script_facade_eta_comes_from_the_actions_own_history() {
+        let (svc, _db, dir) = service().await;
+        let cwd = dir.path().display().to_string();
+        // Finished runs of about 2 s, 4 s and 6 s, under a block and under a bare command.
+        for (block_id, command) in [(Some("b"), "echo hi"), (None, "echo plain")] {
+            for secs in [2, 4, 6] {
+                let action = ActionMeta {
+                    command: command.into(),
+                    working_directory: Some(cwd.clone()),
+                    block_id: block_id.map(Into::into),
+                    ..Default::default()
+                };
+                let started = chrono::Utc::now() - chrono::Duration::seconds(secs);
+                svc.exec
+                    .record_finished_action(action, Some(started), "success".into(), Some(0), None)
+                    .await
+                    .unwrap();
+            }
+        }
+
+        // The `expectedMs` the run's step was created with, read as soon as `execute_script` returns.
+        async fn expected_ms(
+            svc: &ScriptExecutionService,
+            cwd: &str,
+            block_id: Option<&str>,
+            command: &str,
+        ) -> Option<i64> {
+            let request = ExecuteScriptRequest {
+                block_id: block_id.map(Into::into),
+                command: command.into(),
+                parameters: HashMap::new(),
+                working_directory: Some(cwd.into()),
+                env: None,
+                triggered_by: None,
+                workflow_run_id: None,
+                workflow_id: None,
+                step_id: None,
+                workflow_plan: None,
+            };
+            let id = svc.execute_script(request, Arc::new(Quiet)).await.unwrap();
+            let row = svc.repo.get_by_id(&id).await.unwrap().unwrap();
+            // Let the run end before the temp dir goes.
+            wait_for(svc, &id, 10, |r| r.status == "success").await;
+            let steps: Vec<Value> = serde_json::from_str(&row.step_executions_json).unwrap();
+            steps[0]["expectedMs"].as_i64()
+        }
+
+        let near_4s =
+            |ms: Option<i64>| assert!(ms.is_some_and(|ms| (3000..5000).contains(&ms)), "{ms:?}");
+        near_4s(expected_ms(&svc, &cwd, Some("b"), "echo hi").await);
+        near_4s(expected_ms(&svc, &cwd, None, "echo plain").await);
+        // Another block, and a command nobody ran: no history, no ETA.
+        assert_eq!(
+            expected_ms(&svc, &cwd, Some("other"), "echo hi").await,
+            None
+        );
+        assert_eq!(expected_ms(&svc, &cwd, None, "echo fresh").await, None);
     }
 
     /// The run once `done` holds, polled every 50 ms for at most `secs`.

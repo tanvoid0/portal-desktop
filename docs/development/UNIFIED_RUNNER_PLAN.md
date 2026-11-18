@@ -34,7 +34,8 @@ would keep writing `script_executions` rows nobody copies.
 
 - `RunSpec` has no `kind`: `action: Some(ActionMeta)` is an action run. It has
   `env` (merged onto each step's env, no `$` expansion) and `expected` (ETA
-  history; `execute_pipeline` fills it, actions have none).
+  history; `execute_pipeline` fills it from the pipeline's runs, `execute_script`
+  from the action's own, see "ETA for action runs" below).
 - Action deltas: no deadline, no package-manager rewrite, no `[stderr] ` prefix,
   no `$ cmd` / `cwd:` header or package.json warnings (a step's logs are the
   process output, so `ScriptExecutionInfo.output` is what crew prints),
@@ -53,9 +54,36 @@ would keep writing `script_executions` rows nobody copies.
 - `block_id` is stored as given: `pipeline_executions` has no FK on it, the old
   table nulled unknown block ids.
 
-Not done, in order of value: ETA for action runs from their own history
-(`get_by_block` already exists); a later migration that drops `script_executions`
-once this release has been out; `\r` streaming; a Windows Job object.
+- ETA for action runs: the key is `block_id` when the run has one, else equal
+  `(command, working_directory)`. `ExecutionRepository::get_action_history`
+  returns the last 20 successful `kind='action'` rows for it, newest first;
+  `ExecutionService::action_expected` maps them to `HistoryRun`s and
+  `expected_durations` takes the median per step id.
+  `ScriptExecutionService::execute_script` passes the result as `RunSpec.expected`
+  (step id `request.step_id` or "run"), so a first run has no estimate and later
+  runs start from their own median. Best effort: a query or parse error means no
+  ETA, never a failed run. Rows copied from `script_executions` count too: 000051
+  writes the step `duration` when both timestamps parse, and `action_expected`
+  falls back to `finished_at - started_at` when it is missing. The query is not
+  indexed on `block_id` / `command`; fine at today's table size.
+- `queued` renders like `pending` in `executionStatus.ts` (it fell to the default
+  clock icon and muted colour), and `runs.rs` has a test that a cancelled action
+  row with no error reads "Stopped by user" while a cancelled pipeline row does not.
+
+Not done:
+
+- **Dropping `script_executions`: deferred by the user (2026-11-18, "keep it for
+  now"); revisit after C4 has shipped and run once.** It is irreversible against a
+  real DB and the table is the rollback copy the user was told stays. When it is
+  time: a migration `DROP TABLE IF EXISTS
+  script_executions` (its indexes go with it), no re-copy and no "everything was
+  copied" gate (a row missing from `pipeline_executions` is one the user deleted
+  through the facade after 000052; a REPLACE copy would resurrect it), `down` a
+  no-op. Ship it with or after the C4 release: an old build cannot run against a
+  migrated DB anyway (sea-orm refuses unknown applied migrations). Then delete the
+  legacy entity and `ScriptExecutionRepository` (keep `WorkflowLink`) and replace
+  the facade test's raw legacy-row insert with a migration-level one.
+- `\r` streaming; a Windows Job object.
 
 ## C4 — what to do
 
