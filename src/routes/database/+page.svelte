@@ -4,13 +4,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
   import * as Tabs from '$lib/components/ui/tabs';
-  import {
-    PageContainer,
-    PageHeader,
-    PageLoading,
-    PageError,
-    PageEmpty,
-  } from '$lib/components/shell';
+  import { PageHeader, PageLoading, PageError, PageEmpty } from '$lib/components/shell';
   import { toast } from '$lib/utils/toast';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import {
@@ -94,7 +88,7 @@
   <title>Database - Portal Desktop</title>
 </svelte:head>
 
-<PageContainer variant="full" class="space-y-6 py-4 md:py-6">
+<div class="space-y-6">
   <PageHeader
     title="Database Explorer"
     description="Browse & edit SQLite, Postgres, MySQL, MongoDB and Redis — vault, SDK and Docker sources auto-discovered"
@@ -214,4 +208,4 @@
       </section>
     </div>
   {/if}
-</PageContainer>
+</div>
