@@ -31,6 +31,9 @@ const NOT_CONNECTED: &str = "not connected to a Portal Desktop";
 /// fails rather than buffering without bound.
 const CONTROL_QUEUE: usize = 64;
 
+/// Longest `{t:"error"}` message (in characters) the page is handed from `/control`.
+const CONTROL_ERROR_MAX: usize = 200;
+
 #[derive(Clone, Serialize, Deserialize)]
 struct Conn {
     host: String,
@@ -106,13 +109,28 @@ impl Mobile {
 
     /// Stop the bridge and forget the connection (file included).
     fn clear(&self, app: &AppHandle) {
-        {
-            let mut s = self.0.lock().unwrap();
-            if let Some(b) = s.bridge.take() {
-                b.abort();
-            }
-            *s = Inner::default();
+        self.reset(None);
+        self.forgotten(app);
+    }
+
+    /// The state half of `clear`: drop the bridge and the connection. With a `token`, only
+    /// while it is still the connection's, checked under the same lock as the wipe — a
+    /// `/control` dial that was in flight when `set()` re-paired must not wipe the new
+    /// connection when the old token's 401 finally lands. `false`: nothing touched.
+    fn reset(&self, token: Option<&str>) -> bool {
+        let mut s = self.0.lock().unwrap();
+        if token.is_some_and(|t| s.conn.as_ref().map(|c| c.token.as_str()) != Some(t)) {
+            return false;
         }
+        if let Some(b) = s.bridge.take() {
+            b.abort();
+        }
+        *s = Inner::default();
+        true
+    }
+
+    /// The other half of `clear`: the stored file, and the UI.
+    fn forgotten(&self, app: &AppHandle) {
         if let Some(p) = conn_path(app) {
             let _ = std::fs::remove_file(p);
         }
@@ -189,14 +207,11 @@ impl Mobile {
         }
     }
 
-    /// Queue one frame for `/control`. `Some((request, rx))` means no socket was live,
-    /// so this call made a fresh queue and the caller must open the socket on it
+    /// Queue one frame for `/control`. `Some(new)` means no socket was live, so this call
+    /// made a fresh queue and the caller must open the socket on it
     /// ([`Mobile::open_control`]); `None` means the live socket will send the frame.
     /// Never waits on the network, so a slow or dead desktop cannot stall the caller.
-    fn queue_control(
-        &self,
-        frame: String,
-    ) -> Result<Option<(Request, mpsc::Receiver<String>)>, String> {
+    fn queue_control(&self, frame: String) -> Result<Option<NewControl>, String> {
         let mut s = self.0.lock().unwrap();
         let conn = s.conn.as_ref().ok_or(NOT_CONNECTED)?;
         let frame = match &s.control {
@@ -208,25 +223,39 @@ impl Mobile {
             None => frame,
         };
         let req = control_request(conn).ok_or("bad connection details")?;
+        let token = conn.token.clone();
         let (tx, rx) = mpsc::channel(CONTROL_QUEUE);
         let _ = tx.try_send(frame); // a fresh queue has room
         s.control = Some(tx);
-        Ok(Some((req, rx)))
+        Ok(Some(NewControl { req, rx, token }))
     }
 
     /// Run the `/control` socket for a queue made by [`Mobile::queue_control`]: the
-    /// daemon's `{t:"error"}` refusals reach the page as `mobile://control-error`,
-    /// and a 401 means the token was revoked, so disconnect like every other call.
-    fn open_control(&self, app: &AppHandle, req: Request, rx: mpsc::Receiver<String>) {
+    /// daemon's `{t:"error"}` refusals reach the page as `mobile://control-error`.
+    fn open_control(&self, app: &AppHandle, new: NewControl) {
         let (me, app) = (self.clone(), app.clone());
         tauri::async_runtime::spawn(async move {
             let emit = |err: Value| {
                 let _ = app.emit("mobile://control-error", err);
             };
-            if let Err(Stop::Revoked) = control_session(req, rx, emit).await {
-                me.clear(&app);
-            }
+            me.control_task(new, emit, || me.forgotten(&app)).await;
         });
+    }
+
+    /// [`control_session`], then — on a 401, the token revoked — disconnect like every
+    /// other call, but only if the token this socket dialled with is still the
+    /// connection's: after a re-pair its 401 is stale news. `forgotten` runs only then.
+    async fn control_task(
+        &self,
+        new: NewControl,
+        on_error: impl Fn(Value),
+        forgotten: impl FnOnce(),
+    ) {
+        if let Err(Stop::Revoked) = control_session(new.req, new.rx, on_error).await {
+            if self.reset(Some(&new.token)) {
+                forgotten();
+            }
+        }
     }
 
     /// Whoami + events socket, forever, with capped backoff. A 401 anywhere
@@ -278,6 +307,14 @@ enum Stop {
     Other,
 }
 
+/// A `/control` socket still to be opened: its handshake, the queue it drains, and the
+/// token it dials with (kept so a 401 can tell whether that token is still current).
+struct NewControl {
+    req: Request,
+    rx: mpsc::Receiver<String>,
+    token: String,
+}
+
 /// A WebSocket handshake to `path` on the connected desktop. The token rides in the
 /// `Authorization` header, never the URL, so it cannot end up in a log or a proxy.
 fn ws_request(conn: &Conn, path: &str) -> Option<Request> {
@@ -313,11 +350,18 @@ async fn dial(req: Request) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>
 }
 
 /// The only `/control` frame the page needs: a `{t:"error"}` refusal (say, no
-/// `remote.input`), passed through whole. `hello` and the fanout the daemon forwards on
-/// this socket are already delivered by `/events`, so everything else is dropped.
+/// `remote.input`), re-emitted as just `{t, message}` with the message capped — the
+/// daemon chooses the frame, so nothing else in it is handed on. `hello` and the fanout
+/// the daemon forwards on this socket are already delivered by `/events`, so everything
+/// else is dropped.
 fn control_error(text: &str) -> Option<Value> {
     let frame: Value = serde_json::from_str(text).ok()?;
-    (frame["t"] == "error").then_some(frame)
+    if frame["t"] != "error" {
+        return None;
+    }
+    let message = frame["message"].as_str().unwrap_or_default();
+    let message: String = message.chars().take(CONTROL_ERROR_MAX).collect();
+    Some(json!({ "t": "error", "message": message }))
 }
 
 /// One `/control` socket's life: dial, write each queued frame, hand the daemon's
@@ -567,8 +611,8 @@ async fn local(app: AppHandle, m: Mobile, cmd: &str, args: Value) -> Result<Valu
         // refusals (`mobile://control-error`) stay on this side of the bridge.
         "mobile_control_send" => {
             let frame = a.frame.ok_or("missing `frame`")?;
-            if let Some((req, rx)) = m.queue_control(frame.to_string())? {
-                m.open_control(&app, req, rx);
+            if let Some(new) = m.queue_control(frame.to_string())? {
+                m.open_control(&app, new);
             }
             Ok(Value::Null)
         }
@@ -793,8 +837,28 @@ mod tests {
     #[test]
     fn control_error_passes_refusals_and_drops_everything_else() {
         let refusal = r#"{"t":"error","message":"this device is not permitted to send input"}"#;
-        let err = control_error(refusal).unwrap();
-        assert_eq!(err["message"], "this device is not permitted to send input");
+        assert_eq!(
+            control_error(refusal).unwrap(),
+            json!({ "t": "error", "message": "this device is not permitted to send input" })
+        );
+        // The daemon chooses the frame: only `t` and `message` are handed on, and the
+        // message is capped by characters, not bytes.
+        let long = json!({
+            "t": "error",
+            "message": "é".repeat(CONTROL_ERROR_MAX + 50),
+            "extra": { "x": 1 },
+        });
+        assert_eq!(
+            control_error(&long.to_string()).unwrap(),
+            json!({ "t": "error", "message": "é".repeat(CONTROL_ERROR_MAX) })
+        );
+        // No message, or one that is not a string, is an empty one.
+        for bare in [r#"{"t":"error"}"#, r#"{"t":"error","message":{"a":1}}"#] {
+            assert_eq!(
+                control_error(bare).unwrap(),
+                json!({ "t": "error", "message": "" })
+            );
+        }
         // `hello`, a pong, the fanout `/control` forwards (already on `/events`), its
         // lagged notice, and noise: none of it is the page's business.
         for frame in [
@@ -855,11 +919,13 @@ mod tests {
 
         m.0.lock().unwrap().conn = Some(conn());
         // No socket yet: the first frame hands back a queue to open one on.
-        let (req, mut rx) = m
+        let new = m
             .queue_control("a".into())
             .unwrap()
             .expect("opens a socket");
-        assert_eq!(req.uri().path(), "/control");
+        let mut rx = new.rx;
+        assert_eq!(new.req.uri().path(), "/control");
+        assert_eq!(new.token, "s3cret");
         assert_eq!(rx.try_recv().unwrap(), "a");
         // Later frames ride the same socket.
         assert!(m.queue_control("b".into()).unwrap().is_none());
@@ -871,7 +937,8 @@ mod tests {
         assert!(m.queue_control("x".into()).is_err());
         // Once the socket has ended, the next frame opens a fresh one and is not lost.
         drop(rx);
-        let (_, mut rx) = m.queue_control("c".into()).unwrap().expect("replaces it");
+        let new = m.queue_control("c".into()).unwrap().expect("replaces it");
+        let mut rx = new.rx;
         assert_eq!(rx.try_recv().unwrap(), "c");
         // Disconnect resets `Inner`, dropping the sender: the session sees its queue close.
         *m.0.lock().unwrap() = Inner::default();
@@ -961,8 +1028,7 @@ mod tests {
             // The daemon's `hello` and fanout frame came first and never reached the page:
             // the first thing re-emitted is the refusal of the frame we sent.
             let err = errs_rx.recv().await.unwrap();
-            assert_eq!(err["t"], "error");
-            assert_eq!(err["message"], frame);
+            assert_eq!(err, json!({ "t": "error", "message": frame }));
             // Dropping the queue (disconnect) ends the session and closes the socket.
             drop(tx);
             assert!(matches!(session.await.unwrap(), Ok(())));
@@ -970,25 +1036,69 @@ mod tests {
         });
     }
 
-    #[test]
-    fn control_session_tells_a_revoked_token_from_an_unreachable_desktop() {
+    /// A loopback stand-in for a daemon that has revoked the token: every handshake is a 401.
+    async fn fake_401() -> u16 {
         use tokio_tungstenite::tungstenite::handshake::server::{
             ErrorResponse, Request as In, Response as Out,
         };
-        block(async {
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let revoked = Conn {
-                port: listener.local_addr().unwrap().port(),
-                ..conn()
-            };
-            tauri::async_runtime::spawn(async move {
-                let (tcp, _) = listener.accept().await.unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tauri::async_runtime::spawn(async move {
+            while let Ok((tcp, _)) = listener.accept().await {
                 let refuse = |_: &In, _: Out| -> Result<Out, ErrorResponse> {
                     let unauthorized = tokio_tungstenite::tungstenite::http::Response::builder();
                     Err(unauthorized.status(401).body(None).unwrap())
                 };
                 let _ = tokio_tungstenite::accept_hdr_async(tcp, refuse).await;
-            });
+            }
+        });
+        port
+    }
+
+    /// A `/control` dial still in flight when the device re-pairs gets the OLD token's 401
+    /// after the new connection is stored: that stale news must not wipe the new one. A
+    /// 401 for the token the connection still holds does disconnect.
+    #[test]
+    fn a_stale_401_leaves_a_newer_connection_alone() {
+        block(async {
+            let port = fake_401().await;
+            let m = Mobile::default();
+            m.0.lock().unwrap().conn = Some(Conn { port, ..conn() });
+            let dial = m
+                .queue_control("a".into())
+                .unwrap()
+                .expect("opens a socket");
+
+            // The device re-pairs while that dial is in flight: `set()` stores the new token.
+            let fresh = Conn {
+                port,
+                token: "fresh".into(),
+                ..conn()
+            };
+            m.0.lock().unwrap().conn = Some(fresh);
+            let forgotten = std::cell::Cell::new(false);
+            m.control_task(dial, |_| {}, || forgotten.set(true)).await;
+            assert!(!forgotten.get());
+            assert_eq!(m.conn().unwrap().token, "fresh");
+
+            // Dialled with the token the connection holds now: revoked, so disconnect.
+            let dial = m
+                .queue_control("b".into())
+                .unwrap()
+                .expect("opens a socket");
+            m.control_task(dial, |_| {}, || forgotten.set(true)).await;
+            assert!(forgotten.get());
+            assert!(m.conn().is_none());
+        });
+    }
+
+    #[test]
+    fn control_session_tells_a_revoked_token_from_an_unreachable_desktop() {
+        block(async {
+            let revoked = Conn {
+                port: fake_401().await,
+                ..conn()
+            };
             let (_tx, rx) = mpsc::channel(1);
             let res = control_session(control_request(&revoked).unwrap(), rx, |_| {}).await;
             assert!(matches!(res, Err(Stop::Revoked)));

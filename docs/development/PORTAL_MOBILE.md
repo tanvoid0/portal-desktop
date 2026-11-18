@@ -301,11 +301,17 @@ opens a fresh one on the next call after it closes. The Android shell
 authenticates with `Authorization: Bearer` (plus `X-Portal-Device` when it knows
 the device's name) and keeps the token in Rust — the page only hands over the
 frame; the browser has no header to set, so it uses `?token=` as it does for
-`/events`. The `hello` and the event fanout the daemon also sends on `/control`
-are dropped (already on `/events`); its `{t:"error"}` replies — this device
-lacks `remote.input`, injection is unavailable on the PC — arrive as the
-`mobile://control-error` event. `remote.input` stays the opt-in cap per device,
-browsers included.
+`/events`, and does not retry a handshake that failed for a second (it cannot
+tell a revoked token from any other refusal, so a trackpad drag would otherwise
+open a socket per frame). The `hello` and the event fanout the daemon also sends
+on `/control` are dropped (already on `/events`); its `{t:"error"}` replies
+arrive as the `mobile://control-error` event, re-emitted as just
+`{ t: 'error', message }` with the message capped at 200 characters. They say
+this device lacks `remote.input` ("not permitted to send input"), input
+injection is unavailable on the PC, the input call failed ("input failed: …",
+e.g. an unknown key name), or the frame type is not served yet ("not
+implemented yet: …"). `remote.input` stays the opt-in cap per device, browsers
+included.
 
 **Serving it:** `pnpm build:client` builds the SvelteKit frontend with
 `VITE_PORTAL_MOBILE=1` to its own `build-client/` output dir (NOT `build/` —

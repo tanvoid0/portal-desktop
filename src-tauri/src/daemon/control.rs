@@ -131,7 +131,13 @@ async fn run(
         return;
     }
 
-    let mut input_state = input::State::new();
+    // Never the real OS input under `cargo test` (#1118): a test that sends an input
+    // frame as Local, or a gate that regresses, would move the owner's actual mouse.
+    let mut input_state = if cfg!(test) {
+        None
+    } else {
+        input::State::new()
+    };
     pump_control(&mut socket, &mut rx, &caps, &mut input_state, cutoff).await;
     // However the loop below exited — client gone, send failure, device cut
     // off (`pairing::drop_device`), server shutting down — a key or mouse
@@ -259,8 +265,9 @@ mod tests {
     /// A remote peer holding some other capability (`coder`, same as
     /// `control_answers_ping_with_pong`) must not be able to move the mouse —
     /// this is the test that would catch `remote.input` being forgotten from
-    /// the gate, since it never reaches `input::State::dispatch` (and so
-    /// never touches the real mouse) either way.
+    /// the gate. A regressed gate fails it cleanly ("unavailable", not "not
+    /// permitted"): `run` has no input backend under test, so nothing can
+    /// reach the real mouse either way.
     #[tokio::test]
     async fn control_refuses_input_frames_without_the_capability() {
         let addr = spawn_control(Trust::Remote {
@@ -281,6 +288,32 @@ mod tests {
         let reply = next_json(&mut ws).await;
         assert_eq!(reply["t"], "error");
         assert!(reply["message"].as_str().unwrap().contains("not permitted"));
+    }
+
+    /// Under `cargo test` a socket never owns the real input backend (see `run`), so a
+    /// frame `input_allowed` lets through cannot reach the OS: a Local peer, which the gate
+    /// never restricts, is told injection is unavailable. The frame is a zero-delta
+    /// `mouse_move` — a no-op even if a backend ever came back — so this test stays
+    /// harmless in the very case where it is the one that fails (#1118).
+    #[tokio::test]
+    async fn a_test_socket_never_owns_the_real_input_backend() {
+        let addr = spawn_control(Trust::Local).await;
+        let (mut ws, _resp) = tokio_tungstenite::connect_async(format!("ws://{addr}/control"))
+            .await
+            .unwrap();
+        next_json(&mut ws).await; // hello
+
+        ws.send(WsMessage::Text(
+            json!({ "t": "mouse_move", "dx": 0, "dy": 0 }).to_string(),
+        ))
+        .await
+        .unwrap();
+        // With a backend the frame would be applied and, succeeding, answered with nothing.
+        let reply = tokio::time::timeout(std::time::Duration::from_secs(5), next_json(&mut ws))
+            .await
+            .expect("a permitted frame must be answered: there is no input backend under test");
+        assert_eq!(reply["t"], "error");
+        assert!(reply["message"].as_str().unwrap().contains("unavailable"));
     }
 
     /// A browser reaches `/control` as a `Remote` holding exactly the caps its

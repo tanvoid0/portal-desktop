@@ -62,6 +62,7 @@ describe('mobile_control_send in the browser client', () => {
     FakeSocket.all = [];
   });
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
@@ -104,7 +105,7 @@ describe('mobile_control_send in the browser client', () => {
     expect(FakeSocket.all[0].sent).toHaveLength(64);
   });
 
-  it('re-emits only {t:"error"} frames as mobile://control-error', async () => {
+  it('re-emits only {t:"error"} frames as mobile://control-error, as {t, message} capped', async () => {
     const { tauri, pair, send } = await install();
     pair();
     const seen: unknown[] = [];
@@ -121,8 +122,17 @@ describe('mobile_control_send in the browser client', () => {
     socket.receive('null');
     expect(seen).toEqual([]);
 
-    socket.receive('{"t":"error","message":"this device is not permitted to send input"}');
-    expect(seen).toEqual([{ t: 'error', message: 'this device is not permitted to send input' }]);
+    // The daemon chooses the frame: only `t` and a capped string `message` reach the page.
+    socket.receive(
+      '{"t":"error","message":"this device is not permitted to send input","extra":{"x":1}}'
+    );
+    socket.receive(JSON.stringify({ t: 'error', message: 'é'.repeat(250) }));
+    socket.receive('{"t":"error","message":{"a":1}}');
+    expect(seen).toEqual([
+      { t: 'error', message: 'this device is not permitted to send input' },
+      { t: 'error', message: 'é'.repeat(200) },
+      { t: 'error', message: '' },
+    ]);
   });
 
   it('reopens after the daemon closes it, and closes on disconnect', async () => {
@@ -141,5 +151,32 @@ describe('mobile_control_send in the browser client', () => {
     expect(FakeSocket.all[1].readyState).toBe(3);
     await expect(send({ t: 'c' })).rejects.toBe('not connected to a Portal Desktop');
     expect(FakeSocket.all).toHaveLength(2);
+  });
+
+  it('does not retry a handshake that failed for a second, but replaces a socket that had opened', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1_000_000);
+    const { pair, send } = await install();
+    pair();
+    await send({ t: 'a' });
+    FakeSocket.all[0].close(); // refused or revoked: closed without ever opening
+
+    // A trackpad drag keeps sending: no new handshake per frame.
+    for (let i = 0; i < 5; i++) {
+      await expect(send({ t: 'b' })).rejects.toBe(
+        'the control socket failed to open; try again shortly'
+      );
+    }
+    expect(FakeSocket.all).toHaveLength(1);
+
+    vi.setSystemTime(1_001_001);
+    await send({ t: 'c' });
+    expect(FakeSocket.all).toHaveLength(2);
+
+    // A socket that did open and was then dropped is replaced at once: only a failed open backs off.
+    FakeSocket.all[1].open();
+    FakeSocket.all[1].close();
+    await send({ t: 'd' });
+    expect(FakeSocket.all).toHaveLength(3);
   });
 });

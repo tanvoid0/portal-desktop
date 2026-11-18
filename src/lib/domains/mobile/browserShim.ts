@@ -29,6 +29,12 @@ const STORAGE_KEY = 'portal-client-connection';
 /** Frames the `/control` socket may hold while it is still opening — mirrors the Rust shell's `CONTROL_QUEUE`. */
 const CONTROL_QUEUE = 64;
 
+/** Longest `{t:"error"}` message (in characters) the page is handed — mirrors `CONTROL_ERROR_MAX` in the Rust shell. */
+const CONTROL_ERROR_MAX = 200;
+
+/** How long a failed `/control` open is not retried; see `Bridge.controlSend`. */
+const CONTROL_RETRY_MS = 1000;
+
 interface StoredConn {
   host: string;
   port: number;
@@ -87,12 +93,15 @@ function pairError(status: number): string {
 }
 
 /** What `mobile://control-error` carries for one `/control` frame: the daemon's `{t:"error"}`
- * refusals only. `hello` and the fanout it forwards are already delivered by `/events`.
- * Mirrors `control_error()` in `mobile/src-tauri/src/lib.rs`. */
-function controlError(data: string): { t: 'error'; message?: string } | null {
+ * refusals only, re-emitted as just `{t, message}` with the message capped — the daemon chooses
+ * the frame, so nothing else in it is handed on. `hello` and the fanout it forwards are already
+ * delivered by `/events`. Mirrors `control_error()` in `mobile/src-tauri/src/lib.rs`. */
+function controlError(data: string): { t: 'error'; message: string } | null {
   try {
-    const frame = JSON.parse(data) as { t?: unknown } | null;
-    return frame?.t === 'error' ? (frame as { t: 'error'; message?: string }) : null;
+    const frame = JSON.parse(data) as { t?: unknown; message?: unknown } | null;
+    if (frame?.t !== 'error') return null;
+    const message = typeof frame.message === 'string' ? frame.message : '';
+    return { t: 'error', message: [...message].slice(0, CONTROL_ERROR_MAX).join('') };
   } catch {
     return null;
   }
@@ -162,6 +171,8 @@ class Bridge {
   private control: WebSocket | null = null;
   /** Frames sent while it is still opening — a socket cannot `send()` before `open`. */
   private controlQueue: string[] = [];
+  /** When a `/control` socket last closed without ever opening (its handshake failed); see `controlSend`. */
+  private controlFailedAt = -Infinity;
 
   /** `transformCallback(response)` → `{event, id, payload}`, same shape the real Tauri
    * webview delivers to a `listen()` handler (see `connection.svelte.ts`'s `e.payload`). */
@@ -283,20 +294,26 @@ class Bridge {
 
   /** Drop the `/control` socket and anything still queued for it. */
   private closeControl(): void {
-    this.control?.close();
-    this.control = null;
+    const socket = this.control;
+    this.control = null; // first, so its `close` event reads as deliberate, not as a failed open
     this.controlQueue = [];
+    socket?.close();
   }
 
   /** `mobile_control_send`, mirroring the Rust shell's `queue_control`/`open_control`:
    * fire-and-forget — queue the frame and return, never wait on the network. Opens the
    * socket if none is live; one that closed (the daemon drops it on revoke, caps change and
    * expiry) is replaced by the next call. A revoked token can't be told from any other
-   * failed handshake here (see `run`), so it just retries until `run`'s `whoami()` clears. */
+   * failed handshake here (see `run`), so a handshake that fails is not retried for
+   * `CONTROL_RETRY_MS` (a timestamp, no timer): without that, a trackpad drag would open a
+   * WebSocket per frame until `run`'s `whoami()` clears the connection. */
   controlSend(frame: unknown): void {
     const conn = loadConn();
     if (!conn) throw 'not connected to a Portal Desktop';
     const text = JSON.stringify(frame);
+    if (!this.control && Date.now() - this.controlFailedAt < CONTROL_RETRY_MS) {
+      throw 'the control socket failed to open; try again shortly';
+    }
     const socket = this.control ?? this.openControl(conn);
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(text);
@@ -317,7 +334,9 @@ class Bridge {
       throw `cannot reach ${conn.host}:${conn.port}: ${String(e)}`; // bad URL / SecurityError
     }
     this.control = socket;
+    let opened = false;
     socket.onopen = () => {
+      opened = true;
       for (const text of this.controlQueue.splice(0)) socket.send(text);
     };
     socket.onmessage = (ev) => {
@@ -328,6 +347,7 @@ class Bridge {
       if (this.control !== socket) return; // already replaced or cleared
       this.control = null;
       this.controlQueue = [];
+      if (!opened) this.controlFailedAt = Date.now();
     };
     socket.onerror = () => {
       /* onclose always follows; nothing to do here. */
