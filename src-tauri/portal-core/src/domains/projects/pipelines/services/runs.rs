@@ -45,21 +45,27 @@ async fn merge(
         })));
     }
     for e in pipelines {
-        let pipeline = pipeline_repo.get_by_id(e.pipeline_id).await?;
+        let pipeline = match e.pipeline_id {
+            Some(id) => pipeline_repo.get_by_id(id).await?,
+            None => None,
+        };
         let workflow = pipeline.as_ref().and_then(|p| p.preset_key.as_deref()).and_then(|k| k.strip_prefix("release:"));
         let (kind, title) = match (workflow, &pipeline) {
             (Some(w), _) => ("release", format!("Release · {w}")),
-            (None, p) => ("pipeline", p.as_ref().map_or_else(|| e.pipeline_id.to_string(), |p| p.name.clone())),
+            (None, p) => ("pipeline", p.as_ref().map_or_else(|| e.pipeline_id.map(|i| i.to_string()).unwrap_or_default(), |p| p.name.clone())),
         };
         let failed = serde_json::from_str::<Vec<Value>>(&e.step_executions_json)
             .unwrap_or_default()
             .into_iter()
             .rfind(|st| st["status"] == "failed");
         let error = failed.as_ref().and_then(|f| f["error"].as_str()).or(e.error.as_deref()).map(short);
-        let project = project_repo.get_by_id(e.project_id).await?;
+        let project = match e.project_id {
+            Some(id) => project_repo.get_by_id(id).await?,
+            None => None,
+        };
         rows.push((e.started_at, json!({
             "id": e.id, "kind": kind, "title": title,
-            "projectId": e.project_id.to_string(), "projectName": project.map(|p| p.name),
+            "projectId": e.project_id.map(|i| i.to_string()), "projectName": project.map(|p| p.name),
             "status": e.status, "startedAt": e.started_at.to_rfc3339(),
             "finishedAt": e.finished_at.map(|d| d.to_rfc3339()), "triggeredBy": e.triggered_by,
             "exitCode": failed.as_ref().map(|f| f["exitCode"].clone()), "error": error,
@@ -97,7 +103,7 @@ mod tests {
             .unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(5)).await;
         ExecutionRepository::new(db.clone())
-            .create("e".into(), pipeline.id, project.id, "running".into(), "user".into(),
+            .create("e".into(), Some(pipeline.id), Some(project.id), "running".into(), "user".into(),
                 r#"[{"stepId":"a","status":"failed","exitCode":2,"error":"boom"}]"#.into(), "{}".into())
             .await
             .unwrap();

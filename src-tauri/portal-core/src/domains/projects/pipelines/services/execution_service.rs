@@ -33,6 +33,11 @@ use uuid::Uuid;
 const READER_IDLE_GRACE: Duration = Duration::from_secs(3);
 /// The most [`drain_log_readers`] waits in all, however busy the readers are.
 const READER_DRAIN_CAP: Duration = Duration::from_secs(30);
+/// A [`LogReader`] writes its pending lines to the DB when this many have
+/// piled up, or when the oldest has waited [`LOG_FLUSH_EVERY`]. Each write
+/// rewrites the whole step blob, so one write per line was the hot spot.
+const LOG_FLUSH_LINES: usize = 64;
+const LOG_FLUSH_EVERY: Duration = Duration::from_millis(250);
 
 /// A non-long-running step with no explicit `timeout` is killed after this many
 /// seconds, so a process that finishes its work but never exits (e.g.
@@ -49,7 +54,7 @@ pub struct ExecutionRequestData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct StepExecutionState {
+pub(crate) struct StepExecutionState {
     id: String,
     stepId: String,
     stepName: String,
@@ -191,8 +196,8 @@ impl ExecutionService {
         self.execution_repo
             .create(
                 execution_id.clone(),
-                pipeline_id,
-                pipeline.project_id,
+                Some(pipeline_id),
+                Some(pipeline.project_id),
                 "pending".to_string(),
                 "user".to_string(),
                 step_executions_json,
@@ -538,6 +543,9 @@ impl ExecutionService {
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
         cmd.kill_on_drop(true);
+        // Own process group, so Stop can kill everything the shell started.
+        #[cfg(unix)]
+        cmd.process_group(0);
 
         let mut child = cmd
             .spawn()
@@ -742,8 +750,8 @@ impl ExecutionService {
         json!({
             "progress": compute_progress(&steps, &e.status, Utc::now()),
             "id": e.id,
-            "pipelineId": e.pipeline_id.to_string(),
-            "projectId": e.project_id.to_string(),
+            "pipelineId": e.pipeline_id.map(|i| i.to_string()),
+            "projectId": e.project_id.map(|i| i.to_string()),
             "status": e.status,
             "startedAt": e.started_at.to_rfc3339(),
             "finishedAt": e.finished_at.map(|d| d.to_rfc3339()),
@@ -760,13 +768,19 @@ impl ExecutionService {
     ) -> Result<Value, String> {
         let mut item = Self::execution_to_json(&e);
 
-        if let Some(pipeline) = self.pipeline_repo.get_by_id(e.pipeline_id).await? {
+        if let Some(pipeline) = match e.pipeline_id {
+            Some(id) => self.pipeline_repo.get_by_id(id).await?,
+            None => None,
+        } {
             if let Some(obj) = item.as_object_mut() {
                 obj.insert("pipelineName".to_string(), json!(pipeline.name));
             }
         }
 
-        if let Some(project) = self.project_repo.get_by_id(e.project_id).await? {
+        if let Some(project) = match e.project_id {
+            Some(id) => self.project_repo.get_by_id(id).await?,
+            None => None,
+        } {
             if let Some(obj) = item.as_object_mut() {
                 obj.insert("projectName".to_string(), json!(project.name));
             }
@@ -1080,39 +1094,74 @@ async fn append_step_log(
     events: &Arc<dyn EventSink>,
 ) {
     if let Some(p) = parse_progress_line(line) {
-        let _ = modify_steps(repo, execution_id, |steps| {
-            if let Some(step) = steps.iter_mut().find(|s| s.stepId == step_id) {
-                step.progress = Some(p);
-            }
-            true
-        })
-        .await;
-        if progress_emit_due(execution_id) {
-            if let Ok(Some(e)) = repo.get_by_id(execution_id).await {
-                events.emit("pipeline-execution-update", ExecutionService::execution_to_json(&e));
-            }
-        }
+        record_progress(repo, execution_id, step_id, p, events).await;
         return;
     }
     ExecutionService::emit_step_log(events, execution_id, step_id, line, stream);
+    write_step_logs(repo, execution_id, step_id, &[format_log_line(line, stream)]).await;
+}
 
-    let formatted = if stream == "stderr" {
+/// Store a `::portal-progress` line as the step's progress and nudge the UI
+/// (at most once a second).
+async fn record_progress(
+    repo: &ExecutionRepository,
+    execution_id: &str,
+    step_id: &str,
+    p: StepProgress,
+    events: &Arc<dyn EventSink>,
+) {
+    let _ = modify_steps(repo, execution_id, |steps| {
+        if let Some(step) = steps.iter_mut().find(|s| s.stepId == step_id) {
+            step.progress = Some(p);
+        }
+        true
+    })
+    .await;
+    if progress_emit_due(execution_id) {
+        if let Ok(Some(e)) = repo.get_by_id(execution_id).await {
+            events.emit("pipeline-execution-update", ExecutionService::execution_to_json(&e));
+        }
+    }
+}
+
+fn format_log_line(line: &str, stream: &str) -> String {
+    if stream == "stderr" {
         format!("[stderr] {}", line)
     } else {
         line.to_string()
-    };
+    }
+}
+
+/// Append formatted lines to the step's `logs` and `output` in one blob write.
+async fn write_step_logs(
+    repo: &ExecutionRepository,
+    execution_id: &str,
+    step_id: &str,
+    lines: &[String],
+) {
+    if lines.is_empty() {
+        return;
+    }
     let _ = modify_steps(repo, execution_id, |steps| {
         if let Some(step) = steps.iter_mut().find(|s| s.stepId == step_id) {
-            step.logs.push(formatted.clone());
-            step.output.push_str(&formatted);
-            step.output.push('\n');
+            for l in lines {
+                step.logs.push(l.clone());
+                step.output.push_str(l);
+                step.output.push('\n');
+            }
         }
         true
     })
     .await;
 }
 
-/// Copies one of a step's output pipes into its log, line by line.
+/// Copies one of a step's output pipes into its log, line by line. Lines are
+/// emitted live but written to the DB in batches ([`LOG_FLUSH_LINES`] /
+/// [`LOG_FLUSH_EVERY`]); the last batch is written at EOF, which
+/// [`drain_log_readers`] waits for before the step is finalized.
+/// stdout and stderr batch independently, so stored logs may interleave the two
+/// streams within one 250 ms batch (live events stay ordered).
+/// ponytail: a cancel aborts the reader, losing up to one unflushed batch.
 struct LogReader {
     repo: ExecutionRepository,
     execution_id: String,
@@ -1131,20 +1180,53 @@ impl LogReader {
             // the pipe the child blocks on its next write once the pipe fills.
             let mut pipe = BufReader::new(pipe);
             let mut buf = Vec::new();
-            while pipe.read_until(b'\n', &mut buf).await.is_ok_and(|n| n > 0) {
+            let mut pending: Vec<String> = Vec::new();
+            let mut flush_at: Option<tokio::time::Instant> = None;
+            loop {
+                // read_until is cancel-safe: a partial line stays in `buf`.
+                let n = tokio::select! {
+                    r = pipe.read_until(b'\n', &mut buf) => r.unwrap_or(0),
+                    _ = async move {
+                        match flush_at {
+                            Some(t) => tokio::time::sleep_until(t).await,
+                            None => std::future::pending().await,
+                        }
+                    } => {
+                        write_step_logs(&self.repo, &self.execution_id, &self.step_id, &pending).await;
+                        pending.clear();
+                        flush_at = None;
+                        continue;
+                    }
+                };
+                if n == 0 {
+                    break;
+                }
                 self.lines_read.fetch_add(1, Ordering::Relaxed);
                 let line = String::from_utf8_lossy(&buf);
-                append_step_log(
-                    &self.repo,
-                    &self.execution_id,
-                    &self.step_id,
-                    line.trim_end_matches(['\n', '\r']),
-                    self.stream,
-                    &self.events,
-                )
-                .await;
+                let line = line.trim_end_matches(['\n', '\r']);
+                if let Some(p) = parse_progress_line(line) {
+                    record_progress(&self.repo, &self.execution_id, &self.step_id, p, &self.events)
+                        .await;
+                } else {
+                    ExecutionService::emit_step_log(
+                        &self.events,
+                        &self.execution_id,
+                        &self.step_id,
+                        line,
+                        self.stream,
+                    );
+                    pending.push(format_log_line(line, self.stream));
+                    flush_at.get_or_insert_with(|| tokio::time::Instant::now() + LOG_FLUSH_EVERY);
+                    if pending.len() >= LOG_FLUSH_LINES {
+                        write_step_logs(&self.repo, &self.execution_id, &self.step_id, &pending)
+                            .await;
+                        pending.clear();
+                        flush_at = None;
+                    }
+                }
                 buf.clear();
             }
+            write_step_logs(&self.repo, &self.execution_id, &self.step_id, &pending).await;
         })
     }
 }
@@ -1448,32 +1530,40 @@ async fn kill_children_async(children: &Arc<Mutex<Vec<Child>>>) {
 
 async fn kill_process_tree(child: &mut Child) {
     if let Some(pid) = child.id() {
-        if cfg!(target_os = "windows") {
-            // cmd /C npm run dev spawns node as a child — taskkill /T terminates the tree
-            let _ = Command::new("taskkill")
-                .no_window()
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status()
-                .await;
-        } else if cfg!(unix) {
-            // Terminate child processes first (e.g. node under sh -c)
-            let _ = Command::new("pkill")
-                .args(["-TERM", "-P", &pid.to_string()])
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status()
-                .await;
-            let _ = child.start_kill();
-        } else {
-            let _ = child.start_kill();
+        // cmd /C npm run dev spawns node as a child — taskkill /T terminates the tree
+        #[cfg(windows)]
+        let _ = Command::new("taskkill")
+            .no_window()
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .await;
+        // Spawned with process_group(0), so the group id is the shell's pid.
+        // TERM first, so a dev server can clean up after itself; KILL whatever
+        // is still in the group after ~2 s (or left behind by a shell that
+        // already exited).
+        #[cfg(unix)]
+        {
+            signal_group("-TERM", pid).await;
+            let _ = tokio::time::timeout(Duration::from_secs(2), child.wait()).await;
+            signal_group("-KILL", pid).await;
         }
-    } else {
-        let _ = child.start_kill();
     }
+    let _ = child.start_kill();
 
     let _ = tokio::time::timeout(tokio::time::Duration::from_secs(5), child.wait()).await;
+}
+
+/// Send `signal` (e.g. `-TERM`) to the process group led by `pid`.
+#[cfg(unix)]
+async fn signal_group(signal: &str, pid: u32) {
+    let _ = Command::new("kill")
+        .args([signal, "--", &format!("-{pid}")])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .await;
 }
 
 #[cfg(test)]
@@ -1547,7 +1637,7 @@ mod tests {
         tokio::io::AsyncWriteExt::write_all(&mut held_open, b"late\n")
             .await
             .expect("reader was aborted: write end got a broken pipe");
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        tokio::time::sleep(LOG_FLUSH_EVERY * 2).await;
         assert_eq!(
             svc.get_step_logs("e", "a").await.unwrap(),
             ["one", "two", "late"]
@@ -1602,8 +1692,8 @@ mod tests {
         svc.execution_repo
             .create(
                 "e".into(),
-                pipeline.id,
-                project.id,
+                Some(pipeline.id),
+                Some(project.id),
                 "running".into(),
                 "user".into(),
                 serde_json::to_string(&steps).unwrap(),

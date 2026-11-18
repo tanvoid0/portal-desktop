@@ -90,8 +90,8 @@ export interface BlockParameter {
 
 export interface PipelineExecution {
   id: string;
-  pipelineId: string;
-  projectId: string;
+  pipelineId?: string; // absent for a one-step action run
+  projectId?: string; // absent for an action run outside any project
   status: ExecutionStatus;
   startedAt: Date;
   finishedAt?: Date;

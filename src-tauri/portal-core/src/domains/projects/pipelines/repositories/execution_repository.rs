@@ -71,7 +71,11 @@ impl ExecutionRepository {
 
     pub async fn get_all(&self, limit: Option<u64>) -> Result<Vec<ExecutionModel>, String> {
         let connection = self.db_manager.get_connection();
+        // ponytail: pipelines only until actions run on this runner — their
+        // history rows (migrated from script_executions) are still listed from
+        // that table by `runs.rs`; drop this filter when SES becomes a facade.
         let mut query = ExecutionEntity::find()
+            .filter(crate::entities::pipeline_execution::Column::Kind.eq("pipeline"))
             .order_by_desc(crate::entities::pipeline_execution::Column::StartedAt);
 
         if let Some(limit) = limit {
@@ -83,6 +87,14 @@ impl ExecutionRepository {
             .await
             .map_err(|e| format!("Failed to fetch executions: {}", e))?;
         Ok(executions)
+    }
+
+    pub async fn delete(&self, id: &str) -> Result<(), String> {
+        ExecutionEntity::delete_by_id(id)
+            .exec(self.db_manager.get_connection())
+            .await
+            .map_err(|e| format!("Failed to delete execution: {}", e))?;
+        Ok(())
     }
 
     /// Executions that cannot outlive the process that was driving them.
@@ -100,8 +112,8 @@ impl ExecutionRepository {
     pub async fn create(
         &self,
         id: String,
-        pipeline_id: i32,
-        project_id: i32,
+        pipeline_id: Option<i32>,
+        project_id: Option<i32>,
         status: String,
         triggered_by: String,
         step_executions_json: String,
@@ -115,6 +127,7 @@ impl ExecutionRepository {
             id: Set(id),
             pipeline_id: Set(pipeline_id),
             project_id: Set(project_id),
+            kind: Set("pipeline".to_string()),
             status: Set(status),
             started_at: Set(now.into()),
             triggered_by: Set(triggered_by),
