@@ -39,6 +39,7 @@
     type ScriptExecutionInfo,
   } from '$lib/domains/scripts/services/scriptExecutionService';
   import { untrack } from 'svelte';
+  import { isActive } from '$lib/domains/actions/runActions';
   import { goto } from '$app/navigation';
   import { coderSession } from '$lib/domains/coder/state/coderSession.svelte.js';
   import {
@@ -196,15 +197,15 @@
     }
   }
 
-  async function loadHistory() {
-    historyLoading = true;
+  async function loadHistory(opts?: { silent?: boolean }) {
+    if (!opts?.silent) historyLoading = true;
     try {
       const recent = await scriptExecutionService.getRecentExecutions(50);
       runHistory = recent.filter(isProjectExecution);
     } catch {
       // history is best-effort
     } finally {
-      historyLoading = false;
+      if (!opts?.silent) historyLoading = false;
     }
   }
 
@@ -279,6 +280,30 @@
       running = false;
     }
   }
+
+  // Keep history live while the tab is open: poll the (cheap) running set and
+  // reload silently only when a run starts or finishes — fast while runs are
+  // active, slow when idle so runs started elsewhere still appear.
+  $effect(() => {
+    if (!enabled || !project?.id) return;
+    const delay = runHistory.some(isActive) ? 2000 : 5000;
+    const timer = setInterval(async () => {
+      try {
+        const running = new Set(
+          (await scriptExecutionService.getRunningExecutions())
+            .filter(isProjectExecution)
+            .map((e) => e.id)
+        );
+        const known = new Set(runHistory.filter(isActive).map((e) => e.id));
+        const changed =
+          [...known].some((id) => !running.has(id)) || [...running].some((id) => !known.has(id));
+        if (changed) void loadHistory({ silent: true });
+      } catch {
+        // best-effort; Refresh still works
+      }
+    }, delay);
+    return () => clearInterval(timer);
+  });
 
   $effect(() => {
     const projectId = project?.id;

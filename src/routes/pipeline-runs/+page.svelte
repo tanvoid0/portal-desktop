@@ -103,10 +103,11 @@
     void goto(url);
   }
 
-  // While runs are active, poll just the running set (no output payload) and
-  // reload the full list only when a run starts or finishes.
+  // Poll just the running set (no output payload) and reload the full list only
+  // when a run starts or finishes. Fast while runs are active; slow when idle so
+  // runs started elsewhere (CLI, schedule, another window) still appear.
   $effect(() => {
-    if (!executions.some(isActive)) return;
+    const delay = executions.some(isActive) ? 2000 : 5000;
     const timer = setInterval(async () => {
       try {
         const running = new Set(
@@ -119,7 +120,7 @@
       } catch {
         // best-effort; Refresh still works
       }
-    }, 2000);
+    }, delay);
     return () => clearInterval(timer);
   });
 
