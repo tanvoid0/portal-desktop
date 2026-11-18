@@ -322,8 +322,10 @@ pub async fn reject(conn: &DatabaseConnection, device_id: &str) -> Result<(), St
 }
 
 /// Replace the granted capabilities on the most-recent row for `device_id`.
-/// No token re-mint needed — capabilities are read fresh from the database on
-/// every `/control`/`/rpc` call already.
+/// No token re-mint needed — a new `/rpc` call or socket reads the capabilities
+/// fresh from the database. A socket already open keeps the caps it opened with,
+/// so the caller must `daemon::pairing::drop_device` afterwards (see
+/// `update_device_capabilities`).
 pub async fn update_capabilities(
     conn: &DatabaseConnection,
     device_id: &str,

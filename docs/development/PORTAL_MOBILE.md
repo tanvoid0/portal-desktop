@@ -1,7 +1,8 @@
 # Portal Mobile — the phone (and any other device) as a client of Portal Desktop
 
-**Status:** Phase 0 shipped and verified on `main` (`7aeed3da`, `b575e599`,
-2026-11-12/13) — real-phone pairing confirmed end to end. The browser/
+**Status:** Phases 0, 1, 2 and 3a are done on `main`. Phase 0 shipped and
+verified (`7aeed3da`, `b575e599`, 2026-11-12/13) — real-phone pairing
+confirmed end to end. The browser/
 other-desktop client ("Other clients", below) is merged to `main` too, and
 the live browser check has now been run (2026-11-14, dev daemon :18421,
 browser-pane tab): `pnpm build:client` → daemon's fallback_service served
@@ -247,7 +248,10 @@ task #542, pick up as wanted):
    time. Not started.
 3. UDP discovery (`mobile_discover`) not independently confirmed — the test
    phone's busybox `nc` lacks `-b`. Manual host/port pairing works regardless.
-4. Phases 1-6 below — not started; each ships on its own.
+4. Phases 1, 2 and 3a are done (see the list above); the rest ship on their
+   own. Revoking a device, changing its caps, or an expired grant closes its
+   open `/events` and `/control` sockets (`daemon/pairing.rs`: `drop_device`,
+   plus an expiry sweep every 60 s).
 
 ## Other clients: browser and other-desktop (2026-11-14)
 
@@ -323,7 +327,6 @@ parts worth keeping. No new features go there.
   internet relay.
 - Token is stored in an app-private file, not the Android Keystore.
 - `remote_lan_enabled` needs an app restart to take effect.
-- Revoking a device does not close its already-open `/control` socket.
 - Open network issue from 2026-11-11: the S26 Ultra could not TCP-connect to the
   desktop (Avast SecureLine suspected) — see
   `.claude/handoff-phone-pairing-vpn-firewall.md`. Emulator testing goes through

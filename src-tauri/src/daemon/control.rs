@@ -5,9 +5,9 @@
 //! any other client frame gets an explicit "not implemented yet" rather than
 //! silently hanging.
 //!
-//! Known gap: a token revoked while a `/control` socket is already open does
-//! not drop that socket — it only stops a *new* connection. Live
-//! mid-connection revocation is not needed this phase.
+//! A remote socket closes when its device is revoked, its capabilities change,
+//! or its grant expires ([`pairing::drop_device`], plus the 60 s expiry
+//! sweep); a local peer is never dropped.
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Extension, State};

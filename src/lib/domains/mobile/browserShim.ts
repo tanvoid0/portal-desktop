@@ -190,10 +190,11 @@ class Bridge {
   /** whoami + events socket, forever, with capped backoff. Mirrors Rust's `bridge()`/`run_socket()`.
    *
    * One gap vs. the Rust client: a browser `WebSocket` never exposes the handshake's HTTP
-   * status, so a token revoked while the socket is open can't be told apart from an ordinary
-   * drop at the moment it happens — both just retry. The very next retry's `whoami()` call
-   * (still run before every reconnect) catches the revocation and clears, same as Rust, just
-   * up to one backoff step later. ponytail: acceptable gap, no browser API closes it. */
+   * status, so a revoked token can't be told apart from an ordinary drop when the daemon
+   * closes the socket (it does so on revoke, caps change and expiry) — both just retry. The
+   * next retry's `whoami()` call (still run before every reconnect) catches the revocation
+   * and clears, same as Rust, just up to one backoff step later. ponytail: acceptable gap,
+   * no browser API closes it. */
   private async run(conn: StoredConn, gen: number): Promise<void> {
     let delay = 1000;
     while (gen === this.generation) {

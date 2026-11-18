@@ -1,8 +1,8 @@
 //! Mouse/keyboard injection for `/control`'s trackpad and keyboard frames —
 //! the OS side of `control::handle_client_frame`. One [`State`] per socket:
-//! it owns the `Enigo` handle and the set of virtual keys this phone is
-//! currently holding down, so a phone that drops mid-`Ctrl` doesn't leave
-//! this PC stuck holding it ([`State::release_held`] runs on disconnect).
+//! it owns the `Enigo` handle and the virtual keys and mouse buttons this
+//! phone is currently holding down, so a phone that drops mid-`Ctrl` doesn't
+//! leave this PC stuck holding it ([`State::release_held`] runs on disconnect).
 //!
 //! Wire shapes mirror `portal_remote`'s C# server (`Input/InputActions.cs`,
 //! `Input/WinInput.cs`) field-for-field — this is the same Android app
