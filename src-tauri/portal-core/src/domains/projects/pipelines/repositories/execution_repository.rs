@@ -269,10 +269,11 @@ impl ExecutionRepository {
         }
     }
 
-    /// A Stop is final: a row that is already `cancelled` stays so unless this
-    /// write is `cancelled` too. The run loop checks for Stop and then awaits
-    /// before its own `success` / `failed` write; a Stop landing in that gap
-    /// must not be undone by it. One conditional UPDATE, so no read can race it.
+    /// A Stop is final: a row that is already `cancelled` takes no write at all,
+    /// not even another `cancelled` (it would move `finished_at`). The run loop
+    /// checks for Stop and then awaits before its own `success` / `failed`
+    /// write; a Stop landing in that gap must not be undone by it. One
+    /// conditional UPDATE, so no read can race it.
     pub async fn update_status(
         &self,
         id: &str,
@@ -281,7 +282,8 @@ impl ExecutionRepository {
     ) -> Result<ExecutionModel, String> {
         let mut update = ExecutionEntity::update_many()
             .col_expr(Column::Status, sea_orm::sea_query::Expr::value(status.clone()))
-            .filter(Column::Id.eq(id));
+            .filter(Column::Id.eq(id))
+            .filter(Column::Status.ne("cancelled"));
         if let Some(error) = error {
             update = update.col_expr(Column::Error, sea_orm::sea_query::Expr::value(error));
         }
@@ -290,9 +292,6 @@ impl ExecutionRepository {
                 Column::FinishedAt,
                 sea_orm::sea_query::Expr::value(Utc::now().fixed_offset()),
             );
-        }
-        if status != "cancelled" {
-            update = update.filter(Column::Status.ne("cancelled"));
         }
         update
             .exec(self.db_manager.get_connection())
@@ -331,5 +330,41 @@ impl ExecutionRepository {
             .await
             .map_err(|e| format!("Failed to update step executions: {}", e))?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_cancelled_run_stays_cancelled() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(DatabaseManager::new(dir.path().to_path_buf()).await.unwrap());
+        let repo = ExecutionRepository::new(db);
+        let run = |id: &str| NewRun {
+            id: id.into(),
+            status: "running".into(),
+            triggered_by: "user".into(),
+            step_executions_json: "[]".into(),
+            variables_json: "{}".into(),
+            ..Default::default()
+        };
+
+        repo.insert(run("a")).await.unwrap();
+        let stopped = repo.update_status("a", "cancelled".into(), None).await.unwrap();
+        // The run's own terminal write arrives after the Stop.
+        let a = repo.update_status("a", "success".into(), Some("late".into())).await.unwrap();
+        assert_eq!((a.status.as_str(), a.error), ("cancelled", None));
+        // So does the run loop's own `cancelled`: it must not move `finished_at`.
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        let again = repo.update_status("a", "cancelled".into(), None).await.unwrap();
+        assert_eq!(again.finished_at, stopped.finished_at);
+
+        // A run nobody stopped still takes its terminal write.
+        repo.insert(run("b")).await.unwrap();
+        let b = repo.update_status("b", "success".into(), None).await.unwrap();
+        assert_eq!(b.status, "success");
+        assert!(b.finished_at.is_some());
     }
 }

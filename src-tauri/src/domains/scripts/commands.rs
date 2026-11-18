@@ -1,8 +1,10 @@
 use crate::database::DatabaseManager;
+use crate::domains::projects::pipelines::services::ExecutionService;
 use crate::domains::scripts::repositories::WorkflowLink;
 use crate::domains::scripts::services::{
     ExecuteScriptRequest, ScriptExecutionInfo, ScriptExecutionService,
 };
+use crate::events::Events;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,19 +14,26 @@ use tokio::sync::Mutex;
 /// Shared state for script execution service
 pub struct ScriptExecutionState {
     pub service: Arc<Mutex<Option<ScriptExecutionService>>>,
+    /// The managed runner: a run's process lives in it, so the service must
+    /// share it or Stop would find nothing.
+    exec: Arc<ExecutionService>,
 }
 
 impl ScriptExecutionState {
-    pub fn new() -> Self {
+    pub fn new(exec: Arc<ExecutionService>) -> Self {
         Self {
             service: Arc::new(Mutex::new(None)),
+            exec,
         }
     }
 
     pub async fn get_or_init(&self, db_manager: &Arc<DatabaseManager>) -> ScriptExecutionService {
         let mut service = self.service.lock().await;
         if service.is_none() {
-            *service = Some(ScriptExecutionService::new(db_manager.clone()));
+            *service = Some(ScriptExecutionService::new(
+                db_manager.clone(),
+                self.exec.clone(),
+            ));
         }
         service.as_ref().unwrap().clone()
     }
@@ -51,6 +60,7 @@ pub struct ExecuteScriptParams {
 pub async fn execute_script(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
+    events: State<'_, Events>,
     params: ExecuteScriptParams,
 ) -> Result<String, String> {
     let service = execution_state.get_or_init(&db_manager).await;
@@ -68,7 +78,7 @@ pub async fn execute_script(
         workflow_plan: params.workflow_plan,
     };
 
-    service.execute_script(request).await
+    service.execute_script(request, events.sink()).await
 }
 
 /// Record an interactive-terminal run in script history
@@ -129,7 +139,7 @@ pub async fn get_script_execution_live_output(
     execution_id: String,
 ) -> Result<Vec<String>, String> {
     let service = execution_state.get_or_init(&db_manager).await;
-    Ok(service.get_live_output(&execution_id))
+    Ok(service.get_live_output(&execution_id).await)
 }
 
 /// Cancel a running execution

@@ -16,7 +16,7 @@ export interface ScriptExecutionInfo {
   command: string;
   parameters: Record<string, string>;
   workingDirectory: string | null;
-  status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled';
+  status: 'pending' | 'queued' | 'running' | 'success' | 'failed' | 'cancelled';
   exitCode: number | null;
   pid: number | null;
   output: string;

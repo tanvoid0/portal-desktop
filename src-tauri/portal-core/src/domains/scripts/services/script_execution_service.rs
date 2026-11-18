@@ -1,99 +1,15 @@
 use crate::database::DatabaseManager;
-use crate::domains::projects::move_lock;
-use crate::domains::scripts::repositories::{ScriptExecutionRepository, WorkflowLink};
-use crate::entities::script_execution::Model;
-use crate::process_ext::NoWindowExt;
-use crate::utils::pnpm_workspace::prepare_shell_command;
+use crate::domains::projects::pipelines::repositories::{ActionMeta, ExecutionRepository};
+use crate::domains::projects::pipelines::services::{ExecutionService, RunSpec};
+use crate::domains::scripts::repositories::WorkflowLink;
+use crate::entities::pipeline_execution::Model;
+use crate::events::EventSink;
 use crate::utils::shell_template;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
-use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::process::{Child, Command};
-use uuid::Uuid;
-
-type OutputBuffers = Mutex<HashMap<String, Vec<String>>>;
-
-/// Decode one chunk of process output, carrying an incomplete trailing UTF-8
-/// sequence over to the next chunk so a multi-byte char split across two reads
-/// is not mangled. Invalid bytes become U+FFFD rather than ending the stream.
-fn decode_utf8_chunk(carry: &mut Vec<u8>, chunk: &[u8]) -> String {
-    carry.extend_from_slice(chunk);
-    let mut out = String::new();
-    let mut i = 0;
-    loop {
-        match std::str::from_utf8(&carry[i..]) {
-            Ok(s) => {
-                out.push_str(s);
-                i = carry.len();
-                break;
-            }
-            Err(e) => {
-                let end = i + e.valid_up_to();
-                out.push_str(std::str::from_utf8(&carry[i..end]).unwrap_or_default());
-                match e.error_len() {
-                    // Invalid bytes: replace them and keep decoding the rest.
-                    Some(n) => {
-                        out.push('\u{FFFD}');
-                        i = end + n;
-                    }
-                    // An unfinished char at the very end — carry it over.
-                    None => {
-                        i = end;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    carry.drain(..i);
-    out
-}
-
-/// Copy a child pipe into the execution's live buffer as raw chunks — not
-/// lines — so partial lines (progress, prompts) show while the run is going.
-/// stdout and stderr both land in the one buffer, in arrival order.
-async fn pump<R: AsyncRead + Unpin>(stream: Option<R>, id: &str, bufs: &OutputBuffers) {
-    let Some(mut stream) = stream else { return };
-    let mut chunk = [0u8; 8192];
-    let mut carry = Vec::new();
-    loop {
-        let text = match stream.read(&mut chunk).await {
-            Ok(0) | Err(_) => break,
-            Ok(n) => decode_utf8_chunk(&mut carry, &chunk[..n]),
-        };
-        if !text.is_empty() {
-            if let Some(buf) = bufs.lock().unwrap().get_mut(id) {
-                buf.push(text);
-            }
-        }
-    }
-    if !carry.is_empty() {
-        if let Some(buf) = bufs.lock().unwrap().get_mut(id) {
-            buf.push(String::from_utf8_lossy(&carry).into_owned());
-        }
-    }
-}
-
-/// Kill the whole process tree rooted at `pid` — the `cmd /C` / `sh -c`
-/// wrapper. Killing only the wrapper orphans what it started (pnpm -> node
-/// ...), which keeps running and keeps the output pipes open. Async, so no
-/// lock is held and no runtime thread blocks while taskkill/kill runs.
-async fn kill_tree(pid: u32) {
-    #[cfg(windows)]
-    let _ = Command::new("taskkill")
-        .no_window()
-        .args(["/T", "/F", "/PID", &pid.to_string()])
-        .output()
-        .await;
-    // Spawned with process_group(0), so the group id is the wrapper's pid.
-    #[cfg(unix)]
-    let _ = Command::new("kill")
-        .args(["-KILL", "--", &format!("-{pid}")])
-        .output()
-        .await;
-}
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -144,19 +60,49 @@ pub struct ScriptExecutionInfo {
     pub workflow_plan: Option<serde_json::Value>,
 }
 
+/// The run's log so far: every step's `logs`, one element per line, each
+/// ending in `\n` (callers join with ''). A history row copied from
+/// `script_executions` keeps its old output in the same place.
+fn log_lines(row: &Model) -> Vec<String> {
+    let steps: Vec<Value> = serde_json::from_str(&row.step_executions_json).unwrap_or_default();
+    steps
+        .iter()
+        .filter_map(|s| s["logs"].as_array())
+        .flatten()
+        .filter_map(|l| l.as_str().map(|l| format!("{l}\n")))
+        .collect()
+}
+
 impl From<Model> for ScriptExecutionInfo {
     fn from(e: Model) -> Self {
+        let steps: Vec<Value> = serde_json::from_str(&e.step_executions_json).unwrap_or_default();
+        let exit_code = steps
+            .iter()
+            .rev()
+            .find_map(|s| s["exitCode"].as_i64())
+            .map(|c| c as i32);
+        // Live text comes from `get_live_output`; `output` appears once the run is over.
+        let output = if matches!(e.status.as_str(), "pending" | "queued" | "running") {
+            String::new()
+        } else {
+            log_lines(&e).concat()
+        };
+        // The runner records a Stop as `cancelled` with no error; the Action UI
+        // and an MCP client read this string.
+        let error = e
+            .error
+            .or_else(|| (e.status == "cancelled").then(|| "Stopped by user".to_string()));
         Self {
             id: e.id,
             block_id: e.block_id,
-            command: e.command,
-            parameters: serde_json::from_str(&e.parameters_json).unwrap_or_default(),
+            command: e.command.unwrap_or_default(),
+            parameters: serde_json::from_str(&e.variables_json).unwrap_or_default(),
             working_directory: e.working_directory,
             status: e.status,
-            exit_code: e.exit_code,
+            exit_code,
             pid: e.pid,
-            output: e.output,
-            error: e.error,
+            output,
+            error,
             started_at: e.started_at.to_rfc3339(),
             finished_at: e.finished_at.map(|d| d.to_rfc3339()),
             triggered_by: e.triggered_by,
@@ -170,312 +116,82 @@ impl From<Model> for ScriptExecutionInfo {
     }
 }
 
+/// Action and terminal runs, as the `*_script_*` commands speak them, over the
+/// shared pipeline runner: a run is a one-step `kind = 'action'` row in
+/// `pipeline_executions` (see docs/development/UNIFIED_RUNNER_PLAN.md).
+#[derive(Clone)]
 pub struct ScriptExecutionService {
-    repository: ScriptExecutionRepository,
-    db_manager: Arc<DatabaseManager>,
-    // Map execution_id -> Child process
-    running_processes: Arc<Mutex<HashMap<String, Child>>>,
-    // Map execution_id -> live output buffer (for real-time updates)
-    output_buffers: Arc<Mutex<HashMap<String, Vec<String>>>>,
-    // Map execution_id -> working directory, for the relocation in-use check
-    // (`relocation::usage::running_under`) — kept alongside `running_processes`
-    // rather than folded into it so the `Child` map stays untouched.
-    running_dirs: Arc<Mutex<HashMap<String, String>>>,
-    // Runs the user asked to stop. The output task reads this when the process
-    // exits and records `cancelled` itself — after saving the output.
-    cancel_requested: Arc<Mutex<HashSet<String>>>,
+    repo: ExecutionRepository,
+    exec: Arc<ExecutionService>,
 }
 
 impl ScriptExecutionService {
-    pub fn new(db_manager: Arc<DatabaseManager>) -> Self {
+    /// `exec` must be the app's one `ExecutionService`: it owns the running
+    /// processes, so a second instance could not Stop what this one started.
+    pub fn new(db_manager: Arc<DatabaseManager>, exec: Arc<ExecutionService>) -> Self {
         Self {
-            repository: ScriptExecutionRepository::new(db_manager.clone()),
-            db_manager,
-            running_processes: Arc::new(Mutex::new(HashMap::new())),
-            output_buffers: Arc::new(Mutex::new(HashMap::new())),
-            running_dirs: Arc::new(Mutex::new(HashMap::new())),
-            cancel_requested: Arc::new(Mutex::new(HashSet::new())),
+            repo: ExecutionRepository::new(db_manager),
+            exec,
         }
     }
 
-    /// True if any execution currently running has a working directory at or
+    /// True if any action currently running has a working directory at or
     /// under `path`. Used by the project-relocation in-use check.
     pub fn running_under(&self, path: &str) -> bool {
-        self.running_dirs
-            .lock()
-            .unwrap()
-            .values()
-            .any(|dir| crate::domains::projects::move_lock::is_within(dir, path))
+        self.exec.running_actions_under(path)
     }
 
-    /// Build a short error message from exit code + captured output.
-    fn failure_message(exit_code: Option<i32>, output: &str) -> String {
-        let meaningful: Vec<&str> = output
-            .lines()
-            .map(|l| l.trim())
-            .filter(|l| !l.is_empty())
-            .collect();
-        let tail = meaningful
-            .iter()
-            .rev()
-            .take(8)
-            .cloned()
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        match (exit_code, tail.is_empty()) {
-            (Some(code), false) => format!("Exit code {code}\n{tail}"),
-            (Some(code), true) => format!("Exit code {code}"),
-            (None, false) => tail,
-            (None, true) => "Process failed with no output".to_string(),
-        }
+    /// The row of `id` if it is an action run; a pipeline's id is not ours.
+    async fn action(&self, id: &str) -> Result<Option<Model>, String> {
+        Ok(self.repo.get_by_id(id).await?.filter(|r| r.kind == "action"))
     }
 
-    /// Execute a script and track it persistently
-    pub async fn execute_script(&self, request: ExecuteScriptRequest) -> Result<String, String> {
-        if let Some(wd) = &request.working_directory {
-            move_lock::ensure_unlocked_within(Path::new(wd))?;
-        }
-        let execution_id = Uuid::new_v4().to_string();
-        let parameters_json = serde_json::to_string(&request.parameters)
-            .map_err(|e| format!("Failed to serialize parameters: {}", e))?;
-
-        // Fill `${name}` / `$name` with the parameters, quoted for the shell,
-        // then apply shell rewrites (e.g. broken pnpm workspace)
-        let resolved_command = shell_template::render(&request.command, &request.parameters);
-        let exec_command = if let Some(ref wd) = request.working_directory {
-            prepare_shell_command(&resolved_command, wd)
-        } else {
-            resolved_command
-        };
-
-        // Create execution record in database
-        let _execution = self
-            .repository
-            .create(
-                execution_id.clone(),
-                request.block_id.clone(),
-                exec_command.clone(),
-                parameters_json,
-                request.working_directory.clone(),
-                request
-                    .triggered_by
-                    .clone()
-                    .unwrap_or_else(|| "user".to_string()),
-                WorkflowLink {
-                    run_id: request.workflow_run_id.clone(),
-                    workflow_id: request.workflow_id.clone(),
-                    step_id: request.step_id.clone(),
-                    plan_json: request.workflow_plan.as_ref().map(|p| p.to_string()),
-                },
-            )
-            .await?;
-
-        // Initialize output buffer
-        {
-            let mut buffers = self.output_buffers.lock().unwrap();
-            buffers.insert(execution_id.clone(), Vec::new());
-        }
-
-        // Parse command - use shell for complex commands
-        let parts: Vec<&str> = exec_command.split_whitespace().collect();
-        if parts.is_empty() {
-            self.repository
-                .update_status(
-                    &execution_id,
-                    "failed".to_string(),
-                    None,
-                    Some("Empty command".to_string()),
-                )
-                .await?;
+    /// Run a command as a one-step run and return its id once it is queued.
+    pub async fn execute_script(
+        &self,
+        request: ExecuteScriptRequest,
+        events: Arc<dyn EventSink>,
+    ) -> Result<String, String> {
+        if request.command.trim().is_empty() {
             return Err("Command cannot be empty".to_string());
         }
-
-        // Build command - use shell to handle complex commands with pipes, redirects, etc.
-        let mut cmd = shell_template::shell_command(&exec_command);
-
-        // Set working directory
-        if let Some(ref wd) = request.working_directory {
-            cmd.current_dir(wd);
+        // No row for a folder that is not there; the caller hears why (as it did from the spawn).
+        let cwd = request.working_directory.clone().unwrap_or_default();
+        if !cwd.is_empty() && !Path::new(&cwd).is_dir() {
+            return Err(format!("Working directory does not exist: {cwd}"));
         }
-
-        // Extra env (e.g. CI=true so non-interactive runners don't prompt)
-        if let Some(ref env) = request.env {
-            cmd.envs(env);
-        }
-
-        // Configure stdio. stdin is closed (null) so the process can never block
-        // waiting on a prompt that no one will answer (e.g. pnpm's purge
-        // confirmation) — it fails fast instead of hanging the run forever.
-        cmd.stdin(std::process::Stdio::null());
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-        cmd.kill_on_drop(true);
-        // Own process group, so Stop can kill everything the shell started.
-        #[cfg(unix)]
-        cmd.process_group(0);
-
-        // Spawn process
-        let mut child = match cmd.spawn() {
-            Ok(c) => c,
-            Err(e) => {
-                self.repository
-                    .update_status(
-                        &execution_id,
-                        "failed".to_string(),
-                        None,
-                        Some(format!("Failed to spawn process: {}", e)),
-                    )
-                    .await?;
-                return Err(format!("Failed to spawn process: {}", e));
-            }
-        };
-
-        // Take stdout/stderr before moving child
-        let stdout = child.stdout.take();
-        let stderr = child.stderr.take();
-        let pid = child.id();
-
-        // Register the child before anything else can await, so a Stop from
-        // here on finds it (cancel_execution sets its flag, then looks here).
-        self.running_processes
-            .lock()
-            .unwrap()
-            .insert(execution_id.clone(), child);
-        if let Some(ref wd) = request.working_directory {
-            let mut dirs = self.running_dirs.lock().unwrap();
-            dirs.insert(execution_id.clone(), wd.clone());
-        }
-        // A Stop that landed while the process was spawning saw no child.
-        let stop_early = self
-            .cancel_requested
-            .lock()
-            .unwrap()
-            .contains(&execution_id);
-        if let (true, Some(pid)) = (stop_early, pid) {
-            kill_tree(pid).await;
-        }
-        if let Some(pid) = pid {
-            self.repository
-                .update_pid(&execution_id, pid as i32)
-                .await?;
-        }
-
-        // Spawn background task to read output and wait for completion
-        let exec_id_clone = execution_id.clone();
-        let repo = self.repository.clone();
-        let output_buffers = Arc::clone(&self.output_buffers);
-        let running_processes = Arc::clone(&self.running_processes);
-        let running_dirs = Arc::clone(&self.running_dirs);
-        let cancel_requested = Arc::clone(&self.cancel_requested);
-
-        tokio::spawn(async move {
-            // Pump stdout + stderr concurrently (sequential reads can deadlock on
-            // full pipes) into the one arrival-ordered live buffer.
-            let mut pumps = Box::pin(async {
-                tokio::join!(
-                    pump(stdout, &exec_id_clone, &output_buffers),
-                    pump(stderr, &exec_id_clone, &output_buffers),
-                )
-            });
-            // After a Stop, give the pipes a moment to close, then stop reading
-            // anyway: a process that outlived its (killed) parent can still hold
-            // them open, and on Windows taskkill /T can't find it once the parent
-            // is gone. Dropping our read ends lets the run finish as cancelled.
-            // ponytail: orphans survive on Windows; a Job object per run would
-            // kill them too.
-            let mut stop_deadline: Option<std::time::Instant> = None;
-            loop {
-                tokio::select! {
-                    _ = &mut pumps => break,
-                    _ = tokio::time::sleep(std::time::Duration::from_millis(250)) => {
-                        if stop_deadline.is_none()
-                            && cancel_requested.lock().unwrap().contains(&exec_id_clone)
-                        {
-                            stop_deadline =
-                                Some(std::time::Instant::now() + std::time::Duration::from_secs(2));
-                        }
-                        if stop_deadline.is_some_and(|d| std::time::Instant::now() >= d) {
-                            break;
-                        }
-                    }
-                }
-            }
-            drop(pumps); // closes our read ends if we stopped early
-            let combined_output = output_buffers
-                .lock()
-                .unwrap()
-                .get(&exec_id_clone)
-                .map(|chunks| chunks.concat())
-                .unwrap_or_default();
-
-            // Wait for process to complete - extract child from map first, then await
-            let child_opt: Option<Child> = {
-                let mut processes = running_processes.lock().unwrap();
-                processes.remove(&exec_id_clone)
-            };
-            running_dirs.lock().unwrap().remove(&exec_id_clone);
-
-            let wait_result = if let Some(mut child) = child_opt {
-                child.wait().await
-            } else {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Process handle lost before wait",
-                ))
-            };
-
-            // Stopped by the user: record `cancelled`, not `failed`, so whoever
-            // waits on this run (the UI, an MCP client) reads it was stopped. A
-            // clean exit means it finished before the kill landed.
-            let stopped = cancel_requested.lock().unwrap().remove(&exec_id_clone);
-            let killed = stopped && !matches!(&wait_result, Ok(st) if st.success());
-
-            // Update final status in database
-            let (status, exit_code, error) = match wait_result {
-                _ if killed => (
-                    "cancelled".to_string(),
-                    None,
-                    Some("Stopped by user".to_string()),
-                ),
-                Ok(status) if status.success() => ("success".to_string(), status.code(), None),
-                Ok(status) => {
-                    let code = status.code();
-                    (
-                        "failed".to_string(),
-                        code,
-                        Some(Self::failure_message(code, &combined_output)),
-                    )
-                }
-                Err(e) => (
-                    "failed".to_string(),
-                    None,
-                    Some(format!(
-                        "{}\n{}",
-                        e,
-                        Self::failure_message(None, &combined_output)
-                    )),
-                ),
-            };
-
-            // Save output, then the final status — a poller that stops at a
-            // finished status must already see the output.
-            let _ = repo.append_output(&exec_id_clone, &combined_output).await;
-            let _ = repo
-                .update_status(&exec_id_clone, status, exit_code, error)
-                .await;
-
-            // Clean up output buffer
-            {
-                let mut bufs = output_buffers.lock().unwrap();
-                bufs.remove(&exec_id_clone);
-            }
-        });
-
-        Ok(execution_id)
+        // Shown and stored resolved (`${name}` / `$name` filled in, quoted for
+        // the shell); the step keeps the template, which the runner renders
+        // from `variables` — rendering the resolved text again would re-expand.
+        let command = shell_template::render(&request.command, &request.parameters);
+        let step_id = request.step_id.clone().unwrap_or_else(|| "run".to_string());
+        self.exec
+            .execute_steps(
+                RunSpec {
+                    cwd,
+                    steps: vec![json!({
+                        "id": step_id,
+                        "name": command,
+                        "dependsOn": [],
+                        "config": { "command": request.command },
+                    })],
+                    variables: request.parameters,
+                    env: request.env.unwrap_or_default(),
+                    triggered_by: request.triggered_by.unwrap_or_else(|| "user".to_string()),
+                    action: Some(ActionMeta {
+                        command,
+                        working_directory: request.working_directory,
+                        block_id: request.block_id,
+                        workflow_run_id: request.workflow_run_id,
+                        workflow_id: request.workflow_id,
+                        step_id: request.step_id,
+                        workflow_plan_json: request.workflow_plan.map(|p| p.to_string()),
+                    }),
+                    ..Default::default()
+                },
+                events,
+            )
+            .await
     }
 
     /// Record a run that happened in the embedded interactive terminal (no process is spawned here).
@@ -495,18 +211,6 @@ impl ScriptExecutionService {
         status: Option<String>,
         error: Option<String>,
     ) -> Result<(), String> {
-        let id = Uuid::new_v4().to_string();
-        self.repository
-            .create(
-                id.clone(),
-                block_id,
-                command,
-                "{}".to_string(),
-                working_directory,
-                "user".to_string(),
-                link,
-            )
-            .await?;
         let status = status.unwrap_or_else(|| {
             match exit_code {
                 Some(0) => "success",
@@ -515,22 +219,27 @@ impl ScriptExecutionService {
             }
             .to_string()
         });
-        self.repository
-            .update_status(&id, status, exit_code, error)
+        // Backdates started_at to when the terminal run began so duration is real.
+        let started_at = started_at
+            .and_then(|t| chrono::DateTime::parse_from_rfc3339(&t).ok())
+            .map(|t| t.with_timezone(&chrono::Utc));
+        self.exec
+            .record_finished_action(
+                ActionMeta {
+                    command,
+                    working_directory,
+                    block_id,
+                    workflow_run_id: link.run_id,
+                    workflow_id: link.workflow_id,
+                    step_id: link.step_id,
+                    workflow_plan_json: link.plan_json,
+                },
+                started_at,
+                status,
+                exit_code,
+                error,
+            )
             .await?;
-        // Backdate started_at to when the terminal run began so duration is real.
-        if let Some(t) = started_at.and_then(|t| chrono::DateTime::parse_from_rfc3339(&t).ok()) {
-            use crate::entities::script_execution::{ActiveModel, Entity};
-            use sea_orm::{ActiveModelTrait, EntityTrait, Set};
-            let db = self.db_manager.get_connection();
-            if let Ok(Some(m)) = Entity::find_by_id(&id).one(db).await {
-                let mut am: ActiveModel = m.into();
-                am.started_at = Set(t);
-                am.update(db)
-                    .await
-                    .map_err(|e| format!("Failed to set started_at: {}", e))?;
-            }
-        }
         Ok(())
     }
 
@@ -539,9 +248,7 @@ impl ScriptExecutionService {
         &self,
         execution_id: &str,
     ) -> Result<Option<ScriptExecutionInfo>, String> {
-        let execution = self.repository.get_by_id(execution_id).await?;
-
-        Ok(execution.map(Into::into))
+        Ok(self.action(execution_id).await?.map(Into::into))
     }
 
     /// Every step row of one workflow run, oldest first
@@ -549,68 +256,49 @@ impl ScriptExecutionService {
         &self,
         run_id: &str,
     ) -> Result<Vec<ScriptExecutionInfo>, String> {
-        let rows = self.repository.get_by_workflow_run(run_id).await?;
+        let rows = self.repo.get_by_workflow_run(run_id).await?;
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    /// Get live output for a running execution
-    pub fn get_live_output(&self, execution_id: &str) -> Vec<String> {
-        let buffers = self.output_buffers.lock().unwrap();
-        buffers.get(execution_id).cloned().unwrap_or_default()
+    /// The run's output so far, one element per line, each ending in `\n`.
+    /// Read from the database, so it is the same after the run has finished.
+    pub async fn get_live_output(&self, execution_id: &str) -> Vec<String> {
+        match self.action(execution_id).await {
+            Ok(Some(row)) => log_lines(&row),
+            _ => Vec::new(),
+        }
     }
 
-    /// Stop a running execution and its whole process tree.
-    ///
-    /// Only flags and kills: the output task saves what the run printed and
-    /// then records `cancelled` (see `execute_script`).
+    /// Stop a running execution and its whole process tree. The runner records
+    /// `cancelled` at once: a Stop wins, even over a process that was exiting.
     pub async fn cancel_execution(&self, execution_id: &str) -> Result<(), String> {
         let row = self
-            .repository
-            .get_by_id(execution_id)
+            .action(execution_id)
             .await?
             .ok_or_else(|| format!("Execution not found: {execution_id}"))?;
-        if row.status != "running" && row.status != "pending" {
+        // The runner would flip a finished row to cancelled; refuse here.
+        if !matches!(row.status.as_str(), "pending" | "queued" | "running") {
             return Err(format!("Run already finished ({})", row.status));
         }
-
-        // Flag first, then look for the child: execute_script registers the
-        // child before checking the flag, so one of the two always sees the other.
-        self.cancel_requested
-            .lock()
-            .unwrap()
-            .insert(execution_id.to_string());
-        let pid = self
-            .running_processes
-            .lock()
-            .unwrap()
-            .get(execution_id)
-            .map(|child| child.id());
-        match pid {
-            Some(Some(pid)) => {
-                kill_tree(pid).await;
-                if let Some(child) = self.running_processes.lock().unwrap().get_mut(execution_id) {
-                    let _ = child.start_kill();
-                }
-            }
-            // Already exited; the output task is finishing it.
-            Some(None) => {}
-            // Still spawning: execute_script sees the flag once the child is registered.
-            None if row.status == "pending" => {}
-            // Left over from an earlier Portal session — its process isn't ours to
-            // kill (the pid may be reused), so close the row and say so.
-            None => {
-                self.cancel_requested.lock().unwrap().remove(execution_id);
-                self.repository
+        // Left over from an earlier Portal session — its process isn't ours to
+        // kill (the pid may be reused), so close the row and say so.
+        if row.status == "running" && !self.exec.is_running(execution_id) {
+            // Re-read: the run may have finished since `row`, and must not get this stamped on it.
+            let active = self.action(execution_id).await?.is_some_and(|r| {
+                matches!(r.status.as_str(), "pending" | "queued" | "running")
+            });
+            if active {
+                self.repo
                     .update_status(
                         execution_id,
                         "cancelled".to_string(),
-                        None,
                         Some("Not tracked by this Portal session — marked stopped".to_string()),
                     )
                     .await?;
             }
+            return Ok(());
         }
-        Ok(())
+        self.exec.cancel_execution(execution_id, None).await
     }
 
     /// Get executions for a specific block/script
@@ -619,172 +307,73 @@ impl ScriptExecutionService {
         block_id: &str,
         limit: Option<u64>,
     ) -> Result<Vec<ScriptExecutionInfo>, String> {
-        let executions = self.repository.get_by_block(block_id, limit).await?;
-
-        Ok(executions.into_iter().map(Into::into).collect())
+        let rows = self.repo.get_by_block(block_id, limit).await?;
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 
     /// Get all running executions
     pub async fn get_running_executions(&self) -> Result<Vec<ScriptExecutionInfo>, String> {
-        let mut executions = self.repository.get_running().await?;
-        // Pending rows have no pid, so they fall into the "state unknown" branch below.
-        executions.extend(self.repository.get_pending().await?);
-
-        Ok(executions.into_iter().map(Into::into).collect())
+        let rows = self.repo.get_active_actions().await?;
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    /// Get recent executions
+    /// Get recent executions (action runs only, not pipelines)
     pub async fn get_recent_executions(
         &self,
         limit: u64,
     ) -> Result<Vec<ScriptExecutionInfo>, String> {
-        let executions = self.repository.get_recent(limit).await?;
-
-        Ok(executions.into_iter().map(Into::into).collect())
+        let rows = self.repo.get_recent(Some("action"), Some(limit)).await?;
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    /// Check running processes and sync with database
-    /// Called on app startup to reconcile state
+    /// Kept for the `sync_script_executions` command: runs the last session
+    /// left unfinished are closed at startup by `ExecutionService::reconcile_interrupted`.
     pub async fn sync_running_executions(&self) -> Result<(), String> {
-        // A row still `pending` at startup never got a process.
-        for execution in self.repository.get_pending().await? {
-            self.repository
-                .update_status(
-                    &execution.id,
-                    "failed".to_string(),
-                    None,
-                    Some("Interrupted by app restart".to_string()),
-                )
-                .await?;
-        }
-
-        let executions = self.repository.get_running().await?;
-
-        for execution in executions {
-            if let Some(pid) = execution.pid {
-                // Check if process is still running
-                let is_running = self.is_process_alive(pid as u32);
-
-                if !is_running {
-                    // Process died while app was closed, mark as failed
-                    self.repository
-                        .update_status(
-                            &execution.id,
-                            "failed".to_string(),
-                            None,
-                            Some("Process terminated while app was closed".to_string()),
-                        )
-                        .await?;
-                }
-            } else {
-                // No PID recorded, mark as failed
-                self.repository
-                    .update_status(
-                        &execution.id,
-                        "failed".to_string(),
-                        None,
-                        Some("Interrupted by app restart".to_string()),
-                    )
-                    .await?;
-            }
-        }
-
         Ok(())
-    }
-
-    /// Check if a process is still alive by PID
-    fn is_process_alive(&self, pid: u32) -> bool {
-        #[cfg(unix)]
-        {
-            use std::process::Command as StdCommand;
-            // Use kill -0 to check if process exists
-            StdCommand::new("kill")
-                .args(["-0", &pid.to_string()])
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
-        }
-        #[cfg(windows)]
-        {
-            use std::process::Command as StdCommand;
-            // Use tasklist to check if process exists
-            StdCommand::new("tasklist")
-                .no_window()
-                .args(["/FI", &format!("PID eq {}", pid)])
-                .output()
-                .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
-                .unwrap_or(false)
-        }
-        #[cfg(not(any(unix, windows)))]
-        {
-            false
-        }
     }
 
     /// Delete an execution record
     pub async fn delete_execution(&self, execution_id: &str) -> Result<(), String> {
+        // Only an action run is ours to delete; a pipeline's id is a no-op.
+        if self.action(execution_id).await?.is_none() {
+            return Ok(());
+        }
         // First try to cancel if running
         let _ = self.cancel_execution(execution_id).await;
         // Then delete from database
-        self.repository.delete(execution_id).await
-    }
-}
-
-impl Clone for ScriptExecutionService {
-    fn clone(&self) -> Self {
-        Self {
-            repository: self.repository.clone(),
-            db_manager: self.db_manager.clone(),
-            running_processes: Arc::clone(&self.running_processes),
-            output_buffers: Arc::clone(&self.output_buffers),
-            running_dirs: Arc::clone(&self.running_dirs),
-            cancel_requested: Arc::clone(&self.cancel_requested),
-        }
+        self.repo.delete(execution_id).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::pipeline_execution::{Column, Entity};
+    use crate::migrations::m20261119_000051_unify_runs::copy_script_history;
+    use sea_orm::{ColumnTrait, ConnectionTrait, DbBackend, EntityTrait, QueryFilter, Statement};
 
-    #[test]
-    fn utf8_split_across_chunks_is_kept_whole() {
-        let bytes = "ok ✓ done\r50%\r100%\n".as_bytes();
-        let cut = 4; // inside the 3-byte ✓
-        let mut carry = Vec::new();
-        let a = decode_utf8_chunk(&mut carry, &bytes[..cut]);
-        let b = decode_utf8_chunk(&mut carry, &bytes[cut..]);
-        assert_eq!(a, "ok ");
-        assert_eq!(a + &b, "ok ✓ done\r50%\r100%\n");
-        assert!(carry.is_empty());
+    #[derive(Debug)]
+    struct Quiet;
+    impl EventSink for Quiet {
+        fn emit_json(&self, _: &str, _: Value) -> bool {
+            false
+        }
     }
 
-    #[test]
-    fn invalid_byte_then_split_char_keeps_the_tail() {
-        let mut carry = Vec::new();
-        // bad byte, then the first 2 of the 3 bytes of a check mark
-        let a = decode_utf8_chunk(&mut carry, &[b'x', 0xff, 0xe2, 0x9c]);
-        let b = decode_utf8_chunk(&mut carry, &[0x93]);
-        assert_eq!(a + &b, "x\u{fffd}\u{2713}");
-    }
-
-    #[test]
-    fn invalid_bytes_do_not_end_the_stream() {
-        let mut carry = Vec::new();
-        let out = decode_utf8_chunk(&mut carry, b"a\xffb");
-        assert_eq!(out, "a\u{fffd}b");
-        assert!(carry.is_empty());
-    }
-
-    #[tokio::test]
-    async fn record_interactive_stores_workflow_link_status_and_error() {
+    async fn service() -> (ScriptExecutionService, Arc<DatabaseManager>, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
         let db = Arc::new(
             DatabaseManager::new(dir.path().to_path_buf())
                 .await
                 .unwrap(),
         );
-        let svc = ScriptExecutionService::new(db);
+        let exec = Arc::new(ExecutionService::new(db.clone()));
+        (ScriptExecutionService::new(db.clone(), exec), db, dir)
+    }
+
+    #[tokio::test]
+    async fn record_interactive_stores_workflow_link_status_and_error() {
+        let (svc, _db, _dir) = service().await;
         let link = WorkflowLink {
             run_id: Some("r1".into()),
             workflow_id: Some("w1".into()),
@@ -810,5 +399,125 @@ mod tests {
         assert_eq!(r.workflow_id.as_deref(), Some("w1"));
         assert_eq!(r.status, "failed");
         assert_eq!(r.error.as_deref(), Some("deploy broke"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn script_facade_runs_on_pipeline_runner() {
+        let (svc, db, dir) = service().await;
+        let conn = db.get_connection();
+
+        // History the old service wrote: still in script_executions after the
+        // migrations ran, copied by the catch-up, readable under the same id.
+        conn.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            "INSERT INTO script_executions (id, command, parameters_json, working_directory, status, exit_code, output, started_at, finished_at, triggered_by)
+             VALUES ('legacy', 'echo old', '{}', '/w', 'success', 0, 'one\ntwo\n', '2026-01-03T00:00:00+00:00', '2026-01-03T00:00:02+00:00', 'mcp:t')"
+                .to_string(),
+        ))
+        .await
+        .unwrap();
+        copy_script_history(conn, true).await.unwrap();
+        let old = svc.get_execution("legacy").await.unwrap().unwrap();
+        assert_eq!(
+            (old.command.as_str(), old.status.as_str(), old.output.as_str()),
+            ("echo old", "success", "one\ntwo\n")
+        );
+        assert_eq!(old.triggered_by, "mcp:t");
+        assert_eq!(old.exit_code, Some(0));
+
+        // A new run goes through the pipeline runner.
+        let request = ExecuteScriptRequest {
+            block_id: None,
+            command: "echo hi".into(),
+            parameters: HashMap::new(),
+            working_directory: Some(dir.path().display().to_string()),
+            env: None,
+            triggered_by: None,
+            workflow_run_id: None,
+            workflow_id: None,
+            step_id: None,
+            workflow_plan: None,
+        };
+        let id = svc.execute_script(request, Arc::new(Quiet)).await.unwrap();
+        let mut finished = None;
+        for _ in 0..400 {
+            let run = svc.get_execution(&id).await.unwrap().unwrap();
+            if matches!(run.status.as_str(), "success" | "failed") {
+                finished = Some(run);
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        let run = finished.expect("run did not finish");
+        assert_eq!(run.status, "success", "{:?}", run.error);
+        assert!(run.output.contains("hi"), "{:?}", run.output);
+        assert!(svc.get_live_output(&id).await.join("").contains("hi\n"));
+
+        let rows = Entity::find()
+            .filter(Column::Id.eq(id.as_str()))
+            .filter(Column::Kind.eq("action"))
+            .all(conn)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        // And the one place a run can be Stopped has no run left to stop.
+        let err = svc.cancel_execution(&id).await.unwrap_err();
+        assert_eq!(err, "Run already finished (success)");
+    }
+
+    /// The run once `done` holds, polled every 50 ms for at most `secs`.
+    async fn wait_for(
+        svc: &ScriptExecutionService,
+        id: &str,
+        secs: u64,
+        done: fn(&ScriptExecutionInfo) -> bool,
+    ) -> ScriptExecutionInfo {
+        for _ in 0..secs * 20 {
+            let run = svc.get_execution(id).await.unwrap().unwrap();
+            if done(&run) {
+                return run;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        panic!("run {id} did not get there within {secs}s");
+    }
+
+    /// A Stop wins: the run ends `cancelled` with the Stop's message and no exit
+    /// code, leaves the running list, and a second Stop has nothing to stop.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn script_facade_stop_wins() {
+        let (svc, _db, dir) = service().await;
+        let command = if cfg!(windows) {
+            "ping -n 60 127.0.0.1 > nul"
+        } else {
+            "sleep 60"
+        };
+        let request = ExecuteScriptRequest {
+            block_id: None,
+            command: command.into(),
+            parameters: HashMap::new(),
+            working_directory: Some(dir.path().display().to_string()),
+            env: None,
+            triggered_by: None,
+            workflow_run_id: None,
+            workflow_id: None,
+            step_id: None,
+            workflow_plan: None,
+        };
+        let id = svc.execute_script(request, Arc::new(Quiet)).await.unwrap();
+        // A pid means the process exists, so there is a tree to kill.
+        wait_for(&svc, &id, 10, |r| r.status == "running" && r.pid.is_some()).await;
+        svc.cancel_execution(&id).await.unwrap();
+        let run = wait_for(&svc, &id, 15, |r| {
+            matches!(r.status.as_str(), "success" | "failed" | "cancelled")
+        })
+        .await;
+        assert_eq!(run.status, "cancelled", "{:?}", run.error);
+        assert_eq!(run.exit_code, None);
+        assert_eq!(run.error.as_deref(), Some("Stopped by user"));
+        let running = svc.get_running_executions().await.unwrap();
+        assert!(running.iter().all(|r| r.id != id), "{running:?}");
+        let err = svc.cancel_execution(&id).await.unwrap_err();
+        assert!(err.contains("already finished"), "{err}");
     }
 }

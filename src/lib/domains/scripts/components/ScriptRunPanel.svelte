@@ -348,7 +348,7 @@
         >
           {#if currentExecution.output}
             <pre class="whitespace-pre-wrap">{currentExecution.output}</pre>
-          {:else if currentExecution.status === 'running'}
+          {:else if ['pending', 'queued', 'running'].includes(currentExecution.status)}
             <span class="animate-pulse">Waiting for output...</span>
           {:else}
             <span class="text-gray-500">No output</span>

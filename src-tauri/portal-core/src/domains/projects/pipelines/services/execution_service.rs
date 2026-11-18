@@ -791,6 +791,10 @@ impl ExecutionService {
         error: Option<&str>,
     ) -> Result<(), String> {
         self.update_step_fields(execution_id, step_id, |step| {
+            // A Stop that landed first is final: a late success/failed must not undo it.
+            if step.status == "cancelled" && status != "cancelled" {
+                return;
+            }
             step.status = status.to_string();
             step.finishedAt = Some(Utc::now().to_rfc3339());
             if let (Ok(started), Some(finished)) = (
@@ -1152,6 +1156,12 @@ impl ExecutionService {
         execution_id: &str,
         events: Option<Arc<dyn EventSink>>,
     ) -> Result<(), String> {
+        // A finished run has nothing left to stop: its status and times stay as they are.
+        if let Some(run) = self.execution_repo.get_by_id(execution_id).await? {
+            if matches!(run.status.as_str(), "success" | "failed" | "cancelled") {
+                return Ok(());
+            }
+        }
         let runtime_snapshot = {
             let guard = self.running.lock().unwrap();
             guard

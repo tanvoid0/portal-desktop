@@ -17,13 +17,45 @@ SES = `PCORE/domains/scripts/services/script_execution_service.rs`.
 | C1 | batched log persistence, process-group kill (TERM then KILL on unix) | done |
 | C2 | `pipeline_executions` rebuilt: nullable ids, `kind`, action columns | done |
 | C3 | `script_executions` history copied as `kind='action'`, same ids | done |
-| C4 | SES becomes a facade over `ExecutionService`; catch-up migration | **todo** |
+| C4 | SES is a facade over `ExecutionService`; catch-up migration 000052 | done (see "As built") |
 
 C1-C3 verified on a copy of the real DB: 30 pipeline rows kept, 32 script rows
 became 32 action rows with the same ids, no FK violations, every step blob
 deserializes (`cargo test real_db_copy_migrates -- --ignored`, env
 `PORTAL_MIGRATION_DB_COPY=<copy of portal_desktop.db>`). Never point it at the
 live DB: `%APPDATA%/com.tanvoid0.portal-desktop/portal_desktop.db`.
+
+## C4 — as built
+
+Landed as two commits: the runner half (`execute_steps`, repo methods,
+migration 000052) and the facade after it. **Release them together.** 000052
+copies script history once, so a build that has it but still runs the old SES
+would keep writing `script_executions` rows nobody copies.
+
+- `RunSpec` has no `kind`: `action: Some(ActionMeta)` is an action run. It has
+  `env` (merged onto each step's env, no `$` expansion) and `expected` (ETA
+  history; `execute_pipeline` fills it, actions have none).
+- Action deltas: no deadline, no package-manager rewrite, no `[stderr] ` prefix,
+  no `$ cmd` / `cwd:` header or package.json warnings (a step's logs are the
+  process output, so `ScriptExecutionInfo.output` is what crew prints),
+  `error` = `action_failure_message` ("Exit code N" + last 8 lines), pid
+  written, `move_lock` checked in `execute_steps`.
+- SES: `new(db, exec)`, `execute_script(req, events)`, and `get_live_output` is
+  `async` (reads the step logs, so up to ~250 ms behind). `output` is "" while a
+  run is active, as before. `queued` is now a possible script status; crew and
+  the UI treat every non-terminal status as running.
+- `ExecutionRepository::get_all` stays pipeline-only (the plan said to drop the
+  filter): `get_all_pipeline_executions` and the Pipelines pages must not start
+  listing actions. `recent_runs` is `get_recent(None, n)` and `running_runs` is
+  `get_non_terminal()`, both over every kind.
+- `running_under` is pipelines-only, `running_actions_under` the action half,
+  so a relocation reports one blocker per run.
+- `block_id` is stored as given: `pipeline_executions` has no FK on it, the old
+  table nulled unknown block ids.
+
+Not done, in order of value: ETA for action runs from their own history
+(`get_by_block` already exists); a later migration that drops `script_executions`
+once this release has been out; `\r` streaming; a Windows Job object.
 
 ## C4 — what to do
 
@@ -93,9 +125,25 @@ live DB: `%APPDATA%/com.tanvoid0.portal-desktop/portal_desktop.db`.
 
 ## Risks
 
-- Stop semantics: today a clean exit after Stop stays `success` (SES ~:434);
-  the pipeline `cancel_execution` writes `cancelled` immediately (ES ~:911).
-  Decide in review.
+- Stop semantics, **decided: Stop wins.** `cancel_execution` writes `cancelled`
+  at once and a `cancelled` row is final (`update_status` never overwrites it,
+  `finalize_step` leaves a cancelled step alone), so a process that exits
+  cleanly inside the race window still reads `cancelled`. The old script runner
+  kept `success` there. Cost: the last <=250 ms of log lines can land after
+  the status flips.
+- Startup: `reconcile_interrupted` fails every non-terminal action row with
+  "Interrupted by app restart". The old sync kept a `running` row whose pid was
+  still alive; an orphan left by a crashed app is now listed as failed while it
+  may still run (Stop could not kill it before either).
+- Log growth: `modify_steps` rewrites the whole step blob on every log batch, so
+  a dev-server action that prints for hours is O(n^2). Upgrade path: cap or
+  ring-buffer action logs.
+- A missing working directory is rejected up front (an `Err`, no row). Any other
+  spawn failure is a failed run with the reason in `error`, which crew's
+  `run_status` does not print (it shows output only).
+- `record_finished_action` (terminal runs, no-spawn workflow steps) emits no
+  `pipeline-execution-update`; the Action Runs list refreshes through its own
+  callers (`onChanged`, `onExecuted`, `loadHistory`).
 - `\r`-only progress output no longer streams live (reader is line-based);
   upgrade path: split on `\r` too.
 - Windows orphans that outlive their parent survive Stop; a Job object is the

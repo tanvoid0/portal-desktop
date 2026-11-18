@@ -337,18 +337,12 @@ pub fn run() {
                 Ok(_) => {}
                 Err(e) => log_warn!("Pipelines", "Failed to reconcile executions: {}", e),
             }
-            app.manage(execution_service);
+            app.manage(execution_service.clone());
 
-            // Initialize script execution state
-            let script_execution_state = ScriptExecutionState::new();
+            // Script runs are one-step runs on that same runner (the
+            // reconcile above already settled last session's).
+            let script_execution_state = ScriptExecutionState::new(execution_service);
             app.manage(script_execution_state);
-
-            // Sync any running script executions from previous session
-            // Blocking: a spawned sync could race with runs started this session.
-            let service = domains::scripts::ScriptExecutionService::new(db_manager_arc.clone());
-            if let Err(e) = tauri::async_runtime::block_on(service.sync_running_executions()) {
-                log_warn!("Scripts", "Failed to sync script executions: {}", e);
-            }
 
             log_info!("Tauri", "Automation service initialized");
             log_info!("Tauri", "Settings service initialized");
