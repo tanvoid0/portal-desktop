@@ -76,7 +76,7 @@ Not done:
   now"); revisit after C4 has shipped and run once.** It is irreversible against a
   real DB and the table is the rollback copy the user was told stays. When it is
   time: a migration `DROP TABLE IF EXISTS
-  script_executions` (its indexes go with it), no re-copy and no "everything was
+script_executions` (its indexes go with it), no re-copy and no "everything was
   copied" gate (a row missing from `pipeline_executions` is one the user deleted
   through the facade after 000052; a REPLACE copy would resurrect it), `down` a
   no-op. Ship it with or after the C4 release: an old build cannot run against a
