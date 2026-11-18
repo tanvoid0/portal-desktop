@@ -142,8 +142,9 @@ Each ships on its own.
    connection becomes a URL instead of `host:port`; `/rpc` and `/events` keep
    their shape. Not built until LAN use is solid.
 5. **PC control in Svelte** — trackpad + keyboard page over `/control`
-   (`remote.input` is already served by the daemon), resource monitor (one
-   `sysinfo` command + page, which the desktop gets for free too).
+   (`remote.input` is already served by the daemon), resource monitor (the
+   existing `host_stats` + `disk_usage` commands, served under the default
+   read-only `sysinfo` cap, plus a page the desktop gets for free too).
 6. **Media-remote features** — screen mirror, files, now-playing/volume. Port
    from Portal Remote's C# server into the daemon only as each is wanted.
 

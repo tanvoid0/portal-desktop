@@ -290,13 +290,13 @@ pub fn list_locations() -> Vec<Location> {
 }
 
 /// Mounted-volume capacity readout for the Dashboard. Read-only.
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "sysinfo")]
 pub fn disk_usage() -> Vec<DiskUsage> {
     disk::disk_usage()
 }
 
 /// CPU / memory readout for the AI sidebar status bar. Read-only.
-#[portal_rpc_macro::rpc]
+#[portal_rpc_macro::rpc(cap = "sysinfo")]
 pub fn host_stats() -> HostStats {
     disk::host_stats()
 }

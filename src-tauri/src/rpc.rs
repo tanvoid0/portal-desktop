@@ -109,6 +109,10 @@ inventory::collect!(Entry);
 /// `terminal.exec` is deliberately absent — letting a phone run commands on this
 /// PC is opt-in per device (the dialog renders it unchecked). Credentials carry
 /// no capability at all, so they can never be granted to anyone.
+///
+/// `sysinfo` is the read-only CPU/memory/volume readout (`host_stats`,
+/// `disk_usage`): it writes nothing and starts nothing, so it rides the default
+/// grant. Move it to [`SENSITIVE_CAPS`] to make it opt-in.
 pub const DEFAULT_CAPS: &[&str] = &[
     "coder",
     "projects",
@@ -116,6 +120,7 @@ pub const DEFAULT_CAPS: &[&str] = &[
     "dashboard",
     "terminal",
     "agents",
+    "sysinfo",
 ];
 
 /// Capabilities rendered unchecked in the approval dialog: granting one lets a
@@ -567,6 +572,7 @@ b",
                 "pipelines",
                 "projects",
                 "remote.input",
+                "sysinfo",
                 "tasks",
                 "terminal",
                 "terminal.exec"
@@ -594,6 +600,8 @@ b",
         assert_eq!(capability("trigger_n8n_workflow"), Some("n8n.run"));
         assert_eq!(capability("get_script_execution"), Some("actions"));
         assert_eq!(capability("execute_script"), Some("terminal.exec"));
+        assert_eq!(capability("host_stats"), Some("sysinfo"));
+        assert_eq!(capability("disk_usage"), Some("sysinfo"));
         assert!(capability("execute_command_in_directory").is_none());
         assert!(capability("create_pipeline").is_none());
         assert!(capability("github_start_device_flow").is_none());
