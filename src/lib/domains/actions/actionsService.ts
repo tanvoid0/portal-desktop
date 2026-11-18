@@ -17,6 +17,9 @@ import {
 } from './resolver';
 import { profileFromDirectory, profileFromProject, profileVariables } from './profile';
 import { toFailure } from './failure';
+import { stepRecordPayload } from './stepRecord';
+import { queryClient } from '$lib/domains/shared/query';
+import { queryKeys } from '$lib/domains/shared/query/keys';
 import { createAutomationContext } from '$lib/domains/automation/utils/automationContext';
 import { listGitHubActions } from './adapters/githubAdapter';
 import { listN8nActions, runN8nAction } from './adapters/n8nAdapter';
@@ -415,6 +418,24 @@ class ActionsService {
       });
     }
 
+    // A workflow step that spawns no process leaves no script_executions row, so the
+    // reopened run tree would show it pending/skipped: write the finished row ourselves.
+    const record = async (step: ActionStepResult) => {
+      const run = options.run;
+      if (!run) return;
+      try {
+        await scriptExecutionService.recordInteractive({
+          workingDirectory: options.cwd,
+          ...stepRecordPayload(run, step),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.actions.workflowRun(run.workflowRunId),
+        });
+      } catch (e) {
+        log.warn('Failed to record step row', { step: step.actionId, error: e });
+      }
+    };
+
     for (const action of actions) {
       if (!success && stopOnError) {
         results.push({
@@ -446,6 +467,7 @@ class ActionsService {
           error: remote.error,
           runner: 'github',
         });
+        await record(results[results.length - 1]);
         if (!remote.success) {
           success = false;
           if (stopOnError) break;
@@ -462,6 +484,7 @@ class ActionsService {
           error: remote.error,
           runner: 'n8n',
         });
+        await record(results[results.length - 1]);
         if (!remote.success) {
           success = false;
           if (stopOnError) break;
@@ -477,11 +500,13 @@ class ActionsService {
           error: 'Local action has no command',
           runner: 'local',
         });
+        await record(results[results.length - 1]);
         success = false;
         if (stopOnError) break;
         continue;
       }
 
+      let spawned = false;
       try {
         // Ad-hoc Actions catalog entries are not `blocks` rows — omit blockId
         // so script_executions FK is satisfied (null is allowed for freestyle runs).
@@ -496,6 +521,7 @@ class ActionsService {
         });
         // Surface the run as "running" the instant the process spawns (QA-130),
         // instead of only after it finishes.
+        spawned = true;
         options.onStepStart?.({
           actionId: action.id,
           executionId,
@@ -534,6 +560,7 @@ class ActionsService {
           error: error instanceof Error ? error.message : String(error),
           runner: 'local',
         });
+        if (!spawned) await record(results[results.length - 1]);
         if (stopOnError) break;
       }
     }

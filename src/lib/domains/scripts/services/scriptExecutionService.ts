@@ -138,6 +138,13 @@ class ScriptExecutionService {
     workingDirectory?: string;
     exitCode: number | null;
     startedAt?: string;
+    /** Link the row to a workflow run step; status/error override the exit-code verdict. */
+    workflowRunId?: string;
+    workflowId?: string;
+    stepId?: string;
+    workflowPlan?: WorkflowPlanStep[];
+    status?: string;
+    error?: string;
   }): Promise<void> {
     await invokeClient.post('record_interactive_execution', params);
   }
