@@ -35,6 +35,8 @@
   } from '$lib/domains/projects/pipelines/utils/executionDisplay';
   import { copyRunText, isActive, rerun, stopRun } from '../runActions';
   import { runRequester, toTerminalText } from '../runOutput';
+  import { createWorkflowRunQuery } from '../queries/workflowRunQueries';
+  import WorkflowTree from './WorkflowTree.svelte';
 
   interface Props {
     executionId: string;
@@ -42,6 +44,8 @@
     terminal?: boolean;
     /** A new run started from here (Re-run) — the parent should select it. */
     onStarted?: (executionId: string) => void;
+    /** A step node of the workflow tree was clicked — show that step's run. */
+    onSelectExecution?: (executionId: string) => void;
     /** The run finished or was stopped — refresh any list showing it. */
     onChanged?: () => void;
     onClose?: () => void;
@@ -53,6 +57,7 @@
     executionId,
     terminal = $bindable(false),
     onStarted,
+    onSelectExecution,
     onChanged,
     onClose,
     showPageLink = true,
@@ -65,6 +70,12 @@
   let outputEl = $state<HTMLPreElement | null>(null);
   let follow = $state(true);
   let terminalStartedAt: string | undefined;
+
+  const runQuery = createWorkflowRunQuery(() => exec?.workflowRunId);
+  const plan = $derived(exec?.workflowPlan ?? runQuery.data?.[0]?.workflowPlan ?? null);
+  const stepId = $derived(
+    runQuery.data?.find((r) => r.id === executionId)?.stepId ?? exec?.stepId ?? null
+  );
 
   const active = $derived(exec ? isActive(exec) : false);
   const requester = $derived(runRequester(exec?.triggeredBy));
@@ -268,6 +279,15 @@
         <span>Started {new Date(exec.startedAt).toLocaleString()}</span>
         <span>Duration: {formatExecutionDuration(exec.startedAt, exec.finishedAt)}</span>
       </div>
+
+      {#if exec.workflowRunId && plan?.length}
+        <WorkflowTree
+          {plan}
+          executions={runQuery.data ?? []}
+          selectedStepId={stepId}
+          onSelect={(_, id) => id && id !== executionId && onSelectExecution?.(id)}
+        />
+      {/if}
 
       {#if terminal}
         <div class="space-y-2">

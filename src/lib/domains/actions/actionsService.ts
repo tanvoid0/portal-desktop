@@ -7,6 +7,7 @@ import type { Project } from '$lib/domains/projects/types';
 import {
   scriptExecutionService,
   type ScriptExecutionInfo,
+  type WorkflowPlanStep,
 } from '$lib/domains/scripts/services/scriptExecutionService';
 import {
   resolveDirectoryCatalog,
@@ -83,6 +84,21 @@ function topoSortSteps(steps: UnifiedWorkflow['steps'], only?: string[]): string
 
   for (const id of ids) visit(id);
   return result;
+}
+
+/** Plan for the step tree: topo-ordered, needs limited to steps that are in the run. */
+function buildWorkflowPlan(
+  workflow: UnifiedWorkflow,
+  actionIds: string[],
+  catalog: ActionCatalog
+): WorkflowPlanStep[] {
+  return actionIds.map((id) => ({
+    id,
+    name: catalog.actions.find((a) => a.id === id)?.name ?? id,
+    needs: (workflow.steps.find((s) => s.action === id)?.needs ?? []).filter((n) =>
+      actionIds.includes(n)
+    ),
+  }));
 }
 
 class ActionsService {
@@ -262,6 +278,8 @@ class ActionsService {
 
     const errors: string[] = [];
     const steps: ActionPlanPreview['steps'] = [];
+    const wf =
+      typeof target === 'string' ? catalog.workflows.find((w) => w.id === target) : undefined;
     for (const id of actionIds) {
       const action = catalog.actions.find((a) => a.id === id);
       if (!action) {
@@ -277,7 +295,9 @@ class ActionsService {
         name: action.name,
         command: action.command,
         longRunning: action.longRunning,
-        dependsOn: [],
+        dependsOn: (wf?.steps.find((s) => s.action === id)?.needs ?? []).filter((n) =>
+          actionIds.includes(n)
+        ),
       });
     }
 
@@ -356,6 +376,11 @@ class ActionsService {
     return this.runActionList(actions, {
       ...options,
       target: workflow.id,
+      run: {
+        workflowRunId: crypto.randomUUID(),
+        workflowId: workflow.id,
+        workflowPlan: buildWorkflowPlan(workflow, actionIds, catalog),
+      },
     });
   }
 
@@ -365,6 +390,8 @@ class ActionsService {
       cwd: string;
       project?: Project;
       target: string | string[];
+      /** Set for workflow runs only; single-action runs stay without a run id. */
+      run?: { workflowRunId: string; workflowId: string; workflowPlan: WorkflowPlanStep[] };
     }
   ): Promise<ActionRunResult> {
     const stopOnError = options.stopOnError ?? true;
@@ -465,10 +492,15 @@ class ActionsService {
           // Action runs are non-interactive: CI=true keeps package managers and
           // test runners from prompting / dropping into watch mode (QA-129).
           env: { CI: 'true' },
+          ...(options.run && { ...options.run, stepId: action.id }),
         });
         // Surface the run as "running" the instant the process spawns (QA-130),
         // instead of only after it finishes.
-        options.onStepStart?.({ actionId: action.id, executionId });
+        options.onStepStart?.({
+          actionId: action.id,
+          executionId,
+          workflowRunId: options.run?.workflowRunId,
+        });
         const finished = await this.waitForExecution(executionId, action.longRunning);
         const stepSuccess = finished.status === 'success';
         const stopped = finished.status === 'cancelled';

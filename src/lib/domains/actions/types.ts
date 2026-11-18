@@ -54,7 +54,7 @@ export interface ActionRunOptions {
    * the UI can surface the run as "running" with live output instead of waiting
    * for the whole run to resolve. See QA-130.
    */
-  onStepStart?: (step: { actionId: string; executionId: string }) => void;
+  onStepStart?: (step: { actionId: string; executionId: string; workflowRunId?: string }) => void;
 }
 
 export interface ActionStepResult {

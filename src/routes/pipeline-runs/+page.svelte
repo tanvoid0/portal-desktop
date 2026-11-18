@@ -215,6 +215,7 @@
             selectRun(id);
             void loadExecutions({ silent: true });
           }}
+          onSelectExecution={(id) => selectRun(id)}
           onChanged={() => void loadExecutions({ silent: true })}
           onClose={() => selectRun(null)}
         />

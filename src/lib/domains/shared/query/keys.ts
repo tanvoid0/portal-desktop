@@ -11,6 +11,9 @@ export const queryKeys = {
     env: (id: number) => ['projects', id, 'env'] as const,
     moves: ['projects', 'moves'] as const,
   },
+  actions: {
+    workflowRun: (runId: string) => ['actions', 'workflow-run', runId] as const,
+  },
   github: {
     status: ['github', 'status'] as const,
     repositories: (search: string) => ['github', 'repositories', search] as const,

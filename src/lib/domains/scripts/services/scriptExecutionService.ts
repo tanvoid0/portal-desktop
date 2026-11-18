@@ -24,6 +24,17 @@ export interface ScriptExecutionInfo {
   startedAt: string;
   finishedAt: string | null;
   triggeredBy: string;
+  workflowRunId?: string | null;
+  workflowId?: string | null;
+  stepId?: string | null;
+  /** Full plan in topo order, stored on every row so skipped steps survive. */
+  workflowPlan?: WorkflowPlanStep[] | null;
+}
+
+export interface WorkflowPlanStep {
+  id: string;
+  name: string;
+  needs: string[];
 }
 
 export interface ExecuteScriptParams {
@@ -33,6 +44,10 @@ export interface ExecuteScriptParams {
   workingDirectory?: string;
   /** Extra env vars for the spawned process (e.g. { CI: 'true' } for Action runs). */
   env?: Record<string, string>;
+  workflowRunId?: string;
+  workflowId?: string;
+  stepId?: string;
+  workflowPlan?: WorkflowPlanStep[];
 }
 
 class ScriptExecutionService {
@@ -64,6 +79,10 @@ class ScriptExecutionService {
           parameters: params.parameters || {},
           workingDirectory: params.workingDirectory,
           env: params.env,
+          workflowRunId: params.workflowRunId,
+          workflowId: params.workflowId,
+          stepId: params.stepId,
+          workflowPlan: params.workflowPlan,
         },
       });
 
@@ -156,6 +175,15 @@ class ScriptExecutionService {
       log.error('Failed to get executions by block', { blockId, error });
       return [];
     }
+  }
+
+  /** Rows of one workflow run, oldest first. */
+  async getByWorkflowRun(workflowRunId: string): Promise<ScriptExecutionInfo[]> {
+    const rows = await invokeClient.post<ScriptExecutionInfo[]>(
+      'get_script_executions_by_workflow_run',
+      { workflowRunId }
+    );
+    return rows.map((e) => this.mapExecutionResponse(e));
   }
 
   /**
@@ -296,6 +324,10 @@ class ScriptExecutionService {
       startedAt: execution.started_at ?? execution.startedAt,
       finishedAt: execution.finished_at ?? execution.finishedAt ?? null,
       triggeredBy: execution.triggered_by ?? execution.triggeredBy ?? 'user',
+      workflowRunId: execution.workflow_run_id ?? execution.workflowRunId ?? null,
+      workflowId: execution.workflow_id ?? execution.workflowId ?? null,
+      stepId: execution.step_id ?? execution.stepId ?? null,
+      workflowPlan: execution.workflow_plan ?? execution.workflowPlan ?? null,
     };
   }
 }

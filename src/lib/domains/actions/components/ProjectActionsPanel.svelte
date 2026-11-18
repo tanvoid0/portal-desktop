@@ -33,6 +33,7 @@
   import { GitHubProjectActionsPanel } from '$lib/domains/github';
   import ReleaseCard from './ReleaseCard.svelte';
   import ActionRunDetail from './ActionRunDetail.svelte';
+  import WorkflowTree from './WorkflowTree.svelte';
   import ActionRunList from './ActionRunList.svelte';
   import {
     scriptExecutionService,
@@ -433,14 +434,22 @@
                     {/if}
                   </CardHeader>
                   <CardContent class="flex items-center justify-between gap-2">
-                    <p
-                      class="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground"
-                    >
-                      <Icon class="h-3.5 w-3.5 shrink-0" />
-                      {workflow.steps.length > 0
-                        ? workflow.steps.map((s) => s.action).join(' → ')
-                        : workflow.runner}
-                    </p>
+                    {#if workflow.steps.length > 0}
+                      <WorkflowTree
+                        plan={workflow.steps.map((s) => ({
+                          id: s.action,
+                          name: s.action,
+                          needs: s.needs ?? [],
+                        }))}
+                      />
+                    {:else}
+                      <p
+                        class="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground"
+                      >
+                        <Icon class="h-3.5 w-3.5 shrink-0" />
+                        {workflow.runner}
+                      </p>
+                    {/if}
                     <Button
                       type="button"
                       size="sm"
@@ -796,6 +805,7 @@
               openExecution(id);
               void loadHistory();
             }}
+            onSelectExecution={(id) => openExecution(id)}
             onChanged={() => void loadHistory()}
             onClose={() => (selectedRunId = null)}
           />

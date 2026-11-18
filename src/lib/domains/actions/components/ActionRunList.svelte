@@ -112,7 +112,12 @@
 </script>
 
 <div class="space-y-2">
-  {#each executions as execution (execution.id)}
+  {#each executions as execution, i (execution.id)}
+    {#if execution.workflowRunId && execution.workflowRunId !== executions[i - 1]?.workflowRunId}
+      <p class="px-1 pt-2 text-xs font-medium text-muted-foreground">
+        Workflow · {execution.workflowId ?? 'run'}
+      </p>
+    {/if}
     {@const StatusIcon = getExecutionStatusIcon(execution.status)}
     {@const requester = runRequester(execution.triggeredBy)}
     {@const project = projectName?.(execution)}

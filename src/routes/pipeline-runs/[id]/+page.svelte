@@ -67,6 +67,7 @@
       bind:terminal
       showPageLink={false}
       onStarted={(id) => void goto(`/pipeline-runs/${id}`)}
+      onSelectExecution={(id) => void goto(`/pipeline-runs/${id}`)}
     />
   {/if}
 </div>
