@@ -354,11 +354,18 @@ export function buildFeedBlocks(
 export function formatWorkedDuration(ms: number | null): string {
   if (ms == null || ms < 0) return '';
   if (ms < 1000) return 'Worked for < 1s';
-  const totalSeconds = Math.round(ms / 1000);
-  if (totalSeconds < 60) return `Worked for ${totalSeconds}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return seconds === 0 ? `Worked for ${minutes}m` : `Worked for ${minutes}m ${seconds}s`;
+  return `Worked for ${formatElapsedSeconds(ms / 1000)}`;
+}
+
+/** 344 -> "5m 44s", 3720 -> "1h 2m", 42 -> "42s". */
+export function formatElapsedSeconds(secs: number): string {
+  const total = Math.round(secs);
+  if (total < 60) return `${total}s`;
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
 /** Same wording as the chat page's inline reasoning block. */

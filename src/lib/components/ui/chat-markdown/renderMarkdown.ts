@@ -120,6 +120,18 @@ function sanitize(html: string): string {
 }
 
 const MARKDOWN_FENCE_LANGS = new Set(['markdown', 'md']);
+const SHELL_LANGS = new Set([
+  'bash',
+  'sh',
+  'shell',
+  'zsh',
+  'powershell',
+  'pwsh',
+  'ps1',
+  'cmd',
+  'bat',
+  'console',
+]);
 
 let configured = false;
 let renderingMarkdownPreview = false;
@@ -151,9 +163,13 @@ function renderCodeBlock(text: string, lang?: string | null): string {
   return `<div class="chat-code-block" data-lang="${escapeHtml(displayLang)}">
   <div class="chat-code-header">
     <span class="chat-code-lang">${escapeHtml(displayLang)}</span>
-    <button type="button" class="chat-code-copy" aria-label="Copy code">
+    <span class="chat-code-actions">${
+      SHELL_LANGS.has(displayLang)
+        ? '<button type="button" class="chat-code-copy chat-code-run" aria-label="Run in terminal">Run</button>'
+        : ''
+    }<button type="button" class="chat-code-copy" aria-label="Copy code">
       <span class="chat-code-copy-label">Copy</span>
-    </button>
+    </button></span>
   </div>
   <pre class="chat-code-pre"><code class="hljs">${highlighted}</code></pre>
 </div>`;

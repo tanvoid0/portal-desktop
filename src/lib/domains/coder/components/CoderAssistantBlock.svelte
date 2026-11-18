@@ -1,7 +1,7 @@
 <script lang="ts">
   import ChatAssistantTurn from '$lib/domains/ai/components/chat/ChatAssistantTurn.svelte';
   import type { ChatMessage } from '../types.js';
-  import { formatWorkedDuration } from '../utils/feedBlocks.js';
+  import { formatElapsedSeconds, formatWorkedDuration } from '../utils/feedBlocks.js';
 
   interface Props {
     message: ChatMessage;
@@ -22,7 +22,7 @@
 
   const workedLabel = $derived(formatWorkedDuration(responseLatencyMs));
   const typingLabel = $derived(
-    waitingSeconds >= 5 ? `Waiting on model… ${Math.round(waitingSeconds)}s` : 'Thinking…'
+    waitingSeconds >= 5 ? `Waiting on model… ${formatElapsedSeconds(waitingSeconds)}` : 'Thinking…'
   );
 </script>
 

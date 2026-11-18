@@ -274,6 +274,27 @@ export async function executeAgentCommand(req: AgentCommandRequest): Promise<str
   }
 }
 
+/**
+ * Run a command the *user* clicked (a chat code block's Run button) in the
+ * thread's default terminal tab. Fire-and-forget: output lands in the tab.
+ * Unlike `executeAgentCommand` it does not abort in-flight agent commands.
+ * Returns the terminal id so the caller can focus its tab, or null when the
+ * shell never mounted.
+ */
+export async function runUserCommand(
+  threadId: string,
+  workspaceRoot: string,
+  command: string
+): Promise<{ id: string; label: string } | null> {
+  const tab = coderTerminalStore.ensureDefault(threadId, workspaceRoot);
+  coderTerminalStore.setActive(threadId, tab.id);
+  const ac = new AbortController();
+  const ref = await waitForRef(threadId, tab.id, ac.signal, 3000);
+  if (!ref) return { id: tab.id, label: tab.label };
+  await ref.run(command);
+  return { id: tab.id, label: tab.label };
+}
+
 /** Mirror completed tool output into an interactive terminal (display only). */
 export function mirrorCommandOutput(
   threadId: string,

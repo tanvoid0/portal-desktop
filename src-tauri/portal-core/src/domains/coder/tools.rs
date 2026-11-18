@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::process_ext::NoWindowExt;
 use crate::utils::pnpm_workspace::{prepare_shell_command, warn_if_broken_pnpm_workspace};
 use serde_json::{json, Value};
 
@@ -613,6 +614,7 @@ fn run_command(root: &str, command: &str) -> Result<String, String> {
 
     let output = if cfg!(target_os = "windows") {
         Command::new("cmd")
+            .no_window()
             .args(["/C", &exec_command])
             .current_dir(root)
             .output()

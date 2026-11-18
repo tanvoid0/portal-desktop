@@ -1,6 +1,6 @@
 <script lang="ts">
   import { renderMarkdown } from './renderMarkdown.js';
-  import { useChatLinkHandler } from './linkContext.js';
+  import { useChatLinkHandler, useChatRunHandler } from './linkContext.js';
 
   interface Props {
     content: string;
@@ -21,6 +21,7 @@
 
   let container: HTMLDivElement | null = $state(null);
   const linkHandler = useChatLinkHandler();
+  const runHandler = useChatRunHandler();
 
   function onLinkClick(e: MouseEvent) {
     if (!linkHandler || e.defaultPrevented || e.button !== 0) return;
@@ -73,6 +74,27 @@
     return () => cleanups.forEach((cleanup) => cleanup());
   }
 
+  function attachRunHandlers(root: HTMLDivElement) {
+    const buttons = root.querySelectorAll<HTMLButtonElement>('.chat-code-run');
+    const cleanups: Array<() => void> = [];
+
+    buttons.forEach((button) => {
+      const code = button.closest('.chat-code-block')?.querySelector<HTMLElement>('code');
+      if (!runHandler || !code) {
+        button.remove();
+        return;
+      }
+      const onClick = () => {
+        const command = (code.textContent ?? '').trim();
+        if (command) runHandler(command);
+      };
+      button.addEventListener('click', onClick);
+      cleanups.push(() => button.removeEventListener('click', onClick));
+    });
+
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }
+
   function attachPreviewToggleHandlers(root: HTMLDivElement) {
     const buttons = root.querySelectorAll<HTMLButtonElement>('.chat-md-preview-toggle');
     const cleanups: Array<() => void> = [];
@@ -110,7 +132,9 @@
     if (!container) return;
     const cleanupCopy = attachCopyHandlers(container);
     const cleanupPreview = attachPreviewToggleHandlers(container);
+    const cleanupRun = attachRunHandlers(container);
     return () => {
+      cleanupRun();
       cleanupCopy();
       cleanupPreview();
     };

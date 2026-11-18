@@ -11,7 +11,13 @@
   import type { PendingApproval } from '../types.js';
   import { stripLeakedToolSyntax } from '../utils/leakedToolCall.js';
   import { Button } from '$lib/components/ui/button';
-  import { provideChatLinkHandler } from '$lib/components/ui/chat-markdown/linkContext.js';
+  import {
+    provideChatLinkHandler,
+    provideChatRunHandler,
+  } from '$lib/components/ui/chat-markdown/linkContext.js';
+  import { coderSession } from '../state/coderSession.svelte.js';
+  import { coderTerminalStore } from '../state/coderTerminalStore.svelte.js';
+  import { runUserCommand } from '../services/coderTerminalCoordinator.js';
   import { useCoderWorkspace } from '../state/coderWorkspaceStore.svelte.js';
   import { workspacePathFromHref } from '../utils/linkTarget.js';
   import RotateCcw from '~icons/fa6-solid/rotate-left';
@@ -80,6 +86,15 @@
     if (path == null) return false;
     workspace.openFile(path);
     return true;
+  });
+
+  /** Shell code block "Run" → the thread's terminal tab, so it shows in the sidebar. */
+  provideChatRunHandler((command) => {
+    if (!threadId) return;
+    coderSession.terminalOpen = true;
+    const tab = coderTerminalStore.ensureDefault(threadId, workspaceRoot);
+    workspace.openTerminal(threadId, tab.id, tab.label);
+    void runUserCommand(threadId, workspaceRoot, command);
   });
 
   const resultsById = $derived.by(() => {
