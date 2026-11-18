@@ -40,6 +40,9 @@
     ]
   },
   "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["portal"] }
+    },
     "updater": {
       "active": true,
       "endpoints": [

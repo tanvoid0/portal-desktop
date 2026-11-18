@@ -19,6 +19,7 @@
   import AppShell from '$lib/components/layout/app-shell.svelte';
   import ToastContainer from '$lib/components/ui/toast-container.svelte';
   import { toast } from '$lib/utils/toast';
+  import { initDeepLinks } from '$lib/utils/deepLink';
   import { isMobileShell } from '$lib/domains/mobile/shell';
   import { mobileConnection } from '$lib/domains/mobile/connection.svelte';
 
@@ -27,7 +28,11 @@
   // Portal Mobile: every route except /connect needs a live desktop connection.
   let wasConnected = false;
   onMount(() => {
-    if (!isMobileShell) return;
+    if (!isMobileShell) {
+      let stop = () => {};
+      void initDeepLinks((r) => goto(r)).then((u) => (stop = u));
+      return () => stop();
+    }
     document.documentElement.classList.add('portal-mobile');
     void mobileConnection.init();
   });
