@@ -37,5 +37,28 @@
       "macOS (Apple Silicon and Intel)",
       "Linux (.deb, .rpm or AppImage)"
     ]
-  }
+  },
+  "logo": "src-tauri/icons/128x128@2x.png",
+  "screenshots": [
+    {
+      "src": "docs/screenshots/01-overview.png",
+      "caption": "The overview",
+      "alt": "Overview with counts of tasks, projects and running services, and shortcuts to the terminal and cloud"
+    },
+    {
+      "src": "docs/screenshots/02-terminal.png",
+      "caption": "The terminal",
+      "alt": "Terminal where each command becomes a block with its output, duration and folder, beside notes for the tab"
+    },
+    {
+      "src": "docs/screenshots/03-project-audit.png",
+      "caption": "Project audit",
+      "alt": "Audit of every project on disk with active and at-risk counts, unpushed commits and keep, archive or delete choices"
+    },
+    {
+      "src": "docs/screenshots/04-disk-utility.png",
+      "caption": "Disk Utility",
+      "alt": "Disk Utility showing how full each drive is, with scan and quick clean actions"
+    }
+  ]
 }
