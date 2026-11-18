@@ -18,11 +18,23 @@ export interface StepGraph {
   edges: { from: string; to: string }[];
 }
 
+/** One step per id (first wins, `needs` merged) — duplicate ids would duplicate node keys. */
+export function dedupePlan(plan: WorkflowPlanStep[]): WorkflowPlanStep[] {
+  const byId = new Map<string, WorkflowPlanStep>();
+  for (const s of plan) {
+    const first = byId.get(s.id);
+    if (first) first.needs = [...new Set([...first.needs, ...s.needs])];
+    else byId.set(s.id, { ...s });
+  }
+  return [...byId.values()];
+}
+
 /** Stage = longest path from a root. A cycle or unknown `needs` collapses to one column. */
 export function buildStepGraph(
-  plan: WorkflowPlanStep[],
+  rawPlan: WorkflowPlanStep[],
   executions: ScriptExecutionInfo[] = []
 ): StepGraph {
+  const plan = dedupePlan(rawPlan);
   const rows = new Map(executions.filter((e) => e.stepId).map((e) => [e.stepId!, e]));
   // A run is over once a step failed or was stopped; steps with no row then never ran.
   // ponytail: a clean run has no gap to detect, so only failed/cancelled count as "over".

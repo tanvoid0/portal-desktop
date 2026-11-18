@@ -34,6 +34,9 @@
   import ReleaseCard from './ReleaseCard.svelte';
   import ActionRunDetail from './ActionRunDetail.svelte';
   import WorkflowTree from './WorkflowTree.svelte';
+  import { dedupePlan } from '../stepGraph';
+  import { queryClient } from '$lib/domains/shared/query';
+  import { queryKeys } from '$lib/domains/shared/query/keys';
   import ActionRunList from './ActionRunList.svelte';
   import {
     scriptExecutionService,
@@ -242,7 +245,12 @@
     try {
       const result = await actions.forProject(project).run(target, {
         // Surface the run the moment its process spawns — not after it finishes.
-        onStepStart: ({ executionId }) => {
+        onStepStart: ({ executionId, workflowRunId }) => {
+          // Show the new step's row in the tree now, not on the next poll.
+          if (workflowRunId)
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.actions.workflowRun(workflowRunId),
+            });
           openExecution(executionId);
           void loadHistory();
         },
@@ -436,11 +444,13 @@
                   <CardContent class="flex items-center justify-between gap-2">
                     {#if workflow.steps.length > 0}
                       <WorkflowTree
-                        plan={workflow.steps.map((s) => ({
-                          id: s.action,
-                          name: s.action,
-                          needs: s.needs ?? [],
-                        }))}
+                        plan={dedupePlan(
+                          workflow.steps.map((s) => ({
+                            id: s.action,
+                            name: s.action,
+                            needs: s.needs ?? [],
+                          }))
+                        )}
                       />
                     {:else}
                       <p

@@ -22,4 +22,14 @@ describe('buildStepGraph', () => {
     expect(g.columns[2][0].status).toBe('skipped');
     expect(g.columns[1][1].status).toBe('skipped');
   });
+
+  it('dedupes duplicate plan ids, merging needs', () => {
+    const g = buildStepGraph([
+      { id: 'a', name: 'a', needs: [] },
+      { id: 'b', name: 'b', needs: [] },
+      { id: 'a', name: 'a', needs: ['b'] },
+    ]);
+    expect(g.columns.map((c) => c.map((n) => n.id))).toEqual([['b'], ['a']]);
+    expect(g.edges).toEqual([{ from: 'b', to: 'a' }]);
+  });
 });

@@ -29,7 +29,10 @@
   const graph = $derived(buildStepGraph(plan, executions));
   const statusById = $derived(new Map(graph.columns.flat().map((n) => [n.id, n.status])));
   let focusId = $state<string | null>(null);
-  const tabStop = $derived(focusId ?? selectedStepId ?? graph.columns[0]?.[0]?.id);
+  const tabStop = $derived.by(() => {
+    const ids = new Set(graph.columns.flat().map((n) => n.id));
+    return [focusId, selectedStepId].find((id) => id && ids.has(id)) ?? graph.columns[0]?.[0]?.id;
+  });
 
   let box = $state<HTMLDivElement | null>(null);
   let size = $state({ w: 0, h: 0 });
