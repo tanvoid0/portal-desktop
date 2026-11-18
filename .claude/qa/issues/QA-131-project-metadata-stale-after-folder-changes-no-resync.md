@@ -1,7 +1,7 @@
 ---
 id: QA-131
 title: "Projects: metadata is captured once at create-time and never auto-resynced — a project created on an empty folder still shows \"not a git repository\" and the wrong stack after it's been scaffolded"
-status: open
+status: fixed
 severity: minor
 kind: bug
 area: projects
@@ -49,6 +49,25 @@ re-detect.
 
 - `/projects/201` Details panel: "This folder is not a git repository" vs. `git log` showing
   "Initial commit".
+
+## Fix
+
+Fixed as the issue's second suggestion (a nudge with a one-click re-detect) by `8114329f`; no code
+changed for this close-out.
+
+`ProjectGitCard.svelte:34-47`: when the card has no branch and no repository it now reads "This
+folder is not a git repository — or the details are out of date." with a **Re-detect** link
+button (new `refreshing` / `onRedetect` props). `routes/projects/[id]/+page.svelte:598-603` wires
+it to `handleRedetect` (`:332-349`), which calls `projectService.refreshProjectMetadata` ->
+`ProjectService::refresh_project_metadata` (`project_service.rs:285`): it re-reads size, git info
+and the stack from disk, then invalidates the project queries. The stack card, the commands card
+and the page's actions menu use the same handler, so the action is no longer easy to miss.
+
+NOT built: automatic re-analysis on project focus / open, or after a coder session touches the
+folder (the issue's first suggestion). Metadata stays stale until the user clicks Re-detect; the
+only other caller of `refreshProjectMetadata` is the unavailable-projects relink flow.
+
+Docs only, nothing run. Not re-tested live.
 
 ## Verification
 
