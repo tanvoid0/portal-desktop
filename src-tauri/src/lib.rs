@@ -876,6 +876,7 @@ pub fn run() {
             domains::scripts::commands::get_script_execution_live_output,
             domains::scripts::commands::cancel_script_execution,
             domains::scripts::commands::get_script_executions_by_block,
+            domains::scripts::commands::get_script_executions_by_workflow_run,
             domains::scripts::commands::get_running_script_executions,
             domains::scripts::commands::get_recent_script_executions,
             domains::scripts::commands::sync_script_executions,

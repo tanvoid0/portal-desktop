@@ -1,6 +1,7 @@
 use crate::database::DatabaseManager;
 use crate::domains::projects::move_lock;
-use crate::domains::scripts::repositories::ScriptExecutionRepository;
+use crate::domains::scripts::repositories::{ScriptExecutionRepository, WorkflowLink};
+use crate::entities::script_execution::Model;
 use crate::process_ext::NoWindowExt;
 use crate::utils::pnpm_workspace::prepare_shell_command;
 use crate::utils::shell_template;
@@ -109,6 +110,16 @@ pub struct ExecuteScriptRequest {
     /// on the row so a stop can be told apart from a failure by whoever waits.
     #[serde(default)]
     pub triggered_by: Option<String>,
+    /// Workflow grouping: every step of one run shares `workflow_run_id`;
+    /// `workflow_plan` (`[{id,name,needs}]`, topo order) is stored per row.
+    #[serde(default)]
+    pub workflow_run_id: Option<String>,
+    #[serde(default)]
+    pub workflow_id: Option<String>,
+    #[serde(default)]
+    pub step_id: Option<String>,
+    #[serde(default)]
+    pub workflow_plan: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,6 +138,36 @@ pub struct ScriptExecutionInfo {
     pub started_at: String,
     pub finished_at: Option<String>,
     pub triggered_by: String,
+    pub workflow_run_id: Option<String>,
+    pub workflow_id: Option<String>,
+    pub step_id: Option<String>,
+    pub workflow_plan: Option<serde_json::Value>,
+}
+
+impl From<Model> for ScriptExecutionInfo {
+    fn from(e: Model) -> Self {
+        Self {
+            id: e.id,
+            block_id: e.block_id,
+            command: e.command,
+            parameters: serde_json::from_str(&e.parameters_json).unwrap_or_default(),
+            working_directory: e.working_directory,
+            status: e.status,
+            exit_code: e.exit_code,
+            pid: e.pid,
+            output: e.output,
+            error: e.error,
+            started_at: e.started_at.to_rfc3339(),
+            finished_at: e.finished_at.map(|d| d.to_rfc3339()),
+            triggered_by: e.triggered_by,
+            workflow_run_id: e.workflow_run_id,
+            workflow_id: e.workflow_id,
+            step_id: e.step_id,
+            workflow_plan: e
+                .workflow_plan_json
+                .and_then(|j| serde_json::from_str(&j).ok()),
+        }
+    }
 }
 
 pub struct ScriptExecutionService {
@@ -224,6 +265,12 @@ impl ScriptExecutionService {
                     .triggered_by
                     .clone()
                     .unwrap_or_else(|| "user".to_string()),
+                WorkflowLink {
+                    run_id: request.workflow_run_id.clone(),
+                    workflow_id: request.workflow_id.clone(),
+                    step_id: request.step_id.clone(),
+                    plan_json: request.workflow_plan.as_ref().map(|p| p.to_string()),
+                },
             )
             .await?;
 
@@ -449,6 +496,7 @@ impl ScriptExecutionService {
                 "{}".to_string(),
                 working_directory,
                 "user".to_string(),
+                WorkflowLink::default(),
             )
             .await?;
         let status = match exit_code {
@@ -482,21 +530,16 @@ impl ScriptExecutionService {
     ) -> Result<Option<ScriptExecutionInfo>, String> {
         let execution = self.repository.get_by_id(execution_id).await?;
 
-        Ok(execution.map(|e| ScriptExecutionInfo {
-            id: e.id,
-            block_id: e.block_id,
-            command: e.command,
-            parameters: serde_json::from_str(&e.parameters_json).unwrap_or_default(),
-            working_directory: e.working_directory,
-            status: e.status,
-            exit_code: e.exit_code,
-            pid: e.pid,
-            output: e.output,
-            error: e.error,
-            started_at: e.started_at.to_rfc3339(),
-            finished_at: e.finished_at.map(|d| d.to_rfc3339()),
-            triggered_by: e.triggered_by,
-        }))
+        Ok(execution.map(Into::into))
+    }
+
+    /// Every step row of one workflow run, oldest first
+    pub async fn get_executions_by_workflow_run(
+        &self,
+        run_id: &str,
+    ) -> Result<Vec<ScriptExecutionInfo>, String> {
+        let rows = self.repository.get_by_workflow_run(run_id).await?;
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 
     /// Get live output for a running execution
@@ -567,24 +610,7 @@ impl ScriptExecutionService {
     ) -> Result<Vec<ScriptExecutionInfo>, String> {
         let executions = self.repository.get_by_block(block_id, limit).await?;
 
-        Ok(executions
-            .into_iter()
-            .map(|e| ScriptExecutionInfo {
-                id: e.id,
-                block_id: e.block_id,
-                command: e.command,
-                parameters: serde_json::from_str(&e.parameters_json).unwrap_or_default(),
-                working_directory: e.working_directory,
-                status: e.status,
-                exit_code: e.exit_code,
-                pid: e.pid,
-                output: e.output,
-                error: e.error,
-                started_at: e.started_at.to_rfc3339(),
-                finished_at: e.finished_at.map(|d| d.to_rfc3339()),
-                triggered_by: e.triggered_by,
-            })
-            .collect())
+        Ok(executions.into_iter().map(Into::into).collect())
     }
 
     /// Get all running executions
@@ -593,24 +619,7 @@ impl ScriptExecutionService {
         // Pending rows have no pid, so they fall into the "state unknown" branch below.
         executions.extend(self.repository.get_pending().await?);
 
-        Ok(executions
-            .into_iter()
-            .map(|e| ScriptExecutionInfo {
-                id: e.id,
-                block_id: e.block_id,
-                command: e.command,
-                parameters: serde_json::from_str(&e.parameters_json).unwrap_or_default(),
-                working_directory: e.working_directory,
-                status: e.status,
-                exit_code: e.exit_code,
-                pid: e.pid,
-                output: e.output,
-                error: e.error,
-                started_at: e.started_at.to_rfc3339(),
-                finished_at: e.finished_at.map(|d| d.to_rfc3339()),
-                triggered_by: e.triggered_by,
-            })
-            .collect())
+        Ok(executions.into_iter().map(Into::into).collect())
     }
 
     /// Get recent executions
@@ -620,24 +629,7 @@ impl ScriptExecutionService {
     ) -> Result<Vec<ScriptExecutionInfo>, String> {
         let executions = self.repository.get_recent(limit).await?;
 
-        Ok(executions
-            .into_iter()
-            .map(|e| ScriptExecutionInfo {
-                id: e.id,
-                block_id: e.block_id,
-                command: e.command,
-                parameters: serde_json::from_str(&e.parameters_json).unwrap_or_default(),
-                working_directory: e.working_directory,
-                status: e.status,
-                exit_code: e.exit_code,
-                pid: e.pid,
-                output: e.output,
-                error: e.error,
-                started_at: e.started_at.to_rfc3339(),
-                finished_at: e.finished_at.map(|d| d.to_rfc3339()),
-                triggered_by: e.triggered_by,
-            })
-            .collect())
+        Ok(executions.into_iter().map(Into::into).collect())
     }
 
     /// Check running processes and sync with database

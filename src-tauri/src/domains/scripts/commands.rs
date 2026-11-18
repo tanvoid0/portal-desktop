@@ -39,6 +39,10 @@ pub struct ExecuteScriptParams {
     pub env: Option<HashMap<String, String>>,
     /// "user" when omitted; an MCP client passes e.g. "mcp:claude".
     pub triggered_by: Option<String>,
+    pub workflow_run_id: Option<String>,
+    pub workflow_id: Option<String>,
+    pub step_id: Option<String>,
+    pub workflow_plan: Option<serde_json::Value>,
 }
 
 /// Execute a script
@@ -57,6 +61,10 @@ pub async fn execute_script(
         working_directory: params.working_directory,
         env: params.env,
         triggered_by: params.triggered_by,
+        workflow_run_id: params.workflow_run_id,
+        workflow_id: params.workflow_id,
+        step_id: params.step_id,
+        workflow_plan: params.workflow_plan,
     };
 
     service.execute_script(request).await
@@ -122,6 +130,19 @@ pub async fn get_script_executions_by_block(
 ) -> Result<Vec<ScriptExecutionInfo>, String> {
     let service = execution_state.get_or_init(&db_manager).await;
     service.get_executions_by_block(&block_id, limit).await
+}
+
+/// Get every step of one workflow run, oldest first
+#[portal_rpc_macro::rpc(cap = "actions")]
+pub async fn get_script_executions_by_workflow_run(
+    db_manager: State<'_, Arc<DatabaseManager>>,
+    execution_state: State<'_, ScriptExecutionState>,
+    workflow_run_id: String,
+) -> Result<Vec<ScriptExecutionInfo>, String> {
+    let service = execution_state.get_or_init(&db_manager).await;
+    service
+        .get_executions_by_workflow_run(&workflow_run_id)
+        .await
 }
 
 /// Get all currently running executions

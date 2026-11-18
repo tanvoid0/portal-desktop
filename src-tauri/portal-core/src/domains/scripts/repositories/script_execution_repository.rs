@@ -5,6 +5,15 @@ use sea_orm::{
 };
 use std::sync::Arc;
 
+/// Which workflow run/step a row belongs to. Default = ad-hoc run.
+#[derive(Clone, Default)]
+pub struct WorkflowLink {
+    pub run_id: Option<String>,
+    pub workflow_id: Option<String>,
+    pub step_id: Option<String>,
+    pub plan_json: Option<String>,
+}
+
 #[derive(Clone)]
 pub struct ScriptExecutionRepository {
     db_manager: Arc<DatabaseManager>,
@@ -23,6 +32,7 @@ impl ScriptExecutionRepository {
         parameters_json: String,
         working_directory: Option<String>,
         triggered_by: String,
+        workflow: WorkflowLink,
     ) -> Result<Model, String> {
         let db = self.db_manager.get_connection();
         let id_clone = id.clone();
@@ -52,6 +62,10 @@ impl ScriptExecutionRepository {
             started_at: Set(chrono::Utc::now().into()),
             finished_at: Set(None),
             triggered_by: Set(triggered_by),
+            workflow_run_id: Set(workflow.run_id),
+            workflow_id: Set(workflow.workflow_id),
+            step_id: Set(workflow.step_id),
+            workflow_plan_json: Set(workflow.plan_json),
         };
 
         // Note: For SQLite with string primary keys, insert() tries to return the inserted record
@@ -113,6 +127,15 @@ impl ScriptExecutionRepository {
             .all(db)
             .await
             .map_err(|e| format!("Failed to get script executions: {}", e))
+    }
+
+    pub async fn get_by_workflow_run(&self, run_id: &str) -> Result<Vec<Model>, String> {
+        Entity::find()
+            .filter(Column::WorkflowRunId.eq(run_id))
+            .order_by_asc(Column::StartedAt)
+            .all(self.db_manager.get_connection())
+            .await
+            .map_err(|e| format!("Failed to get workflow run executions: {}", e))
     }
 
     pub async fn get_running(&self) -> Result<Vec<Model>, String> {
@@ -230,5 +253,34 @@ impl ScriptExecutionRepository {
             .map_err(|e| format!("Failed to delete execution: {}", e))?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn workflow_run_rows_come_back_oldest_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = DatabaseManager::new(dir.path().to_path_buf())
+            .await
+            .unwrap();
+        let repo = ScriptExecutionRepository::new(Arc::new(db));
+        let link = |run: &str, step: &str| WorkflowLink {
+            run_id: Some(run.into()),
+            step_id: Some(step.into()),
+            ..Default::default()
+        };
+        for (id, run, step) in [("a", "r1", "build"), ("b", "r2", "x"), ("c", "r1", "test")] {
+            let (cmd, params, user) = ("echo".to_string(), "{}".to_string(), "user".to_string());
+            repo.create(id.into(), None, cmd, params, None, user, link(run, step))
+                .await
+                .unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+        let rows = repo.get_by_workflow_run("r1").await.unwrap();
+        let steps: Vec<_> = rows.iter().map(|r| r.step_id.as_deref().unwrap()).collect();
+        assert_eq!(steps, ["build", "test"]);
     }
 }

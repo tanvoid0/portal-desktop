@@ -23,6 +23,11 @@ pub struct Model {
     pub started_at: DateTimeWithTimeZone,
     pub finished_at: Option<DateTimeWithTimeZone>,
     pub triggered_by: String,
+    pub workflow_run_id: Option<String>,
+    pub workflow_id: Option<String>,
+    pub step_id: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub workflow_plan_json: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
