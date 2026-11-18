@@ -18,18 +18,7 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
   import { Separator } from '$lib/components/ui/separator';
-  import { toastActions } from '$lib/utils/toast';
-  import { aiProviderService } from '../../services/aiProviderService.js';
-  import { aiPlatform } from '../../state/aiPlatform.svelte.js';
-  import { flattenCatalogModels, isAuthError } from '../../utils/catalog.js';
-  import type {
-    ProviderConfig,
-    ProviderType,
-    ConfigurationStatus,
-    PlatformCatalog,
-    CatalogProvider,
-    CatalogModel,
-  } from '../../types/index.js';
+  import { AIProviderSettingsState } from '../../state/aiProviderSettings.svelte.js';
   import PlatformHealthBar from './PlatformHealthBar.svelte';
   import PlatformPairForm from './PlatformPairForm.svelte';
   import CatalogModelPicker from './CatalogModelPicker.svelte';
@@ -44,186 +33,10 @@
   import Eye from '~icons/fa6-solid/eye';
   import EyeOff from '~icons/fa6-solid/eye-slash';
 
-  const providerType: ProviderType = 'AgentPlatform';
+  const st = new AIProviderSettingsState();
+  const providerType = st.providerType;
 
-  let providerConfig = $state<ProviderConfig | null>(null);
-  let defaultProvider = $state<ProviderType | null>(null);
-  let configStatus = $state<ConfigurationStatus | null>(null);
-  let isLoading = $state(false);
-  let testingProvider = $state(false);
-  let catalog = $state<PlatformCatalog | null>(null);
-  let catalogProviders = $state<CatalogProvider[]>([]);
-  let catalogModels = $state<CatalogModel[]>([]);
-  let loadingCatalog = $state(false);
-  let catalogLive = $state(false);
-
-  let showApiKey = $state(false);
-  let pairOpen = $state(false);
-  let pairing = $state(false);
-  /** Real auth state of the saved token; `unknown` until a probe/test has run. */
-  let connection = $state<'unknown' | 'ok' | 'unauthorized' | 'unreachable'>('unknown');
-
-  function markConnection(error?: unknown) {
-    connection = error === undefined ? 'ok' : isAuthError(error) ? 'unauthorized' : 'unreachable';
-  }
-
-  onMount(() => {
-    void aiPlatform.refresh();
-    void loadProvider();
-  });
-
-  async function pair(key: string) {
-    pairing = true;
-    try {
-      const res = await aiProviderService.pairPlatform(key);
-      if (res.ok) {
-        toastActions.success('Paired', 'The API token was replaced with a fresh one.');
-        pairOpen = false;
-        await loadProvider();
-      } else {
-        toastActions.error('Pairing failed', res.detail);
-      }
-    } catch (error) {
-      toastActions.error('Pairing failed', error);
-    } finally {
-      pairing = false;
-      await aiPlatform.refresh();
-    }
-  }
-
-  async function loadProvider() {
-    isLoading = true;
-    try {
-      const [config, defaultProviderType, status] = await Promise.all([
-        aiProviderService.getProviderConfig(providerType).catch(() => null),
-        aiProviderService.getDefaultProvider(),
-        aiProviderService.getConfigStatus(providerType).catch(() => null),
-      ]);
-
-      providerConfig = config;
-      defaultProvider = defaultProviderType;
-      configStatus = status;
-      if (status?.is_configured) {
-        aiProviderService
-          .testProvider(providerType)
-          .then(() => markConnection())
-          .catch(markConnection);
-      }
-    } catch (error) {
-      console.error('Failed to load Agent Platform configuration:', error);
-      toastActions.error('Failed to load configuration', error);
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  async function updateConfig(updates: Partial<ProviderConfig>) {
-    if (!providerConfig) return;
-    if ('api_key' in updates || 'base_url' in updates) connection = 'unknown';
-
-    const updated: ProviderConfig = {
-      ...providerConfig,
-      ...updates,
-    };
-
-    try {
-      await aiProviderService.saveProviderConfig(updated);
-      providerConfig = updated;
-
-      const status = await aiProviderService.getConfigStatus(providerType);
-      configStatus = status;
-
-      if (updated.enabled && status.is_configured && !defaultProvider) {
-        await aiProviderService.setDefaultProvider(providerType);
-        defaultProvider = providerType;
-      }
-
-      toastActions.success('Configuration saved');
-    } catch (error) {
-      console.error('Failed to save config:', error);
-      toastActions.error('Failed to save configuration', error);
-    }
-  }
-
-  async function setAsDefault() {
-    try {
-      await aiProviderService.setDefaultProvider(providerType);
-      defaultProvider = providerType;
-      toastActions.success('Agent Platform set as default provider');
-    } catch (error) {
-      toastActions.error('Failed to set default provider', error);
-    }
-  }
-
-  async function testConnection() {
-    if (!providerConfig) return;
-
-    testingProvider = true;
-    try {
-      const configToSave = { ...providerConfig, enabled: true };
-      await aiProviderService.saveProviderConfig(configToSave);
-      providerConfig = configToSave;
-
-      if (!defaultProvider) {
-        await aiProviderService.setDefaultProvider(providerType);
-        defaultProvider = providerType;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      await aiProviderService.testProvider(providerType);
-      markConnection();
-      toastActions.success('Connection successful');
-
-      configStatus = await aiProviderService.getConfigStatus(providerType);
-    } catch (error) {
-      markConnection(error);
-      toastActions.error('Connection test failed', error);
-    } finally {
-      testingProvider = false;
-    }
-  }
-
-  async function loadModels(live = false) {
-    if (!providerConfig) return;
-
-    loadingCatalog = true;
-    catalogLive = live;
-    try {
-      await aiProviderService.saveProviderConfig({
-        ...providerConfig,
-        enabled: true,
-      });
-
-      catalog = live
-        ? await aiProviderService.getCatalogLive()
-        : await aiProviderService.getCatalogAliases();
-
-      catalogProviders = catalog.providers;
-      catalogModels = flattenCatalogModels(catalog.providers);
-      if (live) markConnection();
-
-      if (catalogModels.length === 0) {
-        toastActions.info(
-          'No models found',
-          'Check that agent-platform is running and has models configured in /config'
-        );
-      } else {
-        const liveNote = live ? ' (live upstream)' : ' (aliases)';
-        toastActions.success(
-          `Loaded ${catalogModels.length} model(s) from ${catalogProviders.length} provider(s)${liveNote}`
-        );
-
-        if (!providerConfig.model && catalog.resolved_defaults?.model) {
-          await updateConfig({ model: catalog.resolved_defaults.model });
-        }
-      }
-    } catch (error) {
-      markConnection(error);
-      toastActions.error('Failed to load catalog', error);
-    } finally {
-      loadingCatalog = false;
-    }
-  }
+  onMount(st.init);
 </script>
 
 <div class="space-y-6">
@@ -240,7 +53,7 @@
     </p>
   </div>
 
-  {#if defaultProvider === providerType}
+  {#if st.defaultProvider === providerType}
     <Alert>
       <CheckCircle2 class="h-4 w-4" />
       <AlertTitle>Default provider</AlertTitle>
@@ -250,7 +63,7 @@
     </Alert>
   {/if}
 
-  {#if isLoading || !providerConfig}
+  {#if st.isLoading || !st.providerConfig}
     <Card>
       <CardContent class="py-8">
         <div class="text-center text-muted-foreground">Loading…</div>
@@ -262,11 +75,11 @@
         <CardTitle class="flex items-center gap-2">
           <Server class="h-5 w-5" />
           Agent Platform
-          {#if connection === 'unauthorized'}
+          {#if st.connection === 'unauthorized'}
             <Badge variant="destructive" class="ml-2">Token rejected</Badge>
-          {:else if connection === 'unreachable'}
+          {:else if st.connection === 'unreachable'}
             <Badge variant="destructive" class="ml-2">Unreachable</Badge>
-          {:else if connection === 'ok'}
+          {:else if st.connection === 'ok'}
             <Badge class="ml-2 bg-green-500 hover:bg-green-600">Ready</Badge>
           {/if}
         </CardTitle>
@@ -278,23 +91,23 @@
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
-        {#if configStatus && !configStatus.is_configured}
+        {#if st.configStatus && !st.configStatus.is_configured}
           <Alert variant="destructive">
             <AlertTriangle class="h-4 w-4" />
             <AlertTitle>Configuration incomplete</AlertTitle>
             <AlertDescription>
-              Missing: {configStatus.missing_fields.join(', ')}
+              Missing: {st.configStatus.missing_fields.join(', ')}
             </AlertDescription>
           </Alert>
         {/if}
 
-        {#if configStatus?.warnings.length}
+        {#if st.configStatus?.warnings.length}
           <Alert>
             <AlertTriangle class="h-4 w-4" />
             <AlertTitle>Notes</AlertTitle>
             <AlertDescription>
               <ul class="list-inside list-disc">
-                {#each configStatus.warnings as warning}
+                {#each st.configStatus.warnings as warning}
                   <li>{warning}</li>
                 {/each}
               </ul>
@@ -311,8 +124,8 @@
           </div>
           <Switch
             id="agent-platform-enabled"
-            checked={providerConfig.enabled}
-            onCheckedChange={(checked: boolean) => updateConfig({ enabled: checked })}
+            checked={st.providerConfig.enabled}
+            onCheckedChange={(checked: boolean) => st.updateConfig({ enabled: checked })}
           />
         </div>
 
@@ -326,9 +139,9 @@
           <Input
             id="base-url"
             placeholder="http://127.0.0.1:18410"
-            value={providerConfig.base_url || ''}
+            value={st.providerConfig.base_url || ''}
             oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
-              updateConfig({ base_url: e.currentTarget.value || null })}
+              st.updateConfig({ base_url: e.currentTarget.value || null })}
           />
         </div>
 
@@ -340,23 +153,23 @@
           <div class="flex gap-2">
             <Input
               id="api-key"
-              type={showApiKey ? 'text' : 'password'}
+              type={st.showApiKey ? 'text' : 'password'}
               autocomplete="off"
               spellcheck={false}
               class="font-mono text-sm"
               placeholder="agp_… workspace token from agent-platform /config"
-              value={providerConfig.api_key || ''}
+              value={st.providerConfig.api_key || ''}
               oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
-                updateConfig({ api_key: e.currentTarget.value || null })}
+                st.updateConfig({ api_key: e.currentTarget.value || null })}
             />
             <Button
               variant="outline"
               size="icon"
               type="button"
-              aria-label={showApiKey ? 'Hide API token' : 'Show API token'}
-              onclick={() => (showApiKey = !showApiKey)}
+              aria-label={st.showApiKey ? 'Hide API token' : 'Show API token'}
+              onclick={() => (st.showApiKey = !st.showApiKey)}
             >
-              {#if showApiKey}<EyeOff class="h-4 w-4" />{:else}<Eye class="h-4 w-4" />{/if}
+              {#if st.showApiKey}<EyeOff class="h-4 w-4" />{:else}<Eye class="h-4 w-4" />{/if}
             </Button>
           </div>
           <div class="flex items-center gap-2">
@@ -364,13 +177,13 @@
               variant="outline"
               size="sm"
               type="button"
-              onclick={() => (pairOpen = !pairOpen)}
+              onclick={() => (st.pairOpen = !st.pairOpen)}
             >
               Pair with agent-platform
             </Button>
           </div>
-          {#if pairOpen}
-            <PlatformPairForm {pairing} onPair={pair} />
+          {#if st.pairOpen}
+            <PlatformPairForm pairing={st.pairing} onPair={st.pair} />
           {/if}
           <p class="text-xs text-muted-foreground">
             Hidden by default; use the eye button to reveal. Paste a scoped
@@ -388,18 +201,18 @@
             <Input
               id="model"
               placeholder="e.g. llama3, fast"
-              value={providerConfig.model}
+              value={st.providerConfig.model}
               oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
-                updateConfig({ model: e.currentTarget.value })}
+                st.updateConfig({ model: e.currentTarget.value })}
               class="flex-1"
             />
             <Button
               variant="outline"
               size="sm"
-              onclick={() => loadModels(false)}
-              disabled={loadingCatalog}
+              onclick={() => st.loadModels(false)}
+              disabled={st.loadingCatalog}
             >
-              {#if loadingCatalog && !catalogLive}
+              {#if st.loadingCatalog && !st.catalogLive}
                 <Loader2 class="mr-2 h-4 w-4 animate-spin" />
               {:else}
                 <RefreshCw class="mr-2 h-4 w-4" />
@@ -409,11 +222,11 @@
             <Button
               variant="outline"
               size="sm"
-              onclick={() => loadModels(true)}
-              disabled={loadingCatalog}
+              onclick={() => st.loadModels(true)}
+              disabled={st.loadingCatalog}
               title="Fetch live models from upstream providers"
             >
-              {#if loadingCatalog && catalogLive}
+              {#if st.loadingCatalog && st.catalogLive}
                 <Loader2 class="mr-2 h-4 w-4 animate-spin" />
               {:else}
                 <Sparkles class="mr-2 h-4 w-4" />
@@ -423,11 +236,11 @@
           </div>
 
           <CatalogModelPicker
-            {catalog}
-            providers={catalogProviders}
-            models={catalogModels}
-            selectedModel={providerConfig.model}
-            onSelect={(id) => updateConfig({ model: id })}
+            catalog={st.catalog}
+            providers={st.catalogProviders}
+            models={st.catalogModels}
+            selectedModel={st.providerConfig.model}
+            onSelect={(id) => st.updateConfig({ model: id })}
           />
           <p class="text-xs text-muted-foreground">
             Model alias from the platform's <code class="rounded bg-muted px-1">config.yaml</code>,
@@ -438,16 +251,16 @@
         <Separator />
 
         <div class="flex items-center justify-end gap-2">
-          <Button variant="outline" onclick={testConnection} disabled={testingProvider}>
-            {#if testingProvider}
+          <Button variant="outline" onclick={st.testConnection} disabled={st.testingProvider}>
+            {#if st.testingProvider}
               <Loader2 class="mr-2 h-4 w-4 animate-spin" />
             {:else}
               <RefreshCw class="mr-2 h-4 w-4" />
             {/if}
             Test connection
           </Button>
-          {#if defaultProvider !== providerType && configStatus?.is_configured}
-            <Button variant="default" onclick={setAsDefault}>Set as default</Button>
+          {#if st.defaultProvider !== providerType && st.configStatus?.is_configured}
+            <Button variant="default" onclick={st.setAsDefault}>Set as default</Button>
           {/if}
         </div>
       </CardContent>

@@ -1,6 +1,7 @@
 import { ollamaApi } from '../api/ollamaApi';
 import { logger } from '$lib/domains/shared';
 import { toast } from '$lib/utils/toast';
+import { backgroundJobs } from '$lib/domains/shared/jobs/backgroundJobs.svelte';
 
 const log = logger.createScoped('OllamaService');
 
@@ -101,6 +102,13 @@ export class OllamaModels {
       toast.info('Download Started', `Starting download of ${modelName}...`);
       // Honest status - this is a long-running operation
       this.installationStatus = `Downloading ${modelName}... This may take several minutes for large models`;
+      backgroundJobs.upsert({
+        id: `download:${modelName}`,
+        kind: 'download',
+        title: `Downloading ${modelName}`,
+        detail: 'Ollama model',
+        href: '/sdk',
+      });
 
       const timeout = new Promise((_, reject) =>
         setTimeout(
@@ -123,6 +131,7 @@ export class OllamaModels {
       log.error('Failed to install model', { modelName, error: msg });
       toast.error('Installation Failed', `Failed to install ${modelName}: ${msg}`);
     } finally {
+      backgroundJobs.remove(`download:${modelName}`);
       // Keep progress visible for 2 seconds after completion
       setTimeout(() => this.resetProgress(), 2000);
     }

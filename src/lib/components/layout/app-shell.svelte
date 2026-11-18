@@ -23,6 +23,7 @@
   import { getIdentifier } from '@tauri-apps/api/app';
   import DeviceAuthGuard from '$lib/components/DeviceAuthGuard.svelte';
   import AppTopBar from './app-top-bar.svelte';
+  import BackgroundJobsTray from './BackgroundJobsTray.svelte';
   import AppSidebarHeader from './app-sidebar-header.svelte';
   import AppSidebarFooter from './app-sidebar-footer.svelte';
   import { startAppNotifications } from './appNotifications';
@@ -192,6 +193,10 @@
         : ''}"
     >
       <AppTopBar />
+
+      {#if !isMobileShell}
+        <BackgroundJobsTray />
+      {/if}
 
       {#if !isMobileShell}
         <InterruptedMoveBanner />

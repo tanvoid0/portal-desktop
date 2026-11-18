@@ -2,20 +2,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { goto, replaceState } from '$app/navigation';
+  import { replaceState } from '$app/navigation';
   import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
   import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
-  import RefreshCw from '~icons/fa6-solid/rotate';
   import Loading from '$lib/components/ui/loading.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';
-  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
+  import InfoCard from '$lib/domains/cloud/components/InfoCard.svelte';
+  import ResourceYamlTab from '$lib/domains/cloud/components/ResourceYamlTab.svelte';
+  import ResourceDetailHeader from '$lib/domains/cloud/components/ResourceDetailHeader.svelte';
+  import LabelsCard from '$lib/domains/cloud/components/LabelsCard.svelte';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
-  import { toastActions } from '$lib/utils/toast';
 
   const ingressName = $derived(page.params.ingress);
   const namespace = $derived(
@@ -34,22 +33,8 @@
   let isLoading = $state(true);
   let error = $state<string | null>(null);
 
-  // YAML state
-  let yaml = $state('');
-  let yamlLoading = $state(false);
-  let yamlError = $state<string | null>(null);
-
   onMount(async () => {
     await loadIngress();
-    if (activeTab === 'yaml') {
-      await loadYAML();
-    }
-  });
-
-  $effect(() => {
-    if (activeTab === 'yaml' && !yaml && !yamlLoading && ingress) {
-      loadYAML();
-    }
   });
 
   async function loadIngress() {
@@ -78,46 +63,6 @@
     }
   }
 
-  async function loadYAML() {
-    if (!ingress) return;
-
-    try {
-      yamlLoading = true;
-      yamlError = null;
-
-      const yamlContent = await k8sResourceService.getResourceYaml(
-        'Ingress',
-        ingress.namespace,
-        ingress.name
-      );
-
-      yaml = yamlContent;
-    } catch (err) {
-      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
-      console.error('Failed to load YAML:', err);
-    } finally {
-      yamlLoading = false;
-    }
-  }
-
-  async function handleSaveYAML(yamlContent: string) {
-    if (!ingress) return;
-
-    try {
-      const result = await k8sResourceService.applyResourceYaml(ingress.namespace, yamlContent);
-
-      toastActions.success(result);
-
-      // Reload Ingress to get updated data
-      await loadIngress();
-      await loadYAML();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
-      toastActions.error(errorMsg);
-      throw err;
-    }
-  }
-
   function handleTabChange(tab: string) {
     activeTab = tab;
     const url = new URL(page.url.href);
@@ -142,22 +87,14 @@
   {:else if error}
     <PageError title="Failed to load ingress" message={error} onRetry={loadIngress} />
   {:else if ingress}
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold">Ingress: {ingress.name}</h1>
-        <p class="text-muted-foreground">Namespace: {ingress.namespace}</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" onclick={loadIngress}>
-          <RefreshCw class="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-        <Button variant="outline" size="sm" onclick={() => goto('/cloud/ingress')}>
-          <ArrowLeft class="mr-2 h-4 w-4" />
-          Back to Ingress
-        </Button>
-      </div>
-    </div>
+    <ResourceDetailHeader
+      kind="Ingress"
+      name={ingress.name}
+      namespace={ingress.namespace}
+      backHref="/cloud/ingress"
+      backLabel="Back to Ingress"
+      onRefresh={loadIngress}
+    />
 
     <!-- Tabs -->
     <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -169,29 +106,15 @@
       <!-- Overview Tab -->
       <TabsContent value="overview" class="space-y-4">
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ingress Information</CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              <div>
-                <p class="text-sm text-muted-foreground">Name</p>
-                <p class="font-medium">{ingress.name}</p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Namespace</p>
-                <p class="font-medium">{ingress.namespace}</p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Ingress Class</p>
-                <p class="font-medium">{ingress.metadata?.class || 'N/A'}</p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Age</p>
-                <p class="font-medium">{ingress.metadata?.age || 'N/A'}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <InfoCard
+            title="Ingress Information"
+            fields={[
+              { label: 'Name', value: ingress.name },
+              { label: 'Namespace', value: ingress.namespace },
+              { label: 'Ingress Class', value: ingress.metadata?.class || 'N/A' },
+              { label: 'Age', value: ingress.metadata?.age || 'N/A' },
+            ]}
+          />
 
           {#if addresses.length > 0 || hosts.length > 0}
             <Card>
@@ -224,54 +147,19 @@
           {/if}
 
           {#if ingress.metadata?.labels && Object.keys(ingress.metadata.labels).length > 0}
-            <Card>
-              <CardHeader>
-                <CardTitle>Labels</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div class="flex flex-wrap gap-2">
-                  {#each Object.entries(ingress.metadata.labels) as [key, value]}
-                    <Badge variant="outline">{key}={value}</Badge>
-                  {/each}
-                </div>
-              </CardContent>
-            </Card>
+            <LabelsCard items={ingress.metadata.labels} />
           {/if}
         </div>
       </TabsContent>
 
       <!-- YAML Tab -->
       <TabsContent value="yaml" class="h-[600px]">
-        <Card class="flex h-full flex-col">
-          <CardHeader>
-            <CardTitle>Ingress YAML</CardTitle>
-          </CardHeader>
-          <CardContent class="flex-1 overflow-hidden">
-            {#if yamlLoading}
-              <div class="flex h-full items-center justify-center">
-                <Loading text="Loading YAML..." />
-              </div>
-            {:else if yamlError}
-              <div class="flex h-full items-center justify-center text-center text-destructive">
-                <p>{yamlError}</p>
-              </div>
-            {:else if yaml}
-              <YamlEditor
-                value={yaml}
-                onSave={handleSaveYAML}
-                resourceName={ingress.name}
-                resourceKind="Ingress"
-                namespace={ingress.namespace}
-              />
-            {:else}
-              <div
-                class="flex h-full items-center justify-center text-center text-muted-foreground"
-              >
-                <p>No YAML available.</p>
-              </div>
-            {/if}
-          </CardContent>
-        </Card>
+        <ResourceYamlTab
+          resource={ingress}
+          kind="Ingress"
+          active={activeTab === 'yaml'}
+          onApplied={loadIngress}
+        />
       </TabsContent>
     </Tabs>
   {/if}

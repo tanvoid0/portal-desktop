@@ -3,17 +3,11 @@
 -->
 
 <script lang="ts">
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from '$lib/components/ui/card';
   import { Label } from '$lib/components/ui/label';
   import { Input } from '$lib/components/ui/input';
   import Select from '$lib/components/ui/select.svelte';
-  import { Switch } from '$lib/components/ui/switch';
+  import SettingsSection from './shared/SettingsSection.svelte';
+  import SettingsSwitchRow from './shared/SettingsSwitchRow.svelte';
   import { Separator } from '$lib/components/ui/separator';
   import { settingsService } from '../services/settingsService';
   import type { EditorSettings } from '../types';
@@ -53,231 +47,161 @@
 
 <div class="space-y-6">
   <!-- Font & Display -->
-  <Card>
-    <CardHeader>
-      <CardTitle>Font & Display</CardTitle>
-      <CardDescription>Configure editor font and visual appearance</CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-4">
+  <SettingsSection title="Font & Display" description="Configure editor font and visual appearance">
+    <div class="space-y-2">
+      <Label for="fontFamily">Font Family</Label>
+      <Select
+        defaultValue={settings.fontFamily}
+        options={availableFonts.map((f) => ({
+          value: f.id,
+          label: `${f.name} (${f.category})`,
+        }))}
+        onSelect={(value) => onUpdate({ fontFamily: value })}
+        placeholder="Select font"
+      />
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
       <div class="space-y-2">
-        <Label for="fontFamily">Font Family</Label>
-        <Select
-          defaultValue={settings.fontFamily}
-          options={availableFonts.map((f) => ({
-            value: f.id,
-            label: `${f.name} (${f.category})`,
-          }))}
-          onSelect={(value) => onUpdate({ fontFamily: value })}
-          placeholder="Select font"
+        <Label for="fontSize">Font Size</Label>
+        <Input
+          id="fontSize"
+          type="number"
+          min="8"
+          max="72"
+          bind:value={settings.fontSize}
+          onchange={() => onUpdate({ fontSize: parseInt(String(settings.fontSize)) || 14 })}
         />
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div class="space-y-2">
-          <Label for="fontSize">Font Size</Label>
-          <Input
-            id="fontSize"
-            type="number"
-            min="8"
-            max="72"
-            bind:value={settings.fontSize}
-            onchange={() => onUpdate({ fontSize: parseInt(String(settings.fontSize)) || 14 })}
-          />
-        </div>
-
-        <div class="space-y-2">
-          <Label for="lineHeight">Line Height</Label>
-          <Input
-            id="lineHeight"
-            type="number"
-            min="1"
-            max="3"
-            step="0.1"
-            bind:value={settings.lineHeight}
-            onchange={() =>
-              onUpdate({
-                lineHeight: parseFloat(String(settings.lineHeight)) || 1.5,
-              })}
-          />
-        </div>
+      <div class="space-y-2">
+        <Label for="lineHeight">Line Height</Label>
+        <Input
+          id="lineHeight"
+          type="number"
+          min="1"
+          max="3"
+          step="0.1"
+          bind:value={settings.lineHeight}
+          onchange={() =>
+            onUpdate({
+              lineHeight: parseFloat(String(settings.lineHeight)) || 1.5,
+            })}
+        />
       </div>
-    </CardContent>
-  </Card>
+    </div>
+  </SettingsSection>
 
   <!-- Indentation -->
-  <Card>
-    <CardHeader>
-      <CardTitle>Indentation</CardTitle>
-      <CardDescription>Configure how code is indented</CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-4">
-      <div class="grid grid-cols-2 gap-4">
-        <div class="space-y-2">
-          <Label for="tabSize">Tab Size</Label>
-          <Input
-            id="tabSize"
-            type="number"
-            min="1"
-            max="8"
-            bind:value={settings.tabSize}
-            onchange={() => onUpdate({ tabSize: parseInt(String(settings.tabSize)) || 2 })}
-          />
-        </div>
-
-        <div class="flex items-center justify-between">
-          <div class="space-y-0.5">
-            <Label for="insertSpaces">Insert Spaces</Label>
-            <p class="text-sm text-muted-foreground">Use spaces instead of tabs</p>
-          </div>
-          {#if settings}
-            <Switch
-              id="insertSpaces"
-              checked={settings.insertSpaces}
-              onclick={() => onUpdate({ insertSpaces: !settings.insertSpaces })}
-            />
-          {/if}
-        </div>
-      </div>
-
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="autoIndent">Auto Indent</Label>
-          <p class="text-sm text-muted-foreground">Automatically indent code</p>
-        </div>
-        <Switch
-          id="autoIndent"
-          checked={settings.autoIndent}
-          onCheckedChange={(checked) => onUpdate({ autoIndent: checked })}
+  <SettingsSection title="Indentation" description="Configure how code is indented">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="space-y-2">
+        <Label for="tabSize">Tab Size</Label>
+        <Input
+          id="tabSize"
+          type="number"
+          min="1"
+          max="8"
+          bind:value={settings.tabSize}
+          onchange={() => onUpdate({ tabSize: parseInt(String(settings.tabSize)) || 2 })}
         />
       </div>
-    </CardContent>
-  </Card>
+
+      <SettingsSwitchRow
+        id="insertSpaces"
+        label="Insert Spaces"
+        description="Use spaces instead of tabs"
+        checked={settings.insertSpaces}
+        onToggle={() => onUpdate({ insertSpaces: !settings.insertSpaces })}
+      />
+    </div>
+
+    <SettingsSwitchRow
+      id="autoIndent"
+      label="Auto Indent"
+      description="Automatically indent code"
+      checked={settings.autoIndent}
+      onToggle={() => onUpdate({ autoIndent: !settings.autoIndent })}
+    />
+  </SettingsSection>
 
   <!-- Visual Features -->
-  <Card>
-    <CardHeader>
-      <CardTitle>Visual Features</CardTitle>
-      <CardDescription>Configure editor visual elements</CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-4">
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="wordWrap">Word Wrap</Label>
-          <p class="text-sm text-muted-foreground">Wrap long lines</p>
-        </div>
-        <Switch
-          id="wordWrap"
-          checked={settings.wordWrap}
-          onCheckedChange={(checked) => onUpdate({ wordWrap: checked })}
-        />
-      </div>
+  <SettingsSection title="Visual Features" description="Configure editor visual elements">
+    <SettingsSwitchRow
+      id="wordWrap"
+      label="Word Wrap"
+      description="Wrap long lines"
+      checked={settings.wordWrap}
+      onToggle={() => onUpdate({ wordWrap: !settings.wordWrap })}
+    />
 
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="showLineNumbers">Show Line Numbers</Label>
-          <p class="text-sm text-muted-foreground">Display line numbers</p>
-        </div>
-        <Switch
-          id="showLineNumbers"
-          checked={settings.showLineNumbers}
-          onCheckedChange={(checked) => onUpdate({ showLineNumbers: checked })}
-        />
-      </div>
+    <SettingsSwitchRow
+      id="showLineNumbers"
+      label="Show Line Numbers"
+      description="Display line numbers"
+      checked={settings.showLineNumbers}
+      onToggle={() => onUpdate({ showLineNumbers: !settings.showLineNumbers })}
+    />
 
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="showMinimap">Show Minimap</Label>
-          <p class="text-sm text-muted-foreground">Display code minimap</p>
-        </div>
-        <Switch
-          id="showMinimap"
-          checked={settings.showMinimap}
-          onCheckedChange={(checked) => onUpdate({ showMinimap: checked })}
-        />
-      </div>
+    <SettingsSwitchRow
+      id="showMinimap"
+      label="Show Minimap"
+      description="Display code minimap"
+      checked={settings.showMinimap}
+      onToggle={() => onUpdate({ showMinimap: !settings.showMinimap })}
+    />
 
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="showWhitespace">Show Whitespace</Label>
-          <p class="text-sm text-muted-foreground">Display whitespace characters</p>
-        </div>
-        <Switch
-          id="showWhitespace"
-          checked={settings.showWhitespace}
-          onCheckedChange={(checked) => onUpdate({ showWhitespace: checked })}
-        />
-      </div>
-    </CardContent>
-  </Card>
+    <SettingsSwitchRow
+      id="showWhitespace"
+      label="Show Whitespace"
+      description="Display whitespace characters"
+      checked={settings.showWhitespace}
+      onToggle={() => onUpdate({ showWhitespace: !settings.showWhitespace })}
+    />
+  </SettingsSection>
 
   <!-- Code Features -->
-  <Card>
-    <CardHeader>
-      <CardTitle>Code Features</CardTitle>
-      <CardDescription>Configure code editing features</CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-4">
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="syntaxHighlighting">Syntax Highlighting</Label>
-          <p class="text-sm text-muted-foreground">Color code syntax</p>
-        </div>
-        <Switch
-          id="syntaxHighlighting"
-          checked={settings.syntaxHighlighting}
-          onCheckedChange={(checked) => onUpdate({ syntaxHighlighting: checked })}
-        />
-      </div>
+  <SettingsSection title="Code Features" description="Configure code editing features">
+    <SettingsSwitchRow
+      id="syntaxHighlighting"
+      label="Syntax Highlighting"
+      description="Color code syntax"
+      checked={settings.syntaxHighlighting}
+      onToggle={() => onUpdate({ syntaxHighlighting: !settings.syntaxHighlighting })}
+    />
 
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="bracketMatching">Bracket Matching</Label>
-          <p class="text-sm text-muted-foreground">Highlight matching brackets</p>
-        </div>
-        <Switch
-          id="bracketMatching"
-          checked={settings.bracketMatching}
-          onCheckedChange={(checked) => onUpdate({ bracketMatching: checked })}
-        />
-      </div>
+    <SettingsSwitchRow
+      id="bracketMatching"
+      label="Bracket Matching"
+      description="Highlight matching brackets"
+      checked={settings.bracketMatching}
+      onToggle={() => onUpdate({ bracketMatching: !settings.bracketMatching })}
+    />
 
-      <Separator />
+    <Separator />
 
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="autoComplete">Auto Complete</Label>
-          <p class="text-sm text-muted-foreground">Enable auto-completion</p>
-        </div>
-        <Switch
-          id="autoComplete"
-          checked={settings.autoComplete}
-          onCheckedChange={(checked) => onUpdate({ autoComplete: checked })}
-        />
-      </div>
+    <SettingsSwitchRow
+      id="autoComplete"
+      label="Auto Complete"
+      description="Enable auto-completion"
+      checked={settings.autoComplete}
+      onToggle={() => onUpdate({ autoComplete: !settings.autoComplete })}
+    />
 
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="suggestions">Suggestions</Label>
-          <p class="text-sm text-muted-foreground">Show code suggestions</p>
-        </div>
-        <Switch
-          id="suggestions"
-          checked={settings.suggestions}
-          onCheckedChange={(checked) => onUpdate({ suggestions: checked })}
-        />
-      </div>
+    <SettingsSwitchRow
+      id="suggestions"
+      label="Suggestions"
+      description="Show code suggestions"
+      checked={settings.suggestions}
+      onToggle={() => onUpdate({ suggestions: !settings.suggestions })}
+    />
 
-      <div class="flex items-center justify-between">
-        <div class="space-y-0.5">
-          <Label for="parameterHints">Parameter Hints</Label>
-          <p class="text-sm text-muted-foreground">Show function parameter hints</p>
-        </div>
-        <Switch
-          id="parameterHints"
-          checked={settings.parameterHints}
-          onCheckedChange={(checked) => onUpdate({ parameterHints: checked })}
-        />
-      </div>
-    </CardContent>
-  </Card>
+    <SettingsSwitchRow
+      id="parameterHints"
+      label="Parameter Hints"
+      description="Show function parameter hints"
+      checked={settings.parameterHints}
+      onToggle={() => onUpdate({ parameterHints: !settings.parameterHints })}
+    />
+  </SettingsSection>
 </div>

@@ -2,20 +2,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { goto, replaceState } from '$app/navigation';
+  import { replaceState } from '$app/navigation';
   import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
   import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
-  import RefreshCw from '~icons/fa6-solid/rotate';
   import Loading from '$lib/components/ui/loading.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';
-  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
+  import ResourceYamlTab from '$lib/domains/cloud/components/ResourceYamlTab.svelte';
+  import ResourceDetailHeader from '$lib/domains/cloud/components/ResourceDetailHeader.svelte';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
-  import { toastActions } from '$lib/utils/toast';
 
   const cronJobName = $derived(page.params.cronjob);
   const namespace = $derived(
@@ -34,22 +31,8 @@
   let isLoading = $state(true);
   let error = $state<string | null>(null);
 
-  // YAML state
-  let yaml = $state('');
-  let yamlLoading = $state(false);
-  let yamlError = $state<string | null>(null);
-
   onMount(async () => {
     await loadCronJob();
-    if (activeTab === 'yaml') {
-      await loadYAML();
-    }
-  });
-
-  $effect(() => {
-    if (activeTab === 'yaml' && !yaml && !yamlLoading && cronJob) {
-      loadYAML();
-    }
   });
 
   async function loadCronJob() {
@@ -78,46 +61,6 @@
     }
   }
 
-  async function loadYAML() {
-    if (!cronJob) return;
-
-    try {
-      yamlLoading = true;
-      yamlError = null;
-
-      const yamlContent = await k8sResourceService.getResourceYaml(
-        'CronJob',
-        cronJob.namespace,
-        cronJob.name
-      );
-
-      yaml = yamlContent;
-    } catch (err) {
-      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
-      console.error('Failed to load YAML:', err);
-    } finally {
-      yamlLoading = false;
-    }
-  }
-
-  async function handleSaveYAML(yamlContent: string) {
-    if (!cronJob) return;
-
-    try {
-      const result = await k8sResourceService.applyResourceYaml(cronJob.namespace, yamlContent);
-
-      toastActions.success(result);
-
-      // Reload CronJob to get updated data
-      await loadCronJob();
-      await loadYAML();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
-      toastActions.error(errorMsg);
-      throw err;
-    }
-  }
-
   function handleTabChange(tab: string) {
     activeTab = tab;
     const url = new URL(page.url.href);
@@ -132,22 +75,14 @@
   {:else if error}
     <PageError title="Failed to load cronjob" message={error} onRetry={loadCronJob} />
   {:else if cronJob}
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold">CronJob: {cronJob.name}</h1>
-        <p class="text-muted-foreground">Namespace: {cronJob.namespace}</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" onclick={loadCronJob}>
-          <RefreshCw class="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-        <Button variant="outline" size="sm" onclick={() => goto('/cloud/cronjobs')}>
-          <ArrowLeft class="mr-2 h-4 w-4" />
-          Back to CronJobs
-        </Button>
-      </div>
-    </div>
+    <ResourceDetailHeader
+      kind="CronJob"
+      name={cronJob.name}
+      namespace={cronJob.namespace}
+      backHref="/cloud/cronjobs"
+      backLabel="Back to CronJobs"
+      onRefresh={loadCronJob}
+    />
 
     <!-- Tabs -->
     <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -209,36 +144,12 @@
 
       <!-- YAML Tab -->
       <TabsContent value="yaml" class="h-[600px]">
-        <Card class="flex h-full flex-col">
-          <CardHeader>
-            <CardTitle>CronJob YAML</CardTitle>
-          </CardHeader>
-          <CardContent class="flex-1 overflow-hidden">
-            {#if yamlLoading}
-              <div class="flex h-full items-center justify-center">
-                <Loading text="Loading YAML..." />
-              </div>
-            {:else if yamlError}
-              <div class="flex h-full items-center justify-center text-center text-destructive">
-                <p>{yamlError}</p>
-              </div>
-            {:else if yaml}
-              <YamlEditor
-                value={yaml}
-                onSave={handleSaveYAML}
-                resourceName={cronJob.name}
-                resourceKind="CronJob"
-                namespace={cronJob.namespace}
-              />
-            {:else}
-              <div
-                class="flex h-full items-center justify-center text-center text-muted-foreground"
-              >
-                <p>No YAML available.</p>
-              </div>
-            {/if}
-          </CardContent>
-        </Card>
+        <ResourceYamlTab
+          resource={cronJob}
+          kind="CronJob"
+          active={activeTab === 'yaml'}
+          onApplied={loadCronJob}
+        />
       </TabsContent>
     </Tabs>
   {/if}

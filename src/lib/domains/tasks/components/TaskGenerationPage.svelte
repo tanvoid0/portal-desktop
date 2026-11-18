@@ -1,31 +1,12 @@
 <script lang="ts">
   import FaArrowLeft from '~icons/fa6-solid/arrow-left';
 
-  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
-
-  import {
-    aiTaskService,
-    type GeneratedTaskStructure,
-    type ConversationMessage,
-    type TaskContext,
-  } from '../services/aiTaskService';
-  import { taskActions } from '../stores/taskStore';
-  import { toastActions } from '$lib/utils/toast';
-  import { tauriTaskService } from '../services/tauriTaskService';
-  import { mergeWithOriginal, type OriginalTaskState } from '../utils/mergeGenerated';
-  import type {
-    Task,
-    CreateTaskRequest,
-    UpdateTaskRequest,
-    TaskPriority,
-    TaskStatus,
-  } from '../types';
+  import { TaskGenerationState } from '../state/taskGeneration.svelte';
   import TaskStoryInputCard from './TaskStoryInputCard.svelte';
   import TaskGenerationPreviewPanel from './TaskGenerationPreviewPanel.svelte';
   import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
-  import type { ChatMessage } from '$lib/domains/ai/types';
   import LoadingSpinner from '$lib/components/ui/loading-spinner.svelte';
 
   interface Props {
@@ -34,401 +15,7 @@
 
   let { taskId }: Props = $props();
 
-  let storyText = $state('');
-  let customInstruction = $state('');
-  let selectedTemplateId = $state<string | null>(null);
-  let isGenerating = $state(false);
-  let generatedData = $state<GeneratedTaskStructure | null>(null);
-  let chatMessages = $state<ChatMessage[]>([]);
-  let taskContext = $state<TaskContext | undefined>(undefined);
-  let existingTask = $state<Task | null>(null);
-  let isLoadingTask = $state(false);
-  let createdMainTaskId = $state<string | null>(null);
-  let originalTaskState = $state<OriginalTaskState | null>(null);
-  let existingSubtasks = $state<Map<number, Task>>(new Map()); // Map of order/index to existing subtask
-
-  // Load existing task if taskId is provided
-  onMount(async () => {
-    if (taskId) {
-      isLoadingTask = true;
-      try {
-        existingTask = await tauriTaskService.getTask(taskId);
-        if (existingTask) {
-          // Pre-fill story text with task description
-          storyText = existingTask.description || '';
-
-          // Preload existing task as preview
-          await preloadExistingTaskAsPreview();
-        }
-        // Build context for updating
-        taskContext = await buildTaskContext();
-      } catch (error) {
-        toastActions.error(
-          'Failed to load task',
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-      } finally {
-        isLoadingTask = false;
-      }
-    }
-  });
-
-  async function preloadExistingTaskAsPreview() {
-    if (!existingTask || !taskId) return;
-
-    try {
-      // Get all tasks to find subtasks
-      const allTasks = await tauriTaskService.getTasks();
-      const subtasks = allTasks.filter((t) => t.parentId === taskId);
-
-      // Store existing subtasks mapped by their order/index
-      existingSubtasks = new Map();
-      subtasks.forEach((st, index) => {
-        existingSubtasks.set(index, st);
-      });
-
-      // Convert existing task to GeneratedTaskStructure format
-      generatedData = {
-        main_task: {
-          title: existingTask.title,
-          description: existingTask.description || '',
-          priority: existingTask.priority,
-          type_: existingTask.type || '',
-          estimated_time: existingTask.estimatedTime || null,
-          tags: existingTask.tags || [],
-        },
-        subtasks: subtasks.map((st, index) => ({
-          title: st.title,
-          description: st.description || '',
-          estimated_time: st.estimatedTime || null,
-          dependencies: [],
-          order: index + 1,
-        })),
-        suggested_project: null,
-        suggested_labels: existingTask.tags || [],
-        confidence: 1.0,
-        model_used: 'existing-task',
-      };
-
-      // Store original state for preservation
-      originalTaskState = {
-        status: existingTask.status,
-        priority: existingTask.priority,
-        tags: existingTask.tags || [],
-        type: existingTask.type,
-        estimatedTime: existingTask.estimatedTime,
-      };
-
-      chatMessages = [
-        {
-          role: 'assistant',
-          content: `I've loaded your existing task "${existingTask.title}" with ${subtasks.length} subtask(s). You can refine it using AI or edit manually.`,
-          timestamp: new Date(),
-        },
-      ];
-    } catch (error) {
-      console.error('Failed to preload task as preview:', error);
-    }
-  }
-
-  async function buildTaskContext(): Promise<TaskContext | undefined> {
-    if (!taskId) return undefined;
-
-    const context: TaskContext = {};
-    try {
-      const task = await tauriTaskService.getTask(taskId);
-      if (task) {
-        context.parentTask = {
-          id: task.id,
-          title: task.title,
-          description: task.description,
-          priority: task.priority,
-          type: task.type,
-          tags: task.tags,
-        };
-
-        // Get existing children
-        const allTasks = await tauriTaskService.getTasks();
-        const children = allTasks
-          .filter((t) => t.parentId === taskId)
-          .map((t) => ({
-            id: t.id,
-            title: t.title,
-            description: t.description,
-            status: t.status,
-          }));
-
-        if (children.length > 0) {
-          context.existingChildren = children;
-        }
-      }
-    } catch (error) {
-      console.error('Failed to build task context:', error);
-    }
-
-    return Object.keys(context).length > 0 ? context : undefined;
-  }
-
-  async function handleGenerate() {
-    if (!storyText.trim()) {
-      toastActions.error('Please enter story text');
-      return;
-    }
-
-    isGenerating = true;
-    try {
-      const result = await aiTaskService.generateTasksFromStory({
-        story_text: storyText,
-        provider_type: 'AgentPlatform',
-        instruction: customInstruction.trim() || undefined,
-        context: taskContext,
-      });
-
-      // If updating an existing task, preserve its original state in the generated data
-      generatedData = mergeWithOriginal(result, taskId ? originalTaskState : null);
-
-      chatMessages = [
-        {
-          role: 'assistant',
-          content: `I've ${taskId ? 'refined' : 'generated'} a task structure with ${result.subtasks.length} subtask(s). You can review and edit the preview, or chat with me to make adjustments.`,
-          timestamp: new Date(),
-        },
-      ];
-    } catch (error) {
-      toastActions.error(
-        'Failed to generate tasks',
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      );
-    } finally {
-      isGenerating = false;
-    }
-  }
-
-  async function handleChatMessage(message: string, history: ChatMessage[]) {
-    if (!generatedData) {
-      toastActions.error('Please generate tasks first');
-      return;
-    }
-
-    // Convert chat messages to conversation format
-    // Include the original generation result in the history
-    const conversationHistory: ConversationMessage[] = [
-      {
-        role: 'assistant',
-        content: JSON.stringify(generatedData, null, 2),
-      },
-      ...history
-        .filter(
-          (m) => m.role === 'user' || (m.role === 'assistant' && !m.content.includes('generated'))
-        )
-        .map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-      {
-        role: 'user',
-        content: message,
-      },
-    ];
-
-    try {
-      const result = await aiTaskService.generateTasksFromStory({
-        story_text: storyText,
-        provider_type: 'AgentPlatform',
-        history: conversationHistory,
-        instruction: customInstruction.trim() || undefined,
-        context: taskContext,
-      });
-
-      generatedData = mergeWithOriginal(result, taskId ? originalTaskState : null);
-
-      chatMessages = [
-        ...chatMessages,
-        {
-          role: 'assistant',
-          content: `I've updated the task structure based on your feedback. The preview has been refreshed.`,
-          timestamp: new Date(),
-        },
-      ];
-    } catch (error) {
-      toastActions.error(
-        'Failed to update tasks',
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      );
-    }
-  }
-
-  async function handleAddTask(task: any): Promise<void> {
-    try {
-      // If updating existing task, use update instead of create
-      if (taskId && existingTask) {
-        const updateData: UpdateTaskRequest = {
-          title: task.title,
-          description: task.description,
-          // Preserve original status and other fields unless explicitly changed
-          status: (originalTaskState?.status || existingTask.status) as TaskStatus,
-          priority:
-            (task.priority as TaskPriority) || originalTaskState?.priority || existingTask.priority,
-          type: task.type_ || originalTaskState?.type || existingTask.type,
-          estimatedTime:
-            task.estimated_time || originalTaskState?.estimatedTime || existingTask.estimatedTime,
-          tags:
-            generatedData && generatedData.suggested_labels.length > 0
-              ? generatedData.suggested_labels
-              : originalTaskState?.tags || existingTask.tags,
-        };
-
-        await taskActions.updateTask(taskId, updateData);
-        toastActions.success(`Task "${task.title}" updated successfully`);
-        createdMainTaskId = taskId;
-      } else {
-        // Creating new task
-        const taskData: CreateTaskRequest = {
-          title: task.title,
-          description: task.description,
-          status: 'pending',
-          priority: task.priority as TaskPriority,
-          type: task.type_ || undefined,
-          estimatedTime: task.estimated_time || undefined,
-          tags: generatedData?.suggested_labels || undefined,
-        };
-
-        const createdTask = await taskActions.createTask(taskData);
-        toastActions.success(`Task "${createdTask.title}" created successfully`);
-        createdMainTaskId = createdTask.id;
-      }
-    } catch (error) {
-      toastActions.error(
-        `Failed to ${taskId ? 'update' : 'create'} task`,
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      );
-      throw error;
-    }
-  }
-
-  async function handleAddSubtask(index: number, subtask: any) {
-    if (!generatedData) return;
-
-    try {
-      // If main task hasn't been created yet, create it first
-      let parentTaskId = taskId || createdMainTaskId;
-      if (!parentTaskId && generatedData.main_task) {
-        await handleAddTask(generatedData.main_task);
-        parentTaskId = createdMainTaskId;
-      }
-
-      if (!parentTaskId) {
-        toastActions.error('Please create the main task first');
-        return;
-      }
-
-      const subtaskData: CreateTaskRequest = {
-        title: subtask.title,
-        description: subtask.description || undefined,
-        status: 'pending',
-        priority: 'medium',
-        parentId: parentTaskId,
-        estimatedTime: subtask.estimated_time || undefined,
-      };
-
-      await taskActions.createTask(subtaskData);
-      toastActions.success(`Subtask "${subtask.title}" created successfully`);
-    } catch (error) {
-      toastActions.error(
-        'Failed to create subtask',
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      );
-    }
-  }
-
-  async function handleAddAll() {
-    if (!generatedData) return;
-
-    try {
-      // Update or create main task first
-      await handleAddTask(generatedData.main_task);
-      const mainTaskId = createdMainTaskId || taskId;
-
-      if (!mainTaskId) {
-        toastActions.error('Failed to create main task');
-        return;
-      }
-
-      let updatedCount = 0;
-      let createdCount = 0;
-
-      // Update existing subtasks or create new ones
-      for (let index = 0; index < generatedData.subtasks.length; index++) {
-        const subtask = generatedData.subtasks[index];
-        if (!subtask.title.trim()) continue;
-
-        const existingSubtask = existingSubtasks.get(index);
-
-        if (existingSubtask && taskId) {
-          // Update existing subtask
-          const updateData: UpdateTaskRequest = {
-            title: subtask.title,
-            description: subtask.description || undefined,
-            status: existingSubtask.status, // Preserve status
-            priority: existingSubtask.priority, // Preserve priority
-            estimatedTime: subtask.estimated_time || existingSubtask.estimatedTime,
-          };
-          await taskActions.updateTask(existingSubtask.id, updateData);
-          updatedCount++;
-        } else {
-          // Create new subtask
-          const subtaskData: CreateTaskRequest = {
-            title: subtask.title,
-            description: subtask.description || undefined,
-            status: 'pending',
-            priority: 'medium',
-            parentId: mainTaskId,
-            estimatedTime: subtask.estimated_time || undefined,
-          };
-          await taskActions.createTask(subtaskData);
-          createdCount++;
-        }
-      }
-
-      const action = taskId ? 'Updated' : 'Created';
-      const message = taskId
-        ? `Updated task with ${updatedCount} updated and ${createdCount} new subtask(s)`
-        : `Created task with ${generatedData.subtasks.length} subtask(s)`;
-
-      toastActions.success(message);
-
-      // Navigate to the task
-      goto(`/tasks/${mainTaskId}`);
-    } catch (error) {
-      toastActions.error(
-        `Failed to ${taskId ? 'update' : 'create'} tasks`,
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      );
-    }
-  }
-
-  function handleTemplateSelect(templateId: string, instruction: string) {
-    selectedTemplateId = templateId;
-    customInstruction = instruction;
-  }
-
-  function handleUpdateMainTask(task: any) {
-    if (generatedData) {
-      generatedData = {
-        ...generatedData,
-        main_task: task,
-      };
-    }
-  }
-
-  function handleUpdateSubtask(index: number, subtask: any) {
-    if (generatedData) {
-      generatedData = {
-        ...generatedData,
-        subtasks: generatedData.subtasks.map((s, i) => (i === index ? subtask : s)),
-      };
-    }
-  }
+  const g = new TaskGenerationState(() => taskId);
 </script>
 
 <div class="min-h-screen bg-background">
@@ -453,7 +40,7 @@
       </div>
     </div>
 
-    {#if isLoadingTask}
+    {#if g.isLoadingTask}
       <div class="flex items-center justify-center py-12">
         <LoadingSpinner size="lg" text="Loading task..." />
       </div>
@@ -463,25 +50,25 @@
         <div class="space-y-6 lg:col-span-2">
           <!-- Story Input -->
           <TaskStoryInputCard
-            bind:storyText
-            bind:selectedTemplateId
-            bind:customInstruction
-            {isGenerating}
-            onTemplateSelect={handleTemplateSelect}
-            onGenerate={handleGenerate}
+            bind:storyText={g.storyText}
+            bind:selectedTemplateId={g.selectedTemplateId}
+            bind:customInstruction={g.customInstruction}
+            isGenerating={g.isGenerating}
+            onTemplateSelect={g.handleTemplateSelect}
+            onGenerate={g.handleGenerate}
           />
 
           <!-- Preview -->
-          {#if generatedData}
+          {#if g.generatedData}
             <TaskGenerationPreviewPanel
-              bind:data={generatedData}
-              originalStatus={originalTaskState?.status}
+              bind:data={g.generatedData}
+              originalStatus={g.originalTaskState?.status}
               isUpdateMode={!!taskId}
-              onUpdateMain={handleUpdateMainTask}
-              onUpdateSubtask={handleUpdateSubtask}
-              onAdd={handleAddTask}
-              onAddSubtask={handleAddSubtask}
-              onAddAll={handleAddAll}
+              onUpdateMain={g.handleUpdateMainTask}
+              onUpdateSubtask={g.handleUpdateSubtask}
+              onAdd={g.handleAddTask}
+              onAddSubtask={g.handleAddSubtask}
+              onAddAll={g.handleAddAll}
             />
           {/if}
         </div>
@@ -489,9 +76,9 @@
         <!-- Right Column: Chat Panel -->
         <div class="lg:col-span-1">
           <AIChatPanel
-            bind:messages={chatMessages}
-            onSendMessageWithHistory={handleChatMessage}
-            bind:isLoading={isGenerating}
+            bind:messages={g.chatMessages}
+            onSendMessageWithHistory={g.handleChatMessage}
+            bind:isLoading={g.isGenerating}
             placeholder="Ask me to adjust the tasks, add more subtasks, change priorities..."
             title="Refine Tasks"
             class="h-[calc(100vh-12rem)]"

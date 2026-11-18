@@ -1,6 +1,6 @@
 <script module lang="ts">
-  import type { AIErrorInfo as ErrorInfo } from './aiGenerationErrors';
-  export type AIErrorInfo = ErrorInfo;
+  export type { AIErrorInfo } from './aiGenerationErrors';
+  export type { AIGenerationConfig } from './aiGenerationState.svelte';
 </script>
 
 <script lang="ts">
@@ -12,224 +12,33 @@
   import { Button } from '$lib/components/ui/button';
   import { Textarea } from '$lib/components/ui/textarea';
   import { Label } from '$lib/components/ui/label';
-  import { toastActions } from '$lib/utils/toast';
-  import { goto } from '$app/navigation';
-  import { AI_PROVIDER_SETTINGS_PATH } from '$lib/config/ai-nav';
-  import { defaultParseError } from './aiGenerationErrors';
+  import {
+    AIGenerationDialogState,
+    type AIGenerationConfig as Config,
+  } from './aiGenerationState.svelte';
   import AIGenerationNotices from './AIGenerationNotices.svelte';
   import AIRegenerateDialog from './AIRegenerateDialog.svelte';
-
-  export interface AIGenerationConfig<TInput = string, TOutput = unknown> {
-    /** Title for the dialog */
-    title: string;
-    /** Description for the dialog */
-    description: string;
-    /** Label for the input field */
-    inputLabel: string;
-    /** Placeholder for the input field */
-    inputPlaceholder: string;
-    /** Number of rows for textarea (default: 12) */
-    inputRows?: number;
-    /** Maximum input length (default: 10000) */
-    maxLength?: number;
-    /** Function to generate AI response */
-    generateFn: (
-      input: TInput,
-      history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-      developerNote?: string,
-      instruction?: string
-    ) => Promise<TOutput>;
-    /** Function to serialize result for display in regenerate dialog */
-    serializeResult?: (result: TOutput) => string;
-    /** Optional provider type to use (defaults to AgentPlatform) */
-    providerType?: string;
-    /** Optional info box content */
-    infoContent?: string | { title: string; items: string[] };
-    /** Show developer note input field */
-    showDeveloperNote?: boolean;
-    /** Show instruction input field */
-    showInstruction?: boolean;
-    /** Custom validation function */
-    validateInput?: (input: TInput) => string | null;
-    /** Custom error parser */
-    parseError?: (error: unknown) => AIErrorInfo;
-  }
 
   interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSuccess: (result: unknown, originalInput: string) => void;
-    config: AIGenerationConfig;
+    config: Config;
     /** Previous result for regeneration (optional) */
     previousResult?: unknown;
   }
 
   let { open, onOpenChange, onSuccess, config, previousResult }: Props = $props();
 
-  let inputText = $state('');
-  let developerNote = $state('');
-  let instruction = $state('');
-  let isGenerating = $state(false);
-  let error = $state<string | null>(null);
-  let showRegenerateDialog = $state(false);
-  let regenerateInstructions = $state('');
-  let isRegenerating = $state(false);
-
-  function showErrorToast(errorInfo: AIErrorInfo) {
-    if (errorInfo.actionable && errorInfo.settingsPath) {
-      toastActions.error('AI Generation Failed', errorInfo.message, {
-        action: {
-          label: 'Open Settings',
-          onClick: () => {
-            goto(errorInfo.settingsPath!);
-            onOpenChange(false);
-          },
-        },
-      });
-    } else {
-      toastActions.error('AI Generation Failed', errorInfo.message);
-    }
-  }
-
-  async function handleGenerate() {
-    const maxLength = config.maxLength ?? 10000;
-    const validate = config.validateInput;
-
-    if (!inputText.trim()) {
-      error = 'Please enter input text';
-      return;
-    }
-
-    if (inputText.length > maxLength) {
-      error = `Input text is too long (max ${maxLength} characters)`;
-      return;
-    }
-
-    if (validate) {
-      const validationError = validate(inputText as any);
-      if (validationError) {
-        error = validationError;
-        return;
-      }
-    }
-
-    try {
-      isGenerating = true;
-      error = null;
-
-      const result = await config.generateFn(
-        inputText as any,
-        undefined,
-        developerNote.trim() || undefined,
-        instruction.trim() || undefined
-      );
-
-      toastActions.success('AI generation completed successfully!');
-      const textToPass = inputText;
-      onSuccess(result, textToPass);
-      onOpenChange(false);
-      inputText = '';
-    } catch (err) {
-      const parseError = config.parseError || defaultParseError;
-      const errorInfo: AIErrorInfo =
-        err instanceof Error && 'errorInfo' in err
-          ? (err as Error & { errorInfo: AIErrorInfo }).errorInfo
-          : parseError(err);
-
-      error = errorInfo.message;
-      showErrorToast(errorInfo);
-      console.error('AI generation error:', err);
-    } finally {
-      isGenerating = false;
-    }
-  }
-
-  async function handleRegenerate() {
-    if (!previousResult) {
-      return;
-    }
-
-    if (!regenerateInstructions.trim()) {
-      error = 'Please provide instructions for regeneration';
-      return;
-    }
-
-    try {
-      isRegenerating = true;
-      error = null;
-
-      const history = [
-        {
-          role: 'assistant' as const,
-          content: config.serializeResult
-            ? config.serializeResult(previousResult as any)
-            : JSON.stringify(previousResult, null, 2),
-        },
-        {
-          role: 'user' as const,
-          content: `Please regenerate the above with the following changes: ${regenerateInstructions.trim()}`,
-        },
-      ];
-
-      const result = await config.generateFn(
-        inputText as any,
-        history,
-        developerNote.trim() || undefined,
-        instruction.trim() || undefined
-      );
-
-      toastActions.success('Regeneration completed successfully!');
-      const textToPass = inputText;
-      showRegenerateDialog = false;
-      regenerateInstructions = '';
-      onSuccess(result, textToPass);
-      onOpenChange(false);
-    } catch (err) {
-      const parseError = config.parseError || defaultParseError;
-      const errorInfo: AIErrorInfo =
-        err instanceof Error && 'errorInfo' in err
-          ? (err as Error & { errorInfo: AIErrorInfo }).errorInfo
-          : parseError(err);
-
-      error = errorInfo.message;
-      showErrorToast(errorInfo);
-      console.error('AI regeneration error:', err);
-    } finally {
-      isRegenerating = false;
-    }
-  }
-
-  function handleCancel() {
-    inputText = '';
-    developerNote = '';
-    instruction = '';
-    error = null;
-    onOpenChange(false);
-  }
-
-  function handleOpenSettings() {
-    goto(AI_PROVIDER_SETTINGS_PATH);
-    onOpenChange(false);
-  }
-
-  function getResultPreview(): string {
-    if (!previousResult) return '';
-    if (config.serializeResult) {
-      return config.serializeResult(previousResult as any);
-    }
-    return JSON.stringify(previousResult, null, 2);
-  }
+  const st = new AIGenerationDialogState(() => ({
+    config,
+    previousResult,
+    onSuccess,
+    onOpenChange,
+  }));
 
   $effect(() => {
-    if (!open) {
-      inputText = '';
-      developerNote = '';
-      instruction = '';
-      error = null;
-      isGenerating = false;
-      showRegenerateDialog = false;
-      regenerateInstructions = '';
-    }
+    if (!open) st.reset();
   });
 </script>
 
@@ -245,14 +54,14 @@
         <Label for="ai-input">{config.inputLabel}</Label>
         <Textarea
           id="ai-input"
-          bind:value={inputText}
+          bind:value={st.inputText}
           placeholder={config.inputPlaceholder}
           rows={config.inputRows ?? 12}
-          class={error ? 'border-destructive' : ''}
-          disabled={isGenerating}
+          class={st.error ? 'border-destructive' : ''}
+          disabled={st.isGenerating}
         />
-        {#if error}
-          <p class="text-sm text-destructive">{error}</p>
+        {#if st.error}
+          <p class="text-sm text-destructive">{st.error}</p>
         {/if}
       </div>
 
@@ -264,10 +73,10 @@
           </Label>
           <Textarea
             id="developer-note"
-            bind:value={developerNote}
+            bind:value={st.developerNote}
             placeholder="Add developer-friendly instructions about the required work, technical considerations, or implementation details..."
             rows={4}
-            disabled={isGenerating}
+            disabled={st.isGenerating}
             class="font-mono text-sm"
           />
           <p class="text-xs text-muted-foreground">
@@ -285,10 +94,10 @@
           </Label>
           <Textarea
             id="instruction"
-            bind:value={instruction}
+            bind:value={st.instruction}
             placeholder="e.g., Focus on API endpoints only, break into smaller subtasks, prioritize security features..."
             rows={3}
-            disabled={isGenerating}
+            disabled={st.isGenerating}
           />
           <p class="text-xs text-muted-foreground">
             Specify how you want the tasks to be generated (format, focus areas, structure, etc.).
@@ -298,8 +107,8 @@
 
       <AIGenerationNotices
         infoContent={config.infoContent}
-        {error}
-        onOpenSettings={handleOpenSettings}
+        error={st.error}
+        onOpenSettings={st.openSettings}
       />
     </div>
 
@@ -307,15 +116,15 @@
       {#if previousResult}
         <Button
           variant="outline"
-          onclick={() => (showRegenerateDialog = true)}
-          disabled={isGenerating}
+          onclick={() => (st.showRegenerateDialog = true)}
+          disabled={st.isGenerating}
         >
           <FaRotate class="mr-2 h-4 w-4" />
           Regenerate
         </Button>
       {/if}
-      <Button variant="outline" onclick={handleCancel} disabled={isGenerating}>Cancel</Button>
-      <Button onclick={handleGenerate} disabled={isGenerating || !inputText.trim()}>
+      <Button variant="outline" onclick={st.cancel} disabled={st.isGenerating}>Cancel</Button>
+      <Button onclick={st.generate} disabled={st.isGenerating || !st.inputText.trim()}>
         <FaWandMagicSparkles class="mr-2 h-4 w-4" />
         Generate
       </Button>
@@ -325,16 +134,12 @@
 
 {#if previousResult}
   <AIRegenerateDialog
-    bind:open={showRegenerateDialog}
-    preview={getResultPreview()}
-    bind:instructions={regenerateInstructions}
-    {error}
-    {isRegenerating}
-    onCancel={() => {
-      showRegenerateDialog = false;
-      regenerateInstructions = '';
-      error = null;
-    }}
-    onRegenerate={handleRegenerate}
+    bind:open={st.showRegenerateDialog}
+    preview={st.resultPreview}
+    bind:instructions={st.regenerateInstructions}
+    error={st.error}
+    isRegenerating={st.isRegenerating}
+    onCancel={st.cancelRegenerate}
+    onRegenerate={st.regenerate}
   />
 {/if}

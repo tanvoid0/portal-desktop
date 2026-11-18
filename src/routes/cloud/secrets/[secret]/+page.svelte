@@ -9,8 +9,6 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
-  import RefreshCw from '~icons/fa6-solid/rotate';
   import Trash2 from '~icons/fa6-solid/trash';
   import Eye from '~icons/fa6-solid/eye';
   import EyeOff from '~icons/fa6-solid/eye-slash';
@@ -19,7 +17,9 @@
   import { PageLoading, PageError } from '$lib/components/shell';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
-  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
+  import ResourceYamlTab from '$lib/domains/cloud/components/ResourceYamlTab.svelte';
+  import ResourceDetailHeader from '$lib/domains/cloud/components/ResourceDetailHeader.svelte';
+  import LabelsCard from '$lib/domains/cloud/components/LabelsCard.svelte';
 
   const secretName = $derived(page.params.secret);
   const namespace = $derived(
@@ -38,22 +38,8 @@
   let error = $state<string | null>(null);
   let showSecretValues = $state<Record<string, boolean>>({});
 
-  // YAML state
-  let yaml = $state('');
-  let yamlLoading = $state(false);
-  let yamlError = $state<string | null>(null);
-
   onMount(async () => {
     await loadSecret();
-    if (activeTab === 'yaml') {
-      await loadYAML();
-    }
-  });
-
-  $effect(() => {
-    if (activeTab === 'yaml' && !yaml && !yamlLoading && secret) {
-      loadYAML();
-    }
   });
 
   async function loadSecret() {
@@ -79,46 +65,6 @@
       console.error('Failed to load Secret:', err);
     } finally {
       isLoading = false;
-    }
-  }
-
-  async function loadYAML() {
-    if (!secret) return;
-
-    try {
-      yamlLoading = true;
-      yamlError = null;
-
-      const yamlContent = await k8sResourceService.getResourceYaml(
-        'Secret',
-        secret.namespace,
-        secret.name
-      );
-
-      yaml = yamlContent;
-    } catch (err) {
-      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
-      console.error('Failed to load YAML:', err);
-    } finally {
-      yamlLoading = false;
-    }
-  }
-
-  async function handleSaveYAML(yamlContent: string) {
-    if (!secret) return;
-
-    try {
-      const result = await k8sResourceService.applyResourceYaml(secret.namespace, yamlContent);
-
-      toastActions.success(result);
-
-      // Reload Secret to get updated data
-      await loadSecret();
-      await loadYAML();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
-      toastActions.error(errorMsg);
-      throw err;
     }
   }
 
@@ -181,26 +127,19 @@
   {:else if error}
     <PageError title="Failed to load secret" message={error} onRetry={loadSecret} />
   {:else if secret}
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold">Secret: {secret.name}</h1>
-        <p class="text-muted-foreground">Namespace: {secret.namespace}</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" onclick={loadSecret}>
-          <RefreshCw class="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-        <Button variant="destructive" size="sm" onclick={handleDelete}>
-          <Trash2 class="mr-2 h-4 w-4" />
-          Delete
-        </Button>
-        <Button variant="outline" size="sm" onclick={() => goto('/cloud/secrets')}>
-          <ArrowLeft class="mr-2 h-4 w-4" />
-          Back to Secrets
-        </Button>
-      </div>
-    </div>
+    <ResourceDetailHeader
+      kind="Secret"
+      name={secret.name}
+      namespace={secret.namespace}
+      backHref="/cloud/secrets"
+      backLabel="Back to Secrets"
+      onRefresh={loadSecret}
+    >
+      <Button variant="destructive" size="sm" onclick={handleDelete}>
+        <Trash2 class="mr-2 h-4 w-4" />
+        Delete
+      </Button>
+    </ResourceDetailHeader>
 
     <!-- Warning -->
     <div
@@ -252,18 +191,7 @@
           </Card>
 
           {#if secret.metadata?.labels && Object.keys(secret.metadata.labels).length > 0}
-            <Card>
-              <CardHeader>
-                <CardTitle>Labels</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div class="flex flex-wrap gap-2">
-                  {#each Object.entries(secret.metadata.labels) as [key, value]}
-                    <Badge variant="outline">{key}={value}</Badge>
-                  {/each}
-                </div>
-              </CardContent>
-            </Card>
+            <LabelsCard items={secret.metadata.labels} />
           {/if}
         </div>
       </TabsContent>
@@ -326,27 +254,14 @@
 
       <!-- YAML Tab -->
       <TabsContent value="yaml" class="space-y-4">
-        {#if yamlLoading}
-          <div class="flex h-[600px] items-center justify-center">
-            <Loading text="Loading YAML..." />
-          </div>
-        {:else if yamlError}
-          <div class="flex h-[600px] items-center justify-center text-center text-destructive">
-            <p>{yamlError}</p>
-          </div>
-        {:else if yaml}
-          <YamlEditor
-            value={yaml}
-            onSave={handleSaveYAML}
-            resourceName={secret.name}
-            resourceKind="Secret"
-            namespace={secret.namespace}
+        <div class="h-[600px]">
+          <ResourceYamlTab
+            resource={secret}
+            kind="Secret"
+            active={activeTab === 'yaml'}
+            onApplied={loadSecret}
           />
-        {:else}
-          <div class="flex h-[600px] items-center justify-center text-center text-muted-foreground">
-            <p>No YAML available.</p>
-          </div>
-        {/if}
+        </div>
       </TabsContent>
     </Tabs>
   {/if}

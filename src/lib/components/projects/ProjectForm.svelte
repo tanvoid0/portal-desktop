@@ -4,8 +4,6 @@
 -->
 
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { invokeClient } from '$lib/utils/invokeClient';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
@@ -20,27 +18,10 @@
   } from '$lib/components/ui/tooltip';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import Info from '~icons/fa6-solid/circle-info';
-  import { logger } from '$lib/domains/shared/services/logger';
-  import { isTauriEnvironment } from '$lib/utils/tauri';
   import type { CreateProjectRequest } from '$lib/domains/projects/types';
-  import { ideService, type Framework } from '$lib/domains/ide';
-  import { packageManagerService, type PackageManager } from '$lib/domains/package_managers';
-  import { languageService, type Language } from '$lib/domains/languages';
+  import { ProjectFormState } from '$lib/domains/projects/state/projectForm.svelte';
   import ProjectFormNotice from './ProjectFormNotice.svelte';
   import ProjectEntityPickers from './ProjectEntityPickers.svelte';
-
-  interface ProjectAnalysis {
-    name: string;
-    frameworks: string[]; // Multiple frameworks detected
-    languages: string[]; // Multiple languages detected
-    package_managers: string[]; // Multiple package managers detected
-    build_command: string | null;
-    start_command: string | null;
-    test_command: string | null;
-    output_directory: string | null;
-    dev_port: number | null;
-    prod_port: number | null;
-  }
 
   interface Props {
     projectId?: number;
@@ -52,233 +33,18 @@
 
   let { projectId, initialData = {}, onSubmit, onCancel, isLoading = false }: Props = $props();
 
-  const log = logger.createScoped('ProjectForm');
-
-  // Check if running in Tauri environment (backend-dependent features require this)
-  const isTauri = isTauriEnvironment();
-
-  // Form state
-  let name = $state(initialData.name || '');
-  let description = $state(initialData.description || '');
-  let path = $state(initialData.path || '');
-  let frameworkValueStrings = $state<string[]>(
-    (initialData.framework_ids || []).map((id) => id.toString())
-  );
-  let frameworkIds = $derived(
-    frameworkValueStrings.map((v) => parseInt(v, 10)).filter((id) => !isNaN(id))
-  );
-  let packageManagerValueStrings = $state<string[]>(
-    (initialData.package_manager_ids || []).map((id) => id.toString())
-  );
-  let packageManagerIds = $derived(
-    packageManagerValueStrings.map((v) => parseInt(v, 10)).filter((id) => !isNaN(id))
-  );
-  let languageValueStrings = $state<string[]>(
-    (initialData.language_ids || []).map((id) => id.toString())
-  );
-  let languageIds = $derived(
-    languageValueStrings.map((v) => parseInt(v, 10)).filter((id) => !isNaN(id))
-  );
-
-  // Entity lists
-  let frameworks = $state<Framework[]>([]);
-  let packageManagers = $state<PackageManager[]>([]);
-  let languages = $state<Language[]>([]);
-  let isLoadingEntities = $state(false);
-
-  let error = $state('');
-  let success = $state('');
-  let isAnalyzing = $state(false);
-
-  let detectedCommands = $state({
-    build_command: initialData.build_command as string | undefined,
-    start_command: initialData.start_command as string | undefined,
-    test_command: initialData.test_command as string | undefined,
-    output_directory: initialData.output_directory as string | undefined,
-    dev_port: initialData.dev_port as number | undefined,
-    prod_port: initialData.prod_port as number | undefined,
-  });
-
-  // Set up breadcrumbs on mount
-  onMount(async () => {
-    if (projectId) {
-      // This is an update form
-      log.info('Initializing project update form', { projectId });
-    } else {
-      // This is a create form
-      log.info('Initializing project create form');
-    }
-    await loadEntities();
-  });
-
-  async function loadEntities() {
-    isLoadingEntities = true;
-    try {
-      await Promise.all([loadFrameworks(), loadPackageManagers(), loadLanguages()]);
-    } catch (error) {
-      log.warn('Failed to load entities', { error });
-    } finally {
-      isLoadingEntities = false;
-    }
-  }
-
-  async function loadFrameworks() {
-    try {
-      frameworks = await ideService.getAllFrameworks();
-    } catch (error) {
-      log.warn('Failed to load frameworks', { error });
-    }
-  }
-
-  async function loadPackageManagers() {
-    try {
-      packageManagers = await packageManagerService.getAllPackageManagers();
-    } catch (error) {
-      log.warn('Failed to load package managers', { error });
-    }
-  }
-
-  async function loadLanguages() {
-    try {
-      languages = await languageService.getAllLanguages();
-    } catch (error) {
-      log.warn('Failed to load languages', { error });
-    }
-  }
-
-  async function handlePathChange(newPath: string) {
-    path = newPath;
-
-    if (newPath.trim()) {
-      await analyzeProject(newPath);
-    }
-  }
-
-  /** Ids of the entities whose name matches a detected name, as MultiSelect value strings. */
-  function matchIds(names: string[], list: { id: number; name: string }[]): string[] {
-    const ids = new Set<number>();
-    for (const n of names) {
-      const found = list.find((e) => e.name.toLowerCase() === n.toLowerCase());
-      if (found) ids.add(found.id);
-    }
-    return [...ids].map((id) => id.toString());
-  }
-
-  async function analyzeProject(projectPath: string, forceSync = false) {
-    try {
-      isAnalyzing = true;
-      error = '';
-
-      log.info('Analyzing project directory', { path: projectPath, forceSync });
-
-      const analysis: ProjectAnalysis = await invokeClient.post<ProjectAnalysis>(
-        'analyze_project_directory',
-        {
-          path: projectPath,
-        }
-      );
-
-      log.info('Project analysis completed', analysis);
-
-      // Auto-populate form fields
-      if (forceSync || !name.trim()) {
-        name = analysis.name;
-      }
-
-      // Always update these fields when syncing; otherwise only fill the empty ones
-      if (forceSync || frameworkValueStrings.length === 0) {
-        if (forceSync || analysis.frameworks.length > 0)
-          frameworkValueStrings = matchIds(analysis.frameworks, frameworks);
-      }
-      if (forceSync || packageManagerValueStrings.length === 0) {
-        if (forceSync || analysis.package_managers.length > 0)
-          packageManagerValueStrings = matchIds(analysis.package_managers, packageManagers);
-      }
-      if (forceSync || languageValueStrings.length === 0) {
-        if (forceSync || analysis.languages.length > 0)
-          languageValueStrings = matchIds(analysis.languages, languages);
-      }
-
-      detectedCommands = {
-        build_command: analysis.build_command ?? undefined,
-        start_command: analysis.start_command ?? undefined,
-        test_command: analysis.test_command ?? undefined,
-        output_directory: analysis.output_directory ?? undefined,
-        dev_port: analysis.dev_port ?? undefined,
-        prod_port: analysis.prod_port ?? undefined,
-      };
-
-      success = forceSync
-        ? 'Project properties synced successfully!'
-        : 'Project properties auto-detected successfully!';
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        success = '';
-      }, 3000);
-    } catch (err) {
-      log.error('Failed to analyze project', err);
-      error = 'Failed to analyze project directory. Please check the path and try again.';
-    } finally {
-      isAnalyzing = false;
-    }
-  }
-
-  async function handleSync() {
-    if (path.trim()) {
-      await analyzeProject(path, true);
-    } else {
-      error = 'Please select a project path first.';
-    }
-  }
-
-  async function handleSubmit(event: SubmitEvent) {
-    event.preventDefault();
-
-    if (!name.trim() || !path.trim()) {
-      error = 'Please fill in all required fields.';
-      return;
-    }
-
-    try {
-      error = '';
-      success = '';
-
-      const projectData: CreateProjectRequest = {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        path: path.trim(),
-        framework_ids: frameworkIds,
-        package_manager_ids: packageManagerIds,
-        language_ids: languageIds,
-        build_command: detectedCommands.build_command,
-        start_command: detectedCommands.start_command,
-        test_command: detectedCommands.test_command,
-        output_directory: detectedCommands.output_directory,
-        dev_port: detectedCommands.dev_port,
-        prod_port: detectedCommands.prod_port,
-      };
-
-      await onSubmit(projectData);
-    } catch (err) {
-      log.error('Failed to submit project form', err);
-      error =
-        err instanceof Error && err.message
-          ? err.message
-          : 'Failed to save project. Please try again.';
-    }
-  }
+  const f = new ProjectFormState(() => ({ projectId, initialData, onSubmit }));
 </script>
 
 <div class="space-y-6">
-  {#if success}
-    <ProjectFormNotice kind="success" message={success} />
+  {#if f.success}
+    <ProjectFormNotice kind="success" message={f.success} />
   {/if}
-  {#if error}
-    <ProjectFormNotice kind="error" message={error} />
+  {#if f.error}
+    <ProjectFormNotice kind="error" message={f.error} />
   {/if}
 
-  <form onsubmit={handleSubmit} class="space-y-8">
+  <form onsubmit={f.handleSubmit} class="space-y-8">
     <!-- Basic Information -->
     <Card>
       <CardHeader>
@@ -295,16 +61,16 @@
                     type="button"
                     variant="outline"
                     size="sm"
-                    onclick={handleSync}
-                    disabled={isLoading || isAnalyzing || !path.trim() || !isTauri}
+                    onclick={f.handleSync}
+                    disabled={isLoading || f.isAnalyzing || !f.path.trim() || !f.isTauri}
                     class="flex items-center gap-2"
                   >
-                    <RefreshCw class="h-4 w-4 {isAnalyzing ? 'animate-spin' : ''}" />
+                    <RefreshCw class="h-4 w-4 {f.isAnalyzing ? 'animate-spin' : ''}" />
                     <span class="hidden sm:inline">Sync</span>
                   </Button>
                 {/snippet}
               </TooltipTrigger>
-              {#if !isTauri}
+              {#if !f.isTauri}
                 <TooltipContent>
                   <p class="max-w-xs">
                     This feature requires the desktop app. Project analysis and auto-detection need
@@ -325,17 +91,17 @@
         <!-- Project Path - First and most important -->
         <div class="space-y-2">
           <FolderPicker
-            bind:value={path}
+            bind:value={f.path}
             label="Project Path"
-            description={isTauri
+            description={f.isTauri
               ? 'Select the directory where your project will be located'
               : 'Enter the project path manually. File browser is only available in the desktop app.'}
             placeholder="/path/to/your/project"
-            disabled={isLoading || isAnalyzing}
+            disabled={isLoading || f.isAnalyzing}
             required
-            onChange={handlePathChange}
+            onChange={f.handlePathChange}
           />
-          {#if !isTauri}
+          {#if !f.isTauri}
             <div
               class="flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-950"
             >
@@ -356,9 +122,9 @@
           <Label for="name">Project Name *</Label>
           <Input
             id="name"
-            bind:value={name}
+            bind:value={f.name}
             placeholder="My Awesome Project"
-            disabled={isLoading || isAnalyzing}
+            disabled={isLoading || f.isAnalyzing}
             required
           />
         </div>
@@ -367,9 +133,9 @@
           <Label for="description">Description</Label>
           <Textarea
             id="description"
-            bind:value={description}
+            bind:value={f.description}
             placeholder="Brief description of your project..."
-            disabled={isLoading || isAnalyzing}
+            disabled={isLoading || f.isAnalyzing}
             rows={3}
           />
         </div>
@@ -383,13 +149,13 @@
       </CardHeader>
       <CardContent class="space-y-6">
         <ProjectEntityPickers
-          {frameworks}
-          {packageManagers}
-          {languages}
-          bind:frameworkValues={frameworkValueStrings}
-          bind:packageManagerValues={packageManagerValueStrings}
-          bind:languageValues={languageValueStrings}
-          disabled={isLoading || isAnalyzing || isLoadingEntities}
+          frameworks={f.frameworks}
+          packageManagers={f.packageManagers}
+          languages={f.languages}
+          bind:frameworkValues={f.frameworkValueStrings}
+          bind:packageManagerValues={f.packageManagerValueStrings}
+          bind:languageValues={f.languageValueStrings}
+          disabled={isLoading || f.isAnalyzing || f.isLoadingEntities}
         />
       </CardContent>
     </Card>
@@ -400,12 +166,12 @@
         type="button"
         variant="outline"
         onclick={onCancel}
-        disabled={isLoading || isAnalyzing}
+        disabled={isLoading || f.isAnalyzing}
       >
         Cancel
       </Button>
-      <Button type="submit" disabled={isLoading || isAnalyzing}>
-        {#if isAnalyzing}
+      <Button type="submit" disabled={isLoading || f.isAnalyzing}>
+        {#if f.isAnalyzing}
           Analyzing...
         {:else if isLoading}
           {#if projectId}

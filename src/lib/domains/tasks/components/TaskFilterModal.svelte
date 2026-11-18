@@ -4,6 +4,7 @@
   import * as Dialog from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
   import { Badge } from '$lib/components/ui/badge';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import Select from '$lib/components/ui/select.svelte';
@@ -155,7 +156,7 @@
         <p class="mb-3 block text-sm font-medium text-foreground">Status</p>
         <div class="grid grid-cols-2 gap-2">
           {#each statusOptions as option}
-            <label
+            <Label
               class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
             >
               <Checkbox
@@ -164,7 +165,7 @@
               />
               <Icon icon={option.icon} class="h-4 w-4 text-muted-foreground" />
               <span class="text-sm">{option.label}</span>
-            </label>
+            </Label>
           {/each}
         </div>
       </div>
@@ -174,7 +175,7 @@
         <p class="mb-3 block text-sm font-medium text-foreground">Priority</p>
         <div class="grid grid-cols-3 gap-2">
           {#each priorityOptions as option}
-            <label
+            <Label
               class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
             >
               <Checkbox
@@ -183,7 +184,7 @@
               />
               <Icon icon={option.icon} class="h-4 w-4 {option.color}" />
               <span class="text-sm">{option.label}</span>
-            </label>
+            </Label>
           {/each}
         </div>
       </div>
@@ -193,7 +194,7 @@
         <p class="mb-3 block text-sm font-medium text-foreground">Types</p>
         <div class="grid grid-cols-2 gap-2">
           {#each typeOptions as typeOption}
-            <label
+            <Label
               class="flex cursor-pointer items-center space-x-2 rounded-md p-2 hover:bg-muted/50"
             >
               <Checkbox
@@ -201,7 +202,7 @@
                 onCheckedChange={() => toggleTypeFilter(typeOption.value)}
               />
               <span class="text-sm">{typeOption.label}</span>
-            </label>
+            </Label>
           {/each}
         </div>
       </div>

@@ -1,89 +1,24 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { replaceState } from '$app/navigation';
-  import { page } from '$app/state';
   import AIChatPanel from '$lib/domains/ai/components/chat/AIChatPanel.svelte';
   import ConversationList from '$lib/domains/ai/components/conversations/ConversationList.svelte';
   import ProviderModelSelector from '$lib/domains/ai/components/ProviderModelSelector.svelte';
-  import { toastActions } from '$lib/utils/toast';
-  import { confirmAction } from '$lib/utils/confirm';
-  import { aiConversationService, aiChatService, aiProviderService } from '$lib/domains/ai';
-  import type {
-    Conversation,
-    CatalogStatus,
-    ChatMessage,
-    ContextUsage,
-    LlmUsage,
-    ProviderType,
-  } from '$lib/domains/ai/types/index.js';
-  import { isAuthError } from '$lib/domains/ai/utils/catalog.js';
-  import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
-  import {
-    fromConversationMessages,
-    toWireMessages,
-  } from '$lib/domains/ai/utils/conversationWire.js';
   import PlatformOfflineBanner from '$lib/domains/ai/components/PlatformOfflineBanner.svelte';
   import PlatformStatusBanner from '$lib/domains/ai/components/PlatformStatusBanner.svelte';
   import AIContextBar from '$lib/domains/ai/components/AIContextBar.svelte';
-  import {
-    fallbackTitleFromMessage,
-    isPlaceholderTitle,
-    reconcileThreadTitle,
-  } from '$lib/domains/chat/title.js';
+  import { aiPlatform } from '$lib/domains/ai/state/aiPlatform.svelte.js';
+  import { AIChatPage } from '$lib/domains/ai/state/aiChatPage.svelte.js';
   import PanelLeftOpen from '~icons/fa6-solid/table-columns';
   import Settings2 from '~icons/fa6-solid/sliders';
   import ResponsivePanel from '$lib/components/shell/responsive-panel.svelte';
   import { Button } from '$lib/components/ui/button';
   import ChatSettingsPanel from '$lib/domains/ai/components/chat/ChatSettingsPanel.svelte';
   import { aiTopbar } from '$lib/domains/ai/state/aiTopbarStore.svelte.js';
-  import {
-    loadChatSettings,
-    samplingExtras,
-    type ChatSettings,
-  } from '$lib/domains/ai/utils/chatSettings.js';
 
-  let messages = $state<ChatMessage[]>([]);
-  let isLoading = $state(false);
-  let conversations = $state<Conversation[]>([]);
-  let selectedConversation = $state<Conversation | null>(null);
-  let selectedProvider = $state<ProviderType | null>(null);
-  let selectedBackendProvider = $state<string | null>(null);
-  let selectedModel = $state<string | null>(null);
-  let isSending = $state(false);
-  let conversationId = $state<string | undefined>(undefined);
-  /** Id of the in-flight stream, so the stop button can cancel it. */
-  let activeStreamId = $state<string | null>(null);
-  /** Conversation ids with user-edited titles — ignore smart title events. */
-  let userRenamedConversationIds = $state<Set<string>>(new Set());
-  let conversationsPanelOpen = $state(false);
-  let settingsPanelOpen = $state(false);
-  let chatSettings = $state<ChatSettings>(loadChatSettings());
-  let contextUsage = $state<ContextUsage | null>(null);
-  let llmUsage = $state<LlmUsage | null>(null);
   let providerSelector = $state<ProviderModelSelector | null>(null);
-  // Assume reachable until the first catalog load says otherwise.
-  let platformOnline = $state(true);
-  let platformChecking = $state(true);
-  let platformError = $state<string | null>(null);
-  // The health probe is authoritative when it has a verdict; the catalog
-  // round trip still catches failures the probe cannot see.
-  const platformOffline = $derived(!platformOnline || aiPlatform.blocked);
-  const platformUnauthorized = $derived(
-    aiPlatform.blocked
-      ? aiPlatform.status === 'unauthenticated'
-      : platformOffline && isAuthError(platformError)
-  );
+  const chat = new AIChatPage(() => providerSelector);
 
-  /**
-   * Keep the last completed verdict while a re-check is in flight, so the
-   * offline banner stays mounted and can show its own progress.
-   */
-  function applyPlatformStatus(status: CatalogStatus) {
-    platformChecking = status.checking;
-    if (status.checking) return;
-    platformOnline = status.online;
-    platformError = status.error;
-  }
+  onMount(chat.init);
 
   // Same deal as the coder page: park the controls in the AI layout's tab row.
   $effect(() => {
@@ -92,410 +27,44 @@
       aiTopbar.actions = null;
     };
   });
-
-  /** Mirror the open conversation in the URL (?id=) without navigating. */
-  function setUrlConversationId(id: string | null) {
-    const url = new URL(page.url.href);
-    if (id) url.searchParams.set('id', id);
-    else url.searchParams.delete('id');
-    replaceState(url, {});
-  }
-
-  function patchConversationTitle(id: string, title: string) {
-    if (userRenamedConversationIds.has(id)) return;
-
-    const idx = conversations.findIndex((c) => c.id === id);
-    const current = idx >= 0 ? conversations[idx].title : selectedConversation?.title;
-    const next = reconcileThreadTitle(current, title);
-
-    if (idx >= 0) {
-      conversations[idx] = { ...conversations[idx], title: next };
-      conversations = [...conversations];
-    }
-    if (selectedConversation?.id === id) {
-      selectedConversation = { ...selectedConversation, title: next };
-    }
-  }
-
-  onMount(async () => {
-    void aiPlatform.refresh();
-    const defaultProvider = await aiProviderService.getDefaultProvider();
-    selectedProvider = defaultProvider || 'AgentPlatform';
-
-    // Load conversations first
-    await loadConversations();
-
-    // Check for conversation ID in URL query params after conversations are loaded
-    const urlConversationId = page.url.searchParams.get('id');
-    if (urlConversationId) {
-      const conversation = conversations.find((c) => c.id === urlConversationId);
-      if (conversation) {
-        await handleConversationClick(conversation);
-      } else {
-        // Try loading the conversation directly if not in list
-        try {
-          const result = await aiConversationService.loadConversation(urlConversationId);
-          applyConversationSelection(result.conversation);
-          messages = fromConversationMessages(result.messages);
-          conversationId = urlConversationId;
-          await loadConversations(); // Reload to include it in the list
-        } catch (error) {
-          toastActions.error('Failed to load conversation from URL', error);
-        }
-      }
-    }
-  });
-
-  async function loadConversations() {
-    try {
-      conversations = await aiConversationService.listConversations();
-    } catch (error) {
-      toastActions.error('Failed to load conversations', error);
-    }
-  }
-
-  function applyConversationSelection(conversation: Conversation) {
-    // Usage is reported per turn — it does not carry across threads.
-    contextUsage = null;
-    llmUsage = null;
-    selectedConversation = conversation;
-    selectedProvider = conversation.provider;
-    selectedModel = conversation.model ?? null;
-  }
-
-  async function handleConversationClick(conversation: Conversation) {
-    if (selectedConversation?.id === conversation.id) return;
-
-    isLoading = true;
-    try {
-      const result = await aiConversationService.loadConversation(conversation.id);
-      applyConversationSelection(result.conversation);
-      messages = fromConversationMessages(result.messages);
-      conversationId = conversation.id;
-
-      // Update URL without navigation
-      setUrlConversationId(conversation.id);
-    } catch (error) {
-      toastActions.error('Failed to load conversation', error);
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  async function handleDeleteConversation(conversation: Conversation) {
-    const confirmed = await confirmAction(
-      `Delete conversation "${conversation.title}"?`,
-      'Delete conversation'
-    );
-    if (!confirmed) return;
-
-    try {
-      await aiConversationService.deleteConversation(conversation.id);
-      toastActions.success('Conversation deleted');
-
-      // If deleted conversation was selected, clear selection
-      if (selectedConversation?.id === conversation.id) {
-        handleNewConversation();
-      }
-
-      await loadConversations();
-    } catch (error) {
-      toastActions.error('Failed to delete conversation', error);
-    }
-  }
-
-  async function handleDeleteAllConversations() {
-    const confirmed = await confirmAction(
-      `Delete all ${conversations.length} conversations? This cannot be undone.`,
-      'Delete all conversations'
-    );
-    if (!confirmed) return;
-
-    try {
-      // Delete all conversations one by one
-      const deletePromises = conversations.map((conv) =>
-        aiConversationService.deleteConversation(conv.id)
-      );
-      await Promise.all(deletePromises);
-
-      toastActions.success(`Deleted ${conversations.length} conversations`);
-
-      // Clear selection
-      handleNewConversation();
-      await loadConversations();
-    } catch (error) {
-      toastActions.error('Failed to delete all conversations', error);
-    }
-  }
-
-  function handleNewConversation() {
-    selectedConversation = null;
-    messages = [];
-    conversationId = undefined;
-    contextUsage = null;
-    llmUsage = null;
-
-    // Clear URL parameter
-    setUrlConversationId(null);
-  }
-
-  async function handleModelChange(model: string) {
-    if (!selectedConversation) return;
-    try {
-      await aiConversationService.updateConversationModel(selectedConversation.id, model);
-      selectedConversation = { ...selectedConversation, model };
-    } catch (error) {
-      toastActions.error('Failed to update model', error);
-    }
-  }
-
-  async function handleSendMessage(message: string, history: ChatMessage[]) {
-    if (!message.trim() || isSending || platformOffline) return;
-
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content: message.trim(),
-      timestamp: new Date(),
-    };
-
-    messages = [...messages, userMessage];
-    isSending = true;
-
-    // Create assistant message placeholder for streaming
-    const assistantMessageIndex = messages.length;
-    messages = [
-      ...messages,
-      {
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-      },
-    ];
-
-    try {
-      if (selectedConversation && selectedModel && selectedModel !== selectedConversation.model) {
-        await aiConversationService.updateConversationModel(selectedConversation.id, selectedModel);
-        selectedConversation = { ...selectedConversation, model: selectedModel };
-      }
-
-      // First message on new thread: create with placeholder, optimistic fallback in sidebar
-      if (!selectedConversation && selectedProvider) {
-        const conversation = await aiConversationService.createConversation(
-          'New chat',
-          selectedProvider,
-          selectedModel
-        );
-        selectedConversation = conversation;
-        conversationId = conversation.id;
-        conversations = [conversation, ...conversations];
-
-        const fb = fallbackTitleFromMessage(message.trim(), 'New chat');
-        patchConversationTitle(conversation.id, fb);
-      } else if (
-        selectedConversation &&
-        isPlaceholderTitle(selectedConversation.title) &&
-        history.filter((m) => m.role === 'user').length === 0
-      ) {
-        const fb = fallbackTitleFromMessage(message.trim(), 'New chat');
-        patchConversationTitle(selectedConversation.id, fb);
-      }
-
-      const streamFallback = fallbackTitleFromMessage(message.trim(), 'New chat');
-
-      // Timings for the LM Studio-style stat chips under the reply.
-      const startedAt = performance.now();
-      let thinkingMs: number | null = null;
-
-      // Use streaming API
-      const fullResponse = await aiChatService.streamMessage(message, history, {
-        provider: selectedConversation?.provider || selectedProvider || undefined,
-        llm_provider: selectedBackendProvider || undefined,
-        conversation_id: conversationId,
-        model: selectedModel || undefined,
-        system_prompt: chatSettings.systemPrompt || undefined,
-        temperature: chatSettings.temperature,
-        max_tokens: chatSettings.limitResponseLength ? chatSettings.maxTokens : undefined,
-        extra_options: samplingExtras(chatSettings),
-        onStreamId: (id) => (activeStreamId = id),
-        onTitleUpdated: ({ conversation_id, title }) => {
-          patchConversationTitle(conversation_id, title);
-        },
-        onChunk: (chunk: string) => {
-          messages[assistantMessageIndex].content += chunk;
-          if (thinkingMs === null && messages[assistantMessageIndex].content.includes('</think>')) {
-            thinkingMs = performance.now() - startedAt;
-          }
-          messages = [...messages];
-        },
-        onComplete: (fullMessage: string, payload) => {
-          const durationMs = performance.now() - startedAt;
-          const completionTokens = payload?.llm_usage?.completion_tokens ?? null;
-          messages[assistantMessageIndex].content = fullMessage;
-          messages[assistantMessageIndex].stats = {
-            completionTokens,
-            durationMs,
-            thinkingMs,
-            tokensPerSecond:
-              completionTokens && durationMs > 0 ? completionTokens / (durationMs / 1000) : null,
-            stopReason: payload?.cancelled ? 'Stopped by user' : (payload?.finish_reason ?? null),
-          };
-          messages = [...messages];
-          if (payload?.context_usage) contextUsage = payload.context_usage;
-          if (payload?.llm_usage) llmUsage = payload.llm_usage;
-          if (payload?.title && conversationId) {
-            patchConversationTitle(
-              conversationId,
-              reconcileThreadTitle(selectedConversation?.title, payload.title, streamFallback)
-            );
-          }
-        },
-      });
-
-      // Ensure final message is set
-      messages[assistantMessageIndex].content = fullResponse;
-      messages = [...messages];
-
-      // Stopped before the first token — drop the empty assistant bubble.
-      if (!fullResponse) {
-        messages = messages.slice(0, assistantMessageIndex);
-      }
-
-      // Save conversation if we have one
-      if (selectedConversation) {
-        await persistMessages();
-        await loadConversations();
-
-        // Update URL if not already set
-        if (!conversationId) {
-          setUrlConversationId(selectedConversation.id);
-        }
-      }
-    } catch (error) {
-      toastActions.error('Failed to send message', error);
-      // Remove both user and assistant messages on error
-      messages = messages.slice(0, -2);
-      // The send may have failed because the platform went away — re-check so
-      // the banner appears instead of letting the next send fail the same way.
-      void retryPlatform();
-    } finally {
-      isSending = false;
-      activeStreamId = null;
-    }
-  }
-
-  /** Persist the current message array over the stored conversation. */
-  async function persistMessages() {
-    if (!selectedConversation) return;
-    const id = selectedConversation.id;
-    await aiConversationService.saveConversation(id, toWireMessages(id, messages));
-  }
-
-  /**
-   * Fork the thread: everything up to and including `index` becomes a new
-   * conversation, which then takes over the view. The original is untouched.
-   */
-  async function handleBranch(index: number) {
-    if (isSending) return;
-    const provider = selectedConversation?.provider ?? selectedProvider;
-    if (!provider) return;
-
-    const branched = messages.slice(0, index + 1);
-    try {
-      const conversation = await aiConversationService.createConversation(
-        selectedConversation?.title ?? 'New chat',
-        provider,
-        selectedConversation?.model ?? selectedModel
-      );
-      await aiConversationService.saveConversation(
-        conversation.id,
-        toWireMessages(conversation.id, branched)
-      );
-
-      applyConversationSelection(conversation);
-      messages = branched;
-      conversationId = conversation.id;
-      await loadConversations();
-
-      setUrlConversationId(conversation.id);
-      toastActions.success('Branched into a new conversation');
-    } catch (error) {
-      toastActions.error('Failed to branch conversation', error);
-    }
-  }
-
-  async function handleTruncate(index: number) {
-    if (isSending) return;
-    messages = messages.slice(0, index);
-    try {
-      await persistMessages();
-      await loadConversations();
-    } catch (error) {
-      toastActions.error('Failed to update conversation', error);
-    }
-  }
-
-  async function handleRegenerate() {
-    if (isSending) return;
-    const lastUserIndex = messages.map((m) => m.role).lastIndexOf('user');
-    if (lastUserIndex < 0) return;
-
-    const prompt = messages[lastUserIndex].content;
-    const history = messages.slice(0, lastUserIndex);
-    messages = history;
-    await handleSendMessage(prompt, history);
-  }
-
-  /** Re-fetch the catalog; that round trip is the reachability check. */
-  async function retryPlatform() {
-    await Promise.all([aiPlatform.refresh(), providerSelector?.reload()]);
-  }
-
-  async function handleStop() {
-    if (!activeStreamId) return;
-    try {
-      await aiChatService.cancelStream(activeStreamId);
-    } catch (error) {
-      toastActions.error('Failed to stop generation', error);
-    }
-  }
 </script>
 
 {#snippet topbarActions()}
-  <AIContextBar {contextUsage} {llmUsage} variant="ring" />
+  <AIContextBar contextUsage={chat.contextUsage} llmUsage={chat.llmUsage} variant="ring" />
   <ProviderModelSelector
     bind:this={providerSelector}
-    bind:selectedProvider
-    bind:selectedBackendProvider
-    bind:selectedModel
-    onModelChange={handleModelChange}
-    onStatusChange={applyPlatformStatus}
+    bind:selectedProvider={chat.selectedProvider}
+    bind:selectedBackendProvider={chat.selectedBackendProvider}
+    bind:selectedModel={chat.selectedModel}
+    onModelChange={chat.handleModelChange}
+    onStatusChange={chat.applyPlatformStatus}
     showInlineError={false}
     backendSelectClass="w-[130px]"
     modelSelectClass="w-[220px]"
   />
   <Button
     size="icon"
-    variant={settingsPanelOpen ? 'secondary' : 'ghost'}
+    variant={chat.settingsPanelOpen ? 'secondary' : 'ghost'}
     class="h-8 w-8 shrink-0"
     title="Chat settings"
-    onclick={() => (settingsPanelOpen = !settingsPanelOpen)}
+    onclick={() => (chat.settingsPanelOpen = !chat.settingsPanelOpen)}
   >
     <Settings2 class="h-4 w-4" />
   </Button>
 {/snippet}
 
 <div class="flex h-full w-full overflow-hidden">
-  <ResponsivePanel bind:open={conversationsPanelOpen} side="left" desktopClass="w-64">
+  <ResponsivePanel bind:open={chat.conversationsPanelOpen} side="left" desktopClass="w-64">
     <ConversationList
-      bind:conversations
+      bind:conversations={chat.conversations}
       onConversationClick={(c) => {
-        handleConversationClick(c);
-        conversationsPanelOpen = false;
+        chat.handleConversationClick(c);
+        chat.conversationsPanelOpen = false;
       }}
-      onCreateNew={handleNewConversation}
-      onDeleteConversation={handleDeleteConversation}
-      onDeleteAll={handleDeleteAllConversations}
-      selectedConversationId={selectedConversation?.id}
+      onCreateNew={chat.handleNewConversation}
+      onDeleteConversation={chat.handleDeleteConversation}
+      onDeleteAll={chat.handleDeleteAllConversations}
+      selectedConversationId={chat.selectedConversation?.id}
     />
   </ResponsivePanel>
 
@@ -510,52 +79,52 @@
           variant="ghost"
           class="h-8 w-8 shrink-0 md:hidden"
           title="Conversations"
-          onclick={() => (conversationsPanelOpen = true)}
+          onclick={() => (chat.conversationsPanelOpen = true)}
         >
           <PanelLeftOpen class="h-4 w-4" />
         </Button>
         <h2 class="truncate text-sm font-semibold">
-          {selectedConversation?.title || 'AI Chat'}
+          {chat.selectedConversation?.title || 'AI Chat'}
         </h2>
       </div>
     </div>
     {#if aiPlatform.blocked}
       <PlatformStatusBanner blocks="Sending, regenerate and edit-and-resend" />
-    {:else if platformOffline}
+    {:else if chat.platformOffline}
       <PlatformOfflineBanner
-        unauthorized={platformUnauthorized}
-        checking={platformChecking}
-        error={platformError}
-        onRetry={retryPlatform}
+        unauthorized={chat.platformUnauthorized}
+        checking={chat.platformChecking}
+        error={chat.platformError}
+        onRetry={chat.retryPlatform}
       />
     {/if}
     <div class="flex min-h-0 w-full flex-1 flex-col">
       <AIChatPanel
-        bind:messages
-        isLoading={isSending || isLoading}
-        title={selectedConversation?.title || 'AI Chat'}
+        bind:messages={chat.messages}
+        isLoading={chat.isSending || chat.isLoading}
+        title={chat.selectedConversation?.title || 'AI Chat'}
         placeholder="Ask me anything..."
-        modelLabel={selectedModel}
-        {conversationId}
+        modelLabel={chat.selectedModel}
+        conversationId={chat.conversationId}
         showSelectors={false}
-        {contextUsage}
-        settingsOpen={settingsPanelOpen}
-        onOpenSettings={() => (settingsPanelOpen = !settingsPanelOpen)}
-        onSendMessageWithHistory={handleSendMessage}
-        onStop={handleStop}
-        onRegenerate={handleRegenerate}
-        onTruncate={handleTruncate}
-        onBranch={handleBranch}
-        sendDisabled={platformOffline}
-        sendDisabledHint={platformUnauthorized
+        contextUsage={chat.contextUsage}
+        settingsOpen={chat.settingsPanelOpen}
+        onOpenSettings={() => (chat.settingsPanelOpen = !chat.settingsPanelOpen)}
+        onSendMessageWithHistory={chat.handleSendMessage}
+        onStop={chat.handleStop}
+        onRegenerate={chat.handleRegenerate}
+        onTruncate={chat.handleTruncate}
+        onBranch={chat.handleBranch}
+        sendDisabled={chat.platformOffline}
+        sendDisabledHint={chat.platformUnauthorized
           ? 'Sending is disabled: the agent-platform token was rejected. Fix it in Settings > AI.'
           : 'Agent Platform is offline — retry to reconnect.'}
       />
     </div>
   </div>
 
-  {#if settingsPanelOpen}
-    <ResponsivePanel bind:open={settingsPanelOpen} side="right" desktopClass="w-72">
+  {#if chat.settingsPanelOpen}
+    <ResponsivePanel bind:open={chat.settingsPanelOpen} side="right" desktopClass="w-72">
       {#snippet header()}
         <div class="divider-edge-b divider-edge-full p-2.5">
           <h2 class="flex items-center gap-1.5 text-sm font-semibold">
@@ -564,7 +133,7 @@
           </h2>
         </div>
       {/snippet}
-      <ChatSettingsPanel bind:settings={chatSettings} />
+      <ChatSettingsPanel bind:settings={chat.chatSettings} />
     </ResponsivePanel>
   {/if}
 </div>

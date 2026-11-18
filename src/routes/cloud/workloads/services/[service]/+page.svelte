@@ -2,21 +2,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { goto, replaceState } from '$app/navigation';
+  import { replaceState } from '$app/navigation';
   import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
   import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
-  import RefreshCw from '~icons/fa6-solid/rotate';
-  import FileCode from '~icons/fa6-solid/file-code';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
   import Loading from '$lib/components/ui/loading.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';
-  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
-  import { toastActions } from '$lib/utils/toast';
+  import InfoCard from '$lib/domains/cloud/components/InfoCard.svelte';
+  import ResourceYamlTab from '$lib/domains/cloud/components/ResourceYamlTab.svelte';
+  import ResourceDetailHeader from '$lib/domains/cloud/components/ResourceDetailHeader.svelte';
 
   const serviceName = $derived(page.params.service);
   const namespace = $derived(
@@ -34,22 +31,8 @@
   let isLoading = $state(true);
   let error = $state<string | null>(null);
 
-  // YAML state
-  let yaml = $state('');
-  let yamlLoading = $state(false);
-  let yamlError = $state<string | null>(null);
-
   onMount(async () => {
     await loadService();
-    if (activeTab === 'yaml') {
-      await loadYAML();
-    }
-  });
-
-  $effect(() => {
-    if (activeTab === 'yaml' && !yaml && !yamlLoading) {
-      loadYAML();
-    }
   });
 
   async function loadService() {
@@ -75,46 +58,6 @@
       console.error('Failed to load service:', err);
     } finally {
       isLoading = false;
-    }
-  }
-
-  async function loadYAML() {
-    if (!service) return;
-
-    try {
-      yamlLoading = true;
-      yamlError = null;
-
-      const yamlContent = await k8sResourceService.getResourceYaml(
-        'Service',
-        service.namespace,
-        service.name
-      );
-
-      yaml = yamlContent;
-    } catch (err) {
-      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
-      console.error('Failed to load YAML:', err);
-    } finally {
-      yamlLoading = false;
-    }
-  }
-
-  async function handleSaveYAML(yamlContent: string) {
-    if (!service) return;
-
-    try {
-      const result = await k8sResourceService.applyResourceYaml(service.namespace, yamlContent);
-
-      toastActions.success(result);
-
-      // Reload service to get updated data
-      await loadService();
-      await loadYAML();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
-      toastActions.error(errorMsg);
-      throw err;
     }
   }
 
@@ -148,22 +91,14 @@
   {:else if error}
     <PageError title="Failed to load service" message={error} onRetry={loadService} />
   {:else if service}
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold">Service: {service.name}</h1>
-        <p class="text-muted-foreground">Namespace: {service.namespace}</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" onclick={loadService}>
-          <RefreshCw class="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-        <Button variant="outline" size="sm" onclick={() => goto('/cloud/services')}>
-          <ArrowLeft class="mr-2 h-4 w-4" />
-          Back to Services
-        </Button>
-      </div>
-    </div>
+    <ResourceDetailHeader
+      kind="Service"
+      name={service.name}
+      namespace={service.namespace}
+      backHref="/cloud/services"
+      backLabel="Back to Services"
+      onRefresh={loadService}
+    />
 
     <!-- Tabs -->
     <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -175,33 +110,15 @@
       <!-- Overview Tab -->
       <TabsContent value="overview" class="space-y-4">
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Service Information</CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              <div>
-                <p class="text-sm text-muted-foreground">Status</p>
-                <Badge class="mt-1" variant="default">{service.status}</Badge>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Cluster IP</p>
-                <p class="font-medium">
-                  {service.metadata?.cluster_ip || 'None'}
-                </p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">External IP</p>
-                <p class="font-medium">
-                  {service.metadata?.external_ip || 'None'}
-                </p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Age</p>
-                <p class="font-medium">{service.metadata?.age || 'N/A'}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <InfoCard
+            title="Service Information"
+            fields={[
+              { label: 'Cluster IP', value: service.metadata?.cluster_ip || 'None' },
+              { label: 'External IP', value: service.metadata?.external_ip || 'None' },
+              { label: 'Age', value: service.metadata?.age || 'N/A' },
+            ]}
+            status={{ text: service.status }}
+          />
 
           <Card>
             <CardHeader>
@@ -253,36 +170,12 @@
 
       <!-- YAML Tab -->
       <TabsContent value="yaml" class="h-[600px]">
-        <Card class="flex h-full flex-col">
-          <CardHeader>
-            <CardTitle>Service YAML</CardTitle>
-          </CardHeader>
-          <CardContent class="flex-1 overflow-hidden">
-            {#if yamlLoading}
-              <div class="flex h-full items-center justify-center">
-                <Loading text="Loading YAML..." />
-              </div>
-            {:else if yamlError}
-              <div class="flex h-full items-center justify-center text-center text-destructive">
-                <p>{yamlError}</p>
-              </div>
-            {:else if yaml}
-              <YamlEditor
-                value={yaml}
-                onSave={handleSaveYAML}
-                resourceName={service.name}
-                resourceKind="Service"
-                namespace={service.namespace}
-              />
-            {:else}
-              <div
-                class="flex h-full items-center justify-center text-center text-muted-foreground"
-              >
-                <p>No YAML available.</p>
-              </div>
-            {/if}
-          </CardContent>
-        </Card>
+        <ResourceYamlTab
+          resource={service}
+          kind="Service"
+          active={activeTab === 'yaml'}
+          onApplied={loadService}
+        />
       </TabsContent>
     </Tabs>
   {/if}

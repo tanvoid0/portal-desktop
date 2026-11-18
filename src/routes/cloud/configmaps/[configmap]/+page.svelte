@@ -8,17 +8,16 @@
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
-  import { Badge } from '$lib/components/ui/badge';
-  import ArrowLeft from '~icons/fa6-solid/arrow-left';
-  import RefreshCw from '~icons/fa6-solid/rotate';
-  import FileCode from '~icons/fa6-solid/file-code';
   import Trash2 from '~icons/fa6-solid/trash';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
   import Loading from '$lib/components/ui/loading.svelte';
   import { PageLoading, PageError } from '$lib/components/shell';
   import { toastActions } from '$lib/utils/toast';
   import { confirmAction } from '$lib/utils/confirm';
-  import YamlEditor from '$lib/domains/cloud/components/YamlEditor.svelte';
+  import InfoCard from '$lib/domains/cloud/components/InfoCard.svelte';
+  import ResourceYamlTab from '$lib/domains/cloud/components/ResourceYamlTab.svelte';
+  import ResourceDetailHeader from '$lib/domains/cloud/components/ResourceDetailHeader.svelte';
+  import LabelsCard from '$lib/domains/cloud/components/LabelsCard.svelte';
 
   const configMapName = $derived(page.params.configmap);
   const namespace = $derived(
@@ -36,22 +35,8 @@
   let isLoading = $state(true);
   let error = $state<string | null>(null);
 
-  // YAML state
-  let yaml = $state('');
-  let yamlLoading = $state(false);
-  let yamlError = $state<string | null>(null);
-
   onMount(async () => {
     await loadConfigMap();
-    if (activeTab === 'yaml') {
-      await loadYAML();
-    }
-  });
-
-  $effect(() => {
-    if (activeTab === 'yaml' && !yaml && !yamlLoading && configMap) {
-      loadYAML();
-    }
   });
 
   async function loadConfigMap() {
@@ -77,48 +62,6 @@
       console.error('Failed to load ConfigMap:', err);
     } finally {
       isLoading = false;
-    }
-  }
-
-  async function loadYAML() {
-    if (!configMap) return;
-
-    try {
-      yamlLoading = true;
-      yamlError = null;
-
-      const yamlContent = await k8sResourceService.getResourceYaml(
-        'ConfigMap',
-        configMap.namespace,
-        configMap.name
-      );
-
-      // Convert JSON to YAML (basic conversion)
-      // For now, we'll use JSON pretty-printed
-      yaml = yamlContent;
-    } catch (err) {
-      yamlError = err instanceof Error ? err.message : 'Failed to load YAML';
-      console.error('Failed to load YAML:', err);
-    } finally {
-      yamlLoading = false;
-    }
-  }
-
-  async function handleSaveYAML(yamlContent: string) {
-    if (!configMap) return;
-
-    try {
-      const result = await k8sResourceService.applyResourceYaml(configMap.namespace, yamlContent);
-
-      toastActions.success(result);
-
-      // Reload ConfigMap to get updated data
-      await loadConfigMap();
-      await loadYAML();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to apply YAML';
-      toastActions.error(errorMsg);
-      throw err;
     }
   }
 
@@ -160,26 +103,19 @@
   {:else if error}
     <PageError title="Failed to load configmap" message={error} onRetry={loadConfigMap} />
   {:else if configMap}
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold">ConfigMap: {configMap.name}</h1>
-        <p class="text-muted-foreground">Namespace: {configMap.namespace}</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" onclick={loadConfigMap}>
-          <RefreshCw class="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-        <Button variant="destructive" size="sm" onclick={handleDelete}>
-          <Trash2 class="mr-2 h-4 w-4" />
-          Delete
-        </Button>
-        <Button variant="outline" size="sm" onclick={() => goto('/cloud/configmaps')}>
-          <ArrowLeft class="mr-2 h-4 w-4" />
-          Back to ConfigMaps
-        </Button>
-      </div>
-    </div>
+    <ResourceDetailHeader
+      kind="ConfigMap"
+      name={configMap.name}
+      namespace={configMap.namespace}
+      backHref="/cloud/configmaps"
+      backLabel="Back to ConfigMaps"
+      onRefresh={loadConfigMap}
+    >
+      <Button variant="destructive" size="sm" onclick={handleDelete}>
+        <Trash2 class="mr-2 h-4 w-4" />
+        Delete
+      </Button>
+    </ResourceDetailHeader>
 
     <!-- Tabs -->
     <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -192,43 +128,18 @@
       <!-- Overview Tab -->
       <TabsContent value="overview" class="space-y-4">
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>ConfigMap Information</CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              <div>
-                <p class="text-sm text-muted-foreground">Name</p>
-                <p class="font-medium">{configMap.name}</p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Namespace</p>
-                <p class="font-medium">{configMap.namespace}</p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Data Keys</p>
-                <p class="font-medium">{configMap.metadata?.dataCount || 0}</p>
-              </div>
-              <div>
-                <p class="text-sm text-muted-foreground">Age</p>
-                <p class="font-medium">{configMap.metadata?.age || 'N/A'}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <InfoCard
+            title="ConfigMap Information"
+            fields={[
+              { label: 'Name', value: configMap.name },
+              { label: 'Namespace', value: configMap.namespace },
+              { label: 'Data Keys', value: configMap.metadata?.dataCount || 0 },
+              { label: 'Age', value: configMap.metadata?.age || 'N/A' },
+            ]}
+          />
 
           {#if configMap.metadata?.labels && Object.keys(configMap.metadata.labels).length > 0}
-            <Card>
-              <CardHeader>
-                <CardTitle>Labels</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div class="flex flex-wrap gap-2">
-                  {#each Object.entries(configMap.metadata.labels) as [key, value]}
-                    <Badge variant="outline">{key}={value}</Badge>
-                  {/each}
-                </div>
-              </CardContent>
-            </Card>
+            <LabelsCard items={configMap.metadata.labels} />
           {/if}
         </div>
       </TabsContent>
@@ -273,27 +184,14 @@
 
       <!-- YAML Tab -->
       <TabsContent value="yaml" class="space-y-4">
-        {#if yamlLoading}
-          <div class="flex h-[600px] items-center justify-center">
-            <Loading text="Loading YAML..." />
-          </div>
-        {:else if yamlError}
-          <div class="flex h-[600px] items-center justify-center text-center text-destructive">
-            <p>{yamlError}</p>
-          </div>
-        {:else if yaml}
-          <YamlEditor
-            value={yaml}
-            onSave={handleSaveYAML}
-            resourceName={configMap.name}
-            resourceKind="ConfigMap"
-            namespace={configMap.namespace}
+        <div class="h-[600px]">
+          <ResourceYamlTab
+            resource={configMap}
+            kind="ConfigMap"
+            active={activeTab === 'yaml'}
+            onApplied={loadConfigMap}
           />
-        {:else}
-          <div class="flex h-[600px] items-center justify-center text-center text-muted-foreground">
-            <p>No YAML available.</p>
-          </div>
-        {/if}
+        </div>
       </TabsContent>
     </Tabs>
   {/if}
