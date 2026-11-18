@@ -1653,6 +1653,8 @@ async fn update_done(db: &DatabaseManager, id: &str) -> Result<(), String> {
     project_move::ActiveModel {
         id: Set(id.to_string()),
         state: Set("done".into()),
+        // #1109: an earlier failed promote's error is stale once the move is done.
+        error: Set(None),
         updated_at: Set(now.clone()),
         finished_at: Set(Some(now)),
         ..Default::default()
@@ -2406,5 +2408,57 @@ mod tests {
         fs::write(&progress, "").unwrap();
         assert!(!never_started(&base("verifying")));
         assert!(!never_started(&base("verified")));
+    }
+
+    /// #1109: a failed promote leaves its error on the row; the Finish that then
+    /// completes the move (`update_done`, the one terminal write `run_move` and
+    /// `finish_move` share) must not leave it on a `done` move. `aborted` keeps
+    /// its reason.
+    #[tokio::test]
+    async fn done_clears_the_error_a_failed_promote_left_but_aborted_keeps_it() {
+        let dir = tempdir().unwrap();
+        // An existing (empty) DB file: otherwise `DatabaseManager::new` seeds the
+        // temp dir from the release's real data dir in a debug build.
+        fs::write(dir.path().join("portal_desktop.db"), b"").unwrap();
+        let db = DatabaseManager::new(dir.path().to_path_buf()).await.unwrap();
+        let conn = db.get_connection();
+        // `project_moves.project_id` is a foreign key.
+        let project = project_entity::ActiveModel {
+            name: Set("p".into()),
+            path: Set("p".into()),
+            status: Set("active".into()),
+            starred: Set(false),
+            open_count: Set(0),
+            size: Set(0),
+            file_count: Set(0),
+            has_uncommitted_changes: Set(false),
+            ..Default::default()
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+
+        let promote_err = "promote a -> b: Access is denied. (os error 5)";
+        for id in ["to-done", "to-aborted"] {
+            let row = project_move::Model {
+                project_id: project.id,
+                ..mv(id, "verified", "s", "d", "g")
+            };
+            project_move::Entity::insert(project_move::ActiveModel::from(row))
+                .exec_without_returning(conn)
+                .await
+                .unwrap();
+            mark_error(&db, id, promote_err).await.unwrap(); // the failed promote
+        }
+
+        update_done(&db, "to-done").await.unwrap(); // the Finish
+        let done = load_row(&db, "to-done").await.unwrap();
+        assert_eq!(done.state, "done");
+        assert_eq!(done.error, None);
+
+        update_aborted(&db, "to-aborted").await.unwrap();
+        let aborted = load_row(&db, "to-aborted").await.unwrap();
+        assert_eq!(aborted.state, "aborted");
+        assert_eq!(aborted.error.as_deref(), Some(promote_err));
     }
 }
