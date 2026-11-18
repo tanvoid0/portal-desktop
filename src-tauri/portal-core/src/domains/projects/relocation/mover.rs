@@ -42,7 +42,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf, MAIN_SEPARATOR_STR};
 use std::process::Command;
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, UNIX_EPOCH};
 
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
@@ -80,6 +80,11 @@ const BUF: usize = 64 * 1024;
 /// a project can hold 100k files and the row is only informational (resume
 /// reads the progress log, not these counters).
 const COUNTER_EVERY: u64 = 256;
+
+/// Waits before each retry of a promote that hit a transient error (#1108): a
+/// freshly written tree is often held for a moment by Defender or the indexer.
+/// Six tries over ~5s in all, then the error stands.
+const PROMOTE_BACKOFF_MS: [u64; 5] = [200, 400, 800, 1600, 2000];
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -491,8 +496,7 @@ impl Mover<'_> {
         update_state(self.db, &row.id, "verified").await?;
 
         // ── Promote ── (atomic: staging is a sibling of dest, same volume)
-        fs::rename(&staging, &dest)
-            .map_err(|e| format!("promote {} -> {}: {e}", staging.display(), dest.display()))?;
+        blocking(|| promote(&staging, &dest))?;
 
         // ── Commit ── repoint the moved project (and any nested ones) to dest.
         self.commit(&row.id, &row.source_path, &row.dest_path)
@@ -669,13 +673,7 @@ impl Mover<'_> {
                             "neither the destination nor the staging copy is this move's — roll back instead".into(),
                         ));
                     }
-                    fs::rename(&staging, &dest).map_err(|e| {
-                        MoveError::Failed(format!(
-                            "promote {} -> {}: {e}",
-                            staging.display(),
-                            dest.display()
-                        ))
-                    })?;
+                    blocking(|| promote(&staging, &dest)).map_err(MoveError::Failed)?;
                 }
             }
             // Commit is already durable; nothing to prove, just finish.
@@ -1532,6 +1530,53 @@ fn dest_promoted(row: &project_move::Model) -> bool {
         Some(_) => owns_staging_by_name(row) && !Path::new(&row.staging_path).exists(),
         None => false,
     }
+}
+
+/// Promote: rename the verified staging tree into place. Retries a transient
+/// Windows error ([`is_transient_promote_error`]) on [`PROMOTE_BACKOFF_MS`], and
+/// only while the rename is provably still a no-op — staging in place, nothing
+/// at dest. Anything else may be a half-done promote, which recovery
+/// ([`dest_promoted`]) sorts out and a retry must not. The last error is
+/// surfaced as-is.
+fn promote(staging: &Path, dest: &Path) -> Result<(), String> {
+    promote_with(staging, dest, &PROMOTE_BACKOFF_MS, |from, to| fs::rename(from, to))
+}
+
+fn promote_with(
+    staging: &Path,
+    dest: &Path,
+    backoff_ms: &[u64],
+    mut rename: impl FnMut(&Path, &Path) -> std::io::Result<()>,
+) -> Result<(), String> {
+    let mut retries = 0;
+    loop {
+        match rename(staging, dest) {
+            Ok(()) => return Ok(()),
+            Err(e)
+                if retries < backoff_ms.len()
+                    && is_transient_promote_error(&e)
+                    && matches!(staging.try_exists(), Ok(true))
+                    && matches!(dest.try_exists(), Ok(false)) =>
+            {
+                std::thread::sleep(Duration::from_millis(backoff_ms[retries]));
+                retries += 1;
+            }
+            Err(e) => {
+                return Err(format!(
+                    "promote {} -> {}: {e}",
+                    staging.display(),
+                    dest.display()
+                ))
+            }
+        }
+    }
+}
+
+/// ERROR_ACCESS_DENIED (5), ERROR_SHARING_VIOLATION (32), ERROR_LOCK_VIOLATION
+/// (33): what Windows returns while something else briefly holds a file in the
+/// tree. Windows-only — on unix 5/32/33 are EIO/EPIPE/EDOM, never retried.
+fn is_transient_promote_error(e: &std::io::Error) -> bool {
+    cfg!(windows) && matches!(e.raw_os_error(), Some(5 | 32 | 33))
 }
 
 fn remove_staging(staging: &Path) -> Result<(), String> {
@@ -2460,5 +2505,106 @@ mod tests {
         let aborted = load_row(&db, "to-aborted").await.unwrap();
         assert_eq!(aborted.state, "aborted");
         assert_eq!(aborted.error.as_deref(), Some(promote_err));
+    }
+
+    fn os_err(code: i32) -> std::io::Error {
+        std::io::Error::from_raw_os_error(code)
+    }
+
+    /// A temp root holding a staging dir (with a file) and a not-yet-existing dest.
+    fn promote_dirs() -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let root = tempdir().unwrap();
+        let (staging, dest) = (root.path().join("staging"), root.path().join("dest"));
+        write(&staging.join("a.txt"), "a");
+        (root, staging, dest)
+    }
+
+    /// #1108: only the three transient Windows codes retry — and only on Windows.
+    #[test]
+    fn promote_error_classifier_matches_only_the_transient_windows_codes() {
+        for code in [5, 32, 33] {
+            assert_eq!(is_transient_promote_error(&os_err(code)), cfg!(windows));
+        }
+        // file/path not found, not-same-device, already-exists: real failures.
+        for code in [2, 3, 17, 183] {
+            assert!(!is_transient_promote_error(&os_err(code)));
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn promote_retries_a_transient_error_then_succeeds() {
+        let (_root, staging, dest) = promote_dirs();
+        let mut calls = 0;
+        promote_with(&staging, &dest, &[0, 0, 0], |from, to| {
+            calls += 1;
+            if calls < 3 {
+                Err(os_err(5))
+            } else {
+                fs::rename(from, to)
+            }
+        })
+        .unwrap();
+        assert_eq!(calls, 3);
+        assert!(dest.join("a.txt").exists() && !staging.exists());
+    }
+
+    /// The schedule is a bound: one try plus one per backoff entry, then the
+    /// last error comes back with the same text a single un-retried failure has.
+    #[cfg(windows)]
+    #[test]
+    fn promote_gives_up_after_the_schedule_and_surfaces_the_last_error() {
+        let (_root, staging, dest) = promote_dirs();
+        let mut calls = 0;
+        let err = promote_with(&staging, &dest, &[0, 0], |_, _| {
+            calls += 1;
+            Err(os_err(32))
+        })
+        .unwrap_err();
+        assert_eq!(calls, 3);
+        assert_eq!(
+            err,
+            format!("promote {} -> {}: {}", staging.display(), dest.display(), os_err(32))
+        );
+        assert!(staging.exists()); // untouched
+    }
+
+    #[test]
+    fn promote_does_not_retry_a_non_transient_error() {
+        let (_root, staging, dest) = promote_dirs();
+        let mut calls = 0;
+        promote_with(&staging, &dest, &[0, 0], |_, _| {
+            calls += 1;
+            Err(os_err(2))
+        })
+        .unwrap_err();
+        assert_eq!(calls, 1);
+    }
+
+    /// A transient error is still not retried once the state is ambiguous: dest
+    /// appeared, or staging is gone (the rename may have landed). Recovery
+    /// (`dest_promoted`) owns those, not a blind second rename.
+    #[cfg(windows)]
+    #[test]
+    fn promote_does_not_retry_when_dest_appeared_or_staging_vanished() {
+        let (_root, staging, dest) = promote_dirs();
+        let mut calls = 0;
+        promote_with(&staging, &dest, &[0, 0], |_, to| {
+            calls += 1;
+            fs::create_dir(to).unwrap();
+            Err(os_err(5))
+        })
+        .unwrap_err();
+        assert_eq!(calls, 1);
+
+        let (_root, staging, dest) = promote_dirs();
+        let mut calls = 0;
+        promote_with(&staging, &dest, &[0, 0], |from, _| {
+            calls += 1;
+            fs::remove_dir_all(from).unwrap();
+            Err(os_err(5))
+        })
+        .unwrap_err();
+        assert_eq!(calls, 1);
     }
 }
