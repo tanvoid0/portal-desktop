@@ -199,11 +199,12 @@ impl AppState {
 
     /// The managed database, when there is a running app behind this listener.
     fn db(&self) -> Option<Arc<DatabaseManager>> {
-        self.app.as_ref().map(|a| {
-            tauri::Manager::state::<Arc<DatabaseManager>>(a)
-                .inner()
-                .clone()
-        })
+        // `try_state`: the listener binds before `app.manage(db)` in setup, and
+        // `state()` would panic on a request landing in that window.
+        self.app
+            .as_ref()
+            .and_then(|a| tauri::Manager::try_state::<Arc<DatabaseManager>>(a))
+            .map(|s| s.inner().clone())
     }
 
     /// Record one `/pair/request` attempt from `ip`; false once over the limit.
