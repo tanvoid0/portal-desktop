@@ -80,4 +80,8 @@ export const queryKeys = {
     lanEnabled: ['devices', 'lan-enabled'] as const,
     connectivity: ['devices', 'connectivity'] as const,
   },
+  disk: {
+    hostStats: ['disk', 'host-stats'] as const,
+    usage: ['disk', 'usage'] as const,
+  },
 };

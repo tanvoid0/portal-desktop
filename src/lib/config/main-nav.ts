@@ -185,6 +185,13 @@ export function buildMainNavSections(
           badge: null,
         },
         {
+          title: 'System',
+          url: '/system',
+          icon: 'gauge',
+          description: 'Live CPU, memory and disk usage',
+          badge: null,
+        },
+        {
           title: 'Database',
           url: '/database',
           icon: 'database',

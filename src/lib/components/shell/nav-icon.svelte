@@ -9,6 +9,7 @@
   import FileText from '~icons/fa6-solid/file-lines';
   import Folder from '~icons/fa6-solid/folder';
   import FolderGit2 from '~icons/fa6-solid/folder-tree';
+  import Gauge from '~icons/fa6-solid/gauge-high';
   import Globe from '~icons/fa6-solid/globe';
   import HardDrive from '~icons/fa6-solid/hard-drive';
   import History from '~icons/fa6-solid/clock-rotate-left';
@@ -75,6 +76,8 @@
   <History class={className} />
 {:else if icon === 'hard-drive'}
   <HardDrive class={className} />
+{:else if icon === 'gauge'}
+  <Gauge class={className} />
 {:else if icon === 'scan-search'}
   <ScanSearch class={className} />
 {:else if icon === 'mobile-screen-button'}

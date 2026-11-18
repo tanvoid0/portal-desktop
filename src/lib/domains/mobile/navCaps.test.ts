@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { filterNavForCaps } from './navCaps';
 
+describe('filterNavForCaps /system entry', () => {
+  const nav = [{ title: 'Infra', items: [{ title: 'System', url: '/system' }] }];
+
+  it('keeps the entry when sysinfo is served', () => {
+    expect(filterNavForCaps(nav, ['sysinfo'])[0]?.items[0]?.url).toBe('/system');
+  });
+
+  it('drops the entry, and its emptied section, without sysinfo', () => {
+    expect(filterNavForCaps(nav, ['dashboard'])).toEqual([]);
+  });
+});
+
 const sections = [{ title: 'AI', items: [{ title: 'AI', url: '/ai' }] }];
 const aiUrl = (caps: string[]) => filterNavForCaps(sections, caps)[0]?.items[0]?.url;
 

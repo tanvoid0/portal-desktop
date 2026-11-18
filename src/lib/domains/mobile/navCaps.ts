@@ -6,6 +6,7 @@ const NAV_CAP: Record<string, string> = {
   '/': 'dashboard',
   '/projects': 'projects',
   '/tasks': 'tasks',
+  '/system': 'sysinfo',
   '/terminal': 'terminal',
   '/pipeline-runs': 'actions',
   '/github': 'github',

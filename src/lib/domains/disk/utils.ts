@@ -15,6 +15,21 @@ export function fmtBytes(n: number): string {
   return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** `used` as a 0-100 share of `total`. A zero or unreadable total (an empty card reader) is 0,
+ *  never NaN. */
+export function usedPct(used: number, total: number): number {
+  const pct = (used / total) * 100;
+  return Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 0;
+}
+
+/** Progress-bar fill for a usage %: amber from 75, red from 90 — the steps the Dashboard drive
+ *  cards use. */
+export function pressureClass(pct: number): string {
+  if (pct >= 90) return '[&>[data-slot=progress-indicator]]:bg-status-error';
+  if (pct >= 75) return '[&>[data-slot=progress-indicator]]:bg-status-warning';
+  return '';
+}
+
 export function fmtDate(unixSecs: number): string {
   return new Date(unixSecs * 1000).toLocaleString();
 }
