@@ -106,6 +106,12 @@ struct Manifest {
     /// deterministically, instead of re-asking `git check-ignore` — whose
     /// answer can flip mid-move and fail a genuinely-good copy.
     skipped_dirs: Vec<String>,
+    /// Every walked (non-skipped) directory, rel, forward slashes. Recreated in
+    /// staging before the copy so empty dirs — and dirs emptied by a skip —
+    /// survive the move (board #325). `default`: a manifest journaled before
+    /// this field existed deserializes to none and behaves as it did.
+    #[serde(default)]
+    dirs: Vec<String>,
     entries: Vec<ManifestEntry>,
 }
 
@@ -284,7 +290,7 @@ impl Mover<'_> {
             return Err(MoveError::Blocked(report));
         }
 
-        let (entries, skipped) =
+        let (entries, skipped, dirs) =
             blocking(|| build_manifest(&source, include_regenerable)).map_err(MoveError::Failed)?;
 
         // #217: deny-write hold on the move set, held through the copy below.
@@ -303,6 +309,7 @@ impl Mover<'_> {
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: skipped,
+            dirs,
             entries,
         };
         let manifest_sha = write_manifest(&manifest_path, &manifest).map_err(MoveError::Failed)?;
@@ -449,6 +456,13 @@ impl Mover<'_> {
         // The sidecar should already be there; rewrite it so a resume that lost
         // it (e.g. a half-made staging) is anchored before we copy into it.
         write_sidecar(&staging, &row.id)?;
+
+        // Recreate the directory tree first (idempotent, so resume re-runs it):
+        // an empty dir has no file entry to carry it across.
+        for d in &manifest.dirs {
+            let p = os_join(&staging, d);
+            fs::create_dir_all(&p).map_err(|e| format!("create {}: {e}", p.display()))?;
+        }
 
         // ── Copy ──
         let logged = read_progress(&progress_path)?;
@@ -626,7 +640,8 @@ impl Mover<'_> {
             // The gap is accepted: a write landing in it goes to the Recycle Bin
             // with the source, and the destination already holds the verified copy.
             drop(hold);
-            trash::delete(&source).map_err(|e| MoveError::Failed(format!("recycle source: {e}")))?;
+            trash::delete(&source)
+                .map_err(|e| MoveError::Failed(format!("recycle source: {e}")))?;
             // #417: over the bin's quota Windows reports success but deletes
             // permanently. Say so instead of leaving the user thinking it's
             // recoverable.
@@ -832,7 +847,7 @@ pub struct PreflightWalk {
 }
 
 pub fn preflight_walk(source: &Path, include_regenerable: bool) -> Result<PreflightWalk, String> {
-    let (entries, skipped_dirs) = build_manifest(source, include_regenerable)?;
+    let (entries, skipped_dirs, _) = build_manifest(source, include_regenerable)?;
     let file_count = entries.len() as u64;
     let total_bytes = entries.iter().map(|e| e.len).sum();
     let skipped = skipped_dirs
@@ -868,26 +883,26 @@ fn dir_size(dir: &Path) -> u64 {
 /// slashes), skipping regenerable dirs (`node_modules`, `target`, …) that git
 /// confirms are ignored — unless `include_regenerable`. Entries are sorted by
 /// `rel` so the manifest and every re-walk are directly comparable.
-///
-/// ponytail: empty directories aren't recorded, so a move won't recreate one
-/// that held no files. Add dir entries to the manifest if a project depends on
-/// an empty dir existing; files are the norm and preserving them is the point.
+/// Also returns every walked directory so empty ones can be recreated.
 fn build_manifest(
     source: &Path,
     include_regenerable: bool,
-) -> Result<(Vec<ManifestEntry>, Vec<String>), String> {
+) -> Result<(Vec<ManifestEntry>, Vec<String>, Vec<String>), String> {
     let mut entries = Vec::new();
     let mut skipped = Vec::new();
+    let mut dirs = Vec::new();
     walk(
         source,
         source,
         include_regenerable,
         &mut entries,
         &mut skipped,
+        &mut dirs,
     )?;
     entries.sort_by(|a, b| a.rel.cmp(&b.rel));
     skipped.sort();
-    Ok((entries, skipped))
+    dirs.sort();
+    Ok((entries, skipped, dirs))
 }
 
 /// `rel` of every manifest entry, for [`source_hold::acquire`] — it doesn't
@@ -902,6 +917,7 @@ fn walk(
     include_regenerable: bool,
     entries: &mut Vec<ManifestEntry>,
     skipped: &mut Vec<String>,
+    dirs: &mut Vec<String>,
 ) -> Result<(), String> {
     let read = fs::read_dir(dir).map_err(|e| format!("read {}: {e}", dir.display()))?;
     for entry in read {
@@ -930,7 +946,8 @@ fn walk(
                 skipped.push(rel);
                 continue;
             }
-            walk(root, &path, include_regenerable, entries, skipped)?;
+            dirs.push(rel);
+            walk(root, &path, include_regenerable, entries, skipped, dirs)?;
         } else if ft.is_file() {
             let md = entry
                 .metadata()
@@ -1143,6 +1160,13 @@ fn final_verify(source: &Path, staging: &Path, manifest: &Manifest) -> Result<()
         let dst_h = hash_file(&os_join(staging, &e.rel))?;
         if src_h != dst_h {
             return Err(format!("verify failed: {} differs from its source", e.rel));
+        }
+    }
+    for d in &manifest.dirs {
+        if !os_join(staging, d).is_dir() {
+            return Err(format!(
+                "verify failed: directory {d} missing from the copy"
+            ));
         }
     }
     Ok(())
@@ -1539,7 +1563,9 @@ fn dest_promoted(row: &project_move::Model) -> bool {
 /// ([`dest_promoted`]) sorts out and a retry must not. The last error is
 /// surfaced as-is.
 fn promote(staging: &Path, dest: &Path) -> Result<(), String> {
-    promote_with(staging, dest, &PROMOTE_BACKOFF_MS, |from, to| fs::rename(from, to))
+    promote_with(staging, dest, &PROMOTE_BACKOFF_MS, |from, to| {
+        fs::rename(from, to)
+    })
 }
 
 fn promote_with(
@@ -1982,7 +2008,7 @@ mod tests {
         let dir = tempdir().unwrap();
         write(&dir.path().join("b.txt"), "two");
         write(&dir.path().join("sub/a.txt"), "one");
-        let (entries, skipped) = build_manifest(dir.path(), false).unwrap();
+        let (entries, skipped, _) = build_manifest(dir.path(), false).unwrap();
         let rels: Vec<_> = entries.iter().map(|e| e.rel.clone()).collect();
         assert_eq!(rels, vec!["b.txt", "sub/a.txt"]); // sorted, forward slashes
         assert!(skipped.is_empty());
@@ -1995,7 +2021,7 @@ mod tests {
         write(&dir.path().join("node_modules/dep/index.js"), "x");
         write(&dir.path().join("src/main.rs"), "y");
         // include_regenerable=true never consults git; node_modules is copied.
-        let (entries, _) = build_manifest(dir.path(), true).unwrap();
+        let (entries, _, _) = build_manifest(dir.path(), true).unwrap();
         assert!(entries.iter().any(|e| e.rel == "node_modules/dep/index.js"));
     }
 
@@ -2016,12 +2042,35 @@ mod tests {
     }
 
     #[test]
+    fn empty_dirs_are_captured_and_verified() {
+        let src = tempdir().unwrap();
+        let stg = tempdir().unwrap();
+        write(&src.path().join("a.txt"), "alpha");
+        fs::create_dir_all(src.path().join("logs/empty")).unwrap();
+        let (entries, skipped, dirs) = build_manifest(src.path(), false).unwrap();
+        assert_eq!(dirs, vec!["logs", "logs/empty"]);
+        for e in &entries {
+            copy_entry(src.path(), stg.path(), e).unwrap();
+        }
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            skipped_dirs: skipped,
+            dirs,
+            entries,
+        };
+        // Files copied but the empty dirs never recreated: verify must refuse.
+        assert!(final_verify(src.path(), stg.path(), &manifest).is_err());
+        fs::create_dir_all(stg.path().join("logs/empty")).unwrap();
+        final_verify(src.path(), stg.path(), &manifest).unwrap();
+    }
+
+    #[test]
     fn copy_then_verify_roundtrips_and_catches_tamper() {
         let src = tempdir().unwrap();
         let stg = tempdir().unwrap();
         write(&src.path().join("a.txt"), "alpha");
         write(&src.path().join("sub/b.txt"), "beta");
-        let (entries, skipped) = build_manifest(src.path(), false).unwrap();
+        let (entries, skipped, _) = build_manifest(src.path(), false).unwrap();
 
         for e in &entries {
             copy_entry(src.path(), stg.path(), e).unwrap();
@@ -2029,6 +2078,7 @@ mod tests {
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: skipped,
+            dirs: vec![],
             entries,
         };
         final_verify(src.path(), stg.path(), &manifest).unwrap();
@@ -2051,7 +2101,7 @@ mod tests {
         perms.set_readonly(true);
         fs::set_permissions(&src_file, perms).unwrap();
 
-        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let (entries, _, _) = build_manifest(src.path(), false).unwrap();
         copy_entry(src.path(), stg.path(), &entries[0]).unwrap();
 
         let dst = stg.path().join("packed.idx");
@@ -2063,11 +2113,12 @@ mod tests {
         let src = tempdir().unwrap();
         let stg = tempdir().unwrap();
         write(&src.path().join("a.txt"), "alpha");
-        let (entries, skipped) = build_manifest(src.path(), false).unwrap();
+        let (entries, skipped, _) = build_manifest(src.path(), false).unwrap();
         copy_entry(src.path(), stg.path(), &entries[0]).unwrap();
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: skipped,
+            dirs: vec![],
             entries,
         };
         // A file appears in the source mid-move.
@@ -2082,7 +2133,7 @@ mod tests {
         write(&src.path().join("done.txt"), "aaaa");
         write(&src.path().join("partial.txt"), "bbbbbb");
         write(&src.path().join("missing.txt"), "cc");
-        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let (entries, _, _) = build_manifest(src.path(), false).unwrap();
 
         // Stage all three, but: only "done" is logged with a matching length;
         // "partial" is logged but wrong length; "missing" is not staged at all.
@@ -2116,7 +2167,7 @@ mod tests {
         let src = tempdir().unwrap();
         let stg = tempdir().unwrap();
         write(&src.path().join("a.txt"), "aaaa");
-        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let (entries, _, _) = build_manifest(src.path(), false).unwrap();
         let sha = copy_entry(src.path(), stg.path(), &entries[0]).unwrap();
         fs::write(stg.path().join("a.txt"), "aaab").unwrap(); // same length
         let logged = HashMap::from([("a.txt".to_string(), sha)]);
@@ -2133,7 +2184,7 @@ mod tests {
         write(&src.path().join("a.txt"), "a");
         write(&src.path().join("sub").join(SIDECAR), "mine");
         let want = vec!["a.txt".to_string(), format!("sub/{SIDECAR}")];
-        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let (entries, _, _) = build_manifest(src.path(), false).unwrap();
         assert_eq!(rel_paths(&entries), want);
         let re = rewalk(src.path(), &[]).unwrap();
         assert_eq!(rel_paths(&re), want);
@@ -2148,10 +2199,11 @@ mod tests {
         let dst = tempdir().unwrap();
         write(&src.path().join("a.txt"), "a");
         write(&dst.path().join("a.txt"), "a");
-        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let (entries, _, _) = build_manifest(src.path(), false).unwrap();
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: vec![],
+            dirs: vec![],
             entries,
         };
         let hold = verify_source_removable(src.path(), dst.path(), &manifest).unwrap();
@@ -2175,10 +2227,11 @@ mod tests {
         let dst = root.path().join("dst");
         write(&src.join("a.txt"), "a");
         write(&dst.join("a.txt"), "a");
-        let (entries, _) = build_manifest(&src, false).unwrap();
+        let (entries, _, _) = build_manifest(&src, false).unwrap();
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: vec![],
+            dirs: vec![],
             entries,
         };
         let hold = verify_source_removable(&src, &dst, &manifest).unwrap();
@@ -2194,10 +2247,11 @@ mod tests {
         let dst = tempdir().unwrap();
         write(&src.path().join("a.txt"), "a");
         write(&dst.path().join("a.txt"), "a");
-        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let (entries, _, _) = build_manifest(src.path(), false).unwrap();
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: vec![],
+            dirs: vec![],
             entries,
         };
         fs::remove_file(src.path().join("a.txt")).unwrap();
@@ -2212,10 +2266,11 @@ mod tests {
         let src = tempdir().unwrap();
         let stg = tempdir().unwrap();
         write(&src.path().join("a.txt"), "original");
-        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let (entries, _, _) = build_manifest(src.path(), false).unwrap();
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: vec![],
+            dirs: vec![],
             entries,
         };
         write_sidecar(stg.path(), "move-1").unwrap();
@@ -2238,10 +2293,11 @@ mod tests {
         let src = tempdir().unwrap();
         let stg = tempdir().unwrap();
         write(&src.path().join("a.txt"), "x");
-        let (entries, _) = build_manifest(src.path(), false).unwrap();
+        let (entries, _, _) = build_manifest(src.path(), false).unwrap();
         let manifest = Manifest {
             version: MANIFEST_VERSION,
             skipped_dirs: vec![],
+            dirs: vec![],
             entries,
         };
         write_sidecar(stg.path(), "some-other-move").unwrap();
@@ -2326,7 +2382,13 @@ mod tests {
         fs::create_dir_all(&ours).unwrap();
         write_sidecar(&ours, "stale-old-move").unwrap();
         let src = dir.path().to_str().unwrap();
-        let row = mv("m5", "verified", src, dest.to_str().unwrap(), ours.to_str().unwrap());
+        let row = mv(
+            "m5",
+            "verified",
+            src,
+            dest.to_str().unwrap(),
+            ours.to_str().unwrap(),
+        );
         assert!(owns_staging_by_name(&row));
         assert_eq!(recovery_options(&row).actions, vec![Rollback]);
 
@@ -2334,7 +2396,13 @@ mod tests {
         let other = dir.path().join("elsewhere");
         fs::create_dir_all(&other).unwrap();
         write_sidecar(&other, "stale-old-move").unwrap();
-        let row = mv("m5", "verified", src, dest.to_str().unwrap(), other.to_str().unwrap());
+        let row = mv(
+            "m5",
+            "verified",
+            src,
+            dest.to_str().unwrap(),
+            other.to_str().unwrap(),
+        );
         assert!(!owns_staging_by_name(&row));
         assert!(recovery_options(&row).actions.is_empty());
     }
@@ -2350,7 +2418,13 @@ mod tests {
         fs::create_dir_all(&dest).unwrap();
         write_sidecar(&dest, "stale-old-move").unwrap();
         let src = dir.path().to_str().unwrap();
-        let row = mv("m6", "verified", src, dest.to_str().unwrap(), ours.to_str().unwrap());
+        let row = mv(
+            "m6",
+            "verified",
+            src,
+            dest.to_str().unwrap(),
+            ours.to_str().unwrap(),
+        );
         assert!(dest_promoted(&row));
         assert_eq!(recovery_options(&row).actions, vec![Finish]);
 
@@ -2360,13 +2434,25 @@ mod tests {
 
         // Staging gone but the name is not this move's: not provably ours.
         let other = dir.path().join("elsewhere");
-        let row = mv("m6", "verified", src, dest.to_str().unwrap(), other.to_str().unwrap());
+        let row = mv(
+            "m6",
+            "verified",
+            src,
+            dest.to_str().unwrap(),
+            other.to_str().unwrap(),
+        );
         assert!(!dest_promoted(&row));
 
         // No marker at dest at all: unknown dir, never promoted.
         fs::remove_file(dest.join(SIDECAR)).unwrap();
         fs::remove_dir_all(&ours).unwrap();
-        let row = mv("m6", "verified", src, dest.to_str().unwrap(), ours.to_str().unwrap());
+        let row = mv(
+            "m6",
+            "verified",
+            src,
+            dest.to_str().unwrap(),
+            ours.to_str().unwrap(),
+        );
         assert!(!dest_promoted(&row));
     }
 
@@ -2465,7 +2551,9 @@ mod tests {
         // An existing (empty) DB file: otherwise `DatabaseManager::new` seeds the
         // temp dir from the release's real data dir in a debug build.
         fs::write(dir.path().join("portal_desktop.db"), b"").unwrap();
-        let db = DatabaseManager::new(dir.path().to_path_buf()).await.unwrap();
+        let db = DatabaseManager::new(dir.path().to_path_buf())
+            .await
+            .unwrap();
         let conn = db.get_connection();
         // `project_moves.project_id` is a foreign key.
         let project = project_entity::ActiveModel {
@@ -2564,7 +2652,12 @@ mod tests {
         assert_eq!(calls, 3);
         assert_eq!(
             err,
-            format!("promote {} -> {}: {}", staging.display(), dest.display(), os_err(32))
+            format!(
+                "promote {} -> {}: {}",
+                staging.display(),
+                dest.display(),
+                os_err(32)
+            )
         );
         assert!(staging.exists()); // untouched
     }
