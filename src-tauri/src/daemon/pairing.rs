@@ -201,6 +201,12 @@ impl Cutoff {
         })
     }
 
+    /// [`Cutoff::granted`], or `true` where there is no database to ask. For a
+    /// socket that must not act on a frame before this has been answered.
+    pub(super) async fn still_granted(&self) -> bool {
+        self.db.is_none() || self.granted().await
+    }
+
     /// Whether the database still holds exactly the grant this socket opened
     /// with. Fail closed: a read error, or no database to ask, is "no".
     async fn granted(&self) -> bool {

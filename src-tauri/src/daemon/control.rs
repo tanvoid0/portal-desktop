@@ -152,6 +152,13 @@ async fn pump_control(
     input_state: &mut Option<input::State>,
     cutoff: Option<Cutoff>,
 ) {
+    // Inside the select the first re-check races the first frame, so a revoked
+    // device's first input could be dispatched before it lands. Settle it first.
+    if let Some(c) = &cutoff {
+        if !c.still_granted().await {
+            return;
+        }
+    }
     let cut_off = until_cut_off(cutoff);
     tokio::pin!(cut_off);
     loop {

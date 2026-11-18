@@ -498,14 +498,25 @@ pub fn expired_device_ids(
         .collect()
 }
 
-/// [`expired_device_ids`] over every approved row, as of now.
+/// [`expired_device_ids`] over every approved row, as of now, minus devices
+/// whose most recent row is still a live grant — an old lapsed row left behind
+/// by a re-approval must not cut off the device's current sockets.
 pub async fn expired_devices(conn: &DatabaseConnection) -> Result<Vec<String>, String> {
     let rows = device_approval::Entity::find()
         .filter(device_approval::Column::Approved.eq(true))
         .all(conn)
         .await
         .map_err(|e| format!("Database error: {e}"))?;
-    Ok(expired_device_ids(&rows, Utc::now().into()))
+    let mut ids = expired_device_ids(&rows, Utc::now().into());
+    ids.sort();
+    ids.dedup();
+    let mut lapsed_ids = Vec::new();
+    for id in ids {
+        if live_capabilities(conn, &id).await?.is_none() {
+            lapsed_ids.push(id);
+        }
+    }
+    Ok(lapsed_ids)
 }
 
 #[cfg(test)]
@@ -834,5 +845,10 @@ mod tests {
 
         expire(&conn, "lapsed").await;
         assert_eq!(expired_devices(&conn).await.unwrap(), ["lapsed"]);
+
+        // Re-approved: the old lapsed row remains, but the device is live again.
+        request_pairing(&conn, "lapsed", "Phone").await.unwrap();
+        approve(&conn, "lapsed", "temporary", &[]).await.unwrap();
+        assert!(expired_devices(&conn).await.unwrap().is_empty());
     }
 }

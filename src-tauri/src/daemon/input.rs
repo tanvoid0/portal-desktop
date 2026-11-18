@@ -41,6 +41,15 @@ pub struct State {
     held_buttons: HashSet<Button>,
 }
 
+/// A cancelled `/control` task (server shutdown) never reaches `run`'s
+/// `release_held`; dropping the state does it instead. Idempotent: the sets
+/// are emptied by the first release.
+impl Drop for State {
+    fn drop(&mut self) {
+        self.release_held();
+    }
+}
+
 impl State {
     /// `None` when the platform input backend could not be opened — no
     /// display server, or (per `enigo`'s own docs) missing OS permission.
