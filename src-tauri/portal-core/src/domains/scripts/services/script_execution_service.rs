@@ -479,6 +479,11 @@ impl ScriptExecutionService {
     }
 
     /// Record a run that happened in the embedded interactive terminal (no process is spawned here).
+    ///
+    /// Also used for workflow steps that never spawn a local process (GitHub/n8n,
+    /// no command, a spawn that threw): `link` ties the row to the run, and
+    /// `status`/`error` override what the exit code would imply.
+    #[allow(clippy::too_many_arguments)]
     pub async fn record_interactive(
         &self,
         block_id: Option<String>,
@@ -486,6 +491,9 @@ impl ScriptExecutionService {
         working_directory: Option<String>,
         exit_code: Option<i32>,
         started_at: Option<String>,
+        link: WorkflowLink,
+        status: Option<String>,
+        error: Option<String>,
     ) -> Result<(), String> {
         let id = Uuid::new_v4().to_string();
         self.repository
@@ -496,16 +504,19 @@ impl ScriptExecutionService {
                 "{}".to_string(),
                 working_directory,
                 "user".to_string(),
-                WorkflowLink::default(),
+                link,
             )
             .await?;
-        let status = match exit_code {
-            Some(0) => "success",
-            Some(_) => "failed",
-            None => "cancelled",
-        };
+        let status = status.unwrap_or_else(|| {
+            match exit_code {
+                Some(0) => "success",
+                Some(_) => "failed",
+                None => "cancelled",
+            }
+            .to_string()
+        });
         self.repository
-            .update_status(&id, status.to_string(), exit_code, None)
+            .update_status(&id, status, exit_code, error)
             .await?;
         // Backdate started_at to when the terminal run began so duration is real.
         if let Some(t) = started_at.and_then(|t| chrono::DateTime::parse_from_rfc3339(&t).ok()) {
@@ -734,7 +745,7 @@ impl Clone for ScriptExecutionService {
 
 #[cfg(test)]
 mod tests {
-    use super::decode_utf8_chunk;
+    use super::*;
 
     #[test]
     fn utf8_split_across_chunks_is_kept_whole() {
@@ -763,5 +774,41 @@ mod tests {
         let out = decode_utf8_chunk(&mut carry, b"a\xffb");
         assert_eq!(out, "a\u{fffd}b");
         assert!(carry.is_empty());
+    }
+
+    #[tokio::test]
+    async fn record_interactive_stores_workflow_link_status_and_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(
+            DatabaseManager::new(dir.path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let svc = ScriptExecutionService::new(db);
+        let link = WorkflowLink {
+            run_id: Some("r1".into()),
+            workflow_id: Some("w1".into()),
+            step_id: Some("gh-deploy".into()),
+            plan_json: Some("[]".into()),
+        };
+        svc.record_interactive(
+            None,
+            "gh-deploy".into(),
+            None,
+            None,
+            None,
+            link,
+            Some("failed".into()),
+            Some("deploy broke".into()),
+        )
+        .await
+        .unwrap();
+        let rows = svc.get_executions_by_workflow_run("r1").await.unwrap();
+        assert_eq!(rows.len(), 1);
+        let r = &rows[0];
+        assert_eq!(r.step_id.as_deref(), Some("gh-deploy"));
+        assert_eq!(r.workflow_id.as_deref(), Some("w1"));
+        assert_eq!(r.status, "failed");
+        assert_eq!(r.error.as_deref(), Some("deploy broke"));
     }
 }

@@ -1,4 +1,5 @@
 use crate::database::DatabaseManager;
+use crate::domains::scripts::repositories::WorkflowLink;
 use crate::domains::scripts::services::{
     ExecuteScriptRequest, ScriptExecutionInfo, ScriptExecutionService,
 };
@@ -72,6 +73,7 @@ pub async fn execute_script(
 
 /// Record an interactive-terminal run in script history
 #[portal_rpc_macro::rpc]
+#[allow(clippy::too_many_arguments)]
 pub async fn record_interactive_execution(
     db_manager: State<'_, Arc<DatabaseManager>>,
     execution_state: State<'_, ScriptExecutionState>,
@@ -80,10 +82,31 @@ pub async fn record_interactive_execution(
     working_directory: Option<String>,
     exit_code: Option<i32>,
     started_at: Option<String>,
+    workflow_run_id: Option<String>,
+    workflow_id: Option<String>,
+    step_id: Option<String>,
+    workflow_plan: Option<serde_json::Value>,
+    status: Option<String>,
+    error: Option<String>,
 ) -> Result<(), String> {
     let service = execution_state.get_or_init(&db_manager).await;
+    let link = WorkflowLink {
+        run_id: workflow_run_id,
+        workflow_id,
+        step_id,
+        plan_json: workflow_plan.map(|p| p.to_string()),
+    };
     service
-        .record_interactive(block_id, command, working_directory, exit_code, started_at)
+        .record_interactive(
+            block_id,
+            command,
+            working_directory,
+            exit_code,
+            started_at,
+            link,
+            status,
+            error,
+        )
         .await
 }
 
