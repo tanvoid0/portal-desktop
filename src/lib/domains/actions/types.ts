@@ -185,10 +185,29 @@ export interface ReleaseDescription {
   rehearse: { id: string; steps: { id: string; name: string }[] } | null;
 }
 
+export interface RunSegment {
+  stepId: string;
+  name: string;
+  status: string;
+  weight: number;
+  fraction?: number | null; // 0-1; null/absent = frontend estimates from startedAt/expectedMs
+  startedAt?: string;
+  expectedMs?: number;
+  label?: string;
+}
+
+/** Backend run progress: `progress` on pipeline-execution-update, get_pipeline_execution, release_list. */
+export interface RunProgress {
+  percent: number; // 0-100
+  etaAt?: string | null;
+  segments: RunSegment[];
+}
+
 /** Item from `release_list`. */
 export interface ReleaseRun {
   id: string;
   status: string;
   startedAt: string;
   pipelineName: string;
+  progress?: RunProgress;
 }

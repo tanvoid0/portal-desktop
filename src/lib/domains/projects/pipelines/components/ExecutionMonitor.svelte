@@ -20,6 +20,7 @@
   import type { PipelineExecution, StepExecution } from '../types';
   import { executionService } from '../services/executionService';
   import StepLogViewer from './StepLogViewer.svelte';
+  import RunProgressBar from '$lib/domains/actions/components/RunProgressBar.svelte';
 
   interface Props {
     executionId: string;
@@ -278,6 +279,7 @@
   {:else if !execution}
     <PageLoading message="Loading execution..." />
   {:else}
+    {#if execution.progress}<RunProgressBar progress={execution.progress} />{/if}
     <div class="grid min-h-[480px] flex-1 gap-4 @3xl:grid-cols-[280px_1fr]">
       <!-- Step timeline -->
       <Card class="h-fit">

@@ -39,6 +39,7 @@
   import type { Project } from '$lib/domains/projects/types';
   import type { ReleaseDescription, ReleaseRun } from '../types';
   import ReleaseEditor from './ReleaseEditor.svelte';
+  import RunProgressBar from './RunProgressBar.svelte';
 
   type Proposal = { yaml: string; source: 'scripts' | 'generated'; summary: string };
   type Issue = { level: 'error' | 'warn'; message: string };
@@ -262,13 +263,18 @@
         <Button
           variant="outline"
           size="sm"
-          class="w-full justify-between font-normal"
+          class="h-auto w-full flex-col items-stretch gap-1.5 py-2 font-normal"
           onclick={() => goto(`/projects/${project.id}/pipelines/run/${run.id}`)}
         >
-          <span>{run.pipelineName}</span>
-          <span class="text-muted-foreground">
-            {run.status} · {new Date(run.startedAt).toLocaleString()}
+          <span class="flex w-full justify-between">
+            <span>{run.pipelineName}</span>
+            <span class="text-muted-foreground">
+              {run.status} · {new Date(run.startedAt).toLocaleString()}
+            </span>
           </span>
+          {#if run.progress && ['pending', 'running'].includes(run.status)}
+            <RunProgressBar progress={run.progress} compact />
+          {/if}
         </Button>
       {/each}
       {#if issues.length}

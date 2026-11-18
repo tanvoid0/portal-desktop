@@ -91,6 +91,26 @@ on each run). Cancel kills the process tree on Windows, but not detached Gradle
 daemons, and a Cloud Run deploy already submitted may still finish. Closing the
 window ends running releases (not yet fixed).
 
+## Progress
+
+A step reports progress by printing, on stdout or stderr, a line that is exactly
+(after trim):
+
+```
+::portal-progress <done>/<total> [label]
+```
+
+`done`/`total` are non-negative decimals, `total` > 0; `done` is clamped to
+`total`. The latest line wins. A matched line is not written to the step log;
+a malformed one is an ordinary log line.
+
+Without the protocol the bar is time-based: each step's expected duration is the
+median of its last 5 successful runs (searched in the pipeline's last 20), fixed
+when the run starts as `expectedMs`. The run's `progress` key (on
+`pipeline-execution-update`, `get_pipeline_execution`, `release_list`) is
+`{percent, etaAt, segments[]}`. First run: equal segments, no ETA. `longRunning`
+steps carry no weight and no ETA; a failed or cancelled run freezes the bar.
+
 ## Where to look in the UI
 
 - Project → **Actions** tab — catalog, multi-select run, history, GitHub runs

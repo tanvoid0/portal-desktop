@@ -1,6 +1,7 @@
 pub mod execution_service;
 pub mod pipeline_file;
 pub mod pipeline_service;
+pub mod progress;
 pub mod release_setup;
 
 pub use execution_service::*;

@@ -3,6 +3,10 @@ use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::move_lock;
 use crate::domains::projects::pipelines::repositories::{ExecutionRepository, PipelineRepository};
 use crate::domains::projects::pipelines::services::pipeline_file;
+use crate::domains::projects::pipelines::services::progress::{
+    compute_progress, expected_durations, parse_progress_line, HistoryRun, ProgressStep,
+    StepProgress,
+};
 use crate::domains::projects::pipelines::utils::dependency_resolver::resolve_execution_order;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 use crate::events::{EventSink, EventSinkExt};
@@ -17,7 +21,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::watch;
@@ -62,6 +66,14 @@ struct StepExecutionState {
     duration: Option<i64>,
     retryCount: i32,
     logs: Vec<String>,
+    /// Median duration (ms) of this step's recent successful runs, fixed at run start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    expectedMs: Option<i64>,
+    /// Latest `::portal-progress` line the step printed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    progress: Option<StepProgress>,
+    #[serde(default)]
+    longRunning: bool,
 }
 
 enum StepRunOutcome {
@@ -152,7 +164,25 @@ impl ExecutionService {
         variables.insert("PACKAGE_MANAGER".to_string(), detected_pm.clone());
         let build_command = project.build_command.clone();
 
-        let step_executions = build_initial_step_executions(&steps);
+        let step_ids: Vec<String> = steps
+            .iter()
+            .filter_map(|s| s.get("id")?.as_str().map(String::from))
+            .collect();
+        let history: Vec<HistoryRun> = self
+            .execution_repo
+            .get_by_pipeline(pipeline_id, Some(20))
+            .await?
+            .iter()
+            .map(|e| {
+                serde_json::from_str::<Vec<StepExecutionState>>(&e.step_executions_json)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| (s.stepId, s.status, s.duration))
+                    .collect()
+            })
+            .collect();
+        let expected = expected_durations(&history, &step_ids);
+        let step_executions = build_initial_step_executions(&steps, &expected);
         let step_executions_json = serde_json::to_string(&step_executions)
             .map_err(|e| format!("Failed to serialize steps: {}", e))?;
         let variables_json = serde_json::to_string(&variables)
@@ -693,7 +723,24 @@ impl ExecutionService {
     }
 
     fn execution_to_json(e: &crate::entities::pipeline_execution::Model) -> Value {
+        let steps: Vec<ProgressStep> =
+            serde_json::from_str::<Vec<StepExecutionState>>(&e.step_executions_json)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|s| ProgressStep {
+                    started_at: chrono::DateTime::parse_from_rfc3339(&s.startedAt)
+                        .ok()
+                        .map(|t| t.with_timezone(&Utc)),
+                    step_id: s.stepId,
+                    name: s.stepName,
+                    status: s.status,
+                    long_running: s.longRunning,
+                    expected_ms: s.expectedMs,
+                    progress: s.progress,
+                })
+                .collect();
         json!({
+            "progress": compute_progress(&steps, &e.status, Utc::now()),
             "id": e.id,
             "pipelineId": e.pipeline_id.to_string(),
             "projectId": e.project_id.to_string(),
@@ -1008,6 +1055,22 @@ impl ExecutionService {
     }
 }
 
+/// True at most once a second per execution, so a chatty step cannot flood the UI.
+/// A line skipped here still rides the next update (step finish, or a later line).
+fn progress_emit_due(execution_id: &str) -> bool {
+    static LAST: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
+    let mut guard = LAST.lock().unwrap();
+    let map = guard.get_or_insert_with(HashMap::new);
+    map.retain(|_, t| t.elapsed() < Duration::from_secs(60));
+    match map.get(execution_id) {
+        Some(t) if t.elapsed() < Duration::from_secs(1) => false,
+        _ => {
+            map.insert(execution_id.to_string(), Instant::now());
+            true
+        }
+    }
+}
+
 async fn append_step_log(
     repo: &ExecutionRepository,
     execution_id: &str,
@@ -1016,6 +1079,21 @@ async fn append_step_log(
     stream: &str,
     events: &Arc<dyn EventSink>,
 ) {
+    if let Some(p) = parse_progress_line(line) {
+        let _ = modify_steps(repo, execution_id, |steps| {
+            if let Some(step) = steps.iter_mut().find(|s| s.stepId == step_id) {
+                step.progress = Some(p);
+            }
+            true
+        })
+        .await;
+        if progress_emit_due(execution_id) {
+            if let Ok(Some(e)) = repo.get_by_id(execution_id).await {
+                events.emit("pipeline-execution-update", ExecutionService::execution_to_json(&e));
+            }
+        }
+        return;
+    }
     ExecutionService::emit_step_log(events, execution_id, step_id, line, stream);
 
     let formatted = if stream == "stderr" {
@@ -1182,7 +1260,10 @@ async fn modify_steps(
     Ok(())
 }
 
-fn build_initial_step_executions(steps: &[Value]) -> Vec<StepExecutionState> {
+fn build_initial_step_executions(
+    steps: &[Value],
+    expected: &HashMap<String, i64>,
+) -> Vec<StepExecutionState> {
     steps
         .iter()
         .filter_map(|step| {
@@ -1201,6 +1282,9 @@ fn build_initial_step_executions(steps: &[Value]) -> Vec<StepExecutionState> {
                 duration: None,
                 retryCount: 0,
                 logs: Vec::new(),
+                expectedMs: expected.get(id).copied(),
+                progress: None,
+                longRunning: step["config"]["longRunning"].as_bool() == Some(true),
             })
         })
         .collect()
@@ -1514,7 +1598,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let steps = build_initial_step_executions(&[json!({ "id": "a" }), json!({ "id": "b" })]);
+        let steps = build_initial_step_executions(&[json!({ "id": "a" }), json!({ "id": "b" })], &HashMap::new());
         svc.execution_repo
             .create(
                 "e".into(),

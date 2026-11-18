@@ -2,6 +2,8 @@
  * Pipeline Automation System Types
  */
 
+import type { RunProgress } from '$lib/domains/actions/types';
+
 export interface Pipeline {
   id: string;
   name: string;
@@ -97,6 +99,7 @@ export interface PipelineExecution {
   stepExecutions: StepExecution[];
   variables: Record<string, string>; // Resolved variables at execution time
   error?: string;
+  progress?: RunProgress;
 }
 
 export interface PipelineExecutionListItem extends PipelineExecution {
