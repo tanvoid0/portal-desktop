@@ -1,7 +1,7 @@
 ---
 id: QA-122
 title: Pending-request capability grid overlaps itself inside the narrow pairing card
-status: open
+status: fixed
 severity: major
 kind: bug
 area: devices/pairing
@@ -65,7 +65,26 @@ pairing request to render the card at all; this machine already has two.
 
 ## Fix
 
-<!-- coder: root cause, files changed, checks run, other QA ids this also fixes -->
+Root cause: `CapabilityChecklist.svelte` laid its switches out with `grid-cols-2 sm:grid-cols-3`.
+`sm:` is a viewport breakpoint and Tailwind's `grid-cols-N` tracks are `minmax(0, 1fr)`, so any
+window over 640px forced three ~90px columns even where the component sits in a card a third of
+that — `PendingRequestRow` (~290px inside `/devices`' `sm:grid-cols-2 xl:grid-cols-3` card grid) and
+`DeviceRow`'s edit view — and the longer names (plus the Sensitive badge added since the
+screenshot) spilled into the next column.
+
+Fix: the grid now sizes to its own width, not the viewport's —
+`grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))]` (the pattern `/sdk` uses) — and each
+cell is `flex-wrap`. 13rem holds the widest cell (`agents.history` + Sensitive = 199px measured), so
+a capability is one line at any width; a narrower box just gets fewer columns, down to one, and
+`flex-wrap` drops a badge to a second line instead of past the cell edge. One shared component, so
+the pending card, the paired-device edit view and "Pair a phone" are all fixed (that one now fits 4
+columns where it showed 3). No other QA ids.
+
+Files: `src/lib/domains/devices/components/CapabilityChecklist.svelte`.
+Checks: `pnpm check` and `pnpm lint` (0 errors). Not driven live (no dev instance was run). Layout
+measured in headless Chromium against a mock of the grid (Inter, the real Label/Switch/Badge
+paddings, 17 capabilities) at 138/290/330/456/918/1400px: before, 7 sensitive cells overflow at
+every width up to 456px; after, none overflow at any width and none wrap from 290px up.
 
 ## Verification
 

@@ -40,9 +40,11 @@
     <Button type="button" variant="ghost" size="sm" onclick={toggleAll} {disabled}>
       {allSelected ? 'Deselect all' : 'Select all'}
     </Button>
-    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <!-- Columns follow this element's width, not the viewport's: it also sits in half-width cards.
+         13rem holds the longest cell (switch + "agents.history" + Sensitive); flex-wrap covers longer. -->
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-2">
       {#each capabilities as cap (cap.name)}
-        <Label class="flex items-center gap-2 text-sm font-normal">
+        <Label class="flex flex-wrap items-center gap-2 text-sm font-normal">
           <Switch
             checked={selected.includes(cap.name)}
             onCheckedChange={(v) => toggle(cap.name, v === true)}
