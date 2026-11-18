@@ -23,3 +23,7 @@ node_modules/
 
 # Generated hook cache (impeccable plugin)
 .impeccable/
+
+# ts-rs output: `cargo test` regenerates it unformatted (pnpm gen:types)
+src/lib/domains/*/generated/
+src-tauri/portal-core/bindings/
