@@ -11,6 +11,9 @@
   import type { PendingApproval } from '../types.js';
   import { stripLeakedToolSyntax } from '../utils/leakedToolCall.js';
   import { Button } from '$lib/components/ui/button';
+  import { provideChatLinkHandler } from '$lib/components/ui/chat-markdown/linkContext.js';
+  import { useCoderWorkspace } from '../state/coderWorkspaceStore.svelte.js';
+  import { workspacePathFromHref } from '../utils/linkTarget.js';
   import RotateCcw from '~icons/fa6-solid/rotate-left';
 
   interface Props {
@@ -64,6 +67,20 @@
     onCleanupSubAgent,
     onDecision,
   }: Props = $props();
+
+  const workspace = useCoderWorkspace();
+
+  /** http(s) -> coder browser; a workspace path -> coder file explorer. */
+  provideChatLinkHandler((href) => {
+    if (/^https?:\/\//i.test(href)) {
+      workspace.openBrowser(href);
+      return true;
+    }
+    const path = workspacePathFromHref(href, workspaceRoot);
+    if (path == null) return false;
+    workspace.openFile(path);
+    return true;
+  });
 
   const resultsById = $derived.by(() => {
     const map = new Map<string, string>();

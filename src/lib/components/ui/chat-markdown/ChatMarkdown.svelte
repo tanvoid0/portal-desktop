@@ -1,5 +1,6 @@
 <script lang="ts">
   import { renderMarkdown } from './renderMarkdown.js';
+  import { useChatLinkHandler } from './linkContext.js';
 
   interface Props {
     content: string;
@@ -19,6 +20,14 @@
   }: Props = $props();
 
   let container: HTMLDivElement | null = $state(null);
+  const linkHandler = useChatLinkHandler();
+
+  function onLinkClick(e: MouseEvent) {
+    if (!linkHandler || e.defaultPrevented || e.button !== 0) return;
+    const a = (e.target as HTMLElement | null)?.closest<HTMLAnchorElement>('a.chat-md-link');
+    const href = a?.getAttribute('href');
+    if (href && linkHandler(href)) e.preventDefault();
+  }
 
   const renderedContent = $derived(
     content ? renderMarkdown(content, { streaming: isStreaming && variant === 'assistant' }) : ''
@@ -108,8 +117,10 @@
   });
 </script>
 
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div
   bind:this={container}
+  onclick={onLinkClick}
   class="chat-markdown max-w-none {density === 'compact'
     ? 'chat-markdown--compact prose prose-sm text-xs leading-relaxed'
     : 'prose prose-sm text-sm leading-relaxed'} {variant === 'user'
