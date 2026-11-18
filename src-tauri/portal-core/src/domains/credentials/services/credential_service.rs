@@ -225,7 +225,7 @@ impl CredentialService {
 
     /// Decrypt without throwing when the vault is locked, and without the
     /// side effects of a real credential use: uses `VaultSession::peek_key`
-    /// (not `key`) so it never slides the idle timer, and never bumps
+    /// (not `key`), and never bumps
     /// `last_used` — this is a read-only comparison for drift checking
     /// (project-env), not a credential access.
     pub async fn peek_value(&self, id: &str) -> Result<Option<String>, CredentialError> {

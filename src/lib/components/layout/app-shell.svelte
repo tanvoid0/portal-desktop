@@ -18,6 +18,7 @@
   import ConfirmDialog from '$lib/components/ui/confirm-dialog.svelte';
   import UpdatePrompt from '$lib/domains/updates/components/UpdatePrompt.svelte';
   import VaultGate from '$lib/domains/credentials/components/VaultGate.svelte';
+  import { vaultGate } from '$lib/domains/credentials/state/vault.svelte';
   import { runStartupUpdateCheck } from '$lib/domains/updates/services/startupUpdate';
   import { getCurrentVersion } from '$lib/domains/updates/services/updateService';
   import { getIdentifier } from '@tauri-apps/api/app';
@@ -104,6 +105,10 @@
     getIdentifier()
       .then((id) => (isDebugBuild = id.endsWith('.dev')))
       .catch((error) => log.warn('App identifier unavailable', { error }));
+  });
+
+  onMount(() => {
+    vaultGate.promptIfLocked().catch((error) => log.warn('Vault startup check failed', { error }));
   });
 
   onMount(async () => {

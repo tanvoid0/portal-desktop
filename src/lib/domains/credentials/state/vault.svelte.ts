@@ -14,8 +14,8 @@ class VaultGateState {
 
   /** Opens the gate and resolves once the vault is unlocked (true) or the user cancels (false).
    *  Concurrent callers all resolve together when `settle` runs. The cached vault-status query
-   *  can be up to 5 minutes stale (or locked server-side after a 15-min idle timeout with no
-   *  push to the frontend), so force a fresh check before deciding whether to open the gate. */
+   *  can be up to 5 minutes stale (another window may have locked it), so force a fresh check
+   *  before deciding whether to open the gate. */
   async ensureUnlocked(): Promise<boolean> {
     const status = await queryClient.fetchQuery({
       queryKey: queryKeys.credentials.status,
@@ -25,6 +25,13 @@ class VaultGateState {
     if (status.state === 'unlocked') return true;
     this.open = true;
     return new Promise((resolve) => this.waiters.push(resolve));
+  }
+
+  /** Startup: if the vault has credentials but is locked, ask once so the key is held for the
+   *  rest of the run (the backend has no idle lock). Skips needs_setup — nothing to unlock. */
+  async promptIfLocked(): Promise<void> {
+    const status = await fetchVaultStatus();
+    if (status.state === 'locked' && status.hasCredentials) await this.ensureUnlocked();
   }
 
   settle(ok: boolean) {

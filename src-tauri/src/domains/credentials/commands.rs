@@ -235,8 +235,7 @@ pub async fn vault_unlock_with_hello(
     service.unlock_with_keychain().map_err(|e| e.to_string())
 }
 
-/// Lock the vault immediately (also happens automatically after 15 idle
-/// minutes).
+/// Lock the vault immediately. It otherwise stays unlocked until the app exits.
 #[portal_rpc_macro::rpc(local_only)]
 pub async fn vault_lock(session: State<'_, Arc<VaultSession>>) -> Result<(), String> {
     session.lock();

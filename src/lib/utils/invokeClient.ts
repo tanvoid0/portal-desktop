@@ -25,6 +25,16 @@ const RETRY_AFTER_UNLOCK_COMMANDS = new Set([
   'create_credential',
   'update_credential',
   'decrypt_credential',
+  // GitHub reads: the token decrypt is the first step and has no side effects.
+  'github_get_connection_status',
+  'github_list_repositories',
+  'github_get_repository',
+  'github_list_issues',
+  'github_get_issue',
+  'github_list_workflow_runs',
+  'github_list_workflows',
+  'github_get_workflow_run',
+  'github_get_workflow_job_logs',
 ]);
 
 /**
