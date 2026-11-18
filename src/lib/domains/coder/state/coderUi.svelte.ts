@@ -67,6 +67,18 @@ class CoderUiState {
       this.activeProjectId = match.id;
       projectUi.setActiveProject(match.id);
       this.persistProject(match.path, match.id);
+    } else if (projects.length > 0) {
+      // A saved path that is no project here (a /media/... Linux path on Windows) must not seed
+      // the workspace: drop it so the caller falls back to projects[0]. An empty list means the
+      // projects have not loaded yet, which must not wipe a valid saved choice.
+      // ponytail: also drops a real folder that was never a project; validate_project_path
+      // (exists + is_dir) would keep those, at the cost of an async check here.
+      this.activeProjectPath = null;
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
     }
   }
 
