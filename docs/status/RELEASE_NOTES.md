@@ -1,5 +1,20 @@
 # Portal Desktop - Release Notes
 
+## Version 0.18.0
+
+### Highlights
+
+- Feature: Agents Overview tab with board, activity feed and analytics across backends (#191, #192)
+- Feature: Codex and Cursor agent backends in the Code workspace (#193, #194)
+- Feature: Coder agent tab gets git changes, commit, terminal and explorer
+- Feature: action run history stays live while the tab is open
+- Security: daemon drops a device's open sockets on revoke, caps change and grant expiry (#981, #983)
+- Security: coder workspace roots gated to known projects, threads and worktrees (#864)
+- Fix: project relocation hardening - atomic claims, stale markers, Recycle Bin quota reporting (#413, #417, #866, #908)
+- Fix: DATABASE credential form collects host, port, engine, db and user (#798)
+
+---
+
 ## Version 0.17.0
 
 ### Highlights
