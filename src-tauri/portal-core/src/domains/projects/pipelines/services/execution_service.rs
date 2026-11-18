@@ -502,6 +502,9 @@ impl ExecutionService {
         let mut cmd = shell_template::shell_command(&exec_command);
         cmd.current_dir(working_directory);
         cmd.envs(env);
+        // A GUI parent has no usable stdin; children (flutter, gradle) that read
+        // it exit non-zero. Give them an empty one, like a shell's </dev/null.
+        cmd.stdin(std::process::Stdio::null());
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
         cmd.kill_on_drop(true);
