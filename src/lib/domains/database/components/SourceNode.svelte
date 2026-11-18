@@ -6,6 +6,7 @@
   import ChevronRight from '~icons/fa6-solid/chevron-right';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
   import { Switch } from '$lib/components/ui/switch';
   import TechIcon from '$lib/components/ui/tech-icon.svelte';
   import { toast } from '$lib/utils/toast';
@@ -17,6 +18,7 @@
     redisListDatabases,
     setEditable,
   } from '../api/databaseApi';
+  import { tableList } from '../utils/tableList';
   import type { DbSource } from '../generated';
 
   interface Props {
@@ -26,6 +28,7 @@
     selectedDb?: string | null;
     onSelect: (sourceId: string, table: string, db?: string) => void;
   }
+  const uid = $props.id();
   let { source, selected = null, selectedDb = null, onSelect }: Props = $props();
 
   const ENGINES: Record<string, { label: string; devicon: string }> = {
@@ -39,13 +42,14 @@
 
   const isMongo = $derived(source.engine === 'mongodb');
   const isRedis = $derived(source.engine === 'redis');
+  const isSql = $derived(!isMongo && !isRedis);
   // Mongo servers can have hundreds of collections: one database open at a time.
   let openDb = $state<string | null>(null);
 
   const tables = createQuery(() => ({
     queryKey: queryKeys.database.tables(source.id),
     queryFn: () => listTables(source.id),
-    enabled: !isMongo && !isRedis,
+    enabled: isSql,
   }));
   const redisDbs = createQuery(() => ({
     queryKey: queryKeys.database.redisDatabases(source.id),
@@ -63,6 +67,16 @@
     enabled: isMongo && !!openDb,
   }));
 
+  let toggled = $state<boolean>(); // the user's choice; unset follows the size default
+  let filter = $state('');
+  const allTables = $derived(tables.data ?? []);
+  const { big, query, visible, expanded } = $derived(tableList(allTables, filter, toggled));
+
+  function toggle() {
+    toggled = !expanded;
+    filter = ''; // collapsing a filtered list ends the filter too, or it would just reopen
+  }
+
   const client = useQueryClient();
   const toggleEdit = createMutation(() => ({
     mutationFn: (editable: boolean) => setEditable(source.id, editable),
@@ -73,6 +87,19 @@
 
 <div class="space-y-1">
   <div class="flex items-center gap-2 px-2 py-1 text-sm font-medium" title={source.detail}>
+    {#if isSql}
+      <Button
+        variant="ghost"
+        size="icon"
+        class="size-5"
+        aria-label="{source.label} tables"
+        aria-expanded={expanded}
+        aria-controls="{uid}-tables"
+        onclick={toggle}
+      >
+        <ChevronRight class="h-3 w-3 transition-transform {expanded ? 'rotate-90' : ''}" />
+      </Button>
+    {/if}
     {#if engine.devicon}
       <TechIcon icon={engine.devicon} size="sm" class="shrink-0" />
     {:else}
@@ -151,17 +178,38 @@
   {:else if tables.isError}
     <p class="px-6 text-xs text-destructive">{String(tables.error)}</p>
   {:else}
-    {#each tables.data ?? [] as t (t.name)}
-      <Button
-        variant={selected === t.name ? 'secondary' : 'ghost'}
-        size="sm"
-        class="h-7 w-full justify-start gap-2 pl-6"
-        onclick={() => onSelect(source.id, t.name)}
-      >
-        {#if t.kind === 'view'}<Eye class="h-3.5 w-3.5" />{:else}<Table2 class="h-3.5 w-3.5" />{/if}
-        <span class="truncate">{t.name}</span>
-        <span class="ml-auto text-xs text-muted-foreground">{t.kind}</span>
-      </Button>
-    {/each}
+    {#if big}
+      <div class="px-2">
+        <Input
+          bind:value={filter}
+          placeholder="Filter {allTables.length} tables..."
+          aria-label="Filter {source.label} tables"
+          class="h-7 text-xs md:text-xs"
+        />
+      </div>
+      {#if query}
+        <p class="px-6 text-xs text-muted-foreground tabular-nums">
+          {visible.length ? `${visible.length} of ${allTables.length} tables` : 'No tables match'}
+        </p>
+      {/if}
+    {/if}
+    {#if expanded}
+      <div id="{uid}-tables" class="space-y-1">
+        {#each visible as t (t.name)}
+          <Button
+            variant={selected === t.name ? 'secondary' : 'ghost'}
+            size="sm"
+            class="h-7 w-full justify-start gap-2 pl-6"
+            onclick={() => onSelect(source.id, t.name)}
+          >
+            {#if t.kind === 'view'}<Eye class="h-3.5 w-3.5" />{:else}<Table2
+                class="h-3.5 w-3.5"
+              />{/if}
+            <span class="truncate">{t.name}</span>
+            <span class="ml-auto text-xs text-muted-foreground">{t.kind}</span>
+          </Button>
+        {/each}
+      </div>
+    {/if}
   {/if}
 </div>

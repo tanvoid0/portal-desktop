@@ -1,7 +1,7 @@
 ---
 id: UX-022
 title: Portal's own 280+ table list is always expanded and un-searchable, burying every other source
-status: open
+status: fixed
 severity: minor
 kind: ux
 area: database
@@ -47,7 +47,32 @@ Manual — open `/database`, scroll the source list.
 
 ## Fix
 
-<!-- coder: root cause, files changed, checks run, other QA ids this also fixes -->
+Root cause: `SourceNode.svelte` rendered every table of a SQL source unconditionally and its header
+had only the edit `Switch` and the engine badge — nothing to collapse, nothing to search — so
+Portal's own 280+ tables always sat above every other source.
+
+Fix (SQL sources only; Mongo and Redis headers and bodies are untouched):
+
+- The header gets a chevron button (shadcn `Button`, `aria-expanded`, `aria-controls` → the table
+  list) that collapses and expands the list.
+- A source with more than 30 tables starts collapsed (Portal's own DB loads as one header row);
+  smaller ones start expanded, as before.
+- Those big sources also get a filter box under the header: case-insensitive substring match,
+  "N of M tables" while filtering, "No tables match" when nothing does. It stays visible while
+  collapsed, an active filter forces the list open, and collapsing a filtered list clears the filter.
+- Threshold, filter and which of filter/toggle wins live in a pure function,
+  `utils/tableList.ts`, pinned by `utils/tableList.test.ts`.
+- `src/routes/database/+page.svelte` is untouched: QA-157's `max-h`/`overflow-y-auto` on the source
+  rail still bounds an expanded 280-row list.
+
+Trade-offs: the chevron costs a SQL header's label ~28px (it was already truncating in the 16rem
+rail; the hover `title` is unchanged), and sources of 30 tables or fewer get no filter box. No
+other QA ids; UX-000 does not track UX-022.
+
+Files: `src/lib/domains/database/components/SourceNode.svelte`,
+`src/lib/domains/database/utils/tableList.ts`, `src/lib/domains/database/utils/tableList.test.ts`.
+Checks: `pnpm check` and `pnpm lint` (0 errors), `vitest run --project server` (green, including
+the new `tableList.test.ts`). Not driven live (no dev instance was run).
 
 ## Verification
 
