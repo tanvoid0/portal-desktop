@@ -1,7 +1,7 @@
 ---
 id: QA-159
 title: Agent tab with Files/Git panel open squeezes the chat column to ~220px at 1280x800
-status: open
+status: fixed
 severity: minor
 kind: ux
 area: ai/coder/claude-code (AgentsWorkspace)
@@ -35,5 +35,14 @@ Three fixed columns (session list w-80, workspace panel, sidebar w-56) leave the
 `node .claude/qa/scripts/QA-870-verify.mjs` then view the shot.
 
 ## Fix
+
+Root cause: four columns with no width budget - session list `w-80`, chat `flex-1`, workspace panel `flex-1`, sidebar `w-56` - so the two `flex-1` columns split what the fixed two left (1024 - 320 - 224 = 480 -> 240 each at 1280 with the 16rem app nav open). The window width is the wrong input (the nav eats 16rem of it), so the layout follows the pane's own width.
+
+- `src/lib/domains/agents/components/AgentsWorkspace.svelte`: `bind:clientWidth` on the workspace root; the session list docks only while chat keeps 24rem beside the sidebar (14rem) and, with the panel open, an equal-width panel: pane >= 58rem, or >= 82rem (20+24+24+14) with the panel open (~1568px viewport, about 2xl). Below that it folds into the existing Sessions Sheet + toggle (the old `md:hidden` bar, now shown by the same condition). Chat column `min-w-0` -> `min-w-80` (20rem hard floor); the panel stays `min-w-0 flex-1`, so it is what gives way, never chat.
+- `src/lib/components/shell/responsive-panel.svelte`: optional `collapsed` prop forces the Sheet form on a desktop viewport (default false; other callers unchanged).
+- Measured, not `@container`/`@5xl:`: the fold is a mounted Sheet, not a style, so a class-only container query cannot pick it.
+- Pane widths (nav open, 16rem), panel + sidebar open, session list / chat / panel / sidebar: 1280 folded/400/400/224 (was 320/240/240/224); 1440 folded/480/480/224 (was 320/320/320/224); 1920 and 2560 unchanged at 320/560/560/224 and 320/880/880/224. Panel closed: unchanged from 1184 up (1280: 320/480/-/224). Min window 1024: chat 320 (floor), panel 224.
+- Not touched: `CoderPanel.svelte` (Portal tab) has the same fixed-column layout around the same `CoderWorkspacePanel`.
+- Checks: `pnpm check` exit 0 (0 errors), `pnpm lint` exit 0 (prettier clean, eslint 0 errors, shadcn check passed). Not run in the live app - needs a live look at 1280x800.
 
 ## Verification

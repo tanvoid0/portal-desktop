@@ -10,6 +10,8 @@
     open?: boolean;
     desktopClass?: string;
     borderClass?: string;
+    /** Sheet even on a desktop viewport: for a host whose own width, not the window's, can't dock it. */
+    collapsed?: boolean;
     children: Snippet<[]>;
     header?: Snippet<[]>;
   }
@@ -20,6 +22,7 @@
     open = $bindable(false),
     desktopClass = 'w-64',
     borderClass,
+    collapsed = false,
     children,
     header,
   }: Props = $props();
@@ -31,7 +34,7 @@
   );
 </script>
 
-{#if isMobile.current}
+{#if isMobile.current || collapsed}
   <Sheet.Root bind:open>
     <Sheet.Content
       {side}

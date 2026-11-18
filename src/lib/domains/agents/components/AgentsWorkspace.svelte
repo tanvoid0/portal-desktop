@@ -105,6 +105,17 @@
     if (focused && focused.backend_id !== backendId) syncUrl(null);
   });
 
+  // The columns share the pane, not the window (the app nav takes ~16rem of it). The session list
+  // (w-80) docks only while chat keeps 24rem beside the sidebar (w-56) and, when open, an equal
+  // panel: 20 + 24 + 14 = 58rem, 82rem with the panel. Otherwise it folds into a Sheet. That is a
+  // mounted component, not a style, so the pane is measured instead of using a container query.
+  // ponytail: assumes the sidebar is open and never folds the panel/sidebar, so below ~48rem (the
+  // 1024px min window leaves exactly that) the chat's min-w floor squeezes the panel; Sheet them too.
+  let paneWidth = $state(0);
+  const dockList = $derived(
+    paneWidth >= (cwd && coderWorkspaceStore.activePanel !== 'chat' ? 82 : 58) * 16
+  );
+
   $effect(() => {
     if (!cwd) return;
     aiTopbar.actions = topbarActions;
@@ -154,23 +165,31 @@
   </Button>
 {/snippet}
 
-<div class="flex h-full w-full overflow-hidden">
-  <ResponsivePanel bind:open={sidebarOpen} side="left" desktopClass="w-80 bg-muted/20">
+<div class="flex h-full w-full overflow-hidden" bind:clientWidth={paneWidth}>
+  <ResponsivePanel
+    bind:open={sidebarOpen}
+    side="left"
+    collapsed={!dockList}
+    desktopClass="w-80 bg-muted/20"
+  >
     <AgentSessionSidebar {backendId} {focusedId} onSelect={selectSession} onNewRun={newRun} />
   </ResponsivePanel>
 
-  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-    <div class="divider-edge-b flex shrink-0 items-center gap-2 px-2 py-1.5 md:hidden">
-      <Button
-        size="icon"
-        variant="ghost"
-        class="h-8 w-8"
-        title="Sessions"
-        onclick={() => (sidebarOpen = true)}
-      >
-        <PanelLeftOpen class="h-4 w-4" />
-      </Button>
-    </div>
+  <!-- min-w-80: the floor chat never drops below; the panel (min-w-0) gives way first -->
+  <div class="flex min-w-80 flex-1 flex-col overflow-hidden">
+    {#if !dockList}
+      <div class="divider-edge-b flex shrink-0 items-center gap-2 px-2 py-1.5">
+        <Button
+          size="icon"
+          variant="ghost"
+          class="h-8 w-8"
+          title="Sessions"
+          onclick={() => (sidebarOpen = true)}
+        >
+          <PanelLeftOpen class="h-4 w-4" />
+        </Button>
+      </div>
+    {/if}
     <AgentSessionPanel
       {backendId}
       sessionId={focusedId}
