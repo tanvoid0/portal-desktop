@@ -145,7 +145,9 @@
     running
       ? queuedMessages.length > 0
         ? `Queue follow-up (${queuedMessages.length} queued)…`
-        : 'Queue follow-up… (2+ lines spawns parallel agents)'
+        : agentMode === 'multitask'
+          ? 'Queue follow-up… (2+ lines spawns parallel agents)'
+          : 'Queue follow-up…'
       : agentMode === 'multitask'
         ? 'One task per line (2+ lines), or paste 2+ GitHub issue URLs…'
         : placeholder
