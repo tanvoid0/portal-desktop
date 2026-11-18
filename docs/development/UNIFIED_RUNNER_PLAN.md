@@ -10,14 +10,14 @@ SES = `PCORE/domains/scripts/services/script_execution_service.rs`.
 
 ## Status
 
-| step | what | state |
-|---|---|---|
-| Phase 1 | step progress, ETA from history, `::portal-progress` protocol, bar | done (06b16b40) |
-| Phase 2 | one Action Runs list (`get_recent_runs` / `get_running_runs`) | done (837a9ffa) |
-| C1 | batched log persistence, process-group kill (TERM then KILL on unix) | done |
-| C2 | `pipeline_executions` rebuilt: nullable ids, `kind`, action columns | done |
-| C3 | `script_executions` history copied as `kind='action'`, same ids | done |
-| C4 | SES is a facade over `ExecutionService`; catch-up migration 000052 | done (see "As built") |
+| step    | what                                                                 | state                 |
+| ------- | -------------------------------------------------------------------- | --------------------- |
+| Phase 1 | step progress, ETA from history, `::portal-progress` protocol, bar   | done (06b16b40)       |
+| Phase 2 | one Action Runs list (`get_recent_runs` / `get_running_runs`)        | done (837a9ffa)       |
+| C1      | batched log persistence, process-group kill (TERM then KILL on unix) | done                  |
+| C2      | `pipeline_executions` rebuilt: nullable ids, `kind`, action columns  | done                  |
+| C3      | `script_executions` history copied as `kind='action'`, same ids      | done                  |
+| C4      | SES is a facade over `ExecutionService`; catch-up migration 000052   | done (see "As built") |
 
 C1-C3 verified on a copy of the real DB: 30 pipeline rows kept, 32 script rows
 became 32 action rows with the same ids, no FK violations, every step blob
@@ -132,8 +132,8 @@ Not done:
 ## Must not break (names, casing, shapes; additive JSON only)
 
 - Tauri/daemon commands: `execute_script` (`{params:{command, workingDirectory,
-  env, triggeredBy, blockId, parameters, workflowRunId, workflowId, stepId,
-  workflowPlan}}` -> id string), `record_interactive_execution`,
+env, triggeredBy, blockId, parameters, workflowRunId, workflowId, stepId,
+workflowPlan}}` -> id string), `record_interactive_execution`,
   `get_script_execution` (`{execution_id}` -> camelCase `ScriptExecutionInfo`),
   `get_script_execution_live_output` (-> `string[]`), `cancel_script_execution`,
   `get_script_executions_by_block`, `get_script_executions_by_workflow_run`,

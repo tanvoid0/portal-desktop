@@ -157,7 +157,7 @@
           {...menuProps}
           type="button"
           variant="outline"
-          class="h-auto w-full justify-start rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 {selectedId ===
+          class="h-auto w-full min-w-0 justify-start overflow-hidden rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 {selectedId ===
           execution.id
             ? 'border-primary bg-primary/5'
             : ''}"

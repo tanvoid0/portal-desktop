@@ -17,6 +17,7 @@
   import LinkIcon from '~icons/fa6-solid/link';
   import UnlinkIcon from '~icons/fa6-solid/link-slash';
   import Plus from '~icons/fa6-solid/plus';
+  import ArrowRight from '~icons/fa6-solid/arrow-right';
   import Check from '~icons/fa6-solid/check';
   import PenToSquare from '~icons/fa6-solid/pen-to-square';
   import type { EnvLinkView, EnvVarView } from '../generated';
@@ -25,6 +26,10 @@
   interface Props {
     envVar: EnvVarView;
     fileName: string;
+    otherFiles?: string[];
+    onCopyTo?: (target: string) => void;
+    onMoveTo?: (target: string) => void;
+    onEdit?: () => void;
     isRevealed: boolean;
     onToggleReveal: () => void;
     onUnlockToCompare: () => void;
@@ -39,6 +44,10 @@
   let {
     envVar,
     fileName,
+    otherFiles = [],
+    onCopyTo = () => {},
+    onMoveTo = () => {},
+    onEdit = () => {},
     isRevealed,
     onToggleReveal,
     onUnlockToCompare,
@@ -52,26 +61,35 @@
 </script>
 
 <TableRow>
-  <TableCell class="font-mono">{envVar.key}</TableCell>
+  <TableCell class="truncate font-mono" title={envVar.key}>{envVar.key}</TableCell>
   <TableCell>
-    <div class="flex items-center gap-2">
-      {#if isRevealed}
-        <span class="font-mono tabular-nums">{envVar.value}</span>
-      {:else}
-        <span class="font-mono text-muted-foreground">••••••••</span>
-      {/if}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={isRevealed ? `Hide value of ${envVar.key}` : `Reveal value of ${envVar.key}`}
-        onclick={() => onToggleReveal()}
-      >
-        {#if isRevealed}
-          <EyeOff class="h-3.5 w-3.5" />
+    <div class="flex min-w-0 items-center gap-2">
+      <div class="min-w-0 flex-1">
+        {#if envVar.value === ''}
+          <Badge variant="outline" class="font-normal text-muted-foreground italic">empty</Badge>
+        {:else if isRevealed}
+          <span class="block truncate font-mono tabular-nums" title={envVar.value}>
+            {envVar.value}
+          </span>
         {:else}
-          <Eye class="h-3.5 w-3.5" />
+          <span class="font-mono text-muted-foreground">••••••••</span>
         {/if}
-      </Button>
+      </div>
+      {#if envVar.value !== ''}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="shrink-0"
+          aria-label={isRevealed ? `Hide value of ${envVar.key}` : `Reveal value of ${envVar.key}`}
+          onclick={() => onToggleReveal()}
+        >
+          {#if isRevealed}
+            <EyeOff class="h-3.5 w-3.5" />
+          {:else}
+            <Eye class="h-3.5 w-3.5" />
+          {/if}
+        </Button>
+      {/if}
     </div>
   </TableCell>
   <TableCell>
@@ -106,6 +124,23 @@
         {/snippet}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onclick={() => onEdit()}>
+          <PenToSquare class="mr-2 h-4 w-4" />
+          Edit value…
+        </DropdownMenuItem>
+        {#each otherFiles as target (target)}
+          <DropdownMenuItem onclick={() => onCopyTo(target)}>
+            <Copy class="mr-2 h-4 w-4" />
+            Copy to {target}
+          </DropdownMenuItem>
+        {/each}
+        {#each otherFiles as target (target)}
+          <DropdownMenuItem onclick={() => onMoveTo(target)}>
+            <ArrowRight class="mr-2 h-4 w-4" />
+            Move to {target}
+          </DropdownMenuItem>
+        {/each}
+        <DropdownMenuSeparator />
         {#if envVar.link}
           <DropdownMenuItem onclick={() => onCopyShared(envVar.link!)}>
             <Copy class="mr-2 h-4 w-4" />

@@ -16,7 +16,8 @@ use sha2::{Digest, Sha256};
 use super::entity::{ActiveModel, Column, Entity, Model};
 use crate::database::DatabaseManager;
 use crate::domains::credentials::services::{CredentialService, VaultSession};
-use crate::domains::deployments::services::detect::list_env_files;
+use crate::domains::deployments::services::detect::list_env_files_with;
+use super::files_entity as extra_files;
 use crate::domains::projects::move_lock;
 use crate::domains::projects::repositories::project_repository::ProjectRepository;
 
@@ -59,6 +60,8 @@ pub struct EnvVarView {
 #[ts(export, export_to = "../../../src/lib/domains/projects/generated/")]
 pub struct EnvFileView {
     pub name: String,
+    /// User-linked via a relative path (removable), as opposed to found in the project root.
+    pub linked: bool,
     pub vars: Vec<EnvVarView>,
 }
 
@@ -133,7 +136,8 @@ impl ProjectEnvService {
             .get_by_id(project_id)
             .await?
             .ok_or_else(|| "Project not found".to_string())?;
-        let files = list_env_files(&project.path);
+        let extras = self.extra_paths(project_id).await?;
+        let files = list_env_files_with(&project.path, &extras);
         let links = Entity::find()
             .filter(Column::ProjectId.eq(project_id))
             .all(&self.db)
@@ -161,6 +165,7 @@ impl ProjectEnvService {
             }
             file_views.push(EnvFileView {
                 name: file.name.clone(),
+                linked: extras.contains(&file.name),
                 vars,
             });
         }
@@ -184,6 +189,106 @@ impl ProjectEnvService {
         })
     }
 
+    async fn extra_paths(&self, project_id: i32) -> Result<Vec<String>, String> {
+        let rows = extra_files::Entity::find()
+            .filter(extra_files::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(rows.into_iter().map(|r| r.rel_path).collect())
+    }
+
+    /// Link an extra `.env*` file. Accepts a path relative to the project root, or an
+    /// absolute path inside it; stores it `/`-separated and relative.
+    pub async fn add_file(&self, project_id: i32, path: String) -> Result<String, String> {
+        let project = self
+            .projects
+            .get_by_id(project_id)
+            .await?
+            .ok_or_else(|| "Project not found".to_string())?;
+        let root = Path::new(&project.path);
+        let given = Path::new(path.trim());
+        let rel = if given.is_absolute() {
+            given
+                .strip_prefix(root)
+                .map_err(|_| "File must be inside the project folder".to_string())?
+        } else {
+            given
+        };
+        if rel
+            .components()
+            .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err("Use a plain relative path (no '..' or '.')".into());
+        }
+        if !root.join(rel).is_file() {
+            return Err(format!("Not a file: {}", rel.display()));
+        }
+        let rel = rel.to_string_lossy().replace('\\', "/");
+        if rel == ".env" || !rel.contains('/') && rel.starts_with(".env.") {
+            return Err("Already listed from the project root".into());
+        }
+        extra_files::Entity::delete_many()
+            .filter(extra_files::Column::ProjectId.eq(project_id))
+            .filter(extra_files::Column::RelPath.eq(rel.clone()))
+            .exec(&self.db)
+            .await
+            .map_err(|e| e.to_string())?;
+        extra_files::ActiveModel {
+            project_id: Set(project_id),
+            rel_path: Set(rel.clone()),
+            created_at: Set(chrono::Utc::now().to_rfc3339()),
+            ..Default::default()
+        }
+        .insert(&self.db)
+        .await
+        .map_err(|e| e.to_string())?;
+        Ok(rel)
+    }
+
+    /// Stop showing a linked file. Its credential links stay (they show as orphans).
+    pub async fn remove_file(&self, project_id: i32, rel_path: String) -> Result<(), String> {
+        extra_files::Entity::delete_many()
+            .filter(extra_files::Column::ProjectId.eq(project_id))
+            .filter(extra_files::Column::RelPath.eq(rel_path))
+            .exec(&self.db)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Set (`Some`) or remove (`None`) one key in a listed `.env*` file, leaving every
+    /// other line (comments, order, blanks) untouched. Only files this view lists are
+    /// writable, so `file_name` can't point anywhere else. Creates the file if absent.
+    pub async fn set_var(
+        &self,
+        project_id: i32,
+        file_name: String,
+        key: String,
+        value: Option<String>,
+    ) -> Result<(), String> {
+        let project = self
+            .projects
+            .get_by_id(project_id)
+            .await?
+            .ok_or_else(|| "Project not found".to_string())?;
+        move_lock::ensure_unlocked(Path::new(&project.path))?;
+        let key = key.trim().to_string();
+        if key.is_empty() || key.contains(['=', '\n', ' ']) {
+            return Err("Invalid key".into());
+        }
+        let extras = self.extra_paths(project_id).await?;
+        if !list_env_files_with(&project.path, &extras)
+            .iter()
+            .any(|f| f.name == file_name)
+        {
+            return Err("Unknown .env file".into());
+        }
+        let path = Path::new(&project.path).join(&file_name);
+        let text = std::fs::read_to_string(&path).unwrap_or_default();
+        std::fs::write(&path, apply_var(&text, &key, value.as_deref())).map_err(|e| e.to_string())
+    }
+
     /// Upsert on `(project_id, env_key, file_name)` — snapshots are taken now.
     pub async fn link(
         &self,
@@ -199,7 +304,8 @@ impl ProjectEnvService {
             .ok_or_else(|| "Project not found".to_string())?;
         move_lock::ensure_unlocked(Path::new(&project.path))?;
         let credential = self.credentials.get_credential(&credential_id).await?;
-        let current_value = current_file_value(&project.path, &file_name, &env_key);
+        let extras = self.extra_paths(project_id).await?;
+        let current_value = current_file_value(&project.path, &extras, &file_name, &env_key);
 
         Entity::delete_many()
             .filter(Column::ProjectId.eq(project_id))
@@ -251,7 +357,9 @@ impl ProjectEnvService {
             .credentials
             .get_credential(&model.credential_id)
             .await?;
-        let current_value = current_file_value(&project.path, &model.file_name, &model.env_key);
+        let extras = self.extra_paths(model.project_id).await?;
+        let current_value =
+            current_file_value(&project.path, &extras, &model.file_name, &model.env_key);
 
         let mut active: ActiveModel = model.into();
         active.file_value_hash = Set(current_value.as_deref().map(hash_value));
@@ -302,8 +410,13 @@ impl ProjectEnvService {
 }
 
 /// The value of `env_key` in the specific `.env*` file named, live off disk.
-fn current_file_value(project_path: &str, file_name: &str, env_key: &str) -> Option<String> {
-    list_env_files(project_path)
+fn current_file_value(
+    project_path: &str,
+    extras: &[String],
+    file_name: &str,
+    env_key: &str,
+) -> Option<String> {
+    list_env_files_with(project_path, extras)
         .into_iter()
         .find(|f| f.name == file_name)?
         .vars
@@ -312,9 +425,73 @@ fn current_file_value(project_path: &str, file_name: &str, env_key: &str) -> Opt
         .map(|v| v.value)
 }
 
+/// Rewrite `text` with `key` set to `value` (or removed). Replaces the first matching
+/// line in place, drops any later duplicates, appends if new.
+fn apply_var(text: &str, key: &str, value: Option<&str>) -> String {
+    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let new_line = value.map(|v| {
+        let plain = v
+            .chars()
+            .all(|c| !c.is_whitespace() && !matches!(c, '#' | '"' | '\'' | '='));
+        if plain {
+            format!("{key}={v}")
+        } else {
+            format!("{key}=\"{}\"", v.replace('"', "\\\""))
+        }
+    });
+    let mut out: Vec<String> = Vec::new();
+    let mut done = false;
+    for line in text.lines() {
+        let t = line.trim();
+        let t = t.strip_prefix("export ").unwrap_or(t);
+        let is_key = !t.starts_with('#')
+            && t.split_once('=').map(|(k, _)| k.trim() == key).unwrap_or(false);
+        if !is_key {
+            out.push(line.to_string());
+        } else if !done {
+            done = true;
+            if let Some(l) = &new_line {
+                out.push(l.clone());
+            }
+        }
+    }
+    if !done {
+        if let Some(l) = new_line {
+            out.push(l);
+        }
+    }
+    let mut s = out.join(eol);
+    if !s.is_empty() {
+        s.push_str(eol);
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn apply_var_replaces_appends_removes() {
+        let t = "# c
+A=1
+B=2
+";
+        assert_eq!(apply_var(t, "A", Some("x y")), "# c
+A=\"x y\"
+B=2
+");
+        assert_eq!(apply_var(t, "C", Some("3")), "# c
+A=1
+B=2
+C=3
+");
+        assert_eq!(apply_var(t, "A", None), "# c
+B=2
+");
+        assert_eq!(apply_var("", "A", Some("")), "A=
+");
+    }
 
     #[test]
     fn not_in_file_wins_first() {

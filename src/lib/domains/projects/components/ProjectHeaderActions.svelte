@@ -23,6 +23,8 @@
     githubUrl: string | null;
     isDeploying: boolean;
     refreshing: boolean;
+    /** Rail is docked beside the page (Overview, md+): the Details button is only for the Sheet. */
+    railDocked?: boolean;
     onShowDetails: () => void;
     onOpenEditor: () => void;
     onOpenFolder: () => void;
@@ -37,6 +39,7 @@
     githubUrl,
     isDeploying,
     refreshing,
+    railDocked = false,
     onShowDetails,
     onOpenEditor,
     onOpenFolder,
@@ -50,24 +53,16 @@
 
 <Button
   variant="outline"
-  size="icon"
   onclick={onShowDetails}
-  class="md:hidden"
+  class="gap-2 {railDocked ? 'md:hidden' : ''}"
   aria-label="Project details"
 >
   <Info class="h-4 w-4" />
+  Details
 </Button>
 <Button onclick={onOpenEditor} class="gap-2">
   <Code class="h-4 w-4" />
   Open in editor
-</Button>
-<Button variant="outline" onclick={onOpenFolder} class="gap-2">
-  <FolderOpen class="h-4 w-4" />
-  Open folder
-</Button>
-<Button variant="outline" onclick={onTerminal} class="gap-2">
-  <Terminal class="h-4 w-4" />
-  Terminal
 </Button>
 <DropdownMenu>
   <DropdownMenuTrigger class={buttonVariants({ variant: 'outline' })} aria-label="More actions">
@@ -75,6 +70,14 @@
     More
   </DropdownMenuTrigger>
   <DropdownMenuContent align="end">
+    <DropdownMenuItem onSelect={onOpenFolder}>
+      <FolderOpen class="h-4 w-4" />
+      Open folder
+    </DropdownMenuItem>
+    <DropdownMenuItem onSelect={onTerminal}>
+      <Terminal class="h-4 w-4" />
+      Terminal
+    </DropdownMenuItem>
     <DropdownMenuItem onSelect={onEdit}>
       <Edit class="h-4 w-4" />
       Edit

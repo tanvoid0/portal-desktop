@@ -1,13 +1,23 @@
 <!--
-	Per-project .env viewer: live off disk every load, with optional linking to
-	shared vault credentials so drift between the file and the shared value
-	shows up as a badge instead of a surprise.
+	Per-project .env viewer: live off disk every load, one tab per .env file
+	(plus "All" overview), copy/move/edit values between files, and optional
+	linking to shared vault credentials so drift shows up as a badge.
 -->
 <script lang="ts">
   import { createProjectEnvQuery } from '../queries/projectEnvQueries';
-  import { linkProjectEnv, unlinkProjectEnv, resyncProjectEnvLink } from '../api/projectEnvApi';
+  import {
+    linkProjectEnv,
+    unlinkProjectEnv,
+    resyncProjectEnvLink,
+    addProjectEnvFile,
+    removeProjectEnvFile,
+    setProjectEnvVar,
+  } from '../api/projectEnvApi';
   import type { EnvLinkView, EnvVarView } from '../generated';
   import ProjectEnvRow from './ProjectEnvRow.svelte';
+  import ProjectEnvOverview from './ProjectEnvOverview.svelte';
+  import ProjectEnvFileDialog from './ProjectEnvFileDialog.svelte';
+  import ProjectEnvValueDialog from './ProjectEnvValueDialog.svelte';
   import LinkCredentialDialog from './LinkCredentialDialog.svelte';
   import { queryClient } from '$lib/domains/shared/query/queryClient';
   import { queryKeys } from '$lib/domains/shared/query/keys';
@@ -18,17 +28,20 @@
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Table, TableBody, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
   import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
   import { PageEmpty, PageError, PageLoading } from '$lib/components/shell';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import UnlinkIcon from '~icons/fa6-solid/link-slash';
   import FileKey from '~icons/fa6-solid/key';
+  import PlusIcon from '~icons/fa6-solid/plus';
 
   interface Props {
     projectId: number;
+    projectPath?: string;
     enabled?: boolean;
   }
 
-  const { projectId, enabled = true }: Props = $props();
+  const { projectId, projectPath, enabled = true }: Props = $props();
 
   const envQuery = createProjectEnvQuery(
     () => projectId,
@@ -47,6 +60,52 @@
   function invalidate() {
     return queryClient.invalidateQueries({ queryKey: queryKeys.projects.env(projectId) });
   }
+
+  /** 'all' or a file name. */
+  let scope = $state('all');
+  const files = $derived(projectEnv?.files ?? []);
+  const activeFile = $derived(files.find((f) => f.name === scope) ?? null);
+  // A removed file falls back to the overview instead of an empty pane.
+  $effect(() => {
+    if (scope !== 'all' && !activeFile && files.length) scope = 'all';
+  });
+
+  let addFileOpen = $state(false);
+  let editTarget = $state<{ fileName: string; key: string; value: string } | null>(null);
+
+  async function run(action: () => Promise<void>, ok: string) {
+    try {
+      await action();
+      await invalidate();
+      toast.success(ok);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed');
+    }
+  }
+
+  async function handleAddFile(path: string) {
+    try {
+      const rel = await addProjectEnvFile(projectId, path);
+      await invalidate();
+      addFileOpen = false;
+      scope = rel;
+      toast.success(`Linked ${rel}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to link file');
+    }
+  }
+
+  const handleRemoveFile = (name: string) =>
+    run(() => removeProjectEnvFile(projectId, name), `Stopped showing ${name}`);
+
+  const handleCopy = (v: EnvVarView, from: string, to: string, move: boolean) =>
+    run(
+      async () => {
+        await setProjectEnvVar(projectId, to, v.key, v.value);
+        if (move) await setProjectEnvVar(projectId, from, v.key, null);
+      },
+      `${move ? 'Moved' : 'Copied'} ${v.key} to ${to}`
+    );
 
   async function handleUnlockToCompare() {
     if (await vaultGate.ensureUnlocked()) void invalidate();
@@ -119,18 +178,24 @@
 <div class="space-y-6">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <p class="text-sm text-muted-foreground">
-      Read from disk each time. Portal never edits your .env files.
+      Read from disk each time. Portal only writes a .env line when you edit, copy or move a value.
     </p>
-    <Button
-      variant="ghost"
-      size="sm"
-      class="gap-2"
-      onclick={() => envQuery.refetch()}
-      disabled={envQuery.isFetching}
-    >
-      <RefreshCw class="h-4 w-4 {envQuery.isFetching ? 'animate-spin' : ''}" />
-      Refresh
-    </Button>
+    <div class="flex items-center gap-1">
+      <Button variant="outline" size="sm" class="gap-2" onclick={() => (addFileOpen = true)}>
+        <PlusIcon class="h-3.5 w-3.5" />
+        Link file
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        class="gap-2"
+        onclick={() => envQuery.refetch()}
+        disabled={envQuery.isFetching}
+      >
+        <RefreshCw class="h-4 w-4 {envQuery.isFetching ? 'animate-spin' : ''}" />
+        Refresh
+      </Button>
+    </div>
   </div>
 
   {#if envQuery.isPending}
@@ -142,51 +207,97 @@
       onRetry={() => envQuery.refetch()}
     />
   {:else if projectEnv}
-    {#if projectEnv.files.length === 0}
+    {#if files.length === 0}
       <PageEmpty
         title="No .env files found"
-        description="No .env files found in this project's folder."
+        description="None in the project root. Use “Link file” for one in a sub-folder."
         icon={FileKey}
       />
     {:else}
-      {#each projectEnv.files as file (file.name)}
-        <Card>
-          <CardHeader>
-            <CardTitle class="font-mono text-sm">{file.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Key</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Link</TableHead>
-                  <TableHead class="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {#each file.vars as envVar, i (envVar.key + ':' + i)}
-                  {@const id = `${file.name}:${envVar.key}`}
-                  {@const isRevealed = revealed.has(id)}
-                  <ProjectEnvRow
-                    {envVar}
-                    fileName={file.name}
-                    {isRevealed}
-                    onToggleReveal={() => toggleReveal(id)}
-                    onUnlockToCompare={handleUnlockToCompare}
-                    onCopyShared={handleCopyShared}
-                    onUpdateShared={handleUpdateSharedFromFile}
-                    onResync={handleResync}
-                    onUnlink={handleUnlink}
-                    onLink={(t) => (linkDialogTarget = t)}
-                    onCreate={(t) => (createFor = t)}
-                  />
-                {/each}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      {/each}
+      <div class="flex flex-wrap items-center gap-1.5">
+        <Button
+          size="sm"
+          variant={scope === 'all' ? 'default' : 'outline'}
+          onclick={() => (scope = 'all')}
+        >
+          All
+        </Button>
+        {#each files as f (f.name)}
+          <Button
+            size="sm"
+            variant={scope === f.name ? 'default' : 'outline'}
+            class="font-mono"
+            onclick={() => (scope = f.name)}
+          >
+            {f.name}
+            <Badge variant="secondary" class="ml-1.5 px-1.5">{f.vars.length}</Badge>
+          </Button>
+        {/each}
+      </div>
+
+      <Card>
+        <CardContent>
+          {#if activeFile}
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <span class="truncate font-mono text-sm">{activeFile.name}</span>
+              {#if activeFile.linked}
+                <Button variant="ghost" size="sm" onclick={() => handleRemoveFile(activeFile.name)}>
+                  <UnlinkIcon class="mr-2 h-3.5 w-3.5" />
+                  Stop showing
+                </Button>
+              {/if}
+            </div>
+            {#if activeFile.vars.length === 0}
+              <p class="py-6 text-center text-sm text-muted-foreground">
+                No variables in this file.
+              </p>
+            {:else}
+              {@const otherFiles = files
+                .filter((f) => f.name !== activeFile.name)
+                .map((f) => f.name)}
+              <Table class="table-fixed">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead class="w-[30%]">Key</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead class="w-[24%]">Link</TableHead>
+                    <TableHead class="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {#each activeFile.vars as envVar, i (envVar.key + ':' + i)}
+                    {@const id = `${activeFile.name}:${envVar.key}`}
+                    <ProjectEnvRow
+                      {envVar}
+                      fileName={activeFile.name}
+                      {otherFiles}
+                      onCopyTo={(t) => handleCopy(envVar, activeFile.name, t, false)}
+                      onMoveTo={(t) => handleCopy(envVar, activeFile.name, t, true)}
+                      onEdit={() =>
+                        (editTarget = {
+                          fileName: activeFile.name,
+                          key: envVar.key,
+                          value: envVar.value,
+                        })}
+                      isRevealed={revealed.has(id)}
+                      onToggleReveal={() => toggleReveal(id)}
+                      onUnlockToCompare={handleUnlockToCompare}
+                      onCopyShared={handleCopyShared}
+                      onUpdateShared={handleUpdateSharedFromFile}
+                      onResync={handleResync}
+                      onUnlink={handleUnlink}
+                      onLink={(t) => (linkDialogTarget = t)}
+                      onCreate={(t) => (createFor = t)}
+                    />
+                  {/each}
+                </TableBody>
+              </Table>
+            {/if}
+          {:else}
+            <ProjectEnvOverview {files} onSelect={(n) => (scope = n)} />
+          {/if}
+        </CardContent>
+      </Card>
     {/if}
 
     {#if projectEnv.orphanLinks.length > 0}
@@ -217,6 +328,28 @@
     {/if}
   {/if}
 </div>
+
+{#if addFileOpen}
+  <ProjectEnvFileDialog
+    {projectPath}
+    onSubmit={handleAddFile}
+    onClose={() => (addFileOpen = false)}
+  />
+{/if}
+
+{#if editTarget}
+  <ProjectEnvValueDialog
+    envKey={editTarget.key}
+    fileName={editTarget.fileName}
+    value={editTarget.value}
+    onSubmit={async (v) => {
+      const t = editTarget!;
+      await run(() => setProjectEnvVar(projectId, t.fileName, t.key, v), 'Saved');
+      editTarget = null;
+    }}
+    onClose={() => (editTarget = null)}
+  />
+{/if}
 
 {#if linkDialogTarget}
   <LinkCredentialDialog

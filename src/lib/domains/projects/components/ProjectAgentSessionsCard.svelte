@@ -22,7 +22,9 @@
   </CardHeader>
   <CardContent class="space-y-1.5">
     {#if sessions.length === 0}
-      <p class="text-sm text-muted-foreground">No runs yet.</p>
+      <p class="text-sm text-muted-foreground">
+        No agent sessions yet. Start one to work on this project with an agent.
+      </p>
     {:else}
       {#each sessions as session (session.id)}
         <Button

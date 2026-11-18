@@ -16,6 +16,14 @@
 
   let copied = $state(false);
 
+  // Keep the drive and the last folders visible; the full path stays in the tooltip.
+  const shown = $derived.by(() => {
+    const parts = project.path.split(/[\/]/);
+    return project.path.length > 56 && parts.length > 4
+      ? `${parts[0]}\…\${parts.slice(-3).join('\')}`
+      : project.path;
+  });
+
   async function copyPath() {
     await navigator.clipboard.writeText(project.path);
     copied = true;
@@ -24,7 +32,7 @@
 </script>
 
 <div class="flex min-w-0 items-center gap-1 text-muted-foreground">
-  <span class="truncate font-mono text-xs" title={project.path}>{project.path}</span>
+  <span class="truncate font-mono text-xs" title={project.path}>{shown}</span>
   <Button
     variant="ghost"
     size="sm"

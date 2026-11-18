@@ -274,6 +274,28 @@ fn parse_env_file(path: &Path) -> Vec<EnvVar> {
 /// deploy UI to offer "load from .env" instead of manual entry. Returns empty if
 /// the directory cannot be read.
 pub fn list_env_files(project_path: &str) -> Vec<EnvFile> {
+    list_env_files_with(project_path, &[])
+}
+
+/// [`list_env_files`] plus user-linked files at `extra` paths relative to the
+/// project root (`name` is that relative path, `/`-separated). A linked file
+/// that no longer exists comes back with no vars.
+pub fn list_env_files_with(project_path: &str, extra: &[String]) -> Vec<EnvFile> {
+    let mut out = list_root_env_files(project_path);
+    for rel in extra {
+        if out.iter().any(|f| &f.name == rel) {
+            continue;
+        }
+        let vars = parse_env_file(&Path::new(project_path).join(rel));
+        out.push(EnvFile {
+            name: rel.clone(),
+            vars,
+        });
+    }
+    out
+}
+
+fn list_root_env_files(project_path: &str) -> Vec<EnvFile> {
     let dir = Path::new(project_path);
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();

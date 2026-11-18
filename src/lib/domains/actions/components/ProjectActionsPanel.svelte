@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { page } from '$app/state';
+  import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent } from '$lib/components/ui/card';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import Play from '~icons/fa6-solid/play';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import type { Project } from '$lib/domains/projects/types';
@@ -26,6 +29,29 @@
   let { project, enabled = true }: Props = $props();
 
   const a = new ProjectActionsState(() => ({ project, enabled }));
+
+  const SUBS = ['catalog', 'history', 'generate', 'release', 'github'];
+  const initialSub = page.url.searchParams.get('sub');
+  let tab = $state(SUBS.includes(initialSub ?? '') ? (initialSub as string) : 'catalog');
+  const failedRuns = $derived(a.runHistory.filter((r) => r.status === 'failed').length);
+
+  // Keep the sub-tab in the URL (replace, no history entry) so refresh and links land on it.
+  $effect(() => {
+    const params = new URLSearchParams(page.url.search);
+    if (params.get('sub') === tab) return;
+    params.set('sub', tab);
+    void goto(`${page.url.pathname}?${params}`, { replaceState: true, reset: false });
+  });
+  const showGithub = $derived(a.sourceFilter === 'all' || a.sourceFilter === 'github');
+
+  // Opening a run (from anywhere) jumps to the History tab, where its output lives.
+  $effect(() => {
+    if (a.selectedRunId) tab = 'history';
+  });
+  // Starting a run with no selection yet still shows its result in History.
+  $effect(() => {
+    if (a.lastResult) tab = 'history';
+  });
 </script>
 
 <div class="space-y-6">
@@ -54,34 +80,152 @@
         <RefreshCw class="h-4 w-4" />
         Refresh
       </Button>
-      <Button
-        type="button"
-        size="sm"
-        class="gap-2"
-        onclick={() => void a.runSelected()}
-        disabled={a.running || a.selected.size === 0}
-      >
-        <Play class="h-4 w-4" />
-        {a.running ? 'Running…' : `Run selected (${a.selected.size})`}
-      </Button>
+      {#if a.selected.size > 0 || a.running}
+        <Button
+          type="button"
+          size="sm"
+          class="gap-2"
+          onclick={() => void a.runSelected()}
+          disabled={a.running}
+        >
+          <Play class="h-4 w-4" />
+          {a.running ? 'Running…' : `Run selected (${a.selected.size})`}
+        </Button>
+      {/if}
     </div>
   </div>
 
-  <div class="flex flex-col gap-6 xl:flex-row xl:items-start">
-    <ActionCatalogSidebar
-      actions={a.filteredActions}
-      workflows={a.filteredWorkflows}
-      warnings={a.warnings}
-      loading={a.loading}
-      running={a.running}
-      selected={a.selected}
-      bind:sourceFilter={a.sourceFilter}
-      onToggleSelect={a.toggleSelect}
-      onRun={(id, e) => void a.runTarget(id, e)}
+  {#if a.shownFailure}
+    {@const failure = a.shownFailure}
+    <DoctorFailureCard
+      {failure}
+      run={a.doctorRun}
+      busy={a.doctorBusy || a.genRunning}
+      onDiagnose={() => void a.diagnoseFailure(failure)}
+      onOpenThread={(id) => void a.openThread(id)}
     />
+  {/if}
 
-    <!-- Run details + history -->
-    <div class="min-w-0 flex-1 space-y-4">
+  {#if a.doctorRun.proposal}
+    <DoctorProposalCard
+      proposal={a.doctorRun.proposal}
+      reviewThreadId={a.doctorRun.reviewThreadId}
+      onVerify={() => void a.verifyFix()}
+      onOpenThread={(id) => void a.openThread(id)}
+    />
+  {/if}
+
+  {#if a.doctorRun.reviewThreadId && !a.shownFailure && !a.doctorRun.proposal}
+    <Card class="border-primary/30">
+      <CardContent class="flex flex-wrap items-center gap-2 py-3">
+        <span class="text-sm">
+          {a.doctorRun.status === 'fixed' ? 'Fixed' : 'Agent changes'} · pending your review in Coder
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="link"
+          onclick={() => void a.openThread(a.doctorRun.reviewThreadId!)}
+        >
+          Review changes in Coder
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          class="ml-auto"
+          onclick={() => dismissReviewPointer(project.id)}
+        >
+          Dismiss
+        </Button>
+      </CardContent>
+    </Card>
+  {/if}
+
+  {#if a.doctorRun.report}
+    <DoctorReportCard report={a.doctorRun.report} />
+  {/if}
+
+  <Tabs bind:value={tab}>
+    <TabsList>
+      <TabsTrigger value="catalog">Catalog</TabsTrigger>
+      <TabsTrigger value="history"
+        >History ({a.runHistory.length}){#if failedRuns > 0}<span
+            class="ml-1.5 rounded-full bg-destructive/15 px-1.5 text-xs text-destructive"
+            >{failedRuns} failed</span
+          >{/if}</TabsTrigger
+      >
+      <TabsTrigger value="generate">Generate</TabsTrigger>
+      <TabsTrigger value="release">Release</TabsTrigger>
+      {#if showGithub}<TabsTrigger value="github">GitHub runs</TabsTrigger>{/if}
+    </TabsList>
+
+    <TabsContent value="catalog" class="mt-4">
+      <ActionCatalogSidebar
+        actions={a.filteredActions}
+        workflows={a.filteredWorkflows}
+        warnings={a.warnings}
+        loading={a.loading}
+        running={a.running}
+        selected={a.selected}
+        bind:sourceFilter={a.sourceFilter}
+        onToggleSelect={a.toggleSelect}
+        onRun={(id, e) => void a.runTarget(id, e)}
+      />
+    </TabsContent>
+
+    <TabsContent value="history" class="mt-4">
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        <div class="min-w-0">
+          <RunHistoryCard
+            runs={a.runHistory}
+            loading={a.historyLoading}
+            selectedId={a.selectedRunId}
+            onRefresh={() => void a.loadHistory()}
+            onSelect={(e, opts) => a.openExecution(e.id, opts)}
+            onStarted={(id) => {
+              a.openExecution(id);
+              void a.loadHistory();
+            }}
+            onChanged={(deletedId) => {
+              if (deletedId && deletedId === a.selectedRunId) a.selectedRunId = null;
+              void a.loadHistory();
+            }}
+          />
+        </div>
+        <div class="min-w-0">
+          {#if a.selectedRunId && a.selectedKind && a.selectedKind !== 'action'}
+            <PipelineRunDetail
+              executionId={a.selectedRunId}
+              onClose={() => (a.selectedRunId = null)}
+            />
+          {:else if a.selectedRunId}
+            <ActionRunDetail
+              executionId={a.selectedRunId}
+              bind:terminal={a.runTerminal}
+              onStarted={(id) => {
+                a.openExecution(id);
+                void a.loadHistory();
+              }}
+              onSelectExecution={(id) => {
+                a.pinnedRun = true;
+                a.openExecution(id);
+              }}
+              onChanged={() => void a.loadHistory()}
+              onClose={() => (a.selectedRunId = null)}
+            />
+          {:else if a.lastResult}
+            <LastRunCard result={a.lastResult} onOpenExecution={(id) => a.openExecution(id)} />
+          {:else}
+            <p class="py-8 text-center text-sm text-muted-foreground">
+              Select a run to see its output.
+            </p>
+          {/if}
+        </div>
+      </div>
+    </TabsContent>
+
+    <TabsContent value="generate" class="mt-4">
       <PipelineGeneratorCard
         bind:requirement={a.requirement}
         run={a.genRun}
@@ -90,108 +234,16 @@
         onGenerate={() => void a.generate()}
         onOpenThread={(id) => void a.openThread(id)}
       />
+    </TabsContent>
 
-      {#if a.shownFailure}
-        {@const failure = a.shownFailure}
-        <DoctorFailureCard
-          {failure}
-          run={a.doctorRun}
-          busy={a.doctorBusy || a.genRunning}
-          onDiagnose={() => void a.diagnoseFailure(failure)}
-          onOpenThread={(id) => void a.openThread(id)}
-        />
-      {/if}
+    <TabsContent value="release" class="mt-4">
+      <ReleaseCard {project} />
+    </TabsContent>
 
-      {#if a.doctorRun.proposal}
-        <DoctorProposalCard
-          proposal={a.doctorRun.proposal}
-          reviewThreadId={a.doctorRun.reviewThreadId}
-          onVerify={() => void a.verifyFix()}
-          onOpenThread={(id) => void a.openThread(id)}
-        />
-      {/if}
-
-      {#if a.doctorRun.reviewThreadId && !a.shownFailure && !a.doctorRun.proposal}
-        <Card class="border-primary/30">
-          <CardContent class="flex flex-wrap items-center gap-2 py-3">
-            <span class="text-sm">
-              {a.doctorRun.status === 'fixed' ? 'Fixed' : 'Agent changes'} · pending your review in Coder
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant="link"
-              onclick={() => void a.openThread(a.doctorRun.reviewThreadId!)}
-            >
-              Review changes in Coder
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              class="ml-auto"
-              onclick={() => dismissReviewPointer(project.id)}
-            >
-              Dismiss
-            </Button>
-          </CardContent>
-        </Card>
-      {/if}
-
-      {#if a.doctorRun.report}
-        <DoctorReportCard report={a.doctorRun.report} />
-      {/if}
-
-      <div class="grid gap-4 min-[2200px]:grid-cols-2 min-[2200px]:items-start">
-        {#if a.selectedRunId && a.selectedKind && a.selectedKind !== 'action'}
-          <PipelineRunDetail
-            executionId={a.selectedRunId}
-            onClose={() => (a.selectedRunId = null)}
-          />
-        {:else if a.selectedRunId}
-          <ActionRunDetail
-            executionId={a.selectedRunId}
-            bind:terminal={a.runTerminal}
-            onStarted={(id) => {
-              a.openExecution(id);
-              void a.loadHistory();
-            }}
-            onSelectExecution={(id) => {
-              a.pinnedRun = true;
-              a.openExecution(id);
-            }}
-            onChanged={() => void a.loadHistory()}
-            onClose={() => (a.selectedRunId = null)}
-          />
-        {:else if a.lastResult}
-          <LastRunCard result={a.lastResult} onOpenExecution={(id) => a.openExecution(id)} />
-        {/if}
-
-        <RunHistoryCard
-          runs={a.runHistory}
-          loading={a.historyLoading}
-          selectedId={a.selectedRunId}
-          onRefresh={() => void a.loadHistory()}
-          onSelect={(e, opts) => a.openExecution(e.id, opts)}
-          onStarted={(id) => {
-            a.openExecution(id);
-            void a.loadHistory();
-          }}
-          onChanged={(deletedId) => {
-            if (deletedId && deletedId === a.selectedRunId) a.selectedRunId = null;
-            void a.loadHistory();
-          }}
-        />
-      </div>
-    </div>
-  </div>
-
-  <ReleaseCard {project} />
-
-  {#if a.sourceFilter === 'all' || a.sourceFilter === 'github'}
-    <div class="space-y-3 border-t pt-6">
-      <h3 class="text-sm font-medium text-muted-foreground">GitHub Actions runs</h3>
-      <GitHubProjectActionsPanel {project} {enabled} />
-    </div>
-  {/if}
+    {#if showGithub}
+      <TabsContent value="github" class="mt-4">
+        <GitHubProjectActionsPanel {project} {enabled} />
+      </TabsContent>
+    {/if}
+  </Tabs>
 </div>

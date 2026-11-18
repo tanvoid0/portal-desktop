@@ -2,6 +2,7 @@
 //! re-reads `.env*` files live off disk — see [`service::ProjectEnvService`].
 
 pub mod entity;
+pub mod files_entity;
 pub mod service;
 
 pub use service::{

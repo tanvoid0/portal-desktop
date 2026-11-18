@@ -65,6 +65,7 @@
           {githubUrl}
           isDeploying={d.isDeploying}
           refreshing={d.refreshing}
+          railDocked={d.displayTab === 'overview'}
           onShowDetails={() => (d.factsOpen = true)}
           onOpenEditor={d.handleOpenInEditor}
           onOpenFolder={d.handleOpenInExplorer}
@@ -140,7 +141,11 @@
           </TabsContent>
 
           <TabsContent value="env" class="mt-6">
-            <ProjectEnv projectId={Number(currentProject.id)} enabled={d.activeTab === 'env'} />
+            <ProjectEnv
+              projectId={Number(currentProject.id)}
+              projectPath={currentProject.path}
+              enabled={d.activeTab === 'env'}
+            />
           </TabsContent>
 
           <TabsContent value="terminal" class="mt-6">
@@ -159,8 +164,14 @@
         </Tabs>
       </div>
 
-      <!-- Reference facts stay on screen while you work in Actions or Terminal. -->
-      <ResponsivePanel bind:open={d.factsOpen} side="right" desktopClass="w-80" title="Details">
+      <!-- Docked on Overview; on work tabs it is a Sheet behind the header's Details button. -->
+      <ResponsivePanel
+        bind:open={d.factsOpen}
+        side="right"
+        desktopClass="w-80"
+        title="Details"
+        collapsed={d.displayTab !== 'overview'}
+      >
         <div class="space-y-4 overflow-y-auto p-4">
           {#if d.about}
             <Card>
@@ -186,6 +197,7 @@
             {githubUrl}
             refreshing={d.refreshing}
             onRedetect={d.handleRedetect}
+            onTerminal={d.switchToTerminal}
           />
           <ProjectAgentSessionsCard project={currentProject} sessions={d.agentSessionsForProject} />
         </div>

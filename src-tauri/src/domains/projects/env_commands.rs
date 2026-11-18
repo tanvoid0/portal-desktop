@@ -60,3 +60,41 @@ pub async fn resync_project_env_link(
         .resync(link_id)
         .await
 }
+
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn add_project_env_file(
+    project_id: i32,
+    path: String,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<String, String> {
+    ProjectEnvService::new(&db, session.inner().clone())
+        .add_file(project_id, path)
+        .await
+}
+
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn remove_project_env_file(
+    project_id: i32,
+    rel_path: String,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<(), String> {
+    ProjectEnvService::new(&db, session.inner().clone())
+        .remove_file(project_id, rel_path)
+        .await
+}
+
+#[portal_rpc_macro::rpc(local_only)]
+pub async fn set_project_env_var(
+    project_id: i32,
+    file_name: String,
+    key: String,
+    value: Option<String>,
+    db: State<'_, Arc<DatabaseManager>>,
+    session: State<'_, Arc<VaultSession>>,
+) -> Result<(), String> {
+    ProjectEnvService::new(&db, session.inner().clone())
+        .set_var(project_id, file_name, key, value)
+        .await
+}

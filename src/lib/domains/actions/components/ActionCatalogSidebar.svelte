@@ -1,4 +1,4 @@
-<!-- Left rail of the Actions tab: source filter, catalog warnings, workflow and action cards with Run. -->
+<!-- Catalog tab of Actions: source filter, catalog warnings, workflow and action cards with Run. -->
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
@@ -62,9 +62,7 @@
   }
 </script>
 
-<aside
-  class="w-full shrink-0 space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:w-80 xl:overflow-y-auto 2xl:w-96"
->
+<aside class="w-full min-w-0 space-y-4">
   <div class="flex flex-wrap gap-2">
     {#each FILTERS as filter (filter.id)}
       <Button
@@ -78,11 +76,17 @@
   </div>
 
   {#if warnings.length > 0}
-    <div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
-      {#each warnings as warning (warning)}
-        <p>{warning}</p>
-      {/each}
-    </div>
+    <details class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-sm">
+      <summary class="cursor-pointer text-amber-700 select-none dark:text-amber-400">
+        {warnings.length}
+        {warnings.length === 1 ? 'source unavailable' : 'sources unavailable'}
+      </summary>
+      <div class="space-y-1 py-1.5">
+        {#each warnings as warning (warning)}
+          <p>{warning}</p>
+        {/each}
+      </div>
+    </details>
   {/if}
 
   {#if loading}
@@ -90,14 +94,14 @@
   {:else if actions.length === 0 && workflows.length === 0}
     <PageEmpty
       title="No actions available"
-      description="Add framework/package manager metadata, or create a .portal/pipeline.yml in the project root."
+      description="Add framework/package manager metadata, create a .portal/pipeline.yml, or use the Generate tab to have an agent write one."
       icon={Workflow}
     />
   {:else}
     {#if workflows.length > 0}
       <div class="space-y-2">
         <h3 class="text-sm font-medium text-muted-foreground">Workflows</h3>
-        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
+        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {#each workflows as workflow (workflow.id)}
             {@const Icon = sourceIcon(workflow.source)}
             <Card>
@@ -149,7 +153,7 @@
 
     <div class="space-y-2">
       <h3 class="text-sm font-medium text-muted-foreground">Actions</h3>
-      <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
+      <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {#each actions as action (action.id)}
           {@const Icon = sourceIcon(action.source)}
           <Card>
