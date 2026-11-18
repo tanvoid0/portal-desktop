@@ -160,7 +160,19 @@
     }
   }
 
-  onMount(refresh);
+  // Runs can start outside this card (daemon, another window), and there is no
+  // pipeline event to listen for — so re-read the run list while the card is on screen.
+  // ponytail: polling; swap for a pipeline-run event if the backend grows one.
+  async function refreshRuns() {
+    if (!described || document.hidden) return;
+    runs = await invoke<ReleaseRun[]>('release_list', { projectId, limit: 5 }).catch(() => runs);
+  }
+
+  onMount(() => {
+    refresh();
+    const timer = setInterval(refreshRuns, 3000);
+    return () => clearInterval(timer);
+  });
 </script>
 
 {#if loaded && !described}
