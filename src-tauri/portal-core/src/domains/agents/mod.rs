@@ -13,6 +13,7 @@ pub mod entities;
 pub mod events;
 pub mod process;
 pub mod service;
+pub mod transcripts;
 
 pub use events::AgentEvent;
 pub use service::AgentRunService;

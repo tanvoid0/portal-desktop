@@ -302,6 +302,25 @@ pub fn run() {
                 Ok(_) => {}
                 Err(e) => log_warn!("Agents", "Failed to reconcile stale sessions: {}", e),
             }
+            // Surface Claude Code sessions Portal didn't start (terminal,
+            // desktop app) from ~/.claude/projects; 30s poll, mtime-gated.
+            {
+                let db = db_manager_arc.clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        match domains::agents::transcripts::sync_claude_transcripts(&db)
+                            .await
+                        {
+                            Ok(n) if n > 0 => {
+                                log_info!("Agents", "Imported {} Claude Code sessions", n)
+                            }
+                            Ok(_) => {}
+                            Err(e) => log_warn!("Agents", "Transcript import failed: {}", e),
+                        }
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                    }
+                });
+            }
             app.manage(agents_service);
 
             // Initialize pipeline services
