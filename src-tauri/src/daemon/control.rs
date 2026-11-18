@@ -39,10 +39,7 @@ pub async fn control(
     // The guard has already refused browsers and anonymous remotes (`/control`
     // is not in `is_public_path`), so trust here is always Local or Remote.
     let cutoff = Cutoff::new(&trust, &state);
-    let caps = match &trust {
-        Trust::Remote { caps, .. } => Some(caps.clone()),
-        _ => None,
-    };
+    let caps = super::stream_caps(&trust);
 
     if let (Some(name), Trust::Remote { device_id, .. }) = (device_header(&headers), &trust) {
         if let Some(db) = state.db() {

@@ -519,7 +519,8 @@ async fn health() -> Response {
 async fn whoami(Extension(trust): Extension<Trust>) -> Response {
     let (local, device_id, caps) = match trust {
         Trust::Remote { device_id, caps } => (false, Some(device_id), caps),
-        _ => (
+        Trust::Anon => (false, None, vec![]),
+        Trust::Local => (
             true,
             None,
             crate::rpc::capabilities()
@@ -547,10 +548,7 @@ async fn events(
     // Origin pass, so trust here is Local (full stream) or Remote (filtered by
     // caps) - a page-originated connection only ever arrives as the latter.
     let cutoff = pairing::Cutoff::new(&trust, &state);
-    let caps = match trust {
-        Trust::Remote { caps, .. } => Some(caps),
-        _ => None,
-    };
+    let caps = stream_caps(&trust);
     upgrade.on_upgrade(move |socket| pump(socket, state.tx.subscribe(), caps, cutoff))
 }
 
@@ -634,6 +632,16 @@ fn caller_for(trust: &Trust) -> crate::rpc::Caller {
         Trust::Local => crate::rpc::Caller::local(),
         Trust::Remote { caps, .. } => crate::rpc::Caller::remote(caps.clone()),
         Trust::Anon => crate::rpc::Caller::remote(vec![]),
+    }
+}
+
+/// Stream filter for a socket: `None` (unfiltered) only for `Local`; `Anon`
+/// fails closed to empty caps, like `caller_for`.
+pub(super) fn stream_caps(trust: &Trust) -> Option<Vec<String>> {
+    match trust {
+        Trust::Local => None,
+        Trust::Remote { caps, .. } => Some(caps.clone()),
+        Trust::Anon => Some(vec![]),
     }
 }
 
@@ -1110,6 +1118,17 @@ mod tests {
         });
         assert!(caller.require("agents.exec").is_err());
         assert!(caller.require("coder").is_ok());
+    }
+
+    #[test]
+    fn stream_caps_only_local_is_unfiltered() {
+        assert_eq!(stream_caps(&Trust::Local), None);
+        assert_eq!(stream_caps(&Trust::Anon), Some(vec![]));
+        let remote = Trust::Remote {
+            device_id: "d".into(),
+            caps: vec!["coder".into()],
+        };
+        assert_eq!(stream_caps(&remote), Some(vec!["coder".to_string()]));
     }
 
     #[test]
