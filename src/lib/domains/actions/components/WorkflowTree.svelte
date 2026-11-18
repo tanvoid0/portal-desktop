@@ -98,7 +98,10 @@
     bind:this={box}
     role="group"
     aria-label="Workflow steps"
-    class="relative grid w-max auto-cols-max grid-flow-col gap-x-10 py-1"
+    class={cn(
+      'relative grid w-max auto-cols-max grid-flow-col py-1',
+      interactive ? 'gap-x-10' : 'gap-x-5'
+    )}
     onkeydown={onKeydown}
   >
     <svg
@@ -130,6 +133,8 @@
             aria-disabled={!interactive}
             class={cn(
               'h-auto min-h-10 justify-start gap-2 bg-background transition-colors',
+              // preview: name + icon only, tighter, so a few columns fit a narrow card
+              !interactive && 'min-h-8 px-2 text-xs',
               !interactive && 'pointer-events-none',
               node.id === selectedStepId && 'ring-2 ring-primary'
             )}
@@ -144,7 +149,9 @@
               )}
             />
             <span class="truncate">{node.name}</span>
-            <span class="text-xs text-muted-foreground">{node.status}</span>
+            {#if interactive}
+              <span class="text-xs text-muted-foreground">{node.status}</span>
+            {/if}
           </Button>
         {/each}
       </div>

@@ -80,3 +80,12 @@ export function buildStepGraph(
   for (const s of plan) (columns[broken ? 0 : stage.get(s.id)!] ??= []).push(node(s));
   return { columns, edges };
 }
+
+/** The execution to show once a run ends: the first failed/cancelled step, else the last one run. */
+export function pickRunSelection(
+  steps: { status: string; executionId?: string }[]
+): string | undefined {
+  const ran = steps.filter((s) => s.executionId);
+  return (ran.find((s) => s.status === 'failed' || s.status === 'cancelled') ?? ran.at(-1))
+    ?.executionId;
+}

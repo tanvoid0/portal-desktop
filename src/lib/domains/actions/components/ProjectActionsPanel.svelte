@@ -34,6 +34,7 @@
   import ReleaseCard from './ReleaseCard.svelte';
   import ActionRunDetail from './ActionRunDetail.svelte';
   import WorkflowTree from './WorkflowTree.svelte';
+  import { pickRunSelection } from '../stepGraph';
   import { dedupePlan } from '../stepGraph';
   import { queryClient } from '$lib/domains/shared/query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
@@ -82,6 +83,8 @@
   // The run shown in the detail card; it loads and live-polls itself (QA-130).
   let selectedRunId = $state<string | null>(null);
   let runTerminal = $state(false);
+  // The user clicked a tree node during the run: stop auto-following steps.
+  let pinnedRun = false;
 
   const doctorRun = $derived(getDoctorRun(project.id));
   const doctorBusy = $derived(
@@ -240,6 +243,7 @@
     if (running) return;
 
     running = true;
+    pinnedRun = false;
     lastResult = null;
     resetDoctorRun(project.id);
     try {
@@ -251,15 +255,17 @@
             void queryClient.invalidateQueries({
               queryKey: queryKeys.actions.workflowRun(workflowRunId),
             });
-          openExecution(executionId);
+          if (!pinnedRun) openExecution(executionId);
           void loadHistory();
         },
       });
       lastResult = result;
       // Prefer showing the script execution record (has persisted output)
-      const localStep = result.steps.find((s) => s.executionId);
-      if (localStep?.executionId) {
-        openExecution(localStep.executionId);
+      const pick = pickRunSelection(result.steps);
+      if (pinnedRun) {
+        // keep the user's own selection
+      } else if (pick) {
+        openExecution(pick);
       } else {
         selectedRunId = null;
       }
@@ -441,7 +447,7 @@
                       </CardDescription>
                     {/if}
                   </CardHeader>
-                  <CardContent class="flex items-center justify-between gap-2">
+                  <CardContent class="space-y-2">
                     {#if workflow.steps.length > 0}
                       <WorkflowTree
                         plan={dedupePlan(
@@ -464,7 +470,7 @@
                       type="button"
                       size="sm"
                       variant="outline"
-                      class="shrink-0 gap-1"
+                      class="gap-1"
                       disabled={running}
                       onclick={(e) => void runTarget(workflow.id, e)}
                     >
@@ -815,7 +821,10 @@
               openExecution(id);
               void loadHistory();
             }}
-            onSelectExecution={(id) => openExecution(id)}
+            onSelectExecution={(id) => {
+              pinnedRun = true;
+              openExecution(id);
+            }}
             onChanged={() => void loadHistory()}
             onClose={() => (selectedRunId = null)}
           />

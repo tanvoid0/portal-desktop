@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildStepGraph } from './stepGraph';
+import { buildStepGraph, pickRunSelection } from './stepGraph';
 import type { ScriptExecutionInfo } from '$lib/domains/scripts/services/scriptExecutionService';
 
 describe('buildStepGraph', () => {
@@ -31,5 +31,14 @@ describe('buildStepGraph', () => {
     ]);
     expect(g.columns.map((c) => c.map((n) => n.id))).toEqual([['b'], ['a']]);
     expect(g.edges).toEqual([{ from: 'b', to: 'a' }]);
+  });
+});
+
+describe('pickRunSelection', () => {
+  it('prefers the failed step, else the last one run', () => {
+    const s = (status: string, executionId?: string) => ({ status, executionId });
+    expect(pickRunSelection([s('success', 'a'), s('failed', 'b'), s('skipped')])).toBe('b');
+    expect(pickRunSelection([s('success', 'a'), s('success', 'b')])).toBe('b');
+    expect(pickRunSelection([s('skipped')])).toBeUndefined();
   });
 });
