@@ -277,8 +277,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let url = format!("sqlite://{}?mode=rwc", dir.path().join("t.db").display());
         let db = Database::connect(&url).await.unwrap();
-        let all = Migrator::migrations().len() as u32;
-        Migrator::up(&db, Some(all - 1)).await.unwrap();
+        // Everything before this migration; later ones (the catch-up) run in the tests.
+        let before = Migrator::migrations()
+            .iter()
+            .position(|m| m.name().ends_with("_unify_runs"))
+            .unwrap() as u32;
+        Migrator::up(&db, Some(before)).await.unwrap();
 
         run(&db, "INSERT INTO projects (name, path, created_at, updated_at)
                   VALUES ('p', '/p', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')").await;

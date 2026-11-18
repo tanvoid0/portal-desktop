@@ -252,8 +252,11 @@
 
       // Toast when a pipeline run finishes — same event the execution monitor
       // listens to, so this reaches desktop and a phone that's in the foreground.
+      // Action runs (and every workflow step, which is one) share this event but
+      // have their own UI; toasting them would announce each as a pipeline.
       listen<PipelineExecution>('pipeline-execution-update', (event) => {
         const execution = event.payload;
+        if (execution.kind === 'action') return;
         if (execution.status !== 'success' && execution.status !== 'failed') return;
         if (notifiedExecutions.has(execution.id)) return;
         notifiedExecutions.add(execution.id);

@@ -1,7 +1,10 @@
 use crate::database::DatabaseManager;
 use crate::domains::projects::entities::ProjectResponse;
 use crate::domains::projects::move_lock;
-use crate::domains::projects::pipelines::repositories::{ExecutionRepository, PipelineRepository};
+pub use crate::domains::projects::pipelines::repositories::ActionMeta;
+use crate::domains::projects::pipelines::repositories::{
+    ExecutionRepository, NewRun, PipelineRepository,
+};
 use crate::domains::projects::pipelines::services::pipeline_file;
 use crate::domains::projects::pipelines::services::progress::{
     compute_progress, expected_durations, parse_progress_line, HistoryRun, ProgressStep,
@@ -51,6 +54,38 @@ pub struct ExecutionRequestData {
     pub pipeline_id: String,
     pub variables: Option<HashMap<String, String>>,
     pub secrets: Option<HashMap<String, String>>,
+    /// Who asked for the run, e.g. "mcp:<client>". Absent means "user".
+    #[serde(default)]
+    pub triggered_by: Option<String>,
+}
+
+/// What [`ExecutionService::execute_steps`] runs. `execute_pipeline` fills it
+/// from a pipeline and its project; an Action run (one step, `action: Some`)
+/// fills it from the request.
+#[derive(Default)]
+pub struct RunSpec {
+    pub pipeline_id: Option<i32>,
+    pub project_id: Option<i32>,
+    /// Where the steps run: the project path, or an action's working directory
+    /// (empty = the app's own). Also what the relocation in-use check compares.
+    pub cwd: String,
+    pub steps: Vec<Value>,
+    /// `${NAME}` substitutions for the steps' commands, stored on the row.
+    pub variables: HashMap<String, String>,
+    /// Extra environment for every step, set as given (no `$` expansion).
+    pub env: HashMap<String, String>,
+    pub triggered_by: String,
+    /// An action run has no deadline unless this is set. Pipeline steps ignore
+    /// it: each gets its own `timeout`, or [`DEFAULT_STEP_TIMEOUT_SECS`].
+    pub timeout: Option<Duration>,
+    /// Rewrite `npm`/`yarn`/`pnpm` commands to this package manager; `None` leaves them alone.
+    pub detected_pm: Option<String>,
+    /// Median ms of each step's recent successful runs, by step id, for the ETA.
+    pub expected: HashMap<String, i64>,
+    /// `Some` makes this a `kind = 'action'` run: no `$ cmd` / `cwd:` header, no
+    /// `[stderr] ` prefix (the log is exactly the process output), the pid is
+    /// recorded, and a failure's error is [`action_failure_message`].
+    pub action: Option<ActionMeta>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,9 +124,10 @@ enum StepRunOutcome {
 struct RunningExecution {
     cancel_tx: watch::Sender<bool>,
     children: Arc<Mutex<Vec<Child>>>,
-    /// The project path this run executes against — for the relocation
-    /// in-use check (`relocation::usage::running_under`).
+    /// The project path (or an action's working directory) this run executes
+    /// against — for the relocation in-use check (`relocation::usage::running_under`).
     project_path: String,
+    action: bool,
 }
 
 #[derive(Clone)]
@@ -119,7 +155,24 @@ impl ExecutionService {
             .lock()
             .unwrap()
             .values()
-            .any(|r| crate::domains::projects::move_lock::is_under(&r.project_path, path))
+            .any(|r| !r.action && move_lock::is_under(&r.project_path, path))
+    }
+
+    /// True if any action run's working directory is inside `path`. One-way
+    /// (`is_within`), so an action started from the home directory does not
+    /// block every project move (board #431). Apart from [`Self::running_under`]
+    /// so the in-use check reports a pipeline and a script as what they are.
+    pub fn running_actions_under(&self, path: &str) -> bool {
+        self.running
+            .lock()
+            .unwrap()
+            .values()
+            .any(|r| r.action && move_lock::is_within(&r.project_path, path))
+    }
+
+    /// Whether this process is driving `execution_id` right now.
+    pub fn is_running(&self, execution_id: &str) -> bool {
+        self.running.lock().unwrap().contains_key(execution_id)
     }
 
     pub async fn execute_pipeline(
@@ -127,7 +180,6 @@ impl ExecutionService {
         request: ExecutionRequestData,
         events: Arc<dyn EventSink>,
     ) -> Result<String, String> {
-        let execution_id = Uuid::new_v4().to_string();
         let pipeline_id = request
             .pipeline_id
             .parse::<i32>()
@@ -167,7 +219,6 @@ impl ExecutionService {
         variables.insert("PROJECT_NAME".to_string(), project.name.clone());
         let detected_pm = resolve_package_manager(&project);
         variables.insert("PACKAGE_MANAGER".to_string(), detected_pm.clone());
-        let build_command = project.build_command.clone();
 
         let step_ids: Vec<String> = steps
             .iter()
@@ -187,22 +238,56 @@ impl ExecutionService {
             })
             .collect();
         let expected = expected_durations(&history, &step_ids);
-        let step_executions = build_initial_step_executions(&steps, &expected);
+
+        self.execute_steps(
+            RunSpec {
+                pipeline_id: Some(pipeline_id),
+                project_id: Some(pipeline.project_id),
+                cwd: project.path,
+                steps,
+                variables,
+                triggered_by: request.triggered_by.unwrap_or_else(|| "user".to_string()),
+                detected_pm: Some(detected_pm),
+                expected,
+                ..Default::default()
+            },
+            events,
+        )
+        .await
+    }
+
+    /// Store `spec` as a run, register it so Stop can find it, and drive it on a
+    /// background task. Returns the execution id as soon as the run is queued.
+    /// Pipelines and Actions both come through here.
+    pub async fn execute_steps(
+        &self,
+        spec: RunSpec,
+        events: Arc<dyn EventSink>,
+    ) -> Result<String, String> {
+        // `execute_pipeline` checks its project; an action's folder is checked
+        // here, so no caller can start one inside a project being moved.
+        if spec.action.is_some() && !spec.cwd.is_empty() {
+            move_lock::ensure_unlocked_within(Path::new(&spec.cwd))?;
+        }
+        let execution_id = Uuid::new_v4().to_string();
+        let step_executions = build_initial_step_executions(&spec.steps, &spec.expected);
         let step_executions_json = serde_json::to_string(&step_executions)
             .map_err(|e| format!("Failed to serialize steps: {}", e))?;
-        let variables_json = serde_json::to_string(&variables)
+        let variables_json = serde_json::to_string(&spec.variables)
             .map_err(|e| format!("Failed to serialize variables: {}", e))?;
 
         self.execution_repo
-            .create(
-                execution_id.clone(),
-                Some(pipeline_id),
-                Some(pipeline.project_id),
-                "pending".to_string(),
-                "user".to_string(),
+            .insert(NewRun {
+                id: execution_id.clone(),
+                pipeline_id: spec.pipeline_id,
+                project_id: spec.project_id,
+                status: "pending".to_string(),
+                triggered_by: spec.triggered_by.clone(),
                 step_executions_json,
                 variables_json,
-            )
+                action: spec.action.clone(),
+                ..Default::default()
+            })
             .await?;
 
         let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -215,14 +300,26 @@ impl ExecutionService {
                 RunningExecution {
                     cancel_tx,
                     children: Arc::clone(&children),
-                    project_path: project.path.clone(),
+                    project_path: spec.cwd.clone(),
+                    action: spec.action.is_some(),
                 },
             );
         }
 
-        self.execution_repo
+        if let Err(e) = self
+            .execution_repo
             .update_status(&execution_id, "queued".to_string(), None)
-            .await?;
+            .await
+        {
+            // Nothing will drive this run: unregister it (a leaked entry would
+            // block relocation all session) and close the row.
+            self.running.lock().unwrap().remove(&execution_id);
+            let _ = self
+                .execution_repo
+                .update_status(&execution_id, "failed".to_string(), Some(e.clone()))
+                .await;
+            return Err(e);
+        }
 
         let service = self.clone();
         let exec_id = execution_id.clone();
@@ -232,11 +329,7 @@ impl ExecutionService {
             let result = service
                 .run_execution(
                     exec_id.clone(),
-                    steps,
-                    project.path,
-                    variables,
-                    build_command,
-                    detected_pm,
+                    spec,
                     children,
                     cancel_rx,
                     events_handle.clone(),
@@ -263,15 +356,22 @@ impl ExecutionService {
     async fn run_execution(
         &self,
         execution_id: String,
-        steps: Vec<Value>,
-        project_path: String,
-        variables: HashMap<String, String>,
-        _build_command: Option<String>,
-        detected_pm: String,
+        spec: RunSpec,
         children: Arc<Mutex<Vec<Child>>>,
         mut cancel_rx: watch::Receiver<bool>,
         events: Arc<dyn EventSink>,
     ) -> Result<(), String> {
+        let is_action = spec.action.is_some();
+        let RunSpec {
+            steps,
+            cwd,
+            variables,
+            env,
+            timeout,
+            detected_pm,
+            ..
+        } = spec;
+
         self.execution_repo
             .update_status(&execution_id, "running".to_string(), None)
             .await?;
@@ -322,7 +422,12 @@ impl ExecutionService {
                     .get("longRunning")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
-                let timeout_secs = resolve_step_timeout(step);
+                // An action has no per-step timeout: the run's, or none at all.
+                let step_timeout = if is_action {
+                    timeout
+                } else {
+                    Some(Duration::from_secs(resolve_step_timeout(step)))
+                };
 
                 // Values are quoted for the shell (a folder named `a & calc`
                 // stays one argument), in one pass.
@@ -331,18 +436,17 @@ impl ExecutionService {
                 // Honor the resolved command from the Actions catalog / FE.
                 // Only normalize the package-manager binary name — do not replace
                 // build/dev commands with project metadata heuristics.
-                command = normalize_package_manager_command(&command, &detected_pm);
+                if let Some(pm) = &detected_pm {
+                    command = normalize_package_manager_command(&command, pm);
+                }
 
                 // Optional per-step `cwd` (relative to the project) and `env`, from
                 // `.portal/pipeline.yml`. Absent for steps built by the UI.
                 let step_dir = match config.get("cwd").and_then(|v| v.as_str()) {
-                    Some(rel) => Path::new(&project_path)
-                        .join(rel)
-                        .to_string_lossy()
-                        .into_owned(),
-                    None => project_path.clone(),
+                    Some(rel) => Path::new(&cwd).join(rel).to_string_lossy().into_owned(),
+                    None => cwd.clone(),
                 };
-                let step_env: HashMap<String, String> = config
+                let mut step_env: HashMap<String, String> = config
                     .get("env")
                     .and_then(|v| v.as_object())
                     .map(|o| {
@@ -354,6 +458,7 @@ impl ExecutionService {
                             .collect()
                     })
                     .unwrap_or_default();
+                step_env.extend(env.clone());
 
                 self.set_step_running(&execution_id, &step_id).await?;
                 if let Ok(Some(exec)) = self.get_execution(&execution_id).await {
@@ -368,7 +473,8 @@ impl ExecutionService {
                         &step_dir,
                         &step_env,
                         long_running,
-                        timeout_secs,
+                        step_timeout,
+                        is_action,
                         Arc::clone(&children),
                         &mut cancel_rx,
                         &events,
@@ -386,15 +492,19 @@ impl ExecutionService {
                         }
 
                         if !success {
+                            let error = if is_action {
+                                let logs = self
+                                    .get_step_logs(&execution_id, &step_id)
+                                    .await
+                                    .unwrap_or_default();
+                                let output: String =
+                                    logs.iter().map(|l| format!("{l}\n")).collect();
+                                action_failure_message(Some(exit_code), &output)
+                            } else {
+                                format!("Step '{}' failed with exit code {}", step_name, exit_code)
+                            };
                             self.execution_repo
-                                .update_status(
-                                    &execution_id,
-                                    "failed".to_string(),
-                                    Some(format!(
-                                        "Step '{}' failed with exit code {}",
-                                        step_name, exit_code
-                                    )),
-                                )
+                                .update_status(&execution_id, "failed".to_string(), Some(error))
                                 .await?;
                             if let Ok(Some(exec)) = self.get_execution(&execution_id).await {
                                 self.emit_execution_update(&events, exec);
@@ -479,34 +589,44 @@ impl ExecutionService {
         working_directory: &str,
         env: &HashMap<String, String>,
         long_running: bool,
-        timeout_secs: u64,
+        timeout: Option<Duration>,
+        action: bool,
         children: Arc<Mutex<Vec<Child>>>,
         cancel_rx: &mut watch::Receiver<bool>,
         events: &Arc<dyn EventSink>,
     ) -> Result<StepRunOutcome, String> {
-        let exec_command = prepare_shell_command(command, working_directory);
+        // An action may have no working directory: it then runs in the app's own.
+        let exec_command = if working_directory.is_empty() {
+            command.to_string()
+        } else {
+            prepare_shell_command(command, working_directory)
+        };
 
-        append_step_log(
-            &self.execution_repo,
-            execution_id,
-            step_id,
-            &format!("$ {}", exec_command),
-            "stdout",
-            events,
-        )
-        .await;
-        append_step_log(
-            &self.execution_repo,
-            execution_id,
-            step_id,
-            &format!("cwd: {}", working_directory),
-            "stdout",
-            events,
-        )
-        .await;
+        // An action's log is exactly what the process printed: no header, no warnings.
+        if !action {
+            append_step_log(
+                &self.execution_repo,
+                execution_id,
+                step_id,
+                &format!("$ {}", exec_command),
+                "stdout",
+                events,
+            )
+            .await;
+            append_step_log(
+                &self.execution_repo,
+                execution_id,
+                step_id,
+                &format!("cwd: {}", working_directory),
+                "stdout",
+                events,
+            )
+            .await;
+        }
 
         let pm_prefix = exec_command.split_whitespace().next();
-        if matches!(pm_prefix, Some("npm" | "yarn" | "pnpm"))
+        if !action
+            && matches!(pm_prefix, Some("npm" | "yarn" | "pnpm"))
             && !Path::new(working_directory).join("package.json").exists()
         {
             append_step_log(
@@ -520,7 +640,7 @@ impl ExecutionService {
             .await;
         }
 
-        if pm_prefix == Some("pnpm") {
+        if !action && pm_prefix == Some("pnpm") {
             if let Some(warning) = warn_if_broken_pnpm_workspace(working_directory) {
                 append_step_log(
                     &self.execution_repo,
@@ -535,7 +655,9 @@ impl ExecutionService {
         }
 
         let mut cmd = shell_template::shell_command(&exec_command);
-        cmd.current_dir(working_directory);
+        if !working_directory.is_empty() {
+            cmd.current_dir(working_directory);
+        }
         cmd.envs(env);
         // A GUI parent has no usable stdin; children (flutter, gradle) that read
         // it exit non-zero. Give them an empty one, like a shell's </dev/null.
@@ -553,6 +675,12 @@ impl ExecutionService {
 
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
+        if let (true, Some(pid)) = (action, child.id()) {
+            let _ = self
+                .execution_repo
+                .update_pid(execution_id, pid as i32)
+                .await;
+        }
 
         {
             let mut procs = children.lock().unwrap();
@@ -568,6 +696,7 @@ impl ExecutionService {
             stream,
             events: events.clone(),
             lines_read: Arc::clone(&lines_read),
+            raw: action,
         };
         if let Some(stdout) = stdout {
             readers.push(reader("stdout").spawn(stdout));
@@ -580,7 +709,7 @@ impl ExecutionService {
             return Ok(StepRunOutcome::LongRunning);
         }
 
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+        let deadline = timeout.map(|t| (std::time::Instant::now() + t, t));
 
         let exit_status = loop {
             if *cancel_rx.borrow() {
@@ -591,9 +720,11 @@ impl ExecutionService {
             // A command that runs its work but never exits (e.g. svelte-check not
             // releasing its cmd wrapper on Windows) would otherwise spin here
             // forever; the deadline kills its process tree and fails the step.
-            if std::time::Instant::now() >= deadline {
-                kill_children_async(&children).await;
-                return Err(format!("Step timed out after {timeout_secs}s"));
+            if let Some((at, limit)) = deadline {
+                if std::time::Instant::now() >= at {
+                    kill_children_async(&children).await;
+                    return Err(format!("Step timed out after {}s", limit.as_secs()));
+                }
             }
 
             let wait_result = {
@@ -747,7 +878,7 @@ impl ExecutionService {
                     progress: s.progress,
                 })
                 .collect();
-        json!({
+        let mut item = json!({
             "progress": compute_progress(&steps, &e.status, Utc::now()),
             "id": e.id,
             "pipelineId": e.pipeline_id.map(|i| i.to_string()),
@@ -759,7 +890,70 @@ impl ExecutionService {
             "stepExecutions": serde_json::from_str::<Value>(&e.step_executions_json).unwrap_or(json!([])),
             "variables": serde_json::from_str::<Value>(&e.variables_json).unwrap_or(json!({})),
             "error": e.error,
-        })
+            "kind": e.kind,
+        });
+        if e.kind == "action" {
+            item["command"] = json!(e.command);
+            item["workingDirectory"] = json!(e.working_directory);
+            item["blockId"] = json!(e.block_id);
+            item["workflowRunId"] = json!(e.workflow_run_id);
+            item["workflowId"] = json!(e.workflow_id);
+            item["stepId"] = json!(e.step_id);
+            item["workflowPlan"] = json!(e
+                .workflow_plan_json
+                .as_deref()
+                .and_then(|j| serde_json::from_str::<Value>(j).ok()));
+        }
+        item
+    }
+
+    /// Store a run that already happened elsewhere (the embedded terminal, a
+    /// workflow step that spawns nothing) as a finished action row: one
+    /// finished step, no output. `started_at` backdates it so the duration is real.
+    pub async fn record_finished_action(
+        &self,
+        action: ActionMeta,
+        started_at: Option<chrono::DateTime<Utc>>,
+        status: String,
+        exit_code: Option<i32>,
+        error: Option<String>,
+    ) -> Result<String, String> {
+        let id = Uuid::new_v4().to_string();
+        let started = started_at.unwrap_or_else(Utc::now);
+        let finished = Utc::now();
+        let step = StepExecutionState {
+            id: id.clone(),
+            stepId: action.step_id.clone().unwrap_or_else(|| "run".to_string()),
+            stepName: action.command.clone(),
+            status: status.clone(),
+            startedAt: started.to_rfc3339(),
+            finishedAt: Some(finished.to_rfc3339()),
+            output: String::new(),
+            error: error.clone(),
+            exitCode: exit_code,
+            duration: Some((finished - started).num_milliseconds()),
+            retryCount: 0,
+            logs: Vec::new(),
+            expectedMs: None,
+            progress: None,
+            longRunning: false,
+        };
+        self.execution_repo
+            .insert(NewRun {
+                id: id.clone(),
+                status,
+                triggered_by: "user".to_string(),
+                step_executions_json: serde_json::to_string(&[step])
+                    .map_err(|e| format!("Failed to serialize steps: {}", e))?,
+                variables_json: "{}".to_string(),
+                started_at: Some(started),
+                finished_at: Some(finished),
+                error,
+                action: Some(action),
+                ..Default::default()
+            })
+            .await?;
+        Ok(id)
     }
 
     async fn enrich_execution_list_item(
@@ -872,6 +1066,7 @@ impl ExecutionService {
                 pipeline_id: pipeline_id.to_string(),
                 variables: Some(variables),
                 secrets: None,
+                triggered_by: None,
             },
             events,
         )
@@ -1170,6 +1365,8 @@ struct LogReader {
     events: Arc<dyn EventSink>,
     /// Shared by the step's readers; [`drain_log_readers`] watches it.
     lines_read: Arc<AtomicUsize>,
+    /// Store lines as read, without the `[stderr] ` prefix (an action's log).
+    raw: bool,
 }
 
 impl LogReader {
@@ -1215,7 +1412,11 @@ impl LogReader {
                         line,
                         self.stream,
                     );
-                    pending.push(format_log_line(line, self.stream));
+                    pending.push(if self.raw {
+                        line.to_string()
+                    } else {
+                        format_log_line(line, self.stream)
+                    });
                     flush_at.get_or_insert_with(|| tokio::time::Instant::now() + LOG_FLUSH_EVERY);
                     if pending.len() >= LOG_FLUSH_LINES {
                         write_step_logs(&self.repo, &self.execution_id, &self.step_id, &pending)
@@ -1285,6 +1486,24 @@ async fn drain_log_readers(
         }
     }
     // Otherwise dropping `all` (on return) detaches the readers.
+}
+
+/// The error of a failed action run: the exit code, then the last few lines the
+/// process printed (`output` is its log, one line per `\n`).
+pub(crate) fn action_failure_message(exit_code: Option<i32>, output: &str) -> String {
+    let lines: Vec<&str> = output
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    let tail = lines[lines.len().saturating_sub(8)..].join("\n");
+
+    match (exit_code, tail.is_empty()) {
+        (Some(code), false) => format!("Exit code {code}\n{tail}"),
+        (Some(code), true) => format!("Exit code {code}"),
+        (None, false) => tail,
+        (None, true) => "Process failed with no output".to_string(),
+    }
 }
 
 /// Refuse a run in which any step comes after a `longRunning` one. A
@@ -1584,6 +1803,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn action_failure_message_keeps_the_code_and_the_last_eight_lines() {
+        let out: String = (1..=10).map(|i| format!("line {i}\n\n")).collect();
+        let tail: Vec<String> = (3..=10).map(|i| format!("line {i}")).collect();
+        assert_eq!(
+            action_failure_message(Some(2), &out),
+            format!("Exit code 2\n{}", tail.join("\n"))
+        );
+        assert_eq!(action_failure_message(Some(1), " \n"), "Exit code 1");
+        assert_eq!(action_failure_message(None, "boom\n"), "boom");
+        assert_eq!(
+            action_failure_message(None, ""),
+            "Process failed with no output"
+        );
+    }
+
     #[derive(Debug)]
     struct Quiet;
     impl EventSink for Quiet {
@@ -1622,6 +1857,7 @@ mod tests {
             stream: "stdout",
             events: Arc::new(Quiet),
             lines_read: Arc::clone(&lines_read),
+            raw: false,
         }
         .spawn(pipe);
         let (_cancel_tx, mut cancel_rx) = watch::channel(false);
@@ -1740,5 +1976,111 @@ mod tests {
         assert_eq!(steps[0].status, "success");
         assert_eq!(steps[1].status, "running");
         assert_eq!(steps[0].logs.len(), 2 * LINES);
+    }
+
+    async fn finished(
+        svc: &ExecutionService,
+        id: &str,
+    ) -> crate::entities::pipeline_execution::Model {
+        for _ in 0..400 {
+            let e = svc.execution_repo.get_by_id(id).await.unwrap().unwrap();
+            if matches!(e.status.as_str(), "success" | "failed" | "cancelled") {
+                return e;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        panic!("run {id} did not finish");
+    }
+
+    /// One runner, two log formats: a pipeline keeps its `$ cmd` / `cwd:` header
+    /// and `[stderr] ` prefix; an action's log is exactly the process output.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn pipeline_and_action_runs_share_the_runner_but_not_the_log_format() {
+        let (svc, dir) = service_with_execution().await;
+        let cwd = dir.path().display().to_string();
+        let seed = svc.execution_repo.get_by_id("e").await.unwrap().unwrap();
+        let pipeline_id = seed.pipeline_id.unwrap();
+        let step = |command: &str| json!({ "id": "s", "name": "s", "dependsOn": [], "config": { "command": command } });
+
+        let command = "echo out&& echo err>&2";
+        let steps = json!([step(command)]).to_string();
+        svc.pipeline_repo
+            .update(
+                pipeline_id,
+                None,
+                None,
+                Some(steps),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        let request = ExecutionRequestData {
+            pipeline_id: pipeline_id.to_string(),
+            variables: None,
+            secrets: None,
+            triggered_by: Some("mcp:t".into()),
+        };
+        let id = svc
+            .execute_pipeline(request, Arc::new(Quiet))
+            .await
+            .unwrap();
+        let run = finished(&svc, &id).await;
+        assert_eq!(run.status, "success");
+        assert_eq!(run.triggered_by, "mcp:t");
+        assert_eq!(run.kind, "pipeline");
+        assert_eq!(run.pid, None);
+        let logs = svc.get_step_logs(&id, "s").await.unwrap();
+        assert_eq!(logs[..2], [format!("$ {command}"), format!("cwd: {cwd}")]);
+        assert!(logs.contains(&"out".to_string()), "{logs:?}");
+        assert!(logs.contains(&"[stderr] err".to_string()), "{logs:?}");
+        let json = svc.get_execution(&id).await.unwrap().unwrap();
+        assert_eq!(json["kind"], "pipeline");
+        assert!(json.get("command").is_none());
+
+        // An action: `env` reaches the process as given, `variables` only fill `${}`.
+        let (ok, bad) = if cfg!(windows) {
+            ("echo hi&& echo %PORTAL_T%", "echo oops>&2&& exit 3")
+        } else {
+            ("echo hi&& echo $PORTAL_T", "echo oops>&2&& exit 3")
+        };
+        let run_action = |command: &str| {
+            let spec = RunSpec {
+                cwd: cwd.clone(),
+                steps: vec![step(command)],
+                variables: HashMap::from([("B".to_string(), "x".to_string())]),
+                env: HashMap::from([("PORTAL_T".to_string(), "a$B".to_string())]),
+                triggered_by: "mcp:t".into(),
+                action: Some(ActionMeta {
+                    command: command.into(),
+                    working_directory: Some(cwd.clone()),
+                    step_id: Some("s".into()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            svc.execute_steps(spec, Arc::new(Quiet))
+        };
+        let id = run_action(ok).await.unwrap();
+        let run = finished(&svc, &id).await;
+        assert_eq!(run.status, "success");
+        assert_eq!(run.kind, "action");
+        assert!(run.pid.is_some(), "the action's pid is recorded");
+        assert_eq!(svc.get_step_logs(&id, "s").await.unwrap(), ["hi", "a$B"]);
+        let json = svc.get_execution(&id).await.unwrap().unwrap();
+        assert_eq!(json["kind"], "action");
+        assert_eq!(json["command"], ok);
+        assert_eq!(json["stepId"], "s");
+        assert!(json["pipelineId"].is_null() && json["workflowPlan"].is_null());
+
+        let id = run_action(bad).await.unwrap();
+        let run = finished(&svc, &id).await;
+        assert_eq!(run.status, "failed");
+        assert_eq!(run.error.as_deref(), Some("Exit code 3\noops"));
+        assert_eq!(svc.get_step_logs(&id, "s").await.unwrap(), ["oops"]);
     }
 }

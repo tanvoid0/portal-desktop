@@ -51,6 +51,7 @@ pub mod m20261111_000048_create_agent_tables;
 pub mod m20261114_000049_add_agent_session_links;
 pub mod m20261118_000050_add_workflow_run_to_script_executions;
 pub mod m20261119_000051_unify_runs;
+pub mod m20261119_000052_catch_up_script_history;
 pub mod runner;
 
 // Re-export all migrations for easy access
@@ -105,6 +106,7 @@ pub use m20261111_000048_create_agent_tables::Migration as createAgentTables;
 pub use m20261114_000049_add_agent_session_links::Migration as addAgentSessionLinks;
 pub use m20261118_000050_add_workflow_run_to_script_executions::Migration as addWorkflowRunToScriptExecutions;
 pub use m20261119_000051_unify_runs::Migration as unifyRuns;
+pub use m20261119_000052_catch_up_script_history::Migration as catchUpScriptHistory;
 
 pub struct Migrator;
 
@@ -193,5 +195,6 @@ pub fn get_migrations() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(addAgentSessionLinks),
         Box::new(addWorkflowRunToScriptExecutions),
         Box::new(unifyRuns),
+        Box::new(catchUpScriptHistory),
     ]
 }

@@ -90,6 +90,8 @@ export interface BlockParameter {
 
 export interface PipelineExecution {
   id: string;
+  /** 'action' for a one-step Action / workflow-step run; absent on payloads from an older backend. */
+  kind?: 'pipeline' | 'action';
   pipelineId?: string; // absent for a one-step action run
   projectId?: string; // absent for an action run outside any project
   status: ExecutionStatus;

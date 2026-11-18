@@ -510,6 +510,7 @@ fn parse_execution_request(value: Value) -> Result<ExecutionRequestData, String>
         pipeline_id: frontend.pipeline_id,
         variables: frontend.variables,
         secrets: frontend.secrets,
+        triggered_by: None,
     })
 }
 
