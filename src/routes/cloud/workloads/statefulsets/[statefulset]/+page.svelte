@@ -3,8 +3,8 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
-  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
-  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { ResourceDetail } from '$lib/domains/cloud/state/resourceDetail.svelte';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
@@ -18,54 +18,18 @@
   import LabelsCard from '$lib/domains/cloud/components/LabelsCard.svelte';
 
   const statefulSetName = $derived(page.params.statefulset);
-  const namespace = $derived(
-    page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
+  const r = new ResourceDetail(
+    ResourceType.STATEFULSET,
+    'StatefulSet',
+    () => page.params.statefulset
   );
-  const tabParam = $derived(page.url.searchParams.get('tab') || 'overview');
+  const statefulSet = $derived(r.resource);
 
-  let activeTab = $state('overview');
-
-  // Sync activeTab with tabParam when it changes
-  $effect(() => {
-    activeTab = tabParam;
-  });
-  let statefulSet = $state<ICloudResource | null>(null);
-  let isLoading = $state(true);
-  let error = $state<string | null>(null);
-
-  onMount(async () => {
-    await loadStatefulSet();
-  });
-
-  async function loadStatefulSet() {
-    if (!statefulSetName || !$cloudStore.connection.isConnected) {
-      error = 'StatefulSet name or connection required';
-      isLoading = false;
-      return;
-    }
-
-    try {
-      isLoading = true;
-      error = null;
-
-      await loadResources(ResourceType.STATEFULSET, namespace);
-      const resources = $cloudStore.resources[ResourceType.STATEFULSET] || [];
-      statefulSet = resources.find((ss) => ss.name === statefulSetName) || null;
-
-      if (!statefulSet) {
-        error = `StatefulSet "${statefulSetName}" not found in namespace "${namespace}".`;
-      }
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load StatefulSet';
-      console.error('Failed to load StatefulSet:', err);
-    } finally {
-      isLoading = false;
-    }
-  }
+  onMount(r.load);
 
   function handleTabChange(newTab: string) {
-    activeTab = newTab;
-    goto(`/cloud/workloads/statefulsets/${statefulSetName}?namespace=${namespace}&tab=${newTab}`);
+    r.activeTab = newTab;
+    goto(`/cloud/workloads/statefulsets/${statefulSetName}?namespace=${r.namespace}&tab=${newTab}`);
   }
 </script>
 
@@ -75,16 +39,16 @@
       <ArrowLeft class="mr-2 h-4 w-4" />
       Back
     </Button>
-    <Button variant="outline" size="sm" onclick={loadStatefulSet}>
+    <Button variant="outline" size="sm" onclick={r.load}>
       <RefreshCw class="mr-2 h-4 w-4" />
       Refresh
     </Button>
   </div>
 
-  {#if isLoading}
+  {#if r.isLoading}
     <PageLoading message="Loading statefulset..." />
-  {:else if error}
-    <PageError title="Failed to load statefulset" message={error} onRetry={loadStatefulSet} />
+  {:else if r.error}
+    <PageError title="Failed to load statefulset" message={r.error} onRetry={r.load} />
   {:else if statefulSet}
     <div class="space-y-6">
       <PageHeader
@@ -94,7 +58,7 @@
         badgeVariant={statefulSet.status === 'running' ? 'default' : 'secondary'}
       />
 
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
+      <Tabs value={r.activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="yaml">YAML</TabsTrigger>
@@ -124,8 +88,8 @@
             <ResourceYamlTab
               resource={statefulSet}
               kind="StatefulSet"
-              active={activeTab === 'yaml'}
-              onApplied={loadStatefulSet}
+              active={r.activeTab === 'yaml'}
+              onApplied={r.load}
             />
           </div>
         </TabsContent>

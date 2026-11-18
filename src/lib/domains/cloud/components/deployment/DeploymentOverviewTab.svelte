@@ -2,7 +2,8 @@
 <script lang="ts">
   import type { ICloudResource } from '$lib/domains/cloud/core/types';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
+  import InfoCard from '../InfoCard.svelte';
+  import LabelsCard from '../LabelsCard.svelte';
 
   interface Props {
     deployment: ICloudResource;
@@ -18,37 +19,20 @@
 </script>
 
 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-  <Card>
-    <CardHeader>
-      <CardTitle>Deployment Information</CardTitle>
-    </CardHeader>
-    <CardContent class="space-y-3">
-      <div>
-        <p class="text-sm text-muted-foreground">Status</p>
-        <Badge class="mt-1" variant="default">{deployment.status}</Badge>
-      </div>
-      <div>
-        <p class="text-sm text-muted-foreground">Desired Replicas</p>
-        <p class="font-medium">{desired || 0}</p>
-      </div>
-      <div>
-        <p class="text-sm text-muted-foreground">Current Replicas</p>
-        <p class="font-medium">{deployment.metadata?.current || 0}</p>
-      </div>
-      <div>
-        <p class="text-sm text-muted-foreground">Available Replicas</p>
-        <p class="font-medium">{deployment.metadata?.available || 0}/{desired || 0}</p>
-      </div>
-      <div>
-        <p class="text-sm text-muted-foreground">Up-to-date Replicas</p>
-        <p class="font-medium">{deployment.metadata?.up_to_date || 0}</p>
-      </div>
-      <div>
-        <p class="text-sm text-muted-foreground">Age</p>
-        <p class="font-medium">{deployment.metadata?.age || 'N/A'}</p>
-      </div>
-    </CardContent>
-  </Card>
+  <InfoCard
+    title="Deployment Information"
+    status={{ text: deployment.status }}
+    fields={[
+      { label: 'Desired Replicas', value: desired || 0 },
+      { label: 'Current Replicas', value: deployment.metadata?.current || 0 },
+      {
+        label: 'Available Replicas',
+        value: `${deployment.metadata?.available || 0}/${desired || 0}`,
+      },
+      { label: 'Up-to-date Replicas', value: deployment.metadata?.up_to_date || 0 },
+      { label: 'Age', value: deployment.metadata?.age || 'N/A' },
+    ]}
+  />
 
   <Card>
     <CardHeader>
@@ -75,19 +59,4 @@
   </Card>
 </div>
 
-<Card>
-  <CardHeader>
-    <CardTitle>Labels</CardTitle>
-  </CardHeader>
-  <CardContent>
-    {#if Object.keys(labels).length > 0}
-      <div class="flex flex-wrap gap-2">
-        {#each Object.entries(labels) as [key, value]}
-          <Badge variant="outline">{key}={value}</Badge>
-        {/each}
-      </div>
-    {:else}
-      <p class="text-muted-foreground">No labels configured</p>
-    {/if}
-  </CardContent>
-</Card>
+<LabelsCard items={labels} />

@@ -2,9 +2,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { replaceState } from '$app/navigation';
-  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
-  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { ResourceDetail } from '$lib/domains/cloud/state/resourceDetail.svelte';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
@@ -14,66 +13,17 @@
   import ResourceDetailHeader from '$lib/domains/cloud/components/ResourceDetailHeader.svelte';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
 
-  const cronJobName = $derived(page.params.cronjob);
-  const namespace = $derived(
-    page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
-  );
-  const tabParam = $derived(page.url.searchParams.get('tab') || 'overview');
+  const r = new ResourceDetail(ResourceType.CRONJOB, 'CronJob', () => page.params.cronjob);
+  const cronJob = $derived(r.resource);
 
-  let activeTab = $state('overview');
-
-  // Sync activeTab with tabParam when it changes
-  $effect(() => {
-    activeTab = tabParam;
-  });
-
-  let cronJob = $state<ICloudResource | null>(null);
-  let isLoading = $state(true);
-  let error = $state<string | null>(null);
-
-  onMount(async () => {
-    await loadCronJob();
-  });
-
-  async function loadCronJob() {
-    if (!cronJobName || !$cloudStore.connection.isConnected) {
-      error = 'CronJob name or connection required';
-      isLoading = false;
-      return;
-    }
-
-    try {
-      isLoading = true;
-      error = null;
-
-      await loadResources(ResourceType.CRONJOB, namespace);
-      const resources = $cloudStore.resources[ResourceType.CRONJOB] || [];
-      cronJob = resources.find((cj) => cj.name === cronJobName) || null;
-
-      if (!cronJob) {
-        error = `CronJob "${cronJobName}" not found in namespace "${namespace}".`;
-      }
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load CronJob';
-      console.error('Failed to load CronJob:', err);
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  function handleTabChange(tab: string) {
-    activeTab = tab;
-    const url = new URL(page.url.href);
-    url.searchParams.set('tab', tab);
-    replaceState(url, {});
-  }
+  onMount(r.load);
 </script>
 
 <div class="space-y-6 p-6">
-  {#if isLoading}
+  {#if r.isLoading}
     <PageLoading message="Loading cronjob..." />
-  {:else if error}
-    <PageError title="Failed to load cronjob" message={error} onRetry={loadCronJob} />
+  {:else if r.error}
+    <PageError title="Failed to load cronjob" message={r.error} onRetry={r.load} />
   {:else if cronJob}
     <ResourceDetailHeader
       kind="CronJob"
@@ -81,11 +31,11 @@
       namespace={cronJob.namespace}
       backHref="/cloud/cronjobs"
       backLabel="Back to CronJobs"
-      onRefresh={loadCronJob}
+      onRefresh={r.load}
     />
 
     <!-- Tabs -->
-    <Tabs value={activeTab} onValueChange={handleTabChange}>
+    <Tabs value={r.activeTab} onValueChange={r.setTab}>
       <TabsList>
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="yaml">YAML</TabsTrigger>
@@ -147,8 +97,8 @@
         <ResourceYamlTab
           resource={cronJob}
           kind="CronJob"
-          active={activeTab === 'yaml'}
-          onApplied={loadCronJob}
+          active={r.activeTab === 'yaml'}
+          onApplied={r.load}
         />
       </TabsContent>
     </Tabs>

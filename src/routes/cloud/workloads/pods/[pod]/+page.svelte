@@ -2,10 +2,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { goto, replaceState } from '$app/navigation';
-  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
-  import { get } from 'svelte/store';
-  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { goto } from '$app/navigation';
+  import { cloudStore } from '$lib/domains/cloud/stores';
+  import { ResourceDetail } from '$lib/domains/cloud/state/resourceDetail.svelte';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
@@ -25,21 +25,8 @@
   import PodExecTab from '$lib/domains/cloud/components/pod/PodExecTab.svelte';
   import PodPortForwardDialog from '$lib/domains/cloud/components/pod/PodPortForwardDialog.svelte';
 
-  const podName = $derived(page.params.pod);
-  const namespace = $derived(
-    page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
-  );
-  const tabParam = $derived(page.url.searchParams.get('tab') || 'overview');
-
-  let pod = $state<ICloudResource | null>(null);
-  let isLoading = $state(true);
-  let error = $state<string | null>(null);
-  let activeTab = $state('overview');
-
-  // Sync activeTab with tabParam when it changes
-  $effect(() => {
-    activeTab = tabParam;
-  });
+  const r = new ResourceDetail(ResourceType.POD, 'Pod', () => page.params.pod);
+  const pod = $derived(r.resource);
 
   let showPortForwardDialog = $state(false);
   let activePortForwards = $state<any[]>([]);
@@ -50,7 +37,7 @@
   let metricsError = $state<string | null>(null);
 
   onMount(async () => {
-    await loadPod();
+    await r.load();
     await loadPortForwards();
     await loadMetrics();
   });
@@ -84,56 +71,9 @@
     }
   }
 
-  async function loadPod() {
-    if (!podName || !$cloudStore.connection.isConnected) {
-      error = 'Pod name or connection required';
-      isLoading = false;
-      return;
-    }
-
-    try {
-      isLoading = true;
-      error = null;
-
-      // Load pods into store
-      await loadResources(ResourceType.POD, namespace);
-
-      // Get pods from store after loading
-      const pods = get(cloudStore).resources[ResourceType.POD];
-      if (!pods || !Array.isArray(pods)) {
-        error = `Failed to load pods from namespace "${namespace}"`;
-        isLoading = false;
-        return;
-      }
-
-      const foundPod = pods.find((p: ICloudResource) => p.name === podName);
-
-      if (!foundPod) {
-        error = `Pod "${podName}" not found in namespace "${namespace}"`;
-        isLoading = false;
-        return;
-      }
-
-      pod = foundPod;
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load pod';
-      console.error('Failed to load pod:', err);
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  function handleTabChange(tab: string) {
-    activeTab = tab;
-    // Update URL without navigation
-    const url = new URL(page.url.href);
-    url.searchParams.set('tab', tab);
-    replaceState(url, {});
-  }
-
   function handleExec() {
     // Navigate to exec tab or open terminal
-    handleTabChange('exec');
+    r.setTab('exec');
   }
 
   async function handleDelete() {
@@ -182,10 +122,10 @@
 </script>
 
 <div class="space-y-6 p-6">
-  {#if isLoading}
+  {#if r.isLoading}
     <PageLoading message="Loading pod..." />
-  {:else if error}
-    <PageError title="Failed to load pod" message={error} onRetry={loadPod} />
+  {:else if r.error}
+    <PageError title="Failed to load pod" message={r.error} onRetry={r.load} />
   {:else if pod}
     <div class="flex items-center gap-2">
       <Button variant="ghost" size="sm" onclick={() => goto('/cloud/pods')}>
@@ -204,7 +144,7 @@
               variant="outline"
               size="sm"
               onclick={async () => {
-                await loadPod();
+                await r.load();
                 await loadMetrics();
               }}
             >
@@ -229,7 +169,7 @@
     </div>
 
     <!-- Tabs -->
-    <Tabs value={activeTab} onValueChange={handleTabChange}>
+    <Tabs value={r.activeTab} onValueChange={r.setTab}>
       <TabsList>
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="logs">Logs</TabsTrigger>
@@ -248,11 +188,11 @@
       </TabsContent>
 
       <TabsContent value="logs" class="space-y-4">
-        <PodLogsTab {pod} active={activeTab === 'logs'} />
+        <PodLogsTab {pod} active={r.activeTab === 'logs'} />
       </TabsContent>
 
       <TabsContent value="yaml" class="space-y-4">
-        <PodYamlTab {pod} active={activeTab === 'yaml'} />
+        <PodYamlTab {pod} active={r.activeTab === 'yaml'} />
       </TabsContent>
 
       <TabsContent value="port-forwards" class="space-y-4">

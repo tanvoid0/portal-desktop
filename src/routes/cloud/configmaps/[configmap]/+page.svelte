@@ -2,9 +2,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { goto, replaceState } from '$app/navigation';
-  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
-  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { goto } from '$app/navigation';
+  import { ResourceDetail } from '$lib/domains/cloud/state/resourceDetail.svelte';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Button } from '$lib/components/ui/button';
@@ -19,51 +19,10 @@
   import ResourceDetailHeader from '$lib/domains/cloud/components/ResourceDetailHeader.svelte';
   import LabelsCard from '$lib/domains/cloud/components/LabelsCard.svelte';
 
-  const configMapName = $derived(page.params.configmap);
-  const namespace = $derived(
-    page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
-  );
-  const tabParam = $derived(page.url.searchParams.get('tab') || 'overview');
+  const r = new ResourceDetail(ResourceType.CONFIGMAP, 'ConfigMap', () => page.params.configmap);
+  const configMap = $derived(r.resource);
 
-  let activeTab = $state('overview');
-
-  // Sync activeTab with tabParam when it changes
-  $effect(() => {
-    activeTab = tabParam;
-  });
-  let configMap = $state<ICloudResource | null>(null);
-  let isLoading = $state(true);
-  let error = $state<string | null>(null);
-
-  onMount(async () => {
-    await loadConfigMap();
-  });
-
-  async function loadConfigMap() {
-    if (!configMapName || !$cloudStore.connection.isConnected) {
-      error = 'ConfigMap name or connection required';
-      isLoading = false;
-      return;
-    }
-
-    try {
-      isLoading = true;
-      error = null;
-
-      await loadResources(ResourceType.CONFIGMAP, namespace);
-      const resources = $cloudStore.resources[ResourceType.CONFIGMAP] || [];
-      configMap = resources.find((cm) => cm.name === configMapName) || null;
-
-      if (!configMap) {
-        error = `ConfigMap "${configMapName}" not found in namespace "${namespace}".`;
-      }
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load ConfigMap';
-      console.error('Failed to load ConfigMap:', err);
-    } finally {
-      isLoading = false;
-    }
-  }
+  onMount(r.load);
 
   async function handleDelete() {
     if (!configMap) return;
@@ -84,13 +43,6 @@
     }
   }
 
-  function handleTabChange(tab: string) {
-    activeTab = tab;
-    const url = new URL(page.url.href);
-    url.searchParams.set('tab', tab);
-    replaceState(url, {});
-  }
-
   const dataEntries = $derived.by(() => {
     if (!configMap || !configMap.metadata?.data) return [];
     return Object.entries(configMap.metadata.data);
@@ -98,10 +50,10 @@
 </script>
 
 <div class="space-y-6 p-6">
-  {#if isLoading}
+  {#if r.isLoading}
     <PageLoading message="Loading configmap..." />
-  {:else if error}
-    <PageError title="Failed to load configmap" message={error} onRetry={loadConfigMap} />
+  {:else if r.error}
+    <PageError title="Failed to load configmap" message={r.error} onRetry={r.load} />
   {:else if configMap}
     <ResourceDetailHeader
       kind="ConfigMap"
@@ -109,7 +61,7 @@
       namespace={configMap.namespace}
       backHref="/cloud/configmaps"
       backLabel="Back to ConfigMaps"
-      onRefresh={loadConfigMap}
+      onRefresh={r.load}
     >
       <Button variant="destructive" size="sm" onclick={handleDelete}>
         <Trash2 class="mr-2 h-4 w-4" />
@@ -118,7 +70,7 @@
     </ResourceDetailHeader>
 
     <!-- Tabs -->
-    <Tabs value={activeTab} onValueChange={handleTabChange}>
+    <Tabs value={r.activeTab} onValueChange={r.setTab}>
       <TabsList>
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="data">Data</TabsTrigger>
@@ -188,8 +140,8 @@
           <ResourceYamlTab
             resource={configMap}
             kind="ConfigMap"
-            active={activeTab === 'yaml'}
-            onApplied={loadConfigMap}
+            active={r.activeTab === 'yaml'}
+            onApplied={r.load}
           />
         </div>
       </TabsContent>

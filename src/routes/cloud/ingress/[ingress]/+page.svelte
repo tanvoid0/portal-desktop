@@ -2,9 +2,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { replaceState } from '$app/navigation';
-  import { cloudStore, loadResources } from '$lib/domains/cloud/stores';
-  import { ResourceType, type ICloudResource } from '$lib/domains/cloud/core/types';
+  import { ResourceDetail } from '$lib/domains/cloud/state/resourceDetail.svelte';
+  import { ResourceType } from '$lib/domains/cloud/core/types';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
@@ -16,59 +15,10 @@
   import LabelsCard from '$lib/domains/cloud/components/LabelsCard.svelte';
   import { k8sResourceService } from '$lib/domains/cloud/services/k8sResourceService';
 
-  const ingressName = $derived(page.params.ingress);
-  const namespace = $derived(
-    page.url.searchParams.get('namespace') || $cloudStore.selectedNamespace || 'default'
-  );
-  const tabParam = $derived(page.url.searchParams.get('tab') || 'overview');
+  const r = new ResourceDetail(ResourceType.INGRESS, 'Ingress', () => page.params.ingress);
+  const ingress = $derived(r.resource);
 
-  let activeTab = $state('overview');
-
-  // Sync activeTab with tabParam when it changes
-  $effect(() => {
-    activeTab = tabParam;
-  });
-
-  let ingress = $state<ICloudResource | null>(null);
-  let isLoading = $state(true);
-  let error = $state<string | null>(null);
-
-  onMount(async () => {
-    await loadIngress();
-  });
-
-  async function loadIngress() {
-    if (!ingressName || !$cloudStore.connection.isConnected) {
-      error = 'Ingress name or connection required';
-      isLoading = false;
-      return;
-    }
-
-    try {
-      isLoading = true;
-      error = null;
-
-      await loadResources(ResourceType.INGRESS, namespace);
-      const resources = $cloudStore.resources[ResourceType.INGRESS] || [];
-      ingress = resources.find((i) => i.name === ingressName) || null;
-
-      if (!ingress) {
-        error = `Ingress "${ingressName}" not found in namespace "${namespace}".`;
-      }
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load Ingress';
-      console.error('Failed to load Ingress:', err);
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  function handleTabChange(tab: string) {
-    activeTab = tab;
-    const url = new URL(page.url.href);
-    url.searchParams.set('tab', tab);
-    replaceState(url, {});
-  }
+  onMount(r.load);
 
   const addresses = $derived.by(() => {
     if (!ingress || !ingress.metadata?.addresses) return [];
@@ -82,10 +32,10 @@
 </script>
 
 <div class="space-y-6 p-6">
-  {#if isLoading}
+  {#if r.isLoading}
     <PageLoading message="Loading ingress..." />
-  {:else if error}
-    <PageError title="Failed to load ingress" message={error} onRetry={loadIngress} />
+  {:else if r.error}
+    <PageError title="Failed to load ingress" message={r.error} onRetry={r.load} />
   {:else if ingress}
     <ResourceDetailHeader
       kind="Ingress"
@@ -93,11 +43,11 @@
       namespace={ingress.namespace}
       backHref="/cloud/ingress"
       backLabel="Back to Ingress"
-      onRefresh={loadIngress}
+      onRefresh={r.load}
     />
 
     <!-- Tabs -->
-    <Tabs value={activeTab} onValueChange={handleTabChange}>
+    <Tabs value={r.activeTab} onValueChange={r.setTab}>
       <TabsList>
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="yaml">YAML</TabsTrigger>
@@ -157,8 +107,8 @@
         <ResourceYamlTab
           resource={ingress}
           kind="Ingress"
-          active={activeTab === 'yaml'}
-          onApplied={loadIngress}
+          active={r.activeTab === 'yaml'}
+          onApplied={r.load}
         />
       </TabsContent>
     </Tabs>
