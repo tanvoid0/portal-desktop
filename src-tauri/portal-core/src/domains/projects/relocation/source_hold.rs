@@ -44,15 +44,23 @@ pub struct SourceHold {
 /// as any other preflight blocker. Any other I/O error (the path vanished,
 /// was denied by an ACL, ...) becomes a plain [`MoveError::Failed`] instead,
 /// since "close whatever has it open" would be the wrong thing to tell the
-/// user. Any handles already opened before the failure are dropped (closed)
-/// along with the error.
+/// user. The opens run on a small thread pool (#1110). On failure every handle
+/// opened is dropped (closed) along with the error, and the error is the first
+/// failing path in order — the source root, its dirs (sorted), then `rel_files`
+/// — however the threads interleave.
 #[cfg(target_os = "windows")]
 pub fn acquire(source: &Path, rel_files: &[String]) -> Result<SourceHold, MoveError> {
     use std::io;
     use std::os::windows::fs::OpenOptionsExt;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::OnceLock;
 
     const FILE_SHARE_READ: u32 = 0x0000_0001;
     const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    /// Threads opening handles at once. Open latency under an AV scan overlaps;
+    /// past this the scanner, not the opens, is the limit.
+    const HOLD_THREADS: usize = 16;
 
     fn open_deny_write(path: &Path, is_dir: bool) -> io::Result<File> {
         let mut opts = std::fs::OpenOptions::new();
@@ -87,7 +95,8 @@ pub fn acquire(source: &Path, rel_files: &[String]) -> Result<SourceHold, MoveEr
     // Directories to hold: the source root plus every ancestor dir implied by
     // a file's relative path. build_manifest doesn't record empty dirs, so
     // there is nothing to hold that isn't an ancestor of some file in the set.
-    let mut rel_dirs = std::collections::HashSet::new();
+    // A BTreeSet so the order below is the same on every run.
+    let mut rel_dirs = std::collections::BTreeSet::new();
     for rel in rel_files {
         let parts: Vec<&str> = rel.split('/').collect();
         for i in 0..parts.len().saturating_sub(1) {
@@ -95,15 +104,39 @@ pub fn acquire(source: &Path, rel_files: &[String]) -> Result<SourceHold, MoveEr
         }
     }
 
-    let mut handles = Vec::with_capacity(rel_files.len() + rel_dirs.len() + 1);
-    handles.push(open_deny_write(source, true).map_err(|e| hold_error(source, e))?);
-    for rel in &rel_dirs {
-        let path = os_join(source, rel);
-        handles.push(open_deny_write(&path, true).map_err(|e| hold_error(&path, e))?);
-    }
-    for rel in rel_files {
-        let path = os_join(source, rel);
-        handles.push(open_deny_write(&path, false).map_err(|e| hold_error(&path, e))?);
+    // Root, then dirs, then files: the first path in this order that fails is
+    // the error reported, however the opens below interleave.
+    let paths: Vec<(PathBuf, bool)> = std::iter::once((source.to_path_buf(), true))
+        .chain(rel_dirs.iter().map(|r| (os_join(source, r), true)))
+        .chain(rel_files.iter().map(|r| (os_join(source, r), false)))
+        .collect();
+
+    // #1110: each open is latency-bound under a real-time AV scan (~7ms, CPU
+    // idle), so 5k files opened one by one stalled the start of a move for
+    // 20-55s. Open on HOLD_THREADS threads instead; each result lands in its
+    // own slot by index, so they read back in `paths` order.
+    // ponytail: a failure still finishes the pass (seconds); an AtomicUsize of
+    // the lowest failing index would let workers stop early, keeping the order.
+    let next = AtomicUsize::new(0);
+    let slots: Vec<OnceLock<io::Result<File>>> = paths.iter().map(|_| OnceLock::new()).collect();
+    std::thread::scope(|s| {
+        for _ in 0..HOLD_THREADS.min(paths.len()) {
+            s.spawn(|| loop {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                let Some((path, is_dir)) = paths.get(i) else {
+                    break;
+                };
+                let _ = slots[i].set(open_deny_write(path, *is_dir));
+            });
+        }
+    });
+
+    // First failure in `paths` order wins. Returning drops `handles` and the
+    // rest of `slots`, which closes every handle opened so far.
+    let mut handles = Vec::with_capacity(paths.len());
+    for (slot, (path, _)) in slots.into_iter().zip(&paths) {
+        let opened = slot.into_inner().expect("scope joined every worker");
+        handles.push(opened.map_err(|e| hold_error(path, e))?);
     }
     Ok(SourceHold { handles })
 }
@@ -197,5 +230,70 @@ mod tests {
             matches!(err, MoveError::Failed(_)),
             "expected Failed, got {err:?}"
         );
+    }
+
+    /// `n` small files over five dirs, as sorted manifest-style rels.
+    fn many_files(root: &Path, n: usize) -> Vec<String> {
+        let mut rels: Vec<String> = (0..n).map(|i| format!("d{}/f{i:03}.txt", i % 5)).collect();
+        rels.sort();
+        for rel in &rels {
+            let path = root.join(rel);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "x").unwrap();
+        }
+        rels
+    }
+
+    fn open_for_write(path: &Path) -> std::io::Result<fs::File> {
+        fs::OpenOptions::new().write(true).open(path)
+    }
+
+    /// #1110: the opens run on several threads — every one must still end up in
+    /// the hold, and all of them must close when it drops.
+    #[test]
+    fn acquire_holds_every_file_when_opens_are_spread_over_threads() {
+        let dir = tempdir().unwrap();
+        let rels = many_files(dir.path(), 200);
+        let hold = acquire(dir.path(), &rels).unwrap();
+        for rel in &rels {
+            let err = open_for_write(&dir.path().join(rel)).unwrap_err();
+            assert_eq!(err.raw_os_error(), Some(32), "{rel} was not held");
+        }
+        drop(hold);
+        for rel in &rels {
+            open_for_write(&dir.path().join(rel)).unwrap();
+        }
+    }
+
+    /// #1110: when one open fails, every handle the other threads already took
+    /// is closed again, and the error reported is the first failing path in
+    /// manifest order — here the write-locked file (Blocked), not the later
+    /// missing one (Failed), whichever thread gets to its failure first.
+    #[test]
+    fn acquire_failure_releases_every_handle_and_reports_the_first_failure_in_order() {
+        let dir = tempdir().unwrap();
+        let rels = many_files(dir.path(), 200);
+        let (locked, gone) = (&rels[20], &rels[150]);
+        let _busy = open_for_write(&dir.path().join(locked)).unwrap();
+        fs::remove_file(dir.path().join(gone)).unwrap();
+        // A dir holding neither failing file: its handle must be released too.
+        let spare = (0..5)
+            .map(|k| format!("d{k}"))
+            .find(|d| !locked.starts_with(d) && !gone.starts_with(d))
+            .unwrap();
+
+        for _ in 0..10 {
+            let err = acquire(dir.path(), &rels).unwrap_err();
+            let MoveError::Blocked(report) = err else {
+                panic!("expected the earlier, Blocked failure, got {err:?}")
+            };
+            let detail = &report.blockers[0].detail;
+            assert!(detail.contains(&locked.replace('/', "\\")), "{detail}");
+            for rel in rels.iter().filter(|r| *r != locked && *r != gone) {
+                open_for_write(&dir.path().join(rel)).unwrap();
+            }
+            fs::rename(dir.path().join(&spare), dir.path().join("moved")).unwrap();
+            fs::rename(dir.path().join("moved"), dir.path().join(&spare)).unwrap();
+        }
     }
 }
