@@ -32,4 +32,5 @@ pub mod sdk;
 pub mod settings;
 pub mod tasks;
 pub mod terminal;
+pub mod uninstaller;
 pub mod updates;

@@ -5,8 +5,9 @@
   import { useSidebar, MenuButton as SidebarMenuButton } from '$lib/components/ui/sidebar';
   import HardDrive from '~icons/fa6-solid/hard-drive';
   import Variable from '~icons/fa6-solid/square-root-variable';
+  import Trash from '~icons/fa6-solid/trash';
 
-  type UtilitySection = 'disk' | 'environment';
+  type UtilitySection = 'disk' | 'environment' | 'uninstaller';
 
   interface Props {
     currentSection?: UtilitySection;
@@ -32,12 +33,20 @@
       icon: Variable,
       path: '/utilities/environment',
     },
+    {
+      id: 'uninstaller' as const,
+      label: 'Uninstaller',
+      description: 'Remove programs and their leftovers',
+      icon: Trash,
+      path: '/utilities/uninstaller',
+    },
   ];
 
   const activeSection = $derived.by((): UtilitySection => {
     if (currentSection) return currentSection;
     const path = page.url.pathname;
     if (path.startsWith('/utilities/environment')) return 'environment';
+    if (path.startsWith('/utilities/uninstaller')) return 'uninstaller';
     if (path.startsWith('/utilities/disk')) return 'disk';
     return 'disk';
   });

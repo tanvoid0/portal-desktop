@@ -23,6 +23,7 @@
   import Sparkles from '~icons/fa6-solid/wand-magic-sparkles';
   import Terminal from '~icons/fa6-solid/terminal';
   import Variable from '~icons/fa6-solid/square-root-variable';
+  import Trash from '~icons/fa6-solid/trash';
   import Workflow from '~icons/fa6-solid/diagram-project';
   import Wrench from '~icons/fa6-solid/wrench';
 
@@ -82,6 +83,8 @@
   <ScanSearch class={className} />
 {:else if icon === 'mobile-screen-button'}
   <MobileScreenButton class={className} />
+{:else if icon === 'trash'}
+  <Trash class={className} />
 {:else if icon === 'variable'}
   <Variable class={className} />
 {:else}

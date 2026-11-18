@@ -908,6 +908,9 @@ pub fn run() {
             domains::disk::commands::cancel_verify,
             domains::disk::commands::open_recycle_bin,
             // Environment variable utilities
+            domains::uninstaller::commands::uninstaller_list_programs,
+            domains::uninstaller::commands::uninstaller_scan_leftovers,
+            domains::uninstaller::commands::uninstaller_run,
             domains::environment::commands::env_list_variables,
             domains::environment::commands::env_get_permissions,
             domains::environment::commands::env_set_variable,

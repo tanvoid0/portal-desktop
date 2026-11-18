@@ -163,6 +163,12 @@ export function buildMainNavSections(
               icon: 'variable',
               description: 'Edit user and system environment variables',
             },
+            {
+              title: 'Uninstaller',
+              url: '/utilities/uninstaller',
+              icon: 'trash',
+              description: 'Uninstall programs and clean up what they leave behind',
+            },
           ],
         },
       ],

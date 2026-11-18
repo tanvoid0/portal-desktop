@@ -25,6 +25,7 @@ pub mod settings;
 pub mod shared;
 pub mod tasks;
 pub mod terminal;
+pub mod uninstaller;
 
 // Future domains will be added here:
 // pub mod notifications;

@@ -12,6 +12,7 @@
   let currentSection = $derived.by(() => {
     const path = page.url.pathname;
     if (path.startsWith('/utilities/environment')) return 'environment' as const;
+    if (path.startsWith('/utilities/uninstaller')) return 'uninstaller' as const;
     if (path.startsWith('/utilities/disk')) return 'disk' as const;
     return 'disk' as const;
   });
