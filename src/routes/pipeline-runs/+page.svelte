@@ -19,17 +19,16 @@
   } from '$lib/components/shell';
   import ActionRunList from '$lib/domains/actions/components/ActionRunList.svelte';
   import ActionRunDetail from '$lib/domains/actions/components/ActionRunDetail.svelte';
+  import PipelineRunDetail from '$lib/domains/projects/pipelines/components/PipelineRunDetail.svelte';
   import { isActive } from '$lib/domains/actions/runActions';
   import { runRequester } from '$lib/domains/actions/runOutput';
-  import {
-    scriptExecutionService,
-    type ScriptExecutionInfo,
-  } from '$lib/domains/scripts/services/scriptExecutionService';
+  import { getRecentRuns, getRunningRuns, onRunUpdates } from '$lib/domains/actions/runsService';
+  import type { RunSummary } from '$lib/domains/actions/types';
   import { createProjectsQuery } from '$lib/domains/projects/queries/projectQueries';
   import RefreshCw from '~icons/fa6-solid/rotate';
   import History from '~icons/fa6-solid/clock-rotate-left';
 
-  let executions = $state<ScriptExecutionInfo[]>([]);
+  let executions = $state<RunSummary[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
   let search = $state(page.url.searchParams.get('q') ?? '');
@@ -58,7 +57,7 @@
   const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
   /** Project the run belongs to — same exact-folder rule as the project Actions tab. */
-  function projectOf(exec: ScriptExecutionInfo) {
+  function projectOf(exec: RunSummary) {
     if (!exec.workingDirectory) return null;
     const dir = norm(exec.workingDirectory);
     return (projectsQuery.data ?? []).find((p) => norm(p.path) === dir) ?? null;
@@ -70,10 +69,11 @@
       if (statusFilter !== 'all' && e.status !== statusFilter) return false;
       if (!query) return true;
       return [
-        e.command,
+        e.title,
+        e.kind,
         e.status,
         e.workingDirectory,
-        projectOf(e)?.name,
+        projectOf(e)?.name ?? e.projectName,
         runRequester(e.triggeredBy),
       ]
         .filter(Boolean)
@@ -85,7 +85,7 @@
     if (!opts?.silent) loading = true;
     error = null;
     try {
-      executions = await scriptExecutionService.getRecentExecutions(200);
+      executions = await getRecentRuns(200);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load action runs';
     } finally {
@@ -110,9 +110,7 @@
     const delay = executions.some(isActive) ? 2000 : 5000;
     const timer = setInterval(async () => {
       try {
-        const running = new Set(
-          (await scriptExecutionService.getRunningExecutions()).map((e) => e.id)
-        );
+        const running = new Set((await getRunningRuns()).map((e) => e.id));
         const known = new Set(executions.filter(isActive).map((e) => e.id));
         const changed =
           [...known].some((id) => !running.has(id)) || [...running].some((id) => !known.has(id));
@@ -124,9 +122,17 @@
     return () => clearInterval(timer);
   });
 
+  // Progress and finishes of pipeline/release runs arrive as events, not set changes.
+  $effect(() => onRunUpdates(() => void loadExecutions({ silent: true })));
+
   onMount(() => {
     void loadExecutions();
   });
+
+  // The rail needs the row's kind; wait for the list so a pipeline deep link
+  // never mounts the action detail first. ponytail: a run older than the 200
+  // listed falls back to the action detail.
+  const selectedKind = $derived(executions.find((e) => e.id === selectedRunId)?.kind ?? 'action');
 </script>
 
 <svelte:head>
@@ -181,7 +187,7 @@
       <ActionRunList
         executions={filteredExecutions}
         selectedId={selectedRunId}
-        projectName={(e) => projectOf(e)?.name ?? null}
+        projectName={(e) => projectOf(e)?.name ?? e.projectName ?? null}
         onSelect={(e, opts) => selectRun(e.id, opts)}
         onStarted={(id) => {
           selectRun(id);
@@ -199,26 +205,30 @@
     {/if}
   </div>
 
-  {#if selectedRunId}
+  {#if selectedRunId && !(loading && executions.length === 0)}
     <ResponsivePanel
       bind:open={() => true, (v) => !v && selectRun(null)}
       side="right"
       desktopClass="sticky top-0 max-h-[calc(100vh-7rem)] w-[clamp(28rem,42%,72rem)] self-start"
     >
       <div class="min-h-0 flex-1 overflow-y-auto p-4">
-        <ActionRunDetail
-          executionId={selectedRunId}
-          bind:terminal={
-            () => terminalFor === selectedRunId, (v) => (terminalFor = v ? selectedRunId : null)
-          }
-          onStarted={(id) => {
-            selectRun(id);
-            void loadExecutions({ silent: true });
-          }}
-          onSelectExecution={(id) => selectRun(id)}
-          onChanged={() => void loadExecutions({ silent: true })}
-          onClose={() => selectRun(null)}
-        />
+        {#if selectedKind !== 'action'}
+          <PipelineRunDetail executionId={selectedRunId} onClose={() => selectRun(null)} />
+        {:else}
+          <ActionRunDetail
+            executionId={selectedRunId}
+            bind:terminal={
+              () => terminalFor === selectedRunId, (v) => (terminalFor = v ? selectedRunId : null)
+            }
+            onStarted={(id) => {
+              selectRun(id);
+              void loadExecutions({ silent: true });
+            }}
+            onSelectExecution={(id) => selectRun(id)}
+            onChanged={() => void loadExecutions({ silent: true })}
+            onClose={() => selectRun(null)}
+          />
+        {/if}
       </div>
     </ResponsivePanel>
   {/if}

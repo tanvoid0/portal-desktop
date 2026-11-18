@@ -211,3 +211,21 @@ export interface ReleaseRun {
   pipelineName: string;
   progress?: RunProgress;
 }
+
+/** Row of the unified run list (`get_recent_runs` / `get_running_runs`) — no output or logs. */
+export interface RunSummary {
+  id: string;
+  kind: 'action' | 'pipeline' | 'release';
+  title: string;
+  projectId?: string | null;
+  projectName?: string | null;
+  workingDirectory?: string | null;
+  status: string; // pending | queued | running | success | failed | cancelled
+  startedAt: string;
+  finishedAt?: string | null;
+  triggeredBy: string;
+  workflowRunId?: string | null;
+  exitCode?: number | null;
+  error?: string | null;
+  progress?: RunProgress | null;
+}

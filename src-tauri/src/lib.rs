@@ -493,6 +493,8 @@ pub fn run() {
             domains::projects::pipelines::cancel_pipeline_execution,
             domains::projects::pipelines::release_describe,
             domains::projects::pipelines::release_list,
+            domains::projects::pipelines::get_recent_runs,
+            domains::projects::pipelines::get_running_runs,
             domains::projects::pipelines::release_rehearse,
             domains::projects::pipelines::release_ship,
             domains::projects::pipelines::release_propose,

@@ -599,6 +599,7 @@ b",
         assert_eq!(capability("check_n8n_health"), Some("n8n"));
         assert_eq!(capability("trigger_n8n_workflow"), Some("n8n.run"));
         assert_eq!(capability("get_script_execution"), Some("actions"));
+        assert_eq!(capability("get_recent_runs"), Some("actions"));
         assert_eq!(capability("execute_script"), Some("terminal.exec"));
         assert_eq!(capability("host_stats"), Some("sysinfo"));
         assert_eq!(capability("disk_usage"), Some("sysinfo"));

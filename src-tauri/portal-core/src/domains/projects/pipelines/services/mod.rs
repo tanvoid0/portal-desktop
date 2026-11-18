@@ -3,6 +3,7 @@ pub mod pipeline_file;
 pub mod pipeline_service;
 pub mod progress;
 pub mod release_setup;
+pub mod runs;
 
 pub use execution_service::*;
 pub use pipeline_service::*;

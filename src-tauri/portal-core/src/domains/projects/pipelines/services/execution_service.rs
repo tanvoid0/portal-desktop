@@ -722,7 +722,7 @@ impl ExecutionService {
         );
     }
 
-    fn execution_to_json(e: &crate::entities::pipeline_execution::Model) -> Value {
+    pub(super) fn execution_to_json(e: &crate::entities::pipeline_execution::Model) -> Value {
         let steps: Vec<ProgressStep> =
             serde_json::from_str::<Vec<StepExecutionState>>(&e.step_executions_json)
                 .unwrap_or_default()

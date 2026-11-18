@@ -6,18 +6,23 @@ import {
   scriptExecutionService,
   type ScriptExecutionInfo,
 } from '$lib/domains/scripts/services/scriptExecutionService';
+import { invokeClient } from '$lib/utils/invokeClient';
 import { confirmAction } from '$lib/utils/confirm';
 import { toast } from '$lib/utils/toast';
 import { runRequester, toTerminalText } from './runOutput';
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-export const isActive = (exec: ScriptExecutionInfo) =>
-  exec.status === 'running' || exec.status === 'pending';
+export const isActive = (run: { status: string }) =>
+  run.status === 'running' || run.status === 'pending' || run.status === 'queued';
 
 /** Stop the run and its process tree. A run an MCP client asked for confirms
  *  first: that client reads the run back as stopped, not failed. */
-export async function stopRun(exec: ScriptExecutionInfo): Promise<boolean> {
+export async function stopRun(exec: {
+  id: string;
+  triggeredBy: string;
+  kind?: 'action' | 'pipeline' | 'release';
+}): Promise<boolean> {
   const by = runRequester(exec.triggeredBy);
   if (
     by &&
@@ -30,7 +35,11 @@ export async function stopRun(exec: ScriptExecutionInfo): Promise<boolean> {
     return false;
   }
   try {
-    await scriptExecutionService.cancelExecution(exec.id);
+    if (exec.kind && exec.kind !== 'action') {
+      await invokeClient.post('cancel_pipeline_execution', { executionId: exec.id });
+    } else {
+      await scriptExecutionService.cancelExecution(exec.id);
+    }
     toast.info('Run stopped');
     return true;
   } catch (err) {
@@ -54,7 +63,7 @@ export async function rerun(exec: ScriptExecutionInfo): Promise<string | null> {
   }
 }
 
-export async function deleteRun(exec: ScriptExecutionInfo): Promise<boolean> {
+export async function deleteRun(exec: { id: string }): Promise<boolean> {
   const ok = await confirmAction(
     'Delete this run and its output? This cannot be undone.',
     'Delete run?',

@@ -39,10 +39,9 @@
   import { queryClient } from '$lib/domains/shared/query';
   import { queryKeys } from '$lib/domains/shared/query/keys';
   import ActionRunList from './ActionRunList.svelte';
-  import {
-    scriptExecutionService,
-    type ScriptExecutionInfo,
-  } from '$lib/domains/scripts/services/scriptExecutionService';
+  import PipelineRunDetail from '$lib/domains/projects/pipelines/components/PipelineRunDetail.svelte';
+  import { getRecentRuns, getRunningRuns, onRunUpdates } from '../runsService';
+  import type { RunSummary } from '../types';
   import { untrack } from 'svelte';
   import { isActive } from '$lib/domains/actions/runActions';
   import { goto } from '$app/navigation';
@@ -78,10 +77,11 @@
   let selected = $state<Set<string>>(new Set());
   let lastResult = $state<ActionRunResult | null>(null);
   let seenProjectId: string | number | undefined;
-  let runHistory = $state<ScriptExecutionInfo[]>([]);
+  let runHistory = $state<RunSummary[]>([]);
   let historyLoading = $state(false);
   // The run shown in the detail card; it loads and live-polls itself (QA-130).
   let selectedRunId = $state<string | null>(null);
+  const selectedKind = $derived(runHistory.find((r) => r.id === selectedRunId)?.kind);
   let runTerminal = $state(false);
   // The user clicked a tree node during the run: stop auto-following steps.
   let pinnedRun = false;
@@ -159,7 +159,8 @@
     return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
   }
 
-  function isProjectExecution(exec: ScriptExecutionInfo): boolean {
+  function isProjectExecution(exec: RunSummary): boolean {
+    if (exec.projectId) return String(exec.projectId) === String(project.id);
     if (!exec.workingDirectory) return false;
     return normalizePath(exec.workingDirectory) === normalizePath(project.path);
   }
@@ -207,7 +208,7 @@
   async function loadHistory(opts?: { silent?: boolean }) {
     if (!opts?.silent) historyLoading = true;
     try {
-      const recent = await scriptExecutionService.getRecentExecutions(50);
+      const recent = await getRecentRuns(50);
       runHistory = recent.filter(isProjectExecution);
     } catch {
       // history is best-effort
@@ -301,13 +302,16 @@
   // active, slow when idle so runs started elsewhere still appear.
   $effect(() => {
     if (!enabled || !project?.id) return;
+    return onRunUpdates(() => void loadHistory({ silent: true }));
+  });
+
+  $effect(() => {
+    if (!enabled || !project?.id) return;
     const delay = runHistory.some(isActive) ? 2000 : 5000;
     const timer = setInterval(async () => {
       try {
         const running = new Set(
-          (await scriptExecutionService.getRunningExecutions())
-            .filter(isProjectExecution)
-            .map((e) => e.id)
+          (await getRunningRuns()).filter(isProjectExecution).map((e) => e.id)
         );
         const known = new Set(runHistory.filter(isActive).map((e) => e.id));
         const changed =
@@ -813,7 +817,9 @@
       {/if}
 
       <div class="grid gap-4 min-[2200px]:grid-cols-2 min-[2200px]:items-start">
-        {#if selectedRunId}
+        {#if selectedRunId && selectedKind && selectedKind !== 'action'}
+          <PipelineRunDetail executionId={selectedRunId} onClose={() => (selectedRunId = null)} />
+        {:else if selectedRunId}
           <ActionRunDetail
             executionId={selectedRunId}
             bind:terminal={runTerminal}

@@ -1,6 +1,7 @@
 <!--
-  Action runs list (script_executions rows). Click selects; right-click opens the
-  run's menu — open, stop, re-run, run in terminal, copy, open project, delete.
+  Runs list (RunSummary rows: actions, pipelines, releases). Click selects; right-click
+  opens the run's menu — open, stop, and for actions re-run, run in terminal, copy,
+  open project, delete.
 -->
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
@@ -17,7 +18,12 @@
   import FolderOpen from '~icons/fa6-solid/folder-open';
   import Trash from '~icons/fa6-solid/trash';
   import Robot from '~icons/fa6-solid/robot';
-  import type { ScriptExecutionInfo } from '$lib/domains/scripts/services/scriptExecutionService';
+  import {
+    scriptExecutionService,
+    type ScriptExecutionInfo,
+  } from '$lib/domains/scripts/services/scriptExecutionService';
+  import RunProgressBar from './RunProgressBar.svelte';
+  import type { RunSummary } from '../types';
   import {
     formatExecutionDuration,
     getExecutionStatusBadgeClass,
@@ -29,16 +35,16 @@
   import { runRequester } from '../runOutput';
 
   interface Props {
-    executions: ScriptExecutionInfo[];
+    executions: RunSummary[];
     selectedId?: string | null;
     /** Project label per row (the global list); omit inside a project. */
-    projectName?: (exec: ScriptExecutionInfo) => string | null;
-    onSelect: (exec: ScriptExecutionInfo, opts?: { terminal?: boolean }) => void;
+    projectName?: (exec: RunSummary) => string | null;
+    onSelect: (exec: RunSummary, opts?: { terminal?: boolean }) => void;
     /** A new run started from the menu (Re-run). */
     onStarted?: (executionId: string) => void;
     /** A run was stopped or deleted (then its id is passed) — reload. */
     onChanged?: (deletedId?: string) => void;
-    onOpenProject?: (exec: ScriptExecutionInfo) => void;
+    onOpenProject?: (exec: RunSummary) => void;
   }
 
   let {
@@ -51,45 +57,70 @@
     onOpenProject,
   }: Props = $props();
 
-  function menuFor(exec: ScriptExecutionInfo): MenuItem[] {
+  /** Re-run / copy need the command, which the summary row does not carry. */
+  const withFull = (id: string, fn: (e: ScriptExecutionInfo) => unknown) => async () => {
+    const full = await scriptExecutionService.getExecution(id);
+    if (full) await fn(full);
+  };
+
+  function menuFor(exec: RunSummary): MenuItem[] {
     const active = isActive(exec);
+    const isAction = exec.kind === 'action';
     const items: MenuItem[] = [
       { label: 'Open details', icon: Eye, onSelect: () => onSelect(exec) },
-      {
+    ];
+    // ponytail: non-action rows have no standalone page unless the run knows its project.
+    if (isAction || exec.projectId) {
+      items.push({
         label: 'Open page',
         icon: OpenPage,
-        onSelect: () => void goto(`/pipeline-runs/${exec.id}`),
-      },
-      active
-        ? {
-            label: 'Stop',
-            icon: Stop,
-            variant: 'destructive',
-            onSelect: async () => {
-              if (await stopRun(exec)) onChanged?.();
-            },
-          }
-        : {
-            label: 'Re-run',
-            icon: Rerun,
-            onSelect: async () => {
-              const id = await rerun(exec);
-              if (id) onStarted?.(id);
-            },
-          },
-      {
-        label: 'Run in terminal',
-        icon: TerminalIcon,
-        onSelect: () => onSelect(exec, { terminal: true }),
-      },
-      {
-        label: 'Copy command',
-        icon: Copy,
-        separatorBefore: true,
-        onSelect: () => void copyRunText('command', exec),
-      },
-      { label: 'Copy output', icon: Copy, onSelect: () => void copyRunText('output', exec) },
-    ];
+        onSelect: () =>
+          void goto(
+            isAction
+              ? `/pipeline-runs/${exec.id}`
+              : `/projects/${exec.projectId}/pipelines/run/${exec.id}`
+          ),
+      });
+    }
+    if (active) {
+      items.push({
+        label: 'Stop',
+        icon: Stop,
+        variant: 'destructive',
+        onSelect: async () => {
+          if (await stopRun(exec)) onChanged?.();
+        },
+      });
+    } else if (isAction) {
+      items.push({
+        label: 'Re-run',
+        icon: Rerun,
+        onSelect: withFull(exec.id, async (full) => {
+          const id = await rerun(full);
+          if (id) onStarted?.(id);
+        }),
+      });
+    }
+    if (isAction) {
+      items.push(
+        {
+          label: 'Run in terminal',
+          icon: TerminalIcon,
+          onSelect: () => onSelect(exec, { terminal: true }),
+        },
+        {
+          label: 'Copy command',
+          icon: Copy,
+          separatorBefore: true,
+          onSelect: withFull(exec.id, (full) => copyRunText('command', full)),
+        },
+        {
+          label: 'Copy output',
+          icon: Copy,
+          onSelect: withFull(exec.id, (full) => copyRunText('output', full)),
+        }
+      );
+    }
     if (onOpenProject && projectName?.(exec)) {
       items.push({
         label: 'Open project',
@@ -97,16 +128,17 @@
         onSelect: () => onOpenProject(exec),
       });
     }
-    items.push({
-      label: 'Delete',
-      icon: Trash,
-      variant: 'destructive',
-      separatorBefore: true,
-      disabled: active,
-      onSelect: async () => {
-        if (await deleteRun(exec)) onChanged?.(exec.id);
-      },
-    });
+    if (isAction)
+      items.push({
+        label: 'Delete',
+        icon: Trash,
+        variant: 'destructive',
+        separatorBefore: true,
+        disabled: active,
+        onSelect: async () => {
+          if (await deleteRun(exec)) onChanged?.(exec.id);
+        },
+      });
     return items;
   }
 </script>
@@ -114,9 +146,7 @@
 <div class="space-y-2">
   {#each executions as execution, i (execution.id)}
     {#if execution.workflowRunId && execution.workflowRunId !== executions[i - 1]?.workflowRunId}
-      <p class="px-1 pt-2 text-xs font-medium text-muted-foreground">
-        Workflow · {execution.workflowId ?? 'run'}
-      </p>
+      <p class="px-1 pt-2 text-xs font-medium text-muted-foreground">Workflow run</p>
     {/if}
     {@const StatusIcon = getExecutionStatusIcon(execution.status)}
     {@const requester = runRequester(execution.triggeredBy)}
@@ -152,7 +182,10 @@
                 {#if project}
                   <span class="max-w-[40%] min-w-0 truncate text-sm font-semibold">{project}</span>
                 {/if}
-                <span class="truncate text-sm font-medium">{execution.command}</span>
+                {#if execution.kind !== 'action'}
+                  <Badge variant="outline" class="capitalize">{execution.kind}</Badge>
+                {/if}
+                <span class="truncate text-sm font-medium">{execution.title}</span>
               </div>
               <span class="text-xs text-muted-foreground">
                 {new Date(execution.startedAt).toLocaleString()}
@@ -162,16 +195,13 @@
               <span>
                 Duration: {formatExecutionDuration(execution.startedAt, execution.finishedAt)}
               </span>
-              {#if execution.exitCode != null}
-                <span>exit {execution.exitCode}</span>
-              {/if}
               {#if requester}
                 <span class="flex items-center gap-1"><Robot class="h-3 w-3" />{requester}</span>
               {/if}
-              {#if execution.error}
-                <span class="truncate text-destructive">{execution.error}</span>
-              {/if}
             </div>
+            {#if execution.progress && isActive(execution)}
+              <RunProgressBar progress={execution.progress} compact />
+            {/if}
           </div>
         </Button>
       {/snippet}

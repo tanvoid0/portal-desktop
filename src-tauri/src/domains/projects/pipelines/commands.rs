@@ -1,6 +1,8 @@
 use crate::domains::projects::pipelines::services::{
     ExecutionRequestData, ExecutionService, PipelineService,
 };
+use crate::database::DatabaseManager;
+use crate::domains::projects::pipelines::services::runs;
 use crate::events::Events;
 use serde_json::Value;
 use std::sync::Arc;
@@ -509,4 +511,20 @@ fn parse_execution_request(value: Value) -> Result<ExecutionRequestData, String>
         variables: frontend.variables,
         secrets: frontend.secrets,
     })
+}
+
+/// Script + pipeline executions as one list, newest first, no output.
+#[portal_rpc_macro::rpc(cap = "actions")]
+pub async fn get_recent_runs(
+    limit: u64,
+    db_manager: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<Value>, String> {
+    runs::recent_runs(&db_manager, limit).await
+}
+
+#[portal_rpc_macro::rpc(cap = "actions")]
+pub async fn get_running_runs(
+    db_manager: State<'_, Arc<DatabaseManager>>,
+) -> Result<Vec<Value>, String> {
+    runs::running_runs(&db_manager).await
 }
